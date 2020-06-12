@@ -514,7 +514,7 @@ function episumperentropy2(T; options...)
             G[2i + 1, i] = -1
         end
         h = zeros(T, dim)
-        h[2:2:(end - 1)] .= 1
+        h[2:2:(dim - 1)] .= 1
         # h = vcat(zero(T), ones(T, w_dim), zeros(T, w_dim))
         cones = Cone{T}[Cones.EpiSumPerEntropy{T}(dim)]
 
@@ -532,14 +532,12 @@ function episumperentropy3(T; options...)
         c = fill(-one(T), w_dim)
         A = ones(T, 1, w_dim)
         b = T[dim]
-        # G = vcat(zeros(T, 1, w_dim), Matrix{T}(-I, w_dim, w_dim), zeros(T, w_dim, w_dim))
         G = zeros(T, dim, w_dim)
         for i in 1:w_dim
             G[2i, i] = -1
         end
         h = zeros(dim)
         h[3:2:end] .= 1
-        # h = vcat(zeros(T, 1 + w_dim), ones(T, w_dim))
         cones = Cone{T}[Cones.EpiSumPerEntropy{T}(dim)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -599,7 +597,7 @@ function episumperentropy6(T; options...)
     #     T[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1],
     #     9, 5)
     G = sparse(
-        [4, 6, 7, 2, 9, 5, 9, 3, 9, 4, 6, 7, 8],
+        [3, 5, 7, 2, 9, 4, 9, 6, 9, 3, 5, 7, 8],
         [1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 5],
         [-1, -1, -1, -1, 1, -1, 1, -1, 1, -1, -1, -1, -1],
         9, 5)
