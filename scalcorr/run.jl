@@ -25,8 +25,8 @@ default_solver_options = (
     verbose = true,
     iter_limit = 100,
     timer = timer,
-    system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
-    # system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
+    # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
+    system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
     # max_nbhd = 0.02,
     tol_rel_opt = tol,
     tol_abs_opt = tol,
@@ -36,10 +36,10 @@ default_solver_options = (
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
     # (FastInstances, Float64, 60),
-    (ExpInstances, Float64, 60),
-    # (GeomeanInstances, Float64, 60),
-    # (EntropyInstances, Float64, 60),
-    # (PolyhedralInstances, Float64, 60),
+    # (ExpInstances, Float64, 60),
+    (GeomeanInstances, Float64, 60),
+    (EntropyInstances, Float64, 60),
+    (PolyhedralInstances, Float64, 60),
     ]
 
 # types of models to run and corresponding options and example names
@@ -60,7 +60,7 @@ JuMP_example_names = [
     # "expdesign",
     # "maxvolume", # TODO only useful for exp instances when geomean -> exp bridge is in
     # "portfolio",
-    "robustgeomprog",
+    # "robustgeomprog",
     "signomialmin",
     ]
 

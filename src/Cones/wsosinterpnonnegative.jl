@@ -54,7 +54,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
-        @assert !use_dual # TODO delete later
+        @assert use_dual # TODO delete later
         for Pk in Ps
             @assert size(Pk, 1) == U
         end
@@ -134,10 +134,11 @@ function update_feas(cone::WSOSInterpNonnegative)
     return cone.is_feas
 end
 
-function update_dual_feas(cone::WSOSInterpNonnegative, mu)
-    gap = cone.dual_point + mu * cone.grad
-    return dot(gap, cone.old_hess \ gap)
-end
+update_dual_feas(cone::WSOSInterpNonnegative) = true # TODO use a dikin ellipsoid condition?
+# function update_dual_feas(cone::WSOSInterpNonnegative, mu)
+#     gap = cone.dual_point + mu * cone.grad
+#     return dot(gap, cone.old_hess \ gap)
+# end
 
 # TODO decide whether to compute the LUk' * LUk in grad or in hess (only diag needed for grad)
 # TODO can be done in parallel

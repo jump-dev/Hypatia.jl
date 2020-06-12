@@ -114,29 +114,29 @@ function update_inv_hess(cone::Nonnegative)
     return cone.inv_hess
 end
 
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
-#     @assert cone.is_feas
-#     @. prod = arr / cone.point / cone.point
-#     return prod
-# end
-#
-# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
-#     @assert cone.is_feas
-#     @. prod = arr * cone.point * cone.point
-#     return prod
-# end
-#
-# function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
-#     @assert cone.is_feas
-#     @. prod = arr / cone.point
-#     return prod
-# end
-#
-# function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
-#     @assert cone.is_feas
-#     @. prod = arr * cone.point
-#     return prod
-# end
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+    @assert cone.is_feas
+    @. prod = arr / cone.point / cone.point
+    return prod
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+    @assert cone.is_feas
+    @. prod = arr * cone.point * cone.point
+    return prod
+end
+
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+    @assert cone.is_feas
+    @. prod = arr / cone.point
+    return prod
+end
+
+function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+    @assert cone.is_feas
+    @. prod = arr * cone.point
+    return prod
+end
 
 hess_nz_count(cone::Nonnegative) = cone.dim
 hess_nz_count_tril(cone::Nonnegative) = cone.dim

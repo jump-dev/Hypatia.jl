@@ -88,7 +88,7 @@ function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} w
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
+    # cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
@@ -108,7 +108,7 @@ end
 
 get_nu(cone::EpiNormSpectral) = cone.d1 + 1
 
-use_correction(cone::EpiNormSpectral) = true
+use_correction(cone::EpiNormSpectral) = false # TODO broken currently
 
 use_scaling(cone::EpiNormSpectral) = true
 
@@ -137,6 +137,13 @@ function update_feas(cone::EpiNormSpectral)
     cone.feas_updated = true
     return cone.is_feas
 end
+
+# function update_dual_feas(cone::EpiNormSpectral)
+#     u = cone.dual_point[1]
+#     W = @views vec_copy_to!(similar(cone.W), cone.dual_point[2:end])
+#     nuc_norm = sum(svdvals(W))
+#     return (u >= nuc_norm)
+# end
 
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
@@ -209,50 +216,50 @@ function update_hess(cone::EpiNormSpectral)
     @views vec_copy_to!(H[1, 2:end], cone.HuW)
     H[1, 1] = cone.Huu
 
-    copyto!(cone.old_hess.data, H)
+    # copyto!(cone.old_hess.data, H)
 
     cone.hess_updated = true
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
-    if !cone.hess_prod_updated
-        update_hess_prod(cone)
-    end
-    u = cone.point[1]
-    W = cone.W
-    tmpd1d2 = cone.tmpd1d2
-    tmpd1d1 = cone.tmpd1d1
+# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
+#     if !cone.hess_prod_updated
+#         update_hess_prod(cone)
+#     end
+#     u = cone.point[1]
+#     W = cone.W
+#     tmpd1d2 = cone.tmpd1d2
+#     tmpd1d1 = cone.tmpd1d1
+#
+#     @inbounds for j in 1:size(prod, 2)
+#         arr_1j = arr[1, j]
+#         @views vec_copy_to!(tmpd1d2, arr[2:end, j])
+#
+#         prod[1, j] = cone.Huu * arr_1j + real(dot(cone.HuW, tmpd1d2))
+#
+#         # prod_2j = 2 * cone.fact_Z \ (((tmpd1d2 * W' + W * tmpd1d2' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpd1d2)
+#         mul!(tmpd1d1, tmpd1d2, W')
+#         @inbounds for j in 1:cone.d1
+#             @inbounds for i in 1:j
+#                 tmpd1d1[i, j] += tmpd1d1[j, i]'
+#             end
+#             tmpd1d1[j, j] -= 2 * u * arr_1j
+#         end
+#         mul!(tmpd1d2, Hermitian(tmpd1d1, :U), cone.tau, 2, 2)
+#         ldiv!(cone.fact_Z, tmpd1d2)
+#         @views vec_copy_to!(prod[2:end, j], tmpd1d2)
+#     end
+#
+#     return prod
+# end
 
-    @inbounds for j in 1:size(prod, 2)
-        arr_1j = arr[1, j]
-        @views vec_copy_to!(tmpd1d2, arr[2:end, j])
-
-        prod[1, j] = cone.Huu * arr_1j + real(dot(cone.HuW, tmpd1d2))
-
-        # prod_2j = 2 * cone.fact_Z \ (((tmpd1d2 * W' + W * tmpd1d2' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpd1d2)
-        mul!(tmpd1d1, tmpd1d2, W')
-        @inbounds for j in 1:cone.d1
-            @inbounds for i in 1:j
-                tmpd1d1[i, j] += tmpd1d1[j, i]'
-            end
-            tmpd1d1[j, j] -= 2 * u * arr_1j
-        end
-        mul!(tmpd1d2, Hermitian(tmpd1d1, :U), cone.tau, 2, 2)
-        ldiv!(cone.fact_Z, tmpd1d2)
-        @views vec_copy_to!(prod[2:end, j], tmpd1d2)
-    end
-
-    return prod
-end
-
-using ForwardDiff
-
+# TODO this is buggy - fails higher dimension corr barrier tests
 function correction(
     cone::EpiNormSpectral{T},
     primal_dir::AbstractVector{T},
     dual_dir::AbstractVector{T},
     ) where {T <: Real}
+    @assert cone.hess_updated
 
     dim = cone.dim
     d1 = cone.d1
@@ -275,7 +282,9 @@ function correction(
     mul!(WZi2W, W', Zitau)
 
     # Tuuu
-    third[1, 1, 1] = 6 * u * cone.trZi2 - 8 * u ^ 3 * sum(x -> x ^ 3, cone.Zi) + (d1 - 1) / u ^ 3
+    # third[1, 1, 1] = 6 * u * cone.trZi2 - 8 * u ^ 3 * sum(x -> x ^ 3, cone.Zi) + (d1 - 1) / u ^ 3
+    u2 = 2 * u
+    third[1, 1, 1] = 6 * u * cone.trZi2 - sum(x -> (u2 * x) ^ 3, cone.Zi) + (d1 - 1) / u / u / u
 
     idx1 = 1
     for j in 1:d2, i in 1:d1
@@ -320,9 +329,12 @@ function correction(
     end
 
     third_order = reshape(third, cone.dim^2, cone.dim)
-    Hi_z = Symmetric(cone.old_hess) \ dual_dir
+    # @show extrema(abs, third_order)
+    # Hi_z = cholesky(cone.old_hess) \ dual_dir
+    Hi_z = inv_hess_prod!(similar(dual_dir), dual_dir, cone)
     cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
     cone.correction *= -1
+    # @show extrema(abs, cone.correction)
 
     return cone.correction
 end

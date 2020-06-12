@@ -458,7 +458,10 @@ function correction(
     # barrier = cone.barrier
     # FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), cone.point)
     # @show norm(third_order - FD_3deriv)
-    Hi_z = cone.old_hess \ dual_dir
+    # Hi_z = cone.old_hess \ dual_dir
+    Hinv_z = similar(dual_dir)
+    inv_hess_prod!(Hinv_z, dual_dir, cone)
+
     Hi_z .*= -0.5
     cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
 

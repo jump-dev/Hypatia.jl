@@ -130,9 +130,10 @@ function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
     return cone.is_feas
 end
 
-function update_dual_feas(cone::LinMatrixIneq{T}) where {T <: Real}
-    return all(isposdef(cholesky(cone.As[i]) * cone.dual_point[i]) for i in eachindex(cone.dual_point))
-end
+update_dual_feas(cone::LinMatrixIneq) = true # TODO use a dikin ellipsoid condition?
+# function update_dual_feas(cone::LinMatrixIneq{T}) where {T <: Real}
+#     return all(isposdef(cholesky(cone.As[i]) * cone.dual_point[i]) for i in eachindex(cone.dual_point))
+# end
 
 function update_grad(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert cone.is_feas
@@ -169,9 +170,12 @@ function correction(
     ) where {T <: Real}
     sumAinvAs = cone.sumAinvAs
     corr = cone.correction
-    Hi_z = cone.old_hess \ dual_dir
+    # Hi_z = cone.old_hess \ dual_dir
+    Hinv_z = similar(dual_dir)
+    inv_hess_prod!(Hinv_z, dual_dir, cone)
     for i in eachindex(corr)
-        corr[i] = sum(tr(sumAinvAs[i] * sumAinvAs[j] * sumAinvAs[k]) * primal_dir[j] * Hi_z[k] for j in 1:cone.dim, k in 1:cone.dim)
+        # TODO trace of 3 matrix muls is expensive - try to simplify and cache
+        corr[i] = sum(real(tr(sumAinvAs[i] * sumAinvAs[j] * sumAinvAs[k])) * primal_dir[j] * Hi_z[k] for j in 1:cone.dim, k in 1:cone.dim)
     end
     return corr
 end

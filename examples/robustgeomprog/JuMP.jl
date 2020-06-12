@@ -40,6 +40,12 @@ example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::ExpInstances) = [
     ((20, 40), ClassicConeOptimizer),
     ((40, 80), ClassicConeOptimizer),
     ]
+# example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::EntropyInstances) = [
+#     ((5, 10),),
+#     ((10, 20),),
+#     ((20, 40),),
+#     ((40, 80),),
+#     ]
 
 function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64} # TODO generic reals
     (n, k) = (inst.n, inst.k)

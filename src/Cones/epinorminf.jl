@@ -421,9 +421,9 @@ function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}, dual_dir
     # third order derivatives
     uuu = 4 * u * sum((3 - 4 * u / z * u) / z / z for z in den) + 2 * (cone.n - 1) / u / u / u
     # TODO get below from cone.wden and cone.uden (can do with broadcast)
-    uuw = zeros(cone.n)
-    uww = zeros(cone.n)
-    www = zeros(cone.n)
+    uuw = zeros(T, cone.n)
+    uww = zeros(T, cone.n)
+    www = zeros(T, cone.n)
     for i in 1:cone.n
         wi = w[i]
         deni = den[i]

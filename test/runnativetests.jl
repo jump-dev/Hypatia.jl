@@ -88,16 +88,17 @@ reduce_flags = [
 
 # other solver options
 timer = TimerOutput()
+# tol = 1e-8
 other_options = (
     verbose = true,
     # verbose = false,
-    iter_limit = 250,
+    iter_limit = 50,
     time_limit = 6e1,
     timer = timer,
     # TODO this is tighter than default
-    tol_feas = 1e-12,
-    tol_rel_opt = 1e-12,
-    tol_abs_opt = 1e-12,
+    # tol_feas = tol,
+    # tol_rel_opt = tol,
+    # tol_abs_opt = tol,
     )
 
 @info("starting native tests")
