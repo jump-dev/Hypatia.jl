@@ -485,7 +485,8 @@ end
 
 # TODO add use_dual = true tests
 function episumperentropy1(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     Random.seed!(1)
     for w_dim in [1, 2, 3]
         dim = 1 + 2 * w_dim
@@ -507,7 +508,8 @@ function episumperentropy1(T; options...)
 end
 
 function episumperentropy2(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     for w_dim in [1, 2, 4]
         dim = 1 + 2 * w_dim
         c = fill(-one(T), w_dim)
@@ -531,7 +533,8 @@ function episumperentropy2(T; options...)
 end
 
 function episumperentropy3(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     for w_dim in [2, 4]
         dim = 1 + 2 * w_dim
         c = fill(-one(T), w_dim)
@@ -553,7 +556,8 @@ function episumperentropy3(T; options...)
 end
 
 function episumperentropy4(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = T[1]
     A = zeros(T, 0, 1)
     b = zeros(T, 0)
@@ -573,7 +577,8 @@ function episumperentropy4(T; options...)
 end
 
 function episumperentropy5(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = T[0, -1]
     A = zeros(T, 0, 2)
     b = zeros(T, 0)
@@ -592,7 +597,8 @@ function episumperentropy5(T; options...)
 end
 
 function episumperentropy6(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = T[-1, 0, 0, 0, 0]
     A = zeros(T, 0, 5)
     b = zeros(T, 0)

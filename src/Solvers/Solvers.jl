@@ -381,7 +381,7 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
             return true
         else
             solver.prev_is_slow = true
-            solver.verbose && println("worst residual did not improve significantly")
+            # solver.verbose && println("worst residual did not improve significantly")
         end
     else
         solver.prev_is_slow = false

@@ -48,10 +48,13 @@ function update_scal_hess(
     use_update_1::Bool = use_update_1_default(),
     # use_update_2::Bool = use_update_2_default(),
     ) where {T}
+    if !use_scaling(cone) || use_nt(cone)
+        return cone.hess
+    end
     @assert !cone.scal_hess_updated
+
     s = cone.point
     z = cone.dual_point
-
     rtmu = sqrt(mu)
     # irtmu = inv(rtmu)
     # s = rtmu * s
