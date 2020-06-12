@@ -36,9 +36,9 @@ default_solver_options = (
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
     # (FastInstances, Float64, 60),
-    (ExpInstances, Float64, 60),
+    # (ExpInstances, Float64, 60),
     # (GeomeanInstances, Float64, 60),
-    # (EntropyInstances, Float64, 60),
+    (EntropyInstances, Float64, 60),
     # (PolyhedralInstances, Float64, 60),
     ]
 
@@ -60,7 +60,7 @@ JuMP_example_names = [
     # "expdesign",
     # "maxvolume", # TODO only useful for exp instances when geomean -> exp bridge is in
     # "portfolio",
-    "robustgeomprog",
+    # "robustgeomprog",
     "signomialmin",
     ]
 

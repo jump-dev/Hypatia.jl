@@ -126,12 +126,14 @@ end
 function update_feas(cone::EpiSumPerEntropy)
     @assert !cone.feas_updated
     u = cone.point[1]
+    @show cone.v_idxs, cone.w_idxs
     @views v = cone.point[cone.v_idxs]
     @views w = cone.point[cone.w_idxs]
 
     if all(vi -> vi > 0, v) && all(wi -> wi > 0, w)
         @. cone.tau = log(w / v)
         cone.z = u - dot(w, cone.tau)
+        @show cone.z, v, w
         cone.is_feas = (cone.z > 0)
     else
         cone.is_feas = false
@@ -270,74 +272,74 @@ function inv_hess_vals(cone)
     return
 end
 
-function update_inv_hess(cone::EpiSumPerEntropy{T}) where {T}
-    inv_hess_vals(cone)
-    dim = cone.dim
-    w_dim = cone.w_dim
+# function update_inv_hess(cone::EpiSumPerEntropy{T}) where {T}
+#     inv_hess_vals(cone)
+#     dim = cone.dim
+#     w_dim = cone.w_dim
+#
+#     if !isdefined(cone, :inv_hess)
+#         # initialize sparse idxs for upper triangle of Hessian
+#         dim = cone.dim
+#         H_nnz_tri = 2 * dim - 1 + w_dim
+#         I = Vector{Int}(undef, H_nnz_tri)
+#         J = Vector{Int}(undef, H_nnz_tri)
+#         idxs1 = 1:dim
+#         I[idxs1] .= 1
+#         J[idxs1] .= idxs1
+#         idxs2 = (dim + 1):(2 * dim - 1)
+#         I[idxs2] .= 2:dim
+#         J[idxs2] .= 2:dim
+#         idxs3 = (2 * dim):H_nnz_tri
+#         I[idxs3] .= 2:2:dim
+#         J[idxs3] .= 3:2:dim
+#         V = ones(T, H_nnz_tri)
+#         cone.inv_hess = Symmetric(sparse(I, J, V, dim, dim), :U)
+#     end
+#
+#     # modify nonzeros of sparse data structure of upper triangle of Hessian
+#     H_nzval = cone.inv_hess.data.nzval
+#     H_nzval[1] = cone.Huu
+#     vw_idx = 1
+#     nz_idx = 2
+#     dim_idx = 1
+#     @inbounds for j in 1:w_dim
+#         H_nzval[nz_idx] = cone.Hu[dim_idx]
+#         H_nzval[nz_idx + 1] = cone.Hvv[vw_idx] / cone.denom[vw_idx]
+#         nz_idx += 2
+#         dim_idx += 1
+#         H_nzval[nz_idx] = cone.Hu[dim_idx]
+#         H_nzval[nz_idx + 1] = cone.Hvw[vw_idx] / cone.denom[vw_idx]
+#         # @show typeof(cone.Hvw)
+#         H_nzval[nz_idx + 2] = cone.Hww[vw_idx] / cone.denom[vw_idx]
+#         nz_idx += 3
+#         vw_idx += 1
+#         dim_idx += 1
+#     end
+#
+#     cone.inv_hess_updated = true
+#     return cone.inv_hess
+# end
 
-    if !isdefined(cone, :inv_hess)
-        # initialize sparse idxs for upper triangle of Hessian
-        dim = cone.dim
-        H_nnz_tri = 2 * dim - 1 + w_dim
-        I = Vector{Int}(undef, H_nnz_tri)
-        J = Vector{Int}(undef, H_nnz_tri)
-        idxs1 = 1:dim
-        I[idxs1] .= 1
-        J[idxs1] .= idxs1
-        idxs2 = (dim + 1):(2 * dim - 1)
-        I[idxs2] .= 2:dim
-        J[idxs2] .= 2:dim
-        idxs3 = (2 * dim):H_nnz_tri
-        I[idxs3] .= 2:2:dim
-        J[idxs3] .= 3:2:dim
-        V = ones(T, H_nnz_tri)
-        cone.inv_hess = Symmetric(sparse(I, J, V, dim, dim), :U)
-    end
-
-    # modify nonzeros of sparse data structure of upper triangle of Hessian
-    H_nzval = cone.inv_hess.data.nzval
-    H_nzval[1] = cone.Huu
-    vw_idx = 1
-    nz_idx = 2
-    dim_idx = 1
-    @inbounds for j in 1:w_dim
-        H_nzval[nz_idx] = cone.Hu[dim_idx]
-        H_nzval[nz_idx + 1] = cone.Hvv[vw_idx] / cone.denom[vw_idx]
-        nz_idx += 2
-        dim_idx += 1
-        H_nzval[nz_idx] = cone.Hu[dim_idx]
-        H_nzval[nz_idx + 1] = cone.Hvw[vw_idx] / cone.denom[vw_idx]
-        # @show typeof(cone.Hvw)
-        H_nzval[nz_idx + 2] = cone.Hww[vw_idx] / cone.denom[vw_idx]
-        nz_idx += 3
-        vw_idx += 1
-        dim_idx += 1
-    end
-
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
-
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
-    # updates for nonzero values in the inverse Hessian
-    inv_hess_vals(cone)
-    Hu = cone.Hu
-    Huu = cone.Huu
-    Hvv = cone.Hvv
-    Hvw = cone.Hvw
-    Hww = cone.Hww
-    denom = cone.denom
-
-    @. @views prod[1, :] = arr[1, :] * Huu
-    @views mul!(prod[1, :], arr[2:end, :]', Hu, true, true)
-    @. @views prod[2:end, :] = Hu * arr[1, :]'
-    @inbounds for i in 1:cone.w_dim
-        @. @views prod[2i, :] += (Hvv[i] * arr[2i, :] + Hvw[i] * arr[2i + 1, :]) / denom[i]
-        @. @views prod[2i + 1, :] += (Hww[i] * arr[2i + 1, :] + Hvw[i] * arr[2i, :]) / denom[i]
-    end
-
-    return prod
-end
+# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
+#     # updates for nonzero values in the inverse Hessian
+#     inv_hess_vals(cone)
+#     Hu = cone.Hu
+#     Huu = cone.Huu
+#     Hvv = cone.Hvv
+#     Hvw = cone.Hvw
+#     Hww = cone.Hww
+#     denom = cone.denom
+#
+#     @. @views prod[1, :] = arr[1, :] * Huu
+#     @views mul!(prod[1, :], arr[2:end, :]', Hu, true, true)
+#     @. @views prod[2:end, :] = Hu * arr[1, :]'
+#     @inbounds for i in 1:cone.w_dim
+#         @. @views prod[2i, :] += (Hvv[i] * arr[2i, :] + Hvw[i] * arr[2i + 1, :]) / denom[i]
+#         @. @views prod[2i + 1, :] += (Hww[i] * arr[2i + 1, :] + Hvw[i] * arr[2i, :]) / denom[i]
+#     end
+#
+#     return prod
+# end
 
 function correction(
     cone::EpiSumPerEntropy{T},
