@@ -108,7 +108,7 @@ end
 
 get_nu(cone::EpiNormSpectral) = cone.d1 + 1
 
-use_correction(cone::EpiNormSpectral) = false
+use_correction(cone::EpiNormSpectral) = true
 
 use_scaling(cone::EpiNormSpectral) = true
 
@@ -284,9 +284,7 @@ function correction(
     mul!(WZi2W, W', Zitau)
 
     # Tuuu
-    # third[1, 1, 1] = 6 * u * cone.trZi2 - 8 * u ^ 3 * sum(x -> x ^ 3, cone.Zi) + (d1 - 1) / u ^ 3
-    u2 = 2 * u
-    third[1, 1, 1] = 6 * u * cone.trZi2 - sum(x -> (u2 * x) ^ 3, cone.Zi) + (d1 - 1) / u / u / u
+    third[1, 1, 1] = 6 * u * cone.trZi2 - 8 * u ^ 3 * sum(Zi[i] * Zi2[i] for i in eachindex(Zi)) + (d1 - 1) / u / u / u
 
     idx1 = 1
     for j in 1:d2, i in 1:d1
@@ -331,12 +329,12 @@ function correction(
     end
 
     third_order = reshape(third, cone.dim^2, cone.dim)
-    @show extrema(abs, third_order)
+    # @show extrema(abs, third_order)
     # Hi_z = cholesky(cone.old_hess) \ dual_dir
     Hi_z = inv_hess_prod!(similar(dual_dir), dual_dir, cone)
     cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
     cone.correction *= -1
-    @show extrema(abs, cone.correction)
+    # @show extrema(abs, cone.correction)
 
     return cone.correction
 end

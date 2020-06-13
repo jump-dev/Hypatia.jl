@@ -93,6 +93,7 @@ function test_barrier_oracles(
             FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * Hinv_z / -2
             @test FD_corr ≈ corr atol=tol rtol=tol
         end
+        @test dot(corr, point) ≈ dot(Hinv_z, fd_hess * primal_dir)
     end
 
     return
