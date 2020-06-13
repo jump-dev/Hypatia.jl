@@ -335,8 +335,6 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     return prod
 end
 
-# using ForwardDiff
-
 function correction(
     cone::EpiSumPerEntropy{T},
     primal_dir::AbstractVector{T},

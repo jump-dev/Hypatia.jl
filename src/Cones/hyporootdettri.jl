@@ -43,7 +43,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     Wi::Matrix{R}
     rootdet::T
     rootdetu::T
-    frac::T
+    sigma::T
     kron_const::T
     dot_const::T
 
@@ -140,8 +140,8 @@ function update_grad(cone::HypoRootdetTri)
     copyto!(cone.Wi, cone.fact_W.factors)
     LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0))
     @views smat_to_svec!(cone.grad[2:cone.dim], cone.Wi, cone.rt2)
-    cone.frac = cone.rootdet / cone.rootdetu / cone.side
-    @. cone.grad[2:end] *= -cone.sc_const * (cone.frac + 1)
+    cone.sigma = cone.rootdet / cone.rootdetu / cone.side
+    @. cone.grad[2:end] *= -cone.sc_const * (cone.sigma + 1)
 
     cone.grad_updated = true
     return cone.grad
@@ -215,14 +215,14 @@ end
 function update_hess_prod(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert cone.grad_updated
 
-    frac = cone.frac # rootdet / rootdetu / side
+    sigma = cone.sigma # rootdet / rootdetu / side
     # update constants used in the Hessian
-    cone.kron_const = frac + 1
-    cone.dot_const = frac * (frac - inv(T(cone.side)))
+    cone.kron_const = sigma + 1
+    cone.dot_const = sigma * (sigma - inv(T(cone.side)))
     # update first row in the Hessian
     hess = cone.hess.data
     @. hess[1, :] = cone.grad / cone.rootdetu
-    @. hess[1, 2:end] *= frac / cone.kron_const
+    @. hess[1, 2:end] *= sigma / cone.kron_const
 
     cone.hess_prod_updated = true
     return

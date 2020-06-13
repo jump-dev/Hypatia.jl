@@ -15,13 +15,13 @@ const SO = Hypatia.Solvers
 
 # set = "exporthantsmall"
 # set = "exporthant"
-# set = "exporthantmost"
+set = "exporthantmost"
 # set = "myset"
 # set = "myset2"
 # set = "myset3"
 # set = "failing6"
 # set = "failing7"
-set = "powersmall"
+# set = "powersmall"
 
 cblib_dir = joinpath(ENV["HOME"], "cblib/cblib.zib.de/download/all")
 
