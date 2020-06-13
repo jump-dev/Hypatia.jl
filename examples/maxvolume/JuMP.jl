@@ -24,16 +24,17 @@ example_tests(::Type{MaxVolumeJuMP{Float64}}, ::MinimalInstances) = [
     # ((2, false, true), ExpConeOptimizer), # TODO waiting for MOI bridges geomean to exp
     ]
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::FastInstances) = [
-    ((10, true, false),),
+    # ((10, true, false),),
     ((10, false, true),),
-    ((10, false, true), ClassicConeOptimizer),
-    ((10, true, true),),
-    ((100, true, false),),
+    # ((10, false, true), ClassicConeOptimizer),
+    # ((10, true, true),),
+    ((20, false, true),),
+    # ((100, true, false),),
     ((100, false, true),),
-    ((100, false, true), ClassicConeOptimizer),
-    ((100, true, true),),
-    ((1000, true, false),),
-    ((1000, true, true),), # with bridges extended formulation will need to go into slow list
+    # ((100, false, true), ClassicConeOptimizer),
+    # ((100, true, true),),
+    # ((1000, true, false),),
+    # ((1000, true, true),), # with bridges extended formulation will need to go into slow list
     ]
 example_tests(::Type{MaxVolumeJuMP{Float64}}, ::SlowInstances) = [
     ((1000, false, true), ClassicConeOptimizer),
@@ -41,28 +42,28 @@ example_tests(::Type{MaxVolumeJuMP{Float64}}, ::SlowInstances) = [
     ((2000, false, true),),
     ((2000, true, true),),
     ]
-example_tests(::Type{MaxVolumeJuMP{Float64}}, ::ExpInstances) = [
-    ((10, false, true), ClassicConeOptimizer),
-    ((100, false, true), ClassicConeOptimizer),
-    ((1000, false, true), ClassicConeOptimizer),
-    ]
-example_tests(::Type{MaxVolumeJuMP{Float64}}, ::GeomeanInstances) = begin
-    options = (tol_feas = sqrt(eps()), tol_rel_opt = sqrt(eps()), tol_abs_opt = sqrt(eps()))
-    return [
-    ((10, false, true), GeomeanConeOptimizer, options),
-    ((100, false, true), GeomeanConeOptimizer, options),
-    ((200, false, true), GeomeanConeOptimizer, options),
-    ]
-end
-example_tests(::Type{MaxVolumeJuMP{Float64}}, ::GeomeanInfInstances) = begin
-    return [
-    ((10, false, true),),
-    ((30, false, true),),
-    ((50, false, true),),
-    # ((100, false, true),),
-    # ((200, false, true),),
-    ]
-end
+# example_tests(::Type{MaxVolumeJuMP{Float64}}, ::ExpInstances) = [
+#     ((10, false, true), ClassicConeOptimizer),
+#     ((100, false, true), ClassicConeOptimizer),
+#     ((1000, false, true), ClassicConeOptimizer),
+#     ]
+# example_tests(::Type{MaxVolumeJuMP{Float64}}, ::GeomeanInstances) = begin
+#     options = (tol_feas = sqrt(eps()), tol_rel_opt = sqrt(eps()), tol_abs_opt = sqrt(eps()))
+#     return [
+#     ((10, false, true), GeomeanConeOptimizer, options),
+#     ((100, false, true), GeomeanConeOptimizer, options),
+#     ((200, false, true), GeomeanConeOptimizer, options),
+#     ]
+# end
+# example_tests(::Type{MaxVolumeJuMP{Float64}}, ::GeomeanInfInstances) = begin
+#     return [
+#     ((10, false, true),),
+#     ((30, false, true),),
+#     ((50, false, true),),
+#     # ((100, false, true),),
+#     # ((200, false, true),),
+#     ]
+# end
 
 
 function build(inst::MaxVolumeJuMP{T}) where {T <: Float64} # TODO generic reals

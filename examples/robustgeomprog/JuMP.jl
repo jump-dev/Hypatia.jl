@@ -28,18 +28,18 @@ example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::FastInstances) = [
     # ((5, 10), ClassicConeOptimizer),
     ((10, 20),),
     ((20, 40),),
-    ((40, 80),),
+    # ((40, 80),),
     ]
 example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::SlowInstances) = [
     ((40, 80), ClassicConeOptimizer),
     ((100, 200),),
     ]
-example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::ExpInstances) = [
-    ((5, 10), ClassicConeOptimizer),
-    ((10, 20), ClassicConeOptimizer),
-    ((20, 40), ClassicConeOptimizer),
-    ((40, 80), ClassicConeOptimizer),
-    ]
+# example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::ExpInstances) = [
+#     ((5, 10), ClassicConeOptimizer),
+#     ((10, 20), ClassicConeOptimizer),
+#     ((20, 40), ClassicConeOptimizer),
+#     ((40, 80), ClassicConeOptimizer),
+#     ]
 # example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::EntropyInstances) = [
 #     ((5, 10),),
 #     ((10, 20),),

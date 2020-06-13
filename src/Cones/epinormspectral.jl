@@ -108,7 +108,7 @@ end
 
 get_nu(cone::EpiNormSpectral) = cone.d1 + 1
 
-use_correction(cone::EpiNormSpectral) = false # TODO broken currently
+use_correction(cone::EpiNormSpectral) = true
 
 use_scaling(cone::EpiNormSpectral) = true
 
@@ -255,7 +255,7 @@ end
 #     return prod
 # end
 
-# TODO this is buggy - fails higher dimension corr barrier tests
+# TODO fails higher dimension corr barrier tests
 function correction(
     cone::EpiNormSpectral{T},
     primal_dir::AbstractVector{T},
@@ -331,12 +331,12 @@ function correction(
     end
 
     third_order = reshape(third, cone.dim^2, cone.dim)
-    # @show extrema(abs, third_order)
+    @show extrema(abs, third_order)
     # Hi_z = cholesky(cone.old_hess) \ dual_dir
     Hi_z = inv_hess_prod!(similar(dual_dir), dual_dir, cone)
     cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
     cone.correction *= -1
-    # @show extrema(abs, cone.correction)
+    @show extrema(abs, cone.correction)
 
     return cone.correction
 end

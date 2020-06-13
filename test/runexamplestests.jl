@@ -16,8 +16,8 @@ default_solver_options = (
     verbose = true,
     iter_limit = 100,
     timer = timer,
-    system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
-    # system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
+    # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
+    system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
@@ -25,7 +25,8 @@ instance_sets = [
     # (MinimalInstances, Float64, 15),
     # (MinimalInstances, Float32, 15),
     # (MinimalInstances, BigFloat, 60),
-    (FastInstances, Float64, 15),
+    (FastInstances, Float64, 60),
+    # (FastInstances, Float64, 15),
     # (SlowInstances, Float64, 120),
     ]
 
@@ -54,25 +55,25 @@ JuMP_example_names = [
     # "centralpolymat",
     "conditionnum",
     # "contraction",
-    # "densityest",
-    # "envelope",
+    "densityest",
+    "envelope",
     # "expdesign",
     # "lotkavolterra",
     # "lyapunovstability",
-    # "matrixcompletion",
+    "matrixcompletion",
     # "matrixquadratic",
     # "matrixregression",
-    # "maxvolume",
+    "maxvolume",
     # "muconvexity",
     # "nearestpsd",
-    # "polymin",
+    "polymin",
     # "polynorm",
-    # "portfolio",
-    # "regionofattr",
+    "portfolio",
+    # # "regionofattr",
     # "robustgeomprog",
-    # "secondorderpoly",
-    # "semidefinitepoly",
-    # "shapeconregr",
+    # # "secondorderpoly",
+    # # "semidefinitepoly",
+    # # "shapeconregr",
     # "signomialmin",
     ]
 
@@ -140,8 +141,8 @@ all_tests_time = time()
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
     show(perf, allrows = true, allcols = true)
     println("\n")
-    show(timer)
-    println("\n")
+    # show(timer)
+    # println("\n")
 end
 
 ;

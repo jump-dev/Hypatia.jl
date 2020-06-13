@@ -21,12 +21,12 @@ example_tests(::Type{MatrixCompletionJuMP{Float64}}, ::MinimalInstances) = [
     ]
 example_tests(::Type{MatrixCompletionJuMP{Float64}}, ::FastInstances) = [
     ((5, 8, true),),
-    ((5, 8, true), ClassicConeOptimizer),
+    # ((5, 8, true), ClassicConeOptimizer),
     ((5, 8, false),),
-    ((5, 8, false), ClassicConeOptimizer),
+    # ((5, 8, false), ClassicConeOptimizer),
     ((12, 24, true),),
     ((12, 24, false),),
-    ((14, 140, false),),
+    # ((14, 140, false),),
     ]
 example_tests(::Type{MatrixCompletionJuMP{Float64}}, ::SlowInstances) = [
     ((14, 140, false), ClassicConeOptimizer),
