@@ -50,35 +50,35 @@ example_tests(::Type{DensityEstNative{Float64}}, ::FastInstances) = begin
     ((50, 1, 4, true, true, true), options),
     ((50, 1, 10, true, true, true), options),
     ((50, 1, 50, true, true, true), options),
-    ((100, 1, 100, true, true, true), options),
-    ((500, 1, 500, true, true, true), options),
+    # ((100, 1, 100, true, true, true), options),
+    # ((500, 1, 500, true, true, true), options),
     ((50, 2, 2, true, true, true), options),
-    ((200, 2, 20, true, true, true), options),
-    ((50, 2, 2, false, true, true), options),
-    ((50, 2, 2, true, false, true), options),
-    ((50, 2, 2, true, true, false), options),
-    ((500, 3, 14, true, true, true), options),
-    ((20, 4, 3, false, true, false),),
+    # ((200, 2, 20, true, true, true), options),
+    # ((50, 2, 2, false, true, true), options),
+    # ((50, 2, 2, true, false, true), options),
+    # ((50, 2, 2, true, true, false), options),
+    # ((500, 3, 14, true, true, true), options),
+    # ((20, 4, 3, false, true, false),),
     ((20, 4, 3, true, true, true),),
     ((100, 8, 2, true, true, true), options),
-    ((100, 8, 2, false, true, true), options),
-    ((100, 8, 2, true, false, true), options),
-    ((100, 8, 2, true, true, false), options),
-    ((250, 4, 6, true, true, true), options),
-    ((250, 4, 6, false, true, true), options),
-    ((250, 4, 6, true, false, true), options),
-    ((250, 4, 6, true, true, false), options),
-    ((200, 32, 2, true, true, true), options),
+    # ((100, 8, 2, false, true, true), options),
+    # ((100, 8, 2, true, false, true), options),
+    # ((100, 8, 2, true, true, false), options),
+    # ((250, 4, 6, true, true, true), options),
+    # ((250, 4, 6, false, true, true), options),
+    # ((250, 4, 6, true, false, true), options),
+    # ((250, 4, 6, true, true, false), options),
+    # ((200, 32, 2, true, true, true), options),
     ((:iris, 4, true, true, true), options),
-    ((:iris, 5, true, true, true), options),
-    ((:iris, 6, true, true, true), options),
-    ((:iris, 4, false, true, true), options),
-    ((:iris, 4, true, false, true), options),
-    ((:iris, 4, true, true, false), options),
-    ((:cancer, 4, true, true, true), options),
-    ((:cancer, 4, false, true, true), options),
-    ((:cancer, 4, true, false, true), options),
-    ((:cancer, 4, true, true, false), options),
+    # ((:iris, 5, true, true, true), options),
+    # ((:iris, 6, true, true, true), options),
+    # ((:iris, 4, false, true, true), options),
+    # ((:iris, 4, true, false, true), options),
+    # ((:iris, 4, true, true, false), options),
+    # ((:cancer, 4, true, true, true), options),
+    # ((:cancer, 4, false, true, true), options),
+    # ((:cancer, 4, true, false, true), options),
+    # ((:cancer, 4, true, true, false), options),
     ]
 end
 example_tests(::Type{DensityEstNative{Float64}}, ::SlowInstances) = begin
@@ -96,26 +96,25 @@ example_tests(::Type{DensityEstNative{Float64}}, ::SlowInstances) = begin
     ((400, 5, 6, true, true, false), options),
     ]
 end
-example_tests(::Type{DensityEstNative{Float64}}, ::ExpInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    return [
-    ((50, 2, 2, true, true, false), options),
-    ((20, 4, 3, false, true, false),),
-    ((100, 8, 2, true, true, false), options),
-    ((250, 4, 6, true, true, false), options),
-    ((400, 5, 6, true, true, false), options),
-    ]
-end
-example_tests(::Type{DensityEstNative{Float64}}, ::WSOSGeomeanInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    return [
-    ((50, 2, 2, true, true, true), options),
-    ((20, 4, 3, true, true, true), options),
-    ((100, 8, 2, true, true, true), options),
-    # ((250, 4, 6, true, true, true), options),
-    # ((400, 5, 6, true, true, true), options),
-    ]
-end
+# example_tests(::Type{DensityEstNative{Float64}}, ::ExpInstances) = begin
+#     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+#     return [
+#     ((50, 2, 2, true, true, false), options),
+#     ((100, 8, 2, true, true, false), options),
+#     ((250, 4, 6, true, true, false), options),
+#     ((400, 5, 6, true, true, false), options),
+#     ]
+# end
+# example_tests(::Type{DensityEstNative{Float64}}, ::WSOSGeomeanInstances) = begin
+#     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+#     return [
+#     ((50, 2, 2, true, true, true), options),
+#     ((20, 4, 3, true, true, true), options),
+#     ((100, 8, 2, true, true, true), options),
+#     # ((250, 4, 6, true, true, true), options),
+#     # ((400, 5, 6, true, true, true), options),
+#     ]
+# end
 
 function build(inst::DensityEstNative{T}) where {T <: Real}
     X = inst.X

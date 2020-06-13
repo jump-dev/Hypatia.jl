@@ -43,10 +43,10 @@ example_tests(::Type{MatrixCompletionNative{Float64}}, ::FastInstances) = [
     ((12, 24, false, true, true, true),),
     ((12, 24, true, false, true, true),),
     ((12, 24, false, false, true, true),),
-    ((12, 24, true, true, false, true),),
-    ((12, 24, false, false, false, true),),
-    ((12, 24, true, true, false, false),),
-    ((12, 24, false, false, false, false),),
+    # ((12, 24, true, true, false, true),),
+    # ((12, 24, false, false, false, true),),
+    # ((12, 24, true, true, false, false),),
+    # ((12, 24, false, false, false, false),),
     ]
 example_tests(::Type{MatrixCompletionNative{Float64}}, ::SlowInstances) = [
     # TODO add missing boolean combinations

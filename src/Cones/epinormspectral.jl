@@ -108,7 +108,7 @@ end
 
 get_nu(cone::EpiNormSpectral) = cone.d1 + 1
 
-use_correction(cone::EpiNormSpectral) = true
+use_correction(cone::EpiNormSpectral) = false
 
 use_scaling(cone::EpiNormSpectral) = true
 

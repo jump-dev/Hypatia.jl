@@ -32,21 +32,21 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
+    "native",
     "JuMP",
     ]
 
 # list of names of native examples to run
 native_example_names = [
-    # "densityest",
-    # "envelope",
+    "densityest",
+    "envelope",
     # "expdesign",
-    # "linearopt",
-    # "matrixcompletion",
+    "linearopt",
+    "matrixcompletion",
     # "matrixregression",
-    # "maxvolume",
-    # "polymin",
-    # "portfolio",
+    "maxvolume",
+    "polymin",
+    "portfolio",
     # "sparsepca",
     ]
 
