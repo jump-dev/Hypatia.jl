@@ -63,8 +63,9 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
             # @assert eltype(A_i) <: RealOrComplex{T}
             @assert ishermitian(A_i)
         end
-        @assert isposdef(first(As))
         @assert side > 0
+        @assert div(side * (side + 1), 2) >= dim # TODO necessary to ensure linear independence of As (but not sufficient)
+        @assert isposdef(first(As))
         cone = new{T}()
         cone.use_dual_barrier = use_dual
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
@@ -131,9 +132,6 @@ function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
 end
 
 update_dual_feas(cone::LinMatrixIneq) = true # TODO use a dikin ellipsoid condition?
-# function update_dual_feas(cone::LinMatrixIneq{T}) where {T <: Real}
-#     return all(isposdef(cholesky(cone.As[i]) * cone.dual_point[i]) for i in eachindex(cone.dual_point))
-# end
 
 function update_grad(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert cone.is_feas
@@ -157,7 +155,7 @@ function update_hess(cone::LinMatrixIneq)
     @inbounds for i in 1:cone.dim, j in i:cone.dim
         H[i, j] = real(dot(sumAinvAs[i], sumAinvAs[j]'))
     end
-    copyto!(cone.old_hess.data, H)
+    # copyto!(cone.old_hess.data, H)
 
     cone.hess_updated = true
     return cone.hess

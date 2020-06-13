@@ -229,7 +229,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
         # update hessian factorizations and partition of cones
         for (k, cone_k) in enumerate(model.cones)
             if hasfield(typeof(cone_k), :hess_fact_cache) # TODO use dispatch or a function
-                @assert cone_k.scal_hess_updated
+                # @assert cone_k.scal_hess_updated
                 fact_success = Cones.update_hess_fact(cone_k, recover = Cones.use_dual_barrier(cone_k))
                 if cone_k.hess_fact_cache isa DenseSymCache{T}
                     cones_list = (Cones.use_dual_barrier(cone_k) ? inv_hess_cones : hess_cones)

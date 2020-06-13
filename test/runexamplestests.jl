@@ -16,6 +16,8 @@ default_solver_options = (
     verbose = true,
     iter_limit = 100,
     timer = timer,
+    system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
+    # system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
