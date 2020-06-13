@@ -75,9 +75,9 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = cone.hess_inv_hess_updated = false)
+# reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = cone.hess_inv_hess_updated = false)
 
-# reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
+reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
@@ -237,103 +237,103 @@ function update_hess(cone::EpiSumPerEntropy)
     return cone.hess
 end
 
-# # auxiliary calculations for inverse Hessian and inverse Hessian prod
-# function inv_hess_vals(cone)
-#     cone.hess_inv_hess_updated || update_hess_inv_hess(cone)
-#     u = cone.point[1]
-#     v_idxs = cone.v_idxs
-#     w_idxs = cone.w_idxs
-#     point = cone.point
-#     @views v = point[v_idxs]
-#     @views w = point[w_idxs]
-#     z = cone.z
-#     Hu = cone.Hu
-#     logprod = u - z # TODO cache in feas check?
-#     @. cone.denom = z + 2 * w
-#
-#     for (i, v_idx, w_idx) in zip(1:cone.w_dim, v_idxs, w_idxs)
-#         temp1 = logprod - w[i] * log(w[i] / v[i]) # TODO cache in feas check?
-#         temp2 = log(w[i] / v[i])# TODO cache in feas check?
-#         Hu[v_idx - 1] = -(u - temp1 - 2 * w[i] * temp2) * w[i] * v[i] / cone.denom[i]
-#         Hu[w_idx - 1] = abs2(w[i]) * (temp2 * z + u - temp1) / cone.denom[i]
-#     end
-#     @views cone.Huu = abs2(z) * (1 - dot(Hu, cone.old_hess[1, 2:cone.dim]))
-#     @. cone.Hvw = v * abs2(w)
-#     @. cone.Hvv = z + w
-#     @. cone.Hww = cone.Hvv * abs2(w)
-#     @. cone.Hvv *= abs2(v)
-#
-#     return
-# end
-#
-# function update_inv_hess(cone::EpiSumPerEntropy{T}) where {T}
-#     inv_hess_vals(cone)
-#     dim = cone.dim
-#     w_dim = cone.w_dim
-#
-#     if !isdefined(cone, :inv_hess)
-#         # initialize sparse idxs for upper triangle of Hessian
-#         dim = cone.dim
-#         H_nnz_tri = 2 * dim - 1 + w_dim
-#         I = Vector{Int}(undef, H_nnz_tri)
-#         J = Vector{Int}(undef, H_nnz_tri)
-#         idxs1 = 1:dim
-#         I[idxs1] .= 1
-#         J[idxs1] .= idxs1
-#         idxs2 = (dim + 1):(2 * dim - 1)
-#         I[idxs2] .= 2:dim
-#         J[idxs2] .= 2:dim
-#         idxs3 = (2 * dim):H_nnz_tri
-#         I[idxs3] .= 2:2:dim
-#         J[idxs3] .= 3:2:dim
-#         V = ones(T, H_nnz_tri)
-#         cone.inv_hess = Symmetric(sparse(I, J, V, dim, dim), :U)
-#     end
-#
-#     # modify nonzeros of sparse data structure of upper triangle of Hessian
-#     H_nzval = cone.inv_hess.data.nzval
-#     H_nzval[1] = cone.Huu
-#     vw_idx = 1
-#     nz_idx = 2
-#     dim_idx = 1
-#     @inbounds for j in 1:w_dim
-#         H_nzval[nz_idx] = cone.Hu[dim_idx]
-#         H_nzval[nz_idx + 1] = cone.Hvv[vw_idx] / cone.denom[vw_idx]
-#         nz_idx += 2
-#         dim_idx += 1
-#         H_nzval[nz_idx] = cone.Hu[dim_idx]
-#         H_nzval[nz_idx + 1] = cone.Hvw[vw_idx] / cone.denom[vw_idx]
-#         # @show typeof(cone.Hvw)
-#         H_nzval[nz_idx + 2] = cone.Hww[vw_idx] / cone.denom[vw_idx]
-#         nz_idx += 3
-#         vw_idx += 1
-#         dim_idx += 1
-#     end
-#
-#     cone.inv_hess_updated = true
-#     return cone.inv_hess
-# end
-#
-# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
-#     # updates for nonzero values in the inverse Hessian
-#     inv_hess_vals(cone)
-#     Hu = cone.Hu
-#     Huu = cone.Huu
-#     Hvv = cone.Hvv
-#     Hvw = cone.Hvw
-#     Hww = cone.Hww
-#     denom = cone.denom
-#
-#     @. @views prod[1, :] = arr[1, :] * Huu
-#     @views mul!(prod[1, :], arr[2:end, :]', Hu, true, true)
-#     @. @views prod[2:end, :] = Hu * arr[1, :]'
-#     @inbounds for i in 1:cone.w_dim
-#         @. @views prod[2i, :] += (Hvv[i] * arr[2i, :] + Hvw[i] * arr[2i + 1, :]) / denom[i]
-#         @. @views prod[2i + 1, :] += (Hww[i] * arr[2i + 1, :] + Hvw[i] * arr[2i, :]) / denom[i]
-#     end
-#
-#     return prod
-# end
+# auxiliary calculations for inverse Hessian and inverse Hessian prod
+function inv_hess_vals(cone)
+    cone.hess_inv_hess_updated || update_hess_inv_hess(cone)
+    u = cone.point[1]
+    v_idxs = cone.v_idxs
+    w_idxs = cone.w_idxs
+    point = cone.point
+    @views v = point[v_idxs]
+    @views w = point[w_idxs]
+    z = cone.z
+    Hu = cone.Hu
+    logprod = u - z # TODO cache in feas check?
+    @. cone.denom = z + 2 * w
+
+    for (i, v_idx, w_idx) in zip(1:cone.w_dim, v_idxs, w_idxs)
+        temp1 = logprod - w[i] * log(w[i] / v[i]) # TODO cache in feas check?
+        temp2 = log(w[i] / v[i])# TODO cache in feas check?
+        Hu[v_idx - 1] = -(u - temp1 - 2 * w[i] * temp2) * w[i] * v[i] / cone.denom[i]
+        Hu[w_idx - 1] = abs2(w[i]) * (temp2 * z + u - temp1) / cone.denom[i]
+    end
+    @views cone.Huu = abs2(z) * (1 - dot(Hu, cone.old_hess[1, 2:cone.dim]))
+    @. cone.Hvw = v * abs2(w)
+    @. cone.Hvv = z + w
+    @. cone.Hww = cone.Hvv * abs2(w)
+    @. cone.Hvv *= abs2(v)
+
+    return
+end
+
+function update_inv_hess(cone::EpiSumPerEntropy{T}) where {T}
+    inv_hess_vals(cone)
+    dim = cone.dim
+    w_dim = cone.w_dim
+
+    if !isdefined(cone, :inv_hess)
+        # initialize sparse idxs for upper triangle of Hessian
+        dim = cone.dim
+        H_nnz_tri = 2 * dim - 1 + w_dim
+        I = Vector{Int}(undef, H_nnz_tri)
+        J = Vector{Int}(undef, H_nnz_tri)
+        idxs1 = 1:dim
+        I[idxs1] .= 1
+        J[idxs1] .= idxs1
+        idxs2 = (dim + 1):(2 * dim - 1)
+        I[idxs2] .= 2:dim
+        J[idxs2] .= 2:dim
+        idxs3 = (2 * dim):H_nnz_tri
+        I[idxs3] .= 2:2:dim
+        J[idxs3] .= 3:2:dim
+        V = ones(T, H_nnz_tri)
+        cone.inv_hess = Symmetric(sparse(I, J, V, dim, dim), :U)
+    end
+
+    # modify nonzeros of sparse data structure of upper triangle of Hessian
+    H_nzval = cone.inv_hess.data.nzval
+    H_nzval[1] = cone.Huu
+    vw_idx = 1
+    nz_idx = 2
+    dim_idx = 1
+    @inbounds for j in 1:w_dim
+        H_nzval[nz_idx] = cone.Hu[dim_idx]
+        H_nzval[nz_idx + 1] = cone.Hvv[vw_idx] / cone.denom[vw_idx]
+        nz_idx += 2
+        dim_idx += 1
+        H_nzval[nz_idx] = cone.Hu[dim_idx]
+        H_nzval[nz_idx + 1] = cone.Hvw[vw_idx] / cone.denom[vw_idx]
+        # @show typeof(cone.Hvw)
+        H_nzval[nz_idx + 2] = cone.Hww[vw_idx] / cone.denom[vw_idx]
+        nz_idx += 3
+        vw_idx += 1
+        dim_idx += 1
+    end
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
+    # updates for nonzero values in the inverse Hessian
+    inv_hess_vals(cone)
+    Hu = cone.Hu
+    Huu = cone.Huu
+    Hvv = cone.Hvv
+    Hvw = cone.Hvw
+    Hww = cone.Hww
+    denom = cone.denom
+
+    @. @views prod[1, :] = arr[1, :] * Huu
+    @views mul!(prod[1, :], arr[2:end, :]', Hu, true, true)
+    @. @views prod[2:end, :] = Hu * arr[1, :]'
+    @inbounds for i in 1:cone.w_dim
+        @. @views prod[2i, :] += (Hvv[i] * arr[2i, :] + Hvw[i] * arr[2i + 1, :]) / denom[i]
+        @. @views prod[2i + 1, :] += (Hww[i] * arr[2i + 1, :] + Hvw[i] * arr[2i, :]) / denom[i]
+    end
+
+    return prod
+end
 
 # using ForwardDiff
 
@@ -456,9 +456,9 @@ function correction(
     # barrier = cone.barrier
     # FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), cone.point)
     # @show norm(third_order - FD_3deriv)
-    Hi_z = cone.old_hess \ dual_dir
-    # Hi_z = similar(dual_dir)
-    # inv_hess_prod!(Hi_z, dual_dir, cone)
+    # Hi_z = cone.old_hess \ dual_dir
+    Hi_z = similar(dual_dir)
+    inv_hess_prod!(Hi_z, dual_dir, cone)
 
     Hi_z .*= -T(0.5)
     cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
