@@ -97,7 +97,7 @@ example_tests(::Type{SignomialMinJuMP{Float64}}, ::EntropyInstances) = begin
     return [
     ((:motzkin2,), nothing, options),
     # ((:MCW19ex8,), nothing, relaxed_options),
-    ((3, 2), nothing, options),
+    # ((3, 2), nothing, options),
     # ((20, 3), nothing, options),
     # ((10, 10), nothing, options),
     ]

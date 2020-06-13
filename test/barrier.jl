@@ -231,7 +231,7 @@ function test_hypoperlog_barrier(T::Type{<:Real})
 end
 
 function test_episumperentropy_barrier(T::Type{<:Real})
-    for w_dim in [1, 2, 3, 6]
+    for w_dim in [1, 2, 3]
         dim = 1 + 2 * w_dim
         function barrier(s)
             (u, v, w) = (s[1], s[2:2:(dim - 1)], s[3:2:dim])
