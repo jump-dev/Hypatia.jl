@@ -56,7 +56,7 @@ function test_barrier_oracles(
     test_grad_hess(cone, point, dual_point, tol = tol)
 
     # check gradient and Hessian agree with ForwardDiff
-    if dim < 15 # too slow if dimension is large
+    if dim < 15 && !CO.use_nt(cone) # too slow if dimension is large
         println("starting ForwardDiff tests: $dim")
         CO.reset_data(cone)
         @test CO.is_feas(cone)
@@ -107,17 +107,21 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
     inv_hess = Matrix(CO.inv_hess(cone))
 
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
+    # @show (inv_hess * dual_point) ./ point
+    # @show (hess * point) ./ dual_point
     @test hess * inv_hess ≈ I atol=tol rtol=tol
 
     prod_mat = similar(point, dim, dim)
     @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
     @test CO.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
 
-    prod = similar(point)
-    @test hess * point ≈ -grad atol=tol rtol=tol
-    @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
-    @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
-
+    if !CO.use_nt(cone)
+        prod = similar(point)
+        @test hess * point ≈ -grad atol=tol rtol=tol
+        @test CO.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
+        @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
+    end
+    
     prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
     @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
     CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)

@@ -157,16 +157,34 @@ function update_hess(cone::EpiNormEucl)
     # if cone.use_scaling
         # analogous to W as a function of nt_point_sqrt
         # H = (2 * J * nt_point * nt_point' * J - J) * constant
-        mul!(cone.hess.data, cone.nt_point, cone.nt_point', 2, false)
-        cone.hess.data[:, 1] *= -1
-        cone.hess += I # TODO inefficient
-        cone.hess.data[1, :] *= -1
-        cone.hess.data ./= cone.rt_dist_ratio
+        # mul!(cone.hess.data, cone.nt_point, cone.nt_point', 2, false)
+        # cone.hess.data[:, 1] *= -1
+        # cone.hess += I # TODO inefficient
+        # cone.hess.data[1, :] *= -1
+        # cone.hess.data ./= cone.rt_dist_ratio
     # else
     #     mul!(cone.hess.data, cone.grad, cone.grad', 2, false)
     #     cone.hess += inv(cone.dist) * I # TODO inefficient
     #     cone.hess[1, 1] -= 2 / cone.dist
     # end
+
+    # mul!(cone.hess.data, cone.nt_point, cone.nt_point', 2, false)
+    # @. @views cone.hess.data[1, 2:cone.dim] *= -1
+    # cone.hess += I # TODO inefficient
+    # cone.hess.data[1, 1] -= 2
+    # cone.hess.data ./= cone.rt_dist_ratio
+
+    # nt_dist = jdot(cone.nt_point, cone.nt_point)
+    # mul!(cone.hess.data, cone.nt_point, cone.nt_point', 2, false)
+    # @. @views cone.hess.data[1, 2:cone.dim] *= -1
+    # cone.hess += I * nt_dist
+    # cone.hess.data[1, 1] -= 2 * nt_dist
+    # cone.hess.data ./= abs2(nt_dist)
+
+    ihess = inv_hess(cone)
+    # @show inv(ihess) ./ cone.hess
+
+    cone.hess = inv(ihess)
 
     cone.hess_updated = true
     return cone.hess
@@ -249,6 +267,14 @@ end
 #     return prod
 # end
 
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+    @assert cone.is_feas
+
+    hyperbolic_householder(prod, arr, cone.nt_point, cone.rt_dist_ratio, Winv = false)
+
+    return prod
+end
+
 # function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
 #     @assert cone.is_feas
 #     u = cone.point[1]
@@ -269,6 +295,15 @@ end
 #
 #     return prod
 # end
+
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+    @assert cone.is_feas
+
+    hyperbolic_householder(prod, arr, cone.nt_point_sqrt, cone.rt_rt_dist_ratio, Winv = true)
+
+    return prod
+end
+
 #
 # function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
 #     @assert cone.is_feas
@@ -387,4 +422,23 @@ function update_fields(cone::EpiNormEucl{T}) where {T}
     # end
 
     return
+end
+
+function hyperbolic_householder(prod::AbstractVecOrMat, arr::AbstractVecOrMat, v::AbstractVector, fact::Real; Winv::Bool = false)
+    if Winv
+        v[2:end] *= -1
+    end
+    for j in 1:size(prod, 2)
+        @views pa = 2 * dot(v, arr[:, j])
+        @. @views prod[:, j] = pa * v
+    end
+    @. prod[1, :] -= arr[1, :]
+    @. prod[2:end, :] += arr[2:end, :]
+    if Winv
+        prod ./= fact
+        v[2:end] *= -1
+    else
+        prod .*= fact
+    end
+    return prod
 end
