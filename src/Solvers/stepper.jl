@@ -216,7 +216,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     # if iseven(solver.num_iters) # TODO maybe use nbhd to determine whether to center or predict
     # TODO use nbhd to determine whether to center or predict
     # if mod(solver.num_iters, 2) == 0
-    if all(Cones.in_neighborhood.(cones, solver.mu, T(0.01)))
+    if all(Cones.in_neighborhood.(cones, solver.mu, T(0.05)))
         # predict
         println("pred")
         # Cones.update_scal_hess.(cones, solver.mu, true) # use scaling update
@@ -323,12 +323,16 @@ function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}, pre
             # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
             # scal = (Cones.use_nt(cone_k) ? one(T) : irtmu)
             scal = irtmu
-            stepper.s_rhs_k[k] .-= scal * Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k]) * prev_aff_alpha^2
+            # stepper.s_rhs_k[k] .-= scal * Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k]) * prev_aff_alpha^2
+            corr_k = similar(stepper.primal_dir_k[k])
+            Cones.hess_prod!(corr_k, stepper.primal_dir_k[k], cone_k)
+            stepper.s_rhs_k[k] .+= corr_k - scal * Cones.correction2(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k]) * prev_aff_alpha^2
         end
     end
 
     # NT: kap
-    tkcorr = stepper.dir[stepper.tau_row] * stepper.dir[stepper.kap_row] / solver.tau
+    # tkcorr = stepper.dir[stepper.tau_row] * stepper.dir[stepper.kap_row] / solver.tau
+    tkcorr = -solver.mu / solver.tau * stepper.dir[stepper.tau_row] / solver.tau * (1 + stepper.dir[stepper.tau_row] / solver.tau)
     rhs[end] = -solver.kap - tkcorr * prev_aff_alpha^2
 
     return rhs
@@ -379,7 +383,7 @@ function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}, pre
         # scal = (Cones.use_nt(cone_k) ? solver.mu : rtmu)
         scal = rtmu
         @. stepper.s_rhs_k[k] = -duals_k - scal * grad_k
-        if Cones.use_correction(cone_k) && cone_k isa Cones.Nonnegative #&& prev_aff_alpha > 0
+        if Cones.use_correction(cone_k) && prev_aff_alpha > 0
             # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
             # scal = (Cones.use_nt(cone_k) ? one(T) : irtmu)
             scal = irtmu
