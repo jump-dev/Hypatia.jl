@@ -65,9 +65,13 @@ end
 
 use_heuristic_neighborhood(cone::EpiNormEucl) = false
 
-reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = nt_updated = false)
+reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = cone.nt_updated = false)
 
 use_nt(::EpiNormEucl) = true
+
+use_scaling(::EpiNormEucl) = true
+
+use_correction(::EpiNormEucl) = true
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
@@ -149,7 +153,7 @@ function update_grad(cone::EpiNormEucl)
     return cone.grad
 end
 
-function update_hess(cone::EpiNormEucl)
+function update_scal_hess(cone::EpiNormEucl)
     @assert cone.grad_updated
     @assert cone.is_feas
     cone.nt_updated || update_nt(cone)
@@ -178,7 +182,8 @@ function update_hess(cone::EpiNormEucl)
     return cone.hess
 end
 
-function update_inv_hess(cone::EpiNormEucl)
+ # NOTE not used
+function update_inv_scal_hess(cone::EpiNormEucl)
     @assert cone.is_feas
     cone.nt_updated || update_nt(cone)
 
@@ -198,65 +203,65 @@ function update_inv_hess(cone::EpiNormEucl)
     return cone.inv_hess
 end
 
-# function update_hess(cone::EpiNormEucl)
-#     @assert cone.grad_updated
-#
-#     mul!(cone.hess.data, cone.grad, cone.grad')
-#     inv_dist = inv(cone.dist)
-#     @inbounds for j in eachindex(cone.grad)
-#         cone.hess[j, j] += inv_dist
-#     end
-#     cone.hess[1, 1] -= inv_dist + inv_dist
-#
-#     cone.hess_updated = true
-#     copyto!(cone.old_hess.data, cone.hess.data)
-#     return cone.hess
-# end
-#
-# function update_inv_hess(cone::EpiNormEucl)
-#     @assert cone.is_feas
-#
-#     mul!(cone.inv_hess.data, cone.point, cone.point')
-#     @inbounds for j in eachindex(cone.grad)
-#         cone.inv_hess[j, j] += cone.dist
-#     end
-#     cone.inv_hess[1, 1] -= cone.dist + cone.dist
-#
-#     cone.inv_hess_updated = true
-#     return cone.inv_hess
-# end
+function update_hess(cone::EpiNormEucl)
+    @assert cone.grad_updated
 
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
-#     @assert cone.is_feas
-#     u = cone.point[1]
-#     w = @view cone.point[2:end]
-#
-#     @inbounds for j in 1:size(prod, 2)
-#         uj = arr[1, j]
-#         wj = @view arr[2:end, j]
-#         ga = (dot(w, wj) - u * uj) / cone.dist
-#         prod[1, j] = -ga * u - uj
-#         @. prod[2:end, j] = ga * w + wj
-#     end
-#     @. prod ./= cone.dist
-#
-#     return prod
-# end
-#
-# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
-#     @assert cone.is_feas
-#
-#     @inbounds for j in 1:size(prod, 2)
-#         @views pa = dot(cone.point, arr[:, j])
-#         @. prod[:, j] = pa * cone.point
-#     end
-#     @. @views prod[1, :] -= cone.dist * arr[1, :]
-#     @. @views prod[2:end, :] += cone.dist * arr[2:end, :]
-#
-#     return prod
-# end
+    mul!(cone.hess.data, cone.grad, cone.grad', 2, false)
+    inv_dist = inv(cone.dist)
+    @inbounds for j in eachindex(cone.grad)
+        cone.hess[j, j] += inv_dist
+    end
+    cone.hess[1, 1] -= inv_dist + inv_dist
+
+    cone.hess_updated = true
+    copyto!(cone.old_hess.data, cone.hess.data)
+    return cone.hess
+end
+
+function update_inv_hess(cone::EpiNormEucl)
+    @assert cone.is_feas
+
+    mul!(cone.inv_hess.data, cone.point, cone.point', 2, false)
+    @inbounds for j in eachindex(cone.grad)
+        cone.inv_hess[j, j] += cone.dist
+    end
+    cone.inv_hess[1, 1] -= cone.dist + cone.dist
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+    @assert cone.is_feas
+    u = cone.point[1]
+    w = @view cone.point[2:end]
+
+    @inbounds for j in 1:size(prod, 2)
+        uj = arr[1, j]
+        wj = @view arr[2:end, j]
+        ga = 2 * (dot(w, wj) - u * uj) / cone.dist
+        prod[1, j] = -ga * u - uj
+        @. prod[2:end, j] = ga * w + wj
+    end
+    @. prod ./= cone.dist
+
+    return prod
+end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+    @assert cone.is_feas
+
+    @inbounds for j in 1:size(prod, 2)
+        @views pa = 2 * dot(cone.point, arr[:, j])
+        @. prod[:, j] = pa * cone.point
+    end
+    @. @views prod[1, :] -= cone.dist * arr[1, :]
+    @. @views prod[2:end, :] += cone.dist * arr[2:end, :]
+
+    return prod
+end
+
+function inv_scal_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas
     cone.nt_updated || update_nt(cone)
 
@@ -265,28 +270,28 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     return prod
 end
 
-# function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
-#     @assert cone.is_feas
-#     u = cone.point[1]
-#     w = @view cone.point[2:end]
-#
-#     rt2 = sqrt(T(2))
-#     distrt2 = cone.dist * rt2
-#     rtdist = sqrt(cone.dist)
-#     urtdist = u + rtdist * rt2
-#     @inbounds for j in 1:size(arr, 2)
-#         uj = arr[1, j]
-#         @views wj = arr[2:end, j]
-#         dotwwj = dot(w, wj)
-#         prod[1, j] = (u * uj - dotwwj) / distrt2
-#         wmulj = (dotwwj / urtdist - uj) / distrt2
-#         @. prod[2:end, j] = w * wmulj + wj / rtdist
-#     end
-#
-#     return prod
-# end
+function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
+    @assert cone.is_feas
+    u = cone.point[1]
+    w = @view cone.point[2:end]
 
-function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+    rt2 = sqrt(T(2))
+    dist = cone.dist
+    rtdist = sqrt(cone.dist)
+    urtdist = u + rtdist
+    @inbounds for j in 1:size(arr, 2)
+        uj = arr[1, j]
+        @views wj = arr[2:end, j]
+        dotwwj = dot(w, wj)
+        prod[1, j] = (u * uj - dotwwj) / dist
+        wmulj = (dotwwj / urtdist - uj) / dist
+        @. prod[2:end, j] = w * wmulj + wj / rtdist
+    end
+
+    return prod
+end
+
+function scal_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas
     cone.nt_updated || update_nt(cone)
 
@@ -295,7 +300,8 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ep
     return prod
 end
 
-function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+# NOTE not used
+function inv_scal_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas
     cone.nt_updated || update_nt(cone)
 
@@ -304,27 +310,24 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
     return prod
 end
 
+function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
+    @assert cone.is_feas
+    u = cone.point[1]
+    w = @view cone.point[2:end]
 
-#
-# function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
-#     @assert cone.is_feas
-#     u = cone.point[1]
-#     w = @view cone.point[2:end]
-#
-#     rt2 = sqrt(T(2))
-#     rtdist = sqrt(cone.dist)
-#     urtdist = u + rtdist * rt2
-#     @inbounds for j in 1:size(arr, 2)
-#         uj = arr[1, j]
-#         @views wj = arr[2:end, j]
-#         dotwwj = dot(w, wj)
-#         prod[1, j] = (u * uj + dotwwj) / rt2
-#         wmulj = (dotwwj / urtdist + uj) / rt2
-#         @. prod[2:end, j] = w * wmulj + wj * rtdist
-#     end
-#
-#     return prod
-# end
+    rtdist = sqrt(cone.dist)
+    urtdist = u + rtdist
+    @inbounds for j in 1:size(arr, 2)
+        uj = arr[1, j]
+        @views wj = arr[2:end, j]
+        dotwwj = dot(w, wj)
+        prod[1, j] = (u * uj + dotwwj)
+        wmulj = (dotwwj / urtdist + uj)
+        @. prod[2:end, j] = w * wmulj + wj * rtdist
+    end
+
+    return prod
+end
 
 jdot(x::AbstractVector, y::AbstractVector) = @views x[1] * y[1] - dot(x[2:end], y[2:end])
 

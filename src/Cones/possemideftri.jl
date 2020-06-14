@@ -29,6 +29,8 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    scal_hess_updated::Bool
+    nt_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
@@ -76,11 +78,13 @@ end
 
 use_heuristic_neighborhood(cone::PosSemidefTri) = false
 
-reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.scal_hess_updated = cone.nt_updated = false)
 
 use_nt(::PosSemidefTri) = true
 
 use_correction(::PosSemidefTri) = true
+
+use_scaling(::PosSemidefTri) = true
 
 function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
@@ -154,6 +158,14 @@ function update_hess(cone::PosSemidefTri)
     return cone.hess
 end
 
+function update_scal_hess(cone::PosSemidefTri)
+    @assert cone.grad_updated
+    cone.nt_updated || update_nt(cone)
+    symm_kron(cone.hess.data, cone.scalmat_sqrti' * cone.scalmat_sqrti, cone.rt2) # TODO fix mul
+    cone.hess_updated = true
+    return cone.hess
+end
+
 function update_inv_hess(cone::PosSemidefTri)
     @assert is_feas(cone)
     symm_kron(cone.inv_hess.data, cone.mat, cone.rt2)
@@ -169,6 +181,25 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemi
         rdiv!(cone.mat4, cone.fact_mat)
         ldiv!(cone.fact_mat, cone.mat4)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
+    end
+    return prod
+end
+
+function scal_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
+    @assert is_feas(cone)
+    cone.nt_updated || update_nt(cone)
+    mul!(cone.mat4, cone.scalmat_sqrti', cone.scalmat_sqrti) # TODO fix inefficiency of the mul
+    herm_congruence_prod!(prod, arr, cone.mat4, cone)
+    return prod
+end
+
+# PXP where P is Hermitian
+function herm_congruence_prod!(prod::AbstractVecOrMat, inner::AbstractVecOrMat, outer::AbstractVecOrMat, cone::PosSemidefTri)
+    @inbounds for i in 1:size(inner, 2)
+        svec_to_smat!(cone.mat3, view(inner, :, i), cone.rt2)
+        mul!(cone.mat2, Hermitian(cone.mat3, :U), outer)
+        mul!(cone.mat3, Hermitian(outer, :U), cone.mat2)
+        smat_to_svec!(view(prod, :, i), cone.mat3, cone.rt2)
     end
     return prod
 end
@@ -196,6 +227,18 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Po
     return prod
 end
 
+function scal_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
+    @assert cone.is_feas
+    cone.nt_updated || update_nt(cone)
+    @inbounds for i in 1:size(arr, 2)
+        svec_to_smat!(cone.mat3, view(arr, :, i), cone.rt2)
+        mul!(cone.work_mat, Hermitian(cone.mat3, :U), cone.scalmat_sqrti')
+        mul!(cone.mat3, cone.scalmat_sqrti, cone.work_mat)
+        smat_to_svec!(view(prod, :, i), cone.mat3, cone.rt2)
+    end
+    return prod
+end
+
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
     @inbounds for i in 1:size(arr, 2)
@@ -214,12 +257,12 @@ function update_nt(cone::PosSemidefTri{T, R}, primal_dir::AbstractVector, dual_d
     #     # get the next s, z but in the old scaling
     #     # TODO improve efficiency below
     #     svec_to_smat!(cone.work_mat, primal_dir, cone.rt2)
-    #     cone.work_mat2 = cone.new_scal_point + step_size * cone.scalmat_sqrti * Hermitian(cone.work_mat, :U) * cone.scalmat_sqrti'
+    #     cone.mat3 = cone.new_scal_point + step_size * cone.scalmat_sqrti * Hermitian(cone.work_mat, :U) * cone.scalmat_sqrti'
     #     svec_to_smat!(cone.work_mat, dual_dir, cone.rt2)
     #     cone.work_mat3 = cone.new_scal_point + step_size * cone.scalmat_sqrt' * Hermitian(cone.work_mat, :U) * cone.scalmat_sqrt
     #
     #     # update old scaling
-    #     fact = cholesky!(Hermitian(cone.work_mat2, :U))
+    #     fact = cholesky!(Hermitian(cone.mat3, :U))
     #     dual_fact = cholesky!(Hermitian(cone.work_mat3, :U))
     #     (U, lambda, V) = svd(dual_fact.U * fact.L)
     #     cone.new_scal_point = Diagonal(lambda)
