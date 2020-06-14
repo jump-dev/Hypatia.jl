@@ -56,7 +56,9 @@ include("newton.jl")
 
 use_dual_barrier(cone::Cone) = cone.use_dual_barrier
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
-rescale_point(cone::Cone{T}, s::T) where {T} = nothing
+# rescale_point(cone::Cone{T}, s::T) where {T} = nothing
+rescale_point(cone::Cone{T}, s::T) where {T} = (cone.point .*= s)
+
 load_dual_point(cone::Cone, point::AbstractVector) = copyto!(cone.dual_point, point)
 dimension(cone::Cone) = cone.dim
 set_timer(cone::Cone, timer::TimerOutput) = (cone.timer = timer)
@@ -206,19 +208,17 @@ inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
 use_heuristic_neighborhood(cone::Cone) = cone.use_heuristic_neighborhood
 
-function in_neighborhood_sy(cone::Cone{T}, mu::Real) where {T <: Real}
-    if use_nt(cone)
-        return true
-    end
+function in_neighborhood(cone::Cone{T}, mu::T, max_nbhd::T) where {T <: Real}
+    # if use_nt(cone)
+    #     return true
+    # end
 
     # norm(H^(-1/2) * (z + mu * grad))
     nbhd_tmp = cone.nbhd_tmp
     rtmu = sqrt(mu)
     irtmu = inv(sqrt(mu))
-    g = grad(cone)
+    g = rtmu * grad(cone)
     dp = copy(cone.dual_point)
-    # dp *= irtmu
-    # dp *= inv(mu)
 
     # TODO trying to see if ray intersects dikin ellipsoid
     # TODO find point on ray closest to g in the hessian norm
@@ -259,18 +259,20 @@ function in_neighborhood_sy(cone::Cone{T}, mu::Real) where {T <: Real}
         end
     # end
 
+    # @show nbhd, typeof(cone)
     # return (nbhd < mu * cone.max_neighborhood)
     # return (nbhd < 0.5 * mu)
     # @show nbhd
-    return (nbhd < T(0.7))
-    # return (nbhd < T(1))
+    return (nbhd < rtmu * max_nbhd)
+    # return (nbhd < max_nbhd)
+    # return (nbhd < T(0.5))
 end
 
 # in_neighborhood_sy(cone::Cone, mu::Real) = true
 
-function in_neighborhood(cone::Cone, mu::Real, s::Real)
-    return dot(cone.point, cone.dual_point) > mu * Cones.get_nu(cone) * default_max_neighborhood() * s
-end
+# function in_neighborhood(cone::Cone, mu::Real, s::Real)
+#     return dot(cone.point, cone.dual_point) > mu * Cones.get_nu(cone) * default_max_neighborhood() * s
+# end
 # function in_neighborhood(cone::Cone, mu::Real)
 #     g = grad(cone)
 #     cone.dual_grad_inacc = false

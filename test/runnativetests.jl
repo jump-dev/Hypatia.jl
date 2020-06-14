@@ -31,14 +31,14 @@ system_solvers_instance_names = vcat(
     inst_cones_many,
     )
 system_solvers = Dict(
-    # "NaiveDense" => all_reals,
+    "NaiveDense" => all_reals,
     # "NaiveSparse" => default_reals,
     # # "NaiveIndirect" => all_reals, # TODO fix
     # "NaiveElimDense" => all_reals,
     # "NaiveElimSparse" => default_reals,
     # "SymIndefDense" => all_reals,
     # "SymIndefSparse" => default_reals,
-    "QRCholDense" => all_reals,
+    # "QRCholDense" => all_reals,
     )
 
 # preprocessing test options
@@ -88,7 +88,7 @@ reduce_flags = [
 
 # other solver options
 timer = TimerOutput()
-tol = 1e-8
+tol = 1e-12
 other_options = (
     verbose = true,
     # verbose = false,
@@ -127,6 +127,8 @@ function run_instance_options(T::Type{<:Real}, inst_name::String, sys_name::Stri
 end
 
 all_tests_time = time()
+
+global ITERS = 0
 
 @testset "native tests" begin
     for inst_name in system_solvers_instance_names, (sys_name, real_types) in system_solvers, T in real_types

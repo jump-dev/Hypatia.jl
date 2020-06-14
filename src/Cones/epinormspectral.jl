@@ -284,7 +284,7 @@ function correction(
     mul!(WZi2W, W', Zitau)
 
     # Tuuu
-    third[1, 1, 1] = 6 * u * cone.trZi2 - 8 * u ^ 3 * sum(Zi[i] * Zi2[i] for i in eachindex(Zi)) + (d1 - 1) / u / u / u
+    third[1, 1, 1] = u * (6 * cone.trZi2 - 8 * u * sum(Zi[i] * u * Zi2[i] for i in eachindex(Zi))) + (d1 - 1) / u / u / u
 
     idx1 = 1
     for j in 1:d2, i in 1:d1

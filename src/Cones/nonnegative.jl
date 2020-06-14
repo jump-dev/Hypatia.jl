@@ -53,7 +53,7 @@ use_scaling(cone::Nonnegative) = true
 
 reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = false)
 
-use_nt(::Nonnegative) = true
+# use_nt(::Nonnegative) = true
 
 # TODO only allocate the fields we use
 function setup_data(cone::Nonnegative{T}) where {T <: Real}
@@ -145,10 +145,11 @@ hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 
-# # TODO skajaa ye nbhd
-function in_neighborhood_sy(cone::Nonnegative, mu::Real)
-    mu_nbhd = mu * 0.99
-    return all(abs(si * zi - mu) < mu_nbhd for (si, zi) in zip(cone.point, cone.dual_point))
+# TODO skajaa ye nbhd
+function in_neighborhood(cone::Nonnegative{T}, mu::T, max_nbhd::T) where {T <: Real}
+    mu_nbhd = mu * max_nbhd
+    rtmu = sqrt(mu)
+    return all(abs(rtmu * si * zi - mu) < mu_nbhd for (si, zi) in zip(cone.point, cone.dual_point))
 end
 
 # TODO mosek nbhd
@@ -162,44 +163,53 @@ end
 #     return sy && mo
 # end
 
-function in_neighborhood(cone::Nonnegative, mu::Real, ::Real)
-    return all(cone.point .* cone.dual_point .> mu * default_max_neighborhood())
-end
+# function in_neighborhood(cone::Nonnegative{T}, mu::T, max_nbhd::T = T(0.1)) where {T <: Real}
+#     min_nbhd_mu = mu * T(0.1)
+#     return all(cone.point .* cone.dual_point .> min_nbhd_mu) # TODO inefficient
+# end
 
-function update_scal_hess(
-    cone::Nonnegative{T},
-    mu::T;
-    ) where {T}
-    @assert is_feas(cone)
-    @assert !cone.scal_hess_updated
-    @. cone.hess.diag = cone.dual_point / cone.point
-    cone.scal_hess_updated = true
-    return cone.hess
-end
-
-function scal_hess_prod!(
-    prod::AbstractVecOrMat{T},
-    arr::AbstractVecOrMat{T},
-    cone::Nonnegative{T},
-    mu::T;
-    ) where {T}
-    @. prod = cone.dual_point / cone.point * arr
-end
-
-function scal_hess_sqrt_prod!(
-    prod::AbstractVecOrMat{T},
-    arr::AbstractVecOrMat{T},
-    cone::Nonnegative{T},
-    mu::T;
-    ) where {T}
-    # TODO store sqrt(cone.dual_point / cone.point)
-    @. prod = sqrt(cone.dual_point / cone.point) * arr
-end
+# function update_scal_hess(
+#     cone::Nonnegative{T},
+#     mu::T;
+#     ) where {T}
+#     @assert is_feas(cone)
+#     @assert !cone.scal_hess_updated
+#     @. cone.hess.diag = cone.dual_point / cone.point
+#     cone.scal_hess_updated = true
+#     return cone.hess
+# end
+#
+# function scal_hess_prod!(
+#     prod::AbstractVecOrMat{T},
+#     arr::AbstractVecOrMat{T},
+#     cone::Nonnegative{T},
+#     mu::T;
+#     ) where {T}
+#     @. prod = cone.dual_point / cone.point * arr
+# end
+#
+# function scal_hess_sqrt_prod!(
+#     prod::AbstractVecOrMat{T},
+#     arr::AbstractVecOrMat{T},
+#     cone::Nonnegative{T},
+#     mu::T;
+#     ) where {T}
+#     # TODO store sqrt(cone.dual_point / cone.point)
+#     @. prod = sqrt(cone.dual_point / cone.point) * arr
+# end
 
 function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
     @. cone.correction = primal_dir * dual_dir / cone.point
     return cone.correction
 end
+
+function correction2(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
+    @. cone.correction = -(primal_dir / cone.point)^2 / cone.point
+    return cone.correction
+end
+
+# TODO other cones fallback
+correction2(cone::Cone, primal_dir::AbstractVector, dual_dir::AbstractVector) = correction(cone, primal_dir, dual_dir)
 
 # # attempt correction without assumptions about Hessian/scaling matrix
 # function correction(

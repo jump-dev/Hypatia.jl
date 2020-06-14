@@ -74,7 +74,7 @@ function build_solve_check(
 
     solve_time = Solvers.get_solve_time(solver)
     num_iters = Solvers.get_num_iters(solver)
-
+    global ITERS += num_iters
     return (solver = solver, model = model, status = status,
         solve_time = solve_time, num_iters = num_iters,
         primal_obj = primal_obj, dual_obj = dual_obj,
@@ -161,7 +161,8 @@ function inconsistent2(T; options...)
 end
 
 function nonnegative1(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     Random.seed!(1)
     (n, p, q) = (6, 3, 6)
     c = rand(T(0):T(9), n)
@@ -176,7 +177,8 @@ function nonnegative1(T; options...)
 end
 
 function nonnegative2(T; options...)
-    tol = 2 * sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     Random.seed!(1)
     (n, p, q) = (5, 2, 10)
     c = rand(T(0):T(9), n)
@@ -191,7 +193,8 @@ function nonnegative2(T; options...)
 end
 
 function nonnegative3(T; options...)
-    tol = 2 * sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     Random.seed!(1)
     (n, p, q) = (15, 6, 15)
     c = rand(T(0):T(9), n)
@@ -206,7 +209,8 @@ function nonnegative3(T; options...)
 end
 
 function nonnegative4(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = T[-2, 0]
     A = zeros(T, 0, 2)
     b = zeros(T, 0)
@@ -944,7 +948,7 @@ function epinormspectral1(T; options...)
     tol = 1e-4
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
-    for is_complex in (false, true)
+    for is_complex in (false,)# true)
         dim = Xn * Xm
         if is_complex
             dim *= 2
@@ -984,7 +988,7 @@ function epinormspectral2(T; options...)
     tol = 1e-4
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
-    for is_complex in (false, true)
+    for is_complex in (false,)# true)
         R = (is_complex ? Complex{T} : T)
         dim = Xn * Xm
         if is_complex

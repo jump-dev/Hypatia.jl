@@ -43,8 +43,7 @@ function test_barrier_oracles(
         minus_grad = -CO.grad(cone)
         @test dot(point, minus_grad) ≈ norm(point) * norm(minus_grad) atol=init_tol rtol=init_tol
         @test point ≈ minus_grad atol=init_tol rtol=init_tol
-        # @test CO.in_neighborhood(cone, minus_grad, one(T))
-        @test CO.in_neighborhood(cone, zero(T), one(T))
+        @test CO.in_neighborhood(cone, one(T), one(T))
     end
     init_only && return
 
@@ -89,11 +88,11 @@ function test_barrier_oracles(
             FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
             println("done fd 3o")
             # check log-homog property that F'''(point)[point] = -2F''(point)
-            @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * fd_hess
+            @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * fd_hess atol=tol rtol=tol
             FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * Hinv_z / -2
             @test FD_corr ≈ corr atol=tol rtol=tol
         end
-        @test dot(corr, point) ≈ dot(Hinv_z, fd_hess * primal_dir)
+        @test dot(corr, point) ≈ dot(Hinv_z, fd_hess * primal_dir) atol=tol rtol=tol
     end
 
     return
@@ -123,22 +122,22 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
     CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
     @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
 
-    if CO.use_scaling(cone)
-        # dual_grad = CO.dual_grad(cone, one(T))
-        # @test dot(dual_point, dual_grad) ≈ -nu atol=1000*tol rtol=1000*tol
-
-        scal_hess = CO.scal_hess(cone, one(T))
-        @test scal_hess * point ≈ dual_point
-        # @test scal_hess * dual_grad ≈ grad # second updated not used
-
-        prod = similar(point)
-        @test CO.scal_hess_prod!(prod, point, cone, one(T)) ≈ dual_point
-        # @test CO.scal_hess_prod!(prod, dual_grad, cone, one(T)) ≈ grad # second updated not used
-    end
+    # if CO.use_scaling(cone)
+    #     # dual_grad = CO.dual_grad(cone, one(T))
+    #     # @test dot(dual_point, dual_grad) ≈ -nu atol=1000*tol rtol=1000*tol
+    #
+    #     scal_hess = CO.scal_hess(cone, one(T))
+    #     @test scal_hess * point ≈ dual_point atol=tol rtol=tol
+    #     # @test scal_hess * dual_grad ≈ grad atol=tol rtol=tol # second updated not used
+    #
+    #     prod = similar(point)
+    #     @test CO.scal_hess_prod!(prod, point, cone, one(T)) ≈ dual_point atol=tol rtol=tol
+    #     # @test CO.scal_hess_prod!(prod, dual_grad, cone, one(T)) ≈ grad atol=tol rtol=tol # second updated not used
+    # end
 
     mock_dual_point = -grad + T(1e-3) * randn(length(grad))
     CO.load_dual_point(cone, mock_dual_point)
-    @test CO.in_neighborhood(cone, zero(T), one(T))
+    @test CO.in_neighborhood(cone, one(T), one(T))
 
     return
 end

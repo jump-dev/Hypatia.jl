@@ -47,7 +47,7 @@ example_tests(::Type{<:DensityEstNative{<:BlasReal}}, ::MinimalInstances) = [
 example_tests(::Type{DensityEstNative{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((50, 1, 4, true, true, true), options),
+    # ((50, 1, 4, true, true, true), options),
     ((50, 1, 10, true, true, true), options),
     ((50, 1, 50, true, true, true), options),
     # ((100, 1, 100, true, true, true), options),

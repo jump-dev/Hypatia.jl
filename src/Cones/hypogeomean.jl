@@ -64,7 +64,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::HypoGeomean) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
+# reset_data(cone::HypoGeomean) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
 
 function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     reset_data(cone)
@@ -181,45 +181,45 @@ function update_hess(cone::HypoGeomean)
     return cone.hess
 end
 
-# TODO move into new cone with equal alphas
-function update_inv_hess(cone::HypoGeomean{T}) where {T}
-    @assert all(isequal(inv(T(cone.dim - 1))), cone.alpha)
-    @assert !cone.inv_hess_updated
-    u = cone.point[1]
-    w = view(cone.point, 2:cone.dim)
-    n = cone.dim - 1
-    wprod = cone.wprod
-    H = cone.inv_hess.data
-    denom = n * (n + 1) * wprod - abs2(n) * u
-    H[1, 1] = (n + 1) * abs2(wprod) / n + abs2(u) - 2 * wprod * u
-    H[1, 2:end] = wprod .* w / n
-    H[2:end, 2:end] = wprod * w * w'
-    H[2:end, 2:end] .+= Diagonal(abs2.(w) .* cone.z .* abs2(n))
-    H[2:end, 2:end] /= denom
-
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
-
-function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeomean{T}) where {T}
-    @assert all(isequal(inv(T(cone.dim - 1))), cone.alpha)
-    dim = cone.dim
-    u = cone.point[1]
-    w = view(cone.point, 2:dim)
-    n = dim - 1
-    wprod = cone.wprod
-
-    @inbounds for j in 1:size(prod, 2)
-        @views pa = dot(w, arr[2:dim, j]) * wprod
-        @. prod[2:dim, j] = pa * w
-        prod[1, j] = pa / n
-    end
-    @. @views prod[1, :] += ((n + 1) * abs2(wprod) / n + abs2(u) - 2 * wprod * u) * arr[1, :]
-    @. @views prod[2:dim, :] += (abs2.(w) .* cone.z .* abs2(n)) * arr[2:dim, :]
-    @. @views prod[2:dim, :] /= (n * (n + 1) * wprod - abs2(n) * u)
-    @views mul!(prod[2:dim, :], w, arr[1, :]', wprod / n, true)
-    return prod
-end
+# # TODO move into new cone with equal alphas
+# function update_inv_hess(cone::HypoGeomean{T}) where {T}
+#     @assert all(isequal(inv(T(cone.dim - 1))), cone.alpha)
+#     @assert !cone.inv_hess_updated
+#     u = cone.point[1]
+#     w = view(cone.point, 2:cone.dim)
+#     n = cone.dim - 1
+#     wprod = cone.wprod
+#     H = cone.inv_hess.data
+#     denom = n * (n + 1) * wprod - abs2(n) * u
+#     H[1, 1] = (n + 1) * abs2(wprod) / n + abs2(u) - 2 * wprod * u
+#     H[1, 2:end] = wprod .* w / n
+#     H[2:end, 2:end] = wprod * w * w'
+#     H[2:end, 2:end] .+= Diagonal(abs2.(w) .* cone.z .* abs2(n))
+#     H[2:end, 2:end] /= denom
+#
+#     cone.inv_hess_updated = true
+#     return cone.inv_hess
+# end
+#
+# function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeomean{T}) where {T}
+#     @assert all(isequal(inv(T(cone.dim - 1))), cone.alpha)
+#     dim = cone.dim
+#     u = cone.point[1]
+#     w = view(cone.point, 2:dim)
+#     n = dim - 1
+#     wprod = cone.wprod
+#
+#     @inbounds for j in 1:size(prod, 2)
+#         @views pa = dot(w, arr[2:dim, j]) * wprod
+#         @. prod[2:dim, j] = pa * w
+#         prod[1, j] = pa / n
+#     end
+#     @. @views prod[1, :] += ((n + 1) * abs2(wprod) / n + abs2(u) - 2 * wprod * u) * arr[1, :]
+#     @. @views prod[2:dim, :] += (abs2.(w) .* cone.z .* abs2(n)) * arr[2:dim, :]
+#     @. @views prod[2:dim, :] /= (n * (n + 1) * wprod - abs2(n) * u)
+#     @views mul!(prod[2:dim, :], w, arr[1, :]', wprod / n, true)
+#     return prod
+# end
 
 function correction(
     cone::HypoGeomean{T},
