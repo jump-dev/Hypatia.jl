@@ -20,6 +20,7 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     timer::TimerOutput
 
     feas_updated::Bool
+    dual_feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     hess_fact_updated::Bool
@@ -65,7 +66,8 @@ end
 
 use_heuristic_neighborhood(cone::EpiNormEucl) = false
 
-reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = cone.nt_updated = false)
+reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated =
+    cone.hess_fact_updated = cone.scal_hess_updated = cone.nt_updated = false)
 
 use_nt(::EpiNormEucl) = true
 
@@ -135,12 +137,14 @@ function update_dual_feas(cone::EpiNormEucl)
 
     if u > 0
         w = view(cone.dual_point, 2:cone.dim)
-        return abs2(u) - sum(abs2, w) > 0
+        cone.dual_dist = abs2(u) - sum(abs2, w)
+        dual_feas = (cone.dual_dist > 0)
     else
-        return false
+        dual_feas = false
     end
+    cone.dual_feas_updated = true
 
-    return cone.is_feas
+    return dual_feas
 end
 
 function update_grad(cone::EpiNormEucl)
@@ -153,7 +157,7 @@ function update_grad(cone::EpiNormEucl)
     return cone.grad
 end
 
-function update_scal_hess(cone::EpiNormEucl)
+function update_scal_hess(cone::EpiNormEucl{T}, mu::T) where {T}
     @assert cone.grad_updated
     @assert cone.is_feas
     cone.nt_updated || update_nt(cone)
@@ -350,14 +354,15 @@ end
 # function step_and_update_scaling(cone::EpiNormEucl{T}, primal_dir::AbstractVector, dual_dir::AbstractVector, step_size::T) where {T}
 function update_nt(cone::EpiNormEucl{T}) where {T}
     @assert cone.feas_updated
+    cone.dual_feas_updated || update_dual_feas(cone)
     nt_point = cone.nt_point
     nt_point_sqrt = cone.nt_point_sqrt
     normalized_point = cone.normalized_point
     normalized_dual_point = cone.normalized_dual_point
 
-    # TODO put this somehwere more appropriate, better to judge when scaled updates are decided upon
-    @views cone.dual_dist = abs2(cone.dual_point[1]) - sum(abs2, cone.dual_point[2:end])
-    @assert cone.dual_dist >= 0
+    # # TODO put this somehwere more appropriate, better to judge when scaled updates are decided upon
+    # @views cone.dual_dist = abs2(cone.dual_point[1]) - sum(abs2, cone.dual_point[2:end])
+    # @assert cone.dual_dist >= 0
 
     # if cone.try_scaled_updates
     #     # based on CVXOPT code

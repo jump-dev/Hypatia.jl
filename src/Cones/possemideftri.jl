@@ -26,6 +26,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     timer::TimerOutput
 
     feas_updated::Bool
+    dual_feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
@@ -78,7 +79,7 @@ end
 
 use_heuristic_neighborhood(cone::PosSemidefTri) = false
 
-reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.scal_hess_updated = cone.nt_updated = false)
+reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.scal_hess_updated = cone.nt_updated = false)
 
 use_nt(::PosSemidefTri) = true
 
@@ -132,10 +133,11 @@ function update_feas(cone::PosSemidefTri)
     return cone.is_feas
 end
 
-function update_daul_feas(cone::PosSemidefTri)
+function update_dual_feas(cone::PosSemidefTri)
     svec_to_smat!(cone.dual_mat, cone.point, cone.rt2)
     copyto!(cone.mat2, cone.dual_mat)
     cone.dual_fact_mat = cholesky!(Hermitian(cone.mat2, :U), check = false)
+    cone.dual_feas_updated = true
     return isposdef(cone.dual_fact_mat)
 end
 
@@ -158,7 +160,7 @@ function update_hess(cone::PosSemidefTri)
     return cone.hess
 end
 
-function update_scal_hess(cone::PosSemidefTri)
+function update_scal_hess(cone::PosSemidefTri{T}, mu::T) where {T}
     @assert cone.grad_updated
     cone.nt_updated || update_nt(cone)
     symm_kron(cone.hess.data, cone.scalmat_sqrti' * cone.scalmat_sqrti, cone.rt2) # TODO fix mul
@@ -252,35 +254,13 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
 end
 
 # old step_and_update_scaling
-function update_nt(cone::PosSemidefTri{T, R}, primal_dir::AbstractVector, dual_dir::AbstractVector, step_size::T) where {R <: RealOrComplex{T}} where {T <: Real}
-    # if cone.try_scaled_updates
-    #     # get the next s, z but in the old scaling
-    #     # TODO improve efficiency below
-    #     svec_to_smat!(cone.work_mat, primal_dir, cone.rt2)
-    #     cone.mat3 = cone.new_scal_point + step_size * cone.scalmat_sqrti * Hermitian(cone.work_mat, :U) * cone.scalmat_sqrti'
-    #     svec_to_smat!(cone.work_mat, dual_dir, cone.rt2)
-    #     cone.work_mat3 = cone.new_scal_point + step_size * cone.scalmat_sqrt' * Hermitian(cone.work_mat, :U) * cone.scalmat_sqrt
-    #
-    #     # update old scaling
-    #     fact = cholesky!(Hermitian(cone.mat3, :U))
-    #     dual_fact = cholesky!(Hermitian(cone.work_mat3, :U))
-    #     (U, lambda, V) = svd(dual_fact.U * fact.L)
-    #     cone.new_scal_point = Diagonal(lambda)
-    #     # TODO improve efficiency below
-    #     cone.scalmat_sqrt = cone.scalmat_sqrt * fact.L * V * Diagonal(inv.(sqrt.(lambda)))
-    #     cone.scalmat_sqrti = Diagonal(sqrt.(lambda)) * V' * (fact.L \ cone.scalmat_sqrti)
-    # else
-        # calculate scaling without using old scaling
-        svec_to_smat!(cone.dual_mat, cone.dual_point, cone.rt2)
-        dual_fact_mat = cone.dual_fact = cholesky!(Hermitian(cone.dual_mat, :U), check = false)
-        svec_to_smat!(cone.mat, cone.point, cone.rt2) # TODO is this already done from update feas?
-        fact = cholesky(Hermitian(cone.mat, :U)) # TODO in-place
-
-        # TODO preallocate
-        (U, lambda, V) = svd(dual_fact_mat.U * fact.L)
-        cone.scalmat_sqrt = fact.L * V * Diagonal(inv.(sqrt.(lambda)))
-        cone.scalmat_sqrti = Diagonal(inv.(sqrt.(lambda))) * U' * dual_fact_mat.U
-    # end
+function update_nt(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+    @assert cone.feas_updated
+    cone.dual_feas_updated || update_dual_feas(cone)
+    # TODO preallocate
+    (U, lambda, V) = svd(cone.dual_fact_mat.U * cone.fact_mat.L)
+    cone.scalmat_sqrt = cone.fact_mat.L * V * Diagonal(inv.(sqrt.(lambda)))
+    cone.scalmat_sqrti = Diagonal(inv.(sqrt.(lambda))) * U' * cone.dual_fact_mat.U
 
     return
 end
