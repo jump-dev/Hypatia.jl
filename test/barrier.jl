@@ -66,8 +66,10 @@ function test_barrier_oracles(
         println("done grad")
         hess = CO.hess(cone)
         fd_hess = ForwardDiff.hessian(barrier, point)
-        @test hess ≈ fd_hess atol=tol rtol=tol
-        println("done hess")
+        if !CO.use_nt(cone)
+            @test hess ≈ fd_hess atol=tol rtol=tol
+            println("done hess")
+        end
     end
 
     # check 3rd order corrector agrees with ForwardDiff
@@ -81,7 +83,6 @@ function test_barrier_oracles(
         (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
         Hinv_z = CO.inv_hess_prod!(similar(dual_dir), dual_dir, cone)
         corr = CO.correction(cone, primal_dir, dual_dir)
-        @show corr
         # TODO increase dim limit, not sure why so slow
         if dim < 6 && T in (Float32, Float64)
             println("starting fd 3o")
@@ -92,7 +93,8 @@ function test_barrier_oracles(
             FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * Hinv_z / -2
             @test FD_corr ≈ corr atol=tol rtol=tol
         end
-        @test dot(corr, point) ≈ dot(Hinv_z, fd_hess * primal_dir) atol=tol rtol=tol
+        hess = (CO.use_nt(cone) ? CO.hess(cone) : cone.old_hess)
+        @test dot(corr, point) ≈ dot(Hinv_z, hess * primal_dir) atol=tol rtol=tol
     end
 
     return
@@ -193,7 +195,7 @@ end
 function test_epinormeucl_barrier(T::Type{<:Real})
     function barrier(s)
         (u, w) = (s[1], s[2:end])
-        return -log(abs2(u) - sum(abs2, w))
+        return -log(abs2(u) - sum(abs2, w)) / 2
     end
     for dim in [2, 3, 4, 6]
         test_barrier_oracles(CO.EpiNormEucl{T}(dim), barrier)
