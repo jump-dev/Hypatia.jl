@@ -31,7 +31,6 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     grad::Vector{T}
     correction::Vector{T}
     hess::Symmetric{T, Matrix{T}}
-    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
@@ -85,7 +84,6 @@ function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.correction = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
@@ -218,7 +216,6 @@ function update_hess(cone::EpiNormEucl)
     cone.hess[1, 1] -= inv_dist + inv_dist
 
     cone.hess_updated = true
-    copyto!(cone.old_hess.data, cone.hess.data)
     return cone.hess
 end
 

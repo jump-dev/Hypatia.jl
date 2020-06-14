@@ -41,9 +41,11 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
 
     mat::Matrix{R}
     dual_mat::Matrix{R} # NOTE in old branch this was named dual_fact_mat
-    mat2::Matrix{R}
+    mat2::Matrix{R} # TODO name better. used for cholesky of mat.
+    dual_mat2::Matrix{R}
     mat3::Matrix{R}
     mat4::Matrix{R}
+    mat5::Matrix{R}
     inv_mat::Matrix{R}
     fact_mat
     dual_fact_mat # NOTE in old branch this was named dual_fact
@@ -102,6 +104,8 @@ function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} whe
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
     cone.mat4 = similar(cone.mat)
+    cone.mat5 = similar(cone.mat)
+    cone.dual_mat2 = similar(cone.mat)
     cone.scalmat_sqrt = Matrix{T}(I, cone.side, cone.side)
     cone.scalmat_sqrti = Matrix{T}(I, cone.side, cone.side)
     cone.correction = zeros(T, dim)
@@ -134,9 +138,9 @@ function update_feas(cone::PosSemidefTri)
 end
 
 function update_dual_feas(cone::PosSemidefTri)
-    svec_to_smat!(cone.dual_mat, cone.point, cone.rt2)
-    copyto!(cone.mat2, cone.dual_mat)
-    cone.dual_fact_mat = cholesky!(Hermitian(cone.mat2, :U), check = false)
+    svec_to_smat!(cone.dual_mat, cone.dual_point, cone.rt2)
+    copyto!(cone.dual_mat2, cone.dual_mat)
+    cone.dual_fact_mat = cholesky!(Hermitian(cone.dual_mat2, :U), check = false)
     cone.dual_feas_updated = true
     return isposdef(cone.dual_fact_mat)
 end
@@ -199,8 +203,8 @@ end
 function herm_congruence_prod!(prod::AbstractVecOrMat, inner::AbstractVecOrMat, outer::AbstractVecOrMat, cone::PosSemidefTri)
     @inbounds for i in 1:size(inner, 2)
         svec_to_smat!(cone.mat3, view(inner, :, i), cone.rt2)
-        mul!(cone.mat2, Hermitian(cone.mat3, :U), outer)
-        mul!(cone.mat3, Hermitian(outer, :U), cone.mat2)
+        mul!(cone.mat4, Hermitian(cone.mat3, :U), outer)
+        mul!(cone.mat3, Hermitian(outer, :U), cone.mat4)
         smat_to_svec!(view(prod, :, i), cone.mat3, cone.rt2)
     end
     return prod
@@ -257,6 +261,8 @@ end
 function update_nt(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert cone.feas_updated
     cone.dual_feas_updated || update_dual_feas(cone)
+
+    (s, z) = cone.point[1], cone.dual_point[1]
     # TODO preallocate
     (U, lambda, V) = svd(cone.dual_fact_mat.U * cone.fact_mat.L)
     cone.scalmat_sqrt = cone.fact_mat.L * V * Diagonal(inv.(sqrt.(lambda)))
@@ -265,10 +271,11 @@ function update_nt(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} wher
     return
 end
 
+# TODO think about whether mat5 can be removed
 function correction(cone::PosSemidefTri, primal_dir::AbstractVector, dual_dir::AbstractVector)#, primal_point)
     @assert cone.grad_updated
 
-    S = copytri!(svec_to_smat!(cone.mat2, primal_dir, cone.rt2), 'U', cone.is_complex)
+    S = copytri!(svec_to_smat!(cone.mat5, primal_dir, cone.rt2), 'U', cone.is_complex)
     Z = Hermitian(svec_to_smat!(cone.mat3, dual_dir, cone.rt2))
 
     # TODO compare the following numerically
@@ -279,7 +286,7 @@ function correction(cone::PosSemidefTri, primal_dir::AbstractVector, dual_dir::A
     fact = cholesky(Hermitian(svec_to_smat!(cone.mat4, cone.point, cone.rt2), :U))
     Pinv_S_Z = mul!(cone.mat4, ldiv!(fact, S), Z)
 
-    Pinv_S_Z_symm = cone.mat2
+    Pinv_S_Z_symm = cone.mat5
     @. Pinv_S_Z_symm = (Pinv_S_Z + Pinv_S_Z') / 2
     smat_to_svec!(cone.correction, Pinv_S_Z_symm, cone.rt2)
 
