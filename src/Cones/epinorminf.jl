@@ -453,6 +453,55 @@ function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}, dual_dir
     return corr
 end
 
+function correction2(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
+    dim = cone.dim
+    point = cone.point
+    u = cone.point[1]
+    w = cone.w
+    den = cone.den
+
+    # third order derivatives
+    uuu = 4 * u * sum((3 - 4 * u / z * u) / z / z for z in den) + 2 * (cone.n - 1) / u / u / u
+    # TODO get below from cone.wden and cone.uden (can do with broadcast)
+    uuw = zeros(T, cone.n)
+    uww = zeros(T, cone.n)
+    www = zeros(T, cone.n)
+    for i in 1:cone.n
+        wi = w[i]
+        deni = den[i]
+        wideni4 = 4 * wi / deni
+        udeni4 = 4 * u / deni
+        www[i] = wideni4 * (3 + wideni4 * wi) / deni
+        uww[i] = -udeni4 * (1 + wideni4 * wi) / deni
+        uuw[i] = wideni4 * (-1 + udeni4 * u) / deni
+    end
+
+    # @show uuu
+    # @show extrema(abs, uuw)
+    # @show extrema(abs, uww)
+    # @show extrema(abs, www)
+
+    # third order derivative multiplied by s
+    u_dir = primal_dir[1]
+    corr = cone.correction
+    @views corr1 = (uuu * u_dir + dot(uuw, primal_dir[2:end])) * u_dir
+    for i in 1:cone.n
+        j = i + 1
+        pdj = primal_dir[j]
+        uwwi = uww[i]
+        edgei = uuw[i] * u_dir + uwwi * pdj
+        corr1 += edgei * pdj
+        corr[j] = edgei * u_dir + (uwwi * u_dir + www[i] * pdj) * pdj
+    end
+    corr[1] = corr1
+    @. corr /= -2
+
+    # @show extrema(abs, corr)
+
+    return corr
+end
+
+
 hess_nz_count(cone::EpiNormInf{<:Real, <:Real}) = 3 * cone.dim - 2
 hess_nz_count(cone::EpiNormInf{<:Real, <:Complex}) = 3 * cone.dim - 2 + 2 * cone.n
 hess_nz_count_tril(cone::EpiNormInf{<:Real, <:Real}) = 2 * cone.dim - 1

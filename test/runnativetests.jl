@@ -15,7 +15,7 @@ include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
 
 all_reals = [
-    Float64,
+    # Float64,
     # Float32,
     BigFloat,
     ]
@@ -92,7 +92,7 @@ tol = 1e-12
 other_options = (
     verbose = true,
     # verbose = false,
-    iter_limit = 50,
+    iter_limit = 100,
     time_limit = 6e1,
     timer = timer,
     # TODO this is tighter than default

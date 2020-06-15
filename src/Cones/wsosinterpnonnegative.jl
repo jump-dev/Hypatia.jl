@@ -185,3 +185,12 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector, dua
     end
     return corr
 end
+
+function correction2(cone::WSOSInterpNonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
+    corr = cone.correction
+    @inbounds for k in eachindex(corr)
+        # TODO simplify to make efficient
+        corr[k] = sum(sum(UUk[i, j] * UUk[i, k] * UUk[j, k] for UUk in cone.tmpUU) * primal_dir[i] * primal_dir[j] for i in eachindex(corr), j in eachindex(corr))
+    end
+    return corr
+end

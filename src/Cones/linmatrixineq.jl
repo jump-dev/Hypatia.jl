@@ -177,3 +177,17 @@ function correction(
     end
     return corr
 end
+
+function correction2(
+    cone::LinMatrixIneq{T},
+    primal_dir::AbstractVector{T},
+    dual_dir::AbstractVector{T},
+    ) where {T <: Real}
+    sumAinvAs = cone.sumAinvAs
+    corr = cone.correction
+    for i in eachindex(corr)
+        # TODO trace of 3 matrix muls is expensive - try to simplify and cache
+        corr[i] = sum(real(tr(sumAinvAs[i] * sumAinvAs[j] * sumAinvAs[k])) * primal_dir[j] * primal_dir[k] for j in 1:cone.dim, k in 1:cone.dim)
+    end
+    return corr
+end

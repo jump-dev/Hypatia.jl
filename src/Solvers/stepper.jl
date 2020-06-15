@@ -110,88 +110,88 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     return stepper
 end
 
-function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
-    cones = solver.model.cones
-    point = solver.point
-    timer = solver.timer
-
-    rtmu = sqrt(solver.mu)
-    irtmu = inv(rtmu)
-    # @show irtmu
-    # @assert irtmu >= one(T)
-    Cones.load_point.(cones, point.primal_views)
-    Cones.rescale_point.(cones, irtmu)
-    Cones.load_dual_point.(cones, point.dual_views)
-    Cones.reset_data.(cones)
-    @assert all(Cones.is_feas.(cones))
-    Cones.grad.(cones)
-    Cones.hess.(cones)
-    # Cones.update_scal_hess.(cones, solver.mu, true) # use scaling update
-    # Cones.update_scal_hess.(cones, solver.mu, false) # use scaling update
-
-    update_lhs(solver.system_solver, solver)
-
-    update_rhs_pred(stepper, solver)
-    get_directions(stepper, solver, iter_ref_steps = 3)
-
-    # if solver.mu > 1e-5
-        # update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha)
-        update_rhs_predcorr(stepper, solver, one(T))
-        get_directions(stepper, solver, iter_ref_steps = 3)
-    # end
-
-    stepper.prev_aff_alpha = aff_alpha = find_max_alpha(stepper, solver, true, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2))
-
-    # stepper.prev_gamma = gamma = (one(T) - aff_alpha) * min(abs2(one(T) - aff_alpha), T(0.25))
-    stepper.prev_gamma = gamma = (one(T) - aff_alpha)^2
-    # if aff_alpha < 0.1
-    #     stepper.prev_gamma = gamma = solver.mu / 3
-    # else
-    #     stepper.prev_gamma = gamma = (one(T) - aff_alpha)^2
-    # end
-
-    # TODO have to reload point after affine alpha line search
-    Cones.load_point.(cones, point.primal_views)
-    Cones.rescale_point.(cones, irtmu)
-    Cones.load_dual_point.(cones, point.dual_views)
-    Cones.reset_data.(cones)
-    @assert all(Cones.is_feas.(cones))
-    Cones.grad.(cones)
-    Cones.hess.(cones)
-    Cones.scal_hess.(cones, solver.mu)
-
-    update_rhs_comb(stepper, solver, zero(T), gamma)
-    # if solver.mu > 1e-5
-        # update_rhs_comb(stepper, solver, aff_alpha, gamma)
-        get_directions(stepper, solver, iter_ref_steps = 3)
-        update_rhs_comb(stepper, solver, one(T), gamma)
-    # end
-    get_directions(stepper, solver, iter_ref_steps = 5)
-
-    alpha = find_max_alpha(stepper, solver, false, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
-    if iszero(alpha)
-        @warn("very small alpha")
-        solver.status = :NumericalFailure
-        return false
-    end
-    stepper.prev_alpha = alpha
-
-    @. point.x += alpha * stepper.x_dir
-    @. point.y += alpha * stepper.y_dir
-    @. point.z += alpha * stepper.z_dir
-    @. point.s += alpha * stepper.s_dir
-    solver.tau += alpha * stepper.dir[stepper.tau_row]
-    solver.kap += alpha * stepper.dir[stepper.kap_row]
-    calc_mu(solver)
-
-    if solver.tau <= zero(T) || solver.kap <= zero(T) || solver.mu <= zero(T)
-        @warn("numerical failure: tau is $(solver.tau), kappa is $(solver.kap), mu is $(solver.mu); terminating")
-        solver.status = :NumericalFailure
-        return false
-    end
-
-    return true
-end
+# function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+#     cones = solver.model.cones
+#     point = solver.point
+#     timer = solver.timer
+#
+#     rtmu = sqrt(solver.mu)
+#     irtmu = inv(rtmu)
+#     # @show irtmu
+#     # @assert irtmu >= one(T)
+#     Cones.load_point.(cones, point.primal_views)
+#     Cones.rescale_point.(cones, irtmu)
+#     Cones.load_dual_point.(cones, point.dual_views)
+#     Cones.reset_data.(cones)
+#     @assert all(Cones.is_feas.(cones))
+#     Cones.grad.(cones)
+#     Cones.hess.(cones)
+#     # Cones.update_scal_hess.(cones, solver.mu, true) # use scaling update
+#     # Cones.update_scal_hess.(cones, solver.mu, false) # use scaling update
+#
+#     update_lhs(solver.system_solver, solver)
+#
+#     update_rhs_pred(stepper, solver)
+#     get_directions(stepper, solver, iter_ref_steps = 3)
+#
+#     # if solver.mu > 1e-5
+#         # update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha)
+#         update_rhs_predcorr(stepper, solver, one(T))
+#         get_directions(stepper, solver, iter_ref_steps = 3)
+#     # end
+#
+#     stepper.prev_aff_alpha = aff_alpha = find_max_alpha(stepper, solver, true, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2))
+#
+#     # stepper.prev_gamma = gamma = (one(T) - aff_alpha) * min(abs2(one(T) - aff_alpha), T(0.25))
+#     stepper.prev_gamma = gamma = (one(T) - aff_alpha)^2
+#     # if aff_alpha < 0.1
+#     #     stepper.prev_gamma = gamma = solver.mu / 3
+#     # else
+#     #     stepper.prev_gamma = gamma = (one(T) - aff_alpha)^2
+#     # end
+#
+#     # TODO have to reload point after affine alpha line search
+#     Cones.load_point.(cones, point.primal_views)
+#     Cones.rescale_point.(cones, irtmu)
+#     Cones.load_dual_point.(cones, point.dual_views)
+#     Cones.reset_data.(cones)
+#     @assert all(Cones.is_feas.(cones))
+#     Cones.grad.(cones)
+#     Cones.hess.(cones)
+#     Cones.scal_hess.(cones, solver.mu)
+#
+#     update_rhs_comb(stepper, solver, zero(T), gamma)
+#     # if solver.mu > 1e-5
+#         # update_rhs_comb(stepper, solver, aff_alpha, gamma)
+#         get_directions(stepper, solver, iter_ref_steps = 3)
+#         update_rhs_comb(stepper, solver, one(T), gamma)
+#     # end
+#     get_directions(stepper, solver, iter_ref_steps = 5)
+#
+#     alpha = find_max_alpha(stepper, solver, false, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
+#     if iszero(alpha)
+#         @warn("very small alpha")
+#         solver.status = :NumericalFailure
+#         return false
+#     end
+#     stepper.prev_alpha = alpha
+#
+#     @. point.x += alpha * stepper.x_dir
+#     @. point.y += alpha * stepper.y_dir
+#     @. point.z += alpha * stepper.z_dir
+#     @. point.s += alpha * stepper.s_dir
+#     solver.tau += alpha * stepper.dir[stepper.tau_row]
+#     solver.kap += alpha * stepper.dir[stepper.kap_row]
+#     calc_mu(solver)
+#
+#     if solver.tau <= zero(T) || solver.kap <= zero(T) || solver.mu <= zero(T)
+#         @warn("numerical failure: tau is $(solver.tau), kappa is $(solver.kap), mu is $(solver.mu); terminating")
+#         solver.status = :NumericalFailure
+#         return false
+#     end
+#
+#     return true
+# end
 
 
 # predict / center
@@ -200,54 +200,55 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
     timer = solver.timer
 
-    rtmu = sqrt(solver.mu)
-    irtmu = inv(rtmu)
+    # rtmu = sqrt(solver.mu)
+    # irtmu = inv(rtmu)
     # @show irtmu
     # @assert irtmu >= one(T)
-    Cones.load_point.(cones, point.primal_views)
-    Cones.rescale_point.(cones, irtmu)
-    Cones.load_dual_point.(cones, point.dual_views)
-    Cones.reset_data.(cones)
-    @assert all(Cones.is_feas.(cones))
-    Cones.grad.(cones)
-    Cones.hess.(cones)
+    # Cones.load_point.(cones, point.primal_views)
+    # Cones.rescale_point.(cones, irtmu)
+    # Cones.load_dual_point.(cones, point.dual_views)
+    # Cones.reset_data.(cones)
+    # @assert all(Cones.is_feas.(cones))
+    # Cones.grad.(cones)
+    # Cones.hess.(cones)
     # @show Cones.in_neighborhood.(cones, solver.mu)
+
+    use_corr = true
+    # use_corr = false
+
+    update_lhs(solver.system_solver, solver)
 
     # if iseven(solver.num_iters) # TODO maybe use nbhd to determine whether to center or predict
     # TODO use nbhd to determine whether to center or predict
     # if mod(solver.num_iters, 2) == 0
     if all(Cones.in_neighborhood.(cones, solver.mu, T(0.05)))
         # predict
-        println("pred")
-        # Cones.update_scal_hess.(cones, solver.mu, true) # use scaling update
-        # Cones.update_scal_hess.(cones, solver.mu, false) # use scaling update
-        update_lhs(solver.system_solver, solver)
+        # println("pred")
         update_rhs_pred(stepper, solver)
-
         get_directions(stepper, solver, iter_ref_steps = 3)
+        if use_corr
         # if solver.mu > 1e-5
             # update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha)
             update_rhs_predcorr(stepper, solver, one(T))
             get_directions(stepper, solver, iter_ref_steps = 3)
             # update_rhs_predcorr(stepper, solver, one(T))
-            # get_directions(stepper, solver, iter_ref_steps = 3)
-        # end
+        end
         pred = true
+        stepper.prev_gamma = zero(T) # TODO print like "pred" in column, or "cent" otherwise
     else
         # center
-        # Cones.update_scal_hess.(cones, solver.mu, false) # don't use scaling update
-        update_lhs(solver.system_solver, solver)
         update_rhs_cent(stepper, solver)
-
         get_directions(stepper, solver, iter_ref_steps = 3)
         # if solver.mu > 1e-5
+        if use_corr
             update_rhs_centcorr(stepper, solver, one(T))
-            get_directions(stepper, solver, iter_ref_steps = 3)
-            # update_rhs_centcorr(stepper, solver, one(T))
             # get_directions(stepper, solver, iter_ref_steps = 3)
-        # end
+            # update_rhs_centcorr(stepper, solver, one(T))
+        end
         pred = false
+        stepper.prev_gamma = one(T)
     end
+    get_directions(stepper, solver, iter_ref_steps = 3)
 
     alpha = find_max_alpha(stepper, solver, false, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
     # @show alpha

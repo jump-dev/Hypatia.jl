@@ -293,6 +293,77 @@ function correction(
     return cone.correction
 end
 
+function correction2(
+    cone::HypoGeomean{T},
+    primal_dir::AbstractVector{T},
+    dual_dir::AbstractVector{T},
+    ) where {T <: Real}
+    if !cone.hess_updated
+        update_hess(cone)
+    end
+    dim = cone.dim
+    u = cone.point[1]
+    w = view(cone.point, 2:dim)
+    wprod = cone.wprod
+    z = cone.z
+    alpha = cone.alpha
+    pi = prod(w[j] ^ alpha[j] for j in eachindex(w))
+    wwprodu = wprod / z
+    tau = alpha ./ w ./ z
+    alpha = cone.alpha
+
+    third = zeros(T, dim, dim, dim)
+    # Tuuu
+    third[1, 1, 1] = 2 / z ^ 3
+    # Tuuw
+    for i in eachindex(w)
+        i1 = i + 1
+        third[1, 1, i1] = third[1, i1, 1] = third[i1, 1, 1] = -2 * tau[i] * pi / abs2(z)
+    end
+    # Tuww
+    for i in eachindex(w), j in eachindex(w)
+        (i1, j1) = (i + 1, j + 1)
+        t1 = pi * tau[i] * tau[j] * (2 * pi / z - 1)
+        if i == j
+            third[i1, i1, 1] = third[i1, 1, i1] = third[1, i1, i1] = t1 + tau[i] * pi / w[i] / z
+        else
+            third[1, i1, j1] = third[1, j1, i1] = third[i1, 1, j1] = third[j1, 1, i1] =
+                third[i1, j1, 1] = third[j1, i1, 1] = t1
+        end
+    end
+    # Twww
+    sigma = alpha ./ w
+    for i in eachindex(w), j in eachindex(w), k in eachindex(w)
+        (i1, j1, k1) = (i + 1, j + 1, k + 1)
+        t1 = u * pi / abs2(z) * sigma[i] * sigma[j] * sigma[k] * (1 - 2 * pi / z)
+        if i == j
+            t2 = pi * sigma[i] * sigma[k] / w[i] / z * (1 - pi / z)
+            if j == k
+                third[i1, i1, i1] = t1 + t2 - 2 * pi * tau[i] / w[i] * (u * tau[i] + inv(w[i])) - 2 / w[i] ^ 3
+            else
+                third[i1, i1, k1] = third[i1, k1, i1] = third[k1, i1, i1] = t1 + t2
+            end
+        elseif i != k && j != k
+            third[i1, j1, k1] = third[i1, k1, j1] = third[j1, i1, k1] = third[j1, k1, i1] =
+                third[k1, i1, j1] = third[k1, j1, i1] = t1
+        end
+    end
+    third_order = reshape(third, dim ^ 2, dim)
+
+    # function barrier(s)
+    #     (u, w) = (s[1], s[2:end])
+    #     return -log(prod(w[j] ^ alpha[j] for j in eachindex(w)) - u) - sum(log(wi) for wi in w)
+    # end
+    # FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), cone.point)
+    # @show (third_order - FD_3deriv)
+
+    cone.correction = reshape(third_order * primal_dir, dim, dim) * primal_dir
+    cone.correction ./= -2
+
+    return cone.correction
+end
+
+
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
 function get_central_ray_hypogeomean(alpha::Vector{<:Real})
     wdim = length(alpha)
