@@ -81,8 +81,8 @@ function test_barrier_oracles(
         end
         # check correction term agrees with directional 3rd derivative
         (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
-        Hinv_z = CO.inv_hess_prod!(similar(dual_dir), dual_dir, cone)
-        corr = CO.correction(cone, primal_dir, dual_dir)
+        # Hinv_z = CO.inv_hess_prod!(similar(dual_dir), dual_dir, cone)
+        corr = CO.correction2(cone, primal_dir, dual_dir)
         # TODO increase dim limit, not sure why so slow
         if dim < 6 && T in (Float32, Float64)
             println("starting fd 3o")
@@ -90,11 +90,12 @@ function test_barrier_oracles(
             println("done fd 3o")
             # check log-homog property that F'''(point)[point] = -2F''(point)
             @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * fd_hess atol=tol rtol=tol
-            FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * Hinv_z / -2
+            # FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * Hinv_z / -2
+            FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
             @test FD_corr ≈ corr atol=tol rtol=tol
         end
-        hess = (CO.use_nt(cone) ? CO.hess(cone) : cone.old_hess)
-        @test dot(corr, point) ≈ dot(Hinv_z, hess * primal_dir) atol=tol rtol=tol
+        # hess = (CO.use_nt(cone) ? CO.hess(cone) : cone.old_hess)
+        # @test dot(corr, point) ≈ dot(Hinv_z, hess * primal_dir) atol=tol rtol=tol
     end
 
     return
@@ -354,7 +355,7 @@ function test_linmatrixineq_barrier(T::Type{<:Real})
 end
 
 function test_possemideftri_barrier(T::Type{<:Real})
-    for side in [1, 2, 5]
+    for side in [1, 2, 3, 5]
         # real PSD cone
         function R_barrier(s)
             S = similar(s, side, side)

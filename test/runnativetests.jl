@@ -15,7 +15,7 @@ include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
 
 all_reals = [
-    # Float64,
+    Float64,
     # Float32,
     BigFloat,
     ]

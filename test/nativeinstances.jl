@@ -1265,7 +1265,8 @@ function linmatrixineq3(T; options...)
 end
 
 function possemideftri1(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = T[0, -1, 0]
     A = T[1 0 0; 0 0 1]
     b = T[0.5, 1]
@@ -1280,7 +1281,8 @@ function possemideftri1(T; options...)
 end
 
 function possemideftri2(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = T[0, -1, 0]
     A = T[1 0 1]
     b = T[0]
@@ -1295,7 +1297,8 @@ function possemideftri2(T; options...)
 end
 
 function possemideftri3(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     rt2 = sqrt(T(2))
     Random.seed!(1)
     c = T[1]
@@ -1314,7 +1317,8 @@ function possemideftri3(T; options...)
 end
 
 function possemideftri4(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     rt2 = sqrt(T(2))
     Random.seed!(1)
     s = 3
@@ -1334,7 +1338,8 @@ function possemideftri4(T; options...)
 end
 
 function possemideftri5(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     Trt2 = sqrt(T(2))
     Trt2i = inv(Trt2)
     c = T[1, 0, 0, 1]
@@ -1351,7 +1356,8 @@ function possemideftri5(T; options...)
 end
 
 function possemideftri6(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     rt2 = sqrt(T(2))
     Random.seed!(1)
     c = T[1]
@@ -1370,7 +1376,8 @@ function possemideftri6(T; options...)
 end
 
 function possemideftri7(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 3
@@ -1390,7 +1397,8 @@ function possemideftri7(T; options...)
 end
 
 function possemideftri8(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     rt2 = sqrt(T(2))
     c = T[1]
     A = zeros(T, 0, 1)
@@ -1413,7 +1421,8 @@ function possemideftri8(T; options...)
 end
 
 function possemideftri9(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     rt2 = sqrt(T(2))
     inv2 = inv(T(2))
     c = vcat(one(T), zeros(T, 9))

@@ -292,3 +292,15 @@ function correction(cone::PosSemidefTri, primal_dir::AbstractVector, dual_dir::A
 
     return cone.correction
 end
+
+function correction2(cone::PosSemidefTri, primal_dir::AbstractVector, dual_dir::AbstractVector)#, primal_point)
+    @assert cone.grad_updated
+
+    S = copytri!(svec_to_smat!(cone.mat5, primal_dir, cone.rt2), 'U', cone.is_complex)
+    ldiv!(cone.fact_mat, S)
+    rdiv!(S, cone.fact_mat.U)
+    mul!(cone.mat3, S, S') # TODO use outer prod function
+    smat_to_svec!(cone.correction, cone.mat3, cone.rt2)
+
+    return cone.correction
+end
