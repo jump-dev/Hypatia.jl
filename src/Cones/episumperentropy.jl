@@ -75,7 +75,7 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     end
 end
 
-# reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = cone.hess_inv_hess_updated = false)
+reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = cone.hess_inv_hess_updated = false)
 
 # reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
 
@@ -123,7 +123,9 @@ function update_feas(cone::EpiSumPerEntropy)
     u = cone.point[1]
     @views v = cone.point[cone.v_idxs]
     @views w = cone.point[cone.w_idxs]
-
+    # @show u
+    # @show v
+    # @show w
     if all(vi -> vi > 0, v) && all(wi -> wi > 0, w)
         @. cone.tau = log(w / v)
         cone.z = u - dot(w, cone.tau)
@@ -136,19 +138,21 @@ function update_feas(cone::EpiSumPerEntropy)
     return cone.is_feas
 end
 
-function update_dual_feas(cone::EpiSumPerEntropy{T}) where {T <: Real}
-    u = cone.point[1]
-    @views v = cone.point[cone.v_idxs]
-    @views w = cone.point[cone.w_idxs]
-
-    if all(vi -> vi > 0, v) && u > 0
-        # TODO allocates
-        return all(u * (one(T) .+ log.(v / u)) + w .> 0)
-    else
-        return false
-    end
-end
-
+# TODO 
+update_dual_feas(cone::EpiSumPerEntropy) = true
+# function update_dual_feas(cone::EpiSumPerEntropy{T}) where {T <: Real}
+#     u = cone.point[1]
+#     @views v = cone.point[cone.v_idxs]
+#     @views w = cone.point[cone.w_idxs]
+#
+#     if all(vi -> vi > 0, v) && u > 0
+#         # TODO allocates
+#         return all(u * (one(T) .+ log.(v / u)) + w .> 0)
+#     else
+#         return false
+#     end
+# end
+#
 function update_grad(cone::EpiSumPerEntropy)
     @assert cone.is_feas
     u = cone.point[1]
@@ -167,7 +171,7 @@ function update_grad(cone::EpiSumPerEntropy)
     cone.grad_updated = true
     return cone.grad
 end
-
+#
 function update_hess_inv_hess(cone::EpiSumPerEntropy)
     @assert !cone.hess_inv_hess_updated
     v_idxs = cone.v_idxs
@@ -230,109 +234,109 @@ function update_hess(cone::EpiSumPerEntropy)
         end
     end
 
-    copyto!(cone.old_hess.data, H)
+    # copyto!(cone.old_hess.data, H)
 
     cone.hess_updated = true
     return cone.hess
 end
 
-# # auxiliary calculations for inverse Hessian and inverse Hessian prod
-# function inv_hess_vals(cone)
-#     cone.hess_inv_hess_updated || update_hess_inv_hess(cone)
-#     u = cone.point[1]
-#     v_idxs = cone.v_idxs
-#     w_idxs = cone.w_idxs
-#     point = cone.point
-#     @views v = point[v_idxs]
-#     @views w = point[w_idxs]
-#     z = cone.z
-#     Hu = cone.Hu
-#     logprod = u - z # TODO cache in feas check?
-#     @. cone.denom = z + 2 * w
-#
-#     for (i, v_idx, w_idx) in zip(1:cone.w_dim, v_idxs, w_idxs)
-#         temp1 = logprod - w[i] * log(w[i] / v[i]) # TODO cache in feas check?
-#         temp2 = log(w[i] / v[i])# TODO cache in feas check?
-#         Hu[v_idx - 1] = -(u - temp1 - 2 * w[i] * temp2) * w[i] * v[i] / cone.denom[i]
-#         Hu[w_idx - 1] = abs2(w[i]) * (temp2 * z + u - temp1) / cone.denom[i]
-#     end
-#     @views cone.Huu = abs2(z) * (1 - dot(Hu, cone.old_hess[1, 2:cone.dim]))
-#     @. cone.Hvw = v * abs2(w)
-#     @. cone.Hvv = z + w
-#     @. cone.Hww = cone.Hvv * abs2(w)
-#     @. cone.Hvv *= abs2(v)
-#
-#     return
-# end
-#
-# function update_inv_hess(cone::EpiSumPerEntropy{T}) where {T}
-#     inv_hess_vals(cone)
-#     dim = cone.dim
-#     w_dim = cone.w_dim
-#
-#     if !isdefined(cone, :inv_hess)
-#         # initialize sparse idxs for upper triangle of Hessian
-#         dim = cone.dim
-#         H_nnz_tri = 2 * dim - 1 + w_dim
-#         I = Vector{Int}(undef, H_nnz_tri)
-#         J = Vector{Int}(undef, H_nnz_tri)
-#         idxs1 = 1:dim
-#         I[idxs1] .= 1
-#         J[idxs1] .= idxs1
-#         idxs2 = (dim + 1):(2 * dim - 1)
-#         I[idxs2] .= 2:dim
-#         J[idxs2] .= 2:dim
-#         idxs3 = (2 * dim):H_nnz_tri
-#         I[idxs3] .= 2:2:dim
-#         J[idxs3] .= 3:2:dim
-#         V = ones(T, H_nnz_tri)
-#         cone.inv_hess = Symmetric(sparse(I, J, V, dim, dim), :U)
-#     end
-#
-#     # modify nonzeros of sparse data structure of upper triangle of Hessian
-#     H_nzval = cone.inv_hess.data.nzval
-#     H_nzval[1] = cone.Huu
-#     vw_idx = 1
-#     nz_idx = 2
-#     dim_idx = 1
-#     @inbounds for j in 1:w_dim
-#         H_nzval[nz_idx] = cone.Hu[dim_idx]
-#         H_nzval[nz_idx + 1] = cone.Hvv[vw_idx] / cone.denom[vw_idx]
-#         nz_idx += 2
-#         dim_idx += 1
-#         H_nzval[nz_idx] = cone.Hu[dim_idx]
-#         H_nzval[nz_idx + 1] = cone.Hvw[vw_idx] / cone.denom[vw_idx]
-#         # @show typeof(cone.Hvw)
-#         H_nzval[nz_idx + 2] = cone.Hww[vw_idx] / cone.denom[vw_idx]
-#         nz_idx += 3
-#         vw_idx += 1
-#         dim_idx += 1
-#     end
-#
-#     cone.inv_hess_updated = true
-#     return cone.inv_hess
-# end
-#
-# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
-#     # updates for nonzero values in the inverse Hessian
-#     inv_hess_vals(cone)
-#     Hu = cone.Hu
-#     Huu = cone.Huu
-#     Hvv = cone.Hvv
-#     Hvw = cone.Hvw
-#     Hww = cone.Hww
-#     denom = cone.denom
-#
-#     @. @views prod[1, :] = arr[1, :] * Huu
-#     @views mul!(prod[1, :], arr[2:end, :]', Hu, true, true)
-#     @. @views prod[2:end, :] = Hu * arr[1, :]'
-#     @inbounds for i in 1:cone.w_dim
-#         @. @views prod[2i, :] += (Hvv[i] * arr[2i, :] + Hvw[i] * arr[2i + 1, :]) / denom[i]
-#         @. @views prod[2i + 1, :] += (Hww[i] * arr[2i + 1, :] + Hvw[i] * arr[2i, :]) / denom[i]
-#     end
-#
-#     return prod
-# end
+# auxiliary calculations for inverse Hessian and inverse Hessian prod
+function inv_hess_vals(cone)
+    cone.hess_inv_hess_updated || update_hess_inv_hess(cone)
+    u = cone.point[1]
+    v_idxs = cone.v_idxs
+    w_idxs = cone.w_idxs
+    point = cone.point
+    @views v = point[v_idxs]
+    @views w = point[w_idxs]
+    z = cone.z
+    Hu = cone.Hu
+    logprod = u - z # TODO cache in feas check?
+    @. cone.denom = z + 2 * w
+
+    for (i, v_idx, w_idx) in zip(1:cone.w_dim, v_idxs, w_idxs)
+        temp1 = logprod - w[i] * log(w[i] / v[i]) # TODO cache in feas check?
+        temp2 = log(w[i] / v[i])# TODO cache in feas check?
+        Hu[v_idx - 1] = -(u - temp1 - 2 * w[i] * temp2) * w[i] * v[i] / cone.denom[i]
+        Hu[w_idx - 1] = abs2(w[i]) * (temp2 * z + u - temp1) / cone.denom[i]
+    end
+    @views cone.Huu = abs2(z) * (1 - dot(Hu, cone.old_hess[1, 2:cone.dim]))
+    @. cone.Hvw = v * abs2(w)
+    @. cone.Hvv = z + w
+    @. cone.Hww = cone.Hvv * abs2(w)
+    @. cone.Hvv *= abs2(v)
+
+    return
+end
+
+function update_inv_hess(cone::EpiSumPerEntropy{T}) where {T}
+    inv_hess_vals(cone)
+    dim = cone.dim
+    w_dim = cone.w_dim
+
+    if !isdefined(cone, :inv_hess)
+        # initialize sparse idxs for upper triangle of Hessian
+        dim = cone.dim
+        H_nnz_tri = 2 * dim - 1 + w_dim
+        I = Vector{Int}(undef, H_nnz_tri)
+        J = Vector{Int}(undef, H_nnz_tri)
+        idxs1 = 1:dim
+        I[idxs1] .= 1
+        J[idxs1] .= idxs1
+        idxs2 = (dim + 1):(2 * dim - 1)
+        I[idxs2] .= 2:dim
+        J[idxs2] .= 2:dim
+        idxs3 = (2 * dim):H_nnz_tri
+        I[idxs3] .= 2:2:dim
+        J[idxs3] .= 3:2:dim
+        V = ones(T, H_nnz_tri)
+        cone.inv_hess = Symmetric(sparse(I, J, V, dim, dim), :U)
+    end
+
+    # modify nonzeros of sparse data structure of upper triangle of Hessian
+    H_nzval = cone.inv_hess.data.nzval
+    H_nzval[1] = cone.Huu
+    vw_idx = 1
+    nz_idx = 2
+    dim_idx = 1
+    @inbounds for j in 1:w_dim
+        H_nzval[nz_idx] = cone.Hu[dim_idx]
+        H_nzval[nz_idx + 1] = cone.Hvv[vw_idx] / cone.denom[vw_idx]
+        nz_idx += 2
+        dim_idx += 1
+        H_nzval[nz_idx] = cone.Hu[dim_idx]
+        H_nzval[nz_idx + 1] = cone.Hvw[vw_idx] / cone.denom[vw_idx]
+        # @show typeof(cone.Hvw)
+        H_nzval[nz_idx + 2] = cone.Hww[vw_idx] / cone.denom[vw_idx]
+        nz_idx += 3
+        vw_idx += 1
+        dim_idx += 1
+    end
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
+    # updates for nonzero values in the inverse Hessian
+    inv_hess_vals(cone)
+    Hu = cone.Hu
+    Huu = cone.Huu
+    Hvv = cone.Hvv
+    Hvw = cone.Hvw
+    Hww = cone.Hww
+    denom = cone.denom
+
+    @. @views prod[1, :] = arr[1, :] * Huu
+    @views mul!(prod[1, :], arr[2:end, :]', Hu, true, true)
+    @. @views prod[2:end, :] = Hu * arr[1, :]'
+    @inbounds for i in 1:cone.w_dim
+        @. @views prod[2i, :] += (Hvv[i] * arr[2i, :] + Hvw[i] * arr[2i + 1, :]) / denom[i]
+        @. @views prod[2i + 1, :] += (Hww[i] * arr[2i + 1, :] + Hvw[i] * arr[2i, :]) / denom[i]
+    end
+
+    return prod
+end
 
 function correction(
     cone::EpiSumPerEntropy{T},
@@ -459,6 +463,131 @@ function correction(
 
     Hi_z .*= -T(0.5)
     cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
+
+    return cone.correction
+end
+
+function correction2(
+    cone::EpiSumPerEntropy{T},
+    primal_dir::AbstractVector{T},
+    dual_dir::AbstractVector{T},
+    ) where {T <: Real}
+    @assert cone.hess_updated
+    tau = cone.tau
+    sigma = cone.sigma
+    z = cone.z
+    w_dim = cone.w_dim
+    u = cone.point[1]
+    v_idxs = cone.v_idxs
+    w_idxs = cone.w_idxs
+    point = cone.point
+    @views v = point[v_idxs]
+    @views w = point[w_idxs]
+
+    third = zeros(T, cone.dim, cone.dim, cone.dim)
+
+    # Tuuu
+    third[1, 1, 1] = -2 / z ^ 3
+    # Tuuv
+    third[1, 1, v_idxs] = third[1, v_idxs, 1] = third[v_idxs, 1, 1] = -2 * sigma / abs2(z)
+    # Tuuw
+    third[1, 1, w_idxs] = third[1, w_idxs, 1] = third[w_idxs, 1, 1] = -2 * tau / abs2(z)
+    # Tuvv
+    third[1, v_idxs, v_idxs] = third[v_idxs, 1, v_idxs] = third[v_idxs, v_idxs, 1] = -2 * sigma * sigma' / z - Diagonal(sigma ./ v / z)
+    # Tuvw
+    third[1, v_idxs, w_idxs] = third[v_idxs, 1, w_idxs] = third[v_idxs, w_idxs, 1] =
+        -2 * sigma * tau' / z + Diagonal(inv.(v) / abs2(z))
+    third[1, w_idxs, v_idxs] = third[w_idxs, 1, v_idxs] = third[w_idxs, v_idxs, 1] =
+        -2 * tau * sigma' / z + Diagonal(inv.(v) / abs2(z))
+    # Tuww
+    third[1, w_idxs, w_idxs] = third[w_idxs, 1, w_idxs] = third[w_idxs, w_idxs, 1] = -2 * tau * tau' / z - Diagonal(inv.(w) / abs2(z))
+    # Tvvv
+    for i in 1:w_dim, j in 1:w_dim, k in 1:w_dim
+        (ti, tj, tk) = (v_idxs[i], v_idxs[j], v_idxs[k])
+        t1 = -2 * sigma[i] * sigma[j] * sigma[k]
+        if i == j
+            t2 = -sigma[i] * sigma[k] / v[i]
+            if j == k
+                third[ti, ti, ti] = t1 + 3 * t2 - 2 * sigma[i] / abs2(v[i]) - 2 / v[i] ^ 3
+            else
+                third[ti, ti, tk] = third[ti, tk, ti] = third[tk, ti, ti] = t1 + t2
+            end
+        elseif i != k && j != k
+            third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
+                third[tk, ti, tj] = third[tk, tj, ti] = t1
+        end
+    end
+    # Tvvw
+    for i in 1:w_dim, j in 1:w_dim, k in 1:w_dim
+        # note that the offset for w is not the same as the offset for the vs, so even if i = k, ti != tk, so we make sure to account for that
+        (ti, tj, tk) = (v_idxs[i], v_idxs[j], w_idxs[k])
+        t1 = -2 * sigma[i] * sigma[j] * tau[k]
+        if i == j
+            t2 = -sigma[i] * tau[k] / v[i]
+            if j == k
+                # vi vi wi
+                third[ti, ti, tk] = third[ti, tk, ti] = third[tk, ti, ti] = t1 + t2 + 2 * sigma[i] / v[i] / z + inv(abs2(v[i])) / z
+            else
+                # vi vi wk
+                third[ti, ti, tk] = third[ti, tk, ti] = third[tk, ti, ti] = t1 + t2
+            end
+        elseif i == k
+            # vi vj wj, symmetric to vi vj wi
+            third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
+                third[tk, ti, tj] = third[tk, tj, ti] = t1 + sigma[j] / v[i] / z
+        elseif j != k
+            # vi vj wk
+            third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
+                third[tk, ti, tj] = third[tk, tj, ti] = t1
+        end
+    end
+    # Tvww
+    for i in 1:w_dim, j in 1:w_dim, k in 1:w_dim
+        # note that the offset for v is not the same as the offset for the ws, so even if i = k, ti != tk, so we make sure to account for that
+        (ti, tj, tk) = (v_idxs[i], w_idxs[j], w_idxs[k])
+        t1 = -2 * sigma[i] * tau[j] * tau[k]
+        if j == k
+            if i == j
+                # vi wi wi
+                third[ti, tj, tj] = third[tj, ti, tj] = third[tj, tj, ti] = t1 + 2 * tau[i] / z / v[i] - 1 / v[i] / abs2(z)
+            else
+                # vi wj wj
+                third[ti, tj, tj] = third[tj, ti, tj] = third[tj, tj, ti] = t1 - sigma[i] / w[j] / z
+            end
+        elseif i == j
+            # vi wi wk, symmetric to vi wj wi
+            third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
+                third[tk, ti, tj] = third[tk, tj, ti] = t1 + tau[k] / z / v[i]
+        elseif i != k
+            # vi wj wk
+            third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
+                third[tk, ti, tj] = third[tk, tj, ti] = t1
+        end
+    end
+    # Twww
+    for i in 1:w_dim, j in 1:w_dim, k in 1:w_dim
+        (ti, tj, tk) = (w_idxs[i], w_idxs[j], w_idxs[k])
+        t1 = -2 * tau[i] * tau[j] * tau[k]
+        if i == j
+            t2 = -tau[k] / w[i] / z
+            if j == k
+                third[ti, ti, ti] = t1 + 3 * t2 - abs2(inv(w[i])) / z - 2 / w[i] ^ 3
+            else
+                third[ti, ti, tk] = third[ti, tk, ti] = third[tk, ti, ti] = t1 + t2
+            end
+        elseif i != k && j != k
+            third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
+                third[tk, ti, tj] = third[tk, tj, ti] = t1
+        end
+    end
+
+    third_order = reshape(third, cone.dim^2, cone.dim)
+
+    # barrier = cone.barrier
+    # FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), cone.point)
+    # @show norm(third_order - FD_3deriv)
+
+    cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * primal_dir / -2
 
     return cone.correction
 end

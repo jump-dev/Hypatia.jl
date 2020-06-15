@@ -577,7 +577,7 @@ function episumperentropy4(T; options...)
     # @test r.s ≈ [entr, 1, 5, 2, 3] atol=tol rtol=tol
     @test r.s ≈ [entr, 1, 2, 5, 3] atol=tol rtol=tol
     # @test r.z ≈ [1, 2, 3 / T(5), log(inv(T(2))) - 1, log(5 / T(3)) - 1] atol=tol rtol=tol
-    @test r.z ≈ [1, 2, log(inv(T(2))), 3 / T(5), log(5 / T(3)) - 1] atol=tol rtol=tol
+    @test r.z ≈ [1, 2, log(inv(T(2))) - 1, 3 / T(5), log(5 / T(3)) - 1] atol=tol rtol=tol
 end
 
 function episumperentropy5(T; options...)

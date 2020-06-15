@@ -200,17 +200,18 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
     timer = solver.timer
 
-    # rtmu = sqrt(solver.mu)
-    # irtmu = inv(rtmu)
+    # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)
+    rtmu = sqrt(solver.mu)
+    irtmu = inv(rtmu)
     # @show irtmu
     # @assert irtmu >= one(T)
-    # Cones.load_point.(cones, point.primal_views)
-    # Cones.rescale_point.(cones, irtmu)
-    # Cones.load_dual_point.(cones, point.dual_views)
-    # Cones.reset_data.(cones)
-    # @assert all(Cones.is_feas.(cones))
-    # Cones.grad.(cones)
-    # Cones.hess.(cones)
+    Cones.load_point.(cones, point.primal_views)
+    Cones.rescale_point.(cones, irtmu)
+    Cones.load_dual_point.(cones, point.dual_views)
+    Cones.reset_data.(cones)
+    @assert all(Cones.is_feas.(cones))
+    Cones.grad.(cones)
+    Cones.hess.(cones)
     # @show Cones.in_neighborhood.(cones, solver.mu)
 
     use_corr = true
@@ -226,8 +227,8 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
         # println("pred")
         update_rhs_pred(stepper, solver)
         get_directions(stepper, solver, iter_ref_steps = 3)
-        if use_corr
         # if solver.mu > 1e-5
+        if use_corr
             # update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha)
             update_rhs_predcorr(stepper, solver, one(T))
             get_directions(stepper, solver, iter_ref_steps = 3)
