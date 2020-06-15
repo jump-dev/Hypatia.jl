@@ -54,23 +54,23 @@ function test_barrier_oracles(
     # test gradient and Hessian oracles
     test_grad_hess(cone, point, dual_point, tol = tol)
 
-    # # check gradient and Hessian agree with ForwardDiff
-    # if dim < 15 # too slow if dimension is large
-    #     println("starting ForwardDiff tests: $dim")
-    #     CO.reset_data(cone)
-    #     @test CO.is_feas(cone)
-    #     grad = CO.grad(cone)
-    #     println("start grad")
-    #     fd_grad = ForwardDiff.gradient(barrier, point)
-    #     @test grad ≈ fd_grad atol=tol rtol=tol
-    #     println("done grad")
-    #     hess = CO.hess(cone)
-    #     fd_hess = ForwardDiff.hessian(barrier, point)
-    #     if !CO.use_nt(cone)
-    #         @test hess ≈ fd_hess atol=tol rtol=tol
-    #         println("done hess")
-    #     end
-    # end
+    # check gradient and Hessian agree with ForwardDiff
+    if dim < 15 # too slow if dimension is large
+        println("starting ForwardDiff tests: $dim")
+        CO.reset_data(cone)
+        @test CO.is_feas(cone)
+        grad = CO.grad(cone)
+        println("start grad")
+        fd_grad = ForwardDiff.gradient(barrier, point)
+        @test grad ≈ fd_grad atol=tol rtol=tol
+        println("done grad")
+        hess = CO.hess(cone)
+        fd_hess = ForwardDiff.hessian(barrier, point)
+        if !CO.use_nt(cone)
+            @test hess ≈ fd_hess atol=tol rtol=tol
+            println("done hess")
+        end
+    end
 
     # check 3rd order corrector agrees with ForwardDiff
     # too slow if cone is too large or not using BlasReals

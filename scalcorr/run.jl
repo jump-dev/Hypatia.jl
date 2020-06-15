@@ -17,22 +17,23 @@ struct EntropyInstances <: InstanceSet end
 struct PolyhedralInstances <: InstanceSet end
 struct WSOSGeomeanInstances <: InstanceSet end
 
-# run_in_bf = true
-run_in_bf = false
+run_in_bf = true
+# run_in_bf = false
+T = (run_in_bf ? BigFloat : Float64)
 
 # options to solvers
 timer = TimerOutput()
-tol = 1e-8
+# tol = 1e-8
 default_solver_options = (
     verbose = true,
     iter_limit = 100,
     timer = timer,
-    system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
-    # system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
+    system_solver = Solvers.NaiveDenseSystemSolver{T}(),
+    # system_solver = Solvers.QRCholDenseSystemSolver{T}(),
     # max_nbhd = 0.02,
-    tol_rel_opt = tol,
-    tol_abs_opt = tol,
-    tol_feas = tol,
+    # tol_rel_opt = tol,
+    # tol_abs_opt = tol,
+    # tol_feas = tol,
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
@@ -48,7 +49,7 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
@@ -64,7 +65,7 @@ JuMP_example_names = [
     # "expdesign",
     # "maxvolume", # TODO only useful for exp instances when geomean -> exp bridge is in
     # "portfolio",
-    # "robustgeomprog",
+    "robustgeomprog",
     "signomialmin",
     ]
 
@@ -111,7 +112,7 @@ all_tests_time = time()
         solver_options = (default_solver_options..., time_limit = time_limit)
         for (inst_num, inst) in enumerate(instances)
             if run_in_bf
-                write_and_run(ex_type_T, inst...)
+                write_and_run(ex_type_T, inst..., default_solver_options = solver_options)
             else
                 test_info = "$ex_type_T $inst_set $inst_num: $inst"
                 @testset "$test_info" begin
@@ -129,9 +130,9 @@ all_tests_time = time()
         end
     end
 
-    # @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
-    # show(perf, allrows = true, allcols = true)
-    # println("\n")
+    @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
+    show(perf, allrows = true, allcols = true)
+    println("\n")
     # show(timer)
     # println("\n")
 end

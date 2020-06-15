@@ -193,7 +193,6 @@ end
 #     return true
 # end
 
-
 # predict / center
 function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     cones = solver.model.cones
@@ -226,12 +225,12 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
         # predict
         # println("pred")
         update_rhs_pred(stepper, solver)
-        get_directions(stepper, solver, iter_ref_steps = 3)
         # if solver.mu > 1e-5
         if use_corr
+            get_directions(stepper, solver, iter_ref_steps = 3)
             # update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha)
             update_rhs_predcorr(stepper, solver, one(T))
-            get_directions(stepper, solver, iter_ref_steps = 3)
+            # get_directions(stepper, solver, iter_ref_steps = 3)
             # update_rhs_predcorr(stepper, solver, one(T))
         end
         pred = true
@@ -239,9 +238,9 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     else
         # center
         update_rhs_cent(stepper, solver)
-        get_directions(stepper, solver, iter_ref_steps = 3)
         # if solver.mu > 1e-5
         if use_corr
+            get_directions(stepper, solver, iter_ref_steps = 3)
             update_rhs_centcorr(stepper, solver, one(T))
             # get_directions(stepper, solver, iter_ref_steps = 3)
             # update_rhs_centcorr(stepper, solver, one(T))
@@ -280,9 +279,6 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     return true
 end
-
-
-
 
 # update the RHS for affine direction
 function update_rhs_pred(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}

@@ -60,7 +60,7 @@ function permute_affine(cone::MOI.RelativeEntropyCone, idxs::AbstractVector)
             new_idxs[i] = new_idx
         end
     end
-    @show new_idxs
+    # @show new_idxs
 
     return new_idxs
 end

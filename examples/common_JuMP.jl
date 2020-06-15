@@ -93,7 +93,8 @@ function write_and_run(
     E::Type{<:ExampleInstanceJuMP{Float64}},
     inst_data::Tuple,
     extender = nothing,
-    solver_options = (); # ignored
+    solver_options = ();
+    default_solver_options = (), # default solver options
     out_type::Type = BigFloat,
     rseed::Int = 1
     )
@@ -101,16 +102,15 @@ function write_and_run(
     inst = E(inst_data...)
     model = build(inst)
 
+    hyp_opt = Hypatia.Optimizer()
     if !isnothing(extender)
         # use MOI automated extended formulation
         opt = MOI.Bridges.full_bridge_optimizer(MOI.Utilities.CachingOptimizer(extender{Float64}(), Hypatia.Optimizer()), Float64)
         JuMP.set_optimizer(model, () -> opt)
         MOI.Utilities.attach_optimizer(JuMP.backend(model))
         caching_opt = JuMP.backend(model).optimizer.model
-        hyp_opt = Hypatia.Optimizer(; solver_options...)
         MOI.copy_to(hyp_opt, caching_opt.model)
     else
-        hyp_opt = Hypatia.Optimizer()
         MOI.copy_to(hyp_opt, JuMP.backend(model))
     end
 
@@ -132,11 +132,11 @@ function write_and_run(
         # println(io, "return ", new_model)
     # end
 
-    solver = Solvers.Solver{out_type}(; solver_options...)
+    solver = Solvers.Solver{out_type}(; default_solver_options..., solver_options...)
     Solvers.load(solver, new_model)
     Solvers.solve(solver)
-    return
 
+    return
 end
 
 # fallback: just check optimal status

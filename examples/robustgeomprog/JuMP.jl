@@ -40,12 +40,18 @@ example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::SlowInstances) = [
 #     ((20, 40), ClassicConeOptimizer),
 #     ((40, 80), ClassicConeOptimizer),
 #     ]
-# example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::EntropyInstances) = [
-#     ((5, 10),),
-#     ((10, 20),),
-#     ((20, 40),),
-#     ((40, 80),),
-#     ]
+example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::EntropyInstances) = begin
+    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+    return [
+    ((2, 3), nothing, options),
+    ((4, 6), nothing, options),
+    ((5, 10), nothing, options),
+    ((10, 20), nothing, options),
+    # # ((12, 30), nothing, options),
+    # # ((20, 40), nothing, options),
+    # # ((40, 80), nothing, options),
+    ]
+end
 
 function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64} # TODO generic reals
     (n, k) = (inst.n, inst.k)

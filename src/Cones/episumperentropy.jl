@@ -33,7 +33,7 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
-    old_hess
+    # old_hess # TODO delete
     inv_hess::Symmetric{T, SparseMatrixCSC{T, Int}}
     hess_fact_cache
     nbhd_tmp::Vector{T}
@@ -75,7 +75,7 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = cone.hess_inv_hess_updated = false)
+reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.hess_fact_updated = cone.inv_hess_updated = cone.scal_hess_updated = cone.hess_inv_hess_updated = false)
 
 # reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
 
@@ -88,7 +88,7 @@ function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
+    # cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
@@ -109,8 +109,6 @@ use_scaling(cone::EpiSumPerEntropy) = true
 
 get_nu(cone::EpiSumPerEntropy) = cone.dim
 
-rescale_point(cone::EpiSumPerEntropy{T}, s::T) where {T} = (cone.point .*= s)
-
 function set_initial_point(arr::AbstractVector, cone::EpiSumPerEntropy)
     (arr[1], v, w) = get_central_ray_episumperentropy(div(cone.dim - 1, 2))
     arr[cone.v_idxs] .= v
@@ -123,9 +121,7 @@ function update_feas(cone::EpiSumPerEntropy)
     u = cone.point[1]
     @views v = cone.point[cone.v_idxs]
     @views w = cone.point[cone.w_idxs]
-    # @show u
-    # @show v
-    # @show w
+
     if all(vi -> vi > 0, v) && all(wi -> wi > 0, w)
         @. cone.tau = log(w / v)
         cone.z = u - dot(w, cone.tau)
@@ -138,21 +134,20 @@ function update_feas(cone::EpiSumPerEntropy)
     return cone.is_feas
 end
 
-# TODO 
-update_dual_feas(cone::EpiSumPerEntropy) = true
-# function update_dual_feas(cone::EpiSumPerEntropy{T}) where {T <: Real}
-#     u = cone.point[1]
-#     @views v = cone.point[cone.v_idxs]
-#     @views w = cone.point[cone.w_idxs]
-#
-#     if all(vi -> vi > 0, v) && u > 0
-#         # TODO allocates
-#         return all(u * (one(T) .+ log.(v / u)) + w .> 0)
-#     else
-#         return false
-#     end
-# end
-#
+function update_dual_feas(cone::EpiSumPerEntropy{T}) where {T <: Real}
+    u = cone.dual_point[1]
+    @views v = cone.dual_point[cone.v_idxs]
+    @views w = cone.dual_point[cone.w_idxs]
+
+    if all(vi -> vi > 0, v) && u > 0
+        # TODO allocates
+        return all(u * (1 .+ log.(v / u)) + w .> 0)
+        # return all(v .> u .* exp.(-w ./ u .- 1))
+    else
+        return false
+    end
+end
+
 function update_grad(cone::EpiSumPerEntropy)
     @assert cone.is_feas
     u = cone.point[1]
@@ -171,7 +166,7 @@ function update_grad(cone::EpiSumPerEntropy)
     cone.grad_updated = true
     return cone.grad
 end
-#
+
 function update_hess_inv_hess(cone::EpiSumPerEntropy)
     @assert !cone.hess_inv_hess_updated
     v_idxs = cone.v_idxs
@@ -182,7 +177,7 @@ function update_hess_inv_hess(cone::EpiSumPerEntropy)
     tau = cone.tau
     z = cone.z
     sigma = cone.sigma
-    H = cone.old_hess.data
+    H = cone.hess.data
 
     # H_u_u, H_u_v, H_u_w parts
     H[1, 1] = abs2(cone.grad[1])
@@ -196,8 +191,7 @@ end
 
 function update_hess(cone::EpiSumPerEntropy)
     @assert cone.grad_updated
-    # updates H[1, :] in old_hess
-    cone.hess_inv_hess_updated || update_hess_inv_hess(cone)
+    cone.hess_inv_hess_updated || update_hess_inv_hess(cone) # H_u_u, H_u_v, H_u_w parts
     w_dim = cone.w_dim
     u = cone.point[1]
     v_idxs = cone.v_idxs
@@ -209,9 +203,6 @@ function update_hess(cone::EpiSumPerEntropy)
     z = cone.z
     sigma = cone.sigma
     H = cone.hess.data
-
-    # H_u_u, H_u_v, H_u_w parts
-    @. H[1, :] = cone.old_hess[1, :]
 
     # H_v_v, H_v_w, H_w_w parts
     @inbounds for (i, v_idx, w_idx) in zip(1:w_dim, v_idxs, w_idxs)
@@ -234,14 +225,12 @@ function update_hess(cone::EpiSumPerEntropy)
         end
     end
 
-    # copyto!(cone.old_hess.data, H)
-
     cone.hess_updated = true
     return cone.hess
 end
 
 # auxiliary calculations for inverse Hessian and inverse Hessian prod
-function inv_hess_vals(cone)
+function inv_hess_vals(cone::EpiSumPerEntropy{T}) where {T}
     cone.hess_inv_hess_updated || update_hess_inv_hess(cone)
     u = cone.point[1]
     v_idxs = cone.v_idxs
@@ -256,11 +245,11 @@ function inv_hess_vals(cone)
 
     for (i, v_idx, w_idx) in zip(1:cone.w_dim, v_idxs, w_idxs)
         temp1 = logprod - w[i] * log(w[i] / v[i]) # TODO cache in feas check?
-        temp2 = log(w[i] / v[i])# TODO cache in feas check?
+        temp2 = log(w[i] / v[i]) # TODO cache in feas check?
         Hu[v_idx - 1] = -(u - temp1 - 2 * w[i] * temp2) * w[i] * v[i] / cone.denom[i]
         Hu[w_idx - 1] = abs2(w[i]) * (temp2 * z + u - temp1) / cone.denom[i]
     end
-    @views cone.Huu = abs2(z) * (1 - dot(Hu, cone.old_hess[1, 2:cone.dim]))
+    @views cone.Huu = abs2(z) * (1 - dot(Hu, cone.hess[1, 2:cone.dim]))
     @. cone.Hvw = v * abs2(w)
     @. cone.Hvv = z + w
     @. cone.Hww = cone.Hvv * abs2(w)
@@ -273,7 +262,6 @@ function update_inv_hess(cone::EpiSumPerEntropy{T}) where {T}
     inv_hess_vals(cone)
     dim = cone.dim
     w_dim = cone.w_dim
-
     if !isdefined(cone, :inv_hess)
         # initialize sparse idxs for upper triangle of Hessian
         dim = cone.dim
@@ -317,9 +305,9 @@ function update_inv_hess(cone::EpiSumPerEntropy{T}) where {T}
     return cone.inv_hess
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
+function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiSumPerEntropy{T}) where {T <: Real}
     # updates for nonzero values in the inverse Hessian
-    inv_hess_vals(cone)
+    inv_hess_vals(cone) # TODO only do once
     Hu = cone.Hu
     Huu = cone.Huu
     Hvv = cone.Hvv
