@@ -19,6 +19,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     side::Int
     is_complex::Bool
     point::Vector{T}
+    dual_point::Vector{T}
     rt2::T
     sc_const::T
     timer::TimerOutput
@@ -29,6 +30,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_hess_updated::Bool
     hess_prod_updated::Bool
     hess_fact_updated::Bool
+    scal_hess_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
@@ -39,6 +41,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
 
     W::Matrix{R}
     work_mat::Matrix{R}
+    work_mat2::Matrix{R}
     fact_W
     Wi::Matrix{R}
     rootdet::T
@@ -46,6 +49,8 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     sigma::T
     kron_const::T
     dot_const::T
+
+    corretion::Vector{T}
 
     function HypoRootdetTri{T, R}(
         dim::Int;
@@ -79,12 +84,19 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
+reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
+
+use_nt(::HypoRootdetTri) = false
+
+use_scaling(::HypoRootdetTri) = false
+
+use_correction(::HypoRootdetTri) = true
 
 function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -94,6 +106,8 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     cone.W = zeros(R, cone.side, cone.side)
     cone.Wi = zeros(R, cone.side, cone.side)
     cone.work_mat = zeros(R, cone.side, cone.side)
+    cone.work_mat2 = zeros(R, cone.side, cone.side)
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -114,7 +128,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T, R}) w
     return arr
 end
 
-function update_feas(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function update_feas(cone::HypoRootdetTri)
     @assert !cone.feas_updated
     u = cone.point[1]
 
@@ -130,6 +144,21 @@ function update_feas(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} w
 
     cone.feas_updated = true
     return cone.is_feas
+end
+
+function update_dual_feas(cone::HypoRootdetTri)
+    u = cone.dual_point[1]
+    if u < 0
+        @views svec_to_smat!(cone.dual_W, cone.dual_point[2:end], cone.rt2)
+        dual_fact_W = cholesky!(Hermitian(cone.dual_W, :U), check = false)
+        if isposdef(dual_fact_W)
+        else
+            return false
+        end
+    else
+        return false
+    end
+
 end
 
 function update_grad(cone::HypoRootdetTri)
@@ -249,4 +278,39 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
     @views mul!(prod[2:cone.dim, :], cone.hess[2:end, 1], arr[1, :]', true, cone.sc_const * cone.kron_const)
 
     return prod
+end
+
+# TODO allocs
+function correction2(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
+    side = cone.side
+    sigma = cone.sigma
+    Wi = cone.Wi
+
+    # first term, 3rd order kron
+    S = copytri!(svec_to_smat!(cone.work_mat, primal_dir[2:end], cone.rt2), 'U', cone.is_complex)
+    ldiv!(cone.fact_W, S)
+    rdiv!(S, cone.fact_W.U)
+    mul!(cone.mat3, S, S') # TODO use outer prod function
+    term1 = -(sigma + 1) * smat_to_svec!(zeros(T, cone.dim - 1), cone.work_mat2, cone.rt2)
+
+    # second term, 2nd order kron and a dot
+    S = copytri!(svec_to_smat!(cone.work_mat, primal_dir[2:end], cone.rt2), 'U', cone.is_complex)
+    # keep a kron product handy, could factor out
+    skron2 = Wi * Symmetric(S) * Wi
+    dot_skron = dot(skron2, S)
+    dot_Wi_S = dot(Wi, S)
+    term2 = zeros(T, cone.dim)
+    idx = 2
+    for j in 1:side, i in 1:j
+        term2 = 2 * skron2[i, j] * dot_Wi_S
+        term2 += Wi[i, j] * dot_skron
+    end
+    term2 .*= sigma * (inv(side) - sigma)
+
+    # third term, purely dots
+    term3 = -abs2(dot_Wi_S) * sigma * (inv(side) - sigma) * (inv(side) - 2 * sigma) * [Wi[i, j] * S[i, j] for j in 1:side for i in 1:j]
+
+    # now take into account hypograph variable
+    cone.correction[2:end] = term1 + term2 + term3
+    return cone.correction
 end

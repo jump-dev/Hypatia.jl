@@ -249,6 +249,46 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     return prod
 end
 
+function jprod(x, y)
+    return vcat(dot(x, y), x[1] * y[2:end] + y[1] * x[2:end])
+end
+
+# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+#     @assert cone.is_feas
+#     @assert cone.grad_updated
+#     u = cone.point[1]
+#     w = @view cone.point[2:end]
+#
+#     @inbounds for j in 1:size(prod, 2)
+#         uj = arr[1, j]
+#         wj = @view arr[2:end, j]
+#
+#         aj = arr[:, j]
+#         prod1 = jprod(cone.grad, aj)
+#         prod2 = jprod(cone.grad, prod1)
+#         prod[:, j] = prod2
+#
+#     end
+#
+#     return prod
+# end
+
+# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
+#     @assert cone.is_feas
+#     u = cone.point[1]
+#     w = @view cone.point[2:end]
+#
+#     @inbounds for j in 1:size(prod, 2)
+#         aj = arr[:, j]
+#         prod1 = jprod(cone.grad, cone.grad)
+#         prod2 = jprod(aj, prod1)
+#         @views prod[:, j] = prod2
+#
+#     end
+#
+#     return prod
+# end
+
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas
 
@@ -350,8 +390,31 @@ end
 
 function correction2(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::AbstractVector)
     @assert cone.grad_updated
+    @assert cone.hess_updated
     corr = cone.correction
     point = cone.point
+
+    J = Diagonal(ones(cone.dim))
+    J[2:end, :] *= -1
+
+    # primal_dir = point
+
+    vec_2 = J * cone.hess * primal_dir
+
+    fake_hessian = J * point * vec_2' * J + J * vec_2 * point' * J - jdot(vec_2, point) * J
+    # fake_hessian /= jdot(point, vec_2) ^ 2
+    # fake_hessian /= jdot(point, point) * jdot(vec_2, vec_2)
+    # fake_hessian /= jdot(point, point) ^ 2
+    fake_hessian /= jdot(point, point)
+    @show jdot(point, point)
+
+    # @show fake_hessian ./ cone.hess
+    corr = fake_hessian * primal_dir
+
+    # prod1 = jprod(cone.grad, primal_dir)
+    # prod2 = jprod(prod1, cone.grad)
+    # prod3 = jprod(prod2, primal_dir)
+    # corr = -jprod(prod3, cone.grad)
 
     # TODO only using primal_dir, and no Hinv_z
     # jdot_p_s = jdot(point, primal_dir)
