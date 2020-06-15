@@ -348,6 +348,24 @@ function correction(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::Abs
     return corr
 end
 
+function correction2(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::AbstractVector)
+    @assert cone.grad_updated
+    corr = cone.correction
+    point = cone.point
+
+    # TODO only using primal_dir, and no Hinv_z
+    # jdot_p_s = jdot(point, primal_dir)
+    # @. corr = jdot_p_s * dual_dir
+    # dot_s_z = dot(primal_dir, dual_dir)
+    # dot_p_z = dot(point, dual_dir)
+    # corr[1] += dot_s_z * point[1] - dot_p_z * primal_dir[1]
+    # @. @views corr[2:end] += -dot_s_z * point[2:end] + dot_p_z * primal_dir[2:end]
+    # corr ./= cone.dist
+
+    return corr
+end
+
+
 # function step_and_update_scaling(cone::EpiNormEucl{T}, primal_dir::AbstractVector, dual_dir::AbstractVector, step_size::T) where {T}
 function update_nt(cone::EpiNormEucl{T}) where {T}
     @assert cone.feas_updated
