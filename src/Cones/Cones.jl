@@ -359,13 +359,19 @@ function set_central_point(cone::Cone{T}) where {T <: Real}
 
         tmp = -curr - g
         @show norm(tmp)
-        dir .= hess(cone) \ tmp
+        if norm(tmp) < sqrt(eps(T)) # TODO tune
+            println("final iter $iter")
+            break
+        end
+
+        dir .= (hess(cone) + I) \ tmp
         # inv_hess_prod!(dir, tmp, cone)
 
         nnorm = dot(tmp, dir)
         @assert nnorm > 0
         alpha = (abs(nnorm) > damp_tol ? inv(1 + abs(nnorm)) : one(T))
-        @. curr += alpha * dir
+        @show alpha
+        curr = curr + alpha * dir
     end
 
     println("end newton")
