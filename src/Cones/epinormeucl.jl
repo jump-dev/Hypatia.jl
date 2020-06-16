@@ -32,8 +32,8 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     correction::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
+    nbhd_tmp::Vector{T} # TODO rename
+    nbhd_tmp2::Vector{T} # TODO not used
 
     normalized_point::Vector{T} # TODO can this and normalized_dual_point be removed?
     normalized_dual_point::Vector{T}
@@ -390,40 +390,23 @@ end
 
 function correction2(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::AbstractVector)
     @assert cone.grad_updated
-    @assert cone.hess_updated
+    dim = cone.dim
     corr = cone.correction
     point = cone.point
 
-    J = Diagonal(ones(cone.dim))
-    J[2:end, :] *= -1
+    tmp = hess_prod!(cone.nbhd_tmp, primal_dir, cone)
+    tmp2 = cone.nbhd_tmp2
+    copyto!(tmp2, primal_dir)
+    @views tmp2[2:dim] .*= -1
 
-    # primal_dir = point
+    # fake_hessian = J * point * tmp' + tmp * point' * J - dot(tmp, point) * J
+    # fake_hessian /= jdot(point, point)
 
-    vec_2 = J * cone.hess * primal_dir
-
-    fake_hessian = J * point * vec_2' * J + J * vec_2 * point' * J - jdot(vec_2, point) * J
-    # fake_hessian /= jdot(point, vec_2) ^ 2
-    # fake_hessian /= jdot(point, point) * jdot(vec_2, vec_2)
-    # fake_hessian /= jdot(point, point) ^ 2
-    fake_hessian /= jdot(point, point)
-    @show jdot(point, point)
-
-    # @show fake_hessian ./ cone.hess
-    corr = fake_hessian * primal_dir
-
-    # prod1 = jprod(cone.grad, primal_dir)
-    # prod2 = jprod(prod1, cone.grad)
-    # prod3 = jprod(prod2, primal_dir)
-    # corr = -jprod(prod3, cone.grad)
-
-    # TODO only using primal_dir, and no Hinv_z
-    # jdot_p_s = jdot(point, primal_dir)
-    # @. corr = jdot_p_s * dual_dir
-    # dot_s_z = dot(primal_dir, dual_dir)
-    # dot_p_z = dot(point, dual_dir)
-    # corr[1] += dot_s_z * point[1] - dot_p_z * primal_dir[1]
-    # @. @views corr[2:end] += -dot_s_z * point[2:end] + dot_p_z * primal_dir[2:end]
-    # corr ./= cone.dist
+    corr .= point * dot(primal_dir, tmp)
+    corr[2:dim] .*= -1
+    corr .+= tmp * jdot(point, primal_dir)
+    corr .-= dot(point, tmp) * tmp2
+    corr ./= jdot(point, point)
 
     return corr
 end
