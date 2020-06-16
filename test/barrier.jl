@@ -50,8 +50,7 @@ function test_barrier_oracles(
         dual_point = copy(point)
         @test load_reset_check(cone, point, dual_point)
     # end
-    # init_only && return
-    return
+    init_only && return
 
     # perturb and scale the initial point and check feasible
     perturb_scale(point, dual_point, noise, scale)

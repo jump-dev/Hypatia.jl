@@ -17,11 +17,15 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     max_neighborhood::T
     dim::Int
     point::Vector{T}
+    dual_point::Vector{T}
+    nt_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
+    scal_hess_updated::Bool
+    nt_updated::Bool
     inv_hess_updated::Bool
     hess_sqrt_prod_updated::Bool
     inv_hess_sqrt_prod_updated::Bool
@@ -37,6 +41,8 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     denom::T
     hess_sqrt_vec::Vector{T}
     inv_hess_sqrt_vec::Vector{T}
+
+    correction::Vector{T}
 
     function EpiPerSquare{T}(
         dim::Int;
@@ -55,12 +61,21 @@ end
 
 use_heuristic_neighborhood(cone::EpiPerSquare) = false
 
-reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = false)
+reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated =
+    cone.scal_hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = cone.nt_updated = false)
+
+use_nt(::EpiPerSquare) = true
+
+use_scaling(::EpiPerSquare) = false # TODO update oracles
+
+use_correction(::EpiPerSquare) = true
 
 function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
+    cone.nt_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -68,6 +83,7 @@ function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     cone.inv_hess_sqrt_vec = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -232,4 +248,57 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}
     @. @views prod[3:end, :] += arr[3:end, :] * rtdist
 
     return prod
+end
+
+rotated_jdot(x::Vector, y::Vector) = @views x[1] * y[2] + x[2] * y[1] - dot(x[3:end], y[3:end])
+
+function correction2(cone::EpiPerSquare, primal_dir::AbstractVector, dual_dir::AbstractVector)
+    @assert cone.grad_updated
+    dim = cone.dim
+    corr = cone.correction
+    point = cone.point
+
+    tmp = hess_prod!(cone.nbhd_tmp, primal_dir, cone)
+    tmp2 = cone.nbhd_tmp2
+    copyto!(tmp2, primal_dir)
+    @views tmp2[3:dim] .*= -1
+    (tmp2[1], tmp2[2]) = (tmp2[2], tmp2[1])
+
+    corr .= point * dot(primal_dir, tmp)
+    corr[3:dim] .*= -1
+    (corr[1], corr[2]) = (corr[2], corr[1])
+    corr .+= tmp * rotated_jdot(point, primal_dir)
+    corr .-= dot(point, tmp) * tmp2
+    corr ./= 2 * cone.dist
+
+    return corr
+end
+
+function update_nt(cone::EpiPerSquare)
+    @assert cone.feas_updated
+    cone.dual_feas_updated || update_dual_feas(cone)
+    nt_point = cone.nt_point
+    nt_point_sqrt = cone.nt_point_sqrt
+    normalized_point = cone.normalized_point
+    normalized_dual_point = cone.normalized_dual_point
+
+
+    normalized_point .= cone.point ./ sqrt(cone.dist)
+    normalized_dual_point .= cone.dual_point ./ sqrt(cone.dual_dist)
+    gamma = sqrt((1 + dot(normalized_point, normalized_dual_point)) / 2)
+
+    nt_point[1] = normalized_point[1] + normalized_dual_point[1]
+    @. @views nt_point[2:end] = normalized_point[2:end] - normalized_dual_point[2:end]
+    nt_point ./= 2 * gamma
+
+    copyto!(nt_point_sqrt, nt_point)
+    nt_point_sqrt[1] += 1
+    nt_point_sqrt ./= sqrt(2 * nt_point_sqrt[1])
+
+    cone.rt_dist_ratio = sqrt(cone.dist / cone.dual_dist)
+    cone.rt_rt_dist_ratio = sqrt(cone.rt_dist_ratio)
+
+    cone.nt_updated = true
+
+    return
 end

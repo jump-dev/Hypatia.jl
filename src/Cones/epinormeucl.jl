@@ -33,7 +33,7 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     nbhd_tmp::Vector{T} # TODO rename
-    nbhd_tmp2::Vector{T} # TODO not used
+    nbhd_tmp2::Vector{T} # TODO rename
 
     normalized_point::Vector{T} # TODO can this and normalized_dual_point be removed?
     normalized_dual_point::Vector{T}
@@ -248,46 +248,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     return prod
 end
 
-function jprod(x, y)
-    return vcat(dot(x, y), x[1] * y[2:end] + y[1] * x[2:end])
-end
-
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
-#     @assert cone.is_feas
-#     @assert cone.grad_updated
-#     u = cone.point[1]
-#     w = @view cone.point[2:end]
-#
-#     @inbounds for j in 1:size(prod, 2)
-#         uj = arr[1, j]
-#         wj = @view arr[2:end, j]
-#
-#         aj = arr[:, j]
-#         prod1 = jprod(cone.grad, aj)
-#         prod2 = jprod(cone.grad, prod1)
-#         prod[:, j] = prod2
-#
-#     end
-#
-#     return prod
-# end
-
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
-#     @assert cone.is_feas
-#     u = cone.point[1]
-#     w = @view cone.point[2:end]
-#
-#     @inbounds for j in 1:size(prod, 2)
-#         aj = arr[:, j]
-#         prod1 = jprod(cone.grad, cone.grad)
-#         prod2 = jprod(aj, prod1)
-#         @views prod[:, j] = prod2
-#
-#     end
-#
-#     return prod
-# end
-
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas
 
@@ -402,10 +362,10 @@ function correction2(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::Ab
     # fake_hessian /= jdot(point, point)
 
     corr .= point * dot(primal_dir, tmp)
-    corr[2:dim] .*= -1
+    @views corr[2:dim] .*= -1
     corr .+= tmp * jdot(point, primal_dir)
     corr .-= dot(point, tmp) * tmp2
-    corr ./= jdot(point, point)
+    corr ./= cone.dist
 
     return corr
 end
