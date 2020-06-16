@@ -271,7 +271,7 @@ end
 # in_neighborhood_sy(cone::Cone, mu::Real) = true
 
 # function in_neighborhood(cone::Cone, mu::Real, s::Real)
-#     return dot(cone.point, cone.dual_point) > mu * Cones.get_nu(cone) * default_max_neighborhood() * s
+#     return dot(cone.point, cone.dual_point) > mu * get_nu(cone) * default_max_neighborhood() * s
 # end
 # function in_neighborhood(cone::Cone, mu::Real)
 #     g = grad(cone)
@@ -282,6 +282,102 @@ end
 #     end
 #     return (get_nu(cone) > 0.3 * mu * dot(g, conj_g))
 # end
+
+
+# function step!(nc::NewtonCache)
+#     nc.grad .= ForwardDiff.gradient(nc.barrier, nc.x) + nc.z
+#     nc.hess .= ForwardDiff.hessian(nc.barrier, nc.x)
+#     nc.stepdir .= -Symmetric(nc.hess) \ nc.grad
+#     nc.gradnorm = -dot(nc.grad, nc.stepdir)
+#     return nc
+# end
+#
+# function damped_newton_method(nc::NewtonCache)
+#     max_iter = 50
+#     iter = 0
+#     eta = 1e-14
+#     step!(nc)
+#     while nc.gradnorm > eta
+#         @. nc.x += 1 / (1 + nc.gradnorm) * nc.stepdir
+#         step!(nc)
+#         iter += 1
+#         iter > max_iter && error("iteration limit in Newton method")
+#     end
+#     return
+# end
+
+# newton for central initial point
+# TODO don't run if cone has known central initial point
+function set_central_point(cone::Cone{T}) where {T <: Real}
+    curr = zeros(T, dimension(cone))
+    set_initial_point(curr, cone)
+    @show curr
+    # reset_data(cone)
+    # load_point(cone, curr)
+    # @assert is_feas(cone)
+    # g = grad(cone)
+    # println()
+    # @show typeof(cone)
+    # @show dimension(cone)
+    # # @show g, curr
+    # if norm(g + curr) < sqrt(eps(T)) # TODO tune
+    #     println("already central")
+    #     return curr
+    # end
+
+    nu = get_nu(cone)
+    # curr .*= sqrt(nu / sum(abs2, curr)) # rescale norm
+    # # TODO some delete below lines
+    # @assert norm(curr) ≈ sqrt(nu)
+    # # load_point(cone, curr)
+    # # @assert is_feas(cone)
+    # # g = grad(cone)
+    # # @show norm(g) - sqrt(nu)
+    # # # @assert norm(g) ≈ sqrt(nu)
+
+    max_iter = 20 # TODO make it depend on sqrt(nu)?
+    eta = sqrt(eps(T)) # TODO adjust
+    damp_tol = 0.2 # TODO tune
+
+    println("start newton")
+    iter = 0
+    dir = similar(curr)
+    while iter < max_iter
+        iter += 1
+        println(iter)
+
+        # TODO don't need gradient, just inv_hess * curr
+        load_point(cone, curr)
+        reset_data(cone)
+        @assert is_feas(cone)
+        g = grad(cone)
+        # @show curr
+        # @show -g
+        @assert dot(g, curr) ≈ -nu
+        @assert hess(cone) * curr ≈ -g
+        # @show hess(cone)
+
+        tmp = -curr - g
+        @show norm(tmp)
+        dir .= hess(cone) \ tmp
+        # inv_hess_prod!(dir, tmp, cone)
+
+        nnorm = dot(tmp, dir)
+        @assert nnorm > 0
+        alpha = (abs(nnorm) > damp_tol ? inv(1 + abs(nnorm)) : one(T))
+        @. curr += alpha * dir
+    end
+
+    println("end newton")
+    load_point(cone, curr)
+    reset_data(cone)
+    @assert is_feas(cone)
+    g = grad(cone)
+    println(norm(g + curr))
+    println()
+
+    return curr
+end
 
 # utilities for arrays
 

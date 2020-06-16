@@ -368,7 +368,8 @@ function epinorminf8(T; options...)
 end
 
 function epinormeucl1(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     Trt2 = sqrt(T(2))
     Tirt2 = inv(Trt2)
     c = T[0, -1, -1]
@@ -386,7 +387,8 @@ function epinormeucl1(T; options...)
 end
 
 function epinormeucl2(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = T[0, -1, -1]
     A = T[1 0 0]
     b = T[0]
@@ -401,7 +403,8 @@ function epinormeucl2(T; options...)
 end
 
 function epinormeucl3(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = T[1, 0, 0]
     A = T[0 1 0]
     b = T[1]
@@ -416,7 +419,8 @@ function epinormeucl3(T; options...)
 end
 
 function epipersquare1(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = T[0, 0, -1, -1]
     A = T[1 0 0 0; 0 1 0 0]
     b = T[0.5, 1]
@@ -431,7 +435,8 @@ function epipersquare1(T; options...)
 end
 
 function epipersquare2(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     Tirt2 = inv(sqrt(T(2)))
     c = T[0, 0, -1]
     A = T[1 0 0; 0 1 0]
@@ -447,7 +452,8 @@ function epipersquare2(T; options...)
 end
 
 function epipersquare3(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = T[0, 1, -1, -1]
     A = T[1 0 0 0]
     b = T[0]
@@ -462,7 +468,8 @@ function epipersquare3(T; options...)
 end
 
 function epipersquare4(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = zeros(T, 7)
     c[1] = -1
     A = zeros(T, 0, 7)

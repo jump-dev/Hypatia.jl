@@ -38,14 +38,20 @@ function test_barrier_oracles(
     @test cone.point == point
     @test cone.dual_point == dual_point
 
-    if isfinite(init_tol)
-        # tests for centrality of initial point
-        minus_grad = -CO.grad(cone)
-        @test dot(point, minus_grad) ≈ norm(point) * norm(minus_grad) atol=init_tol rtol=init_tol
-        @test point ≈ minus_grad atol=init_tol rtol=init_tol
-        @test CO.in_neighborhood(cone, one(T), one(T))
-    end
-    init_only && return
+    # if isfinite(init_tol)
+    #     # tests for centrality of initial point
+    #     minus_grad = -CO.grad(cone)
+    #     @test dot(point, minus_grad) ≈ norm(point) * norm(minus_grad) atol=init_tol rtol=init_tol
+    #     @test point ≈ minus_grad atol=init_tol rtol=init_tol
+    #     @test CO.in_neighborhood(cone, one(T), T(eps(T)^0.2))
+    # else
+        # use newton to get better initial point
+        point = CO.set_central_point(cone)
+        dual_point = copy(point)
+        @test load_reset_check(cone, point, dual_point)
+    # end
+    # init_only && return
+    return
 
     # perturb and scale the initial point and check feasible
     perturb_scale(point, dual_point, noise, scale)
@@ -510,7 +516,11 @@ end
 
 function test_wsosinterpnonnegative_barrier(T::Type{<:Real})
     Random.seed!(1)
-    for (n, halfdeg) in [(1, 1), (1, 2), (1, 3), (2, 1), (2, 2), (3, 1)]
+    # for (n, halfdeg) in [(1, 1), (1, 2), (1, 3), (2, 1), (2, 2), (3, 1)]
+
+
+
+    for (n, halfdeg) in [(1, 2),]
         (U, _, Ps, _) = MU.interpolate(MU.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false) # use a unit box domain
         barrier(s) = -sum(logdet(cholesky!(Symmetric(P' * Diagonal(s) * P))) for P in Ps)
         cone = CO.WSOSInterpNonnegative{T, T}(U, Ps)

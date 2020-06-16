@@ -126,7 +126,6 @@ function update_feas(cone::EpiNormEucl)
     end
 
     cone.feas_updated = true
-
     return cone.is_feas
 end
 
@@ -140,8 +139,8 @@ function update_dual_feas(cone::EpiNormEucl)
     else
         dual_feas = false
     end
-    cone.dual_feas_updated = true
 
+    cone.dual_feas_updated = true
     return dual_feas
 end
 
