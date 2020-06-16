@@ -338,45 +338,47 @@ function correction2(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}, dua
     z = cone.rootdetu
     rho(T, i, j) = (i == j ? 1 : sqrt(2))
 
-    # debug against explicit multiplication
-    third = zeros(dim, dim, dim)
-    third_debug = zeros(dim, dim, dim)
+    Tuuu = 2 / z ^ 3
 
-    third[1, 1, 1] = 2 / z ^ 3
-    idx1 = 2
-    for j in 1:side, i in 1:j
-        # Tuuw
-        third[1, 1, idx1] = third[1, idx1, 1] = third[idx1, 1, 1] = -2 * sigma / abs2(z) * Wi[j, i] * rho(T, i, j)
-        idx2 = 2
-        # Tuww
-        for l in 1:side, k in 1:l
-            (idx2 <= idx1) || continue
-            third[1, idx1, idx2] = third[1, idx2, idx1] = third[idx1, 1, idx2] =
-                third[idx2, 1, idx1] = third[idx1, idx2, 1] = third[idx2, idx1, 1] =
-                rho(T, i, j) * rho(T, k, l) * Wi[j, i] * Wi[l, k] * sigma / z * (2 * sigma - inv(side)) + sigma / z * skron(i, j, k, l, Wi)
-            idx3 = 2
-            # Twww
-            for n in 1:side, m in 1:n
-                (idx3 <= idx2) || continue
-                # don't forget to negate skron
-                third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
-                    third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] =
-                    -rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n] * sigma * (inv(side) - sigma) * (inv(side) - 2 * sigma) +
-                    sigma * (inv(side) - sigma) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi)) +
-                    -(sigma + 1) * third_skron(i, j, k, l, m, n, Wi)
-                third_debug[idx1, idx2, idx3] = third_debug[idx1, idx3, idx2] = third_debug[idx2, idx1, idx3] =
-                    third_debug[idx2, idx3, idx1] = third_debug[idx3, idx1, idx2] = third_debug[idx3, idx2, idx1] =
-                    # -(sigma + 1) * third_skron(i, j, k, l, m, n, Wi)
-                    sigma * (inv(side) - sigma) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi))
-                    # -rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n] * sigma * (inv(side) - sigma) * (inv(side) - 2 * sigma)
-                idx3 += 1
-            end
-            idx2 += 1
-        end
-        idx1 += 1
-    end
-    third *= theta
-    third_debug *= theta
+    # debug against explicit multiplication
+    # third = zeros(dim, dim, dim)
+    # third_debug = zeros(dim, dim, dim)
+    #
+    # third[1, 1, 1] = 2 / z ^ 3
+    # idx1 = 2
+    # for j in 1:side, i in 1:j
+    #     # Tuuw
+    #     third[1, 1, idx1] = third[1, idx1, 1] = third[idx1, 1, 1] = -2 * sigma / abs2(z) * Wi[j, i] * rho(T, i, j)
+    #     idx2 = 2
+    #     # Tuww
+    #     for l in 1:side, k in 1:l
+    #         (idx2 <= idx1) || continue
+    #         third[1, idx1, idx2] = third[1, idx2, idx1] = third[idx1, 1, idx2] =
+    #             third[idx2, 1, idx1] = third[idx1, idx2, 1] = third[idx2, idx1, 1] =
+    #             rho(T, i, j) * rho(T, k, l) * Wi[j, i] * Wi[l, k] * sigma / z * (2 * sigma - inv(side)) + sigma / z * skron(i, j, k, l, Wi)
+    #         idx3 = 2
+    #         # Twww
+    #         for n in 1:side, m in 1:n
+    #             (idx3 <= idx2) || continue
+    #             # don't forget to negate skron
+    #             third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
+    #                 third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] =
+    #                 -rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n] * sigma * (inv(side) - sigma) * (inv(side) - 2 * sigma) +
+    #                 sigma * (inv(side) - sigma) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi)) +
+    #                 -(sigma + 1) * third_skron(i, j, k, l, m, n, Wi)
+    #             third_debug[idx1, idx2, idx3] = third_debug[idx1, idx3, idx2] = third_debug[idx2, idx1, idx3] =
+    #                 third_debug[idx2, idx3, idx1] = third_debug[idx3, idx1, idx2] = third_debug[idx3, idx2, idx1] =
+    #                 # -(sigma + 1) * third_skron(i, j, k, l, m, n, Wi)
+    #                 sigma * (inv(side) - sigma) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi))
+    #                 # -rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n] * sigma * (inv(side) - sigma) * (inv(side) - 2 * sigma)
+    #             idx3 += 1
+    #         end
+    #         idx2 += 1
+    #     end
+    #     idx1 += 1
+    # end
+    # third *= theta
+    # third_debug *= theta
 
     # first term, 3rd order kron
     S = copytri!(svec_to_smat!(similar(cone.work_mat), primal_dir[2:end], cone.rt2), 'U', cone.is_complex) # TODO allocates
@@ -416,14 +418,24 @@ function correction2(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}, dua
     term4b = smat_to_svec!(zeros(w_dim), Wi, cone.rt2) * dot_Wi_S * sigma / z * (2 * sigma - inv(side))
     term4 = theta * (term4a + term4b) * 2 * primal_dir[1]
 
+    term5a = -2 * sigma / abs2(z) * smat_to_svec!(zeros(w_dim), Wi, cone.rt2)
+    term5 = term5a * abs2(primal_dir[1]) * theta
+
 
     corr = similar(cone.correction)
-    corr[2:dim] = term1 + term2 + term3 + term4
-    for k in 2:dim
-        corr[k] += third[1, 1, k] * abs2(primal_dir[1])
+    corr[2:dim] = term1 + term2 + term3 + term4 + term5
+    # for k in 2:dim
+        # corr[k] += third[1, 1, k] * abs2(primal_dir[1])
         # corr[k] += 2 * primal_dir[1] * sum(third[1, j, k] * primal_dir[j] for j in 2:dim)
-    end
-    corr[1] = sum(third[1, j, k] * primal_dir[j] * primal_dir[k] for j in 1:dim for k in 1:dim)
+    # end
+    # corr[1] = sum(third[1, j, k] * primal_dir[j] * primal_dir[k] for j in 1:dim for k in 1:dim)
+    corr[1] = theta * (
+        dot((term4a + term4b), primal_dir[2:dim]) +
+        # sum(third[1, j, k] * primal_dir[j] * primal_dir[k] for j in 2:dim for k in 2:dim) +
+        # 2 * primal_dir[1] * sum(third[1, 1, j] * primal_dir[j] for j in 2:dim) +
+        2 * primal_dir[1] * dot(term5a, primal_dir[2:dim]) +
+        Tuuu * abs2(primal_dir[1])
+        )
     # @show corr ./ (reshape(reshape(third, dim^2, dim) * primal_dir, dim, dim) * primal_dir / -2)
     cone.correction = corr / -2
 
