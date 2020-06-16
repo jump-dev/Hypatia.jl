@@ -18,10 +18,14 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     dim::Int
     point::Vector{T}
     dual_point::Vector{T}
-    nt_point::Vector{T}
+    nt_point::Vector{T} # actually a normalized nt point
+    nt_point_sqrt::Vector{T}
+    normalized_point::Vector{T}
+    normalized_dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
+    dual_feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     scal_hess_updated::Bool
@@ -37,7 +41,10 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     nbhd_tmp2::Vector{T}
 
     dist::T
+    dual_dist::T
     rtdist::T
+    rt_dist_ratio::T
+    rt_rt_dist_ratio::T
     denom::T
     hess_sqrt_vec::Vector{T}
     inv_hess_sqrt_vec::Vector{T}
@@ -61,12 +68,12 @@ end
 
 use_heuristic_neighborhood(cone::EpiPerSquare) = false
 
-reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated =
+reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated =
     cone.scal_hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = cone.nt_updated = false)
 
 use_nt(::EpiPerSquare) = true
 
-use_scaling(::EpiPerSquare) = false # TODO update oracles
+use_scaling(::EpiPerSquare) = true # TODO update oracles
 
 use_correction(::EpiPerSquare) = true
 
@@ -76,6 +83,9 @@ function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.nt_point = zeros(T, dim)
+    cone.nt_point_sqrt = zeros(T, dim)
+    cone.normalized_point = zeros(T, dim)
+    cone.normalized_dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -112,6 +122,19 @@ function update_feas(cone::EpiPerSquare)
     return cone.is_feas
 end
 
+function update_dual_feas(cone::EpiPerSquare)
+    u = cone.dual_point[1]
+    v = cone.dual_point[2]
+
+    if u > 0 && v > 0
+        w = view(cone.dual_point, 3:cone.dim)
+        cone.dual_dist = u * v - sum(abs2, w) / 2
+        return cone.dual_dist > 0
+    else
+        return false
+    end
+end
+
 function update_grad(cone::EpiPerSquare)
     @assert cone.is_feas
 
@@ -138,6 +161,26 @@ function update_hess(cone::EpiPerSquare)
     cone.hess_updated = true
     return cone.hess
 end
+
+function update_scal_hess(cone::EpiPerSquare{T}, mu::T) where {T}
+    cone.nt_updated || update_nt(cone)
+    H = cone.hess.data
+
+    nt_inv = cone.nt_point
+    g2 = nt_inv[2]
+    nt_inv[2] = -nt_inv[1]
+    nt_inv[1] = -g2
+
+    mul!(H, nt_inv, nt_inv')
+    @inbounds for j in 3:cone.dim
+        H[j, j] += 1
+    end
+    H[1, 2] -= 1
+
+    cone.scal_hess_updated = true
+    return cone.hess
+end
+
 
 function update_inv_hess(cone::EpiPerSquare)
     @assert cone.is_feas
@@ -252,6 +295,7 @@ end
 
 rotated_jdot(x::Vector, y::Vector) = @views x[1] * y[2] + x[2] * y[1] - dot(x[3:end], y[3:end])
 
+# TODO allocs
 function correction2(cone::EpiPerSquare, primal_dir::AbstractVector, dual_dir::AbstractVector)
     @assert cone.grad_updated
     dim = cone.dim
@@ -282,14 +326,19 @@ function update_nt(cone::EpiPerSquare)
     normalized_point = cone.normalized_point
     normalized_dual_point = cone.normalized_dual_point
 
-
     normalized_point .= cone.point ./ sqrt(cone.dist)
     normalized_dual_point .= cone.dual_point ./ sqrt(cone.dual_dist)
     gamma = sqrt((1 + dot(normalized_point, normalized_dual_point)) / 2)
 
-    nt_point[1] = normalized_point[1] + normalized_dual_point[1]
-    @. @views nt_point[2:end] = normalized_point[2:end] - normalized_dual_point[2:end]
+    # nt_point[1] = normalized_point[1] + normalized_dual_point[2]
+    # nt_point[2] = normalized_point[2] + normalized_dual_point[1]
+    # @. @views nt_point[3:end] = normalized_point[3:end] - normalized_dual_point[3:end]
+    nt_point[1] = normalized_point[2] + normalized_dual_point[1]
+    nt_point[2] = normalized_point[1] + normalized_dual_point[2]
+    @. @views nt_point[3:end] = -normalized_point[3:end] + normalized_dual_point[3:end]
     nt_point ./= 2 * gamma
+    @show 2 * nt_point[1] * nt_point[2] - sum(abs2, nt_point[3:end])
+    @show gamma
 
     copyto!(nt_point_sqrt, nt_point)
     nt_point_sqrt[1] += 1

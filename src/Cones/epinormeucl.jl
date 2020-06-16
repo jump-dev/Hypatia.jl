@@ -442,6 +442,8 @@ function update_nt(cone::EpiNormEucl{T}) where {T}
         @. @views nt_point[2:end] = normalized_point[2:end] - normalized_dual_point[2:end]
         nt_point ./= 2 * gamma
 
+        # @show abs2(nt_point[1]) - sum(abs2, nt_point[2:end])
+
         copyto!(nt_point_sqrt, nt_point)
         nt_point_sqrt[1] += 1
         nt_point_sqrt ./= sqrt(2 * nt_point_sqrt[1])
