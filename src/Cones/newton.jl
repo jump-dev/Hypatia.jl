@@ -1,7 +1,7 @@
 
-using ForwardDiff
-using DoubleFloats
-using Quadmath
+# using ForwardDiff
+# using DoubleFloats
+# using Quadmath
 
 # for exp cone barrier
 # TODO combine Hi * g into one
