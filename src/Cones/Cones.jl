@@ -309,78 +309,40 @@ end
 # newton for central initial point
 # TODO don't run if cone has known central initial point
 function set_central_point(cone::Cone{T}) where {T <: Real}
+    tol = sqrt(eps(T)) # TODO adjust
+    max_iter = 10 # TODO make it depend on sqrt(nu)?
+    damp_tol = 0.2 # TODO tune
+    nu = get_nu(cone)
+
     curr = zeros(T, dimension(cone))
     set_initial_point(curr, cone)
-    @show curr
-    # reset_data(cone)
-    # load_point(cone, curr)
-    # @assert is_feas(cone)
-    # g = grad(cone)
-    # println()
-    # @show typeof(cone)
-    # @show dimension(cone)
-    # # @show g, curr
-    # if norm(g + curr) < sqrt(eps(T)) # TODO tune
-    #     println("already central")
-    #     return curr
-    # end
+    curr .*= sqrt(nu / sum(abs2, curr)) # rescale norm as a heuristic
 
-    nu = get_nu(cone)
-    # curr .*= sqrt(nu / sum(abs2, curr)) # rescale norm
-    # # TODO some delete below lines
-    # @assert norm(curr) ≈ sqrt(nu)
-    # # load_point(cone, curr)
-    # # @assert is_feas(cone)
-    # # g = grad(cone)
-    # # @show norm(g) - sqrt(nu)
-    # # # @assert norm(g) ≈ sqrt(nu)
-
-    max_iter = 20 # TODO make it depend on sqrt(nu)?
-    eta = sqrt(eps(T)) # TODO adjust
-    damp_tol = 0.2 # TODO tune
-
-    println("start newton")
-    iter = 0
     dir = similar(curr)
+    iter = 0
     while iter < max_iter
-        iter += 1
-        println(iter)
-
-        # TODO don't need gradient, just inv_hess * curr
         load_point(cone, curr)
         reset_data(cone)
         @assert is_feas(cone)
         g = grad(cone)
-        # @show curr
-        # @show -g
-        @assert dot(g, curr) ≈ -nu
-        @assert hess(cone) * curr ≈ -g
-        # @show hess(cone)
 
         tmp = -curr - g
         @show norm(tmp)
-        if norm(tmp) < sqrt(eps(T)) # TODO tune
-            println("final iter $iter")
+        if norm(tmp) < tol # TODO tune
+            println("final iter $iter\n")
             break
         end
 
-        dir .= (hess(cone) + I) \ tmp
-        # inv_hess_prod!(dir, tmp, cone)
+        dir .= cholesky!(Symmetric(hess(cone) + I)) \ tmp # TODO make more efficient, maybe add to cone.hess directly and use hess fact
+        # inv_hess_prod!(dir, tmp, cone) # cannot use
 
         nnorm = dot(tmp, dir)
         @assert nnorm > 0
         alpha = (abs(nnorm) > damp_tol ? inv(1 + abs(nnorm)) : one(T))
         @show alpha
         curr = curr + alpha * dir
+        iter += 1
     end
-
-    println("end newton")
-    load_point(cone, curr)
-    reset_data(cone)
-    @assert is_feas(cone)
-    g = grad(cone)
-    println(norm(g + curr))
-    println()
 
     return curr
 end
