@@ -308,6 +308,7 @@ end
 
 # newton for central initial point
 # TODO don't run if cone has known central initial point
+# TODO remove allocs
 function set_central_point(cone::Cone{T}) where {T <: Real}
     tol = sqrt(eps(T)) # TODO adjust
     max_iter = 10 # TODO make it depend on sqrt(nu)?

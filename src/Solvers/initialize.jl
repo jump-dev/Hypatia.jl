@@ -9,16 +9,26 @@ function initialize_cone_point(cones::Vector{Cones.Cone{T}}, cone_idxs::Vector{U
     q = isempty(cones) ? 0 : sum(Cones.dimension, cones)
     point = Models.Point(T[], T[], zeros(T, q), zeros(T, q), cones, cone_idxs)
 
+    use_newton = true
+    # use_newton = false
+
     for (k, cone_k) in enumerate(cones)
         Cones.setup_data(cone_k)
         Cones.set_timer(cone_k, timer)
         primal_k = point.primal_views[k]
-        Cones.set_initial_point(primal_k, cone_k)
+        if use_newton
+            primal_k .= Cones.set_central_point(cone_k) # TODO pass in arg?
+        else
+            Cones.set_initial_point(primal_k, cone_k)
+        end
         Cones.load_point(cone_k, primal_k)
         dual_k = point.dual_views[k]
         @assert Cones.is_feas(cone_k)
         g = Cones.grad(cone_k)
         @. dual_k = -g
+        if use_newton
+            @assert primal_k ≈ dual_k rtol=eps(T)^0.25 # TODO delete
+        end
         hasfield(typeof(cone_k), :hess_fact_cache) && @assert Cones.update_hess_fact(cone_k)
     end
 
