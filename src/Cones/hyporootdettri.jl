@@ -401,18 +401,33 @@ function correction2(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}, dua
         term2[idx] *= (i == j ? 1 : sqrt(T(2)))
         idx += 1
     end
-    @show term2
     term2 .*= theta * sigma * (inv(side) - sigma)
-    @show term2 ./ (reshape(reshape(third_debug[2:end, 2:end, 2:end], w_dim^2, w_dim) * primal_dir[2:end], w_dim, w_dim) * primal_dir[2:end])
+    # @show term2 ./ (reshape(reshape(third_debug[2:end, 2:end, 2:end], w_dim^2, w_dim) * primal_dir[2:end], w_dim, w_dim) * primal_dir[2:end])
     #
     # third term, purely dots
     term3 = -theta * abs2(dot_Wi_S) * sigma * (inv(side) - sigma) * (inv(side) - 2 * sigma) * [Wi[i, j] * (i == j ? 1 : sqrt(T(2))) for j in 1:side for i in 1:j]
     # @show term3 ./ (reshape(reshape(third_debug[2:end, 2:end, 2:end], w_dim^2, w_dim) * primal_dir[2:end], w_dim, w_dim) * primal_dir[2:end])
     #
-    # # now take into account hypograph variable
-    # cone.correction[2:end] = term1 + term2 + term3
+    # now take into account hypograph variable
+    # corr[k] += 2 * sum(third[1, j, k] * primal_dir[1] * primal_dir[j] for j in 2:dim)
+    # add on contributions from Tuww
+    S = copytri!(svec_to_smat!(similar(cone.work_mat), primal_dir[2:end], cone.rt2), 'U', cone.is_complex) # TODO allocates
+    term4a = sigma / z * smat_to_svec!(zeros(w_dim), Wi * S * Wi, cone.rt2)
+    term4b = smat_to_svec!(zeros(w_dim), Wi, cone.rt2) * dot_Wi_S * sigma / z * (2 * sigma - inv(side))
+    term4 = theta * (term4a + term4b) * 2 * primal_dir[1]
 
 
-    cone.correction = reshape(reshape(third, dim^2, dim) * primal_dir, dim, dim) * primal_dir / -2
+    corr = similar(cone.correction)
+    corr[2:dim] = term1 + term2 + term3 + term4
+    for k in 2:dim
+        corr[k] += third[1, 1, k] * abs2(primal_dir[1])
+        # corr[k] += 2 * primal_dir[1] * sum(third[1, j, k] * primal_dir[j] for j in 2:dim)
+    end
+    corr[1] = sum(third[1, j, k] * primal_dir[j] * primal_dir[k] for j in 1:dim for k in 1:dim)
+    # @show corr ./ (reshape(reshape(third, dim^2, dim) * primal_dir, dim, dim) * primal_dir / -2)
+    cone.correction = corr / -2
+
+
+    # cone.correction = reshape(reshape(third, dim^2, dim) * primal_dir, dim, dim) * primal_dir / -2
     return cone.correction
 end
