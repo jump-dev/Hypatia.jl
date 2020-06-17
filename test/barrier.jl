@@ -60,11 +60,11 @@ function test_barrier_oracles(
     test_grad_hess(cone, point, dual_point, tol = tol)
 
     # check gradient and Hessian agree with ForwardDiff
+    CO.reset_data(cone)
+    @test CO.is_feas(cone)
+    grad = CO.grad(cone)
     if dim < 15 # too slow if dimension is large
         println("starting ForwardDiff tests: $dim")
-        CO.reset_data(cone)
-        @test CO.is_feas(cone)
-        grad = CO.grad(cone)
         println("start grad")
         fd_grad = ForwardDiff.gradient(barrier, point)
         @test grad ≈ fd_grad atol=tol rtol=tol
@@ -84,18 +84,17 @@ function test_barrier_oracles(
         if cone isa CO.HypoPerLog{T} && dim > 3
             return # TODO fix corrector for larger dim
         end
+        # check correction satisfies log-homog property F'''(s)[s, s] = -2F''(s) * s = 2F'(s)
+        @test -CO.correction2(cone, point, point) ≈ grad atol=tol rtol=tol # TODO delete third arg
         # check correction term agrees with directional 3rd derivative
         (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
-        # Hinv_z = CO.inv_hess_prod!(similar(dual_dir), dual_dir, cone)
         corr = CO.correction2(cone, primal_dir, dual_dir)
-        # TODO increase dim limit, not sure why so slow
-        if dim < 6 && T in (Float32, Float64)
+        if dim < 7 && T in (Float32, Float64)
             println("starting fd 3o")
             FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
             println("done fd 3o")
-            # check log-homog property that F'''(point)[point] = -2F''(point)
+            # check log-homog property that F'''(s)[s] = -2F''(s)
             @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * fd_hess atol=tol rtol=tol
-            # FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * Hinv_z / -2
             FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
             @show FD_corr ./ corr
             @test FD_corr ≈ corr atol=tol rtol=tol
@@ -499,16 +498,16 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
         # end
         # test_barrier_oracles(cone, R_barrier_sc1)
 
-        # # complex rootdet barrier
-        # dim = 1 + side^2
-        # cone = CO.HypoRootdetTri{T, Complex{T}}(dim)
-        # function C_barrier(s)
-        #     (u, W) = (s[1], zeros(Complex{eltype(s)}, side, side))
-        #     CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
-        #     fact_W = cholesky!(Hermitian(W, :U))
-        #     return cone.sc_const * (-log(exp(logdet(fact_W) / side) - u) - logdet(fact_W))
-        # end
-        # test_barrier_oracles(cone, C_barrier)
+        # complex rootdet barrier
+        dim = 1 + side^2
+        cone = CO.HypoRootdetTri{T, Complex{T}}(dim)
+        function C_barrier(s)
+            (u, W) = (s[1], zeros(Complex{eltype(s)}, side, side))
+            CO.svec_to_smat!(W, s[2:end], sqrt(T(2)))
+            fact_W = cholesky!(Hermitian(W, :U))
+            return cone.sc_const * (-log(exp(logdet(fact_W) / side) - u) - logdet(fact_W))
+        end
+        test_barrier_oracles(cone, C_barrier)
     end
     return
 end

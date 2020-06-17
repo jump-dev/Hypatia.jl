@@ -158,6 +158,7 @@ function update_dual_feas(cone::HypoRootdetTri)
 end
 
 function update_grad(cone::HypoRootdetTri)
+    @assert cone.feas_updated
     @assert cone.is_feas
     u = cone.point[1]
 
@@ -277,169 +278,89 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
     return prod
 end
 
-function third_skron(i, j, k, l, m, n, Wi::Symmetric{T, Matrix{T}}) where {T}
-    rt2 = sqrt(T(2))
-    t1 = Wi[i, m] * Wi[n, k] * Wi[l, j] + Wi[i, k] * Wi[l, m] * Wi[n, j]
-    if m != n
-        t1 += Wi[i, n] * Wi[m, k] * Wi[l, j] + Wi[i, k] * Wi[l, n] * Wi[m, j]
-        if k != l
-            t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j] + Wi[i, n] * Wi[m, l] * Wi[k, j] + Wi[i, l] * Wi[k, n] * Wi[m, j]  #################
-            if i != j
-                t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] +
-                    Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i] +
-                    Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i] + Wi[j, n] * Wi[m, l] * Wi[k, i] + Wi[j, l] * Wi[k, n] * Wi[m, i]
-            end
-        elseif i != j
-            t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i]
-        end
-    elseif k != l
-        t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j]
-        if i != j
-            t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i]
-        end
-    elseif i != j
-        t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i]
-    end
+# function third_skron(i, j, k, l, m, n, Wi::Symmetric{T, Matrix{T}}) where {T}
+#     rt2 = sqrt(T(2))
+#     t1 = Wi[i, m] * Wi[n, k] * Wi[l, j] + Wi[i, k] * Wi[l, m] * Wi[n, j]
+#     if m != n
+#         t1 += Wi[i, n] * Wi[m, k] * Wi[l, j] + Wi[i, k] * Wi[l, n] * Wi[m, j]
+#         if k != l
+#             t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j] + Wi[i, n] * Wi[m, l] * Wi[k, j] + Wi[i, l] * Wi[k, n] * Wi[m, j]  #################
+#             if i != j
+#                 t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] +
+#                     Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i] +
+#                     Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i] + Wi[j, n] * Wi[m, l] * Wi[k, i] + Wi[j, l] * Wi[k, n] * Wi[m, i]
+#             end
+#         elseif i != j
+#             t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i]
+#         end
+#     elseif k != l
+#         t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j]
+#         if i != j
+#             t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i]
+#         end
+#     elseif i != j
+#         t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i]
+#     end
+#
+#     num_match = (i == j) + (k == l) + (m == n)
+#     if num_match == 0
+#         t1 /= rt2 * 2
+#     elseif num_match == 1
+#         t1 /= 2
+#     elseif num_match == 2
+#         t1 /= rt2
+#     end
+#
+#     return t1
+# end
+# function skron(i, j, k, l, W::Symmetric{T, Matrix{T}}) where {T}
+#     if (i == j) && (k == l)
+#         return abs2(W[i, k])
+#     elseif (i == j) || (k == l)
+#         return sqrt(T(2)) * W[k, i] * W[j, l]
+#     else
+#         return W[k, i] * W[j, l] + W[l, i] * W[j, k]
+#     end
+# end
 
-    num_match = (i == j) + (k == l) + (m == n)
-    if num_match == 0
-        t1 /= rt2 * 2
-    elseif num_match == 1
-        t1 /= 2
-    elseif num_match == 2
-        t1 /= rt2
-    end
-
-    return t1
-end
-function skron(i, j, k, l, W::Symmetric{T, Matrix{T}}) where {T}
-    if (i == j) && (k == l)
-        return abs2(W[i, k])
-    elseif (i == j) || (k == l)
-        return sqrt(T(2)) * W[k, i] * W[j, l]
-    else
-        return W[k, i] * W[j, l] + W[l, i] * W[j, k]
-    end
-end
-
-# TODO allocs
+# TODO allocs and simplifications
 function correction2(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
     u_dir = primal_dir[1]
     @views w_dir = primal_dir[2:end]
 
     side = cone.side
     sigma = cone.sigma
-    Wi = Symmetric(cone.Wi)
-    dim = cone.dim
-    w_dim = dim - 1
-    theta = cone.sc_const
+    w_dim = cone.dim - 1
     z = cone.rootdetu
-    rho(T, i, j) = (i == j ? one(T) : sqrt(T(2)))
 
-    Tuuu = 2 / z / z / z
-
-    # debug against explicit multiplication
-    # third = zeros(dim, dim, dim)
-    # third_debug = zeros(dim, dim, dim)
-    #
-    # third[1, 1, 1] = 2 / z ^ 3
-    # idx1 = 2
-    # for j in 1:side, i in 1:j
-    #     # Tuuw
-    #     third[1, 1, idx1] = third[1, idx1, 1] = third[idx1, 1, 1] = -2 * sigma / abs2(z) * Wi[j, i] * rho(T, i, j)
-    #     idx2 = 2
-    #     # Tuww
-    #     for l in 1:side, k in 1:l
-    #         (idx2 <= idx1) || continue
-    #         third[1, idx1, idx2] = third[1, idx2, idx1] = third[idx1, 1, idx2] =
-    #             third[idx2, 1, idx1] = third[idx1, idx2, 1] = third[idx2, idx1, 1] =
-    #             rho(T, i, j) * rho(T, k, l) * Wi[j, i] * Wi[l, k] * sigma / z * (2 * sigma - inv(side)) + sigma / z * skron(i, j, k, l, Wi)
-    #         idx3 = 2
-    #         # Twww
-    #         for n in 1:side, m in 1:n
-    #             (idx3 <= idx2) || continue
-    #             # don't forget to negate skron
-    #             third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
-    #                 third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] =
-    #                 -rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n] * sigma * (inv(side) - sigma) * (inv(side) - 2 * sigma) +
-    #                 sigma * (inv(side) - sigma) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi)) +
-    #                 -(sigma + 1) * third_skron(i, j, k, l, m, n, Wi)
-    #             third_debug[idx1, idx2, idx3] = third_debug[idx1, idx3, idx2] = third_debug[idx2, idx1, idx3] =
-    #                 third_debug[idx2, idx3, idx1] = third_debug[idx3, idx1, idx2] = third_debug[idx3, idx2, idx1] =
-    #                 # -(sigma + 1) * third_skron(i, j, k, l, m, n, Wi)
-    #                 sigma * (inv(side) - sigma) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi))
-    #                 # -rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n] * sigma * (inv(side) - sigma) * (inv(side) - 2 * sigma)
-    #             idx3 += 1
-    #         end
-    #         idx2 += 1
-    #     end
-    #     idx1 += 1
-    # end
-    # third *= theta
-    # third_debug *= theta
-
-    # first term, 3rd order kron
-    S = copytri!(svec_to_smat!(similar(cone.work_mat), w_dir, cone.rt2), 'U', cone.is_complex) # TODO allocates
+    vec_Wi = smat_to_svec!(zeros(T, w_dim), cone.Wi, cone.rt2)
+    S = copytri!(svec_to_smat!(cone.work_mat, w_dir, cone.rt2), 'U', cone.is_complex) # TODO allocates
+    dot_Wi_S = dot(vec_Wi, w_dir)
     ldiv!(cone.fact_W, S)
+    dot_skron = real(dot(S, S'))
+
     rdiv!(S, cone.fact_W.U)
     mul!(cone.work_mat2, S, S') # TODO use outer prod function
-    term1 = -2 * theta * (sigma + 1) * smat_to_svec!(zeros(T, cone.dim - 1), cone.work_mat2, cone.rt2)
-    # @show term1 ./ (reshape(reshape(third_debug[2:end, 2:end, 2:end], w_dim^2, w_dim) * w_dir, w_dim, w_dim) * w_dir)
+    term1 = smat_to_svec!(zeros(T, w_dim), cone.work_mat2, cone.rt2)
+    term1 .*= -2 * (sigma + 1)
 
+    skron2 = rdiv!(S, cone.fact_W.U')
+    vec_skron2 = smat_to_svec!(zeros(T, w_dim), skron2, cone.rt2)
+    scal1 = sigma * (inv(T(side)) - sigma)
+    term2 = (dot_skron * scal1) * vec_Wi + (2 * dot_Wi_S * scal1) * vec_skron2
 
-    # second term, 2nd order kron and a dot
-    S = copytri!(svec_to_smat!(cone.work_mat, w_dir, cone.rt2), 'U', cone.is_complex)
-    # keep a kron product handy, could factor out
-    skron2 = Wi * Symmetric(S) * Wi # TODO ldiv rdiv
-    dot_skron = dot(skron2, S)
-    dot_Wi_S = dot(Wi, S)
-    term2 = zeros(T, w_dim)
-    idx = 1
-    for j in 1:side, i in 1:j
-        term2[idx] = rho(T, i, j) * (2 * skron2[i, j] * dot_Wi_S + Wi[i, j] * dot_skron)
-        idx += 1
-    end
-    scal1 = theta * sigma * (inv(T(side)) - sigma)
-    term2 .*= scal1
-    # @show term2 ./ (reshape(reshape(third_debug[2:end, 2:end, 2:end], w_dim^2, w_dim) * w_dir, w_dim, w_dim) * w_dir)
-    #
-    # third term, purely dots
     scal2 = dot_Wi_S * (inv(T(side)) - sigma - sigma)
     scal3 = -scal1 * scal2 * dot_Wi_S
-    term3 = scal3 * [Wi[i, j] * rho(T, i, j) for j in 1:side for i in 1:j]
-    # @show term3 ./ (reshape(reshape(third_debug[2:end, 2:end, 2:end], w_dim^2, w_dim) * w_dir, w_dim, w_dim) * w_dir)
-    #
-    # now take into account hypograph variable
-    # corr[k] += 2 * sum(third[1, j, k] * u_dir * primal_dir[j] for j in 2:dim)
-    # add on contributions from Tuww
-    # S = copytri!(svec_to_smat!(similar(cone.work_mat), w_dir, cone.rt2), 'U', cone.is_complex) # TODO allocates
-    term4a = smat_to_svec!(zeros(T, w_dim), skron2, cone.rt2)
-    term4b = -scal2 * smat_to_svec!(zeros(T, w_dim), Wi, cone.rt2)
-    term4ab = sigma / z * (term4a + term4b)
-    term4 = 2 * u_dir * theta * term4ab
+    term3 = scal3 * vec_Wi
 
-    term5a = -2 * sigma / abs2(z) * smat_to_svec!(zeros(T, w_dim), Wi, cone.rt2)
-    term5 = term5a * u_dir * theta * u_dir
+    scal4 = 2 * u_dir / z * sigma
+    term4ab = vec_skron2 - scal2 * vec_Wi
+    term4 = scal4 * term4ab
 
+    corr = cone.correction
+    corr[2:end] = term1 + term2 + (scal3 * vec_Wi) + term4 + (-scal4 * u_dir / z * vec_Wi)
+    corr[1] = (sigma * dot(term4ab, w_dir) + 2 * (-scal4 * dot(vec_Wi, w_dir) + abs2(u_dir / z))) / z
+    corr *= cone.sc_const / -2
 
-    corr = similar(cone.correction)
-    corr[2:dim] = term1 + term2 + term3 + term4 + term5
-    # for k in 2:dim
-        # corr[k] += third[1, 1, k] * abs2(u_dir)
-        # corr[k] += 2 * u_dir * sum(third[1, j, k] * primal_dir[j] for j in 2:dim)
-    # end
-    # corr[1] = sum(third[1, j, k] * primal_dir[j] * primal_dir[k] for j in 1:dim for k in 1:dim)
-    corr[1] = theta * (
-        dot(term4ab, primal_dir[2:dim]) +
-        # sum(third[1, j, k] * primal_dir[j] * primal_dir[k] for j in 2:dim for k in 2:dim) +
-        # 2 * u_dir * sum(third[1, 1, j] * primal_dir[j] for j in 2:dim) +
-        u_dir * (2 * dot(term5a, primal_dir[2:dim]) +
-        Tuuu * u_dir)
-        )
-    # @show corr ./ (reshape(reshape(third, dim^2, dim) * primal_dir, dim, dim) * primal_dir / -2)
-    cone.correction = corr / -2
-
-
-    # cone.correction = reshape(reshape(third, dim^2, dim) * primal_dir, dim, dim) * primal_dir / -2
-    return cone.correction
+    return corr
 end

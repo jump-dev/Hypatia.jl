@@ -328,7 +328,6 @@ function set_central_point(cone::Cone{T}) where {T <: Real}
         g = grad(cone)
 
         tmp = -curr - g
-        @show norm(tmp)
         if norm(tmp) < tol # TODO tune
             println("final iter $iter\n")
             break

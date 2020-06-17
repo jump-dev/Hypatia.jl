@@ -1705,7 +1705,7 @@ function hyporootdettri1(T; options...)
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 3
-    for is_complex in (false, )#true)
+    for is_complex in (false, true)
         dim = (is_complex ? 1 + side^2 : 1 + Cones.svec_length(side))
         R = (is_complex ? Complex{T} : T)
         c = T[-1]
@@ -1735,7 +1735,7 @@ function hyporootdettri2(T; options...)
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 4
-    for is_complex in (false, )#true)
+    for is_complex in (false, true)
         dim = (is_complex ? 1 + side^2 : 1 + Cones.svec_length(side))
         R = (is_complex ? Complex{T} : T)
         c = T[1]
@@ -1766,7 +1766,7 @@ function hyporootdettri3(T; options...)
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 3
-    for is_complex in (false, )#true)
+    for is_complex in (false, true)
         dim = (is_complex ? 1 + side^2 : 1 + Cones.svec_length(side))
         R = (is_complex ? Complex{T} : T)
         c = T[-1]
