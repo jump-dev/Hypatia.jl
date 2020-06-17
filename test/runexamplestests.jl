@@ -34,47 +34,47 @@ instance_sets = [
 # types of models to run and corresponding options and example names
 model_types = [
     # "native",
-    # "JuMP",
+    "JuMP",
     ]
 
 # list of names of native examples to run
 native_example_names = [
     # "densityest",
     # "envelope",
-    # # "expdesign",
-    "linearopt",
+    # "expdesign",
+    # "linearopt",
     # "matrixcompletion",
-    # # "matrixregression",
+    # "matrixregression",
     # "maxvolume",
     # "polymin",
     # "portfolio",
-    # # "sparsepca",
+    # "sparsepca",
     ]
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    # # "centralpolymat",
+    "centralpolymat",
     # "conditionnum",
-    # # "contraction",
+    # "contraction",
     # "densityest",
     # "envelope",
-    # # "expdesign",
-    # # "lotkavolterra",
-    # # "lyapunovstability",
+    # "expdesign",
+    # "lotkavolterra",
+    # "lyapunovstability",
     # "matrixcompletion",
-    # # "matrixquadratic",
-    # # "matrixregression",
+    # "matrixquadratic",
+    # "matrixregression",
     # "maxvolume",
-    # # "muconvexity",
-    # # "nearestpsd",
+    # "muconvexity",
+    # "nearestpsd",
     # "polymin",
-    # # "polynorm",
+    # "polynorm",
     # "portfolio",
-    # # "regionofattr",
+    # "regionofattr",
     # "robustgeomprog",
-    # # "secondorderpoly",
-    # # "semidefinitepoly",
-    # # "shapeconregr",
+    # "secondorderpoly",
+    # "semidefinitepoly",
+    # "shapeconregr",
     # "signomialmin",
     ]
 
@@ -146,4 +146,5 @@ all_tests_time = time()
     # println("\n")
 end
 
+@show sum(perf[:iters])
 ;

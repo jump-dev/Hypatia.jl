@@ -110,86 +110,6 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     return stepper
 end
 
-function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
-    cones = solver.model.cones
-    point = solver.point
-    timer = solver.timer
-
-    # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)
-    rtmu = sqrt(solver.mu)
-    irtmu = inv(rtmu)
-    # @show irtmu
-    # @assert irtmu >= one(T)
-    Cones.load_point.(cones, point.primal_views)
-    Cones.rescale_point.(cones, irtmu)
-    Cones.load_dual_point.(cones, point.dual_views)
-    Cones.reset_data.(cones)
-    @assert all(Cones.is_feas.(cones))
-    Cones.grad.(cones)
-    Cones.hess.(cones)
-    # @assert all(Cones.in_neighborhood.(cones, solver.mu, T(0.7)))
-
-    update_lhs(solver.system_solver, solver)
-
-    # calc pred-corr and cent-corr directions then gamma then combine them
-    use_corr = true
-    # use_corr = false
-
-    # centering
-    update_rhs_cent(stepper, solver)
-    get_directions(stepper, solver, iter_ref_steps = 3)
-    # if solver.mu > 1e-5
-    if use_corr
-        update_rhs_centcorr(stepper, solver, one(T))
-        get_directions(stepper, solver, iter_ref_steps = 3)
-    end
-    dir_cent = copy(stepper.dir)
-
-    # prediction
-    update_rhs_pred(stepper, solver)
-    get_directions(stepper, solver, iter_ref_steps = 3)
-    # if solver.mu > 1e-5
-    if use_corr
-        # update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha) # TODO
-        update_rhs_predcorr(stepper, solver, one(T))
-        get_directions(stepper, solver, iter_ref_steps = 3)
-    end
-
-    max_nbhd = T(0.4) # TODO tune
-
-    # gamma and combined direction
-    stepper.prev_aff_alpha = aff_alpha = find_max_alpha(stepper, solver, true, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2), max_nbhd = max_nbhd)
-    stepper.prev_gamma = gamma = (1 - aff_alpha) # TODO tune function - power 1 seemed better than 2
-    # stepper.prev_gamma = gamma = (1 - aff_alpha)^2
-    axpby!(gamma, dir_cent, 1 - gamma, stepper.dir)
-
-    # alpha step length
-    stepper.prev_alpha = alpha = find_max_alpha(stepper, solver, false, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3), max_nbhd = max_nbhd)
-    if iszero(alpha)
-        @warn("very small alpha")
-        solver.status = :NumericalFailure
-        return false
-    end
-
-    # step
-    @. point.x += alpha * stepper.x_dir
-    @. point.y += alpha * stepper.y_dir
-    @. point.z += alpha * stepper.z_dir
-    @. point.s += alpha * stepper.s_dir
-    solver.tau += alpha * stepper.dir[stepper.tau_row]
-    solver.kap += alpha * stepper.dir[stepper.kap_row]
-    calc_mu(solver)
-
-    if solver.tau <= zero(T) || solver.kap <= zero(T) || solver.mu <= zero(T)
-        @warn("numerical failure: tau is $(solver.tau), kappa is $(solver.kap), mu is $(solver.mu); terminating")
-        solver.status = :NumericalFailure
-        return false
-    end
-
-    return true
-end
-
-# # predict / center
 # function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 #     cones = solver.model.cones
 #     point = solver.point
@@ -207,57 +127,48 @@ end
 #     @assert all(Cones.is_feas.(cones))
 #     Cones.grad.(cones)
 #     Cones.hess.(cones)
-#     # @show Cones.in_neighborhood.(cones, solver.mu)
+#     # @assert all(Cones.in_neighborhood.(cones, solver.mu, T(0.7)))
 #
 #     update_lhs(solver.system_solver, solver)
 #
+#     # calc pred-corr and cent-corr directions then gamma then combine them
 #     use_corr = true
 #     # use_corr = false
 #
-#     # if iseven(solver.num_iters) # TODO maybe use nbhd to determine whether to center or predict
-#     # TODO use nbhd to determine whether to center or predict
-#     # if mod(solver.num_iters, 2) == 0
-#     if all(Cones.in_neighborhood.(cones, solver.mu, T(0.05)))
-#         # predict
-#         # println("pred")
-#         update_rhs_pred(stepper, solver)
-#         # if solver.mu > 1e-5
-#         if use_corr
-#             get_directions(stepper, solver, iter_ref_steps = 3)
-#             # update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha)
-#             update_rhs_predcorr(stepper, solver, one(T))
-#             # get_directions(stepper, solver, iter_ref_steps = 3)
-#             # update_rhs_predcorr(stepper, solver, one(T))
-#         end
-#         pred = true
-#         stepper.prev_gamma = zero(T) # TODO print like "pred" in column, or "cent" otherwise
-#     else
-#         # center
-#         update_rhs_cent(stepper, solver)
-#         # if solver.mu > 1e-5
-#         if use_corr
-#             get_directions(stepper, solver, iter_ref_steps = 3)
-#             update_rhs_centcorr(stepper, solver, one(T))
-#             # get_directions(stepper, solver, iter_ref_steps = 3)
-#             # update_rhs_centcorr(stepper, solver, one(T))
-#         end
-#         pred = false
-#         stepper.prev_gamma = one(T)
-#     end
+#     # centering
+#     update_rhs_cent(stepper, solver)
 #     get_directions(stepper, solver, iter_ref_steps = 3)
+#     # if solver.mu > 1e-5
+#     if use_corr
+#         update_rhs_centcorr(stepper, solver, one(T))
+#         get_directions(stepper, solver, iter_ref_steps = 3)
+#     end
+#     dir_cent = copy(stepper.dir)
+#
+#     # prediction
+#     update_rhs_pred(stepper, solver)
+#     get_directions(stepper, solver, iter_ref_steps = 3)
+#     # if solver.mu > 1e-5
+#     if use_corr
+#         # update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha) # TODO
+#         update_rhs_predcorr(stepper, solver, one(T))
+#         get_directions(stepper, solver, iter_ref_steps = 3)
+#     end
+#
+#     max_nbhd = T(0.4) # TODO tune
+#
+#     # gamma and combined direction
+#     stepper.prev_aff_alpha = aff_alpha = find_max_alpha(stepper, solver, true, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2), max_nbhd = max_nbhd)
+#     stepper.prev_gamma = gamma = (1 - aff_alpha) # TODO tune function - power 1 seemed better than 2
+#     # stepper.prev_gamma = gamma = (1 - aff_alpha)^2
+#     axpby!(gamma, dir_cent, 1 - gamma, stepper.dir)
 #
 #     # alpha step length
-#     alpha = find_max_alpha(stepper, solver, false, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
-#     # @show alpha
-#     !pred && alpha < 0.98 && println(alpha)
+#     stepper.prev_alpha = alpha = find_max_alpha(stepper, solver, false, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3), max_nbhd = max_nbhd)
 #     if iszero(alpha)
 #         @warn("very small alpha")
 #         solver.status = :NumericalFailure
 #         return false
-#     end
-#     stepper.prev_alpha = alpha
-#     if pred
-#         stepper.prev_aff_alpha = alpha
 #     end
 #
 #     # step
@@ -277,6 +188,95 @@ end
 #
 #     return true
 # end
+
+# predict / center
+function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+    cones = solver.model.cones
+    point = solver.point
+    timer = solver.timer
+
+    # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)
+    rtmu = sqrt(solver.mu)
+    irtmu = inv(rtmu)
+    # @show irtmu
+    # @assert irtmu >= one(T)
+    Cones.load_point.(cones, point.primal_views)
+    Cones.rescale_point.(cones, irtmu)
+    Cones.load_dual_point.(cones, point.dual_views)
+    Cones.reset_data.(cones)
+    @assert all(Cones.is_feas.(cones))
+    Cones.grad.(cones)
+    Cones.hess.(cones)
+    # @show Cones.in_neighborhood.(cones, solver.mu)
+
+    update_lhs(solver.system_solver, solver)
+
+    use_corr = true
+    # use_corr = false
+
+    # if iseven(solver.num_iters) # TODO maybe use nbhd to determine whether to center or predict
+    # TODO use nbhd to determine whether to center or predict
+    # if mod(solver.num_iters, 2) == 0
+    if all(Cones.in_neighborhood.(cones, solver.mu, T(0.05)))
+        # predict
+        # println("pred")
+        update_rhs_pred(stepper, solver)
+        # if solver.mu > 1e-5
+        if use_corr
+            get_directions(stepper, solver, iter_ref_steps = 3)
+            # update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha)
+            update_rhs_predcorr(stepper, solver, one(T))
+            # get_directions(stepper, solver, iter_ref_steps = 3)
+            # update_rhs_predcorr(stepper, solver, one(T))
+        end
+        pred = true
+        stepper.prev_gamma = zero(T) # TODO print like "pred" in column, or "cent" otherwise
+    else
+        # center
+        update_rhs_cent(stepper, solver)
+        # if solver.mu > 1e-5
+        if use_corr
+            get_directions(stepper, solver, iter_ref_steps = 3)
+            update_rhs_centcorr(stepper, solver, one(T))
+            # get_directions(stepper, solver, iter_ref_steps = 3)
+            # update_rhs_centcorr(stepper, solver, one(T))
+        end
+        pred = false
+        stepper.prev_gamma = one(T)
+    end
+    get_directions(stepper, solver, iter_ref_steps = 3)
+
+    # alpha step length
+    alpha = find_max_alpha(stepper, solver, false, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
+    # @show alpha
+    !pred && alpha < 0.98 && println(alpha)
+    if iszero(alpha)
+        @warn("very small alpha")
+        solver.status = :NumericalFailure
+        return false
+    end
+    stepper.prev_alpha = alpha
+    if pred
+        stepper.prev_aff_alpha = alpha
+    end
+
+    # step
+    @. point.x += alpha * stepper.x_dir
+    @. point.y += alpha * stepper.y_dir
+    @. point.z += alpha * stepper.z_dir
+    @. point.s += alpha * stepper.s_dir
+    solver.tau += alpha * stepper.dir[stepper.tau_row]
+    solver.kap += alpha * stepper.dir[stepper.kap_row]
+    calc_mu(solver)
+
+    if solver.tau <= zero(T) || solver.kap <= zero(T) || solver.mu <= zero(T)
+        @warn("numerical failure: tau is $(solver.tau), kappa is $(solver.kap), mu is $(solver.mu); terminating")
+        solver.status = :NumericalFailure
+        return false
+    end
+
+    return true
+end
 
 # update the RHS for affine direction
 function update_rhs_pred(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
@@ -316,13 +316,10 @@ function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}, pre
         duals_k = solver.point.dual_views[k]
         @. stepper.s_rhs_k[k] = -duals_k
         if Cones.use_correction(cone_k) && prev_aff_alpha > 0
-            # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
-            # scal = (Cones.use_nt(cone_k) ? one(T) : irtmu)
-            scal = irtmu
-            # stepper.s_rhs_k[k] .-= scal * Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k]) * prev_aff_alpha^2
             corr_k = similar(stepper.primal_dir_k[k])
             Cones.hess_prod!(corr_k, stepper.primal_dir_k[k], cone_k)
-            stepper.s_rhs_k[k] .+= corr_k + scal * Cones.correction2(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k]) * prev_aff_alpha^2
+            prim_k_scal = sqrt(irtmu) * stepper.primal_dir_k[k]
+            stepper.s_rhs_k[k] .+= corr_k + Cones.correction2(cone_k, prim_k_scal, prim_k_scal) * prev_aff_alpha^2
         end
     end
 
@@ -380,11 +377,8 @@ function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}, pre
         scal = rtmu
         @. stepper.s_rhs_k[k] = -duals_k - scal * grad_k
         if Cones.use_correction(cone_k) && prev_aff_alpha > 0
-            # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
-            # scal = (Cones.use_nt(cone_k) ? one(T) : irtmu)
-            scal = irtmu
-            stepper.s_rhs_k[k] .+= scal * Cones.correction2(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k]) * prev_aff_alpha^2
-            # println(scal * Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k]))
+            prim_k_scal = sqrt(irtmu) * stepper.primal_dir_k[k]
+            stepper.s_rhs_k[k] .+= Cones.correction2(cone_k, prim_k_scal, prim_k_scal) * prev_aff_alpha^2 # TODO delete third arg
         end
     end
 
@@ -396,43 +390,43 @@ function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}, pre
     return rhs
 end
 
-# update the RHS for combined direction
-function update_rhs_comb(stepper::CombinedStepper{T}, solver::Solver{T}, aff_alpha::T, gamma::T) where {T <: Real}
-    rhs = stepper.rhs
-
-    # x, y, z, tau
-    stepper.x_rhs .= solver.x_residual * (1 - gamma)
-    stepper.y_rhs .= solver.y_residual * (1 - gamma)
-    stepper.z_rhs .= solver.z_residual * (1 - gamma)
-    rhs[stepper.tau_row] = (solver.kap + solver.primal_obj_t - solver.dual_obj_t) * (1 - gamma)
-
-    # s
-    rtmu = sqrt(solver.mu)
-    irtmu = inv(rtmu)
-    for (k, cone_k) in enumerate(solver.model.cones)
-        duals_k = solver.point.dual_views[k]
-        grad_k = Cones.grad(cone_k)
-        # scal = (Cones.use_nt(cone_k) ? solver.mu : rtmu)
-        scal = rtmu
-        @. stepper.s_rhs_k[k] = -duals_k - (scal * grad_k) * gamma
-        if Cones.use_correction(cone_k) && aff_alpha > 0
-            # (reuses affine direction)
-            # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
-            # stepper.s_rhs_k[k] .-= cone_k.correction
-            # scal = (Cones.use_nt(cone_k) ? one(T) : irtmu)
-            scal = irtmu
-            stepper.s_rhs_k[k] .-= scal * Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k]) * aff_alpha^2
-        end
-    end
-
-    # NT: kap (corrector reuses kappa/tau affine directions)
-    # rhs[end] = -solver.kap + (solver.mu / solver.tau) * gamma - stepper.tkcorr
-    tkcorr = stepper.dir[stepper.tau_row] * stepper.dir[stepper.kap_row] / solver.tau
-    rhs[end] = -solver.kap + (solver.mu / solver.tau) * gamma - tkcorr * aff_alpha^2 # TODO see comment on correction above
-    # rhs[end] = -solver.kap + (solver.mu / solver.tau) * gamma - stepper.tkcorr * aff_alpha^2 # TODO see comment on correction above
-
-    return rhs
-end
+# # update the RHS for combined direction
+# function update_rhs_comb(stepper::CombinedStepper{T}, solver::Solver{T}, aff_alpha::T, gamma::T) where {T <: Real}
+#     rhs = stepper.rhs
+#
+#     # x, y, z, tau
+#     stepper.x_rhs .= solver.x_residual * (1 - gamma)
+#     stepper.y_rhs .= solver.y_residual * (1 - gamma)
+#     stepper.z_rhs .= solver.z_residual * (1 - gamma)
+#     rhs[stepper.tau_row] = (solver.kap + solver.primal_obj_t - solver.dual_obj_t) * (1 - gamma)
+#
+#     # s
+#     rtmu = sqrt(solver.mu)
+#     irtmu = inv(rtmu)
+#     for (k, cone_k) in enumerate(solver.model.cones)
+#         duals_k = solver.point.dual_views[k]
+#         grad_k = Cones.grad(cone_k)
+#         # scal = (Cones.use_nt(cone_k) ? solver.mu : rtmu)
+#         scal = rtmu
+#         @. stepper.s_rhs_k[k] = -duals_k - (scal * grad_k) * gamma
+#         if Cones.use_correction(cone_k) && aff_alpha > 0
+#             # (reuses affine direction)
+#             # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
+#             # stepper.s_rhs_k[k] .-= cone_k.correction
+#             # scal = (Cones.use_nt(cone_k) ? one(T) : irtmu)
+#             scal = irtmu
+#             stepper.s_rhs_k[k] .-= scal * Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k]) * aff_alpha^2
+#         end
+#     end
+#
+#     # NT: kap (corrector reuses kappa/tau affine directions)
+#     # rhs[end] = -solver.kap + (solver.mu / solver.tau) * gamma - stepper.tkcorr
+#     tkcorr = stepper.dir[stepper.tau_row] * stepper.dir[stepper.kap_row] / solver.tau
+#     rhs[end] = -solver.kap + (solver.mu / solver.tau) * gamma - tkcorr * aff_alpha^2 # TODO see comment on correction above
+#     # rhs[end] = -solver.kap + (solver.mu / solver.tau) * gamma - stepper.tkcorr * aff_alpha^2 # TODO see comment on correction above
+#
+#     return rhs
+# end
 
 # calculate direction given rhs, and apply iterative refinement
 function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}; iter_ref_steps::Int = 0) where {T <: Real}
