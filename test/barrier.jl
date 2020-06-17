@@ -390,7 +390,7 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
     Random.seed!(1)
     invrt2 = inv(sqrt(T(2)))
 
-    for side in [1, 2, 3, 5, 10, 20, 40, 80]
+    for side in [1, 2, 3, 4, 5, ]#10, 20, 40, 80]
         # generate random sparsity pattern for lower triangle
         sparsity = inv(sqrt(side))
         (row_idxs, col_idxs, _) = findnz(tril!(sprand(Bool, side, side, sparsity)) + I)
@@ -476,7 +476,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
 end
 
 function test_hyporootdettri_barrier(T::Type{<:Real})
-    for side in [1, 2, 3, 5, 8]
+    for side in [1, 2, 3, 4, 5, 8]
         # real rootdet barrier
         dim = 1 + CO.svec_length(side)
         cone = CO.HypoRootdetTri{T, T}(dim)
@@ -499,7 +499,7 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
         # end
         # test_barrier_oracles(cone, R_barrier_sc1)
 
-        # complex rootdet barrier
+        # # complex rootdet barrier
         # dim = 1 + side^2
         # cone = CO.HypoRootdetTri{T, Complex{T}}(dim)
         # function C_barrier(s)

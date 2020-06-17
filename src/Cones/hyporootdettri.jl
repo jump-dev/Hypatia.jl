@@ -60,7 +60,6 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
-        @assert !use_dual # TODO delete later
         @assert dim >= 2
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
@@ -104,7 +103,7 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.W = zeros(R, cone.side, cone.side)
-    cone.Wi = zeros(R, cone.side, cone.side)
+    # cone.Wi = zeros(R, cone.side, cone.side)
     cone.work_mat = zeros(R, cone.side, cone.side)
     cone.work_mat2 = zeros(R, cone.side, cone.side)
     cone.correction = zeros(T, dim)
@@ -146,21 +145,16 @@ function update_feas(cone::HypoRootdetTri)
     return cone.is_feas
 end
 
+# update_dual_feas(cone::HypoRootdetTri) = true
 function update_dual_feas(cone::HypoRootdetTri)
     u = cone.dual_point[1]
     if u < 0
-        @views svec_to_smat!(cone.dual_W, cone.dual_point[2:end], cone.rt2)
-        dual_fact_W = cholesky!(Hermitian(cone.dual_W, :U), check = false)
-        if isposdef(dual_fact_W)
-            rootdet = exp(logdet(cone.fact_W) / cone.side)
-            return (rootdet * cone.side > -u)
-        else
-            return false
-        end
+        @views svec_to_smat!(cone.work_mat, cone.dual_point[2:end], cone.rt2)
+        dual_fact_W = cholesky!(Hermitian(cone.work_mat, :U), check = false)
+        return isposdef(dual_fact_W) && (logdet(dual_fact_W) > cone.side * log(-u / cone.side))
     else
         return false
     end
-
 end
 
 function update_grad(cone::HypoRootdetTri)
@@ -168,8 +162,9 @@ function update_grad(cone::HypoRootdetTri)
     u = cone.point[1]
 
     cone.grad[1] = cone.sc_const / cone.rootdetu
-    copyto!(cone.Wi, cone.fact_W.factors)
-    LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0))
+    # copyto!(cone.Wi, cone.fact_W.factors)
+    # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0)) # TODO inplace for bigfloat
+    cone.Wi = inv(cone.fact_W)
     @views smat_to_svec!(cone.grad[2:cone.dim], cone.Wi, cone.rt2)
     cone.sigma = cone.rootdet / cone.rootdetu / cone.side
     @. cone.grad[2:end] *= -cone.sc_const * (cone.sigma + 1)
@@ -329,6 +324,9 @@ end
 
 # TODO allocs
 function correction2(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
+    u_dir = primal_dir[1]
+    @views w_dir = primal_dir[2:end]
+
     side = cone.side
     sigma = cone.sigma
     Wi = Symmetric(cone.Wi)
@@ -336,9 +334,9 @@ function correction2(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}, dua
     w_dim = dim - 1
     theta = cone.sc_const
     z = cone.rootdetu
-    rho(T, i, j) = (i == j ? 1 : sqrt(2))
+    rho(T, i, j) = (i == j ? one(T) : sqrt(T(2)))
 
-    Tuuu = 2 / z ^ 3
+    Tuuu = 2 / z / z / z
 
     # debug against explicit multiplication
     # third = zeros(dim, dim, dim)
@@ -381,60 +379,62 @@ function correction2(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}, dua
     # third_debug *= theta
 
     # first term, 3rd order kron
-    S = copytri!(svec_to_smat!(similar(cone.work_mat), primal_dir[2:end], cone.rt2), 'U', cone.is_complex) # TODO allocates
+    S = copytri!(svec_to_smat!(similar(cone.work_mat), w_dir, cone.rt2), 'U', cone.is_complex) # TODO allocates
     ldiv!(cone.fact_W, S)
     rdiv!(S, cone.fact_W.U)
     mul!(cone.work_mat2, S, S') # TODO use outer prod function
-    term1 = -theta * (sigma + 1) * smat_to_svec!(zeros(T, cone.dim - 1), cone.work_mat2, cone.rt2) / 0.5
-    # @show term1 ./ (reshape(reshape(third_debug[2:end, 2:end, 2:end], w_dim^2, w_dim) * primal_dir[2:end], w_dim, w_dim) * primal_dir[2:end])
+    term1 = -2 * theta * (sigma + 1) * smat_to_svec!(zeros(T, cone.dim - 1), cone.work_mat2, cone.rt2)
+    # @show term1 ./ (reshape(reshape(third_debug[2:end, 2:end, 2:end], w_dim^2, w_dim) * w_dir, w_dim, w_dim) * w_dir)
 
 
-    # # second term, 2nd order kron and a dot
-    S = copytri!(svec_to_smat!(cone.work_mat, primal_dir[2:end], cone.rt2), 'U', cone.is_complex)
+    # second term, 2nd order kron and a dot
+    S = copytri!(svec_to_smat!(cone.work_mat, w_dir, cone.rt2), 'U', cone.is_complex)
     # keep a kron product handy, could factor out
-    skron2 = Wi * Symmetric(S) * Wi
+    skron2 = Wi * Symmetric(S) * Wi # TODO ldiv rdiv
     dot_skron = dot(skron2, S)
     dot_Wi_S = dot(Wi, S)
     term2 = zeros(T, w_dim)
     idx = 1
     for j in 1:side, i in 1:j
-        term2[idx] = 2 * skron2[i, j] * dot_Wi_S
-        term2[idx] += Wi[i, j] * dot_skron #* (i == j ? 1 : sqrt(T(2)))
-        term2[idx] *= (i == j ? 1 : sqrt(T(2)))
+        term2[idx] = rho(T, i, j) * (2 * skron2[i, j] * dot_Wi_S + Wi[i, j] * dot_skron)
         idx += 1
     end
-    term2 .*= theta * sigma * (inv(side) - sigma)
-    # @show term2 ./ (reshape(reshape(third_debug[2:end, 2:end, 2:end], w_dim^2, w_dim) * primal_dir[2:end], w_dim, w_dim) * primal_dir[2:end])
+    scal1 = theta * sigma * (inv(T(side)) - sigma)
+    term2 .*= scal1
+    # @show term2 ./ (reshape(reshape(third_debug[2:end, 2:end, 2:end], w_dim^2, w_dim) * w_dir, w_dim, w_dim) * w_dir)
     #
     # third term, purely dots
-    term3 = -theta * abs2(dot_Wi_S) * sigma * (inv(side) - sigma) * (inv(side) - 2 * sigma) * [Wi[i, j] * (i == j ? 1 : sqrt(T(2))) for j in 1:side for i in 1:j]
-    # @show term3 ./ (reshape(reshape(third_debug[2:end, 2:end, 2:end], w_dim^2, w_dim) * primal_dir[2:end], w_dim, w_dim) * primal_dir[2:end])
+    scal2 = dot_Wi_S * (inv(T(side)) - sigma - sigma)
+    scal3 = -scal1 * scal2 * dot_Wi_S
+    term3 = scal3 * [Wi[i, j] * rho(T, i, j) for j in 1:side for i in 1:j]
+    # @show term3 ./ (reshape(reshape(third_debug[2:end, 2:end, 2:end], w_dim^2, w_dim) * w_dir, w_dim, w_dim) * w_dir)
     #
     # now take into account hypograph variable
-    # corr[k] += 2 * sum(third[1, j, k] * primal_dir[1] * primal_dir[j] for j in 2:dim)
+    # corr[k] += 2 * sum(third[1, j, k] * u_dir * primal_dir[j] for j in 2:dim)
     # add on contributions from Tuww
-    S = copytri!(svec_to_smat!(similar(cone.work_mat), primal_dir[2:end], cone.rt2), 'U', cone.is_complex) # TODO allocates
-    term4a = sigma / z * smat_to_svec!(zeros(w_dim), Wi * S * Wi, cone.rt2)
-    term4b = smat_to_svec!(zeros(w_dim), Wi, cone.rt2) * dot_Wi_S * sigma / z * (2 * sigma - inv(side))
-    term4 = theta * (term4a + term4b) * 2 * primal_dir[1]
+    # S = copytri!(svec_to_smat!(similar(cone.work_mat), w_dir, cone.rt2), 'U', cone.is_complex) # TODO allocates
+    term4a = smat_to_svec!(zeros(T, w_dim), skron2, cone.rt2)
+    term4b = -scal2 * smat_to_svec!(zeros(T, w_dim), Wi, cone.rt2)
+    term4ab = sigma / z * (term4a + term4b)
+    term4 = 2 * u_dir * theta * term4ab
 
-    term5a = -2 * sigma / abs2(z) * smat_to_svec!(zeros(w_dim), Wi, cone.rt2)
-    term5 = term5a * abs2(primal_dir[1]) * theta
+    term5a = -2 * sigma / abs2(z) * smat_to_svec!(zeros(T, w_dim), Wi, cone.rt2)
+    term5 = term5a * u_dir * theta * u_dir
 
 
     corr = similar(cone.correction)
     corr[2:dim] = term1 + term2 + term3 + term4 + term5
     # for k in 2:dim
-        # corr[k] += third[1, 1, k] * abs2(primal_dir[1])
-        # corr[k] += 2 * primal_dir[1] * sum(third[1, j, k] * primal_dir[j] for j in 2:dim)
+        # corr[k] += third[1, 1, k] * abs2(u_dir)
+        # corr[k] += 2 * u_dir * sum(third[1, j, k] * primal_dir[j] for j in 2:dim)
     # end
     # corr[1] = sum(third[1, j, k] * primal_dir[j] * primal_dir[k] for j in 1:dim for k in 1:dim)
     corr[1] = theta * (
-        dot((term4a + term4b), primal_dir[2:dim]) +
+        dot(term4ab, primal_dir[2:dim]) +
         # sum(third[1, j, k] * primal_dir[j] * primal_dir[k] for j in 2:dim for k in 2:dim) +
-        # 2 * primal_dir[1] * sum(third[1, 1, j] * primal_dir[j] for j in 2:dim) +
-        2 * primal_dir[1] * dot(term5a, primal_dir[2:dim]) +
-        Tuuu * abs2(primal_dir[1])
+        # 2 * u_dir * sum(third[1, 1, j] * primal_dir[j] for j in 2:dim) +
+        u_dir * (2 * dot(term5a, primal_dir[2:dim]) +
+        Tuuu * u_dir)
         )
     # @show corr ./ (reshape(reshape(third, dim^2, dim) * primal_dir, dim, dim) * primal_dir / -2)
     cone.correction = corr / -2

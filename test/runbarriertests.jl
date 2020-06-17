@@ -13,20 +13,20 @@ barrier_testfuns = [
     # test_episumperentropy_barrier,
     # test_power_barrier,
     # test_hypogeomean_barrier,
-    test_epinormspectral_barrier,
+    # test_epinormspectral_barrier,
     # # test_matrixepipersquare_barrier,
     # test_linmatrixineq_barrier,
     # test_possemideftri_barrier,
     # # test_possemideftrisparse_barrier,
     # # test_hypoperlogdettri_barrier,
-    # # test_hyporootdettri_barrier,
+    test_hyporootdettri_barrier,
     # test_wsosinterpnonnegative_barrier,
     # # test_wsosinterppossemideftri_barrier,
     # # test_wsosinterpepinormeucl_barrier,
     ]
 
 real_types = [
-    Float64,
+    # Float64,
     # Float32,
     BigFloat,
     ]

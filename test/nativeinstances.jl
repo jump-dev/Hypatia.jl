@@ -1700,11 +1700,12 @@ function hypoperlogdettri4(T; options...)
 end
 
 function hyporootdettri1(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 3
-    for is_complex in (false, true)
+    for is_complex in (false, )#true)
         dim = (is_complex ? 1 + side^2 : 1 + Cones.svec_length(side))
         R = (is_complex ? Complex{T} : T)
         c = T[-1]
@@ -1729,11 +1730,12 @@ function hyporootdettri1(T; options...)
 end
 
 function hyporootdettri2(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 4
-    for is_complex in (false, true)
+    for is_complex in (false, )#true)
         dim = (is_complex ? 1 + side^2 : 1 + Cones.svec_length(side))
         R = (is_complex ? Complex{T} : T)
         c = T[1]
@@ -1759,11 +1761,12 @@ end
 
 function hyporootdettri3(T; options...)
     # max u: u <= rootdet(W) where W is not full rank
-    tol = eps(T) ^ 0.15
+    # tol = eps(T) ^ 0.15
+    tol = 1e-3
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 3
-    for is_complex in (false, true)
+    for is_complex in (false, )#true)
         dim = (is_complex ? 1 + side^2 : 1 + Cones.svec_length(side))
         R = (is_complex ? Complex{T} : T)
         c = T[-1]
@@ -1784,7 +1787,8 @@ function hyporootdettri3(T; options...)
 end
 
 function hyporootdettri4(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     rt2 = sqrt(T(2))
     c = T[-1, 0, 0, 0]
     A = zeros(T, 0, 4)
