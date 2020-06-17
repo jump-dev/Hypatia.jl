@@ -89,6 +89,8 @@ function test_barrier_oracles(
         # check correction term agrees with directional 3rd derivative
         (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
         corr = CO.correction2(cone, primal_dir, dual_dir)
+        hess = (CO.use_nt(cone) ? CO.hess(cone) : cone.old_hess)
+        @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
         if dim < 7 && T in (Float32, Float64)
             println("starting fd 3o")
             FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
@@ -99,8 +101,6 @@ function test_barrier_oracles(
             @show FD_corr ./ corr
             @test FD_corr ≈ corr atol=tol rtol=tol
         end
-        # hess = (CO.use_nt(cone) ? CO.hess(cone) : cone.old_hess)
-        # @test dot(corr, point) ≈ dot(Hinv_z, hess * primal_dir) atol=tol rtol=tol
     end
 
     return

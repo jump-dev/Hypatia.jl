@@ -278,51 +278,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
     return prod
 end
 
-# function third_skron(i, j, k, l, m, n, Wi::Symmetric{T, Matrix{T}}) where {T}
-#     rt2 = sqrt(T(2))
-#     t1 = Wi[i, m] * Wi[n, k] * Wi[l, j] + Wi[i, k] * Wi[l, m] * Wi[n, j]
-#     if m != n
-#         t1 += Wi[i, n] * Wi[m, k] * Wi[l, j] + Wi[i, k] * Wi[l, n] * Wi[m, j]
-#         if k != l
-#             t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j] + Wi[i, n] * Wi[m, l] * Wi[k, j] + Wi[i, l] * Wi[k, n] * Wi[m, j]  #################
-#             if i != j
-#                 t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] +
-#                     Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i] +
-#                     Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i] + Wi[j, n] * Wi[m, l] * Wi[k, i] + Wi[j, l] * Wi[k, n] * Wi[m, i]
-#             end
-#         elseif i != j
-#             t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i]
-#         end
-#     elseif k != l
-#         t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j]
-#         if i != j
-#             t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i]
-#         end
-#     elseif i != j
-#         t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i]
-#     end
-#
-#     num_match = (i == j) + (k == l) + (m == n)
-#     if num_match == 0
-#         t1 /= rt2 * 2
-#     elseif num_match == 1
-#         t1 /= 2
-#     elseif num_match == 2
-#         t1 /= rt2
-#     end
-#
-#     return t1
-# end
-# function skron(i, j, k, l, W::Symmetric{T, Matrix{T}}) where {T}
-#     if (i == j) && (k == l)
-#         return abs2(W[i, k])
-#     elseif (i == j) || (k == l)
-#         return sqrt(T(2)) * W[k, i] * W[j, l]
-#     else
-#         return W[k, i] * W[j, l] + W[l, i] * W[j, k]
-#     end
-# end
-
 # TODO allocs and simplifications
 # TODO try to reuse fields already calculated for g and H
 function correction2(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}

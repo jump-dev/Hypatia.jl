@@ -17,11 +17,13 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     U::Int
     Ps::Vector{Matrix{T}}
     point::AbstractVector{T}
+    dual_point::AbstractVector{T}
     timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
+    scal_hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
@@ -40,6 +42,8 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     ΛFLP::Vector{Matrix{T}}
     tmpLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
+
+    correction::Vector{T}
 
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
@@ -74,6 +78,7 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     R = cone.R
     Ps = cone.Ps
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = similar(cone.point)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -88,10 +93,17 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.ΛFL = Vector{Any}(undef, length(Ps))
     cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
+    cone.correction = zeros(T, dim)
     return
 end
 
 get_nu(cone::WSOSInterpPosSemidefTri) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
+
+use_correction(cone::WSOSInterpPosSemidefTri) = false
+
+use_scaling(cone::WSOSInterpPosSemidefTri) = false
+
+rescale_point(cone::WSOSInterpPosSemidefTri{T}, s::T) where {T} = (cone.point .*= s)
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpPosSemidefTri)
     arr .= 0
@@ -132,6 +144,8 @@ function update_feas(cone::WSOSInterpPosSemidefTri)
     cone.feas_updated = true
     return cone.is_feas
 end
+
+update_dual_feas(cone::WSOSInterpPosSemidefTri) = true
 
 function update_grad(cone::WSOSInterpPosSemidefTri)
     @assert is_feas(cone)
@@ -218,12 +232,12 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
             for k in eachindex(cone.Ps)
                 PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
                 @inbounds @. @views Hview += PlambdaPk[block_p_idxs, block_p_idxs2] * PlambdaPk[block_q_idxs, block_q_idxs2]
-                if (p != q) || (p2 != q2)
+                if (p != q) && (p2 != q2)
                     @inbounds @. @views Hview += PlambdaPk[block_p_idxs, block_q_idxs2] * PlambdaPk[block_q_idxs, block_p_idxs2]
                 end
             end
             if xor(p == q, p2 == q2)
-                @. Hview *= cone.rt2i
+                @. Hview *= cone.rt2
             end
         end
     end
@@ -231,3 +245,59 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     cone.hess_updated = true
     return cone.hess
 end
+
+# this works better when point is shuffled. everything else works better when it is not. maybe save a permutation.
+# function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::WSOSInterpPosSemidefTri{T}) where {T}
+#     U = cone.U
+#     R = cone.R
+#     prod .= 0
+#
+#     arr_shuf = similar(arr)
+#     prod_shuf = similar(prod)
+#     r_dim = svec_length(R)
+#
+#     # permute array
+#     for k in 1:size(prod, 2)
+#         idx_new = 1
+#         for u in 1:cone.U
+#             r_idx = 1
+#             for j in 1:cone.R, i in 1:j
+#                 arr_shuf[idx_new, k] = arr[block_idxs(U, r_idx)[u], k]
+#                 @show k, arr[block_idxs(U, r_idx)[u], k]
+#                 r_idx += 1
+#                 idx_new += 1
+#             end
+#         end
+#     end
+#
+#     # get permuted product
+#     for j in 1:size(prod, 2)
+#         arr_shufj = arr_shuf[:, j]
+#         for p in 1:U
+#             arr_mat = svec_to_smat!(zeros(T, R, R), arr_shufj[block_idxs(r_dim, p)], cone.rt2)
+#             for k in eachindex(cone.Ps)
+#                 PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
+#                 PlambdaPk_slice = [PlambdaPk[block_idxs(U, i)[p], block_idxs(U, j)[p]] for j in 1:R, i in 1:R]
+#                 prod_mat = PlambdaPk_slice * Symmetric(arr_mat) * PlambdaPk_slice
+#                 tmp = smat_to_svec!(zeros(r_dim), prod_mat, cone.rt2)
+#                 prod_shuf[block_idxs(r_dim, p), j] += tmp
+#             end
+#         end
+#     end
+#
+#     # un-permute product
+#     for k in 1:size(prod, 2)
+#         r_idx = 1
+#         idx = 1
+#         for j in 1:cone.R, i in 1:j
+#             for u in 1:U
+#                 prod[idx, k] = prod_shuf[block_idxs(r_dim, u)[r_idx], k]
+#                 idx += 1
+#             end
+#             r_idx += 1
+#         end
+#     end
+#
+#     return prod
+#
+# end

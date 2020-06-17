@@ -75,7 +75,7 @@ barrier(cone::Cone) = cone.barrier
 
 use_nt(::Cone) = false
 
-reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
+reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 # function update_dual_feas(cone::Cone{T}, mu::T) where {T <: Real}
 #     nbhd_tmp = cone.nbhd_tmp
