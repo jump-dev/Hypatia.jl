@@ -29,6 +29,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
+    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
     nbhd_tmp::Vector{T}
@@ -81,6 +82,7 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.dual_point = zeros(T, dim)
     cone.grad = similar(cone.point)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
@@ -99,7 +101,7 @@ end
 
 get_nu(cone::WSOSInterpPosSemidefTri) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
 
-use_correction(cone::WSOSInterpPosSemidefTri) = false
+use_correction(cone::WSOSInterpPosSemidefTri) = true
 
 use_scaling(cone::WSOSInterpPosSemidefTri) = false
 
@@ -241,6 +243,7 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
             end
         end
     end
+    copyto!(cone.old_hess.data, H)
 
     cone.hess_updated = true
     return cone.hess
@@ -248,6 +251,7 @@ end
 
 # this works better when point is shuffled. everything else works better when it is not. maybe save a permutation.
 function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::WSOSInterpPosSemidefTri{T}) where {T}
+    @assert cone.grad_updated
     U = cone.U
     R = cone.R
     prod .= 0
@@ -278,8 +282,8 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::W
             for p in 1:U
                 for q in 1:U
                     arr_mat = svec_to_smat!(zeros(T, R, R), arr_shufj[block_idxs(r_dim, q)], cone.rt2)
-                    PlambdaPk_slice = [PlambdaPk[block_idxs(U, i)[p], block_idxs(U, j)[q]] for j in 1:R, i in 1:R]
-                    prod_mat = PlambdaPk_slice * Symmetric(arr_mat) * PlambdaPk_slice
+                    PlambdaPk_slice = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[q]] for ii in 1:R, jj in 1:R]
+                    prod_mat = PlambdaPk_slice * Symmetric(arr_mat) * PlambdaPk_slice'
                     tmp = smat_to_svec!(zeros(r_dim), prod_mat, cone.rt2)
                     prod_shuf[block_idxs(r_dim, p), j] += tmp
                 end
@@ -294,6 +298,7 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::W
         idx = 1
         for j in 1:cone.R, i in 1:j
             for u in 1:U
+                # @show block_idxs(r_dim, u), length(block_idxs(r_dim, u)), r_idx
                 prod[idx, k] = prod_shuf[block_idxs(r_dim, u)[r_idx], k]
                 idx += 1
             end
@@ -304,4 +309,57 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::W
 
     return prod
 
+end
+
+function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector, dual_dir::AbstractVector)
+    @assert cone.grad_updated
+    corr = cone.correction
+    U = cone.U
+    R = cone.R
+
+    s_shuf = similar(primal_dir)
+    corr_shuf = similar(corr)
+    corr_shuf .= 0
+    r_dim = svec_length(R)
+
+    # permute primal_dir
+    idx_new = 1
+    for u in 1:cone.U
+        r_idx = 1
+        for j in 1:cone.R, i in 1:j
+            s_shuf[idx_new] = primal_dir[block_idxs(U, r_idx)[u]]
+            r_idx += 1
+            idx_new += 1
+        end
+    end
+
+    for k in eachindex(cone.Ps)
+        PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
+        for p in 1:U, q in 1:U, r in 1:U
+            primal_dir_mat_q = svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, q)], cone.rt2)
+            primal_dir_mat_r = svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, r)], cone.rt2)
+            PlambdaPk_slice_pq = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[q]] for ii in 1:R, jj in 1:R]
+            PlambdaPk_slice_qr = [PlambdaPk[block_idxs(U, ii)[q], block_idxs(U, jj)[r]] for ii in 1:R, jj in 1:R]
+            PlambdaPk_slice_pr = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[r]] for ii in 1:R, jj in 1:R]
+            prod_mat =
+                PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_pr
+                # (PlambdaPk_slice + PlambdaPk_slice') * Symmetric(primal_dir_mat) * (PlambdaPk_slice + PlambdaPk_slice') * Symmetric(primal_dir_mat) * (PlambdaPk_slice + PlambdaPk_slice')
+                # PlambdaPk_slice' * Symmetric(primal_dir_mat) * PlambdaPk_slice * Symmetric(primal_dir_mat) * PlambdaPk_slice'
+            tmp = smat_to_svec!(zeros(r_dim), prod_mat, cone.rt2)
+            corr_shuf[block_idxs(r_dim, p)] += tmp
+        end
+    end
+
+    r_idx = 1
+    idx = 1
+    for j in 1:cone.R, i in 1:j
+        for u in 1:U
+            # @show block_idxs(r_dim, u), length(block_idxs(r_dim, u)), r_idx
+            corr[idx] = corr_shuf[block_idxs(r_dim, u)[r_idx]]
+            idx += 1
+        end
+        r_idx += 1
+    end
+
+    return corr
 end
