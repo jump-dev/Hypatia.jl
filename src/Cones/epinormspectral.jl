@@ -373,28 +373,19 @@ function correction2(
     # tau d1 d2
 
     # Twww contribution to corrector
-    term1 = 2 * vec(tau * primal_W' * tau * primal_W' * tau)
+    term1 = vec(tau * primal_W' * tau * primal_W' * tau)
     term2 = vec(
         (tau * primal_W' * Zi * primal_W * Wtau) +
         (Zi * primal_W * Wtau * primal_W' * tau) +
         (Zi * primal_W * tau' * primal_W * Wtau)
-        ) +
-        vec(
-        (tau' * primal_W * Wtau * primal_W' * Zi)' +
-        (Wtau * primal_W' * Zi * primal_W * tau')' +
-        (Wtau * primal_W' * tau * primal_W' * Zi)'
         )
     # like term2 with I in place of Wtau
     term3 = vec(
         (tau * primal_W' * Zi * primal_W) +
         (Zi * primal_W * primal_W' * tau) +
         (Zi * primal_W * tau' * primal_W)
-        ) +
-        vec(
-        (tau' * primal_W * primal_W' * Zi)' +
-        (primal_W' * Zi * primal_W * tau')' +
-        (primal_W' * tau * primal_W' * Zi)'
         )
+    terms_twww = 2 * (term1 + term2 + term3)
 
     # contribution to w part of the corrector from Tuww terms
     term4 = vec(Zi2 * primal_W * Wtau)
@@ -409,7 +400,7 @@ function correction2(
     terms_Tuuw = term8 * primal_u
 
     corr = cone.correction
-    corr[2:end] = -(term1 + term2 + term3 + terms_Tuww + terms_Tuuw)
+    corr[2:end] = -(terms_twww + terms_Tuww + terms_Tuuw)
     Tuuu = u * (6 * cone.trZi2 - 8 * u * sum(Zi[i] * u * Zi2[i] for i in eachindex(Zi))) + (d1 - 1) / u / u / u
     corr[1] = -dot(vec(primal_W), terms47 + 2 * term8) - Tuuu * abs2(primal_u)
 
