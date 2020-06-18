@@ -309,7 +309,6 @@ function correction(
                 idx3 >= idx2 || continue
                 dZki_dwmn = tau[k, n] * Zi[m, i] + tau[i, n] * Zi[m, k]
                 dwtaujl_dwmn = tau[m, j] * Wtau[l, n] + tau[m, l] * Wtau[j, n]
-                dZik_dmn = 2 * tau[i, n] * Zi[m, k]
                 dtauil_dwmn = Zi[m, i] * Wtau[l, n] + tau[m, l] * tau[i, n]
                 dtaukj_dwmn = Zi[m, k] * Wtau[j, n] + tau[m, j] * tau[k, n]
                 Twww = dZki_dwmn * Wtau[j, l] + Zi[k, i] * dwtaujl_dwmn + tau[k, j] * dtauil_dwmn + dtaukj_dwmn * tau[i, l]
@@ -394,7 +393,6 @@ function correction2(
                 idx3 >= idx2 || continue
                 dZki_dwmn = tau[k, n] * Zi[m, i] + tau[i, n] * Zi[m, k]
                 dwtaujl_dwmn = tau[m, j] * Wtau[l, n] + tau[m, l] * Wtau[j, n]
-                dZik_dmn = 2 * tau[i, n] * Zi[m, k]
                 dtauil_dwmn = Zi[m, i] * Wtau[l, n] + tau[m, l] * tau[i, n]
                 dtaukj_dwmn = Zi[m, k] * Wtau[j, n] + tau[m, j] * tau[k, n]
                 Twww = dZki_dwmn * Wtau[j, l] + Zi[k, i] * dwtaujl_dwmn + tau[k, j] * dtauil_dwmn + dtaukj_dwmn * tau[i, l]
@@ -410,7 +408,9 @@ function correction2(
                 third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
                     third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] = Twww
                 third_debug[idx1, idx2, idx3] = third_debug[idx1, idx3, idx2] = third_debug[idx2, idx1, idx3] =
-                    third_debug[idx2, idx3, idx1] = third_debug[idx3, idx1, idx2] = third_debug[idx3, idx2, idx1] = tau[m, l] * tau[i, n] * tau[k, j] + tau[m, j] * tau[k, n] * tau[i, l]
+                    third_debug[idx2, idx3, idx1] = third_debug[idx3, idx1, idx2] = third_debug[idx3, idx2, idx1] =
+                    tau[k, n] * Zi[m, i] * Wtau[j, l] + Zi[m, k] * tau[i, n] * Wtau[j, l] + Zi[k, i] * tau[m, j] * Wtau[l, n] + Zi[k, i] * tau[m, l] * Wtau[j, n] +
+                    Zi[m, i] * tau[k, j] * Wtau[l, n] + Zi[m, k] * tau[i, l] * Wtau[j, n]
             end
         end
     end
@@ -424,10 +424,25 @@ function correction2(
 
     @views corr2n = cone.correction[2:end]
 
-    term1 = vec(tau' * primal_W * tau' * primal_W * tau') * 2
-    @show term1 ./ debug_corr[2:end]
+    term1 = 2 * vec(tau * primal_W' * tau * primal_W' * tau)
+    # @show term1 ./ debug_corr[2:end]
 
-    # term2 = Zi' * primal_W * Wtau' * primal_W * tau'
+    # Zi ~ d1 d1
+    # primal_W ~ d1 d2
+    # Wtau ~ d2 d2
+    # tau d1 d2
+
+    term2 = vec(
+        (tau * primal_W' * Zi * primal_W * Wtau) +
+        (Zi * primal_W * Wtau * primal_W' * tau) +
+        (Zi * primal_W * tau' * primal_W * Wtau)
+        ) +
+        vec(
+        (tau' * primal_W * Wtau * primal_W' * Zi)' +
+        (Wtau * primal_W' * Zi * primal_W * tau')' +
+        (Wtau * primal_W' * tau * primal_W' * Zi)'
+        )
+    @show term2 ./ debug_corr[2:end]
 
     # corr[]
 
