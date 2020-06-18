@@ -409,8 +409,9 @@ function correction2(
                     third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] = Twww
                 third_debug[idx1, idx2, idx3] = third_debug[idx1, idx3, idx2] = third_debug[idx2, idx1, idx3] =
                     third_debug[idx2, idx3, idx1] = third_debug[idx3, idx1, idx2] = third_debug[idx3, idx2, idx1] =
-                    tau[k, n] * Zi[m, i] * Wtau[j, l] + Zi[m, k] * tau[i, n] * Wtau[j, l] + Zi[k, i] * tau[m, j] * Wtau[l, n] + Zi[k, i] * tau[m, l] * Wtau[j, n] +
-                    Zi[m, i] * tau[k, j] * Wtau[l, n] + Zi[m, k] * tau[i, l] * Wtau[j, n]
+                    (j == l ? Zi[m, k] * tau[i, n] + Zi[m, i] * tau[k, n] : 0) +
+                    (l == n ? Zi[k, i] * tau[m, j] + Zi[i, m] * tau[k, j] : 0) +
+                    (j == n ? Zi[k, i] * tau[m, l] + Zi[k, m] * tau[i, l] : 0)
             end
         end
     end
@@ -442,7 +443,20 @@ function correction2(
         (Wtau * primal_W' * Zi * primal_W * tau')' +
         (Wtau * primal_W' * tau * primal_W' * Zi)'
         )
-    @show term2 ./ debug_corr[2:end]
+    # @show term2 ./ debug_corr[2:end]
+
+    # like term2 with I in place of Wtau
+    term3 = vec(
+        (tau * primal_W' * Zi * primal_W) +
+        (Zi * primal_W * primal_W' * tau) +
+        (Zi * primal_W * tau' * primal_W)
+        ) +
+        vec(
+        (tau' * primal_W * primal_W' * Zi)' +
+        (primal_W' * Zi * primal_W * tau')' +
+        (primal_W' * tau * primal_W' * Zi)'
+        )
+    # @show term3 ./ debug_corr[2:end]
 
     # corr[]
 
