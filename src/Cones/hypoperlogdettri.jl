@@ -22,6 +22,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     side::Int
     is_complex::Bool
     point::Vector{T}
+    dual_point::Vector{T}
     rt2::T
     sc_const::T
     timer::TimerOutput
@@ -29,19 +30,23 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
+    scal_hess_updated::Bool
     inv_hess_updated::Bool
     hess_prod_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
+    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
     mat::Matrix{R}
-    mat2::Matrix{R}
+    dual_mat::Matrix{R}
+    mat2::Matrix{R} # TODO named differently in some cones, fix inconsistency
+    mat3::Matrix{R}
     fact_mat
     ldWv::T
     z::T
@@ -50,6 +55,8 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     ldWvuv::T
     vzip1::T
     Wivzi::Matrix{R}
+
+    correction::Vector{T}
 
     function HypoPerLogdetTri{T, R}(
         dim::Int;
@@ -85,20 +92,29 @@ end
 
 reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
 
+use_scaling(::HypoPerLogdetTri) = false
+
+use_correction(::HypoPerLogdetTri) = true
+
 function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.mat = Matrix{R}(undef, cone.side, cone.side)
+    cone.dual_mat = Matrix{R}(undef, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
+    cone.mat3 = similar(cone.mat)
     cone.Wi = similar(cone.mat)
     cone.Wivzi = similar(cone.mat)
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -138,6 +154,26 @@ function update_feas(cone::HypoPerLogdetTri)
 
     cone.feas_updated = true
     return cone.is_feas
+end
+
+function update_dual_feas(cone::HypoPerLogdetTri)
+    @assert !cone.feas_updated
+    u = cone.dual_point[1]
+    v = cone.dual_point[2]
+    side = cone.side
+
+    if u < 0
+        svec_to_smat!(cone.dual_mat, view(cone.point, 3:cone.dim), cone.rt2)
+        dual_fact = cholesky!(Hermitian(cone.dual_mat, :U), check = false)
+        if isposdef(dual_fact)
+            return v > u * (logdet(Symmetric(W)) - side * log(-u) + side)
+        else
+            return false
+        end
+    else
+        return false
+    end
+
 end
 
 function update_grad(cone::HypoPerLogdetTri)
@@ -223,6 +259,7 @@ function update_hess(cone::HypoPerLogdetTri)
     end
 
     @. @views cone.hess.data[3:cone.dim, :] *= cone.sc_const
+    copyto!(cone.old_hess.data, H)
 
     cone.hess_updated = true
     return cone.hess
@@ -274,6 +311,143 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
 
     return prod
 end
+
+rho(T, i, j) = (i == j ? 1 : sqrt(T(2)))
+function skron(i, j, k, l, W::Symmetric{T, Matrix{T}}) where {T}
+    if (i == j) && (k == l)
+        return abs2(W[i, k])
+    elseif (i == j) || (k == l)
+        return sqrt(T(2)) * W[k, i] * W[j, l]
+    else
+        return W[k, i] * W[j, l] + W[l, i] * W[j, k]
+    end
+end
+function third_skron(i, j, k, l, m, n, Wi::Symmetric{T, Matrix{T}}) where {T}
+    rt2 = sqrt(T(2))
+    t1 = Wi[i, m] * Wi[n, k] * Wi[l, j] + Wi[i, k] * Wi[l, m] * Wi[n, j]
+    if m != n
+        t1 += Wi[i, n] * Wi[m, k] * Wi[l, j] + Wi[i, k] * Wi[l, n] * Wi[m, j]
+        if k != l
+            t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j] + Wi[i, n] * Wi[m, l] * Wi[k, j] + Wi[i, l] * Wi[k, n] * Wi[m, j]  #################
+            if i != j
+                t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] +
+                    Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i] +
+                    Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i] + Wi[j, n] * Wi[m, l] * Wi[k, i] + Wi[j, l] * Wi[k, n] * Wi[m, i]
+            end
+        elseif i != j
+            t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i]
+        end
+    elseif k != l
+        t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j]
+        if i != j
+            t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i]
+        end
+    elseif i != j
+        t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i]
+    end
+
+    num_match = (i == j) + (k == l) + (m == n)
+    if num_match == 0
+        t1 /= rt2 * 2
+    elseif num_match == 1
+        t1 /= 2
+    elseif num_match == 2
+        t1 /= rt2
+    end
+
+    return t1
+end
+
+# TODO allocs and simplifications
+# TODO try to reuse fields already calculated for g and H
+function correction2(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
+    @assert cone.grad_updated
+    u = cone.point[1]
+    v = cone.point[2]
+    z = cone.z
+    Wi = Symmetric(cone.Wi)
+    pi = cone.ldWv # TODO rename
+    vzip1 = cone.vzip1 # 1 + v / z
+    nLz = cone.nLz # (side - pi) / z
+    d = cone.side # TODO rename
+    dim = cone.dim
+    w_dim = dim - 2
+
+    u_dir = primal_dir[1]
+    @views w_dir = primal_dir[3:end]
+    vec_Wi = smat_to_svec!(similar(primal_dir, dim - 2), Wi, cone.rt2) # TODO allocates
+    S = copytri!(svec_to_smat!(cone.mat2, w_dir, cone.rt2), 'U', cone.is_complex)
+
+    # cone.nLz = (cone.side - cone.ldWv) / z
+    # cone.ldWvuv = cone.ldWv - u / v
+
+    rt2 = cone.rt2
+    third = zeros(dim, dim, dim)
+    third_debug = zeros(dim, dim, dim)
+    third[1, 1, 1] = 2 / z ^ 3
+    third[1, 1, 2] = third[1, 2, 1] = third[2, 1, 1] = -2 / z ^ 3 * (pi - d)
+    third[1, 1, 3:end] = third[1, 3:end, 1] = third[3:end, 1, 1] = -2 / z ^ 3 * v * vec_Wi
+    third[1, 2, 2] = third[2, 1, 2] = third[2, 2, 1] = 2 * abs2(pi - d) / z ^ 3 + d / abs2(z) / v
+    third[1, 2, 3:end] = third[1, 3:end, 2] = third[2, 1, 3:end] =
+        third[2, 3:end, 1] = third[3:end, 1, 2] = third[3:end, 2, 1] = (2 * v * (pi - d) / abs2(z) - inv(z)) / z * vec_Wi
+    third[2, 2, 2] = -2 * (pi - d) / abs2(z) * (abs2(pi - d) / z + d / v) - d / z / v * (1 / v + (pi - d) / z) - 2 * (d + 1) / v ^ 3
+    third[2, 2, 3:end] = third[2, 3:end, 2] = third[3:end, 2, 2] = (2 * (pi - d) * (1 - v * (pi - d) / z) - d) / abs2(z) .* vec_Wi
+
+    idx1 = 3
+    for j in 1:d, i in 1:j
+        idx2 = 3
+        for l in 1:d, k in 1:l
+            # Tuww
+            third[1, idx1, idx2] = third[1, idx2, idx1] = third[idx1, 1, idx2] =
+                third[idx2, 1, idx1] = third[idx1, idx2, 1] = third[idx2, idx1, 1] =
+                rho(T, i, j) * rho(T, k, l) * Wi[i, j] * Wi[k, l] * abs2(v) * 2 / z ^ 3 + v / abs2(z) * skron(i, j, k, l, Wi)
+            # Tvww
+            third[2, idx1, idx2] = third[2, idx2, idx1] = third[idx1, 2, idx2] =
+                third[idx2, 2, idx1] = third[idx1, idx2, 2] = third[idx2, idx1, 2] =
+                (inv(z) - v * (pi - d) / abs2(z)) * (2 * v / z * rho(T, i, j) * rho(T, k, l) * Wi[i, j] * Wi[k, l] + skron(i, j, k, l, Wi))
+            idx3 = 3
+            for n in 1:d, m in 1:n
+                third[idx1, idx2, idx3] =
+                    -2 * (v / z) ^ 3 * rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n] -
+                    abs2(v / z) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi)) +
+                    -(1 + v / z) * third_skron(i, j, k, l, m, n, Wi)
+                third_debug[idx1, idx2, idx3] =
+                2 * (v / z) ^ 3 * rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n]
+                idx3 += 1
+            end
+            idx2 += 1
+        end
+        idx1 += 1
+    end
+
+    dot_Wi_S = dot(vec_Wi, w_dir)
+    ldiv!(cone.fact_mat, S)
+    dot_skron = real(dot(S, S'))
+
+    rdiv!(S, cone.fact_mat.U)
+    mul!(cone.mat3, S, S') # TODO use outer prod function
+    term1 = smat_to_svec!(zeros(T, w_dim), cone.mat3, cone.rt2) # TODO allocates
+    term1 .*= -2 * vzip1
+
+    skron2 = rdiv!(S, cone.fact_mat.U')
+    vec_skron2 = smat_to_svec!(zeros(T, w_dim), skron2, cone.rt2) # TODO allocates
+    scal1 = -abs2(v / z)
+    term2 = (dot_skron * scal1) * vec_Wi + (2 * dot_Wi_S * scal1) * vec_skron2
+
+    scal2 = -2 * scal1 * v / z * abs2(dot_Wi_S)
+    term3 = scal2 * vec_Wi
+
+    corr_debug = reshape(reshape(third_debug, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
+    @show term3 ./ corr_debug[3:end]
+
+    corr = cone.correction
+    corr = reshape(reshape(third, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
+
+    corr *= cone.sc_const / -2
+
+    return corr
+end
+
 
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
 function get_central_ray_hypoperlogdettri(Wside::Int)
