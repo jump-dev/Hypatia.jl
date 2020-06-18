@@ -346,13 +346,10 @@ function correction2(
     ) where {T <: Real}
     @assert cone.hess_updated
 
-    dim = cone.dim
     d1 = cone.d1
     d2 = cone.d2
     u = cone.point[1]
     W = cone.W
-    third = zeros(T, cone.dim, cone.dim, cone.dim)
-    third_debug = zeros(T, cone.dim, cone.dim, cone.dim)
 
     Zi = cone.Zi
     tau = cone.tau
@@ -367,75 +364,16 @@ function correction2(
     WZi2W = cone.tmpd2d2
     mul!(WZi2W, W', Zitau)
 
-    # Tuuu
-    third[1, 1, 1] = u * (6 * cone.trZi2 - 8 * u * sum(Zi[i] * u * Zi2[i] for i in eachindex(Zi))) + (d1 - 1) / u / u / u
-
-    idx1 = 1
-    for j in 1:d2, i in 1:d1
-        idx1 += 1
-        # Tuuw
-        third[1, 1, idx1] = third[1, idx1, 1] = third[idx1, 1, 1] = 8 * abs2(u) * Zi2tau[i, j] - 2 * Zitau[i, j]
-        third_debug[1, 1, idx1] = third_debug[1, idx1, 1] = third_debug[idx1, 1, 1] = 8 * abs2(u) * Zi2tau[i, j] - 2 * Zitau[i, j]
-        idx2 = 1
-        for l in 1:d2, k in 1:d1
-            idx2 += 1
-            idx2 >= idx1 || continue
-            # Tuww
-            Tuww = -2 * u * (Zi2[k, i] * Wtau[j, l] + Zi[k, i] * WZi2W[j, l] + tau[k, j] * Zitau[i, l] + Zitau[k, j] * tau[i, l])
-            if j == l
-                Tuww -= 2 * u * Zi2[i, k]
-            end
-            third[1, idx1, idx2] = third[1, idx2, idx1] = third[idx1, 1, idx2] =
-                third[idx2, 1, idx1] = third[idx1, idx2, 1] = third[idx2, idx1, 1] = Tuww
-            # third_debug[1, idx1, idx2] = third_debug[1, idx2, idx1] = third_debug[idx1, 1, idx2] =
-            #     third_debug[idx2, 1, idx1] = third_debug[idx1, idx2, 1] = third_debug[idx2, idx1, 1] = -2 * u * (j == l ? Zi2[i, k] : 0)
-            idx3 = 1
-            # Twww
-            for n in 1:d2, m in 1:d1
-                idx3 += 1
-                idx3 >= idx2 || continue
-                dZki_dwmn = tau[k, n] * Zi[m, i] + tau[i, n] * Zi[m, k]
-                dwtaujl_dwmn = tau[m, j] * Wtau[l, n] + tau[m, l] * Wtau[j, n]
-                dtauil_dwmn = Zi[m, i] * Wtau[l, n] + tau[m, l] * tau[i, n]
-                dtaukj_dwmn = Zi[m, k] * Wtau[j, n] + tau[m, j] * tau[k, n]
-                Twww = dZki_dwmn * Wtau[j, l] + Zi[k, i] * dwtaujl_dwmn + tau[k, j] * dtauil_dwmn + dtaukj_dwmn * tau[i, l]
-                if j == l
-                    Twww += Zi[m, k] * tau[i, n] + Zi[m, i] * tau[k, n]
-                end
-                if l == n
-                    Twww += Zi[k, i] * tau[m, j] + Zi[i, m] * tau[k, j]
-                end
-                if j == n
-                    Twww += Zi[k, i] * tau[m, l] + Zi[k, m] * tau[i, l]
-                end
-                third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
-                    third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] = Twww
-                # third_debug[idx1, idx2, idx3] = third_debug[idx1, idx3, idx2] = third_debug[idx2, idx1, idx3] =
-                #     third_debug[idx2, idx3, idx1] = third_debug[idx3, idx1, idx2] = third_debug[idx3, idx2, idx1] =
-                #     (j == l ? Zi[m, k] * tau[i, n] + Zi[m, i] * tau[k, n] : 0) +
-                #     (l == n ? Zi[k, i] * tau[m, j] + Zi[i, m] * tau[k, j] : 0) +
-                #     (j == n ? Zi[k, i] * tau[m, l] + Zi[k, m] * tau[i, l] : 0)
-            end
-        end
-    end
-
-
-    #####################
-    dim = cone.dim
     primal_u = primal_dir[1]
     primal_W = reshape(primal_dir[2:end], d1, d2)
-    debug_corr = reshape(reshape(third_debug, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
-
-    @views corr2n = cone.correction[2:end]
-
-    term1 = 2 * vec(tau * primal_W' * tau * primal_W' * tau)
-    # @show term1 ./ debug_corr[2:end]
 
     # Zi ~ d1 d1
     # primal_W ~ d1 d2
     # Wtau ~ d2 d2
     # tau d1 d2
 
+    # Twww contribution to corrector
+    term1 = 2 * vec(tau * primal_W' * tau * primal_W' * tau)
     term2 = vec(
         (tau * primal_W' * Zi * primal_W * Wtau) +
         (Zi * primal_W * Wtau * primal_W' * tau) +
@@ -446,8 +384,6 @@ function correction2(
         (Wtau * primal_W' * Zi * primal_W * tau')' +
         (Wtau * primal_W' * tau * primal_W' * Zi)'
         )
-    # @show term2 ./ debug_corr[2:end]
-
     # like term2 with I in place of Wtau
     term3 = vec(
         (tau * primal_W' * Zi * primal_W) +
@@ -459,29 +395,25 @@ function correction2(
         (primal_W' * Zi * primal_W * tau')' +
         (primal_W' * tau * primal_W' * Zi)'
         )
-    # @show term3 ./ debug_corr[2:end]
 
     # contribution to w part of the corrector from Tuww terms
     term4 = vec(Zi2 * primal_W * Wtau)
     term5 = vec(Zi * primal_W * WZi2W)
     term6 = vec(tau * primal_W' * Zitau + Zitau * primal_W' * tau)
     term7 = vec(Zi2 * primal_W)
-    terms47 = -4u * (term4 + term5 + term6 + term7)
-    terms_Tuww = primal_u * terms47
+    terms47 = -2u * (term4 + term5 + term6 + term7)
+    terms_Tuww = 2 * primal_u * terms47
 
     # contribution to w part of the corretor from Tuuw terms
     term8 = (8 * abs2(u) * vec(Zi2tau) - 2 * vec(Zitau)) * primal_u
     terms_Tuuw = term8 * primal_u
-    # @show term8 ./ debug_corr[2:end]
 
-    corr = similar(cone.correction)
+    corr = cone.correction
     corr[2:end] = -(term1 + term2 + term3 + terms_Tuww + terms_Tuuw)
     Tuuu = u * (6 * cone.trZi2 - 8 * u * sum(Zi[i] * u * Zi2[i] for i in eachindex(Zi))) + (d1 - 1) / u / u / u
-    corr[1] = -dot(vec(primal_W), terms47 / 2 + 2 * term8) - Tuuu * abs2(primal_u)
-    cone.correction .= corr
+    corr[1] = -dot(vec(primal_W), terms47 + 2 * term8) - Tuuu * abs2(primal_u)
 
-    # # corr[]
-    #
+
     # third_order = reshape(third, cone.dim^2, cone.dim)
     # # @show extrema(abs, third_order)
     # cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * primal_dir
