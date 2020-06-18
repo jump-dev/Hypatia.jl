@@ -375,6 +375,7 @@ function correction2(
         idx1 += 1
         # Tuuw
         third[1, 1, idx1] = third[1, idx1, 1] = third[idx1, 1, 1] = 8 * abs2(u) * Zi2tau[i, j] - 2 * Zitau[i, j]
+        third_debug[1, 1, idx1] = third_debug[1, idx1, 1] = third_debug[idx1, 1, 1] = 8 * abs2(u) * Zi2tau[i, j] - 2 * Zitau[i, j]
         idx2 = 1
         for l in 1:d2, k in 1:d1
             idx2 += 1
@@ -386,6 +387,8 @@ function correction2(
             end
             third[1, idx1, idx2] = third[1, idx2, idx1] = third[idx1, 1, idx2] =
                 third[idx2, 1, idx1] = third[idx1, idx2, 1] = third[idx2, idx1, 1] = Tuww
+            # third_debug[1, idx1, idx2] = third_debug[1, idx2, idx1] = third_debug[idx1, 1, idx2] =
+            #     third_debug[idx2, 1, idx1] = third_debug[idx1, idx2, 1] = third_debug[idx2, idx1, 1] = -2 * u * (j == l ? Zi2[i, k] : 0)
             idx3 = 1
             # Twww
             for n in 1:d2, m in 1:d1
@@ -407,11 +410,11 @@ function correction2(
                 end
                 third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
                     third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] = Twww
-                third_debug[idx1, idx2, idx3] = third_debug[idx1, idx3, idx2] = third_debug[idx2, idx1, idx3] =
-                    third_debug[idx2, idx3, idx1] = third_debug[idx3, idx1, idx2] = third_debug[idx3, idx2, idx1] =
-                    (j == l ? Zi[m, k] * tau[i, n] + Zi[m, i] * tau[k, n] : 0) +
-                    (l == n ? Zi[k, i] * tau[m, j] + Zi[i, m] * tau[k, j] : 0) +
-                    (j == n ? Zi[k, i] * tau[m, l] + Zi[k, m] * tau[i, l] : 0)
+                # third_debug[idx1, idx2, idx3] = third_debug[idx1, idx3, idx2] = third_debug[idx2, idx1, idx3] =
+                #     third_debug[idx2, idx3, idx1] = third_debug[idx3, idx1, idx2] = third_debug[idx3, idx2, idx1] =
+                #     (j == l ? Zi[m, k] * tau[i, n] + Zi[m, i] * tau[k, n] : 0) +
+                #     (l == n ? Zi[k, i] * tau[m, j] + Zi[i, m] * tau[k, j] : 0) +
+                #     (j == n ? Zi[k, i] * tau[m, l] + Zi[k, m] * tau[i, l] : 0)
             end
         end
     end
@@ -458,12 +461,29 @@ function correction2(
         )
     # @show term3 ./ debug_corr[2:end]
 
+    # contribution to w part of the corrector from Tuww terms
+    term4 = -4u * primal_u * vec(Zi2 * primal_W * Wtau)
+    # @show term4 ./ debug_corr[2:end]
+    term5 = -4u * primal_u * vec(Zi * primal_W * WZi2W)
+    # @show term5 ./ debug_corr[2:end]
+    term6 = -4u * primal_u * vec(tau * primal_W' * Zitau + Zitau * primal_W' * tau)
+    # @show term6 ./ debug_corr[2:end]
+    term7 = -4u * primal_u * vec(Zi2 * primal_W)
+    # @show term7 ./ debug_corr[2:end]
+
+    # contribution to w part of the corretor from Tuuw terms
+    term8 = (8 * abs2(u) * vec(Zi2tau) - 2 * vec(Zitau)) * abs2(primal_u)
+    # @show term8 ./ debug_corr[2:end]
+
+    corr = -(term1 + term2 + term3 + term4 + term5 + term6 + term7 + term8)
+
     # corr[]
 
     third_order = reshape(third, cone.dim^2, cone.dim)
     # @show extrema(abs, third_order)
     cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * primal_dir
     cone.correction *= -1
+    @show corr ./ cone.correction[2:end]
     # @show extrema(abs, cone.correction)
 
     return cone.correction
