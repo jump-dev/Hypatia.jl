@@ -462,29 +462,32 @@ function correction2(
     # @show term3 ./ debug_corr[2:end]
 
     # contribution to w part of the corrector from Tuww terms
-    term4 = -4u * primal_u * vec(Zi2 * primal_W * Wtau)
-    # @show term4 ./ debug_corr[2:end]
-    term5 = -4u * primal_u * vec(Zi * primal_W * WZi2W)
-    # @show term5 ./ debug_corr[2:end]
-    term6 = -4u * primal_u * vec(tau * primal_W' * Zitau + Zitau * primal_W' * tau)
-    # @show term6 ./ debug_corr[2:end]
-    term7 = -4u * primal_u * vec(Zi2 * primal_W)
-    # @show term7 ./ debug_corr[2:end]
+    term4 = vec(Zi2 * primal_W * Wtau)
+    term5 = vec(Zi * primal_W * WZi2W)
+    term6 = vec(tau * primal_W' * Zitau + Zitau * primal_W' * tau)
+    term7 = vec(Zi2 * primal_W)
+    terms47 = -4u * (term4 + term5 + term6 + term7)
+    terms_Tuww = primal_u * terms47
 
     # contribution to w part of the corretor from Tuuw terms
-    term8 = (8 * abs2(u) * vec(Zi2tau) - 2 * vec(Zitau)) * abs2(primal_u)
+    term8 = (8 * abs2(u) * vec(Zi2tau) - 2 * vec(Zitau)) * primal_u
+    terms_Tuuw = term8 * primal_u
     # @show term8 ./ debug_corr[2:end]
 
-    corr = -(term1 + term2 + term3 + term4 + term5 + term6 + term7 + term8)
+    corr = similar(cone.correction)
+    corr[2:end] = -(term1 + term2 + term3 + terms_Tuww + terms_Tuuw)
+    Tuuu = u * (6 * cone.trZi2 - 8 * u * sum(Zi[i] * u * Zi2[i] for i in eachindex(Zi))) + (d1 - 1) / u / u / u
+    corr[1] = -dot(vec(primal_W), terms47 / 2 + 2 * term8) - Tuuu * abs2(primal_u)
+    cone.correction .= corr
 
-    # corr[]
-
-    third_order = reshape(third, cone.dim^2, cone.dim)
-    # @show extrema(abs, third_order)
-    cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * primal_dir
-    cone.correction *= -1
-    @show corr ./ cone.correction[2:end]
-    # @show extrema(abs, cone.correction)
+    # # corr[]
+    #
+    # third_order = reshape(third, cone.dim^2, cone.dim)
+    # # @show extrema(abs, third_order)
+    # cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * primal_dir
+    # cone.correction *= -1
+    # @show corr ./ cone.correction
+    # # @show extrema(abs, cone.correction)
 
     return cone.correction
 end
