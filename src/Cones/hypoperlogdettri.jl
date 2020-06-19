@@ -361,7 +361,6 @@ end
 # TODO try to reuse fields already calculated for g and H
 function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
     @assert cone.grad_updated
-    u = cone.point[1]
     v = cone.point[2]
     z = cone.z
     Wi = Symmetric(cone.Wi)
@@ -372,7 +371,7 @@ function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
     dim = cone.dim
     w_dim = dim - 2
 
-    T = typeof(u) # TODO delete
+    T = typeof(v) # TODO delete
 
     u_dir = primal_dir[1]
     v_dir = primal_dir[2]
@@ -423,10 +422,10 @@ function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
                     -2 * (v / z) ^ 3 * rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n] +
                     -abs2(v / z) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi)) +
                     -(1 + v / z) * third_skron(i, j, k, l, m, n, Wi)
-                # third_debug[idx1, idx2, idx3] =
-                # -(1 + v / z) * third_skron(i, j, k, l, m, n, Wi)
-                # -abs2(v / z) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi))
-                # 2 * (v / z) ^ 3 * rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n]
+                third_debug[idx1, idx2, idx3] =
+                    -2 * (v / z) ^ 3 * rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n] +
+                    -abs2(v / z) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi)) +
+                    -(1 + v / z) * third_skron(i, j, k, l, m, n, Wi)
                 idx3 += 1
             end
             idx2 += 1
@@ -448,7 +447,7 @@ function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
     scal1 = -abs2(v / z)
     term2 = (dot_skron * scal1) * vec_Wi + (2 * dot_Wi_S * scal1) * vec_skron2
 
-    scal2 = -2 * scal1 * v / z * abs2(dot_Wi_S)
+    scal2 = 2 * scal1 * v / z * abs2(dot_Wi_S)
     term3 = scal2 * vec_Wi
 
     # TODO factor like rootdet
@@ -481,15 +480,17 @@ function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
     corrv = Tvvv * abs2(v_dir) + Tuvv * u_dir * v_dir * 2 + vvw_scal * dot(vec_Wi, w_dir) * 2 + # vvv + uvv + wvv
         Tuuv * abs2(u_dir) + dot(term5a, w_dir) + uvw_scal * dot(vec_Wi, w_dir) * u_dir # vuu + vww + vwu
 
+    corr = vcat(corru, corrv, corrw)
+
     # corr_debug = reshape(reshape(third_debug, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
     # @show dot(term4a, w_dir) ./ corr_debug[1]
-    # @show term1 ./ corr_debug[3:end]
+    # @show (term1 + term2 + term3) ./ corr_debug[3:end]
 
-    corr = cone.correction
-    corr .= reshape(reshape(third, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
-    @show corru / corr[1]
-    @show corrv / corr[2]
-    @show corrw ./ corr[3:end]
+    # corr = cone.correction
+    # corr .= reshape(reshape(third, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
+    # @show corru / corr[1]
+    # @show corrv / corr[2]
+    # @show corrw ./ corr[3:end]
 
     corr *= cone.sc_const / -2
 
