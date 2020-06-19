@@ -339,8 +339,8 @@ function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
         for p in 1:U
             tmp .= 0
             for q in 1:U, r in 1:U
-                primal_dir_mat_q = svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, q)], cone.rt2)
-                primal_dir_mat_r = svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, r)], cone.rt2)
+                primal_dir_mat_q = Symmetric(svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, q)], cone.rt2))
+                primal_dir_mat_r = Symmetric(svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, r)], cone.rt2))
                 PlambdaPk_slice_pq = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[q]] for ii in 1:R, jj in 1:R]
                 PlambdaPk_slice_qr = [PlambdaPk[block_idxs(U, ii)[q], block_idxs(U, jj)[r]] for ii in 1:R, jj in 1:R]
                 # PlambdaPk_slice_pr = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[r]] for ii in 1:R, jj in 1:R]
@@ -349,18 +349,16 @@ function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
                 # @show PlambdaPk_slice_rp
                 prod_mat =
                     # TODO understand the right symmetrization (not what's below)
+                    # PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp +
+                    # PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp' +
+                    # PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr' * primal_dir_mat_r * PlambdaPk_slice_rp +
+                    # PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr' * primal_dir_mat_r * PlambdaPk_slice_rp' +
+                    # PlambdaPk_slice_pq' * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp +
+                    # PlambdaPk_slice_pq' * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp' +
+                    # PlambdaPk_slice_pq' * primal_dir_mat_q * PlambdaPk_slice_qr' * primal_dir_mat_r * PlambdaPk_slice_rp +
+                    # PlambdaPk_slice_pq' * primal_dir_mat_q * PlambdaPk_slice_qr' * primal_dir_mat_r * PlambdaPk_slice_rp'
                     PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp +
-                    PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp' +
-                    PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr' * primal_dir_mat_r * PlambdaPk_slice_rp +
-                    PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr' * primal_dir_mat_r * PlambdaPk_slice_rp' +
-                    PlambdaPk_slice_pq' * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp +
-                    PlambdaPk_slice_pq' * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp' +
-                    PlambdaPk_slice_pq' * primal_dir_mat_q * PlambdaPk_slice_qr' * primal_dir_mat_r * PlambdaPk_slice_rp +
-                    PlambdaPk_slice_pq' * primal_dir_mat_q * PlambdaPk_slice_qr' * primal_dir_mat_r * PlambdaPk_slice_rp'
-                    # (PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_pr)')
-                    # (PlambdaPk_slice + PlambdaPk_slice') * Symmetric(primal_dir_mat) * (PlambdaPk_slice + PlambdaPk_slice') * Symmetric(primal_dir_mat) * (PlambdaPk_slice + PlambdaPk_slice')
-                    # PlambdaPk_slice' * Symmetric(primal_dir_mat) * PlambdaPk_slice * Symmetric(primal_dir_mat) * PlambdaPk_slice'
-                # tmp += PlambdaPk_slice_pq
+                    (PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp)'
                 tmp += prod_mat
             end
             # @show tmp, issymmetric(tmp)
@@ -379,6 +377,8 @@ function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
         end
         r_idx += 1
     end
+
+    corr ./= 2
 
     return corr
 end
