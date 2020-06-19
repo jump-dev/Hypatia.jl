@@ -24,6 +24,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     dual_feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
+    scal_hess_updated::Bool # pretend nt is scaling matrix for barrier tests, TODO remove
     nt_updated::Bool
     inv_hess_updated::Bool
     hess_sqrt_prod_updated::Bool
@@ -63,9 +64,11 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = cone.nt_updated = false)
+reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated =
+    cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = cone.nt_updated = cone.scal_hess_updated = false)
 
-# use_scaling(::EpiPerSquare) = true # TODO update oracles
+use_scaling(::EpiPerSquare) = true # TODO update oracles
+# use_nt(::EpiPerSquare) = true
 
 use_correction(cone::EpiPerSquare) = true
 
@@ -158,16 +161,20 @@ function update_scal_hess(cone::EpiPerSquare{T}, mu::T) where {T}
     cone.nt_updated || update_nt(cone)
     H = cone.hess.data
 
-    nt_inv = cone.nt_point
+    # NOTE does the barrier need to be scaled by rt2? the dist of nt_point is 1, but dist of its inverse/grad is 2. asymmetry.
+    nt_inv = copy(cone.nt_point) * 2 # TODO allocs
     g2 = nt_inv[2]
     nt_inv[2] = -nt_inv[1]
     nt_inv[1] = -g2
+    # @show rotated_jdot(cone.nt_point, cone.nt_point)
+    # @show rotated_jdot(nt_inv, nt_inv)
+    @show dot(cone.nt_point, nt_inv)
 
-    mul!(H, nt_inv, nt_inv')
+    mul!(H, nt_inv, nt_inv', 2, false)
     @inbounds for j in 3:cone.dim
-        H[j, j] += 1
+        H[j, j] += 4
     end
-    H[1, 2] -= 1
+    H[1, 2] -= 4
 
     cone.scal_hess_updated = true
     return cone.hess
@@ -318,19 +325,15 @@ function update_nt(cone::EpiPerSquare)
     normalized_point = cone.normalized_point
     normalized_dual_point = cone.normalized_dual_point
 
-    normalized_point .= cone.point ./ sqrt(cone.dist)
-    normalized_dual_point .= cone.dual_point ./ sqrt(cone.dual_dist)
+    normalized_point .= cone.point ./ sqrt(cone.dist * 2) # NOTE the dist got scaled by 2
+    normalized_dual_point .= cone.dual_point ./ sqrt(cone.dual_dist * 2)# NOTE the dist got scaled by 2
     gamma = sqrt((1 + dot(normalized_point, normalized_dual_point)) / 2)
 
-    # nt_point[1] = normalized_point[1] + normalized_dual_point[2]
-    # nt_point[2] = normalized_point[2] + normalized_dual_point[1]
-    # @. @views nt_point[3:end] = normalized_point[3:end] - normalized_dual_point[3:end]
     nt_point[1] = normalized_point[2] + normalized_dual_point[1]
     nt_point[2] = normalized_point[1] + normalized_dual_point[2]
     @. @views nt_point[3:end] = -normalized_point[3:end] + normalized_dual_point[3:end]
     nt_point ./= 2 * gamma
     @show 2 * nt_point[1] * nt_point[2] - sum(abs2, nt_point[3:end])
-    @show gamma
 
     copyto!(nt_point_sqrt, nt_point)
     nt_point_sqrt[1] += 1
