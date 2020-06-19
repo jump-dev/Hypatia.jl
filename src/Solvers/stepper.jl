@@ -217,17 +217,14 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     # if iseven(solver.num_iters) # TODO maybe use nbhd to determine whether to center or predict
     # TODO use nbhd to determine whether to center or predict
     # if mod(solver.num_iters, 2) == 0
-    if all(Cones.in_neighborhood.(cones, solver.mu, T(0.05)))
+    if all(Cones.in_neighborhood.(cones, solver.mu, T(0.02)))
         # predict
         # println("pred")
         update_rhs_pred(stepper, solver)
         # if solver.mu > 1e-5
         if use_corr
             get_directions(stepper, solver, iter_ref_steps = 3)
-            # update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha)
             update_rhs_predcorr(stepper, solver, one(T))
-            # get_directions(stepper, solver, iter_ref_steps = 3)
-            # update_rhs_predcorr(stepper, solver, one(T))
         end
         pred = true
         stepper.prev_gamma = zero(T) # TODO print like "pred" in column, or "cent" otherwise
@@ -238,8 +235,6 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
         if use_corr
             get_directions(stepper, solver, iter_ref_steps = 3)
             update_rhs_centcorr(stepper, solver, one(T))
-            # get_directions(stepper, solver, iter_ref_steps = 3)
-            # update_rhs_centcorr(stepper, solver, one(T))
         end
         pred = false
         stepper.prev_gamma = one(T)
@@ -318,8 +313,8 @@ function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}, pre
         if Cones.use_correction(cone_k) && prev_aff_alpha > 0
             corr_k = similar(stepper.primal_dir_k[k])
             Cones.hess_prod!(corr_k, stepper.primal_dir_k[k], cone_k)
-            prim_k_scal = sqrt(irtmu) * stepper.primal_dir_k[k]
-            stepper.s_rhs_k[k] .+= corr_k + Cones.correction2(cone_k, prim_k_scal, prim_k_scal) * prev_aff_alpha^2
+            prim_k_scal = prev_aff_alpha * sqrt(irtmu) * stepper.primal_dir_k[k]
+            stepper.s_rhs_k[k] .+= prev_aff_alpha * corr_k + Cones.correction2(cone_k, prim_k_scal, prim_k_scal)
         end
     end
 
@@ -531,7 +526,8 @@ function find_max_alpha(
     prev_alpha::T,
     min_alpha::T,
     min_nbhd::T = T(0.1),
-    max_nbhd::T = T(0.99),
+    # max_nbhd::T = T(0.99),
+    max_nbhd::T = T(0.8),
     ) where {T <: Real}
     cones = solver.model.cones
     cone_times = stepper.cone_times

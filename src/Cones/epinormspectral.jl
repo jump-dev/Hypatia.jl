@@ -224,36 +224,36 @@ function update_hess(cone::EpiNormSpectral)
     return cone.hess
 end
 
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
-#     if !cone.hess_prod_updated
-#         update_hess_prod(cone)
-#     end
-#     u = cone.point[1]
-#     W = cone.W
-#     tmpd1d2 = cone.tmpd1d2
-#     tmpd1d1 = cone.tmpd1d1
-#
-#     @inbounds for j in 1:size(prod, 2)
-#         arr_1j = arr[1, j]
-#         @views vec_copy_to!(tmpd1d2, arr[2:end, j])
-#
-#         prod[1, j] = cone.Huu * arr_1j + real(dot(cone.HuW, tmpd1d2))
-#
-#         # prod_2j = 2 * cone.fact_Z \ (((tmpd1d2 * W' + W * tmpd1d2' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpd1d2)
-#         mul!(tmpd1d1, tmpd1d2, W')
-#         @inbounds for j in 1:cone.d1
-#             @inbounds for i in 1:j
-#                 tmpd1d1[i, j] += tmpd1d1[j, i]'
-#             end
-#             tmpd1d1[j, j] -= 2 * u * arr_1j
-#         end
-#         mul!(tmpd1d2, Hermitian(tmpd1d1, :U), cone.tau, 2, 2)
-#         ldiv!(cone.fact_Z, tmpd1d2)
-#         @views vec_copy_to!(prod[2:end, j], tmpd1d2)
-#     end
-#
-#     return prod
-# end
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
+    if !cone.hess_prod_updated
+        update_hess_prod(cone)
+    end
+    u = cone.point[1]
+    W = cone.W
+    tmpd1d2 = cone.tmpd1d2
+    tmpd1d1 = cone.tmpd1d1
+
+    @inbounds for j in 1:size(prod, 2)
+        arr_1j = arr[1, j]
+        @views vec_copy_to!(tmpd1d2, arr[2:end, j])
+
+        prod[1, j] = cone.Huu * arr_1j + real(dot(cone.HuW, tmpd1d2))
+
+        # prod_2j = 2 * cone.fact_Z \ (((tmpd1d2 * W' + W * tmpd1d2' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpd1d2)
+        mul!(tmpd1d1, tmpd1d2, W')
+        @inbounds for j in 1:cone.d1
+            @inbounds for i in 1:j
+                tmpd1d1[i, j] += tmpd1d1[j, i]'
+            end
+            tmpd1d1[j, j] -= 2 * u * arr_1j
+        end
+        mul!(tmpd1d2, Hermitian(tmpd1d1, :U), cone.tau, 2, 2)
+        ldiv!(cone.fact_Z, tmpd1d2)
+        @views vec_copy_to!(prod[2:end, j], tmpd1d2)
+    end
+
+    return prod
+end
 
 # TODO fails higher dimension corr barrier tests
 function correction(

@@ -155,4 +155,6 @@ global ITERS = 0
     # show(timer)
     # println("\n")
 end
+
+@show ITERS
 ;

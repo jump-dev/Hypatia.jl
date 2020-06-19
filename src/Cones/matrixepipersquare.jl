@@ -247,3 +247,28 @@ function update_hess(cone::MatrixEpiPerSquare)
     cone.hess_updated = true
     return cone.hess
 end
+
+
+
+
+
+function symmat(s::AbstractVector{T}, d1, d2) where {T <: Real}
+    @assert d1 <= d2
+    side = d1 + d2
+    v_idx = svec_length(d1) + 1
+    S = zeros(T, side, side)
+    @views svec_to_smat!(S[1:d1, 1:d1], s[1:(v_idx - 1)], sqrt(T(2)))
+    S[(d1 + 1):end, (d1 + 1):end] += 2 * s[v_idx] * I
+    @views vec_copy_to!(S[1:d1, (d1 + 1):end], s[(v_idx + 1):end])
+    S = Symmetric(S, :U)
+    return M
+end
+function symvec(S::AbstractMatrix{T}, d1, d2) where {T <: Real}
+    @assert d1 <= d2
+    v_idx = svec_length(d1) + 1
+    s = zeros(T, v_idx + 1 + d1 * d2)
+    @views smat_to_svec!(s[1:(v_idx - 1)], S[1:d1, 1:d1], sqrt(T(2)))
+    s[v_idx] = M[end, end] / 2
+    @views vec_copy_to!(s[(v_idx + 1):end], S[1:d1, (d1 + 1):end])
+    return v
+end
