@@ -955,7 +955,7 @@ function epinormspectral1(T; options...)
     tol = 1e-4
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
-    for is_complex in (false,)# true)
+    for is_complex in (false, true)
         dim = Xn * Xm
         if is_complex
             dim *= 2
@@ -995,7 +995,7 @@ function epinormspectral2(T; options...)
     tol = 1e-4
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
-    for is_complex in (false,)# true)
+    for is_complex in (false, true)
         R = (is_complex ? Complex{T} : T)
         dim = Xn * Xm
         if is_complex
@@ -1026,8 +1026,7 @@ end
 function epinormspectral3(T; options...)
     # tol = sqrt(sqrt(eps(T)))
     tol = 1e-4
-    # for is_complex in (false, true), (Xn, Xm) in ((1, 1), (1, 3), (2, 2), (3, 4))
-    for is_complex in (false,), (Xn, Xm) in ((1, 1), (1, 3), (2, 2), (3, 4))
+    for is_complex in (false, true), (Xn, Xm) in ((1, 1), (1, 3), (2, 2), (3, 4))
         dim = Xn * Xm
         if is_complex
             dim *= 2

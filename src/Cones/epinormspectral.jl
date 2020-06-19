@@ -140,8 +140,12 @@ end
 
 update_dual_feas(cone::EpiNormSpectral) = true
 
+# # TODO is there a faster way to check u >= nuc_norm, eg thru a cholesky?
 # function update_dual_feas(cone::EpiNormSpectral)
 #     u = cone.dual_point[1]
+#     if u <= 0
+#         return false
+#     end
 #     W = @views vec_copy_to!(similar(cone.W), cone.dual_point[2:end])
 #     nuc_norm = sum(svdvals(W))
 #     return (u >= nuc_norm)
@@ -241,11 +245,11 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
 
         # prod_2j = 2 * cone.fact_Z \ (((tmpd1d2 * W' + W * tmpd1d2' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpd1d2)
         mul!(tmpd1d1, tmpd1d2, W')
-        @inbounds for j in 1:cone.d1
-            @inbounds for i in 1:j
-                tmpd1d1[i, j] += tmpd1d1[j, i]'
+        @inbounds for k in 1:cone.d1
+            @inbounds for i in 1:k
+                tmpd1d1[i, k] += tmpd1d1[k, i]'
             end
-            tmpd1d1[j, j] -= 2 * u * arr_1j
+            tmpd1d1[k, k] -= 2 * u * arr_1j
         end
         mul!(tmpd1d2, Hermitian(tmpd1d1, :U), cone.tau, 2, 2)
         ldiv!(cone.fact_Z, tmpd1d2)
@@ -255,90 +259,91 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     return prod
 end
 
-# TODO fails higher dimension corr barrier tests
-function correction(
-    cone::EpiNormSpectral{T},
-    primal_dir::AbstractVector{T},
-    dual_dir::AbstractVector{T},
-    ) where {T <: Real}
-    @assert cone.hess_updated
+# # TODO fails higher dimension corr barrier tests
+# function correction(
+#     cone::EpiNormSpectral{T},
+#     primal_dir::AbstractVector{T},
+#     dual_dir::AbstractVector{T},
+#     ) where {T <: Real}
+#     @assert cone.hess_updated
+#
+#     dim = cone.dim
+#     d1 = cone.d1
+#     d2 = cone.d2
+#     u = cone.point[1]
+#     W = cone.W
+#     third = zeros(T, cone.dim, cone.dim, cone.dim)
+#
+#     Zi = cone.Zi
+#     tau = cone.tau
+#     # TODO use stored fields
+#     Zi2 = Zi ^ 2
+#     Wtau = W' * tau
+#
+#     Zitau = cone.Zitau
+#     Zi2tau = cone.tmpd1d2
+#     copyto!(Zi2tau, Zitau)
+#     ldiv!(cone.fact_Z, Zi2tau)
+#     WZi2W = cone.tmpd2d2
+#     mul!(WZi2W, W', Zitau)
+#
+#     # Tuuu
+#     third[1, 1, 1] = u * (6 * cone.trZi2 - 8 * u * sum(Zi[i] * u * Zi2[i] for i in eachindex(Zi))) + (d1 - 1) / u / u / u
+#
+#     idx1 = 1
+#     for j in 1:d2, i in 1:d1
+#         idx1 += 1
+#         # Tuuw
+#         third[1, 1, idx1] = third[1, idx1, 1] = third[idx1, 1, 1] = 8 * abs2(u) * Zi2tau[i, j] - 2 * Zitau[i, j]
+#         idx2 = 1
+#         for l in 1:d2, k in 1:d1
+#             idx2 += 1
+#             idx2 >= idx1 || continue
+#             # Tuww
+#             Tuww = -2 * u * (Zi2[k, i] * Wtau[j, l] + Zi[k, i] * WZi2W[j, l] + tau[k, j] * Zitau[i, l] + Zitau[k, j] * tau[i, l])
+#             if j == l
+#                 Tuww -= 2 * u * Zi2[i, k]
+#             end
+#             third[1, idx1, idx2] = third[1, idx2, idx1] = third[idx1, 1, idx2] =
+#                 third[idx2, 1, idx1] = third[idx1, idx2, 1] = third[idx2, idx1, 1] = Tuww
+#             idx3 = 1
+#             # Twww
+#             for n in 1:d2, m in 1:d1
+#                 idx3 += 1
+#                 idx3 >= idx2 || continue
+#                 dZki_dwmn = tau[k, n] * Zi[m, i] + tau[i, n] * Zi[m, k]
+#                 dwtaujl_dwmn = tau[m, j] * Wtau[l, n] + tau[m, l] * Wtau[j, n]
+#                 dtauil_dwmn = Zi[m, i] * Wtau[l, n] + tau[m, l] * tau[i, n]
+#                 dtaukj_dwmn = Zi[m, k] * Wtau[j, n] + tau[m, j] * tau[k, n]
+#                 Twww = dZki_dwmn * Wtau[j, l] + Zi[k, i] * dwtaujl_dwmn + tau[k, j] * dtauil_dwmn + dtaukj_dwmn * tau[i, l]
+#                 if j == l
+#                     Twww += Zi[m, k] * tau[i, n] + Zi[m, i] * tau[k, n]
+#                 end
+#                 if l == n
+#                     Twww += Zi[k, i] * tau[m, j] + Zi[i, m] * tau[k, j]
+#                 end
+#                 if j == n
+#                     Twww += Zi[k, i] * tau[m, l] + Zi[k, m] * tau[i, l]
+#                 end
+#                 third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
+#                     third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] = Twww
+#             end
+#         end
+#     end
+#
+#     third_order = reshape(third, cone.dim^2, cone.dim)
+#     # @show extrema(abs, third_order)
+#     # Hi_z = cholesky(cone.old_hess) \ dual_dir
+#     Hi_z = inv_hess_prod!(similar(dual_dir), dual_dir, cone)
+#     cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
+#     cone.correction *= -1
+#     # @show extrema(abs, cone.correction)
+#
+#     return cone.correction
+# end
 
-    dim = cone.dim
-    d1 = cone.d1
-    d2 = cone.d2
-    u = cone.point[1]
-    W = cone.W
-    third = zeros(T, cone.dim, cone.dim, cone.dim)
 
-    Zi = cone.Zi
-    tau = cone.tau
-    # TODO use stored fields
-    Zi2 = Zi ^ 2
-    Wtau = W' * tau
-
-    Zitau = cone.Zitau
-    Zi2tau = cone.tmpd1d2
-    copyto!(Zi2tau, Zitau)
-    ldiv!(cone.fact_Z, Zi2tau)
-    WZi2W = cone.tmpd2d2
-    mul!(WZi2W, W', Zitau)
-
-    # Tuuu
-    third[1, 1, 1] = u * (6 * cone.trZi2 - 8 * u * sum(Zi[i] * u * Zi2[i] for i in eachindex(Zi))) + (d1 - 1) / u / u / u
-
-    idx1 = 1
-    for j in 1:d2, i in 1:d1
-        idx1 += 1
-        # Tuuw
-        third[1, 1, idx1] = third[1, idx1, 1] = third[idx1, 1, 1] = 8 * abs2(u) * Zi2tau[i, j] - 2 * Zitau[i, j]
-        idx2 = 1
-        for l in 1:d2, k in 1:d1
-            idx2 += 1
-            idx2 >= idx1 || continue
-            # Tuww
-            Tuww = -2 * u * (Zi2[k, i] * Wtau[j, l] + Zi[k, i] * WZi2W[j, l] + tau[k, j] * Zitau[i, l] + Zitau[k, j] * tau[i, l])
-            if j == l
-                Tuww -= 2 * u * Zi2[i, k]
-            end
-            third[1, idx1, idx2] = third[1, idx2, idx1] = third[idx1, 1, idx2] =
-                third[idx2, 1, idx1] = third[idx1, idx2, 1] = third[idx2, idx1, 1] = Tuww
-            idx3 = 1
-            # Twww
-            for n in 1:d2, m in 1:d1
-                idx3 += 1
-                idx3 >= idx2 || continue
-                dZki_dwmn = tau[k, n] * Zi[m, i] + tau[i, n] * Zi[m, k]
-                dwtaujl_dwmn = tau[m, j] * Wtau[l, n] + tau[m, l] * Wtau[j, n]
-                dtauil_dwmn = Zi[m, i] * Wtau[l, n] + tau[m, l] * tau[i, n]
-                dtaukj_dwmn = Zi[m, k] * Wtau[j, n] + tau[m, j] * tau[k, n]
-                Twww = dZki_dwmn * Wtau[j, l] + Zi[k, i] * dwtaujl_dwmn + tau[k, j] * dtauil_dwmn + dtaukj_dwmn * tau[i, l]
-                if j == l
-                    Twww += Zi[m, k] * tau[i, n] + Zi[m, i] * tau[k, n]
-                end
-                if l == n
-                    Twww += Zi[k, i] * tau[m, j] + Zi[i, m] * tau[k, j]
-                end
-                if j == n
-                    Twww += Zi[k, i] * tau[m, l] + Zi[k, m] * tau[i, l]
-                end
-                third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
-                    third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] = Twww
-            end
-        end
-    end
-
-    third_order = reshape(third, cone.dim^2, cone.dim)
-    # @show extrema(abs, third_order)
-    # Hi_z = cholesky(cone.old_hess) \ dual_dir
-    Hi_z = inv_hess_prod!(similar(dual_dir), dual_dir, cone)
-    cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
-    cone.correction *= -1
-    # @show extrema(abs, cone.correction)
-
-    return cone.correction
-end
-
-
+# TODO reduce allocs
 function correction2(
     cone::EpiNormSpectral{T},
     primal_dir::AbstractVector{T},
@@ -346,71 +351,41 @@ function correction2(
     ) where {T <: Real}
     @assert cone.hess_updated
 
-    d1 = cone.d1
-    d2 = cone.d2
     u = cone.point[1]
     W = cone.W
-
     Zi = cone.Zi
     tau = cone.tau
-    # TODO use stored fields
-    Zi2 = Zi ^ 2
-    Wtau = W' * tau
-
     Zitau = cone.Zitau
-    Zi2tau = cone.tmpd1d2
-    copyto!(Zi2tau, Zitau)
-    ldiv!(cone.fact_Z, Zi2tau)
-    WZi2W = cone.tmpd2d2
-    mul!(WZi2W, W', Zitau)
+    u_dir = primal_dir[1]
+    @views W_dir = vec_copy_to!(similar(W), primal_dir[2:end])
 
-    primal_u = primal_dir[1]
-    primal_W = reshape(primal_dir[2:end], d1, d2)
+    # TODO use stored fields
+    WtauI = W' * tau + I
+    Wdirtau = W_dir' * tau
+    ZiWdir = cone.fact_Z \ W_dir
+    ZiWdirWtauI = ZiWdir * WtauI
 
-    # Zi ~ d1 d1
-    # primal_W ~ d1 d2
-    # Wtau ~ d2 d2
-    # tau d1 d2
-
-    # Twww contribution to corrector
-    term1 = vec(tau * primal_W' * tau * primal_W' * tau)
-    term2 = vec(
-        (tau * primal_W' * Zi * primal_W * Wtau) +
-        (Zi * primal_W * Wtau * primal_W' * tau) +
-        (Zi * primal_W * tau' * primal_W * Wtau)
+    terms_twww = 2 * (
+        tau * (Wdirtau * Wdirtau + W_dir' * ZiWdirWtauI) +
+        ZiWdirWtauI * Wdirtau +
+        ZiWdir * Wdirtau' * WtauI
         )
-    # like term2 with I in place of Wtau
-    term3 = vec(
-        (tau * primal_W' * Zi * primal_W) +
-        (Zi * primal_W * primal_W' * tau) +
-        (Zi * primal_W * tau' * primal_W)
-        )
-    terms_twww = 2 * (term1 + term2 + term3)
 
-    # contribution to w part of the corrector from Tuww terms
-    term4 = vec(Zi2 * primal_W * Wtau)
-    term5 = vec(Zi * primal_W * WZi2W)
-    term6 = vec(tau * primal_W' * Zitau + Zitau * primal_W' * tau)
-    term7 = vec(Zi2 * primal_W)
-    terms47 = -2u * (term4 + term5 + term6 + term7)
-    terms_Tuww = 2 * primal_u * terms47
+    terms47 = -2 * u * (cone.fact_Z \ ZiWdirWtauI + (ZiWdir * W' + tau * W_dir') * Zitau + Zitau * Wdirtau)
+    terms_Tuww = 2 * u_dir * terms47
 
-    # contribution to w part of the corretor from Tuuw terms
-    term8 = (8 * abs2(u) * vec(Zi2tau) - 2 * vec(Zitau)) * primal_u
-    terms_Tuuw = term8 * primal_u
+    term8 = 8 * u * u_dir * u * Zitau - 2 * u_dir * tau
+    ldiv!(cone.fact_Z, term8)
+    terms_Tuuw = u_dir * term8
 
     corr = cone.correction
-    corr[2:end] = -(terms_twww + terms_Tuww + terms_Tuuw)
-    Tuuu = u * (6 * cone.trZi2 - 8 * u * sum(Zi[i] * u * Zi2[i] for i in eachindex(Zi))) + (d1 - 1) / u / u / u
-    corr[1] = -dot(vec(primal_W), terms47 + 2 * term8) - Tuuu * abs2(primal_u)
 
+    @views vec_copy_to!(corr[2:end], -(terms_twww + terms_Tuww + terms_Tuuw))
 
-    # third_order = reshape(third, cone.dim^2, cone.dim)
-    # # @show extrema(abs, third_order)
-    # cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * primal_dir
-    # cone.correction *= -1
-    # @show corr ./ cone.correction
-    # # @show extrema(abs, cone.correction)
+    corr[1] = -real(dot(W_dir, terms47 + 2 * term8))
+    ZiLi = cone.fact_Z.L \ Zi
+    trZi3 = sum(abs2, ZiLi)
+    corr[1] -= u * u_dir * (6 * cone.trZi2 - 8 * u * trZi3 * u) * u_dir + (cone.d1 - 1) * abs2(u_dir / u) / u
 
-    return cone.correction
+    return corr
 end
