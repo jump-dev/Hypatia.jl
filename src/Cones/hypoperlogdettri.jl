@@ -312,7 +312,7 @@ function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
     Wi = Symmetric(cone.Wi)
     pi = cone.ldWv # TODO rename
     vzip1 = cone.vzip1 # 1 + v / z
-    nLz = cone.nLz # (side - pi) / z # TODO use where pi - d appears
+    nLz = cone.nLz # (side - pi) / z
     d = cone.side # TODO rename
     w_dim = cone.dim - 2
 
@@ -347,12 +347,12 @@ function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
     term4 = 2 * u_dir * term4a
 
     # Tvww contribution to w part of correction
-    term5a = (inv(z) - v * (pi - d) / abs2(z)) * (2 * v / z * dot_Wi_S * vec_Wi + vec_skron2)
+    term5a = (inv(z) + v * nLz / z) * (2 * v / z * dot_Wi_S * vec_Wi + vec_skron2)
     term5 = 2 * v_dir * term5a
 
     uuw_scal = -2 * u_dir * v / z ^ 3
-    vvw_scal = v_dir / abs2(z) * (2 * (pi - d) * (1 - v * (pi - d) / z) - d)
-    uvw_scal = 2 * (2 * v * (pi - d) / abs2(z) - inv(z)) / z
+    vvw_scal = v_dir / abs2(z) * (2 * (pi - d) * (1 + v * nLz) - d)
+    uvw_scal = 2 * (-2 * v * nLz / z - inv(z)) / z
     corrw =
         term1 + term2 + term3 + term4 + term5 +
         uuw_scal * u_dir * vec_Wi + # uuw
@@ -361,13 +361,13 @@ function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
 
     Tuuu = 2 / z ^ 3
     Tuuv = -2 / z ^ 3 * (pi - d)
-    Tuvv = 2 * abs2(pi - d) / z ^ 3 + d / abs2(z) / v
+    Tuvv = 2 * abs2(nLz) / z + d / abs2(z) / v
     corru = Tuuu * u_dir ^ 2 + Tuuv * u_dir * v_dir * 2 + # uuu + uuv
         uuw_scal * dot(vec_Wi, w_dir) * 2 + # uuw
         uvw_scal * dot(vec_Wi, w_dir) * v_dir + # uvw
         dot(term4a, w_dir) + # uww
         Tuvv * abs2(v_dir) # uvv
-    Tvvv = -2 * (pi - d) / abs2(z) * (abs2(pi - d) / z + d / v) - d / z / v * (1 / v + (pi - d) / z) - 2 * (d + 1) / v ^ 3
+    Tvvv = 2 * nLz / z * (nLz * (d - pi) + d / v) - d / z / v * (1 / v - nLz) - 2 * (d + 1) / v ^ 3
     corrv = Tvvv * abs2(v_dir) + Tuvv * u_dir * v_dir * 2 + vvw_scal * dot(vec_Wi, w_dir) * 2 + # vvv + uvv + wvv
         Tuuv * abs2(u_dir) + dot(term5a, w_dir) + uvw_scal * dot(vec_Wi, w_dir) * u_dir # vuu + vww + vwu
 
