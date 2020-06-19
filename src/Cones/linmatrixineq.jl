@@ -20,26 +20,21 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
 
     feas_updated::Bool
     grad_updated::Bool
-    dual_grad_updated::Bool
     hess_updated::Bool
-    scal_hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
-    dual_grad
     hess::Symmetric{T, Matrix{T}}
-    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
     sumA
     fact
     sumAinvAs::Vector
-
-    correction
 
     function LinMatrixIneq{T}(
         As::Vector;
@@ -48,7 +43,6 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
-        # @assert !use_dual # TODO delete later
         dim = length(As)
         @assert dim > 1
         side = 0
@@ -78,7 +72,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::LinMatrixIneq) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
+reset_data(cone::LinMatrixIneq) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::LinMatrixIneq{T}) where {T <: Real}
@@ -87,24 +81,18 @@ function setup_data(cone::LinMatrixIneq{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
-    cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.correction = zeros(T, dim)
     return
 end
 
 get_nu(cone::LinMatrixIneq) = cone.side
 
 use_correction(cone::LinMatrixIneq) = true
-
-use_scaling(cone::LinMatrixIneq) = true
-
-rescale_point(cone::LinMatrixIneq{T}, s::T) where {T} = (cone.point .*= s)
 
 function set_initial_point(arr::AbstractVector, cone::LinMatrixIneq{T}) where {T <: Real}
     arr .= 0
@@ -155,28 +143,27 @@ function update_hess(cone::LinMatrixIneq)
     @inbounds for i in 1:cone.dim, j in i:cone.dim
         H[i, j] = real(dot(sumAinvAs[i], sumAinvAs[j]'))
     end
-    # copyto!(cone.old_hess.data, H)
 
     cone.hess_updated = true
     return cone.hess
 end
 
-function correction(
-    cone::LinMatrixIneq{T},
-    primal_dir::AbstractVector{T},
-    dual_dir::AbstractVector{T},
-    ) where {T <: Real}
-    sumAinvAs = cone.sumAinvAs
-    corr = cone.correction
-    # Hi_z = cone.old_hess \ dual_dir
-    Hi_z = similar(dual_dir)
-    inv_hess_prod!(Hi_z, dual_dir, cone)
-    for i in eachindex(corr)
-        # TODO trace of 3 matrix muls is expensive - try to simplify and cache
-        corr[i] = sum(real(tr(sumAinvAs[i] * sumAinvAs[j] * sumAinvAs[k])) * primal_dir[j] * Hi_z[k] for j in 1:cone.dim, k in 1:cone.dim)
-    end
-    return corr
-end
+# function correction(
+#     cone::LinMatrixIneq{T},
+#     primal_dir::AbstractVector{T},
+#     dual_dir::AbstractVector{T},
+#     ) where {T <: Real}
+#     sumAinvAs = cone.sumAinvAs
+#     corr = cone.correction
+#     # Hi_z = cone.old_hess \ dual_dir
+#     Hi_z = similar(dual_dir)
+#     inv_hess_prod!(Hi_z, dual_dir, cone)
+#     for i in eachindex(corr)
+#         # TODO trace of 3 matrix muls is expensive - try to simplify and cache
+#         corr[i] = sum(real(tr(sumAinvAs[i] * sumAinvAs[j] * sumAinvAs[k])) * primal_dir[j] * Hi_z[k] for j in 1:cone.dim, k in 1:cone.dim)
+#     end
+#     return corr
+# end
 
 function correction2(cone::LinMatrixIneq, primal_dir::AbstractVector)
     sumAinvAs = cone.sumAinvAs

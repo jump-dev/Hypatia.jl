@@ -30,16 +30,15 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
-    scal_hess_updated::Bool
     inv_hess_updated::Bool
     hess_prod_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
-    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -56,8 +55,6 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     vzip1::T
     Wivzi::Matrix{R}
 
-    correction::Vector{T}
-
     function HypoPerLogdetTri{T, R}(
         dim::Int;
         use_dual::Bool = false,
@@ -66,7 +63,6 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
-        @assert !use_dual # TODO delete later
         @assert dim >= 3
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
@@ -92,8 +88,6 @@ end
 
 reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
 
-use_scaling(::HypoPerLogdetTri) = false
-
 use_correction(::HypoPerLogdetTri) = true
 
 function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -103,9 +97,9 @@ function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} 
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.mat = Matrix{R}(undef, cone.side, cone.side)
@@ -114,7 +108,6 @@ function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} 
     cone.mat3 = similar(cone.mat)
     cone.Wi = similar(cone.mat)
     cone.Wivzi = similar(cone.mat)
-    cone.correction = zeros(T, dim)
     return
 end
 
@@ -258,7 +251,6 @@ function update_hess(cone::HypoPerLogdetTri)
     end
 
     @. @views cone.hess.data[3:cone.dim, :] *= cone.sc_const
-    copyto!(cone.old_hess.data, H)
 
     cone.hess_updated = true
     return cone.hess
@@ -311,51 +303,51 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
     return prod
 end
 
-rho(T, i, j) = (i == j ? 1 : sqrt(T(2)))
-function skron(i, j, k, l, W::Symmetric{T, Matrix{T}}) where {T}
-    if (i == j) && (k == l)
-        return abs2(W[i, k])
-    elseif (i == j) || (k == l)
-        return sqrt(T(2)) * W[k, i] * W[j, l]
-    else
-        return W[k, i] * W[j, l] + W[l, i] * W[j, k]
-    end
-end
-function third_skron(i, j, k, l, m, n, Wi::Symmetric{T, Matrix{T}}) where {T}
-    rt2 = sqrt(T(2))
-    t1 = Wi[i, m] * Wi[n, k] * Wi[l, j] + Wi[i, k] * Wi[l, m] * Wi[n, j]
-    if m != n
-        t1 += Wi[i, n] * Wi[m, k] * Wi[l, j] + Wi[i, k] * Wi[l, n] * Wi[m, j]
-        if k != l
-            t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j] + Wi[i, n] * Wi[m, l] * Wi[k, j] + Wi[i, l] * Wi[k, n] * Wi[m, j]  #################
-            if i != j
-                t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] +
-                    Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i] +
-                    Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i] + Wi[j, n] * Wi[m, l] * Wi[k, i] + Wi[j, l] * Wi[k, n] * Wi[m, i]
-            end
-        elseif i != j
-            t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i]
-        end
-    elseif k != l
-        t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j]
-        if i != j
-            t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i]
-        end
-    elseif i != j
-        t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i]
-    end
-
-    num_match = (i == j) + (k == l) + (m == n)
-    if num_match == 0
-        t1 /= rt2 * 2
-    elseif num_match == 1
-        t1 /= 2
-    elseif num_match == 2
-        t1 /= rt2
-    end
-
-    return t1
-end
+# rho(T, i, j) = (i == j ? 1 : sqrt(T(2)))
+# function skron(i, j, k, l, W::Symmetric{T, Matrix{T}}) where {T}
+#     if (i == j) && (k == l)
+#         return abs2(W[i, k])
+#     elseif (i == j) || (k == l)
+#         return sqrt(T(2)) * W[k, i] * W[j, l]
+#     else
+#         return W[k, i] * W[j, l] + W[l, i] * W[j, k]
+#     end
+# end
+# function third_skron(i, j, k, l, m, n, Wi::Symmetric{T, Matrix{T}}) where {T}
+#     rt2 = sqrt(T(2))
+#     t1 = Wi[i, m] * Wi[n, k] * Wi[l, j] + Wi[i, k] * Wi[l, m] * Wi[n, j]
+#     if m != n
+#         t1 += Wi[i, n] * Wi[m, k] * Wi[l, j] + Wi[i, k] * Wi[l, n] * Wi[m, j]
+#         if k != l
+#             t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j] + Wi[i, n] * Wi[m, l] * Wi[k, j] + Wi[i, l] * Wi[k, n] * Wi[m, j]  #################
+#             if i != j
+#                 t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] +
+#                     Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i] +
+#                     Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i] + Wi[j, n] * Wi[m, l] * Wi[k, i] + Wi[j, l] * Wi[k, n] * Wi[m, i]
+#             end
+#         elseif i != j
+#             t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i]
+#         end
+#     elseif k != l
+#         t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j]
+#         if i != j
+#             t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i]
+#         end
+#     elseif i != j
+#         t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i]
+#     end
+#
+#     num_match = (i == j) + (k == l) + (m == n)
+#     if num_match == 0
+#         t1 /= rt2 * 2
+#     elseif num_match == 1
+#         t1 /= 2
+#     elseif num_match == 2
+#         t1 /= rt2
+#     end
+#
+#     return t1
+# end
 
 # TODO allocs and simplifications
 # TODO try to reuse fields already calculated for g and H
@@ -495,7 +487,6 @@ function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
 
     return corr
 end
-
 
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
 function get_central_ray_hypoperlogdettri(Wside::Int)

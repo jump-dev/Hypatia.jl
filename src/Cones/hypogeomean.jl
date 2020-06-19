@@ -21,25 +21,20 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
 
     feas_updated::Bool
     grad_updated::Bool
-    dual_grad_updated::Bool
     hess_updated::Bool
-    scal_hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
-    dual_grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
-    old_hess
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
     wprod::T
     z::T
-
-    correction::Vector{T}
 
     function HypoGeomean{T}(
         alpha::Vector{T};
@@ -48,7 +43,6 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
-        # @assert !use_dual # TODO delete later
         dim = length(alpha) + 1
         @assert dim >= 2
         @assert all(ai > 0 for ai in alpha)
@@ -72,24 +66,18 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
-    cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.correction = zeros(T, dim)
     return
 end
 
 get_nu(cone::HypoGeomean) = cone.dim
 
 use_correction(cone::HypoGeomean) = true
-
-use_scaling(cone::HypoGeomean) = true
-
-rescale_point(cone::HypoGeomean{T}, s::T) where {T} = (cone.point .*= s)
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {T}
     # get closed form central ray if all powers are equal, else use fitting
@@ -174,8 +162,6 @@ function update_hess(cone::HypoGeomean)
         end
         H[j1, j1] = (awwwprodu * (1 + aj * wwprodum1) + inv(wj)) / wj
     end
-
-    copyto!(cone.old_hess.data, H)
 
     cone.hess_updated = true
     return cone.hess

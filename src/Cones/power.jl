@@ -23,15 +23,14 @@ mutable struct Power{T <: Real} <: Cone{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
-    scal_hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
-    old_hess
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -41,9 +40,6 @@ mutable struct Power{T <: Real} <: Cone{T}
     aui::Vector{T}
     auiproduuw::Vector{T}
 
-    correction::Vector{T}
-    barrier::Function # TODO delete later
-
     function Power{T}(
         alpha::Vector{T},
         n::Int;
@@ -52,7 +48,6 @@ mutable struct Power{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
-        # @assert !use_dual # TODO delete later
         @assert n >= 1
         dim = length(alpha) + n
         @assert dim >= 3
@@ -66,17 +61,11 @@ mutable struct Power{T <: Real} <: Cone{T}
         cone.dim = dim
         cone.alpha = alpha
         cone.hess_fact_cache = hess_fact_cache
-        function barrier(s)
-            m = length(cone.alpha)
-            (u, w) = (s[1:m], s[(m + 1):end])
-            return -log(prod(u[j] ^ (2 * alpha[j]) for j in eachindex(alpha)) - sum(abs2, w)) - sum((1 - alpha[j]) * log(u[j]) for j in eachindex(alpha))
-        end
-        cone.barrier = barrier
         return cone
     end
 end
 
-reset_data(cone::Power) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
+reset_data(cone::Power) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 dimension(cone::Power) = length(cone.alpha) + cone.n
 
@@ -89,22 +78,18 @@ function setup_data(cone::Power{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.aui = zeros(length(cone.alpha))
     cone.auiproduuw = zeros(length(cone.alpha))
-    cone.correction = zeros(T, dim)
     return
 end
-
-use_scaling(cone::Power) = true
 
 use_correction(cone::Power) = true
 
 get_nu(cone::Power) = length(cone.alpha) + 1
-
-rescale_point(cone::Power{T}, s::T) where {T} = (cone.point .*= s)
 
 function set_initial_point(arr::AbstractVector, cone::Power)
     m = length(cone.alpha)
@@ -192,8 +177,6 @@ function update_hess(cone::Power)
         H[j, j] += offset
     end
 
-    cone.old_hess = Symmetric(copy(H), :U)
-
     cone.hess_updated = true
     return cone.hess
 end
@@ -233,100 +216,100 @@ end
 #     return prod
 # end
 
-function correction(
-    cone::Power{T},
-    primal_dir::AbstractVector{T},
-    dual_dir::AbstractVector{T},
-    ) where {T <: Real}
-    @assert cone.hess_updated
-
-    m = length(cone.alpha)
-    u = cone.point[1:m]
-    w = view(cone.point, (m + 1):cone.dim)
-    w_idxs = (m + 1):cone.dim
-    alpha = cone.alpha
-
-    produ = cone.produ # = exp(2 * sum(cone.alpha[i] * log(u[i]) for i in eachindex(cone.alpha)))
-    produw = cone.produw # = cone.produ - sum(abs2, w)
-    produuw = cone.produuw # = cone.produ / cone.produw
-    produuw_tw = produuw * (produuw - 1)
-    aui = cone.aui # @. cone.aui = 2 * cone.alpha / u
-
-    third_order = zeros(T, cone.dim, cone.dim, cone.dim)
-    # third_order_flat = zeros(T, cone.dim ^ 2, cone.dim)
-
-    # ui
-    for i in 1:m
-        # ui uj
-        for j in 1:m
-            # ui uj uk
-            for k in 1:m
-                t1 = aui[i] * aui[k] * produuw * (1 - produuw)
-                t2 = aui[j] * t1 * (2 * produuw - 1)
-                if i == j
-                    t3 = t1 / u[i]
-                    if j == k
-                        third_order[i, i, i] = 3 * t3 + t2 - 2 * ((1 - alpha[i]) / u[i] + produuw * aui[i]) / u[i] / u[i]
-                    else
-                        third_order[i, i, k] = third_order[i, k, i] = third_order[k, i, i] = t2 + t3
-                    end
-                elseif i != k && j != k
-                    third_order[i, j, k] = third_order[i, k, j] = third_order[j, i, k] = third_order[j, k, i] =
-                        third_order[k, i, j] = third_order[k, j, i] = t2
-                end
-            end
-            # ui uj wk
-            for k in w_idxs
-                wk = k - m
-                if i == j
-                    # TODO could also be expressed as:
-                    # third_order[i, i, k] = third_order[i, k, i] = third_order[k, i, i] = t1 + 2 * w[wk] * produuw / produw * aui[i] / u[i] where t1 is the case i != j
-                    third_order[i, i, k] = third_order[i, k, i] = third_order[k, i, i] = 2 * w[wk] * produuw / produw * aui[i] * (aui[i] * (2 * produuw - 1) + inv(u[i]))
-                else
-                    third_order[i, j, k] = third_order[i, k, j] = third_order[j, i, k] = third_order[j, k, i] =
-                        third_order[k, i, j] = third_order[k, j, i] = 2 * aui[i] * aui[j] * produuw * (2 * produuw - 1) * w[wk] / produw
-                end
-            end
-        end
-        # ui wj wk
-        for j in w_idxs, k in w_idxs
-            (wj, wk) = (j, k) .- m
-            t1 = -8 * aui[i] * w[wj] * w[wk] * produuw / produw / produw
-            if j == k
-                third_order[i, j, j] = third_order[j, i, j] = third_order[j, j, i] = t1 - 2 * aui[i] * produuw / produw
-            else
-                third_order[i, j, k] = third_order[i, k, j] = third_order[j, i, k] = third_order[j, k, i] =
-                third_order[k, i, j] = third_order[k, j, i] = t1
-            end
-        end
-
-    end
-    for i in w_idxs, j in w_idxs, k in w_idxs
-        (wi, wj, wk) = (i, j, k) .- m
-        t1 = 16 * w[wi] * w[wj] * w[wk] / produw / produw / produw
-        if i == j
-            t2 = w[wk] / produw / produw
-            if j == k
-                third_order[i, i, i] = t1 + 12 * t2
-            else
-                third_order[i, i, k] = third_order[i, k, i] = third_order[k, i, i] = t1 + 4 * t2
-            end
-        elseif i != k && j != k
-            third_order[i, j, k] = third_order[i, k, j] = third_order[j, i, k] = third_order[j, k, i] =
-                third_order[k, i, j] = third_order[k, j, i] = t1
-        end
-    end
-    third_order = reshape(third_order, cone.dim^2, cone.dim)
-
-    # barrier = cone.barrier
-    # FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), cone.point)
-    # @show norm(third_order - FD_3deriv)
-    Hi_z = cone.old_hess \ dual_dir
-    Hi_z .*= -0.5
-    cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
-
-    return cone.correction
-end
+# function correction(
+#     cone::Power{T},
+#     primal_dir::AbstractVector{T},
+#     dual_dir::AbstractVector{T},
+#     ) where {T <: Real}
+#     @assert cone.hess_updated
+#
+#     m = length(cone.alpha)
+#     u = cone.point[1:m]
+#     w = view(cone.point, (m + 1):cone.dim)
+#     w_idxs = (m + 1):cone.dim
+#     alpha = cone.alpha
+#
+#     produ = cone.produ # = exp(2 * sum(cone.alpha[i] * log(u[i]) for i in eachindex(cone.alpha)))
+#     produw = cone.produw # = cone.produ - sum(abs2, w)
+#     produuw = cone.produuw # = cone.produ / cone.produw
+#     produuw_tw = produuw * (produuw - 1)
+#     aui = cone.aui # @. cone.aui = 2 * cone.alpha / u
+#
+#     third_order = zeros(T, cone.dim, cone.dim, cone.dim)
+#     # third_order_flat = zeros(T, cone.dim ^ 2, cone.dim)
+#
+#     # ui
+#     for i in 1:m
+#         # ui uj
+#         for j in 1:m
+#             # ui uj uk
+#             for k in 1:m
+#                 t1 = aui[i] * aui[k] * produuw * (1 - produuw)
+#                 t2 = aui[j] * t1 * (2 * produuw - 1)
+#                 if i == j
+#                     t3 = t1 / u[i]
+#                     if j == k
+#                         third_order[i, i, i] = 3 * t3 + t2 - 2 * ((1 - alpha[i]) / u[i] + produuw * aui[i]) / u[i] / u[i]
+#                     else
+#                         third_order[i, i, k] = third_order[i, k, i] = third_order[k, i, i] = t2 + t3
+#                     end
+#                 elseif i != k && j != k
+#                     third_order[i, j, k] = third_order[i, k, j] = third_order[j, i, k] = third_order[j, k, i] =
+#                         third_order[k, i, j] = third_order[k, j, i] = t2
+#                 end
+#             end
+#             # ui uj wk
+#             for k in w_idxs
+#                 wk = k - m
+#                 if i == j
+#                     # TODO could also be expressed as:
+#                     # third_order[i, i, k] = third_order[i, k, i] = third_order[k, i, i] = t1 + 2 * w[wk] * produuw / produw * aui[i] / u[i] where t1 is the case i != j
+#                     third_order[i, i, k] = third_order[i, k, i] = third_order[k, i, i] = 2 * w[wk] * produuw / produw * aui[i] * (aui[i] * (2 * produuw - 1) + inv(u[i]))
+#                 else
+#                     third_order[i, j, k] = third_order[i, k, j] = third_order[j, i, k] = third_order[j, k, i] =
+#                         third_order[k, i, j] = third_order[k, j, i] = 2 * aui[i] * aui[j] * produuw * (2 * produuw - 1) * w[wk] / produw
+#                 end
+#             end
+#         end
+#         # ui wj wk
+#         for j in w_idxs, k in w_idxs
+#             (wj, wk) = (j, k) .- m
+#             t1 = -8 * aui[i] * w[wj] * w[wk] * produuw / produw / produw
+#             if j == k
+#                 third_order[i, j, j] = third_order[j, i, j] = third_order[j, j, i] = t1 - 2 * aui[i] * produuw / produw
+#             else
+#                 third_order[i, j, k] = third_order[i, k, j] = third_order[j, i, k] = third_order[j, k, i] =
+#                 third_order[k, i, j] = third_order[k, j, i] = t1
+#             end
+#         end
+#
+#     end
+#     for i in w_idxs, j in w_idxs, k in w_idxs
+#         (wi, wj, wk) = (i, j, k) .- m
+#         t1 = 16 * w[wi] * w[wj] * w[wk] / produw / produw / produw
+#         if i == j
+#             t2 = w[wk] / produw / produw
+#             if j == k
+#                 third_order[i, i, i] = t1 + 12 * t2
+#             else
+#                 third_order[i, i, k] = third_order[i, k, i] = third_order[k, i, i] = t1 + 4 * t2
+#             end
+#         elseif i != k && j != k
+#             third_order[i, j, k] = third_order[i, k, j] = third_order[j, i, k] = third_order[j, k, i] =
+#                 third_order[k, i, j] = third_order[k, j, i] = t1
+#         end
+#     end
+#     third_order = reshape(third_order, cone.dim^2, cone.dim)
+#
+#     # barrier = cone.barrier
+#     # FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), cone.point)
+#     # @show norm(third_order - FD_3deriv)
+#     Hi_z = cone.old_hess \ dual_dir
+#     Hi_z .*= -0.5
+#     cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
+#
+#     return cone.correction
+# end
 
 function correction2(cone::Power, primal_dir::AbstractVector)
     @assert cone.hess_updated
@@ -410,7 +393,11 @@ function correction2(cone::Power, primal_dir::AbstractVector)
     end
     third_order = reshape(third_order, cone.dim^2, cone.dim)
 
-    # barrier = cone.barrier
+    # function barrier(s)
+    #     m = length(cone.alpha)
+    #     (u, w) = (s[1:m], s[(m + 1):end])
+    #     return -log(prod(u[j] ^ (2 * alpha[j]) for j in eachindex(alpha)) - sum(abs2, w)) - sum((1 - alpha[j]) * log(u[j]) for j in eachindex(alpha))
+    # end
     # FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), cone.point)
     # @show norm(third_order - FD_3deriv)
 

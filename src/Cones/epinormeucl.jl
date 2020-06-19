@@ -23,37 +23,31 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     dual_feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
-    hess_fact_updated::Bool
-    scal_hess_updated::Bool
     inv_hess_updated::Bool
     nt_updated::Bool
     is_feas::Bool
     grad::Vector{T}
-    correction::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    correction::Vector{T}
     nbhd_tmp::Vector{T} # TODO rename
     nbhd_tmp2::Vector{T} # TODO rename
 
+    dist::T
+    dual_dist::T
+    rt_dist_ratio::T # sqrt(dist / dual_dist)
+    rt_rt_dist_ratio::T # sqrt(rt_dist_ratio)
     normalized_point::Vector{T} # TODO can this and normalized_dual_point be removed?
     normalized_dual_point::Vector{T}
     nt_point::Vector{T} # actually a normalized NT point
     nt_point_sqrt::Vector{T}
     scaled_point::Vector{T}
 
-    dist::T
-    dual_dist::T
-    rt_dist_ratio::T # sqrt(dist / dual_dist)
-    rt_rt_dist_ratio::T # sqrt(sqrt(dist / dual_dist))
-    corretion::Vector{T}
-
-    # TODO remove fact_cache when NT in
     function EpiNormEucl{T}(
         dim::Int;
         use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
         max_neighborhood::Real = default_max_neighborhood(),
         ) where {T <: Real}
-        @assert !use_dual # TODO delete later
         @assert dim >= 2
         cone = new{T}()
         cone.use_dual_barrier = use_dual
@@ -63,14 +57,9 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::EpiNormEucl) = false
+reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.nt_updated = false)
 
-reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated =
-    cone.hess_fact_updated = cone.scal_hess_updated = cone.nt_updated = false)
-
-use_nt(::EpiNormEucl) = true
-
-use_scaling(::EpiNormEucl) = true
+# use_scaling(::EpiNormEucl) = true
 
 use_correction(::EpiNormEucl) = true
 
@@ -82,12 +71,11 @@ function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     cone.dual_point = zeros(T, dim)
     cone.scaled_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
-    cone.correction = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-
+    cone.correction = zeros(T, dim)
     cone.normalized_point = zeros(T, dim)
     cone.normalized_dual_point = zeros(T, dim)
     cone.nt_point = zeros(T, dim)
@@ -101,7 +89,6 @@ function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     cone.dual_dist = 1
     cone.rt_dist_ratio = 1
     cone.rt_rt_dist_ratio = 1
-
     return
 end
 
@@ -331,21 +318,21 @@ end
 
 jdot(x::AbstractVector, y::AbstractVector) = @views x[1] * y[1] - dot(x[2:end], y[2:end])
 
-function correction(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::AbstractVector)
-    @assert cone.grad_updated
-    corr = cone.correction
-    point = cone.point
-
-    jdot_p_s = jdot(point, primal_dir)
-    @. corr = jdot_p_s * dual_dir
-    dot_s_z = dot(primal_dir, dual_dir)
-    dot_p_z = dot(point, dual_dir)
-    corr[1] += dot_s_z * point[1] - dot_p_z * primal_dir[1]
-    @. @views corr[2:end] += -dot_s_z * point[2:end] + dot_p_z * primal_dir[2:end]
-    corr ./= cone.dist
-
-    return corr
-end
+# function correction(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::AbstractVector)
+#     @assert cone.grad_updated
+#     corr = cone.correction
+#     point = cone.point
+#
+#     jdot_p_s = jdot(point, primal_dir)
+#     @. corr = jdot_p_s * dual_dir
+#     dot_s_z = dot(primal_dir, dual_dir)
+#     dot_p_z = dot(point, dual_dir)
+#     corr[1] += dot_s_z * point[1] - dot_p_z * primal_dir[1]
+#     @. @views corr[2:end] += -dot_s_z * point[2:end] + dot_p_z * primal_dir[2:end]
+#     corr ./= cone.dist
+#
+#     return corr
+# end
 
 function correction2(cone::EpiNormEucl, primal_dir::AbstractVector)
     @assert cone.grad_updated

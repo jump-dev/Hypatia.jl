@@ -18,36 +18,24 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     timer::TimerOutput
     nu::Int
 
-    scal::T
-
     feas_updated::Bool
     grad_updated::Bool
-    dual_grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
-    scal_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
-    dual_grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
-    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    scal_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
-
-    correction::Vector{T}
 
     lwv::T
     vlwvu::T
     lvwnivlwvu::T
     vwivlwvu::Vector{T}
-
-    barrier::Function # TODO delete later
-
-    dual_grad_inacc::Bool
 
     function HypoPerLog{T}(
         dim::Int;
@@ -56,11 +44,6 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
-        # TODO delete when generalize again later
-        @assert dim == 3
-        @assert !use_dual
-        @assert !use_heuristic_neighborhood
-        # old:
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual_barrier = use_dual
@@ -69,7 +52,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
         cone.dim = dim
         cone.nu = 1 + 2 * (dim - 2)
         cone.hess_fact_cache = hess_fact_cache
-        cone.barrier = (x -> -log(x[2] * log(x[3] / x[2]) - x[1]) - log(x[3]) - log(x[2]))
+        # cone.barrier = (x -> -log(x[2] * log(x[3] / x[2]) - x[1]) - log(x[3]) - log(x[2]))
         return cone
     end
 end
@@ -81,28 +64,21 @@ function setup_data(cone::HypoPerLog{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
-    cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.scal_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.correction = zeros(T, dim)
     cone.vwivlwvu = zeros(T, dim - 2)
-    cone.dual_grad_inacc = false
     return
 end
-
-use_scaling(cone::HypoPerLog) = true
 
 use_correction(cone::HypoPerLog) = true
 
 get_nu(cone::HypoPerLog) = cone.nu
 
-reset_data(cone::HypoPerLog) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.scal_hess_updated = cone.hess_fact_updated = false)
-
-rescale_point(cone::HypoPerLog{T}, s::T) where {T} = (cone.point .*= s)
+reset_data(cone::HypoPerLog) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 function set_initial_point(arr::AbstractVector, cone::HypoPerLog)
     (arr[1], arr[2], w) = get_central_ray_hypoperlog(cone.dim - 2)
@@ -234,8 +210,6 @@ function update_hess(cone::HypoPerLog)
     # # @show norm(cone.dual_point)
     # @show norm(H)
 
-    cone.old_hess = copy(cone.hess) # TODO remove if not needed later - if hess isn't modified by scaling
-
     cone.hess_updated = true
     return cone.hess
 end
@@ -322,8 +296,7 @@ function correction(
     # H = inv(Hi)
     # @show H - hess(cone)
     @assert cone.hess_updated
-    # H = hess(cone)
-    H = cone.old_hess # TODO hess?
+    H = hess(cone)
     vlwvup = T[-1, lwv - 1, v / w]
     gpp = Symmetric(H - Diagonal(T[0, abs2(inv(v)), abs2(inv(w))]), :U) # TODO improve
     zz3vlwvup = (dual_dir[2:3] + dual_dir[1] * vlwvup[2:3]) / (vlwvu + 2 * v)

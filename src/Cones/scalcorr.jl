@@ -50,7 +50,7 @@ function update_scal_hess(
     ) where {T}
     # @assert !cone.scal_hess_updated
     cone.scal_hess_updated = true
-    if !use_scaling(cone) || use_nt(cone)
+    if !use_scaling(cone)
         return hess(cone)
     end
 

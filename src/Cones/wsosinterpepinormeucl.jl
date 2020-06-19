@@ -39,7 +39,6 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
 
     mat::Vector{Matrix{T}}
     matfact::Vector
-
     Λi_Λ::Vector{Vector{Matrix{T}}}
     Λ11::Vector{Matrix{T}}
     tmpLL::Vector{Matrix{T}}
@@ -60,7 +59,6 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
-        @assert !use_dual # TODO delete later
         for Pj in Ps
             @assert size(Pj, 1) == U
         end

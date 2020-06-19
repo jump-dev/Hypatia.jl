@@ -23,18 +23,15 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
 
     feas_updated::Bool
     grad_updated::Bool
-    dual_grad_updated::Bool
     hess_updated::Bool
-    scal_hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
-    dual_grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
-    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -43,8 +40,6 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tmpLU::Vector{Matrix{R}}
     tmpUU::Vector{Matrix{R}}
     ΛF::Vector
-
-    correction
 
     function WSOSInterpNonnegative{T, R}(
         U::Int,
@@ -77,11 +72,10 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
-    cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     Ps = cone.Ps
@@ -90,18 +84,12 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     cone.tmpLU = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
     cone.tmpUU = [Matrix{R}(undef, dim, dim) for Pk in Ps]
     cone.ΛF = Vector{Any}(undef, length(Ps))
-
-    cone.correction = zeros(T, dim)
     return
 end
 
 get_nu(cone::WSOSInterpNonnegative) = sum(size(Pk, 2) for Pk in cone.Ps)
 
 use_correction(cone::WSOSInterpNonnegative) = true
-
-use_scaling(cone::WSOSInterpNonnegative) = true
-
-rescale_point(cone::WSOSInterpNonnegative{T}, s::T) where {T} = (cone.point .*= s)
 
 # TODO find "central" initial point, like for other cones
 set_initial_point(arr::AbstractVector, cone::WSOSInterpNonnegative) = (arr .= 1)
@@ -135,10 +123,6 @@ function update_feas(cone::WSOSInterpNonnegative)
 end
 
 update_dual_feas(cone::WSOSInterpNonnegative) = true # TODO use a dikin ellipsoid condition?
-# function update_dual_feas(cone::WSOSInterpNonnegative, mu)
-#     gap = cone.dual_point + mu * cone.grad
-#     return dot(gap, cone.old_hess \ gap)
-# end
 
 # TODO decide whether to compute the LUk' * LUk in grad or in hess (only diag needed for grad)
 # TODO can be done in parallel
@@ -172,19 +156,18 @@ function update_hess(cone::WSOSInterpNonnegative)
     end
 
     cone.hess_updated = true
-    copyto!(cone.old_hess.data, cone.hess.data)
     return cone.hess
 end
 
-function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
-    Hi_z = similar(dual_dir)
-    inv_hess_prod!(Hi_z, dual_dir, cone)
-    corr = cone.correction
-    @inbounds for k in eachindex(corr)
-        corr[k] = sum(sum(UUk[i, j] * UUk[i, k] * UUk[j, k] for UUk in cone.tmpUU) * primal_dir[i] * Hi_z[j] for i in eachindex(corr), j in eachindex(corr))
-    end
-    return corr
-end
+# function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
+#     Hi_z = similar(dual_dir)
+#     inv_hess_prod!(Hi_z, dual_dir, cone)
+#     corr = cone.correction
+#     @inbounds for k in eachindex(corr)
+#         corr[k] = sum(sum(UUk[i, j] * UUk[i, k] * UUk[j, k] for UUk in cone.tmpUU) * primal_dir[i] * Hi_z[j] for i in eachindex(corr), j in eachindex(corr))
+#     end
+#     return corr
+# end
 
 function correction2(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
     corr = cone.correction

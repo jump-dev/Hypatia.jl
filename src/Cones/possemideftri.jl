@@ -36,6 +36,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -49,10 +50,8 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_mat::Matrix{R}
     fact_mat
     dual_fact_mat # NOTE in old branch this was named dual_fact
-
     scalmat_sqrt::Matrix{R}
     scalmat_sqrti::Matrix{R}
-    correction::Vector{T}
 
     function PosSemidefTri{T, R}(
         dim::Int;
@@ -79,15 +78,11 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::PosSemidefTri) = false
-
 reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.scal_hess_updated = cone.nt_updated = false)
-
-use_nt(::PosSemidefTri) = true
 
 use_correction(::PosSemidefTri) = true
 
-use_scaling(::PosSemidefTri) = true
+# use_scaling(::PosSemidefTri) = true
 
 function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
@@ -97,6 +92,7 @@ function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} whe
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.mat = zeros(R, cone.side, cone.side)
@@ -108,7 +104,6 @@ function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} whe
     cone.dual_mat2 = similar(cone.mat)
     cone.scalmat_sqrt = Matrix{T}(I, cone.side, cone.side)
     cone.scalmat_sqrti = Matrix{T}(I, cone.side, cone.side)
-    cone.correction = zeros(T, dim)
     return
 end
 
@@ -271,27 +266,27 @@ function update_nt(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} wher
     return
 end
 
-# TODO think about whether mat5 can be removed
-function correction(cone::PosSemidefTri, primal_dir::AbstractVector, dual_dir::AbstractVector)#, primal_point)
-    @assert cone.grad_updated
-
-    S = copytri!(svec_to_smat!(cone.mat5, primal_dir, cone.rt2), 'U', cone.is_complex)
-    Z = Hermitian(svec_to_smat!(cone.mat3, dual_dir, cone.rt2))
-
-    # TODO compare the following numerically
-    # Pinv_S_Z = mul!(cone.work_mat3, ldiv!(cone.fact, S), Z)
-    # Pinv_S_Z = ldiv!(cone.fact, mul!(cone.work_mat3, S, Z))
-    # TODO reuse factorization if useful
-    # fact = cholesky(Hermitian(svec_to_smat!(cone.work_mat3, primal_point, cone.rt2), :U))
-    fact = cholesky(Hermitian(svec_to_smat!(cone.mat4, cone.point, cone.rt2), :U))
-    Pinv_S_Z = mul!(cone.mat4, ldiv!(fact, S), Z)
-
-    Pinv_S_Z_symm = cone.mat5
-    @. Pinv_S_Z_symm = (Pinv_S_Z + Pinv_S_Z') / 2
-    smat_to_svec!(cone.correction, Pinv_S_Z_symm, cone.rt2)
-
-    return cone.correction
-end
+# # TODO think about whether mat5 can be removed
+# function correction(cone::PosSemidefTri, primal_dir::AbstractVector, dual_dir::AbstractVector)#, primal_point)
+#     @assert cone.grad_updated
+#
+#     S = copytri!(svec_to_smat!(cone.mat5, primal_dir, cone.rt2), 'U', cone.is_complex)
+#     Z = Hermitian(svec_to_smat!(cone.mat3, dual_dir, cone.rt2))
+#
+#     # TODO compare the following numerically
+#     # Pinv_S_Z = mul!(cone.work_mat3, ldiv!(cone.fact, S), Z)
+#     # Pinv_S_Z = ldiv!(cone.fact, mul!(cone.work_mat3, S, Z))
+#     # TODO reuse factorization if useful
+#     # fact = cholesky(Hermitian(svec_to_smat!(cone.work_mat3, primal_point, cone.rt2), :U))
+#     fact = cholesky(Hermitian(svec_to_smat!(cone.mat4, cone.point, cone.rt2), :U))
+#     Pinv_S_Z = mul!(cone.mat4, ldiv!(fact, S), Z)
+#
+#     Pinv_S_Z_symm = cone.mat5
+#     @. Pinv_S_Z_symm = (Pinv_S_Z + Pinv_S_Z') / 2
+#     smat_to_svec!(cone.correction, Pinv_S_Z_symm, cone.rt2)
+#
+#     return cone.correction
+# end
 
 function correction2(cone::PosSemidefTri, primal_dir::AbstractVector)
     @assert cone.grad_updated

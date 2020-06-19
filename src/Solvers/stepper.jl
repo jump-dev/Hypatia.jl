@@ -38,7 +38,7 @@ mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     cone_times::Vector{Float64}
     cone_order::Vector{Int}
 
-    tkcorr::T
+    tkcorr::T # TODO delete
 
     CombinedStepper{T}() where {T <: Real} = new{T}()
 end
@@ -395,14 +395,12 @@ end
 #     for (k, cone_k) in enumerate(solver.model.cones)
 #         duals_k = solver.point.dual_views[k]
 #         grad_k = Cones.grad(cone_k)
-#         # scal = (Cones.use_nt(cone_k) ? solver.mu : rtmu)
 #         scal = rtmu
 #         @. stepper.s_rhs_k[k] = -duals_k - (scal * grad_k) * gamma
 #         if Cones.use_correction(cone_k) && aff_alpha > 0
 #             # (reuses affine direction)
 #             # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
 #             # stepper.s_rhs_k[k] .-= cone_k.correction
-#             # scal = (Cones.use_nt(cone_k) ? one(T) : irtmu)
 #             scal = irtmu
 #             stepper.s_rhs_k[k] .-= scal * Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k]) * aff_alpha^2
 #         end

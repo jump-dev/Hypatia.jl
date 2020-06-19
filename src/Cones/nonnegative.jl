@@ -18,16 +18,13 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
 
     feas_updated::Bool
     grad_updated::Bool
-    dual_grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     scal_hess_updated::Bool
     is_feas::Bool
     grad::Vector{T}
-    dual_grad::Vector{T}
     hess::Diagonal{T, Vector{T}}
     inv_hess::Diagonal{T, Vector{T}}
-
     correction::Vector{T}
 
     function Nonnegative{T}(
@@ -35,7 +32,6 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
         use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
         max_neighborhood::Real = default_max_neighborhood(),
         ) where {T <: Real}
-        @assert !use_dual # TODO delete later
         @assert dim >= 1
         cone = new{T}()
         cone.use_dual_barrier = use_dual
@@ -45,15 +41,11 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::Nonnegative) = false
-
 use_correction(cone::Nonnegative) = true
 
-use_scaling(cone::Nonnegative) = true
+# use_scaling(cone::Nonnegative) = true
 
-reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = false)
-
-# use_nt(::Nonnegative) = true
+reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::Nonnegative{T}) where {T <: Real}
@@ -62,7 +54,6 @@ function setup_data(cone::Nonnegative{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
-    cone.dual_grad = zeros(T, dim)
     cone.hess = Diagonal(zeros(T, dim))
     cone.inv_hess = Diagonal(zeros(T, dim))
     cone.correction = zeros(T, dim)
@@ -87,13 +78,6 @@ function update_grad(cone::Nonnegative)
     @. cone.grad = -inv(cone.point)
     cone.grad_updated = true
     return cone.grad
-end
-
-function update_dual_grad(cone::Nonnegative, mu::Real)
-    @assert cone.is_feas
-    @. cone.dual_grad = -inv(cone.dual_point)
-    cone.dual_grad_updated = true
-    return cone.dual_grad
 end
 
 function update_hess(cone::Nonnegative)
@@ -198,10 +182,10 @@ end
 #     @. prod = sqrt(cone.dual_point / cone.point) * arr
 # end
 
-function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
-    @. cone.correction = primal_dir * dual_dir / cone.point
-    return cone.correction
-end
+# function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
+#     @. cone.correction = primal_dir * dual_dir / cone.point
+#     return cone.correction
+# end
 
 function correction2(cone::Nonnegative, primal_dir::AbstractVector)
     @. cone.correction = (primal_dir / cone.point)^2 / cone.point

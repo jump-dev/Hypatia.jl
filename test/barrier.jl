@@ -20,7 +20,7 @@ function test_barrier_oracles(
     cone::CO.Cone{T},
     barrier::Function;
     noise::T = T(0.1),
-    scale::T = T(1e-2),
+    scale::T = T(1e-3),
     tol::Real = 1000eps(T),
     init_tol::Real = tol,
     init_only::Bool = false,
@@ -38,6 +38,7 @@ function test_barrier_oracles(
     @test cone.point == point
     @test cone.dual_point == dual_point
 
+    # TODO adapt now that we have newton for initial point
     # if isfinite(init_tol)
     #     # tests for centrality of initial point
     #     minus_grad = -CO.grad(cone)
@@ -49,14 +50,18 @@ function test_barrier_oracles(
         point = CO.set_central_point(cone)
         dual_point = copy(point)
         @test load_reset_check(cone, point, dual_point)
+        @test CO.in_neighborhood(cone, one(T), sqrt(sqrt(T(eps(T)))))
     # end
     init_only && return
 
     # perturb and scale the initial point and check feasible
-    perturb_scale(point, dual_point, noise, scale)
+    perturb_scale(point, dual_point, noise, one(T))
     @test load_reset_check(cone, point, dual_point)
+    @test CO.in_neighborhood(cone, one(T), one(T))
 
     # test gradient and Hessian oracles
+    perturb_scale(point, dual_point, noise, scale)
+    @test load_reset_check(cone, point, dual_point)
     test_grad_hess(cone, point, dual_point, tol = tol)
 
     # check gradient and Hessian agree with ForwardDiff
@@ -64,18 +69,18 @@ function test_barrier_oracles(
     @test CO.is_feas(cone)
     grad = CO.grad(cone)
     hess = CO.hess(cone)
-    # if dim < 9 # too slow if dimension is large
-    #     println("starting ForwardDiff tests: $dim")
-    #     println("start grad")
-    #     fd_grad = ForwardDiff.gradient(barrier, point)
-    #     @test grad ≈ fd_grad atol=tol rtol=tol
-    #     println("done grad")
-    #     fd_hess = ForwardDiff.hessian(barrier, point)
-    #     if !CO.use_nt(cone)
-    #         @test hess ≈ fd_hess atol=tol rtol=tol
-    #         println("done hess")
-    #     end
-    # end
+    if dim < 9 # too slow if dimension is large
+        println("starting ForwardDiff tests: $dim")
+        println("start grad")
+        fd_grad = ForwardDiff.gradient(barrier, point)
+        @test grad ≈ fd_grad atol=tol rtol=tol
+        println("done grad")
+        fd_hess = ForwardDiff.hessian(barrier, point)
+        if !CO.use_scaling(cone)
+            @test hess ≈ fd_hess atol=tol rtol=tol
+            println("done hess")
+        end
+    end
 
     # check 3rd order corrector agrees with ForwardDiff
     # too slow if cone is too large or not using BlasReals
@@ -90,18 +95,17 @@ function test_barrier_oracles(
         # check correction term agrees with directional 3rd derivative
         (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
         corr = CO.correction2(cone, primal_dir)
-        # hess = (CO.use_nt(cone) ? CO.hess(cone) : cone.old_hess)
         @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
-        # if dim < 5 && T in (Float32, Float64)
-        #     println("starting fd 3o")
-        #     FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
-        #     println("done fd 3o")
-        #     # check log-homog property that F'''(s)[s] = -2F''(s)
-        #     @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess atol=tol rtol=tol
-        #     FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
-        #     @show FD_corr ./ corr
-        #     @test FD_corr ≈ corr atol=tol rtol=tol
-        # end
+        if dim < 5 && T in (Float32, Float64)
+            println("starting fd 3o")
+            FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
+            println("done fd 3o")
+            # check log-homog property that F'''(s)[s] = -2F''(s)
+            @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess atol=tol rtol=tol
+            FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
+            @show FD_corr ./ corr
+            @test FD_corr ≈ corr atol=tol rtol=tol
+        end
     end
 
     return
@@ -131,22 +135,12 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
     CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
     @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
 
-    # if CO.use_scaling(cone)
-    #     # dual_grad = CO.dual_grad(cone, one(T))
-    #     # @test dot(dual_point, dual_grad) ≈ -nu atol=1000*tol rtol=1000*tol
-    #
-    #     scal_hess = CO.scal_hess(cone, one(T))
-    #     @test scal_hess * point ≈ dual_point atol=tol rtol=tol
-    #     # @test scal_hess * dual_grad ≈ grad atol=tol rtol=tol # second updated not used
-    #
-    #     prod = similar(point)
-    #     @test CO.scal_hess_prod!(prod, point, cone, one(T)) ≈ dual_point atol=tol rtol=tol
-    #     # @test CO.scal_hess_prod!(prod, dual_grad, cone, one(T)) ≈ grad atol=tol rtol=tol # second updated not used
-    # end
-
-    mock_dual_point = -grad + T(1e-3) * randn(length(grad))
-    CO.load_dual_point(cone, mock_dual_point)
-    @test CO.in_neighborhood(cone, one(T), one(T))
+    if CO.use_scaling(cone)
+        scal_hess = CO.scal_hess(cone, one(T))
+        @test scal_hess * point ≈ dual_point atol=tol rtol=tol
+        prod = similar(point)
+        @test CO.scal_hess_prod!(prod, point, cone, one(T)) ≈ dual_point atol=tol rtol=tol
+    end
 
     return
 end

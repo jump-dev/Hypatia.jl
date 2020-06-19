@@ -30,13 +30,12 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_hess_updated::Bool
     hess_prod_updated::Bool
     hess_fact_updated::Bool
-    scal_hess_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
-    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -50,8 +49,6 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     sigma::T
     kron_const::T
     dot_const::T
-
-    correction::Vector{T}
 
     function HypoRootdetTri{T, R}(
         dim::Int;
@@ -84,9 +81,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
-
-use_scaling(::HypoRootdetTri) = false
+reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
 
 use_correction(::HypoRootdetTri) = true
 
@@ -97,16 +92,15 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.W = zeros(R, cone.side, cone.side)
     # cone.Wi = zeros(R, cone.side, cone.side)
     cone.work_mat = zeros(R, cone.side, cone.side)
     cone.work_mat2 = zeros(R, cone.side, cone.side)
-    cone.correction = zeros(T, dim)
     return
 end
 
@@ -233,7 +227,6 @@ function update_hess(cone::HypoRootdetTri)
         end
     end
     @. H[2:end, 2:end] *= cone.sc_const
-    copyto!(cone.old_hess.data, H)
 
     cone.hess_updated = true
     return cone.hess

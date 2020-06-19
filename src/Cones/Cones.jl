@@ -23,8 +23,8 @@ import Hypatia.sqrt_prod
 import Hypatia.inv_sqrt_prod
 import Hypatia.invert
 
-# default_max_neighborhood() = 0.5 # TODO skajaa ye
-default_max_neighborhood() = 0.5 # TODO mosek
+default_max_neighborhood() = 0.5 # TODO skajaa ye
+# default_max_neighborhood() = 0.5 # TODO mosek
 default_use_heuristic_neighborhood() = false
 
 # hessian_cache(T::Type{<:BlasReal}) = DenseSymCache{T}() # use Bunch Kaufman for BlasReals from start
@@ -51,13 +51,12 @@ include("wsosinterpnonnegative.jl")
 include("wsosinterppossemideftri.jl")
 include("wsosinterpepinormeucl.jl")
 
-include("scalcorr.jl")
-include("newton.jl")
+# include("scalcorr.jl")
+# include("newton.jl")
 
 use_dual_barrier(cone::Cone) = cone.use_dual_barrier
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
-# rescale_point(cone::Cone{T}, s::T) where {T} = nothing
-rescale_point(cone::Cone{T}, s::T) where {T} = (cone.point .*= s)
+rescale_point(cone::Cone{T}, s::T) where {T} = (cone.point .*= s) # TODO incorporate into load_point?
 
 load_dual_point(cone::Cone, point::AbstractVector) = copyto!(cone.dual_point, point)
 dimension(cone::Cone) = cone.dim
@@ -66,52 +65,18 @@ set_timer(cone::Cone, timer::TimerOutput) = (cone.timer = timer)
 is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))
 is_dual_feas(cone::Cone) = update_dual_feas(cone) # TODO field? like above
 grad(cone::Cone) = (cone.grad_updated ? cone.grad : update_grad(cone))
-dual_grad(cone::Cone, mu::Real) = (cone.dual_grad_updated ? cone.dual_grad : update_dual_grad(cone, mu))
 hess(cone::Cone) = (cone.hess_updated ? cone.hess : update_hess(cone))
 inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(cone))
-barrier(cone::Cone) = cone.barrier
 
 # fallbacks
 
-use_nt(::Cone) = false
+use_scaling(::Cone) = false
 
-reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
+use_correction(::Cone) = false
 
-# function update_dual_feas(cone::Cone{T}, mu::T) where {T <: Real}
-#     nbhd_tmp = cone.nbhd_tmp
-#     dp = cone.dual_point
-#     g = grad(cone)
-#     scal = -dot(g, dp)
-#     if scal <= 0
-#         return false
-#     end
-#     scal /= norm(dp)
-#     @. nbhd_tmp = scal * dp + g
-#
-#
-#
-#         has_hess_fact_cache = hasfield(typeof(cone), :hess_fact_cache)
-#         if has_hess_fact_cache && !update_hess_fact(cone)
-#             return false
-#         end
-#         nbhd_tmp2 = cone.nbhd_tmp2
-#         if has_hess_fact_cache && cone.hess_fact_cache isa DenseSymCache{T}
-#             inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
-#             nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
-#             if nbhd_sqr < -eps(T) # TODO possibly loosen
-#                 # @warn("numerical failure: cone neighborhood is $nbhd_sqr")
-#                 return false
-#             end
-#             nbhd = sqrt(abs(nbhd_sqr))
-#         else
-#             inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
-#             nbhd = norm(nbhd_tmp2)
-#         end
-#     end
-#
-#         return (nbhd < mu * cone.max_neighborhood)
-#
-# end
+scal_hess(cone::Cone{T}, mu::T) where {T <: Real} = (cone.scal_hess_updated ? cone.hess : update_scal_hess(cone, mu))
+
+reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 update_hess_prod(cone::Cone) = nothing
 
@@ -209,7 +174,7 @@ inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 use_heuristic_neighborhood(cone::Cone) = cone.use_heuristic_neighborhood
 
 function in_neighborhood(cone::Cone{T}, mu::T, max_nbhd::T) where {T <: Real}
-    # if use_nt(cone)
+    # if use_scaling(cone)
     #     return true
     # end
 
@@ -229,6 +194,7 @@ function in_neighborhood(cone::Cone{T}, mu::T, max_nbhd::T) where {T <: Real}
         return false
     end
 
+    # TODO this can be used to check feasibility rather than nbhd
     # scal = -gdp / sum(abs2, dp)
     # dp .*= scal
     # @show scal
@@ -283,34 +249,11 @@ end
 #     return (get_nu(cone) > 0.3 * mu * dot(g, conj_g))
 # end
 
-
-# function step!(nc::NewtonCache)
-#     nc.grad .= ForwardDiff.gradient(nc.barrier, nc.x) + nc.z
-#     nc.hess .= ForwardDiff.hessian(nc.barrier, nc.x)
-#     nc.stepdir .= -Symmetric(nc.hess) \ nc.grad
-#     nc.gradnorm = -dot(nc.grad, nc.stepdir)
-#     return nc
-# end
-#
-# function damped_newton_method(nc::NewtonCache)
-#     max_iter = 50
-#     iter = 0
-#     eta = 1e-14
-#     step!(nc)
-#     while nc.gradnorm > eta
-#         @. nc.x += 1 / (1 + nc.gradnorm) * nc.stepdir
-#         step!(nc)
-#         iter += 1
-#         iter > max_iter && error("iteration limit in Newton method")
-#     end
-#     return
-# end
-
 # newton for central initial point
 # TODO don't run if cone has known central initial point
 # TODO remove allocs
 function set_central_point(cone::Cone{T}) where {T <: Real}
-    tol = sqrt(eps(T)) # TODO adjust
+    tol = 10 * sqrt(eps(T)) # TODO adjust
     max_iter = 10 # TODO make it depend on sqrt(nu)?
     damp_tol = 0.2 # TODO tune
     nu = get_nu(cone)
@@ -328,6 +271,7 @@ function set_central_point(cone::Cone{T}) where {T <: Real}
         g = grad(cone)
 
         tmp = -curr - g
+        # @show norm(tmp)
         if norm(tmp) < tol # TODO tune
             println("final iter $iter\n")
             break
@@ -339,10 +283,13 @@ function set_central_point(cone::Cone{T}) where {T <: Real}
         nnorm = dot(tmp, dir)
         @assert nnorm > 0
         alpha = (abs(nnorm) > damp_tol ? inv(1 + abs(nnorm)) : one(T))
-        @show alpha
+        # @show alpha
+        # @show nnorm
+
         curr = curr + alpha * dir
         iter += 1
     end
+    # @show norm(curr + grad(cone))
 
     return curr
 end

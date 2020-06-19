@@ -18,17 +18,12 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     dim::Int
     point::Vector{T}
     dual_point::Vector{T}
-    nt_point::Vector{T} # actually a normalized nt point
-    nt_point_sqrt::Vector{T}
-    normalized_point::Vector{T}
-    normalized_dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
     dual_feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
-    scal_hess_updated::Bool
     nt_updated::Bool
     inv_hess_updated::Bool
     hess_sqrt_prod_updated::Bool
@@ -37,6 +32,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -48,15 +44,16 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     denom::T
     hess_sqrt_vec::Vector{T}
     inv_hess_sqrt_vec::Vector{T}
-
-    correction::Vector{T}
+    nt_point::Vector{T} # actually a normalized nt point
+    nt_point_sqrt::Vector{T}
+    normalized_point::Vector{T}
+    normalized_dual_point::Vector{T}
 
     function EpiPerSquare{T}(
         dim::Int;
         use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
         max_neighborhood::Real = default_max_neighborhood(),
         ) where {T <: Real}
-        @assert !use_dual # TODO delete later
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual_barrier = use_dual
@@ -66,34 +63,29 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::EpiPerSquare) = false
+reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = cone.nt_updated = false)
 
-reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated =
-    cone.scal_hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = cone.nt_updated = false)
+# use_scaling(::EpiPerSquare) = true # TODO update oracles
 
-use_nt(::EpiPerSquare) = true
-
-use_scaling(::EpiPerSquare) = true # TODO update oracles
-
-use_correction(::EpiPerSquare) = true
+use_correction(cone::EpiPerSquare) = true
 
 function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
-    cone.nt_point = zeros(T, dim)
-    cone.nt_point_sqrt = zeros(T, dim)
-    cone.normalized_point = zeros(T, dim)
-    cone.normalized_dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.correction = zeros(T, dim)
     cone.hess_sqrt_vec = zeros(T, dim)
     cone.inv_hess_sqrt_vec = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.correction = zeros(T, dim)
+    cone.nt_point = zeros(T, dim)
+    cone.nt_point_sqrt = zeros(T, dim)
+    cone.normalized_point = zeros(T, dim)
+    cone.normalized_dual_point = zeros(T, dim)
     return
 end
 

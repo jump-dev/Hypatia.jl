@@ -23,15 +23,14 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
-    scal_hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
-    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -44,8 +43,6 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     tmpLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
 
-    correction::Vector{T}
-
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
         U::Int,
@@ -55,7 +52,6 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
-        @assert !use_dual # TODO delete later
         for Pk in Ps
             @assert size(Pk, 1) == U
         end
@@ -82,9 +78,9 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.dual_point = zeros(T, dim)
     cone.grad = similar(cone.point)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.rt2 = sqrt(T(2))
@@ -95,17 +91,12 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.ΛFL = Vector{Any}(undef, length(Ps))
     cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
-    cone.correction = zeros(T, dim)
     return
 end
 
 get_nu(cone::WSOSInterpPosSemidefTri) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
 
 use_correction(cone::WSOSInterpPosSemidefTri) = true
-
-use_scaling(cone::WSOSInterpPosSemidefTri) = false
-
-rescale_point(cone::WSOSInterpPosSemidefTri{T}, s::T) where {T} = (cone.point .*= s)
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpPosSemidefTri)
     arr .= 0
@@ -243,7 +234,6 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
             end
         end
     end
-    copyto!(cone.old_hess.data, H)
 
     cone.hess_updated = true
     return cone.hess
