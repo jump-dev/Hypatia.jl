@@ -311,52 +311,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
     return prod
 end
 
-rho(T, i, j) = (i == j ? 1 : sqrt(T(2)))
-function skron(i, j, k, l, W::Symmetric{T, Matrix{T}}) where {T}
-    if (i == j) && (k == l)
-        return abs2(W[i, k])
-    elseif (i == j) || (k == l)
-        return sqrt(T(2)) * W[k, i] * W[j, l]
-    else
-        return W[k, i] * W[j, l] + W[l, i] * W[j, k]
-    end
-end
-function third_skron(i, j, k, l, m, n, Wi::Symmetric{T, Matrix{T}}) where {T}
-    rt2 = sqrt(T(2))
-    t1 = Wi[i, m] * Wi[n, k] * Wi[l, j] + Wi[i, k] * Wi[l, m] * Wi[n, j]
-    if m != n
-        t1 += Wi[i, n] * Wi[m, k] * Wi[l, j] + Wi[i, k] * Wi[l, n] * Wi[m, j]
-        if k != l
-            t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j] + Wi[i, n] * Wi[m, l] * Wi[k, j] + Wi[i, l] * Wi[k, n] * Wi[m, j]  #################
-            if i != j
-                t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] +
-                    Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i] +
-                    Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i] + Wi[j, n] * Wi[m, l] * Wi[k, i] + Wi[j, l] * Wi[k, n] * Wi[m, i]
-            end
-        elseif i != j
-            t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i]
-        end
-    elseif k != l
-        t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j]
-        if i != j
-            t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i]
-        end
-    elseif i != j
-        t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i]
-    end
-
-    num_match = (i == j) + (k == l) + (m == n)
-    if num_match == 0
-        t1 /= rt2 * 2
-    elseif num_match == 1
-        t1 /= 2
-    elseif num_match == 2
-        t1 /= rt2
-    end
-
-    return t1
-end
-
 # TODO allocs and simplifications
 # TODO try to reuse fields already calculated for g and H
 function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
@@ -366,72 +320,17 @@ function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
     Wi = Symmetric(cone.Wi)
     pi = cone.ldWv # TODO rename
     vzip1 = cone.vzip1 # 1 + v / z
-    nLz = cone.nLz # (side - pi) / z
+    nLz = cone.nLz # (side - pi) / z # TODO use where pi - d appears
     d = cone.side # TODO rename
-    dim = cone.dim
-    w_dim = dim - 2
+    w_dim = cone.dim - 2
 
     T = typeof(v) # TODO delete
 
     u_dir = primal_dir[1]
     v_dir = primal_dir[2]
     @views w_dir = primal_dir[3:end]
-    vec_Wi = smat_to_svec!(similar(primal_dir, dim - 2), Wi, cone.rt2) # TODO allocates
+    vec_Wi = smat_to_svec!(similar(primal_dir, w_dim), Wi, cone.rt2) # TODO allocates
     S = copytri!(svec_to_smat!(cone.mat2, w_dir, cone.rt2), 'U', cone.is_complex)
-
-    # cone.nLz = (cone.side - cone.ldWv) / z
-    # cone.ldWvuv = cone.ldWv - u / v
-
-    rt2 = cone.rt2
-    third = zeros(dim, dim, dim)
-    third_debug = zeros(dim, dim, dim)
-    third[1, 1, 1] = 2 / z ^ 3
-    third[1, 1, 2] = third[1, 2, 1] = third[2, 1, 1] = -2 / z ^ 3 * (pi - d)
-    # third_debug[1, 1, 2] = third_debug[1, 2, 1] = third_debug[2, 1, 1] = -2 / z ^ 3 * (pi - d)
-    third[1, 1, 3:end] = third[1, 3:end, 1] = third[3:end, 1, 1] = -2 / z ^ 3 * v * vec_Wi
-    # third_debug[1, 1, 3:end] = third_debug[1, 3:end, 1] = third_debug[3:end, 1, 1] = -2 / z ^ 3 * v * vec_Wi
-    third[1, 2, 2] = third[2, 1, 2] = third[2, 2, 1] = 2 * abs2(pi - d) / z ^ 3 + d / abs2(z) / v
-    third[1, 2, 3:end] = third[1, 3:end, 2] = third[2, 1, 3:end] =
-        third[2, 3:end, 1] = third[3:end, 1, 2] = third[3:end, 2, 1] = (2 * v * (pi - d) / abs2(z) - inv(z)) / z * vec_Wi
-    # third_debug[1, 2, 3:end] = third_debug[1, 3:end, 2] = third_debug[2, 1, 3:end] =
-    #     third_debug[2, 3:end, 1] = third_debug[3:end, 1, 2] = third_debug[3:end, 2, 1] = (2 * v * (pi - d) / abs2(z) - inv(z)) / z * vec_Wi
-    third[2, 2, 2] = -2 * (pi - d) / abs2(z) * (abs2(pi - d) / z + d / v) - d / z / v * (1 / v + (pi - d) / z) - 2 * (d + 1) / v ^ 3
-    third[2, 2, 3:end] = third[2, 3:end, 2] = third[3:end, 2, 2] = (2 * (pi - d) * (1 - v * (pi - d) / z) - d) / abs2(z) .* vec_Wi
-
-    idx1 = 3
-    for j in 1:d, i in 1:j
-        idx2 = 3
-        for l in 1:d, k in 1:l
-            # Tuww
-            third[1, idx1, idx2] = third[1, idx2, idx1] = third[idx1, 1, idx2] =
-                third[idx2, 1, idx1] = third[idx1, idx2, 1] = third[idx2, idx1, 1] =
-                rho(T, i, j) * rho(T, k, l) * Wi[i, j] * Wi[k, l] * abs2(v) * 2 / z ^ 3 + v / abs2(z) * skron(i, j, k, l, Wi)
-            # third_debug[1, idx1, idx2] = third_debug[1, idx2, idx1] = third_debug[idx1, 1, idx2] =
-            #     third_debug[idx2, 1, idx1] = third_debug[idx1, idx2, 1] = third_debug[idx2, idx1, 1] =
-            #     rho(T, i, j) * rho(T, k, l) * Wi[i, j] * Wi[k, l] * abs2(v) * 2 / z ^ 3 + v / abs2(z) * skron(i, j, k, l, Wi)
-            # Tvww
-            third[2, idx1, idx2] = third[2, idx2, idx1] = third[idx1, 2, idx2] =
-                third[idx2, 2, idx1] = third[idx1, idx2, 2] = third[idx2, idx1, 2] =
-                (inv(z) - v * (pi - d) / abs2(z)) * (2 * v / z * rho(T, i, j) * rho(T, k, l) * Wi[i, j] * Wi[k, l] + skron(i, j, k, l, Wi))
-            # third_debug[2, idx1, idx2] = third_debug[2, idx2, idx1] = third_debug[idx1, 2, idx2] =
-            #     third_debug[idx2, 2, idx1] = third_debug[idx1, idx2, 2] = third_debug[idx2, idx1, 2] =
-            #     (inv(z) - v * (pi - d) / abs2(z)) * (2 * v / z * rho(T, i, j) * rho(T, k, l) * Wi[i, j] * Wi[k, l] + skron(i, j, k, l, Wi))
-            idx3 = 3
-            for n in 1:d, m in 1:n
-                third[idx1, idx2, idx3] =
-                    -2 * (v / z) ^ 3 * rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n] +
-                    -abs2(v / z) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi)) +
-                    -(1 + v / z) * third_skron(i, j, k, l, m, n, Wi)
-                third_debug[idx1, idx2, idx3] =
-                    -2 * (v / z) ^ 3 * rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n] +
-                    -abs2(v / z) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi)) +
-                    -(1 + v / z) * third_skron(i, j, k, l, m, n, Wi)
-                idx3 += 1
-            end
-            idx2 += 1
-        end
-        idx1 += 1
-    end
 
     dot_Wi_S = dot(vec_Wi, w_dir)
     ldiv!(cone.fact_mat, S)
@@ -481,16 +380,6 @@ function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
         Tuuv * abs2(u_dir) + dot(term5a, w_dir) + uvw_scal * dot(vec_Wi, w_dir) * u_dir # vuu + vww + vwu
 
     corr = vcat(corru, corrv, corrw)
-
-    # corr_debug = reshape(reshape(third_debug, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
-    # @show dot(term4a, w_dir) ./ corr_debug[1]
-    # @show (term1 + term2 + term3) ./ corr_debug[3:end]
-
-    # corr = cone.correction
-    # corr .= reshape(reshape(third, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
-    # @show corru / corr[1]
-    # @show corrv / corr[2]
-    # @show corrw ./ corr[3:end]
 
     corr *= cone.sc_const / -2
 
