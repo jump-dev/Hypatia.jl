@@ -90,7 +90,6 @@ function test_barrier_oracles(
             return # TODO fix corrector for larger dim
         end
         # check correction satisfies log-homog property F'''(s)[s, s] = -2F''(s) * s = 2F'(s)
-        @show -CO.correction2(cone, point) ./ grad
         @test -CO.correction2(cone, point) ≈ grad atol=tol rtol=tol # TODO delete third arg
         # check correction term agrees with directional 3rd derivative
         (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
