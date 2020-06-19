@@ -117,7 +117,7 @@ end
 function update_dual_feas(cone::EpiNormInf)
     u = cone.dual_point[1]
     if u > 0
-        w = @views vec_copy_to!(similar(cone.w), cone.point[2:end]) # TODO alloc
+        w = @views vec_copy_to!(similar(cone.w), cone.dual_point[2:end]) # TODO alloc
         return (u > norm(w, 1))
     end
     return false
