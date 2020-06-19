@@ -387,7 +387,9 @@ function correction2(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}, d
     third_debug = zeros(dim, dim, dim)
     third[1, 1, 1] = 2 / z ^ 3
     third[1, 1, 2] = third[1, 2, 1] = third[2, 1, 1] = -2 / z ^ 3 * (pi - d)
+    # third_debug[1, 1, 2] = third_debug[1, 2, 1] = third_debug[2, 1, 1] = -2 / z ^ 3 * (pi - d)
     third[1, 1, 3:end] = third[1, 3:end, 1] = third[3:end, 1, 1] = -2 / z ^ 3 * v * vec_Wi
+    # third_debug[1, 1, 3:end] = third_debug[1, 3:end, 1] = third_debug[3:end, 1, 1] = -2 / z ^ 3 * v * vec_Wi
     third[1, 2, 2] = third[2, 1, 2] = third[2, 2, 1] = 2 * abs2(pi - d) / z ^ 3 + d / abs2(z) / v
     third[1, 2, 3:end] = third[1, 3:end, 2] = third[2, 1, 3:end] =
         third[2, 3:end, 1] = third[3:end, 1, 2] = third[3:end, 2, 1] = (2 * v * (pi - d) / abs2(z) - inv(z)) / z * vec_Wi
@@ -420,8 +422,8 @@ function correction2(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}, d
                     -2 * (v / z) ^ 3 * rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n] +
                     -abs2(v / z) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi)) +
                     -(1 + v / z) * third_skron(i, j, k, l, m, n, Wi)
-                third_debug[idx1, idx2, idx3] =
-                -(1 + v / z) * third_skron(i, j, k, l, m, n, Wi)
+                # third_debug[idx1, idx2, idx3] =
+                # -(1 + v / z) * third_skron(i, j, k, l, m, n, Wi)
                 # -abs2(v / z) * (rho(T, i, j) * Wi[i, j] * skron(k, l, m, n, Wi) + rho(T, k, l) * Wi[k, l] * skron(i, j, m, n, Wi) + rho(T, m, n) * Wi[m, n] * skron(i, j, k, l, Wi))
                 # 2 * (v / z) ^ 3 * rho(T, i, j) * rho(T, k, l) * rho(T, m, n) * Wi[i, j] * Wi[k, l] * Wi[m, n]
                 idx3 += 1
@@ -457,7 +459,6 @@ function correction2(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}, d
     term5a = (inv(z) - v * (pi - d) / abs2(z)) * (2 * v / z * dot_Wi_S * vec_Wi + vec_skron2)
     term5 = 2 * v_dir * term5a
 
-    # Tuuw contribution to w part of correction
     term6 = 2 * u_dir * v_dir * vec_Wi / z * (2 * v * (pi - d) / abs2(z) - inv(z))
     corrw =
         term1 + term2 + term3 + term4 + term5 +
@@ -467,21 +468,24 @@ function correction2(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}, d
 
     Tuuu = 2 / z ^ 3
     Tuuv = -2 / z ^ 3 * (pi - d)
+    Tuvv = 2 * abs2(pi - d) / z ^ 3 + d / abs2(z) / v
     corru = Tuuu * u_dir ^ 2 + Tuuv * u_dir * v_dir * 2 + # uuu + uuv
         -2 / z ^ 3 * v * dot(vec_Wi, w_dir) * u_dir * 2 + # uuw
         (2 * v * (pi - d) / abs2(z) - inv(z)) / z * dot(vec_Wi, w_dir) * v_dir * 2 + # uvw
-        2 * dot(term4a, vec_Wi) # uww
+        dot(term4a, w_dir) + # uww
+        Tuvv * abs2(v_dir) # uvv
 
     Tvvv = -2 * (pi - d) / abs2(z) * (abs2(pi - d) / z + d / v) - d / z / v * (1 / v + (pi - d) / z) - 2 * (d + 1) / v ^ 3
     corrv = Tvvv * v_dir ^ 2
 
     corr_debug = reshape(reshape(third_debug, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
+    # @show dot(term4a, w_dir) ./ corr_debug[1]
     # @show term1 ./ corr_debug[3:end]
 
     corr = cone.correction
     corr = reshape(reshape(third, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
-    # @show corru / corr[1]
-    @show corrw ./ corr[3:end]
+    @show corru / corr[1]
+    # @show corrw ./ corr[3:end]
 
     corr *= cone.sc_const / -2
 
