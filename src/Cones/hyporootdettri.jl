@@ -34,6 +34,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
+    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
     nbhd_tmp::Vector{T}
@@ -85,8 +86,6 @@ end
 
 reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = cone.scal_hess_updated = false)
 
-use_nt(::HypoRootdetTri) = false
-
 use_scaling(::HypoRootdetTri) = false
 
 use_correction(::HypoRootdetTri) = true
@@ -98,6 +97,7 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
@@ -233,6 +233,7 @@ function update_hess(cone::HypoRootdetTri)
         end
     end
     @. H[2:end, 2:end] *= cone.sc_const
+    copyto!(cone.old_hess.data, H)
 
     cone.hess_updated = true
     return cone.hess
