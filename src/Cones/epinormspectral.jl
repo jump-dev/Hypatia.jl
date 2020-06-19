@@ -344,11 +344,7 @@ end
 
 
 # TODO reduce allocs
-function correction2(
-    cone::EpiNormSpectral{T},
-    primal_dir::AbstractVector{T},
-    dual_dir::AbstractVector{T},
-    ) where {T <: Real}
+function correction2(cone::EpiNormSpectral, primal_dir::AbstractVector)
     @assert cone.hess_updated
 
     u = cone.point[1]

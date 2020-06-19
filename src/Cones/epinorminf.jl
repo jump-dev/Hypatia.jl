@@ -453,7 +453,7 @@ function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}, dual_dir
     return corr
 end
 
-function correction2(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
+function correction2(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T}
     dim = cone.dim
     point = cone.point
     u = cone.point[1]

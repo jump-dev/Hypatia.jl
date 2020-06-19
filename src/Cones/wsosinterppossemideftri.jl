@@ -311,7 +311,7 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::W
 
 end
 
-function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector, dual_dir::AbstractVector)
+function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
     @assert cone.grad_updated
     corr = cone.correction
     U = cone.U

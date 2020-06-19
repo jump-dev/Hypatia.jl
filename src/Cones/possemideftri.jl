@@ -293,7 +293,7 @@ function correction(cone::PosSemidefTri, primal_dir::AbstractVector, dual_dir::A
     return cone.correction
 end
 
-function correction2(cone::PosSemidefTri, primal_dir::AbstractVector, dual_dir::AbstractVector)#, primal_point)
+function correction2(cone::PosSemidefTri, primal_dir::AbstractVector)
     @assert cone.grad_updated
 
     S = copytri!(svec_to_smat!(cone.mat5, primal_dir, cone.rt2), 'U', cone.is_complex)

@@ -178,11 +178,7 @@ function correction(
     return corr
 end
 
-function correction2(
-    cone::LinMatrixIneq{T},
-    primal_dir::AbstractVector{T},
-    dual_dir::AbstractVector{T},
-    ) where {T <: Real}
+function correction2(cone::LinMatrixIneq, primal_dir::AbstractVector)
     sumAinvAs = cone.sumAinvAs
     corr = cone.correction
     for i in eachindex(corr)

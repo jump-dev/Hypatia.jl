@@ -328,11 +328,7 @@ function correction(
     return cone.correction
 end
 
-function correction2(
-    cone::Power{T},
-    primal_dir::AbstractVector{T},
-    dual_dir::AbstractVector{T},
-    ) where {T <: Real}
+function correction2(cone::Power, primal_dir::AbstractVector)
     @assert cone.hess_updated
 
     m = length(cone.alpha)
@@ -340,6 +336,7 @@ function correction2(
     w = view(cone.point, (m + 1):cone.dim)
     w_idxs = (m + 1):cone.dim
     alpha = cone.alpha
+    T = eltype(cone.point)
 
     produ = cone.produ # = exp(2 * sum(cone.alpha[i] * log(u[i]) for i in eachindex(cone.alpha)))
     produw = cone.produw # = cone.produ - sum(abs2, w)

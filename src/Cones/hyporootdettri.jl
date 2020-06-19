@@ -281,7 +281,7 @@ end
 
 # TODO allocs and simplifications
 # TODO try to reuse fields already calculated for g and H
-function correction2(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
+function correction2(cone::HypoRootdetTri, primal_dir::AbstractVector)
     u_dir = primal_dir[1]
     @views w_dir = primal_dir[2:end]
 
@@ -289,6 +289,7 @@ function correction2(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}, dua
     sigma = cone.sigma
     w_dim = cone.dim - 1
     z = cone.rootdetu
+    T = typeof(z)
 
     vec_Wi = smat_to_svec!(zeros(T, w_dim), cone.Wi, cone.rt2) # TODO allocates
     S = copytri!(svec_to_smat!(cone.work_mat, w_dir, cone.rt2), 'U', cone.is_complex)

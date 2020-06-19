@@ -186,7 +186,7 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector, dua
     return corr
 end
 
-function correction2(cone::WSOSInterpNonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
+function correction2(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
     corr = cone.correction
     @inbounds for k in eachindex(corr)
         # TODO simplify to make efficient

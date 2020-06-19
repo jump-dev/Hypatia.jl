@@ -359,7 +359,7 @@ end
 
 # TODO allocs and simplifications
 # TODO try to reuse fields already calculated for g and H
-function correction2(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
+function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
     @assert cone.grad_updated
     u = cone.point[1]
     v = cone.point[2]
@@ -371,6 +371,8 @@ function correction2(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}, d
     d = cone.side # TODO rename
     dim = cone.dim
     w_dim = dim - 2
+
+    T = typeof(u) # TODO delete
 
     u_dir = primal_dir[1]
     v_dir = primal_dir[2]

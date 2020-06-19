@@ -198,8 +198,6 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)
     rtmu = sqrt(solver.mu)
     irtmu = inv(rtmu)
-    # @show irtmu
-    # @assert irtmu >= one(T)
     Cones.load_point.(cones, point.primal_views)
     Cones.rescale_point.(cones, irtmu)
     Cones.load_dual_point.(cones, point.dual_views)
@@ -207,16 +205,12 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     @assert all(Cones.is_feas.(cones))
     Cones.grad.(cones)
     Cones.hess.(cones)
-    # @show Cones.in_neighborhood.(cones, solver.mu)
 
     update_lhs(solver.system_solver, solver)
 
     use_corr = true
     # use_corr = false
 
-    # if iseven(solver.num_iters) # TODO maybe use nbhd to determine whether to center or predict
-    # TODO use nbhd to determine whether to center or predict
-    # if mod(solver.num_iters, 2) == 0
     if all(Cones.in_neighborhood.(cones, solver.mu, T(0.02)))
         # predict
         # println("pred")
@@ -224,7 +218,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
         # if solver.mu > 1e-5
         if use_corr
             get_directions(stepper, solver, iter_ref_steps = 3)
-            update_rhs_predcorr(stepper, solver, one(T))
+            update_rhs_predcorr(stepper, solver)
         end
         pred = true
         stepper.prev_gamma = zero(T) # TODO print like "pred" in column, or "cent" otherwise
@@ -234,7 +228,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
         # if solver.mu > 1e-5
         if use_corr
             get_directions(stepper, solver, iter_ref_steps = 3)
-            update_rhs_centcorr(stepper, solver, one(T))
+            update_rhs_centcorr(stepper, solver)
         end
         pred = false
         stepper.prev_gamma = one(T)
@@ -285,8 +279,7 @@ function update_rhs_pred(stepper::CombinedStepper{T}, solver::Solver{T}) where {
 
     # s
     for k in eachindex(solver.model.cones)
-        duals_k = solver.point.dual_views[k]
-        @. stepper.s_rhs_k[k] = -duals_k
+        @. stepper.s_rhs_k[k] = -solver.point.dual_views[k]
     end
 
     # NT: kap
@@ -295,8 +288,9 @@ function update_rhs_pred(stepper::CombinedStepper{T}, solver::Solver{T}) where {
     return rhs
 end
 
+# TODO just add to s_k parts of pred rhs
 # update the RHS for affine-corr direction
-function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}, prev_aff_alpha::T) where {T <: Real}
+function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     rhs = stepper.rhs
 
     # x, y, z, tau
@@ -306,22 +300,24 @@ function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}, pre
     rhs[stepper.tau_row] = solver.kap + solver.primal_obj_t - solver.dual_obj_t
 
     # s
-    irtmu = inv(sqrt(solver.mu))
+    irtrtmu = inv(sqrt(sqrt(solver.mu)))
     for (k, cone_k) in enumerate(solver.model.cones)
         duals_k = solver.point.dual_views[k]
         @. stepper.s_rhs_k[k] = -duals_k
-        if Cones.use_correction(cone_k) && prev_aff_alpha > 0
-            corr_k = similar(stepper.primal_dir_k[k])
-            Cones.hess_prod!(corr_k, stepper.primal_dir_k[k], cone_k)
-            prim_k_scal = prev_aff_alpha * sqrt(irtmu) * stepper.primal_dir_k[k]
-            stepper.s_rhs_k[k] .+= prev_aff_alpha * corr_k + Cones.correction2(cone_k, prim_k_scal, prim_k_scal)
+        if Cones.use_correction(cone_k)
+            # TODO avoid allocs
+            prim_dir_k = stepper.primal_dir_k[k]
+            stepper.s_rhs_k[k] .+= Cones.hess_prod!(similar(prim_dir_k), prim_dir_k, cone_k)
+            prim_k_scal = irtrtmu * prim_dir_k
+            stepper.s_rhs_k[k] .+= Cones.correction2(cone_k, prim_k_scal)
         end
     end
 
     # NT: kap
-    # tkcorr = stepper.dir[stepper.tau_row] * stepper.dir[stepper.kap_row] / solver.tau
-    tkcorr = -solver.mu / solver.tau * stepper.dir[stepper.tau_row] / solver.tau * (1 + stepper.dir[stepper.tau_row] / solver.tau)
-    rhs[end] = -solver.kap - tkcorr * prev_aff_alpha^2
+    # tkcorr = stepper.dir[stepper.tau_row] * stepper.dir[stepper.kap_row] / solver.tau # NOTE old way
+    # rhs[end] = -solver.kap - tkcorr
+    tau_dir_tau = stepper.dir[stepper.tau_row] / solver.tau
+    rhs[end] = -solver.kap + solver.mu / solver.tau * tau_dir_tau * (1 + tau_dir_tau)
 
     return rhs
 end
@@ -339,11 +335,8 @@ function update_rhs_cent(stepper::CombinedStepper{T}, solver::Solver{T}) where {
     # s
     rtmu = sqrt(solver.mu)
     for (k, cone_k) in enumerate(solver.model.cones)
-        duals_k = solver.point.dual_views[k]
         grad_k = Cones.grad(cone_k)
-        # scal = (Cones.use_nt(cone_k) ? solver.mu : rtmu)
-        scal = rtmu
-        @. stepper.s_rhs_k[k] = -duals_k - scal * grad_k
+        @. stepper.s_rhs_k[k] = -solver.point.dual_views[k] - rtmu * grad_k
     end
 
     # NT: kap
@@ -353,7 +346,7 @@ function update_rhs_cent(stepper::CombinedStepper{T}, solver::Solver{T}) where {
 end
 
 # update the RHS for cent-corr direction
-function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}, prev_aff_alpha::T) where {T <: Real}
+function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     rhs = stepper.rhs
 
     # x, y, z, tau
@@ -364,23 +357,24 @@ function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}, pre
 
     # s
     rtmu = sqrt(solver.mu)
-    irtmu = inv(sqrt(solver.mu))
+    irtrtmu = inv(sqrt(rtmu))
     for (k, cone_k) in enumerate(solver.model.cones)
         duals_k = solver.point.dual_views[k]
         grad_k = Cones.grad(cone_k)
-        # scal = (Cones.use_nt(cone_k) ? solver.mu : rtmu)
-        scal = rtmu
-        @. stepper.s_rhs_k[k] = -duals_k - scal * grad_k
-        if Cones.use_correction(cone_k) && prev_aff_alpha > 0
-            prim_k_scal = sqrt(irtmu) * stepper.primal_dir_k[k]
-            stepper.s_rhs_k[k] .+= Cones.correction2(cone_k, prim_k_scal, prim_k_scal) * prev_aff_alpha^2 # TODO delete third arg
+        @. stepper.s_rhs_k[k] = -duals_k - rtmu * grad_k
+        if Cones.use_correction(cone_k)
+            # TODO avoid allocs
+            prim_dir_k = stepper.primal_dir_k[k]
+            prim_k_scal = irtrtmu * prim_dir_k
+            stepper.s_rhs_k[k] .+= Cones.correction2(cone_k, prim_k_scal)
         end
     end
 
     # NT: kap
     # tkcorr = stepper.dir[stepper.tau_row] * stepper.dir[stepper.kap_row] / solver.tau
-    tkcorr = -solver.mu / solver.tau * (stepper.dir[stepper.tau_row] / solver.tau)^2
-    rhs[end] = -solver.kap + solver.mu / solver.tau - tkcorr * prev_aff_alpha^2
+    # rhs[end] = -solver.kap + solver.mu / solver.tau - tkcorr
+    tau_dir_tau = stepper.dir[stepper.tau_row] / solver.tau
+    rhs[end] = -solver.kap + solver.mu / solver.tau * (1 + abs2(tau_dir_tau))
 
     return rhs
 end

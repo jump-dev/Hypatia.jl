@@ -455,11 +455,7 @@ function correction(
     return cone.correction
 end
 
-function correction2(
-    cone::EpiSumPerEntropy{T},
-    primal_dir::AbstractVector{T},
-    dual_dir::AbstractVector{T},
-    ) where {T <: Real}
+function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) where {T <: Real}
     @assert cone.hess_updated
     tau = cone.tau
     sigma = cone.sigma

@@ -293,11 +293,7 @@ function correction(
     return cone.correction
 end
 
-function correction2(
-    cone::HypoGeomean{T},
-    primal_dir::AbstractVector{T},
-    dual_dir::AbstractVector{T},
-    ) where {T <: Real}
+function correction2(cone::HypoGeomean{T}, primal_dir::AbstractVector{T}) where {T <: Real}
     if !cone.hess_updated
         update_hess(cone)
     end

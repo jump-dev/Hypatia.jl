@@ -296,7 +296,7 @@ end
 rotated_jdot(x::AbstractVector, y::AbstractVector) = @views x[1] * y[2] + x[2] * y[1] - dot(x[3:end], y[3:end]) # TODO if only used once, don't make separate function
 
 # TODO allocs
-function correction2(cone::EpiPerSquare, primal_dir::AbstractVector, dual_dir::AbstractVector)
+function correction2(cone::EpiPerSquare, primal_dir::AbstractVector)
     @assert cone.grad_updated
     dim = cone.dim
     corr = cone.correction

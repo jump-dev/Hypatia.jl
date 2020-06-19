@@ -347,7 +347,7 @@ function correction(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::Abs
     return corr
 end
 
-function correction2(cone::EpiNormEucl, primal_dir::AbstractVector, dual_dir::AbstractVector)
+function correction2(cone::EpiNormEucl, primal_dir::AbstractVector)
     @assert cone.grad_updated
     dim = cone.dim
     corr = cone.correction
