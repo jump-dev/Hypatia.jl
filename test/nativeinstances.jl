@@ -1592,7 +1592,8 @@ function possemideftrisparse5(T; options...)
 end
 
 function hypoperlogdettri1(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 4
@@ -1622,7 +1623,8 @@ function hypoperlogdettri1(T; options...)
 end
 
 function hypoperlogdettri2(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 3
@@ -1652,7 +1654,8 @@ function hypoperlogdettri2(T; options...)
 end
 
 function hypoperlogdettri3(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 3
@@ -1677,7 +1680,8 @@ function hypoperlogdettri3(T; options...)
 end
 
 function hypoperlogdettri4(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     rt2 = sqrt(T(2))
     c = T[-1, 0, 0, 0, 0]
     A = zeros(T, 1, 5)

@@ -173,7 +173,6 @@ function update_dual_feas(cone::HypoPerLogdetTri)
     else
         return false
     end
-
 end
 
 function update_grad(cone::HypoPerLogdetTri)
@@ -480,15 +479,15 @@ function correction2(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}, d
     corrv = Tvvv * abs2(v_dir) + Tuvv * u_dir * v_dir * 2 + vvw_scal * dot(vec_Wi, w_dir) * 2 + # vvv + uvv + wvv
         Tuuv * abs2(u_dir) + dot(term5a, w_dir) + uvw_scal * dot(vec_Wi, w_dir) * u_dir # vuu + vww + vwu
 
-    corr_debug = reshape(reshape(third_debug, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
+    # corr_debug = reshape(reshape(third_debug, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
     # @show dot(term4a, w_dir) ./ corr_debug[1]
     # @show term1 ./ corr_debug[3:end]
 
     corr = cone.correction
-    corr = reshape(reshape(third, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
-    # @show corru / corr[1]
+    corr .= reshape(reshape(third, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
+    @show corru / corr[1]
     @show corrv / corr[2]
-    # @show corrw ./ corr[3:end]
+    @show corrw ./ corr[3:end]
 
     corr *= cone.sc_const / -2
 

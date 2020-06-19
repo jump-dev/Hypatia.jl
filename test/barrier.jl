@@ -430,7 +430,7 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
 end
 
 function test_hypoperlogdettri_barrier(T::Type{<:Real})
-    for side in [1, 2, 3, 4, 5, 6, 12, 20]
+    for side in [1, 2, 3, 6, 10, 15, 20]
         # real logdet barrier
         dim = 2 + CO.svec_length(side)
         cone = CO.HypoPerLogdetTri{T, T}(dim)
@@ -439,7 +439,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
             return cone.sc_const * (-log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - (side + 1) * log(v))
         end
-        if side <= 5
+        if side <= 10
             test_barrier_oracles(cone, R_barrier, init_tol = 1e-5)
         else
             test_barrier_oracles(cone, R_barrier, init_tol = 1e-1, init_only = true)
