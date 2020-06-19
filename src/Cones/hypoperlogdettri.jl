@@ -459,24 +459,26 @@ function correction2(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}, d
     term5a = (inv(z) - v * (pi - d) / abs2(z)) * (2 * v / z * dot_Wi_S * vec_Wi + vec_skron2)
     term5 = 2 * v_dir * term5a
 
-    term6 = 2 * u_dir * v_dir * vec_Wi / z * (2 * v * (pi - d) / abs2(z) - inv(z))
+    uuw_scal = -2 * u_dir * v / z ^ 3
+    vvw_scal = v_dir / abs2(z) * (2 * (pi - d) * (1 - v * (pi - d) / z) - d)
+    uvw_scal = 2 * (2 * v * (pi - d) / abs2(z) - inv(z)) / z
     corrw =
         term1 + term2 + term3 + term4 + term5 +
-        -2 * abs2(u_dir) * v / z ^ 3 * vec_Wi + # uuw
-        abs2(v_dir / z) * vec_Wi * (2 * (pi - d) * (1 - v * (pi - d) / z) - d) + # vvw
-        2 * u_dir * v_dir * vec_Wi / z * (2 * v * (pi - d) / abs2(z) - inv(z)) # uvw
+        uuw_scal * u_dir * vec_Wi + # uuw
+        vvw_scal * v_dir * vec_Wi + # vvw
+        uvw_scal * u_dir * v_dir * vec_Wi # uvw
 
     Tuuu = 2 / z ^ 3
     Tuuv = -2 / z ^ 3 * (pi - d)
     Tuvv = 2 * abs2(pi - d) / z ^ 3 + d / abs2(z) / v
     corru = Tuuu * u_dir ^ 2 + Tuuv * u_dir * v_dir * 2 + # uuu + uuv
-        -2 / z ^ 3 * v * dot(vec_Wi, w_dir) * u_dir * 2 + # uuw
-        (2 * v * (pi - d) / abs2(z) - inv(z)) / z * dot(vec_Wi, w_dir) * v_dir * 2 + # uvw
+        uuw_scal * dot(vec_Wi, w_dir) * 2 + # uuw
+        uvw_scal * dot(vec_Wi, w_dir) * v_dir + # uvw
         dot(term4a, w_dir) + # uww
         Tuvv * abs2(v_dir) # uvv
-
     Tvvv = -2 * (pi - d) / abs2(z) * (abs2(pi - d) / z + d / v) - d / z / v * (1 / v + (pi - d) / z) - 2 * (d + 1) / v ^ 3
-    corrv = Tvvv * v_dir ^ 2
+    corrv = Tvvv * abs2(v_dir) + Tuvv * u_dir * v_dir * 2 + vvw_scal * dot(vec_Wi, w_dir) * 2 + # vvv + uvv + wvv
+        Tuuv * abs2(u_dir) + dot(term5a, w_dir) + uvw_scal * dot(vec_Wi, w_dir) * u_dir # vuu + vww + vwu
 
     corr_debug = reshape(reshape(third_debug, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
     # @show dot(term4a, w_dir) ./ corr_debug[1]
@@ -484,7 +486,8 @@ function correction2(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}, d
 
     corr = cone.correction
     corr = reshape(reshape(third, dim ^ 2, dim) * primal_dir, dim, dim) * primal_dir
-    @show corru / corr[1]
+    # @show corru / corr[1]
+    @show corrv / corr[2]
     # @show corrw ./ corr[3:end]
 
     corr *= cone.sc_const / -2
