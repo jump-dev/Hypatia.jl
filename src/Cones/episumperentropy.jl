@@ -49,6 +49,7 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     Hvw::Vector{T} # part of inverse Hessian 1st diagonal
     Hww::Vector{T} # part of inverse Hessian 0th diagonal
     denom::Vector{T} # denominator for all parts but the first of the inverse Hessian
+    detdiag::Vector{T} # determinant of blocks on the diagonal of the inverse Hessian
 
     function EpiSumPerEntropy{T}(
         dim::Int;
@@ -93,6 +94,7 @@ function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
     cone.Hvw = zeros(T, w_dim)
     cone.Hww = zeros(T, w_dim)
     cone.denom = zeros(T, w_dim)
+    cone.detdiag = zeros(T, w_dim)
     return
 end
 
@@ -170,6 +172,20 @@ function update_hess_inv_hess(cone::EpiSumPerEntropy)
     sigma = cone.sigma
     H = cone.hess.data
 
+    # @inbounds for (j, wj) in enumerate(w)
+    #     wdenj = cone.wden[j]
+    #     invdenj = 2 / cone.den[j]
+    #
+    #         d11 = cone.diag[2j - 1] = abs2(real(wdenj)) + invdenj
+    #         d22 = cone.diag[2j] = abs2(imag(wdenj)) + invdenj
+    #         d12 = cone.offdiag[j] = real(wdenj) * imag(wdenj)
+    #         cone.detdiag[j] = d11 * d22 - abs2(d12)
+    #
+    #     u2pwj2 = usqr + abs2(wj)
+    #     invedge[j] = 2 * u / u2pwj2 * wj
+    #     schur += 2 / u2pwj2
+    # end
+
     # H_u_u, H_u_v, H_u_w parts
     H[1, 1] = abs2(cone.grad[1])
     @. sigma = w / v / z
@@ -245,6 +261,7 @@ function inv_hess_vals(cone::EpiSumPerEntropy{T}) where {T}
     @. cone.Hvv = z + w
     @. cone.Hww = cone.Hvv * abs2(w)
     @. cone.Hvv *= abs2(v)
+    @. cone.detdiag = cone.Hvv * cone.Hww - abs2(cone.Hvw) # TODO this isn't used outside of inv_hess_sqrt_prod so just move it there and don't cache
 
     return
 end
@@ -312,6 +329,49 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
     @inbounds for i in 1:cone.w_dim
         @. @views prod[2i, :] += (Hvv[i] * arr[2i, :] + Hvw[i] * arr[2i + 1, :]) / denom[i]
         @. @views prod[2i + 1, :] += (Hww[i] * arr[2i + 1, :] + Hvw[i] * arr[2i, :]) / denom[i]
+    end
+
+    return prod
+end
+
+function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
+    if !cone.hess_inv_hess_updated
+        update_hess_inv_hess(cone) # TODO needed?
+    end
+
+    u = cone.point[1]
+    v_idxs = cone.v_idxs
+    w_idxs = cone.w_idxs
+    point = cone.point
+    @views v = point[v_idxs]
+    @views w = point[w_idxs]
+
+    # schur = 2 * sum(inv(abs2(u + )))
+    # all(u * (1 .+ log.(v / u)) + w .> 0)
+    schur = cone.Huu
+    for i in 1:cone.w_dim
+        a = [cone.Hu[2i - 1], cone.Hu[2i]]
+        A = Symmetric([cone.Hvv[i] cone.Hvw[i]; cone.Hvw[i] cone.Hww[i]])
+        schur -= dot(a, A \ a) * (cone.denom[i]) ^ 3
+    end
+    # @show Matrix(cone.inv_hess)
+    # @show schur
+    @. @views prod[1, :] = sqrt(schur) * arr[1, :]
+
+    for (j, oj) in enumerate(cone.Hvw)
+        # TODO cache these fields?
+        evj = cone.Hu[2j - 1]
+        ewj = cone.Hu[2j]
+        # rtd1j = sqrt(cone.diag[2j - 1])
+        rtd1j = sqrt(cone.Hvv[j])
+        rtdetj = sqrt(cone.detdiag[j])
+        ortd1j = oj / rtd1j
+        side1j = evj / rtd1j
+        side2j = (ewj * rtd1j - evj * ortd1j) / rtdetj
+        rtdetd1j = rtdetj / rtd1j
+        # @show side1j, side2j, rtdetd1j, ortd1j, rtd1j
+        @. @views prod[2j, :] = side1j * arr[1, :] + rtd1j * arr[2j, :] + ortd1j * arr[2j + 1, :]
+        @. @views prod[2j + 1, :] = side2j * arr[1, :] + rtdetd1j * arr[2j + 1, :]
     end
 
     return prod
