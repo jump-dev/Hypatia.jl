@@ -346,15 +346,18 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
     @views v = point[v_idxs]
     @views w = point[w_idxs]
 
-    schur = cone.Huu
-    for i in 1:cone.w_dim
-        a = [cone.Hu[2i - 1], cone.Hu[2i]]
-        # Hu is already divided by denom, diagonal blocks are not
-        A = Symmetric([cone.Hvv[i] cone.Hvw[i]; cone.Hvw[i] cone.Hww[i]] ./ cone.denom[i])
-        schur -= dot(a, A \ a)
-    end
-    @show Matrix(cone.inv_hess)
-    @show schur
+    # schur = cone.Huu
+    # for i in 1:cone.w_dim
+    #     a = [cone.Hu[2i - 1], cone.Hu[2i]]
+    #     # Hu is already divided by denom, diagonal blocks are not
+    #     A = Symmetric([cone.Hvv[i] cone.Hvw[i]; cone.Hvw[i] cone.Hww[i]] ./ cone.denom[i])
+    #     schur -= dot(a, A \ a)
+    # end
+    # @show Matrix(cone.inv_hess)
+    # @show schur
+    # @show cone.denom
+    A = Matrix(cone.inv_hess)
+    schur = cone.Huu - dot(A[2:end, 1], A[2:end, 2:end] * A[2:end, 1])
     @. @views prod[1, :] = sqrt(schur) * arr[1, :]
 
     for (j, oj) in enumerate(cone.Hvw)
@@ -371,7 +374,12 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
         # @show side1j, side2j, rtdetd1j, ortd1j, rtd1j
         @. @views prod[2j, :] = side1j * arr[1, :] + rtd1j * arr[2j, :] + ortd1j * arr[2j + 1, :]
         @. @views prod[2j + 1, :] = side2j * arr[1, :] + rtdetd1j * arr[2j + 1, :]
+
+        # @. @views prod[2j, :] *= sqrt(cone.denom[j])
+        # @. @views prod[2j + 1, :] *= sqrt(cone.denom[j])
     end
+    # @show prod
+    @show prod ./ cholesky(Matrix(cone.inv_hess)).L
 
     return prod
 end
