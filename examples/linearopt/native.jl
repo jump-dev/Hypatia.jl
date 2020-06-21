@@ -20,10 +20,10 @@ example_tests(::Type{<:LinearOptNative{<:Real}}, ::MinimalInstances) = [
     ((2, 4, 0.5),),
     ]
 example_tests(::Type{LinearOptNative{Float64}}, ::FastInstances) = [
-    ((15, 20, 1.0),),
+    # ((15, 20, 1.0),),
     ((15, 20, 0.25),),
-    ((50, 100, 1.0),),
-    ((50, 100, 0.15),),
+    # ((50, 100, 1.0),),
+    # ((50, 100, 0.15),),
     ]
 example_tests(::Type{LinearOptNative{Float64}}, ::SlowInstances) = [
     ((500, 1000, 0.05),),

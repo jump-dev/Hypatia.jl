@@ -206,14 +206,15 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     update_lhs(solver.system_solver, solver)
 
-    # use_corr = true
-    use_corr = false
+    use_corr = true
+    # use_corr = false
 
-    if all(Cones.in_neighborhood.(cones, solver.mu, T(0.02)))
+    # TODO if use NT, only need nonsymm cones in nbhd
+    if all(Cones.in_neighborhood.(cones, solver.mu, T(0.04)))
         # predict
         # println("pred")
         update_rhs_pred(stepper, solver)
-        # if solver.mu > 1e-5
+        # if use_corr && solver.mu > 1e-7
         if use_corr
             get_directions(stepper, solver, iter_ref_steps = 3)
             update_rhs_predcorr(stepper, solver)
@@ -223,7 +224,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     else
         # center
         update_rhs_cent(stepper, solver)
-        # if solver.mu > 1e-5
+        # if use_corr && solver.mu > 1e-7
         if use_corr
             get_directions(stepper, solver, iter_ref_steps = 3)
             update_rhs_centcorr(stepper, solver)
@@ -516,9 +517,9 @@ function find_max_alpha(
     affine_phase::Bool; # TODO remove if not using
     prev_alpha::T,
     min_alpha::T,
-    min_nbhd::T = T(0.1),
+    min_nbhd::T = T(0.5),
     # max_nbhd::T = T(0.99),
-    max_nbhd::T = T(0.8),
+    max_nbhd::T = T(0.5),
     ) where {T <: Real}
     cones = solver.model.cones
     cone_times = stepper.cone_times

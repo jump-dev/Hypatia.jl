@@ -17,8 +17,8 @@ default_solver_options = (
     verbose = true,
     iter_limit = 100,
     timer = timer,
-    system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
-    # system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
+    # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
+    system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
@@ -26,29 +26,29 @@ instance_sets = [
     # (MinimalInstances, Float64, 15),
     # (MinimalInstances, Float32, 15),
     # (MinimalInstances, BigFloat, 60),
-    (FastInstances, Float64, 15),
+    (FastInstances, Float64, 60),
     # (FastInstances, Float64, 15),
     # (SlowInstances, Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
-    "JuMP",
+    "native",
+    # "JuMP",
     ]
 
 # list of names of native examples to run
 native_example_names = [
-    # "densityest",
-    # "envelope",
-    # "expdesign",
-    # "linearopt",
-    # "matrixcompletion",
-    # "matrixregression",
-    # "maxvolume",
-    # "polymin",
-    # "portfolio",
-    # "sparsepca",
+    "densityest",
+    "envelope",
+    "expdesign",
+    "linearopt",
+    "matrixcompletion",
+    "matrixregression",
+    "maxvolume",
+    "polymin",
+    "portfolio",
+    "sparsepca",
     ]
 
 # list of names of JuMP examples to run

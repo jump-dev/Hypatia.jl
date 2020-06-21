@@ -24,12 +24,12 @@ example_tests(::Type{<:SparsePCANative{<:Real}}, ::MinimalInstances) = [
     ((3, 2, false, 10, false),),
     ]
 example_tests(::Type{SparsePCANative{Float64}}, ::FastInstances) = [
-    ((5, 3, true, 0, false),),
-    ((5, 3, false, 0, false),),
-    ((5, 3, true, 10, false),),
-    ((5, 3, false, 10, false),),
-    ((30, 10, true, 0, false),),
-    ((30, 10, false, 0, false),),
+    # ((5, 3, true, 0, false),),
+    # ((5, 3, false, 0, false),),
+    # ((5, 3, true, 10, false),),
+    # ((5, 3, false, 10, false),),
+    # ((30, 10, true, 0, false),),
+    # ((30, 10, false, 0, false),),
     ((30, 10, true, 10, false),),
     ((30, 10, false, 10, false),),
     ]
