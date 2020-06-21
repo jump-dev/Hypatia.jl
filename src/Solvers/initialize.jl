@@ -27,7 +27,8 @@ function initialize_cone_point(cones::Vector{Cones.Cone{T}}, cone_idxs::Vector{U
         g = Cones.grad(cone_k)
         @. dual_k = -g
         if use_newton
-            @assert primal_k ≈ dual_k rtol=eps(T)^0.25 # TODO delete
+            @show norm(primal_k - dual_k)
+            # @assert primal_k ≈ dual_k rtol=eps(T)^0.25 # TODO delete
         end
         hasfield(typeof(cone_k), :hess_fact_cache) && @assert Cones.update_hess_fact(cone_k)
     end

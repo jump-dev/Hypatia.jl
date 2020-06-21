@@ -18,17 +18,17 @@ barrier_testfuns = [
     test_linmatrixineq_barrier,
     test_possemideftri_barrier,
     # test_possemideftrisparse_barrier,
-    # test_hypoperlogdettri_barrier,
+    test_hypoperlogdettri_barrier,
     test_hyporootdettri_barrier,
     test_wsosinterpnonnegative_barrier,
-    # test_wsosinterppossemideftri_barrier,
+    test_wsosinterppossemideftri_barrier,
     # test_wsosinterpepinormeucl_barrier,
     ]
 
 real_types = [
     Float64,
     # Float32,
-    # BigFloat,
+    BigFloat,
     ]
 
 @info("starting barrier tests")

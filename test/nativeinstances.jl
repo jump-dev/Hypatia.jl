@@ -1871,7 +1871,8 @@ end
 
 function wsosinterppossemideftri1(T; options...)
     # convexity parameter for (x + 1) ^ 2 * (x - 1) ^ 2
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
     fn = (x + 1) ^ 2 * (x - 1) ^ 2
@@ -1892,7 +1893,8 @@ end
 
 function wsosinterppossemideftri2(T; options...)
     # convexity parameter for x[1] ^ 4 - 3 * x[2] ^ 2
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(2), 1)
     DynamicPolynomials.@polyvar x[1:2]
     fn = x[1] ^ 4 - 3 * x[2] ^ 2
@@ -1917,7 +1919,8 @@ function wsosinterppossemideftri3(T; options...)
         return # too slow with BigFloat real types
     end
     # convexity parameter for sum(x .^ 6) - sum(x .^ 2)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(3), 2)
     DynamicPolynomials.@polyvar x[1:3]
     fn = sum(x .^ 4) - sum(x .^ 2)

@@ -150,22 +150,14 @@ function update_feas(cone::HypoPerLogdetTri)
 end
 
 function update_dual_feas(cone::HypoPerLogdetTri)
-    @assert !cone.feas_updated
     u = cone.dual_point[1]
     v = cone.dual_point[2]
-    side = cone.side
-
     if u < 0
-        svec_to_smat!(cone.dual_mat, view(cone.point, 3:cone.dim), cone.rt2)
+        svec_to_smat!(cone.dual_mat, view(cone.dual_point, 3:cone.dim), cone.rt2)
         dual_fact = cholesky!(Hermitian(cone.dual_mat, :U), check = false)
-        if isposdef(dual_fact)
-            return v > u * (logdet(Symmetric(W)) - side * log(-u) + side)
-        else
-            return false
-        end
-    else
-        return false
+        return isposdef(dual_fact) && (v > u * (logdet(dual_fact) - cone.side * log(-u) + cone.side))
     end
+    return false
 end
 
 function update_grad(cone::HypoPerLogdetTri)
@@ -174,8 +166,9 @@ function update_grad(cone::HypoPerLogdetTri)
     u = cone.point[1]
     v = cone.point[2]
 
-    copyto!(cone.Wi, cone.fact_mat.factors)
-    LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0))
+    # copyto!(cone.Wi, cone.fact_mat.factors)
+    # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0))
+    cone.Wi = inv(cone.fact_mat)
     cone.nLz = (cone.side - cone.ldWv) / z
     cone.ldWvuv = cone.ldWv - u / v
     cone.vzip1 = 1 + v / z
@@ -347,7 +340,7 @@ function correction2(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
     term4 = 2 * u_dir * term4a
 
     # Tvww contribution to w part of correction
-    term5a = (inv(z) + v * nLz / z) * (2 * v / z * dot_Wi_S * vec_Wi + vec_skron2)
+    term5a = (1 + v * nLz) / z * (2 * v / z * dot_Wi_S * vec_Wi + vec_skron2)
     term5 = 2 * v_dir * term5a
 
     uuw_scal = -2 * u_dir * v / z ^ 3

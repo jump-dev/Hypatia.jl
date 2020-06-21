@@ -118,8 +118,6 @@ end
 #     # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)
 #     rtmu = sqrt(solver.mu)
 #     irtmu = inv(rtmu)
-#     # @show irtmu
-#     # @assert irtmu >= one(T)
 #     Cones.load_point.(cones, point.primal_views)
 #     Cones.rescale_point.(cones, irtmu)
 #     Cones.load_dual_point.(cones, point.dual_views)
@@ -140,7 +138,7 @@ end
 #     get_directions(stepper, solver, iter_ref_steps = 3)
 #     # if solver.mu > 1e-5
 #     if use_corr
-#         update_rhs_centcorr(stepper, solver, one(T))
+#         update_rhs_centcorr(stepper, solver)
 #         get_directions(stepper, solver, iter_ref_steps = 3)
 #     end
 #     dir_cent = copy(stepper.dir)
@@ -151,7 +149,7 @@ end
 #     # if solver.mu > 1e-5
 #     if use_corr
 #         # update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha) # TODO
-#         update_rhs_predcorr(stepper, solver, one(T))
+#         update_rhs_predcorr(stepper, solver)
 #         get_directions(stepper, solver, iter_ref_steps = 3)
 #     end
 #
@@ -208,8 +206,8 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     update_lhs(solver.system_solver, solver)
 
-    use_corr = true
-    # use_corr = false
+    # use_corr = true
+    use_corr = false
 
     if all(Cones.in_neighborhood.(cones, solver.mu, T(0.02)))
         # predict
@@ -432,6 +430,7 @@ function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}; iter_ref
     res .-= rhs
     norm_inf = norm(res, Inf)
     norm_2 = norm(res, 2)
+    # @show res
 
     for i in 1:iter_ref_steps
         # @show norm_inf

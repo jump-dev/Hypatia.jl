@@ -24,7 +24,6 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     dual_feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
-    scal_hess_updated::Bool # pretend nt is scaling matrix for barrier tests, TODO remove
     nt_updated::Bool
     inv_hess_updated::Bool
     hess_sqrt_prod_updated::Bool
@@ -64,11 +63,9 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated =
-    cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = cone.nt_updated = cone.scal_hess_updated = false)
+reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = cone.nt_updated = false)
 
-use_scaling(::EpiPerSquare) = true # TODO update oracles
-# use_nt(::EpiPerSquare) = true
+# use_scaling(::EpiPerSquare) = true # TODO update oracles
 
 use_correction(cone::EpiPerSquare) = true
 
@@ -176,7 +173,7 @@ function update_scal_hess(cone::EpiPerSquare{T}, mu::T) where {T}
     end
     H[1, 2] -= 4
 
-    cone.scal_hess_updated = true
+    cone.hess_updated = true
     return cone.hess
 end
 
