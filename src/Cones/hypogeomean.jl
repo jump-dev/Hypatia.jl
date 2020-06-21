@@ -347,6 +347,7 @@ function correction2(cone::HypoGeomean{T}, primal_dir::AbstractVector{T}) where 
         t1 = u * pi / abs2(z) * sigma[i] * sigma[j] * sigma[k] * (1 - 2 * pi / z)
         if i == j
             t2 = pi * sigma[i] * sigma[k] / w[i] / z * (1 - pi / z)
+            # @show t2 * w_dir[1]^2
             if j == k
                 third[i1, i1, i1] = t1 + t2 - 2 * pi * tau[i] / w[i] * (u * tau[i] + inv(w[i])) - 2 / w[i] ^ 3
                 third_debug[i1, i1, i1] = t2
@@ -370,7 +371,7 @@ function correction2(cone::HypoGeomean{T}, primal_dir::AbstractVector{T}) where 
         # www_scal_ijk * abs2(dot(sigma, w_dir)) .* sigma # +
         # 2 * www_scal_iik * dot(sigma, w_dir) .* sigma ./ w .* w_dir
         # www_scal_iik * ((dim - 2) * dot(sigma ./ w, abs2.(w_dir)) .* sigma + 2 * dot(sigma, w_dir) .* sigma ./ w .* w_dir)
-        www_scal_iik * ((dim - 2) * dot(sigma ./ w, abs2.(w_dir)) .* sigma + 2 * dot(sigma, w_dir) .* sigma ./ w .* w_dir - abs2.(sigma) ./ w .* abs2.(w_dir)) # + # WRONG
+        www_scal_iik * (dot(sigma ./ w, abs2.(w_dir)) .* sigma + 2 * dot(sigma, w_dir) .* sigma ./ w .* w_dir - 2 * abs2.(sigma) ./ w .* abs2.(w_dir)) # + # WRONG
         # -2 * pi * tau ./ w .* (u * tau + inv.(w)) .* abs2.(w_dir) - 2 ./ w .^ 3 .* abs2.(w_dir) # correct
 
     corr_debug = reshape(reshape(third_debug, dim^2, dim) * primal_dir, dim, dim) * primal_dir
