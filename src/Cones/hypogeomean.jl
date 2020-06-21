@@ -279,6 +279,7 @@ function correction(
     return cone.correction
 end
 
+# TODO allocations, reuse fields from hess
 function correction2(cone::HypoGeomean{T}, primal_dir::AbstractVector{T}) where {T <: Real}
     if !cone.hess_updated
         update_hess(cone)
@@ -291,7 +292,6 @@ function correction2(cone::HypoGeomean{T}, primal_dir::AbstractVector{T}) where 
     alpha = cone.alpha
     piz = pi / z # TODO unused
     tau = alpha ./ w ./ z
-    alpha = cone.alpha
     corr = cone.correction
     corr .= 0
     u_dir = primal_dir[1]
@@ -300,28 +300,27 @@ function correction2(cone::HypoGeomean{T}, primal_dir::AbstractVector{T}) where 
     # Tuuu
     corr[1] = 2 / z ^ 3 * abs2(u_dir)
     # Tuuw
-    uuw_scal = -2 * pi / z / z * u_dir
+    uuw_scal = -2 * u_dir * piz / z
     corr[1] += uuw_scal * dot(tau, w_dir) * 2
     @. corr[2:end] += uuw_scal * u_dir * tau
 
     # Tuww
-    uww_scal_ii = pi / z
-    uww_scal_ij = pi * (2 * uww_scal_ii - 1)
-    corr[1] += uww_scal_ij * abs2(dot(tau, w_dir)) + uww_scal_ii * dot(tau ./ w, abs2.(w_dir))
-    corr[2:end] += 2 * u_dir * (uww_scal_ij .* tau * dot(tau, w_dir) + uww_scal_ii * tau ./ w .* w_dir)
+    uww_scal_ij = pi * (2 * piz - 1)
+    corr[1] += uww_scal_ij * abs2(dot(tau, w_dir)) + piz * dot(tau ./ w, abs2.(w_dir))
+    corr[2:end] += 2 * u_dir * tau .* (uww_scal_ij * dot(tau, w_dir) .+ piz ./ w .* w_dir)
 
     # Twww
     sigma = alpha ./ w
-    www_scal_ijk = u * pi / abs2(z) * (1 - 2 * pi / z)
-    www_scal_iik = pi / z * (1 - pi / z)
+    www_scal_ijk = u * pi / abs2(z) * (1 - 2 * piz)
+    www_scal_iik = piz * (1 - piz)
     corr[2:end] +=
         www_scal_ijk * abs2(dot(sigma, w_dir)) .* sigma +
         www_scal_iik * sigma .* (dot(sigma ./ w, abs2.(w_dir)) .+ 2 * (dot(sigma, w_dir) .* w_dir - sigma .* abs2.(w_dir)) ./ w) +
-        -2 * pi * tau ./ w .* (u * tau + inv.(w)) .* abs2.(w_dir) - 2 ./ w .^ 3 .* abs2.(w_dir)
+        -2 * (pi * tau .* (u * tau + inv.(w)) + inv.(w) ./ w) .* abs2.(w_dir) ./ w
 
     corr ./= -2
 
-    return cone.correction
+    return corr
 end
 
 
