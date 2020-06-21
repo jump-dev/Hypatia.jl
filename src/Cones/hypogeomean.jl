@@ -298,98 +298,29 @@ function correction2(cone::HypoGeomean{T}, primal_dir::AbstractVector{T}) where 
     u_dir = primal_dir[1]
     w_dir = view(primal_dir, 2:dim)
 
-    third = zeros(T, dim, dim, dim)
-    third_debug = zeros(T, dim, dim, dim)
     # Tuuu
-    third[1, 1, 1] = 2 / z ^ 3
-    third_debug[1, 1, 1] = 2 / z ^ 3
     corr[1] = 2 / z ^ 3 * abs2(u_dir)
     # Tuuw
-    for i in eachindex(w)
-        i1 = i + 1
-        third[1, 1, i1] = third[1, i1, 1] = third[i1, 1, 1] = -2 * tau[i] * pi / abs2(z)
-        # third_debug[1, 1, i1] = third_debug[1, i1, 1] = third_debug[i1, 1, 1] = -2 * tau[i] * pi / abs2(z)
-    end
     uuw_scal = -2 * pi / z / z * u_dir
     corr[1] += uuw_scal * dot(tau, w_dir) * 2
-    # @. corr[2:end] += uuw_scal * u_dir * tau # correct
-    # corr_debug = reshape(reshape(third_debug, dim^2, dim) * primal_dir, dim, dim) * primal_dir
-    # @show corr_debug[1] / corr[1]
-    # @show corr_debug[2:end] ./ corr[2:end]
+    @. corr[2:end] += uuw_scal * u_dir * tau
 
     # Tuww
-    for i in eachindex(w), j in eachindex(w)
-        (i1, j1) = (i + 1, j + 1)
-        t1 = pi * tau[i] * tau[j] * (2 * pi / z - 1)
-        if i == j
-            third[i1, i1, 1] = third[i1, 1, i1] = third[1, i1, i1] = t1 + tau[i] * pi / w[i] / z
-            # third_debug[i1, i1, 1] = third_debug[i1, 1, i1] = third_debug[1, i1, i1] = t1 + tau[i] * pi / w[i] / z
-        else
-            third[1, i1, j1] = third[1, j1, i1] = third[i1, 1, j1] = third[j1, 1, i1] =
-                third[i1, j1, 1] = third[j1, i1, 1] = t1
-            # third_debug[1, i1, j1] = third_debug[1, j1, i1] = third_debug[i1, 1, j1] = third_debug[j1, 1, i1] =
-                # third_debug[i1, j1, 1] = third_debug[j1, i1, 1] = t1
-        end
-    end
-
     uww_scal_ii = pi / z
     uww_scal_ij = pi * (2 * uww_scal_ii - 1)
     corr[1] += uww_scal_ij * abs2(dot(tau, w_dir)) + uww_scal_ii * dot(tau ./ w, abs2.(w_dir))
-    # corr[2:end] += 2 * u_dir * (uww_scal_ij .* tau * dot(tau, w_dir) + uww_scal_ii * tau ./ w .* w_dir) # correct
-    # corr_debug = reshape(reshape(third_debug, dim^2, dim) * primal_dir, dim, dim) * primal_dir
-    # @show corr_debug[1] / corr[1]
-    # @show corr_debug[2:end] ./ corr[2:end]
+    corr[2:end] += 2 * u_dir * (uww_scal_ij .* tau * dot(tau, w_dir) + uww_scal_ii * tau ./ w .* w_dir)
 
     # Twww
     sigma = alpha ./ w
-    for i in eachindex(w), j in eachindex(w), k in eachindex(w)
-        (i1, j1, k1) = (i + 1, j + 1, k + 1)
-        t1 = u * pi / abs2(z) * sigma[i] * sigma[j] * sigma[k] * (1 - 2 * pi / z)
-        if i == j
-            t2 = pi * sigma[i] * sigma[k] / w[i] / z * (1 - pi / z)
-            # @show t2 * w_dir[1]^2
-            if j == k
-                third[i1, i1, i1] = t1 + t2 - 2 * pi * tau[i] / w[i] * (u * tau[i] + inv(w[i])) - 2 / w[i] ^ 3
-                third_debug[i1, i1, i1] = t2
-                # t1 # + t2 - 2 * pi * tau[i] / w[i] * (u * tau[i] + inv(w[i])) - 2 / w[i] ^ 3
-            else
-                third[i1, i1, k1] = third[i1, k1, i1] = third[k1, i1, i1] = t1 + t2
-                third_debug[i1, i1, k1] = third_debug[i1, k1, i1] = third_debug[k1, i1, i1] = t2
-                # t1 # + t2
-            end
-        elseif i != k && j != k
-            third[i1, j1, k1] = third[i1, k1, j1] = third[j1, i1, k1] = third[j1, k1, i1] =
-                third[k1, i1, j1] = third[k1, j1, i1] = t1
-            # third_debug[i1, j1, k1] = third_debug[i1, k1, j1] = third_debug[j1, i1, k1] = third_debug[j1, k1, i1] =
-            #     third_debug[k1, i1, j1] = third_debug[k1, j1, i1] = t1
-        end
-    end
     www_scal_ijk = u * pi / abs2(z) * (1 - 2 * pi / z)
-    # www_scal_iik = pi * sigma[i] * sigma[k] / w[i] / z * (1 - pi / z)
     www_scal_iik = pi / z * (1 - pi / z)
     corr[2:end] +=
-        # www_scal_ijk * abs2(dot(sigma, w_dir)) .* sigma # +
-        # 2 * www_scal_iik * dot(sigma, w_dir) .* sigma ./ w .* w_dir
-        # www_scal_iik * ((dim - 2) * dot(sigma ./ w, abs2.(w_dir)) .* sigma + 2 * dot(sigma, w_dir) .* sigma ./ w .* w_dir)
-        www_scal_iik * (dot(sigma ./ w, abs2.(w_dir)) .* sigma + 2 * dot(sigma, w_dir) .* sigma ./ w .* w_dir - 2 * abs2.(sigma) ./ w .* abs2.(w_dir)) # + # WRONG
-        # -2 * pi * tau ./ w .* (u * tau + inv.(w)) .* abs2.(w_dir) - 2 ./ w .^ 3 .* abs2.(w_dir) # correct
+        www_scal_ijk * abs2(dot(sigma, w_dir)) .* sigma +
+        www_scal_iik * (dot(sigma ./ w, abs2.(w_dir)) .* sigma + 2 * dot(sigma, w_dir) .* sigma ./ w .* w_dir - 2 * abs2.(sigma) ./ w .* abs2.(w_dir)) +
+        -2 * pi * tau ./ w .* (u * tau + inv.(w)) .* abs2.(w_dir) - 2 ./ w .^ 3 .* abs2.(w_dir)
 
-    corr_debug = reshape(reshape(third_debug, dim^2, dim) * primal_dir, dim, dim) * primal_dir
-    # @show corr_debug[1] / corr[1]
-    @show corr_debug[2:end] ./ corr[2:end]
-
-    third_order = reshape(third, dim ^ 2, dim)
-
-    # function barrier(s)
-    #     (u, w) = (s[1], s[2:end])
-    #     return -log(prod(w[j] ^ alpha[j] for j in eachindex(w)) - u) - sum(log(wi) for wi in w)
-    # end
-    # FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), cone.point)
-    # @show (third_order - FD_3deriv)
-
-    # @show reshape(third_order * primal_dir, dim, dim) * primal_dir ./ corr
-    cone.correction = reshape(third_order * primal_dir, dim, dim) * primal_dir
-    cone.correction ./= -2
+    corr ./= -2
 
     return cone.correction
 end
