@@ -334,68 +334,11 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
     return prod
 end
 
-function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
-    if !cone.hess_inv_hess_updated
-        update_hess_inv_hess(cone) # TODO needed?
-    end
-
-    u = cone.point[1]
-    v_idxs = cone.v_idxs
-    w_idxs = cone.w_idxs
-    point = cone.point
-    @views v = point[v_idxs]
-    @views w = point[w_idxs]
-
-    # schur = cone.Huu
-    # for i in 1:cone.w_dim
-    #     a = [cone.Hu[2i - 1], cone.Hu[2i]]
-    #     # Hu is already divided by denom, diagonal blocks are not
-    #     A = Symmetric([cone.Hvv[i] cone.Hvw[i]; cone.Hvw[i] cone.Hww[i]] ./ cone.denom[i])
-    #     schur -= dot(a, A \ a)
-    # end
-    # @show Matrix(cone.inv_hess)
-    # @show schur
-    # @show cone.denom
-    # A = Matrix(cone.inv_hess)
-    # schur = cone.Huu - dot(A[2:end, 1], A[2:end, 2:end] * A[2:end, 1])
-    # @show dot(A[2:end, 1], A[2:end, 2:end] * A[2:end, 1])
-    schur = cone.Huu
-    @. @views prod[1, :] = sqrt(schur) * arr[1, :]
-
-    for (j, oj) in enumerate(cone.Hvw)
-        # TODO cache these fields?
-        evj = cone.Hu[2j - 1]
-        ewj = cone.Hu[2j]
-        # rtd1j = sqrt(cone.diag[2j - 1])
-        rtd1j = sqrt(cone.Hvv[j] / cone.denom[j])
-        rtdetj = sqrt(cone.detdiag[j])
-        ortd1j = oj / rtd1j
-        side1j = evj / rtd1j
-        side2j = (ewj * rtd1j - evj * ortd1j) / rtdetj
-        rtdetd1j = rtdetj / rtd1j
-        # @show side1j, side2j, rtdetd1j, ortd1j, rtd1j
-        @. @views prod[2j, :] = side1j * arr[1, :] + rtd1j * arr[2j, :] + ortd1j * arr[2j + 1, :]
-        @. @views prod[2j + 1, :] = side2j * arr[1, :] + rtdetd1j * arr[2j + 1, :]
-
-        # @. @views prod[2j, :] *= sqrt(cone.denom[j])
-        # @. @views prod[2j + 1, :] *= sqrt(cone.denom[j])
-    end
-    # @show prod
-    @show prod ./ cholesky(Matrix(cone.inv_hess)).L
-
-    return prod
-end
-
-# function correction(
-#     cone::EpiSumPerEntropy{T},
-#     primal_dir::AbstractVector{T},
-#     dual_dir::AbstractVector{T},
-#     ) where {T <: Real}
-#     @assert cone.hess_updated
-#     tau = cone.tau
-#     sigma = cone.sigma
-#     z = cone.z
-#     w_dim = cone.w_dim
+# function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
+#     if !cone.hess_inv_hess_updated
+#         update_hess_inv_hess(cone) # TODO needed?
+#     end
+#
 #     u = cone.point[1]
 #     v_idxs = cone.v_idxs
 #     w_idxs = cone.w_idxs
@@ -403,116 +346,44 @@ end
 #     @views v = point[v_idxs]
 #     @views w = point[w_idxs]
 #
-#     third = zeros(T, cone.dim, cone.dim, cone.dim)
+#     # schur = cone.Huu
+#     # for i in 1:cone.w_dim
+#     #     a = [cone.Hu[2i - 1], cone.Hu[2i]]
+#     #     # Hu is already divided by denom, diagonal blocks are not
+#     #     A = Symmetric([cone.Hvv[i] cone.Hvw[i]; cone.Hvw[i] cone.Hww[i]] ./ cone.denom[i])
+#     #     schur -= dot(a, A \ a)
+#     # end
+#     # @show Matrix(cone.inv_hess)
+#     # @show schur
+#     # @show cone.denom
+#     # A = Matrix(cone.inv_hess)
+#     # schur = cone.Huu - dot(A[2:end, 1], A[2:end, 2:end] * A[2:end, 1])
+#     # @show dot(A[2:end, 1], A[2:end, 2:end] * A[2:end, 1])
+#     schur = cone.Huu
+#     @. @views prod[1, :] = sqrt(schur) * arr[1, :]
 #
-#     # Tuuu
-#     third[1, 1, 1] = -2 / z ^ 3
-#     # Tuuv
-#     third[1, 1, v_idxs] = third[1, v_idxs, 1] = third[v_idxs, 1, 1] = -2 * sigma / abs2(z)
-#     # Tuuw
-#     third[1, 1, w_idxs] = third[1, w_idxs, 1] = third[w_idxs, 1, 1] = -2 * tau / abs2(z)
-#     # Tuvv
-#     third[1, v_idxs, v_idxs] = third[v_idxs, 1, v_idxs] = third[v_idxs, v_idxs, 1] = -2 * sigma * sigma' / z - Diagonal(sigma ./ v / z)
-#     # Tuvw
-#     third[1, v_idxs, w_idxs] = third[v_idxs, 1, w_idxs] = third[v_idxs, w_idxs, 1] =
-#         -2 * sigma * tau' / z + Diagonal(inv.(v) / abs2(z))
-#     third[1, w_idxs, v_idxs] = third[w_idxs, 1, v_idxs] = third[w_idxs, v_idxs, 1] =
-#         -2 * tau * sigma' / z + Diagonal(inv.(v) / abs2(z))
-#     # Tuww
-#     third[1, w_idxs, w_idxs] = third[w_idxs, 1, w_idxs] = third[w_idxs, w_idxs, 1] = -2 * tau * tau' / z - Diagonal(inv.(w) / abs2(z))
-#     # Tvvv
-#     for i in 1:w_dim, j in 1:w_dim, k in 1:w_dim
-#         (ti, tj, tk) = (v_idxs[i], v_idxs[j], v_idxs[k])
-#         t1 = -2 * sigma[i] * sigma[j] * sigma[k]
-#         if i == j
-#             t2 = -sigma[i] * sigma[k] / v[i]
-#             if j == k
-#                 third[ti, ti, ti] = t1 + 3 * t2 - 2 * sigma[i] / abs2(v[i]) - 2 / v[i] ^ 3
-#             else
-#                 third[ti, ti, tk] = third[ti, tk, ti] = third[tk, ti, ti] = t1 + t2
-#             end
-#         elseif i != k && j != k
-#             third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
-#                 third[tk, ti, tj] = third[tk, tj, ti] = t1
-#         end
+#     for (j, oj) in enumerate(cone.Hvw)
+#         # TODO cache these fields?
+#         evj = cone.Hu[2j - 1]
+#         ewj = cone.Hu[2j]
+#         # rtd1j = sqrt(cone.diag[2j - 1])
+#         rtd1j = sqrt(cone.Hvv[j] / cone.denom[j])
+#         rtdetj = sqrt(cone.detdiag[j])
+#         ortd1j = oj / rtd1j
+#         side1j = evj / rtd1j
+#         side2j = (ewj * rtd1j - evj * ortd1j) / rtdetj
+#         rtdetd1j = rtdetj / rtd1j
+#         # @show side1j, side2j, rtdetd1j, ortd1j, rtd1j
+#         @. @views prod[2j, :] = side1j * arr[1, :] + rtd1j * arr[2j, :] + ortd1j * arr[2j + 1, :]
+#         @. @views prod[2j + 1, :] = side2j * arr[1, :] + rtdetd1j * arr[2j + 1, :]
+#
+#         # @. @views prod[2j, :] *= sqrt(cone.denom[j])
+#         # @. @views prod[2j + 1, :] *= sqrt(cone.denom[j])
 #     end
-#     # Tvvw
-#     for i in 1:w_dim, j in 1:w_dim, k in 1:w_dim
-#         # note that the offset for w is not the same as the offset for the vs, so even if i = k, ti != tk, so we make sure to account for that
-#         (ti, tj, tk) = (v_idxs[i], v_idxs[j], w_idxs[k])
-#         t1 = -2 * sigma[i] * sigma[j] * tau[k]
-#         if i == j
-#             t2 = -sigma[i] * tau[k] / v[i]
-#             if j == k
-#                 # vi vi wi
-#                 third[ti, ti, tk] = third[ti, tk, ti] = third[tk, ti, ti] = t1 + t2 + 2 * sigma[i] / v[i] / z + inv(abs2(v[i])) / z
-#             else
-#                 # vi vi wk
-#                 third[ti, ti, tk] = third[ti, tk, ti] = third[tk, ti, ti] = t1 + t2
-#             end
-#         elseif i == k
-#             # vi vj wj, symmetric to vi vj wi
-#             third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
-#                 third[tk, ti, tj] = third[tk, tj, ti] = t1 + sigma[j] / v[i] / z
-#         elseif j != k
-#             # vi vj wk
-#             third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
-#                 third[tk, ti, tj] = third[tk, tj, ti] = t1
-#         end
-#     end
-#     # Tvww
-#     for i in 1:w_dim, j in 1:w_dim, k in 1:w_dim
-#         # note that the offset for v is not the same as the offset for the ws, so even if i = k, ti != tk, so we make sure to account for that
-#         (ti, tj, tk) = (v_idxs[i], w_idxs[j], w_idxs[k])
-#         t1 = -2 * sigma[i] * tau[j] * tau[k]
-#         if j == k
-#             if i == j
-#                 # vi wi wi
-#                 third[ti, tj, tj] = third[tj, ti, tj] = third[tj, tj, ti] = t1 + 2 * tau[i] / z / v[i] - 1 / v[i] / abs2(z)
-#             else
-#                 # vi wj wj
-#                 third[ti, tj, tj] = third[tj, ti, tj] = third[tj, tj, ti] = t1 - sigma[i] / w[j] / z
-#             end
-#         elseif i == j
-#             # vi wi wk, symmetric to vi wj wi
-#             third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
-#                 third[tk, ti, tj] = third[tk, tj, ti] = t1 + tau[k] / z / v[i]
-#         elseif i != k
-#             # vi wj wk
-#             third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
-#                 third[tk, ti, tj] = third[tk, tj, ti] = t1
-#         end
-#     end
-#     # Twww
-#     for i in 1:w_dim, j in 1:w_dim, k in 1:w_dim
-#         (ti, tj, tk) = (w_idxs[i], w_idxs[j], w_idxs[k])
-#         t1 = -2 * tau[i] * tau[j] * tau[k]
-#         if i == j
-#             t2 = -tau[k] / w[i] / z
-#             if j == k
-#                 third[ti, ti, ti] = t1 + 3 * t2 - abs2(inv(w[i])) / z - 2 / w[i] ^ 3
-#             else
-#                 third[ti, ti, tk] = third[ti, tk, ti] = third[tk, ti, ti] = t1 + t2
-#             end
-#         elseif i != k && j != k
-#             third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
-#                 third[tk, ti, tj] = third[tk, tj, ti] = t1
-#         end
-#     end
+#     # @show prod
+#     @show prod ./ cholesky(Matrix(cone.inv_hess)).L
 #
-#     third_order = reshape(third, cone.dim^2, cone.dim)
-#
-#     # barrier = cone.barrier
-#     # FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), cone.point)
-#     # @show norm(third_order - FD_3deriv)
-#     # Hi_z = cone.old_hess \ dual_dir
-#     Hi_z = similar(dual_dir)
-#     inv_hess_prod!(Hi_z, dual_dir, cone)
-#
-#     Hi_z .*= -T(0.5)
-#     cone.correction .= reshape(third_order * primal_dir, cone.dim, cone.dim) * Hi_z
-#
-#     return cone.correction
+#     return prod
 # end
 
 function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) where {T <: Real}

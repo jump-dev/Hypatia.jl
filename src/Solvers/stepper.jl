@@ -151,7 +151,7 @@ end
 #         get_directions(stepper, solver, iter_ref_steps = 3)
 #     end
 #
-#     max_nbhd = T(0.4) # TODO tune
+#     max_nbhd = T(0.7) # TODO tune
 #
 #     # gamma and combined direction
 #     stepper.prev_aff_alpha = aff_alpha = find_max_alpha(stepper, solver, true, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2), max_nbhd = max_nbhd)
@@ -304,9 +304,16 @@ function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}) whe
         if Cones.use_correction(cone_k)
             # TODO avoid allocs
             prim_dir_k = stepper.primal_dir_k[k]
-            stepper.s_rhs_k[k] .+= Cones.hess_prod!(similar(prim_dir_k), prim_dir_k, cone_k)
+            H_prim_dir_k = Cones.hess_prod!(similar(prim_dir_k), prim_dir_k, cone_k)
             prim_k_scal = irtrtmu * prim_dir_k
-            stepper.s_rhs_k[k] .+= Cones.correction2(cone_k, prim_k_scal)
+            corr_k = Cones.correction2(cone_k, prim_k_scal)
+            corr_point = dot(corr_k, cone_k.point)
+            corr_viol = abs(1 - irtrtmu * dot(prim_k_scal, H_prim_dir_k) / corr_point)
+            if (corr_point < eps(T)) || (corr_viol < 0.1)
+                @. stepper.s_rhs_k[k] += H_prim_dir_k + corr_k
+            else
+                println("skip pred-corr: $corr_viol")
+            end
         end
     end
 
@@ -363,7 +370,15 @@ function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}) whe
             # TODO avoid allocs
             prim_dir_k = stepper.primal_dir_k[k]
             prim_k_scal = irtrtmu * prim_dir_k
-            stepper.s_rhs_k[k] .+= Cones.correction2(cone_k, prim_k_scal)
+            H_prim_dir_k_scal = Cones.hess_prod!(similar(prim_dir_k), prim_k_scal, cone_k)
+            corr_k = Cones.correction2(cone_k, prim_k_scal)
+            corr_point = dot(corr_k, cone_k.point)
+            corr_viol = abs(1 - dot(prim_k_scal, H_prim_dir_k_scal) / corr_point)
+            if (corr_point < eps(T)) || (corr_viol < 0.1)
+                stepper.s_rhs_k[k] .+= corr_k
+            else
+                println("skip cent-corr: $corr_viol")
+            end
         end
     end
 

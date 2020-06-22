@@ -17,7 +17,7 @@ include(joinpath(@__DIR__, "nativesets.jl"))
 all_reals = [
     Float64,
     # Float32,
-    BigFloat,
+    # BigFloat,
     ]
 default_reals = [
     Float64,
@@ -88,7 +88,7 @@ reduce_flags = [
 
 # other solver options
 timer = TimerOutput()
-tol = 1e-6
+tol = 1e-7
 other_options = (
     verbose = true,
     # verbose = false,
