@@ -38,67 +38,63 @@ function test_barrier_oracles(
     @test cone.point == point
     @test cone.dual_point == dual_point
 
-    # TODO adapt now that we have newton for initial point
-    # if isfinite(init_tol)
-    #     # tests for centrality of initial point
-    #     minus_grad = -CO.grad(cone)
-    #     @test dot(point, minus_grad) ≈ norm(point) * norm(minus_grad) atol=init_tol rtol=init_tol
-    #     @test point ≈ minus_grad atol=init_tol rtol=init_tol
-    #     @test CO.in_neighborhood(cone, one(T), T(eps(T)^0.2))
-    # else
-        # use newton to get better initial point
-        point = CO.set_central_point(cone)
-        dual_point = copy(point)
-        @test load_reset_check(cone, point, dual_point)
-        @test CO.in_neighborhood(cone, one(T), sqrt(sqrt(T(eps(T)))))
-    # end
-    init_only && return
-
-    # perturb and scale the initial point and check feasible
-    perturb_scale(point, dual_point, noise, one(T))
-    @test load_reset_check(cone, point, dual_point)
-    # @test CO.in_neighborhood(cone, one(T), one(T))
+    # # TODO adapt now that we have newton for initial point
+    # # if isfinite(init_tol)
+    # #     # tests for centrality of initial point
+    # #     minus_grad = -CO.grad(cone)
+    # #     @test dot(point, minus_grad) ≈ norm(point) * norm(minus_grad) atol=init_tol rtol=init_tol
+    # #     @test point ≈ minus_grad atol=init_tol rtol=init_tol
+    # #     @test CO.in_neighborhood(cone, one(T), T(eps(T)^0.2))
+    # # else
+    #     # use newton to get better initial point
+    #     point = CO.set_central_point(cone)
+    #     dual_point = copy(point)
+    #     @test load_reset_check(cone, point, dual_point)
+    #     @test CO.in_neighborhood(cone, one(T), sqrt(sqrt(T(eps(T)))))
+    # # end
+    # init_only && return
+    #
+    # # perturb and scale the initial point and check feasible
+    # perturb_scale(point, dual_point, noise, one(T))
+    # @test load_reset_check(cone, point, dual_point)
+    # # @test CO.in_neighborhood(cone, one(T), one(T))
 
     # test gradient and Hessian oracles
     perturb_scale(point, dual_point, noise, scale)
     @test load_reset_check(cone, point, dual_point)
-    test_grad_hess(cone, point, dual_point, tol = tol)
+    # test_grad_hess(cone, point, dual_point, tol = tol)
 
     # check gradient and Hessian agree with ForwardDiff
     CO.reset_data(cone)
     @test CO.is_feas(cone)
     grad = CO.grad(cone)
     hess = CO.hess(cone)
-    if dim < 13 # too slow if dimension is large
-        println("starting ForwardDiff tests: $dim")
-        println("start grad")
-        fd_grad = ForwardDiff.gradient(barrier, point)
-        @test grad ≈ fd_grad atol=tol rtol=tol
-        println("done grad")
-        fd_hess = ForwardDiff.hessian(barrier, point)
-        if !CO.use_scaling(cone)
-            @test hess ≈ fd_hess atol=tol rtol=tol
-            println("done hess")
-        end
-    end
+    # if dim < 13 # too slow if dimension is large
+    #     println("starting ForwardDiff tests: $dim")
+    #     println("start grad")
+    #     fd_grad = ForwardDiff.gradient(barrier, point)
+    #     @test grad ≈ fd_grad atol=tol rtol=tol
+    #     println("done grad")
+    #     fd_hess = ForwardDiff.hessian(barrier, point)
+    #     if !CO.use_scaling(cone)
+    #         @test hess ≈ fd_hess atol=tol rtol=tol
+    #         println("done hess")
+    #     end
+    # end
 
     # check 3rd order corrector agrees with ForwardDiff
     # too slow if cone is too large or not using BlasReals
     if CO.use_correction(cone)
         println("starting correction tests: $dim")
-        if cone isa CO.HypoPerLog{T} && dim > 3
-            return # TODO fix corrector for larger dim
-        end
         # check correction satisfies log-homog property F'''(s)[s, s] = -2F''(s) * s = 2F'(s)
         @test -CO.correction2(cone, point) ≈ grad atol=tol rtol=tol # TODO delete third arg
         # check correction term agrees with directional 3rd derivative
         (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
         corr = CO.correction2(cone, primal_dir)
         @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
-        if dim < 5 && T in (Float32, Float64)
-            println("starting fd 3o")
+        if dim < 8 && T in (Float32, Float64)
+            # println("starting fd 3o")
             FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
-            println("done fd 3o")
             # check log-homog property that F'''(s)[s] = -2F''(s)
             @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess atol=tol rtol=tol
             FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
@@ -173,21 +169,21 @@ function test_nonnegative_barrier(T::Type{<:Real})
 end
 
 function test_epinorminf_barrier(T::Type{<:Real})
-    for n in [1, 2, 3, 5]
-        # real epinorminf cone
-        function R_barrier(s)
-            (u, w) = (s[1], s[2:end])
-            return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (n - 1) * log(u)
-        end
-        test_barrier_oracles(CO.EpiNormInf{T, T}(1 + n), R_barrier)
-
-        # complex epinorminf cone
-        # function C_barrier(s)
-        #     (u, wr) = (s[1], s[2:end])
-        #     w = CO.rvec_to_cvec!(zeros(Complex{eltype(s)}, n), wr)
+    for n in [1, 2, ]#3, 5]
+        # # real epinorminf cone
+        # function R_barrier(s)
+        #     (u, w) = (s[1], s[2:end])
         #     return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (n - 1) * log(u)
         # end
-        # test_barrier_oracles(CO.EpiNormInf{T, Complex{T}}(1 + 2n), C_barrier)
+        # test_barrier_oracles(CO.EpiNormInf{T, T}(1 + n), R_barrier)
+
+        # complex epinorminf cone
+        function C_barrier(s)
+            (u, wr) = (s[1], s[2:end])
+            w = CO.rvec_to_cvec!(zeros(Complex{eltype(s)}, n), wr)
+            return -sum(log(abs2(u) - abs2(wj)) for wj in w) + (n - 1) * log(u)
+        end
+        test_barrier_oracles(CO.EpiNormInf{T, Complex{T}}(1 + 2n), C_barrier)
     end
     return
 end

@@ -314,7 +314,6 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ep
     if !cone.hess_inv_hess_updated
         update_hess_inv_hess(cone) # TODO needed?
     end
-    @. cone.rtdiag = sqrt(cone.diag) # TODO update
 
     @. @views prod[1, :] = sqrt(cone.schur) * arr[1, :]
     if cone.is_complex
@@ -332,6 +331,7 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ep
             @. @views prod[2j + 1, :] = side2j * arr[1, :] + rtdetd1j * arr[2j + 1, :]
         end
     else
+        @. cone.rtdiag = sqrt(cone.diag) # TODO update
         @. @views prod[2:end, :] = cone.edge / cone.rtdiag * arr[1, :]'
         @. @views prod[2:end, :] += cone.rtdiag * arr[2:end, :]
     end
@@ -344,7 +344,6 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
     if !cone.hess_inv_hess_updated
         update_hess_inv_hess(cone) # TODO needed?
     end
-    @. cone.rtdiag = sqrt(cone.diag) # TODO update
 
     @. @views prod[1, :] = arr[1, :]
     @views mul!(prod[1, :], arr[2:end, :]', cone.invedge, true, true)
@@ -360,6 +359,7 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
             @. @views prod[2j + 1, :] = arr[2j + 1, :] / rtd2j
         end
     else
+        @. cone.rtdiag = sqrt(cone.diag) # TODO update
         @. @views prod[2:end, :] = arr[2:end, :] / cone.rtdiag
     end
 
@@ -392,18 +392,18 @@ end
 #     end
 #
 #     # third order derivative multiplied by s
-#     u_dir = primal_dir[1]
+#     udir = primal_dir[1]
 #     Hiz1 = Hinv_z[1]
 #     corr = cone.correction
-#     @views corr1 = (uuu * u_dir + dot(uuw, primal_dir[2:end])) * Hiz1
+#     @views corr1 = (uuu * udir + dot(uuw, primal_dir[2:end])) * Hiz1
 #     for i in 1:cone.n
 #         j = i + 1
 #         Hizj = Hinv_z[j]
-#         pdj = primal_dir[j]
+#         wdi = primal_dir[j]
 #         uwwi = uww[i]
-#         edgei = uuw[i] * u_dir + uwwi * pdj
+#         edgei = uuw[i] * udir + uwwi * wdi
 #         corr1 += edgei * Hizj
-#         corr[j] = edgei * Hiz1 + (uwwi * u_dir + www[i] * pdj) * Hizj
+#         corr[j] = edgei * Hiz1 + (uwwi * udir + www[i] * wdi) * Hizj
 #     end
 #     corr[1] = corr1
 #     @. corr /= -2
@@ -413,50 +413,53 @@ end
 
 # TODO complex
 # TODO in-place, inbounds
-function correction2(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T}
-    dim = cone.dim
-    point = cone.point
+function correction2(cone::EpiNormInf{T, R}, primal_dir::AbstractVector{T}) where {R <: RealOrComplex{T}} where {T <: Real}
     u = cone.point[1]
     w = cone.w
     den = cone.den
-
-    # third order derivatives
-    uuu = 4 * u * sum((3 - 4 * u / z * u) / z / z for z in den) + 2 * (cone.n - 1) / u / u / u
-    # TODO get below from cone.wden and cone.uden (can do with broadcast)
-    uuw = zeros(T, cone.n)
-    uww = zeros(T, cone.n)
-    www = zeros(T, cone.n)
-    for i in 1:cone.n
-        wi = w[i]
-        deni = den[i]
-        wideni4 = 4 * wi / deni
-        udeni4 = 4 * u / deni
-        www[i] = wideni4 * (3 + wideni4 * wi) / deni
-        uww[i] = -udeni4 * (1 + wideni4 * wi) / deni
-        uuw[i] = wideni4 * (-1 + udeni4 * u) / deni
+    wdim = cone.n
+    corr = cone.correction
+    udir = primal_dir[1]
+    @views wdir = primal_dir[2:end]
+    if cone.is_complex # TODO don't do
+        wdir = vec_copy_to!(zeros(R, wdim), wdir)
     end
 
-    # @show uuu
-    # @show extrema(abs, uuw)
-    # @show extrema(abs, uww)
-    # @show extrema(abs, www)
+    corr1 = 4 * u * udir * sum((3 - 4 * u / z * u) / z / z for z in den) * udir + 2 * (wdim - 1) * abs2(udir / u) / u
+    for i in 1:wdim
+        wi = w[i]
+        deni = den[i]
+        wdiri = wdir[i]
+        # TODO use stored values
+        wideni4 = 4 * wi / deni
+        udeni4 = 4 * u / deni
 
-    # third order derivative multiplied by s
-    u_dir = primal_dir[1]
-    corr = cone.correction
-    @views corr1 = (uuu * u_dir + dot(uuw, primal_dir[2:end])) * u_dir
-    for i in 1:cone.n
-        j = i + 1
-        pdj = primal_dir[j]
-        uwwi = uww[i]
-        edgei = uuw[i] * u_dir + uwwi * pdj
-        corr1 += edgei * pdj
-        corr[j] = edgei * u_dir + (uwwi * u_dir + www[i] * pdj) * pdj
+        suuw = udir * (-1 + udeni4 * u) / deni
+        uuwre = suuw * real(wideni4)
+        uuwim = suuw * imag(wideni4)
+        corr1 += 2 * (uuwre * real(wdiri) + uuwim * imag(wdiri))
+        corr[2i] = uuwre * udir
+        corr[2i + 1] = uuwim * udir
+
+        uwwre = (1 + real(wideni4) * real(wi))
+        uwwim = (1 + imag(wideni4) * imag(wi))
+        suww = -udeni4 / deni
+        uwwrere = suww * uwwre * real(wdiri)
+        uwwimim = suww * uwwim * imag(wdiri)
+        uwwimre = suww * imag(wideni4) * real(wi)
+        corr1 += uwwrere * real(wdiri) + uwwimim * imag(wdiri) + 2 * uwwimre * imag(wdiri) * real(wdiri)
+        corr[2i] += 2 * udir * (uwwrere + uwwimre * imag(wdiri))
+        corr[2i + 1] += 2 * udir * (uwwimim + uwwimre * real(wdiri))
+
+        wwwrerere = real(wideni4) * (2 + uwwre)
+        wwwimimim = imag(wideni4) * (2 + uwwim)
+        wwwrereim = imag(wideni4) * uwwre * real(wdiri)
+        wwwimimre = real(wideni4) * uwwim * imag(wdiri)
+        corr[2i] += (real(wdiri)^2 * wwwrerere + imag(wdiri) * (2 * wwwrereim + wwwimimre)) / deni
+        corr[2i + 1] += (imag(wdiri)^2 * wwwimimim + real(wdiri) * (2 * wwwimimre + wwwrereim)) / deni
     end
     corr[1] = corr1
     @. corr /= -2
-
-    # @show extrema(abs, corr)
 
     return corr
 end

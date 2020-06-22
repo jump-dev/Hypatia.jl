@@ -38,8 +38,6 @@ mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     cone_times::Vector{Float64}
     cone_order::Vector{Int}
 
-    tkcorr::T # TODO delete
-
     CombinedStepper{T}() where {T <: Real} = new{T}()
 end
 
