@@ -366,97 +366,44 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
     return prod
 end
 
-# function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}, dual_dir::AbstractVector{T}) where {T}
-#     dim = cone.dim
-#     point = cone.point
-#     u = cone.point[1]
-#     w = cone.w
-#     den = cone.den
-#
-#     Hinv_z = inv_hess_prod!(similar(dual_dir), dual_dir, cone)
-#
-#     # third order derivatives
-#     uuu = 4 * u * sum((3 - 4 * u / z * u) / z / z for z in den) + 2 * (cone.n - 1) / u / u / u
-#     # TODO get below from cone.wden and cone.uden (can do with broadcast)
-#     uuw = zeros(T, cone.n)
-#     uww = zeros(T, cone.n)
-#     www = zeros(T, cone.n)
-#     for i in 1:cone.n
-#         wi = w[i]
-#         deni = den[i]
-#         wideni4 = 4 * wi / deni
-#         udeni4 = 4 * u / deni
-#         www[i] = wideni4 * (3 + wideni4 * wi) / deni
-#         uww[i] = -udeni4 * (1 + wideni4 * wi) / deni
-#         uuw[i] = wideni4 * (-1 + udeni4 * u) / deni
-#     end
-#
-#     # third order derivative multiplied by s
-#     udir = primal_dir[1]
-#     Hiz1 = Hinv_z[1]
-#     corr = cone.correction
-#     @views corr1 = (uuu * udir + dot(uuw, primal_dir[2:end])) * Hiz1
-#     for i in 1:cone.n
-#         j = i + 1
-#         Hizj = Hinv_z[j]
-#         wdi = primal_dir[j]
-#         uwwi = uww[i]
-#         edgei = uuw[i] * udir + uwwi * wdi
-#         corr1 += edgei * Hizj
-#         corr[j] = edgei * Hiz1 + (uwwi * udir + www[i] * wdi) * Hizj
-#     end
-#     corr[1] = corr1
-#     @. corr /= -2
-#
-#     return corr
-# end
-
-# TODO complex
-# TODO in-place, inbounds
 function correction2(cone::EpiNormInf{T, R}, primal_dir::AbstractVector{T}) where {R <: RealOrComplex{T}} where {T <: Real}
     u = cone.point[1]
-    w = cone.w
-    den = cone.den
-    wdim = cone.n
-    corr = cone.correction
     udir = primal_dir[1]
-    @views wdir = primal_dir[2:end]
-    if cone.is_complex # TODO don't do
-        wdir = vec_copy_to!(zeros(R, wdim), wdir)
-    end
+    corr = cone.correction
 
-    corr1 = 4 * u * udir * sum((3 - 4 * u / z * u) / z / z for z in den) * udir + 2 * (wdim - 1) * abs2(udir / u) / u
-    for i in 1:wdim
-        wi = w[i]
-        deni = den[i]
-        wdiri = wdir[i]
-        # TODO use stored values
-        wideni4 = 4 * wi / deni
-        udeni4 = 4 * u / deni
-
-        suuw = udir * (-1 + udeni4 * u) / deni
-        uuwre = suuw * real(wideni4)
-        uuwim = suuw * imag(wideni4)
-        corr1 += 2 * (uuwre * real(wdiri) + uuwim * imag(wdiri))
-        corr[2i] = uuwre * udir
-        corr[2i + 1] = uuwim * udir
-
-        uwwre = (1 + real(wideni4) * real(wi))
-        uwwim = (1 + imag(wideni4) * imag(wi))
-        suww = -udeni4 / deni
-        uwwrere = suww * uwwre * real(wdiri)
-        uwwimim = suww * uwwim * imag(wdiri)
-        uwwimre = suww * imag(wideni4) * real(wi)
-        corr1 += uwwrere * real(wdiri) + uwwimim * imag(wdiri) + 2 * uwwimre * imag(wdiri) * real(wdiri)
-        corr[2i] += 2 * udir * (uwwrere + uwwimre * imag(wdiri))
-        corr[2i + 1] += 2 * udir * (uwwimim + uwwimre * real(wdiri))
-
-        wwwrerere = real(wideni4) * (2 + uwwre)
-        wwwimimim = imag(wideni4) * (2 + uwwim)
-        wwwrereim = imag(wideni4) * uwwre * real(wdiri)
-        wwwimimre = real(wideni4) * uwwim * imag(wdiri)
-        corr[2i] += (real(wdiri)^2 * wwwrerere + imag(wdiri) * (2 * wwwrereim + wwwimimre)) / deni
-        corr[2i + 1] += (imag(wdiri)^2 * wwwimimim + real(wdiri) * (2 * wwwimimre + wwwrereim)) / deni
+    corr1 = 4 * u * udir * sum((3 - 4 * u / z * u) / z / z for z in cone.den) * udir + 2 * (cone.n - 1) * abs2(udir / u) / u
+    for i in 1:cone.n
+        deni = cone.den[i]
+        udeni = 2 * cone.uden[i]
+        suuw = udir * (-1 + udeni * u)
+        wi = cone.w[i]
+        wdeni = 2 * cone.wden[i]
+        if cone.is_complex
+            (wdenire, wdeniim) = reim(wdeni)
+            (wire, wiim) = reim(wi)
+            (dire, diim) = (primal_dir[2i], primal_dir[2i + 1])
+            uuwre = suuw * wdenire
+            uuwim = suuw * wdeniim
+            uwwre = 1 + wdenire * wire
+            uwwim = 1 + wdeniim * wiim
+            uwwrere = -udeni * uwwre * dire
+            uwwimim = -udeni * uwwim * diim
+            uwwimre = -udeni * wdeniim * wire
+            wwwrerere = wdenire * (2 + uwwre)
+            wwwimimim = wdeniim * (2 + uwwim)
+            wwwrereim = wdeniim * uwwre * dire
+            wwwimimre = wdenire * uwwim * diim
+            corr1 += (2 * (uuwre * dire + uuwim * diim) + uwwrere * dire + uwwimim * diim + 2 * uwwimre * diim * dire) / deni
+            corr[2i] = (udir * (2 * (uwwrere + uwwimre * diim) + uuwre) + (dire^2 * wwwrerere + diim * (2 * wwwrereim + wwwimimre))) / deni
+            corr[2i + 1] = (udir * (2 * (uwwimim + uwwimre * dire) + uuwim) + (diim^2 * wwwimimim + dire * (2 * wwwimimre + wwwrereim))) / deni
+        else
+            di = primal_dir[1 + i]
+            uuw = suuw * wdeni
+            uww = 1 + wdeni * wi
+            uww2 = -udeni * uww * di
+            corr1 += di * (2 * uuw + uww2) / deni
+            corr[1 + i] = (udir * (uuw + 2 * uww2) + di * wdeni * (2 + uww) * di) / deni
+        end
     end
     corr[1] = corr1
     @. corr /= -2

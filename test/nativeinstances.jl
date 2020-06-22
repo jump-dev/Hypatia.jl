@@ -306,7 +306,7 @@ function epinorminf5(T; options...)
     tol = 1e-4
     Random.seed!(1)
     c = T[1, 0, 0, 0, 0, 0]
-    A = rand(T(-9):T(9), 3, 6)
+    A = rand(T(-9):T(9), 6, 6)
     b = vec(sum(A, dims = 2))
     G = rand(T, 6, 6)
     h = vec(sum(G, dims = 2))
@@ -318,7 +318,8 @@ function epinorminf5(T; options...)
 end
 
 function epinorminf6(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = T[0, -1, -1, -1, -1]
     A = T[1 0 0 0 0; 0 1 0 0 0; 0 0 0 1 0; 0 0 0 0 1]
     b = T[2, 0, 1, 0]
@@ -333,7 +334,8 @@ function epinorminf6(T; options...)
 end
 
 function epinorminf7(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     c = T[1, 0, 0, 0, 0, 0, 0]
     A = zeros(T, 0, 7)
     b = zeros(T, 0)
@@ -351,7 +353,8 @@ function epinorminf7(T; options...)
 end
 
 function epinorminf8(T; options...)
-    tol = eps(T) ^ 0.2
+    # tol = eps(T) ^ 0.2
+    tol = 1e-4
     c = T[1, -1, 1, 1]
     A = T[1 0 0 0 ; 0 1 0 0; 0 0 1 0]
     b = T[-0.4, 0.3, -0.3]

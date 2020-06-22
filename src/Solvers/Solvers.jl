@@ -326,9 +326,9 @@ function calc_convergence_params(solver::Solver{T}) where {T <: Real}
     solver.primal_obj = solver.primal_obj_t / solver.tau + model.obj_offset
     solver.dual_obj = solver.dual_obj_t / solver.tau + model.obj_offset
     solver.gap = dot(point.z, point.s)
-    if solver.primal_obj < zero(T)
+    if solver.primal_obj < -eps(T)
         solver.rel_gap = solver.gap / -solver.primal_obj
-    elseif solver.dual_obj > zero(T)
+    elseif solver.dual_obj > eps(T)
         solver.rel_gap = solver.gap / solver.dual_obj
     else
         solver.rel_gap = NaN
@@ -350,7 +350,7 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         solver.status = :Optimal
         return true
     end
-    if solver.dual_obj_t > zero(T)
+    if solver.dual_obj_t > eps(T)
         infres_pr = solver.x_norm_res_t * solver.x_conv_tol / solver.dual_obj_t
         if infres_pr <= solver.tol_feas
             solver.verbose && println("primal infeasibility detected; terminating")
@@ -358,7 +358,7 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
             return true
         end
     end
-    if solver.primal_obj_t < zero(T)
+    if solver.primal_obj_t < -eps(T)
         infres_du = -max(solver.y_norm_res_t * solver.y_conv_tol, solver.z_norm_res_t * solver.z_conv_tol) / solver.primal_obj_t
         if infres_du <= solver.tol_feas
             solver.verbose && println("dual infeasibility detected; terminating")

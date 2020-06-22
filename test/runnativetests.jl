@@ -17,7 +17,7 @@ include(joinpath(@__DIR__, "nativesets.jl"))
 all_reals = [
     Float64,
     # Float32,
-    # BigFloat,
+    BigFloat,
     ]
 default_reals = [
     Float64,
