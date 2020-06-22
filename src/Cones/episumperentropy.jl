@@ -498,34 +498,36 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
             if j == k
                 # vi vi wi
                 third[ti, ti, tk] = third[ti, tk, ti] = third[tk, ti, ti] = t1 + t2 + 2 * sigma[i] / v[i] / z + inv(abs2(v[i])) / z
-                # third_debug[ti, ti, tk] = third_debug[ti, tk, ti] = third_debug[tk, ti, ti] = t1 + t2 + 2 * sigma[i] / v[i] / z + inv(abs2(v[i])) / z
+                third_debug[ti, ti, tk] = third_debug[ti, tk, ti] = third_debug[tk, ti, ti] = t1 + t2 + 2 * sigma[i] / v[i] / z + inv(abs2(v[i])) / z
             else
                 # vi vi wk
                 third[ti, ti, tk] = third[ti, tk, ti] = third[tk, ti, ti] = t1 + t2
-                # third_debug[ti, ti, tk] = third_debug[ti, tk, ti] = third_debug[tk, ti, ti] = t1 + t2
+                third_debug[ti, ti, tk] = third_debug[ti, tk, ti] = third_debug[tk, ti, ti] = t1 + t2
             end
         elseif i == k
             # vi vj wj, symmetric to vi vj wi
             third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
                 third[tk, ti, tj] = third[tk, tj, ti] = t1 + sigma[j] / v[i] / z
-            # third_debug[ti, tj, tk] = third_debug[ti, tk, tj] = third_debug[tj, ti, tk] = third_debug[tj, tk, ti] =
-            #     third_debug[tk, ti, tj] = third_debug[tk, tj, ti] = t1 + sigma[j] / v[i] / z
+            third_debug[ti, tj, tk] = third_debug[ti, tk, tj] = third_debug[tj, ti, tk] = third_debug[tj, tk, ti] =
+                third_debug[tk, ti, tj] = third_debug[tk, tj, ti] = t1 + sigma[j] / v[i] / z
         elseif j != k
             # vi vj wk
             third[ti, tj, tk] = third[ti, tk, tj] = third[tj, ti, tk] = third[tj, tk, ti] =
                 third[tk, ti, tj] = third[tk, tj, ti] = t1
-            # third_debug[ti, tj, tk] = third_debug[ti, tk, tj] = third_debug[tj, ti, tk] = third_debug[tj, tk, ti] =
-            #     third_debug[tk, ti, tj] = third_debug[tk, tj, ti] = t1
+            third_debug[ti, tj, tk] = third_debug[ti, tk, tj] = third_debug[tj, ti, tk] = third_debug[tj, tk, ti] =
+                third_debug[tk, ti, tj] = third_debug[tk, tj, ti] = t1
         end
     end
-    # v_corr .+= -4 * dot(sigma, v_dir) * dot(tau, w_dir) .* sigma +
-    #     -2 * dot(tau, w_dir) .* sigma ./ v .* v_dir +
-    #     1 / z * (sigma .* v_dir * dot(w_dir, inv.(v)) + w_dir ./ v * dot(sigma, v_dir)) + # WRONG
-    #     inv.(abs2.(v)) .* v_dir .* w_dir / z
-    # w_corr .+= -2 * abs2(dot(sigma, v_dir)) .* tau +
-    #     -dot(sigma ./ v, abs2.(v_dir)) .* tau +
-    #     2 / z * (dot(sigma, v_dir) ) .* v_dir ./ v +
-    #     inv.(abs2.(v)) .* abs2.(v_dir) / z
+    # @show 2 * sigma[1] / v[1] / z * w_dir[1] * v_dir[1]
+    # @show 1 / z * (sigma * dot(w_dir .* v_dir, inv.(v)) + w_dir ./ v * dot(sigma, v_dir))
+    v_corr .+= -4 * dot(sigma, v_dir) * dot(tau, w_dir) .* sigma +
+        -2 * dot(tau, w_dir) .* sigma ./ v .* v_dir +
+        2 / z * (sigma * dot(w_dir .* v_dir, inv.(v)) + w_dir ./ v * dot(sigma, v_dir)) +
+        2 * inv.(abs2.(v)) .* v_dir .* w_dir / z
+    w_corr .+= -2 * abs2(dot(sigma, v_dir)) .* tau +
+        -dot(sigma ./ v, abs2.(v_dir)) .* tau +
+        2 / z * (dot(sigma, v_dir) ) .* v_dir ./ v +
+        inv.(abs2.(v)) .* abs2.(v_dir) / z
 
     # Tvww
     for i in 1:w_dim, j in 1:w_dim, k in 1:w_dim
@@ -556,17 +558,15 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
                 third_debug[tk, ti, tj] = third_debug[tk, tj, ti] = t1
         end
     end
+    # -2 * dot(tau, w_dir) .* sigma ./ v .* v_dir
     v_corr .+= -2 * abs2(dot(tau, w_dir)) .* sigma +
         -dot(inv.(w), abs2.(w_dir)) .* sigma / z + abs2.(w_dir) ./ w .* sigma / z +
         2 / z * dot(tau, w_dir) .* w_dir ./ v +
         -inv.(v) .* abs2.(w_dir) / z / z
-        # inv.(abs2.(v)) .* v_dir .* w_dir / z
     w_corr .+= -4 * dot(tau, w_dir) * dot(sigma, v_dir) .* tau +
-        -2 * dot(sigma, v_dir) * w_dir ./ w / z + sigma .* v_dir .* w_dir ./ w / z +
-        dot(tau, w_dir) * v_dir ./ v / z + dot(inv.(v), v_dir) * tau .* w_dir / z +  # WRONG
-        -inv.(v) .* v_dir .* w_dir / z / z
-        # inv.(abs2.(v)) .* abs2.(v_dir) / z
-    @show corr ./ (reshape(reshape(third_debug, dim^2, dim) * primal_dir, dim, dim) * primal_dir)
+        -2 * dot(sigma, v_dir) * w_dir ./ w / z + 2 * sigma .* v_dir .* w_dir ./ w / z +
+        2 * (dot(tau, w_dir) * v_dir ./ v / z + dot(inv.(v), v_dir .* w_dir) * tau / z) +  # WRONG
+        -2 ./ v .* v_dir .* w_dir / z / z
 
     # Twww
     for i in 1:w_dim, j in 1:w_dim, k in 1:w_dim
@@ -593,6 +593,7 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
         -(dot(inv.(w), abs2.(w_dir)) .* tau .+ 2 * dot(tau, w_dir) .* w_dir ./ w) / z +
         -2 * (1 ./ w .^ 3) .* abs2.(w_dir)
 
+    @show corr ./ (reshape(reshape(third_debug, dim^2, dim) * primal_dir, dim, dim) * primal_dir)
     third_order = reshape(third, cone.dim^2, cone.dim)
 
     # barrier = cone.barrier
