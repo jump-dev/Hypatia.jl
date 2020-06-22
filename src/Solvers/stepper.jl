@@ -233,7 +233,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     get_directions(stepper, solver, iter_ref_steps = 3)
 
     # alpha step length
-    alpha = find_max_alpha(stepper, solver, false, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
+    alpha = find_max_alpha(stepper, solver, false, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3), max_nbhd = one(T))
     # @show alpha
     !pred && alpha < 0.98 && println(alpha)
     if iszero(alpha)

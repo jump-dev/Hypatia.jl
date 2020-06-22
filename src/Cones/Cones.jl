@@ -88,7 +88,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     return prod
 end
 
-function update_hess_fact(cone::Cone{T}; recover::Bool = false) where {T <: Real}
+function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
     cone.hess_fact_updated && return true
     if !cone.hess_updated
         update_hess(cone)
