@@ -290,8 +290,9 @@ function correction2(cone::HypoGeomean{T}, primal_dir::AbstractVector{T}) where 
     pi = cone.wprod # TODO rename
     z = cone.z
     alpha = cone.alpha
-    piz = pi / z # TODO unused
+    piz = pi / z
     tau = alpha ./ w ./ z
+    sigma = alpha ./ w
     corr = cone.correction
     corr .= 0
     u_dir = primal_dir[1]
@@ -303,15 +304,12 @@ function correction2(cone::HypoGeomean{T}, primal_dir::AbstractVector{T}) where 
     uuw_scal = -2 * u_dir * piz / z
     corr[1] += uuw_scal * dot(tau, w_dir) * 2
     @. corr[2:end] += uuw_scal * u_dir * tau
-
     # Tuww
     uww_scal_ij = pi * (2 * piz - 1)
     corr[1] += uww_scal_ij * abs2(dot(tau, w_dir)) + piz * dot(tau ./ w, abs2.(w_dir))
     corr[2:end] += 2 * u_dir * tau .* (uww_scal_ij * dot(tau, w_dir) .+ piz ./ w .* w_dir)
-
     # Twww
-    sigma = alpha ./ w
-    www_scal_ijk = u * pi / abs2(z) * (1 - 2 * piz)
+    www_scal_ijk = u * piz * (1 - 2 * piz) / z
     www_scal_iik = piz * (1 - piz)
     corr[2:end] +=
         www_scal_ijk * abs2(dot(sigma, w_dir)) .* sigma +

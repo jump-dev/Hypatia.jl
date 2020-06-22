@@ -356,8 +356,10 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
     # @show Matrix(cone.inv_hess)
     # @show schur
     # @show cone.denom
-    A = Matrix(cone.inv_hess)
-    schur = cone.Huu - dot(A[2:end, 1], A[2:end, 2:end] * A[2:end, 1])
+    # A = Matrix(cone.inv_hess)
+    # schur = cone.Huu - dot(A[2:end, 1], A[2:end, 2:end] * A[2:end, 1])
+    # @show dot(A[2:end, 1], A[2:end, 2:end] * A[2:end, 1])
+    schur = cone.Huu
     @. @views prod[1, :] = sqrt(schur) * arr[1, :]
 
     for (j, oj) in enumerate(cone.Hvw)
