@@ -208,7 +208,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     # use_corr = false
 
     # TODO if use NT, only need nonsymm cones in nbhd
-    if all(Cones.in_neighborhood.(cones, solver.mu, T(0.04)))
+    if all(Cones.in_neighborhood.(cones, solver.mu, T(0.05)))
         # predict
         # println("pred")
         update_rhs_pred(stepper, solver)
@@ -530,9 +530,9 @@ function find_max_alpha(
     affine_phase::Bool; # TODO remove if not using
     prev_alpha::T,
     min_alpha::T,
-    min_nbhd::T = T(0.5),
-    # max_nbhd::T = T(0.99),
-    max_nbhd::T = T(0.5),
+    min_nbhd::T = T(0.1),
+    # max_nbhd::T = one(T),
+    max_nbhd::T = T(0.7),
     ) where {T <: Real}
     cones = solver.model.cones
     cone_times = stepper.cone_times
@@ -617,27 +617,6 @@ function find_max_alpha(
             end
         end
         in_nbhd && break
-
-        # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.in_neighborhood_sy(cone_k, mu_ls))
-
-        # fsble_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k))
-        # in_nbhd_k = fsble_k
-
-        # if fsble_k
-        #     # if affine_phase
-        #     #     in_nbhd_k = true
-        #     # else
-        #         # in_nbhd_k = Cones.in_neighborhood(cone_k, mu_ls, irtmu)
-        #         in_nbhd_k = Cones.in_neighborhood_sy(cone_k, mu_ls)
-        #     # end
-        #     # in_nbhd_k = (affine_phase ? true : Cones.in_neighborhood_sy(cone_k, mu_ls) && Cones.in_neighborhood(cone_k, mu_ls))
-        #     # in_nbhd_k = (affine_phase ? true : Cones.in_neighborhood_sy(cone_k, mu_ls))
-        #     #
-        #     # in_nbhd_k = true
-        #     # in_nbhd_k = !affine_phase || (dot(primals_ls[k], duals_ls[k]) / Cones.get_nu(cone_k) > mu_ls)
-        # else
-        #     in_nbhd_k = false
-        # end
     end
 
     return alpha

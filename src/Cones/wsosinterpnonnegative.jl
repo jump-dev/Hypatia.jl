@@ -149,7 +149,7 @@ function update_hess(cone::WSOSInterpNonnegative)
     cone.hess .= 0
     @inbounds for k in eachindex(cone.Ps)
         LUk = cone.tmpLU[k]
-        UUk = mul!(cone.tmpUU[k], LUk', LUk)
+        UUk = mul!(cone.tmpUU[k], LUk', LUk) # TODO use syrk
         @inbounds for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end
@@ -159,21 +159,15 @@ function update_hess(cone::WSOSInterpNonnegative)
     return cone.hess
 end
 
-# function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
-#     Hi_z = similar(dual_dir)
-#     inv_hess_prod!(Hi_z, dual_dir, cone)
-#     corr = cone.correction
-#     @inbounds for k in eachindex(corr)
-#         corr[k] = sum(sum(UUk[i, j] * UUk[i, k] * UUk[j, k] for UUk in cone.tmpUU) * primal_dir[i] * Hi_z[j] for i in eachindex(corr), j in eachindex(corr))
-#     end
-#     return corr
-# end
-
 function correction2(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
     corr = cone.correction
-    @inbounds for k in eachindex(corr)
-        # TODO simplify to make efficient
-        corr[k] = sum(sum(UUk[i, j] * UUk[i, k] * UUk[j, k] for UUk in cone.tmpUU) * primal_dir[i] * primal_dir[j] for i in eachindex(corr), j in eachindex(corr))
+    corr .= 0
+    @inbounds for k in eachindex(cone.Ps)
+        # NOTE don't overwrite tmpLU or tmpUU
+        LpdU = (cone.tmpLU[k] * Diagonal(primal_dir)) * cone.tmpUU[k] # TODO allocs
+        @inbounds for j in 1:cone.dim
+            corr[j] += sum(abs2, view(LpdU, :, j))
+        end
     end
     return corr
 end

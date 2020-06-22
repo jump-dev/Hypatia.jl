@@ -12,7 +12,7 @@ barrier_testfuns = [
     # # test_hypoperlog_barrier,
     # test_episumperentropy_barrier,
     # test_power_barrier,
-    test_hypogeomean_barrier,
+    # test_hypogeomean_barrier,
     # test_epinormspectral_barrier,
     # # test_matrixepipersquare_barrier,
     # test_linmatrixineq_barrier,
@@ -20,7 +20,7 @@ barrier_testfuns = [
     # # test_possemideftrisparse_barrier,
     # test_hypoperlogdettri_barrier,
     # test_hyporootdettri_barrier,
-    # test_wsosinterpnonnegative_barrier,
+    test_wsosinterpnonnegative_barrier,
     # test_wsosinterppossemideftri_barrier,
     # # test_wsosinterpepinormeucl_barrier,
     ]

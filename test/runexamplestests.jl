@@ -144,7 +144,7 @@ all_tests_time = time()
     println("\n")
     # show(timer)
     # println("\n")
+    @show sum(perf[:iters])
 end
 
-@show sum(perf[:iters])
 ;
