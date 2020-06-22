@@ -128,12 +128,7 @@ function update_grad(cone::HypoGeomean)
 
     cone.grad[1] = inv(cone.z)
     wwprodu = -cone.wprod / cone.z
-    # for j in 1:(cone.dim - 1)
-    #     cone.grad[j + 1] = exp(sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha) if i != j)) / (-cone.z) - inv(w[j])
-    # end
     @. cone.grad[2:end] = (wwprodu * cone.alpha - 1) / w
-
-    # @show dot(cone.grad, cone.point) + cone.dim
 
     cone.grad_updated = true
     return cone.grad
@@ -207,120 +202,36 @@ end
 #     return prod
 # end
 
-function correction(
-    cone::HypoGeomean{T},
-    primal_dir::AbstractVector{T},
-    dual_dir::AbstractVector{T},
-    ) where {T <: Real}
-    if !cone.hess_updated
-        update_hess(cone)
-    end
-    dim = cone.dim
-    u = cone.point[1]
-    w = view(cone.point, 2:dim)
-    wprod = cone.wprod
-    z = cone.z
-    alpha = cone.alpha
-    pi = prod(w[j] ^ alpha[j] for j in eachindex(w))
-    wwprodu = wprod / z
-    tau = alpha ./ w ./ z
-    alpha = cone.alpha
-    Hinv_z = similar(dual_dir)
-    inv_hess_prod!(Hinv_z, dual_dir, cone)
-
-    third = zeros(T, dim, dim, dim)
-    # Tuuu
-    third[1, 1, 1] = 2 / z ^ 3
-    # Tuuw
-    for i in eachindex(w)
-        i1 = i + 1
-        third[1, 1, i1] = third[1, i1, 1] = third[i1, 1, 1] = -2 * tau[i] * pi / abs2(z)
-    end
-    # Tuww
-    for i in eachindex(w), j in eachindex(w)
-        (i1, j1) = (i + 1, j + 1)
-        t1 = pi * tau[i] * tau[j] * (2 * pi / z - 1)
-        if i == j
-            third[i1, i1, 1] = third[i1, 1, i1] = third[1, i1, i1] = t1 + tau[i] * pi / w[i] / z
-        else
-            third[1, i1, j1] = third[1, j1, i1] = third[i1, 1, j1] = third[j1, 1, i1] =
-                third[i1, j1, 1] = third[j1, i1, 1] = t1
-        end
-    end
-    # Twww
-    sigma = alpha ./ w
-    for i in eachindex(w), j in eachindex(w), k in eachindex(w)
-        (i1, j1, k1) = (i + 1, j + 1, k + 1)
-        t1 = u * pi / abs2(z) * sigma[i] * sigma[j] * sigma[k] * (1 - 2 * pi / z)
-        if i == j
-            t2 = pi * sigma[i] * sigma[k] / w[i] / z * (1 - pi / z)
-            if j == k
-                third[i1, i1, i1] = t1 + t2 - 2 * pi * tau[i] / w[i] * (u * tau[i] + inv(w[i])) - 2 / w[i] ^ 3
-            else
-                third[i1, i1, k1] = third[i1, k1, i1] = third[k1, i1, i1] = t1 + t2
-            end
-        elseif i != k && j != k
-            third[i1, j1, k1] = third[i1, k1, j1] = third[j1, i1, k1] = third[j1, k1, i1] =
-                third[k1, i1, j1] = third[k1, j1, i1] = t1
-        end
-    end
-    third_order = reshape(third, dim ^ 2, dim)
-
-    # function barrier(s)
-    #     (u, w) = (s[1], s[2:end])
-    #     return -log(prod(w[j] ^ alpha[j] for j in eachindex(w)) - u) - sum(log(wi) for wi in w)
-    # end
-    # FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), cone.point)
-    # @show (third_order - FD_3deriv)
-
-    cone.correction = reshape(third_order * primal_dir, dim, dim) * Hinv_z
-    cone.correction ./= -2
-
-    return cone.correction
-end
-
-# TODO allocations, reuse fields from hess
 function correction2(cone::HypoGeomean{T}, primal_dir::AbstractVector{T}) where {T <: Real}
-    if !cone.hess_updated
-        update_hess(cone)
-    end
     dim = cone.dim
     u = cone.point[1]
     w = view(cone.point, 2:dim)
     pi = cone.wprod # TODO rename
     z = cone.z
     alpha = cone.alpha
-    piz = pi / z
-    tau = alpha ./ w ./ z
-    sigma = alpha ./ w
     corr = cone.correction
-    corr .= 0
     u_dir = primal_dir[1]
     w_dir = view(primal_dir, 2:dim)
 
-    # Tuuu
-    corr[1] = 2 / z ^ 3 * abs2(u_dir)
-    # Tuuw
-    uuw_scal = -2 * u_dir * piz / z
-    corr[1] += uuw_scal * dot(tau, w_dir) * 2
-    @. corr[2:end] += uuw_scal * u_dir * tau
-    # Tuww
-    uww_scal_ij = pi * (2 * piz - 1)
-    corr[1] += uww_scal_ij * abs2(dot(tau, w_dir)) + piz * dot(tau ./ w, abs2.(w_dir))
-    corr[2:end] += 2 * u_dir * tau .* (uww_scal_ij * dot(tau, w_dir) .+ piz ./ w .* w_dir)
-    # Twww
-    www_scal_ijk = u * piz * (1 - 2 * piz) / z
-    www_scal_iik = piz * (1 - piz)
-    corr[2:end] +=
-        www_scal_ijk * abs2(dot(sigma, w_dir)) .* sigma +
-        www_scal_iik * sigma .* (dot(sigma ./ w, abs2.(w_dir)) .+ 2 * (dot(sigma, w_dir) .* w_dir - sigma .* abs2.(w_dir)) ./ w) +
-        -2 * (pi * tau .* (u * tau + inv.(w)) + inv.(w) ./ w) .* abs2.(w_dir) ./ w
-
-    corr ./= -2
+    piz = pi / z
+    wdw = w_dir ./ w
+    udz = u_dir / z
+    uuw1 = -2 * udz * piz
+    awdw = dot(alpha, wdw)
+    uww1 = awdw * piz * (2 * piz - 1)
+    awdw2 = sum(alpha[i] * abs2(wdw[i]) for i in eachindex(alpha))
+    corr[1] = (abs2(udz) + uuw1 * awdw + (uww1 * awdw + piz * awdw2) / 2) / -z
+    www1 = piz * (1 - piz)
+    all1 = (uuw1 * u_dir / z + www1 * awdw2 + awdw * u * piz * (1 - 2 * piz) / z * awdw) / -2 - udz * uww1
+    all2 = www1 * awdw + udz * piz
+    all3 = www1 + piz * u / z
+    @views wcorr = corr[2:end]
+    @. wcorr = all1 * alpha
+    @. wcorr += wdw * (((all3 * alpha + piz) * alpha + 1) * wdw - all2 * alpha) # TODO check this is fast - if not, use an explicit loop
+    wcorr ./= w
 
     return corr
 end
-
 
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
 function get_central_ray_hypogeomean(alpha::Vector{<:Real})
