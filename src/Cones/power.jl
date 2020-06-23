@@ -327,11 +327,6 @@ function correction2(cone::Power, primal_dir::AbstractVector)
     produuw_tw = produuw * (produuw - 1)
     aui = cone.aui # @. cone.aui = 2 * cone.alpha / u
 
-
-    third_order = zeros(T, cone.dim, cone.dim, cone.dim)
-    third_debug = zeros(T, cone.dim, cone.dim, cone.dim)
-    # third_order_flat = zeros(T, cone.dim ^ 2, cone.dim)
-
     corr = cone.correction
     corr .= 0
     dim = cone.dim
@@ -339,72 +334,6 @@ function correction2(cone::Power, primal_dir::AbstractVector)
     w_corr = view(corr, w_idxs)
     u_dir = view(primal_dir, 1:m)
     w_dir = view(primal_dir, w_idxs)
-
-
-    # ui
-    for i in 1:m
-        # ui uj
-        for j in 1:m
-            # ui uj uk
-            for k in 1:m
-                t1 = aui[i] * aui[k] * produuw * (1 - produuw)
-                t2 = aui[j] * t1 * (2 * produuw - 1)
-                if i == j
-                    t3 = t1 / u[i]
-                    if j == k
-                        third_order[i, i, i] = 3 * t3 + t2 - 2 * ((1 - alpha[i]) / u[i] + produuw * aui[i]) / u[i] / u[i]
-                        third_debug[i, i, i] = 3 * t3 + t2 - 2 * ((1 - alpha[i]) / u[i] + produuw * aui[i]) / u[i] / u[i]
-                    else
-                        third_order[i, i, k] = third_order[i, k, i] = third_order[k, i, i] = t2 + t3
-                        third_debug[i, i, k] = third_debug[i, k, i] = third_debug[k, i, i] = t2 + t3
-                    end
-                elseif i != k && j != k
-                    third_order[i, j, k] = third_order[i, k, j] = third_order[j, i, k] = third_order[j, k, i] =
-                        third_order[k, i, j] = third_order[k, j, i] = t2
-                    third_debug[i, j, k] = third_debug[i, k, j] = third_debug[j, i, k] = third_debug[j, k, i] =
-                        third_debug[k, i, j] = third_debug[k, j, i] = t2
-                end
-            end
-
-            # ui uj wk
-            for k in w_idxs
-                wk = k - m
-                if i == j
-                    # TODO could also be expressed as:
-                    # third_order[i, i, k] = third_order[i, k, i] = third_order[k, i, i] = t1 + 2 * w[wk] * produuw / produw * aui[i] / u[i] where t1 is the case i != j
-                    third_order[i, i, k] = third_order[i, k, i] = third_order[k, i, i] =
-                    2 * w[wk] * produuw / produw * aui[i] * (aui[i] * (2 * produuw - 1) + inv(u[i]))
-                    third_debug[i, i, k] = third_debug[i, k, i] = third_debug[k, i, i] =
-                    2 * aui[i] * aui[j] * produuw * (2 * produuw - 1) * w[wk] / produw + 2 * w[wk] * produuw / produw * aui[i] / u[i]
-                else
-                    third_order[i, j, k] = third_order[i, k, j] = third_order[j, i, k] = third_order[j, k, i] =
-                        third_order[k, i, j] = third_order[k, j, i] = 2 * aui[i] * aui[j] * produuw * (2 * produuw - 1) * w[wk] / produw
-                    third_debug[i, j, k] = third_debug[i, k, j] = third_debug[j, i, k] = third_debug[j, k, i] =
-                        third_debug[k, i, j] = third_debug[k, j, i] = 2 * aui[i] * aui[j] * produuw * (2 * produuw - 1) * w[wk] / produw
-                end
-            end
-        end
-
-        # if i == 1
-        #     @show norm(third_debug - third_order)
-        # end
-
-        # ui wj wk
-        for j in w_idxs, k in w_idxs
-            (wj, wk) = (j, k) .- m
-            t1 = -8 * aui[i] * w[wj] * w[wk] * produuw / produw / produw
-            if j == k
-                third_order[i, j, j] = third_order[j, i, j] = third_order[j, j, i] = t1 - 2 * aui[i] * produuw / produw
-                third_debug[i, j, j] = third_debug[j, i, j] = third_debug[j, j, i] = t1 - 2 * aui[i] * produuw / produw
-            else
-                third_order[i, j, k] = third_order[i, k, j] = third_order[j, i, k] = third_order[j, k, i] =
-                third_order[k, i, j] = third_order[k, j, i] = t1
-                third_debug[i, j, k] = third_debug[i, k, j] = third_debug[j, i, k] = third_debug[j, k, i] =
-                third_debug[k, i, j] = third_debug[k, j, i] = t1
-            end
-        end
-
-    end
 
     wwdir = dot(w, w_dir)
     auiudir = dot(aui, u_dir)
@@ -415,44 +344,28 @@ function correction2(cone::Power, primal_dir::AbstractVector)
         ((2 * produuw - 1) * abs2(auiudir) + dot(aui ./ u, abs2.(u_dir)) .+ 2 * auiudir * u_dir ./ u) +
         -2 * ((1 .- alpha) ./ u + produuw * aui) ./ u ./ u .* abs2.(u_dir) +
         # uuw
-        2 * produuw / produw *
+        2 * produuw / produw * aui .*
         (wwdir * (
-        (2 * produuw - 1) * 2 * auiudir * aui +
-        2 * u_dir .* aui ./ u +
+        (2 * produuw - 1) * 2 * auiudir .+
+        2 * u_dir ./ u .+
         # uww
-        -4 / produw * wwdir * aui
-        ) -
-        aui .* sum(abs2.(w_dir))
+        -4 / produw * wwdir
+        ) .-
+        sum(abs2.(w_dir))
         )
 
-    @show corr ./ (reshape(reshape(third_debug, dim^2, dim) * primal_dir, dim, dim) * primal_dir)
-
-    for i in w_idxs, j in w_idxs, k in w_idxs
-        (wi, wj, wk) = (i, j, k) .- m
-        t1 = 16 * w[wi] * w[wj] * w[wk] / produw / produw / produw
-        if i == j
-            t2 = w[wk] / produw / produw
-            if j == k
-                third_order[i, i, i] = t1 + 12 * t2
-            else
-                third_order[i, i, k] = third_order[i, k, i] = third_order[k, i, i] = t1 + 4 * t2
-            end
-        elseif i != k && j != k
-            third_order[i, j, k] = third_order[i, k, j] = third_order[j, i, k] = third_order[j, k, i] =
-                third_order[k, i, j] = third_order[k, j, i] = t1
-        end
-    end
-    third_order = reshape(third_order, cone.dim^2, cone.dim)
-
-    # function barrier(s)
-    #     m = length(cone.alpha)
-    #     (u, w) = (s[1:m], s[(m + 1):end])
-    #     return -log(prod(u[j] ^ (2 * alpha[j]) for j in eachindex(alpha)) - sum(abs2, w)) - sum((1 - alpha[j]) * log(u[j]) for j in eachindex(alpha))
-    # end
-    # FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), cone.point)
-    # @show norm(third_order - FD_3deriv)
-
-    cone.correction = reshape(third_order * primal_dir, cone.dim, cone.dim) * primal_dir / -2
+    # w[wk] / produw / produw
+    w_corr .+=
+        # uuw
+        2 * produuw / produw * w .* ((2 * produuw - 1) * abs2(auiudir) + dot(aui ./ u, abs2.(u_dir))) +
+        # uww
+        -4 * produuw / produw * auiudir * (4  / produw * wwdir * w + w_dir) +
+        # www
+        4 / produw / produw * (
+        4 * abs2(wwdir) / produw * w +
+        2 * wwdir .* w_dir + sum(abs2.(w_dir)) .* w
+        )
+    corr ./= -2
 
     return cone.correction
 end
