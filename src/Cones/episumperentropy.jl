@@ -410,6 +410,7 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
     tau_w = dot(tau, w_dir)
     sigma_v = dot(sigma, v_dir)
     sigma_v_v = dot(sigma ./ v, abs2.(v_dir))
+    wi_w = dot(inv.(w), abs2.(w_dir))
 
     # Tuuu
     Tuuu = -2 / z ^ 3
@@ -439,7 +440,7 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
 
     # Tuww
     scal_uww_ij = -2 / z
-    corr[1] += scal_uww_ij * abs2(tau_w) - dot(inv.(w), abs2.(w_dir)) / z / z
+    corr[1] += scal_uww_ij * abs2(tau_w) - wi_w / z / z
     w_corr .+= 2 * u_dir * (scal_uww_ij .* tau .* tau_w .- w_dir ./ w / z / z)
 
     # Tvvv
@@ -448,7 +449,6 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
         -sigma .* (sigma_v_v .+ 2 * sigma_v .* v_dir ./ v) +
         -2 * (sigma + 1 ./ v) .* abs2.(v_dir) ./ v ./ v
 
-
     # Tvvw
     v_corr .+= -4 * sigma_v * tau_w .* sigma +
         -2 * tau_w .* sigma ./ v .* v_dir +
@@ -456,24 +456,24 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
         2 * inv.(abs2.(v)) .* v_dir .* w_dir / z
     w_corr .+= -2 * abs2(sigma_v) .* tau +
         -dot(sigma ./ v, abs2.(v_dir)) .* tau +
-        2 / z * (sigma_v ) .* v_dir ./ v +
+        2 / z * sigma_v * v_dir ./ v +
         inv.(abs2.(v)) .* abs2.(v_dir) / z
 
     # Tvww
     v_corr .+= -2 * abs2(tau_w) .* sigma +
-        -dot(inv.(w), abs2.(w_dir)) .* sigma / z + abs2.(w_dir) ./ w .* sigma / z +
+        sigma .* (-wi_w .+ abs2.(w_dir) ./ w) / z +
         2 / z * tau_w .* w_dir ./ v +
         -inv.(v) .* abs2.(w_dir) / z / z
     w_corr .+= -4 * tau_w * sigma_v .* tau +
-        -2 * sigma_v * w_dir ./ w / z + 2 * sigma .* v_dir .* w_dir ./ w / z +
-        2 * (tau_w * v_dir ./ v / z + dot(inv.(v), v_dir .* w_dir) * tau / z) +  # WRONG
+        2 * (-sigma_v .+ sigma .* v_dir) .* w_dir ./ w / z +
+        2 * (tau_w * v_dir ./ v + dot(inv.(v), v_dir .* w_dir) * tau) / z +
         -2 ./ v .* v_dir .* w_dir / z / z
 
     # Twww
     w_corr .+=
         -2 * abs2(tau_w) .* tau +
-        -(dot(inv.(w), abs2.(w_dir)) .* tau .+ 2 * tau_w .* w_dir ./ w) / z +
-        -(2 ./ w .^ 3 + inv.(w) ./ w / z) .* abs2.(w_dir)
+        -(wi_w .* tau .+ 2 * tau_w .* w_dir ./ w) / z +
+        -(2 ./ w .+ 1 / z) .* abs2.(w_dir) ./ w ./ w
 
     corr ./= -2
 
