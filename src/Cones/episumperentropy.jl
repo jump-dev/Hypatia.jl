@@ -409,10 +409,12 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
 
     tau_w = dot(tau, w_dir)
     sigma_v = dot(sigma, v_dir)
-    wi_w = dot(inv.(w), abs2.(w_dir))
+    wdw = w_dir ./ w
+    wi_w = dot(wdw, w_dir)
     vdv = v_dir ./ v
     sigma_v_v = sum(sigma .* vdv .* v_dir)
     vdvwd = dot(vdv, w_dir)
+    udz = u_dir / z
 
     # Tuuu
     # Tuuu = -2 / z ^ 3
@@ -438,9 +440,9 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
     # corr[1] += scal_uww_ij * abs2(tau_w) - wi_w / z / z
 
     # v
-    v_corr .+= -2 / z / z * u_dir * u_dir .* sigma
-    v_corr .+= 2 * u_dir * sigma .* (-2 / z * sigma_v .- vdv / z)
-    v_corr .+= 2 * u_dir * (-2 / z * tau_w * sigma .+ w_dir ./ v ./ z ./ z)
+    v_corr .+= -2 * abs2(udz) .* sigma
+    v_corr .+= 2 * udz * sigma .* (-2 * sigma_v .- vdv)
+    v_corr .+= 2 * udz * (-2 * tau_w * sigma .+ w_dir ./ v / z)
     v_corr .+= -2 * abs2(sigma_v) .* sigma +
         -sigma .* (sigma_v_v .+ 2 * sigma_v .* vdv) +
         -2 * (sigma + 1 ./ v) .* abs2.(v_dir) ./ v ./ v
@@ -454,8 +456,8 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
         -inv.(v) .* abs2.(w_dir) / z / z
 
     # w
-    w_corr .+= -2 / z / z * u_dir * u_dir .* tau # note (scal_uvv * u_dir) already calculated in uuv
-    w_corr .+= 2 * u_dir * (-2 / z * sigma_v * tau .+ vdv ./ z ./ z)
+    w_corr .+= -2 * abs2(udz) .* tau # note (scal_uvv * u_dir) already calculated in uuv
+    w_corr .+= 2 * u_dir * (-2 / z * sigma_v * tau .+ vdv / z / z)
     w_corr .+= 2 * u_dir * (-2 / z .* tau .* tau_w .- w_dir ./ w / z / z)
     w_corr .+= -2 * abs2(sigma_v) .* tau +
         -sum(sigma .* v_dir .* vdv) .* tau +
@@ -472,7 +474,6 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
     # all
     corr ./= -2
 
-    udz = u_dir / z
     twsv = sigma_v + tau_w
     corr[1] = (twsv * (2 * udz + twsv) + abs2(udz) + (sigma_v_v + wi_w / z) / 2 - vdvwd / z) / z
 
