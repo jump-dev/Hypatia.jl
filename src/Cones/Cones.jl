@@ -64,6 +64,7 @@ set_timer(cone::Cone, timer::TimerOutput) = (cone.timer = timer)
 
 is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))
 is_dual_feas(cone::Cone) = update_dual_feas(cone) # TODO field? like above
+# update_dual_feas(cone::Cone) = # TODO write a fallback dual feas check that checks if ray of dual point intersects dikin ellipsoid at primal point
 grad(cone::Cone) = (cone.grad_updated ? cone.grad : update_grad(cone))
 hess(cone::Cone) = (cone.hess_updated ? cone.hess : update_hess(cone))
 inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(cone))

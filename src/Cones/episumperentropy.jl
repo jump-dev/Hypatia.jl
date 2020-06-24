@@ -247,21 +247,22 @@ function inv_hess_vals(cone::EpiSumPerEntropy{T}) where {T}
     @views w = point[w_idxs]
     z = cone.z
     Hu = cone.Hu
-    logprod = u - z # TODO cache in feas check?
     @. cone.denom = z + 2 * w
 
-    for (i, v_idx, w_idx) in zip(1:cone.w_dim, v_idxs, w_idxs)
-        temp1 = logprod - w[i] * log(w[i] / v[i]) # TODO cache in feas check?
-        temp2 = log(w[i] / v[i]) # TODO cache in feas check?
-        Hu[v_idx - 1] = -(u - temp1 - 2 * w[i] * temp2) * w[i] * v[i] / cone.denom[i]
-        Hu[w_idx - 1] = abs2(w[i]) * (temp2 * z + u - temp1) / cone.denom[i]
+    @inbounds for (i, v_idx, w_idx) in zip(1:cone.w_dim, v_idxs, w_idxs)
+        lwv = log(w[i] / v[i]) # TODO cache in feas check? tau gets modified
+        wlwv = w[i] * lwv
+        scal = w[i] / (z + 2 * w[i])
+        Hu[v_idx - 1] = v[i] * (wlwv - z) * scal
+        Hu[w_idx - 1] = w[i] * (z * (lwv + 1) + wlwv) * scal
     end
+
     @views cone.Huu = abs2(z) * (1 - dot(Hu, cone.hess[1, 2:cone.dim]))
-    @. cone.Hvw = v * abs2(w)
-    @. cone.Hvv = z + w
+    @. cone.Hvw = v * abs2(w) / cone.denom
+    @. cone.Hvv = (z + w) / cone.denom
     @. cone.Hww = cone.Hvv * abs2(w)
     @. cone.Hvv *= abs2(v)
-    @. cone.detdiag = (cone.Hvv * cone.Hww - abs2(cone.Hvw)) / cone.denom / cone.denom # TODO this isn't used outside of inv_hess_sqrt_prod so just move it there and don't cache
+    @. cone.detdiag = cone.Hvv * cone.Hww - abs2(cone.Hvw) # TODO this isn't used outside of inv_hess_sqrt_prod so just move it there and don't cache
 
     return
 end
@@ -297,13 +298,12 @@ function update_inv_hess(cone::EpiSumPerEntropy{T}) where {T}
     dim_idx = 1
     @inbounds for j in 1:w_dim
         H_nzval[nz_idx] = cone.Hu[dim_idx]
-        H_nzval[nz_idx + 1] = cone.Hvv[vw_idx] / cone.denom[vw_idx]
+        H_nzval[nz_idx + 1] = cone.Hvv[vw_idx]
         nz_idx += 2
         dim_idx += 1
         H_nzval[nz_idx] = cone.Hu[dim_idx]
-        H_nzval[nz_idx + 1] = cone.Hvw[vw_idx] / cone.denom[vw_idx]
-        # @show typeof(cone.Hvw)
-        H_nzval[nz_idx + 2] = cone.Hww[vw_idx] / cone.denom[vw_idx]
+        H_nzval[nz_idx + 1] = cone.Hvw[vw_idx]
+        H_nzval[nz_idx + 2] = cone.Hww[vw_idx]
         nz_idx += 3
         vw_idx += 1
         dim_idx += 1
@@ -327,8 +327,12 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
     @views mul!(prod[1, :], arr[2:end, :]', Hu, true, true)
     @. @views prod[2:end, :] = Hu * arr[1, :]'
     @inbounds for i in 1:cone.w_dim
-        @. @views prod[2i, :] += (Hvv[i] * arr[2i, :] + Hvw[i] * arr[2i + 1, :]) / denom[i]
-        @. @views prod[2i + 1, :] += (Hww[i] * arr[2i + 1, :] + Hvw[i] * arr[2i, :]) / denom[i]
+        vi = 2i
+        wi = vi + 1
+        @views arrv = arr[vi, :]
+        @views arrw = arr[wi, :]
+        @. prod[vi, :] += Hvv[i] * arrv + Hvw[i] * arrw
+        @. prod[wi, :] += Hww[i] * arrw + Hvw[i] * arrv
     end
 
     return prod
@@ -350,7 +354,7 @@ end
 #     # for i in 1:cone.w_dim
 #     #     a = [cone.Hu[2i - 1], cone.Hu[2i]]
 #     #     # Hu is already divided by denom, diagonal blocks are not
-#     #     A = Symmetric([cone.Hvv[i] cone.Hvw[i]; cone.Hvw[i] cone.Hww[i]] ./ cone.denom[i])
+#     #     A = Symmetric([cone.Hvv[i] cone.Hvw[i]; cone.Hvw[i] cone.Hww[i]])
 #     #     schur -= dot(a, A \ a)
 #     # end
 #     # @show Matrix(cone.inv_hess)
@@ -367,7 +371,7 @@ end
 #         evj = cone.Hu[2j - 1]
 #         ewj = cone.Hu[2j]
 #         # rtd1j = sqrt(cone.diag[2j - 1])
-#         rtd1j = sqrt(cone.Hvv[j] / cone.denom[j])
+#         rtd1j = sqrt(cone.Hvv[j])
 #         rtdetj = sqrt(cone.detdiag[j])
 #         ortd1j = oj / rtd1j
 #         side1j = evj / rtd1j
@@ -377,8 +381,8 @@ end
 #         @. @views prod[2j, :] = side1j * arr[1, :] + rtd1j * arr[2j, :] + ortd1j * arr[2j + 1, :]
 #         @. @views prod[2j + 1, :] = side2j * arr[1, :] + rtdetd1j * arr[2j + 1, :]
 #
-#         # @. @views prod[2j, :] *= sqrt(cone.denom[j])
-#         # @. @views prod[2j + 1, :] *= sqrt(cone.denom[j])
+        # @. @views prod[2j, :] *= sqrt(cone.denom[j])
+        # @. @views prod[2j + 1, :] *= sqrt(cone.denom[j])
 #     end
 #     # @show prod
 #     @show prod ./ cholesky(Matrix(cone.inv_hess)).L
@@ -406,7 +410,6 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
     wdw = w_dir ./ w
     vdv = v_dir ./ v
     const0 = u_dir / z + dot(sigma, v_dir) + dot(tau, w_dir)
-    # const1 = abs2(const0) + ((sum(w .* vdv .* vdv) + dot(wdw, w_dir)) / 2 - dot(vdv, w_dir)) / z
     const1 = abs2(const0) + sum(w[i] * abs2(vdv[i]) + w_dir[i] * (wdw[i] - 2 * vdv[i]) for i in eachindex(w)) / (2 * z)
 
     # v

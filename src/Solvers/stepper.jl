@@ -204,8 +204,8 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     update_lhs(solver.system_solver, solver)
 
-    # use_corr = true
-    use_corr = false
+    use_corr = true
+    # use_corr = false
 
     # TODO if use NT, only need nonsymm cones in nbhd
     if all(Cones.in_neighborhood.(cones, solver.mu, T(0.05)))
@@ -530,9 +530,9 @@ function find_max_alpha(
     affine_phase::Bool; # TODO remove if not using
     prev_alpha::T,
     min_alpha::T,
-    min_nbhd::T = T(0.1),
-    # max_nbhd::T = one(T),
-    max_nbhd::T = T(0.7),
+    min_nbhd::T = T(0.5),
+    max_nbhd::T = one(T),
+    # max_nbhd::T = T(0.7),
     ) where {T <: Real}
     cones = solver.model.cones
     cone_times = stepper.cone_times
@@ -607,8 +607,9 @@ function find_max_alpha(
             Cones.load_dual_point(cone_k, duals_ls[k])
             Cones.reset_data(cone_k)
 
-            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, mu_ls, max_nbhd))
-            # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k))
+            # TODO is_dual_feas function should fall back to a nbhd-like check (for ray maybe) if not using nbhd check
+            # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, mu_ls, max_nbhd))
+            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k))
 
             cone_times[k] = time_ns() - time_k
             if !in_nbhd_k
