@@ -148,29 +148,19 @@ function update_hess(cone::LinMatrixIneq)
     return cone.hess
 end
 
-# function correction(
-#     cone::LinMatrixIneq{T},
-#     primal_dir::AbstractVector{T},
-#     dual_dir::AbstractVector{T},
-#     ) where {T <: Real}
-#     sumAinvAs = cone.sumAinvAs
-#     corr = cone.correction
-#     # Hi_z = cone.old_hess \ dual_dir
-#     Hi_z = similar(dual_dir)
-#     inv_hess_prod!(Hi_z, dual_dir, cone)
-#     for i in eachindex(corr)
-#         # TODO trace of 3 matrix muls is expensive - try to simplify and cache
-#         corr[i] = sum(real(tr(sumAinvAs[i] * sumAinvAs[j] * sumAinvAs[k])) * primal_dir[j] * Hi_z[k] for j in 1:cone.dim, k in 1:cone.dim)
-#     end
-#     return corr
-# end
-
 function correction2(cone::LinMatrixIneq, primal_dir::AbstractVector)
     sumAinvAs = cone.sumAinvAs
     corr = cone.correction
-    for i in eachindex(corr)
-        # TODO trace of 3 matrix muls is expensive - try to simplify and cache
-        corr[i] = sum(real(tr(sumAinvAs[i] * sumAinvAs[j] * sumAinvAs[k])) * primal_dir[j] * primal_dir[k] for j in 1:cone.dim, k in 1:cone.dim)
+    dim = cone.dim
+
+    tmp = similar(sumAinvAs[1])
+    tmp .= 0
+    @inbounds for j in 1:dim, k in 1:dim
+        mul!(tmp, sumAinvAs[j], sumAinvAs[k], primal_dir[j] * primal_dir[k], true)
     end
+    @inbounds for i in 1:dim
+        corr[i] = real(dot(sumAinvAs[i], tmp'))
+    end
+
     return corr
 end
