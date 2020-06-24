@@ -407,6 +407,11 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
     w_corr = view(corr, w_idxs)
     corr .= 0
 
+    tau_w = dot(tau, w_dir)
+    sigma_v = dot(sigma, v_dir)
+    sigma_v_v = dot(sigma ./ v, abs2.(v_dir))
+    wi_w = dot(inv.(w), abs2.(w_dir))
+
     # Tuuu
     Tuuu = -2 / z ^ 3
     corr[1] = Tuuu * abs2(u_dir)
@@ -414,62 +419,61 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
     scal_uvv = -2 / z / z * u_dir
 
     # Tuuv
-    corr[1] += scal_uvv * dot(sigma, v_dir) * 2
+    corr[1] += scal_uvv * sigma_v * 2
     v_corr .+= scal_uvv * u_dir .* sigma
 
     # Tuuw
-    corr[1] += scal_uvv * dot(tau, w_dir) * 2
+    corr[1] += scal_uvv * tau_w * 2
     w_corr .+= scal_uvv * u_dir .* tau # note (scal_uvv * u_dir) already calculated in uuv
 
 
     # Tuvv
     scal_uvv_ij = -2 / z
-    corr[1] += scal_uvv_ij * abs2(dot(v_dir, sigma)) - dot(sigma ./ v, abs2.(v_dir)) / z
-    v_corr .+= 2 * u_dir * sigma .* (scal_uvv_ij .* dot(v_dir, sigma) .- v_dir ./ v / z)
+    corr[1] += scal_uvv_ij * abs2(sigma_v) - sigma_v_v / z
+    v_corr .+= 2 * u_dir * sigma .* (scal_uvv_ij * sigma_v .- v_dir ./ v / z)
 
     # Tuvw
     scal_uvw = -2 / z
-    corr[1] += 2 * (scal_uvw * dot(tau, w_dir) * dot(sigma, v_dir) + dot(inv.(v) / abs2(z), v_dir .* w_dir))
-    v_corr .+= 2 * u_dir * (scal_uvw * dot(tau, w_dir) * sigma .+ w_dir ./ v ./ z ./ z)
-    w_corr .+= 2 * u_dir * (scal_uvw * dot(sigma, v_dir) * tau .+ v_dir ./ v ./ z ./ z)
+    corr[1] += 2 * (scal_uvw * tau_w * sigma_v + dot(inv.(v) / abs2(z), v_dir .* w_dir))
+    v_corr .+= 2 * u_dir * (scal_uvw * tau_w * sigma .+ w_dir ./ v ./ z ./ z)
+    w_corr .+= 2 * u_dir * (scal_uvw * sigma_v * tau .+ v_dir ./ v ./ z ./ z)
 
     # Tuww
     scal_uww_ij = -2 / z
-    corr[1] += scal_uww_ij * abs2(dot(tau, w_dir)) - dot(inv.(w) / z / z, abs2.(w_dir))
-    w_corr .+= 2 * u_dir * (scal_uww_ij .* tau .* dot(tau, w_dir) .- w_dir ./ w / z / z)
+    corr[1] += scal_uww_ij * abs2(tau_w) - wi_w / z / z
+    w_corr .+= 2 * u_dir * (scal_uww_ij .* tau .* tau_w .- w_dir ./ w / z / z)
 
     # Tvvv
     v_corr .+=
-        -2 * abs2(dot(sigma, v_dir)) .* sigma +
-        -sigma .* (dot(sigma ./ v, abs2.(v_dir)) .+ 2 * dot(sigma, v_dir) .* v_dir ./ v) +
-        -2 * (sigma ./ v ./ v + 1 ./ v .^ 3) .* abs2.(v_dir)
-
+        -2 * abs2(sigma_v) .* sigma +
+        -sigma .* (sigma_v_v .+ 2 * sigma_v .* v_dir ./ v) +
+        -2 * (sigma + 1 ./ v) .* abs2.(v_dir) ./ v ./ v
 
     # Tvvw
-    v_corr .+= -4 * dot(sigma, v_dir) * dot(tau, w_dir) .* sigma +
-        -2 * dot(tau, w_dir) .* sigma ./ v .* v_dir +
-        2 / z * (sigma * dot(w_dir .* v_dir, inv.(v)) + w_dir ./ v * dot(sigma, v_dir)) +
+    v_corr .+= -4 * sigma_v * tau_w .* sigma +
+        -2 * tau_w .* sigma ./ v .* v_dir +
+        2 / z * (sigma * dot(w_dir .* v_dir, inv.(v)) + w_dir ./ v * sigma_v) +
         2 * inv.(abs2.(v)) .* v_dir .* w_dir / z
-    w_corr .+= -2 * abs2(dot(sigma, v_dir)) .* tau +
+    w_corr .+= -2 * abs2(sigma_v) .* tau +
         -dot(sigma ./ v, abs2.(v_dir)) .* tau +
-        2 / z * (dot(sigma, v_dir) ) .* v_dir ./ v +
+        2 / z * sigma_v * v_dir ./ v +
         inv.(abs2.(v)) .* abs2.(v_dir) / z
 
     # Tvww
-    v_corr .+= -2 * abs2(dot(tau, w_dir)) .* sigma +
-        -dot(inv.(w), abs2.(w_dir)) .* sigma / z + abs2.(w_dir) ./ w .* sigma / z +
-        2 / z * dot(tau, w_dir) .* w_dir ./ v +
+    v_corr .+= -2 * abs2(tau_w) .* sigma +
+        sigma .* (-wi_w .+ abs2.(w_dir) ./ w) / z +
+        2 / z * tau_w .* w_dir ./ v +
         -inv.(v) .* abs2.(w_dir) / z / z
-    w_corr .+= -4 * dot(tau, w_dir) * dot(sigma, v_dir) .* tau +
-        -2 * dot(sigma, v_dir) * w_dir ./ w / z + 2 * sigma .* v_dir .* w_dir ./ w / z +
-        2 * (dot(tau, w_dir) * v_dir ./ v / z + dot(inv.(v), v_dir .* w_dir) * tau / z) +  # WRONG
+    w_corr .+= -4 * tau_w * sigma_v .* tau +
+        2 * (-sigma_v .+ sigma .* v_dir) .* w_dir ./ w / z +
+        2 * (tau_w * v_dir ./ v + dot(inv.(v), v_dir .* w_dir) * tau) / z +
         -2 ./ v .* v_dir .* w_dir / z / z
 
     # Twww
     w_corr .+=
-        -2 * abs2(dot(tau, w_dir)) .* tau +
-        -(dot(inv.(w), abs2.(w_dir)) .* tau .+ 2 * dot(tau, w_dir) .* w_dir ./ w) / z +
-        -(2 ./ w .^ 3 + inv.(w) ./ w / z) .* abs2.(w_dir)
+        -2 * abs2(tau_w) .* tau +
+        -(wi_w .* tau .+ 2 * tau_w .* w_dir ./ w) / z +
+        -(2 ./ w .+ 1 / z) .* abs2.(w_dir) ./ w ./ w
 
     corr ./= -2
 
