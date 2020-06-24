@@ -391,56 +391,34 @@ function correction2(cone::EpiSumPerEntropy{T}, primal_dir::AbstractVector{T}) w
     tau = cone.tau
     sigma = cone.sigma
     z = cone.z
-    w_dim = cone.w_dim
-    u = cone.point[1]
     v_idxs = cone.v_idxs
     w_idxs = cone.w_idxs
-    point = cone.point
-    @views v = point[v_idxs]
-    @views w = point[w_idxs]
+    @views v = cone.point[v_idxs]
+    @views w = cone.point[w_idxs]
     u_dir = primal_dir[1]
     v_dir = primal_dir[v_idxs]
     w_dir = primal_dir[w_idxs]
-
     corr = cone.correction
     v_corr = view(corr, v_idxs)
     w_corr = view(corr, w_idxs)
-    corr .= 0
 
-    tau_w = dot(tau, w_dir)
-    sigma_v = dot(sigma, v_dir)
+    i2z = inv(2 * z)
     wdw = w_dir ./ w
-    wdv = w_dir ./ v
-    wdwdz = dot(wdw, w_dir) / (2 * z)
     vdv = v_dir ./ v
-    sigma_v_v = sum(sigma .* vdv .* v_dir)
-    vdvwd = dot(vdv, w_dir)
-    udz = u_dir / z
-    const0 = udz + sigma_v + tau_w
-    const1 = abs2(const0) + sigma_v_v / 2 + wdwdz - vdvwd / z
+    const0 = u_dir / z + dot(sigma, v_dir) + dot(tau, w_dir)
+    # const1 = abs2(const0) + ((sum(w .* vdv .* vdv) + dot(wdw, w_dir)) / 2 - dot(vdv, w_dir)) / z
+    const1 = abs2(const0) + sum(w[i] * abs2(vdv[i]) + w_dir[i] * (wdw[i] - 2 * vdv[i]) for i in eachindex(w)) / (2 * z)
 
     # v
-    v_corr .= const1 # constant
-    v_corr .+= (const0 .+ vdv) .* vdv .- (wdw / (2 * z)) .* w_dir
+    v_corr .= const1
+    v_corr .+= (const0 .+ vdv) .* vdv .- i2z * wdw .* w_dir
     v_corr .*= sigma
-    v_corr .+= abs2.(vdv) ./ v
-    v_corr .+= (-const0 .- vdv .+ w_dir / (2 * z)) .* wdv / z
+    v_corr .+= ((vdv .- w_dir / z) .* vdv + (-const0 .+ i2z * w_dir) .* w_dir / z) ./ v
 
     # w
-    w_corr .+= -2 * abs2(udz) .* tau # note (scal_uvv * u_dir) already calculated in uuv
-    w_corr .+= 2 * udz * (-2 * sigma_v * tau .+ vdv / z)
-    w_corr .+= 2 * udz * (-2 .* tau .* tau_w .- wdw / z)
-    w_corr .+= -(2 * abs2(sigma_v) + sum(sigma .* v_dir .* vdv)) .* tau +
-        2 / z * sigma_v * vdv +
-        inv.(abs2.(v)) .* abs2.(v_dir) / z
-    w_corr .+= -4 * tau_w * sigma_v .* tau +
-        2 * (-sigma_v .+ sigma .* v_dir) .* wdw / z +
-        2 * (tau_w * vdv + vdvwd * tau) / z +
-        -2 ./ v .* v_dir .* w_dir / z / z
-    w_corr .+= -2 * abs2(tau_w) .* tau +
-        -2 * (wdwdz .* tau .+ tau_w / z .* wdw) +
-        -(2 ./ w .+ 1 / z) .* abs2.(w_dir) ./ w ./ w
-    w_corr ./= -2
+    w_corr .= const1 * tau
+    w_corr .+= ((const0 .- sigma .* v_dir) / z + (inv.(w) .+ i2z) .* wdw) .* wdw
+    w_corr .+= (-const0 .+ w_dir / z .- vdv / 2) / z .* vdv
 
     corr[1] = const1 / z
 

@@ -204,8 +204,8 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     update_lhs(solver.system_solver, solver)
 
-    use_corr = true
-    # use_corr = false
+    # use_corr = true
+    use_corr = false
 
     # TODO if use NT, only need nonsymm cones in nbhd
     if all(Cones.in_neighborhood.(cones, solver.mu, T(0.05)))

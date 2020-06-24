@@ -33,8 +33,8 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
-    # "JuMP",
+    # "native",
+    "JuMP",
     ]
 
 # list of names of native examples to run
@@ -53,7 +53,7 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
+    # "centralpolymat",
     # "conditionnum",
     # "contraction",
     # "densityest",
@@ -71,11 +71,11 @@ JuMP_example_names = [
     # "polynorm",
     # "portfolio",
     # "regionofattr",
-    # "robustgeomprog",
+    "robustgeomprog",
     # "secondorderpoly",
     # "semidefinitepoly",
     # "shapeconregr",
-    # "signomialmin",
+    "signomialmin",
     ]
 
 # start the tests
@@ -140,11 +140,11 @@ all_tests_time = time()
     end
 
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
-    show(perf, allrows = true, allcols = true)
-    println("\n")
+    @show sum(perf[:iters])
+    # show(perf, allrows = true, allcols = true)
+    # println("\n")
     # show(timer)
     # println("\n")
-    @show sum(perf[:iters])
 end
 
 ;
