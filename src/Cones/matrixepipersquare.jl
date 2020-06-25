@@ -263,52 +263,6 @@ function update_hess(cone::MatrixEpiPerSquare)
     return cone.hess
 end
 
-rho(T, i, j) = (i == j ? 1 : sqrt(T(2)))
-function skron(i, j, k, l, W::Hermitian{T, Matrix{T}}) where {T}
-    if (i == j) && (k == l)
-        return abs2(W[i, k])
-    elseif (i == j) || (k == l)
-        return sqrt(T(2)) * W[k, i] * W[j, l]
-    else
-        return W[k, i] * W[j, l] + W[l, i] * W[j, k]
-    end
-end
-function third_skron(i, j, k, l, m, n, Wi::Hermitian{T, Matrix{T}}) where {T}
-    rt2 = sqrt(T(2))
-    t1 = Wi[i, m] * Wi[n, k] * Wi[l, j] + Wi[i, k] * Wi[l, m] * Wi[n, j]
-    if m != n
-        t1 += Wi[i, n] * Wi[m, k] * Wi[l, j] + Wi[i, k] * Wi[l, n] * Wi[m, j]
-        if k != l
-            t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j] + Wi[i, n] * Wi[m, l] * Wi[k, j] + Wi[i, l] * Wi[k, n] * Wi[m, j]  #################
-            if i != j
-                t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] +
-                    Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i] +
-                    Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i] + Wi[j, n] * Wi[m, l] * Wi[k, i] + Wi[j, l] * Wi[k, n] * Wi[m, i]
-            end
-        elseif i != j
-            t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i]
-        end
-    elseif k != l
-        t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j]
-        if i != j
-            t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i]
-        end
-    elseif i != j
-        t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i]
-    end
-
-    num_match = (i == j) + (k == l) + (m == n)
-    if num_match == 0
-        t1 /= rt2 * 2
-    elseif num_match == 1
-        t1 /= 2
-    elseif num_match == 2
-        t1 /= rt2
-    end
-
-    return t1
-end
-
 # TODO reduce allocs
 function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     @assert cone.hess_updated
@@ -343,98 +297,6 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
 
     ZiU = cone.fact_Z \ U # TODO cache or don't use
     ZiUZiW = ZiU * tau
-
-    idx1 = 1
-    for j in 1:d1, i in 1:j
-        # Tuvv
-        third[idx1, v_idx, v_idx] = third[v_idx, idx1, v_idx] = third[v_idx, v_idx, idx1] =
-            8 * (ZiUZi - 2 * v * ZiU ^ 2 * Zi)[i, j] * rho(T, i, j)
-        # third_debug[idx1, v_idx, v_idx] = third_debug[v_idx, idx1, v_idx] = third_debug[v_idx, v_idx, idx1] =
-        #     8 * (ZiUZi - 2 * v * ZiU ^ 2 * Zi)[i, j] * rho(T, i, j)
-        idx2 = v_idx + 1
-        for l in 1:d2, k in 1:d1
-            # Tuvw
-            third[idx1, v_idx, idx2] = third[idx1, idx2, v_idx] = third[v_idx, idx1, idx2] =
-                third[v_idx, idx2, idx1] = third[idx2, idx1, v_idx] = third[idx2, v_idx, idx1] =
-                -2 * rho(T, i, j) * (Zi[i, k] * tau[j, l] + Zi[k, j] * tau[i, l]) + 4 * rho(T, i, j) * v * (
-                ZiUZi[k, i] * tau[j, l] + Zi[k, i] * ZiUZiW[j, l] + ZiUZi[k, j] * tau[i, l] +
-                Zi[k, j] * ZiUZiW[i, l]
-                )
-            # third_debug[idx1, v_idx, idx2] = third_debug[idx1, idx2, v_idx] = third_debug[v_idx, idx1, idx2] =
-            #     third_debug[v_idx, idx2, idx1] = third_debug[idx2, idx1, v_idx] = third_debug[idx2, v_idx, idx1] =
-            #     -2 * rho(T, i, j) * (Zi[i, k] * tau[j, l] + Zi[k, j] * tau[i, l]) +
-            #     4 * rho(T, i, j) * v * (
-            #     ZiUZi[k, i] * tau[j, l] + ZiUZi[k, j] * tau[i, l] +
-            #     Zi[k, i] * ZiUZiW[j, l] + Zi[k, j] * ZiUZiW[i, l]
-            #     )
-            # Tuww
-            idx3 = v_idx + 1
-            for n in 1:d2, m in 1:d1
-                third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
-                    third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] =
-                    -2 * rho(T, i, j) * v * (
-                    Zi[i, m] * tau[k, n] * tau[j, l] + Zi[m, k] * tau[i, n] * tau[j, l] + Zi[i, k] * tau[m, l] * tau[j, n] +
-                    Zi[k, j] * tau[m, l] * tau[i, n] + Zi[k, m] * tau[i, l] * tau[j, n] + Zi[m, j] * tau[i, l] * tau[k, n] +
-                    Zi[i, k] * Zi[m, j] * Wtau[l, n] + Zi[k, j] * Zi[m, i] * Wtau[l, n] +
-                    (l == n ? (Zi[i, k] * Zi[j, m] + Zi[k, j] * Zi[i, m]) : 0)
-                    )
-                # third_debug[idx1, idx2, idx3] = third_debug[idx1, idx3, idx2] = third_debug[idx2, idx1, idx3] =
-                #     third_debug[idx2, idx3, idx1] = third_debug[idx3, idx1, idx2] = third_debug[idx3, idx2, idx1] =
-                #     -2 * rho(T, i, j) * v * (
-                #     Zi[i, m] * tau[k, n] * tau[j, l] + Zi[m, k] * tau[i, n] * tau[j, l] + Zi[i, k] * tau[m, l] * tau[j, n] +
-                #     Zi[k, j] * tau[m, l] * tau[i, n] + Zi[k, m] * tau[i, l] * tau[j, n] + Zi[m, j] * tau[i, l] * tau[k, n] +
-                #     Zi[i, k] * Zi[m, j] * Wtau[l, n] + Zi[k, j] * Zi[m, i] * Wtau[l, n] +
-                #     (l == n ? (Zi[i, k] * Zi[j, m] + Zi[k, j] * Zi[i, m]) : 0)
-                #     )
-                idx3 += 1
-            end
-            idx2 += 1
-        end
-        idx2 = 1
-        for l in 1:d1, k in 1:l
-            # Tuuv
-            third[idx1, idx2, v_idx] = third[idx1, v_idx, idx2] = third[idx2, idx1, v_idx] =
-                third[idx2, v_idx, idx1] = third[v_idx, idx1, idx2] = third[v_idx, idx2, idx1] =
-                8 * v * skron(i, j, k, l, Zi) - 4 * rho(T, i, j) * rho(T, k, l) * abs2(v) * (
-                ZiUZi[k, i] * Zi[j, l] + ZiUZi[j, l] * Zi[k, i] + ZiUZi[l, i] * Zi[j, k] + ZiUZi[j, k] * Zi[l, i]
-                )
-            # third_debug[idx1, idx2, v_idx] = third_debug[idx1, v_idx, idx2] = third_debug[idx2, idx1, v_idx] =
-            #     third_debug[idx2, v_idx, idx1] = third_debug[v_idx, idx1, idx2] = third_debug[v_idx, idx2, idx1] =
-            #     8 * v * skron(i, j, k, l, Zi) - 4 * rho(T, i, j) * rho(T, k, l) * abs2(v) * (
-            #     ZiUZi[k, i] * Zi[j, l] + ZiUZi[j, l] * Zi[k, i] + ZiUZi[l, i] * Zi[j, k] + ZiUZi[j, k] * Zi[l, i]
-            #     )
-            # Tuuu
-            idx3 = 1
-            for n in 1:d1, m in 1:n
-                third[idx1, idx2, idx3] = -8 * v ^ 3 * third_skron(i, j, k, l, m, n, Zi)
-                # third_debug[idx1, idx2, idx3] = -8 * v ^ 3 * third_skron(i, j, k, l, m, n, Zi)
-                idx3 += 1
-            end
-            # Tuuw
-            idx3 = v_idx + 1
-            for n in 1:d2, m in 1:d1
-                third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
-                    third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] =
-                    2 * abs2(v) * rho(T, i, j) * rho(T, k, l) * (
-                    Zi[k, i] * (Zi[m, j] * tau[l, n] + Zi[m, l] * tau[j, n]) +
-                    Zi[j, l] * (Zi[m, k] * tau[i, n] + Zi[m, i] * tau[k, n]) +
-                    Zi[l, i] * (Zi[m, j] * tau[k, n] + Zi[m, k] * tau[j, n]) +
-                    Zi[j, k] * (Zi[m, l] * tau[i, n] + Zi[m, i] * tau[l, n])
-                    )
-                # third_debug[idx1, idx2, idx3] = third_debug[idx1, idx3, idx2] = third_debug[idx2, idx1, idx3] =
-                #     third_debug[idx2, idx3, idx1] = third_debug[idx3, idx1, idx2] = third_debug[idx3, idx2, idx1] =
-                #     2 * abs2(v) * rho(T, i, j) * rho(T, k, l) * (
-                #     Zi[k, i] * (Zi[m, j] * tau[l, n] + Zi[m, l] * tau[j, n]) +
-                #     Zi[j, l] * (Zi[m, k] * tau[i, n] + Zi[m, i] * tau[k, n]) +
-                #     Zi[l, i] * (Zi[m, j] * tau[k, n] + Zi[m, k] * tau[j, n]) +
-                #     Zi[j, k] * (Zi[m, l] * tau[i, n] + Zi[m, i] * tau[l, n])
-                #     )
-                idx3 += 1
-            end
-            idx2 += 1
-        end
-        idx1 += 1
-    end
 
     # uvv
     U_corr .+= 8 * abs2(v_dir) * smat_to_svec!(similar(U_corr), ZiUZi - 2 * v * ZiUZiUZi, cone.rt2)
@@ -496,65 +358,10 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
 
     # Tvvv
     third[v_idx, v_idx, v_idx] = -16 * tr(ZiU ^ 3) + 2 * (d1 - 1) / v ^ 3
-    # third_debug[v_idx, v_idx, v_idx] = -16 * tr(ZiU ^ 3) + 2 * (d1 - 1) / v ^ 3
 
     vvv = -16 * tr(ZiU ^ 3) + 2 * (d1 - 1) / v ^ 3
 
     corr[v_idx] += vvv * abs2(v_dir)
-
-    # Twww
-    idx1 = v_idx
-    for j in 1:d2, i in 1:d1
-        idx1 += 1
-        # Tvvw
-        third[idx1, v_idx, v_idx] = third[v_idx, idx1, v_idx] = third[v_idx, v_idx, idx1] =
-            16 * (ZiU^2 * tau)[i, j]
-        # third_debug[idx1, v_idx, v_idx] = third_debug[v_idx, idx1, v_idx] = third_debug[v_idx, v_idx, idx1] =
-        #     16 * (ZiU^2 * tau)[i, j]
-        idx2 = v_idx
-        for l in 1:d2, k in 1:d1
-            idx2 += 1
-            idx2 >= idx1 || continue
-            # Tvww
-            third[idx1, idx2, v_idx] = third[idx1, v_idx, idx2] = third[idx2, idx1, v_idx] =
-                third[idx2, v_idx, idx1] = third[v_idx, idx1, idx2] = third[v_idx, idx2, idx1] =
-                -4 * (ZiUZi[k, i] * Wtau[j, l] + Zi[k, i] * (W' * ZiU * tau)[j, l] + (ZiU * tau)[k, j] * tau[i, l] +
-                    tau[k, j] * (ZiU * tau)[i, l] + (j == l ? ZiUZi[i, k] : 0))
-            third_debug[idx1, idx2, v_idx] = third_debug[idx1, v_idx, idx2] = third_debug[idx2, idx1, v_idx] =
-                third_debug[idx2, v_idx, idx1] = third_debug[v_idx, idx1, idx2] = third_debug[v_idx, idx2, idx1] =
-                -4 * (ZiUZi[k, i] * Wtau[j, l] +
-                Zi[k, i] * (W' * ZiU * tau)[j, l] +
-                (ZiU * tau)[k, j] * tau[i, l] + tau[k, j] * (ZiU * tau)[i, l] +
-                (j == l ? ZiUZi[i, k] : 0)
-                )
-            # Twww
-            idx3 = v_idx
-            for n in 1:d2, m in 1:d1
-                idx3 += 1
-                idx3 >= idx2 || continue
-                dZki_dwmn = tau[k, n] * Zi[m, i] + tau[i, n] * Zi[m, k]
-                dwtaujl_dwmn = tau[m, j] * Wtau[l, n] + tau[m, l] * Wtau[j, n]
-                dZik_dmn = 2 * tau[i, n] * Zi[m, k]
-                dtauil_dwmn = Zi[m, i] * Wtau[l, n] + tau[m, l] * tau[i, n]
-                dtaukj_dwmn = Zi[m, k] * Wtau[j, n] + tau[m, j] * tau[k, n]
-                t1 = dZki_dwmn * Wtau[j, l] + Zi[k, i] * dwtaujl_dwmn + tau[k, j] * dtauil_dwmn + dtaukj_dwmn * tau[i, l]
-                if j == l
-                    t1 += Zi[m, k] * tau[i, n] + Zi[m, i] * tau[k, n]
-                end
-                if l == n
-                    t1 += Zi[k, i] * tau[m, j] + Zi[i, m] * tau[k, j]
-                end
-                if j == n
-                    t1 += Zi[k, i] * tau[m, l] + Zi[k, m] * tau[i, l]
-                end
-                t1 *= 2
-                third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
-                    third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] = t1
-                # third_debug[idx1, idx2, idx3] = third_debug[idx1, idx3, idx2] = third_debug[idx2, idx1, idx3] =
-                #     third_debug[idx2, idx3, idx1] = third_debug[idx3, idx1, idx2] = third_debug[idx3, idx2, idx1] = t1
-            end
-        end
-    end
 
     # www
     # copied from spectral norm cone
@@ -588,12 +395,6 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     corr[v_idx] += -4 * dot(t3_vvw_W, W_dir)
     W_corr .+= -8 * v_dir * vec_copy_to!(similar(W_corr), t3_vvw_W)
 
-
-    # @show corr ./ (reshape(reshape(third_debug, dim^2, dim) * primal_dir, dim, dim) * primal_dir)
-    # @show corr ./ (reshape(reshape(third, dim^2, dim) * primal_dir, dim, dim) * primal_dir)
-    #
-    # cone.correction .= reshape(reshape(third, dim^2, dim) * primal_dir, dim, dim) * primal_dir
-    # cone.correction ./= -2
     corr ./= -2
 
     return corr
