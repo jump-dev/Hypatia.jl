@@ -342,35 +342,44 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     v_dir = primal_dir[v_idx]
 
     ZiU = cone.fact_Z \ U # TODO cache or don't use
+    ZiUZiW = ZiU * tau
 
     idx1 = 1
     for j in 1:d1, i in 1:j
         # Tuvv
         third[idx1, v_idx, v_idx] = third[v_idx, idx1, v_idx] = third[v_idx, v_idx, idx1] =
             8 * (ZiUZi - 2 * v * ZiU ^ 2 * Zi)[i, j] * rho(T, i, j)
-        third_debug[idx1, v_idx, v_idx] = third_debug[v_idx, idx1, v_idx] = third_debug[v_idx, v_idx, idx1] =
-            8 * (ZiUZi - 2 * v * ZiU ^ 2 * Zi)[i, j] * rho(T, i, j)
+        # third_debug[idx1, v_idx, v_idx] = third_debug[v_idx, idx1, v_idx] = third_debug[v_idx, v_idx, idx1] =
+        #     8 * (ZiUZi - 2 * v * ZiU ^ 2 * Zi)[i, j] * rho(T, i, j)
         idx2 = v_idx + 1
         for l in 1:d2, k in 1:d1
             # Tuvw
             third[idx1, v_idx, idx2] = third[idx1, idx2, v_idx] = third[v_idx, idx1, idx2] =
                 third[v_idx, idx2, idx1] = third[idx2, idx1, v_idx] = third[idx2, v_idx, idx1] =
                 -2 * rho(T, i, j) * (Zi[i, k] * tau[j, l] + Zi[k, j] * tau[i, l]) + 4 * rho(T, i, j) * v * (
-                ZiUZi[k, i] * tau[j, l] + Zi[k, i] * (ZiU * tau)[j, l] + ZiUZi[k, j] * tau[i, l] +
-                Zi[k, j] * (ZiU * tau)[i, l]
+                ZiUZi[k, i] * tau[j, l] + Zi[k, i] * ZiUZiW[j, l] + ZiUZi[k, j] * tau[i, l] +
+                Zi[k, j] * ZiUZiW[i, l]
                 )
-            third_debug[idx1, v_idx, idx2] = third_debug[idx1, idx2, v_idx] = third_debug[v_idx, idx1, idx2] =
-                third_debug[v_idx, idx2, idx1] = third_debug[idx2, idx1, v_idx] = third_debug[idx2, v_idx, idx1] =
-                -2 * rho(T, i, j) * (Zi[i, k] * tau[j, l] + Zi[k, j] * tau[i, l])
-                # + 4 * rho(T, i, j) * v * (
-                # ZiUZi[k, i] * tau[j, l] + Zi[k, i] * (ZiU * tau)[j, l] + ZiUZi[k, j] * tau[i, l] +
-                # Zi[k, j] * (ZiU * tau)[i, l]
-                # )
+            # third_debug[idx1, v_idx, idx2] = third_debug[idx1, idx2, v_idx] = third_debug[v_idx, idx1, idx2] =
+            #     third_debug[v_idx, idx2, idx1] = third_debug[idx2, idx1, v_idx] = third_debug[idx2, v_idx, idx1] =
+            #     -2 * rho(T, i, j) * (Zi[i, k] * tau[j, l] + Zi[k, j] * tau[i, l]) +
+            #     4 * rho(T, i, j) * v * (
+            #     ZiUZi[k, i] * tau[j, l] + ZiUZi[k, j] * tau[i, l] +
+            #     Zi[k, i] * ZiUZiW[j, l] + Zi[k, j] * ZiUZiW[i, l]
+            #     )
             # Tuww
             idx3 = v_idx + 1
             for n in 1:d2, m in 1:d1
                 third[idx1, idx2, idx3] = third[idx1, idx3, idx2] = third[idx2, idx1, idx3] =
                     third[idx2, idx3, idx1] = third[idx3, idx1, idx2] = third[idx3, idx2, idx1] =
+                    -2 * rho(T, i, j) * v * (
+                    Zi[i, m] * tau[k, n] * tau[j, l] + Zi[m, k] * tau[i, n] * tau[j, l] + Zi[i, k] * tau[m, l] * tau[j, n] +
+                    Zi[k, j] * tau[m, l] * tau[i, n] + Zi[k, m] * tau[i, l] * tau[j, n] + Zi[m, j] * tau[i, l] * tau[k, n] +
+                    Zi[i, k] * Zi[m, j] * Wtau[l, n] + Zi[k, j] * Zi[m, i] * Wtau[l, n] +
+                    (l == n ? (Zi[i, k] * Zi[j, m] + Zi[k, j] * Zi[i, m]) : 0)
+                    )
+                third_debug[idx1, idx2, idx3] = third_debug[idx1, idx3, idx2] = third_debug[idx2, idx1, idx3] =
+                    third_debug[idx2, idx3, idx1] = third_debug[idx3, idx1, idx2] = third_debug[idx3, idx2, idx1] =
                     -2 * rho(T, i, j) * v * (
                     Zi[i, m] * tau[k, n] * tau[j, l] + Zi[m, k] * tau[i, n] * tau[j, l] + Zi[i, k] * tau[m, l] * tau[j, n] +
                     Zi[k, j] * tau[m, l] * tau[i, n] + Zi[k, m] * tau[i, l] * tau[j, n] + Zi[m, j] * tau[i, l] * tau[k, n] +
@@ -413,16 +422,46 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
         idx1 += 1
     end
 
-    # uvv
-    U_corr .+= 8 * abs2(v_dir) * smat_to_svec!(similar(U_corr), ZiUZi - 2 * v * ZiUZiUZi, cone.rt2)
-    corr[v_idx] += 16 * v_dir * dot(ZiUZi - 2 * v * ZiUZiUZi, U_dir)
-    # uvw term 1
-    t1_uvw_W = Zi * W_dir * tau' + (Zi * W_dir * tau')'  # TODO could do reuse either of these two in corr[v_idx]
-    t1_uvw_U = Zi * U_dir * tau * 2
-    U_corr .+= -4 * v_dir * smat_to_svec!(similar(U_corr), t1_uvw_W, cone.rt2)
-    # corr[v_idx] += -4 * dot(U_dir, t1_uvw_W)
-    corr[v_idx] += -4 * dot(W_dir, t1_uvw_U)
-    W_corr .+= -4 * v_dir * vec_copy_to!(similar(W_corr), t1_uvw_U)
+    # # uvv
+    # U_corr .+= 8 * abs2(v_dir) * smat_to_svec!(similar(U_corr), ZiUZi - 2 * v * ZiUZiUZi, cone.rt2)
+    # corr[v_idx] += 16 * v_dir * dot(ZiUZi - 2 * v * ZiUZiUZi, U_dir)
+    #
+    # # uvw term 1, kron using Zi and tau
+    # t1_uvw_W = Zi * W_dir * tau' + (Zi * W_dir * tau')'  # TODO could do reuse either of these two in corr[v_idx]
+    # t1_uvw_U = Zi * U_dir * tau * 2
+    # U_corr .+= -4 * v_dir * smat_to_svec!(similar(U_corr), t1_uvw_W, cone.rt2)
+    # # corr[v_idx] += -4 * dot(U_dir, t1_uvw_W)
+    # corr[v_idx] += -4 * dot(W_dir, t1_uvw_U)
+    # W_corr .+= -4 * v_dir * vec_copy_to!(similar(W_corr), t1_uvw_U)
+    # # uvw term 2, kron using ZiUZi and tau times v
+    # t2_uvw_W = ZiUZi * W_dir * tau' + (ZiUZi * W_dir * tau')'  # TODO could do reuse either of these two in corr[v_idx]
+    # t2_uvw_U = ZiUZi * U_dir * tau * 2
+    # U_corr .+= 8 * v * v_dir * smat_to_svec!(similar(U_corr), t2_uvw_W, cone.rt2)
+    # # corr[v_idx] += 8 * v * dot(U_dir, t2_uvw_W)
+    # corr[v_idx] += 8 * v * dot(W_dir, t2_uvw_U)
+    # W_corr .+= 8 * v * v_dir * vec_copy_to!(similar(W_corr), t2_uvw_U)
+    # # uvw term 3, kron using ZiUZiW and Zi
+    # t3_uvw_W = Zi * W_dir * ZiUZiW' + (Zi * W_dir * ZiUZiW')'  # TODO could do reuse either of these two in corr[v_idx]
+    # t3_uvw_U = Zi * U_dir * ZiUZiW * 2
+    # U_corr .+= 8 * v * v_dir * smat_to_svec!(similar(U_corr), t3_uvw_W, cone.rt2)
+    # # corr[v_idx] += 8 * v * dot(U_dir, t3_uvw_W)
+    # corr[v_idx] += 8 * v * dot(W_dir, t3_uvw_U)
+    # W_corr .+= 8 * v * v_dir * vec_copy_to!(similar(W_corr), t3_uvw_U)
+
+    # uww term 1, kron using Zi, tau, tau
+    t1_uww_W = Zi * W_dir * tau' * W_dir * tau' + tau * W_dir' * Zi * W_dir * tau' + (Zi * W_dir * tau' * W_dir * tau')'
+    U_corr .+= -4 * v * smat_to_svec!(similar(U_corr), t1_uww_W, cone.rt2)
+    t1_uww_U =
+        Zi * U_dir * tau * W_dir' * tau +
+        Zi * W_dir * tau' * U_dir * tau +
+        tau * W_dir' * Zi * U_dir * tau
+    W_corr .+= -8 * v * (vec(t1_uww_U))
+    # uww term 2, kron using Wtau, Zi, Zi and kron using I, Zi, Zi
+    t2_uww_W = Zi * W_dir * Wtau * W_dir' * Zi + Zi * W_dir * W_dir' * Zi
+    U_corr .+= -4 * v * smat_to_svec!(similar(U_corr), t2_uww_W, cone.rt2)
+    t2_uww_U = Zi * U_dir * Zi * W_dir * Wtau + Zi * U_dir * Zi * W_dir
+    W_corr .+= -8 * v * vec_copy_to!(similar(W_corr), t2_uww_U)
+
     @show corr ./ (reshape(reshape(third_debug, dim^2, dim) * primal_dir, dim, dim) * primal_dir)
 
     # Tvvv
