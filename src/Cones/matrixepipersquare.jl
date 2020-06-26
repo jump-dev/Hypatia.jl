@@ -29,25 +29,24 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
     U_idxs::UnitRange{Int}
     v_idx::Int
     W_idxs::UnitRange{Int}
-    U::Hermitian{R,Matrix{R}}
-    dual_U::Hermitian{R,Matrix{R}}
+    U::Hermitian{R, Matrix{R}}
+    dual_U::Hermitian{R, Matrix{R}}
     W::Matrix{R}
     dual_W::Matrix{R}
-    Z::Hermitian{R,Matrix{R}}
+    Z::Hermitian{R, Matrix{R}}
     fact_Z
     Zi::Hermitian{R, Matrix{R}}
     ZiW::Matrix{R}
-    ZiUZi::Hermitian{R,Matrix{R}}
+    ZiUZi::Hermitian{R, Matrix{R}}
     tmpmm::Matrix{R}
     tmpnn::Matrix{R}
-
-    correction::Vector{T}
 
     function MatrixEpiPerSquare{T, R}(
         d1::Int,
@@ -85,6 +84,7 @@ function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     d1 = cone.d1
@@ -98,7 +98,6 @@ function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}
     cone.ZiUZi = Hermitian(zeros(R, d1, d1), :U)
     cone.tmpmm = Matrix{R}(undef, d2, d2)
     cone.tmpnn = Matrix{R}(undef, d1, d1)
-    cone.correction = zeros(T, dim)
     return
 end
 
@@ -137,8 +136,21 @@ function update_feas(cone::MatrixEpiPerSquare)
     return cone.is_feas
 end
 
-# TODO
-update_dual_feas(cone::MatrixEpiPerSquare) = true
+function update_dual_feas(cone::MatrixEpiPerSquare)
+    v = cone.dual_point[cone.v_idx]
+    if v > 0
+        @views U = svec_to_smat!(cone.dual_U.data, cone.dual_point[cone.U_idxs], cone.rt2)
+        F = cholesky!(cone.dual_U, check = false)
+        isposdef(F) || return false
+        @views W = vec_copy_to!(cone.dual_W, cone.dual_point[cone.W_idxs])
+        LW = ldiv!(F.L, W)
+        trLW = sum(abs2, LW)
+        if 2 * v >= trLW
+            return true
+        end
+    end
+    return false
+end
 
 function update_grad(cone::MatrixEpiPerSquare)
     @assert cone.is_feas
@@ -307,21 +319,21 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     t1_uvw_U = Zi * U_dir * tau * 2
     U_corr .+= -4 * v_dir * smat_to_svec!(similar(U_corr), t1_uvw_W, cone.rt2)
     # corr[v_idx] += -4 * dot(U_dir, t1_uvw_W)
-    corr[v_idx] += -4 * dot(W_dir, t1_uvw_U)
+    corr[v_idx] += -4 * real(dot(W_dir, t1_uvw_U))
     W_corr .+= -4 * v_dir * vec_copy_to!(similar(W_corr), t1_uvw_U)
     # uvw term 2, kron using ZiUZi and tau times v
     t2_uvw_W = ZiUZi * W_dir * tau' + (ZiUZi * W_dir * tau')'  # TODO could do reuse either of these two in corr[v_idx]
     t2_uvw_U = ZiUZi * U_dir * tau * 2
     U_corr .+= 8 * v * v_dir * smat_to_svec!(similar(U_corr), t2_uvw_W, cone.rt2)
     # corr[v_idx] += 8 * v * dot(U_dir, t2_uvw_W)
-    corr[v_idx] += 8 * v * dot(W_dir, t2_uvw_U)
+    corr[v_idx] += 8 * v * real(dot(W_dir, t2_uvw_U))
     W_corr .+= 8 * v * v_dir * vec_copy_to!(similar(W_corr), t2_uvw_U)
     # uvw term 3, kron using ZiUZiW and Zi
     t3_uvw_W = Zi * W_dir * ZiUZiW' + (Zi * W_dir * ZiUZiW')'  # TODO could do reuse either of these two in corr[v_idx]
     t3_uvw_U = Zi * U_dir * ZiUZiW * 2
     U_corr .+= 8 * v * v_dir * smat_to_svec!(similar(U_corr), t3_uvw_W, cone.rt2)
     # corr[v_idx] += 8 * v * dot(U_dir, t3_uvw_W)
-    corr[v_idx] += 8 * v * dot(W_dir, t3_uvw_U)
+    corr[v_idx] += 8 * v * real(dot(W_dir, t3_uvw_U))
     W_corr .+= 8 * v * v_dir * vec_copy_to!(similar(W_corr), t3_uvw_U)
 
     # uww term 1, kron using Zi, tau, tau
@@ -331,7 +343,7 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
         Zi * U_dir * tau * W_dir' * tau +
         Zi * W_dir * tau' * U_dir * tau +
         tau * W_dir' * Zi * U_dir * tau
-    W_corr .+= -8 * v * (vec(t1_uww_U))
+    W_corr .+= -8 * v * vec_copy_to!(similar(W_corr), t1_uww_U)
     # uww term 2, kron using Wtau, Zi, Zi and kron using I, Zi, Zi
     t2_uww_W = Zi * W_dir * Wtau * W_dir' * Zi + Zi * W_dir * W_dir' * Zi
     U_corr .+= -4 * v * smat_to_svec!(similar(U_corr), t2_uww_W, cone.rt2)
@@ -341,11 +353,11 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     # uuv term1 kron of Zi and Zi
     t1_uuv_U = Zi * U_dir * Zi
     U_corr .+= 16 * v * v_dir * smat_to_svec!(similar(U_corr), t1_uuv_U, cone.rt2)
-    corr[v_idx] += 8 * v * dot(U_dir, t1_uuv_U)
+    corr[v_idx] += 8 * v * real(dot(U_dir, t1_uuv_U))
     # uuv term2 kron of ZiUZi and Zi
     t2_uuv_U = ZiUZi * U_dir * Zi + Zi * U_dir * ZiUZi
     U_corr .+= -16 * abs2(v) * v_dir * smat_to_svec!(similar(U_corr), t2_uuv_U, cone.rt2)
-    corr[v_idx] += -8 * abs2(v) * dot(U_dir, t2_uuv_U)
+    corr[v_idx] += -8 * abs2(v) * real(dot(U_dir, t2_uuv_U))
 
     # uuu
     U_corr .+= -16 * v ^ 3 * smat_to_svec!(similar(U_corr), Zi * U_dir * Zi * U_dir * Zi, cone.rt2)
@@ -357,9 +369,9 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     W_corr .+= 16 * abs2(v) * vec_copy_to!(similar(W_corr), uuv_UU)
 
     # Tvvv
-    third[v_idx, v_idx, v_idx] = -16 * tr(ZiU ^ 3) + 2 * (d1 - 1) / v ^ 3
+    third[v_idx, v_idx, v_idx] = -16 * real(tr(ZiU ^ 3)) + 2 * (d1 - 1) / v ^ 3
 
-    vvv = -16 * tr(ZiU ^ 3) + 2 * (d1 - 1) / v ^ 3
+    vvv = -16 * real(tr(ZiU ^ 3)) + 2 * (d1 - 1) / v ^ 3
 
     corr[v_idx] += vvv * abs2(v_dir)
 
@@ -378,21 +390,21 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
 
     # vvw
     vvw_W = ZiUZiUZi * W
-    corr[v_idx] += 32 * v_dir * dot(vvw_W, W_dir)
+    corr[v_idx] += 32 * v_dir * real(dot(vvw_W, W_dir))
     W_corr .+= 16 * abs2(v_dir) * vec_copy_to!(similar(W_corr), vvw_W)
 
     # vww
     # term 1 kron of ZiUZi and Wtau plus kron of ZiUZi and I
     t1_vvw_W = ZiUZi * W_dir * Wtau + ZiUZi * W_dir
-    corr[v_idx] += -4 * dot(t1_vvw_W, W_dir)
+    corr[v_idx] += -4 * real(dot(t1_vvw_W, W_dir))
     W_corr .+= -8 * v_dir * vec_copy_to!(similar(W_corr), t1_vvw_W)
     # term 2 kron of Zi and (W' * ZiU * tau)
     t2_vvw_W = Zi * W_dir * (W' * ZiU * tau)
-    corr[v_idx] += -4 * dot(t2_vvw_W, W_dir)
+    corr[v_idx] += -4 * real(dot(t2_vvw_W, W_dir))
     W_corr .+= -8 * v_dir * vec_copy_to!(similar(W_corr), t2_vvw_W)
     # term 3 kron of (ZiU * tau)' and tau
     t3_vvw_W = (ZiU * tau) * W_dir' * tau + tau * W_dir' * (ZiU * tau)
-    corr[v_idx] += -4 * dot(t3_vvw_W, W_dir)
+    corr[v_idx] += -4 * real(dot(t3_vvw_W, W_dir))
     W_corr .+= -8 * v_dir * vec_copy_to!(similar(W_corr), t3_vvw_W)
 
     corr ./= -2
@@ -402,24 +414,24 @@ end
 
 
 
-# TODO for experimenting with jordan hessian / inverse-hessian products like S * vec * S
-function symmat(s::AbstractVector{T}, d1, d2) where {T <: Real}
-    @assert d1 <= d2
-    side = d1 + d2
-    v_idx = svec_length(d1) + 1
-    S = zeros(T, side, side)
-    @views svec_to_smat!(S[1:d1, 1:d1], s[1:(v_idx - 1)], sqrt(T(2)))
-    S[(d1 + 1):end, (d1 + 1):end] += 2 * s[v_idx] * I
-    @views vec_copy_to!(S[1:d1, (d1 + 1):end], s[(v_idx + 1):end])
-    S = Symmetric(S, :U)
-    return M
-end
-function symvec(S::AbstractMatrix{T}, d1, d2) where {T <: Real}
-    @assert d1 <= d2
-    v_idx = svec_length(d1) + 1
-    s = zeros(T, v_idx + 1 + d1 * d2)
-    @views smat_to_svec!(s[1:(v_idx - 1)], S[1:d1, 1:d1], sqrt(T(2)))
-    s[v_idx] = M[end, end] / 2
-    @views vec_copy_to!(s[(v_idx + 1):end], S[1:d1, (d1 + 1):end])
-    return v
-end
+# # TODO for experimenting with jordan hessian / inverse-hessian products like S * vec * S
+# function symmat(s::AbstractVector{T}, d1, d2) where {T <: Real}
+#     @assert d1 <= d2
+#     side = d1 + d2
+#     v_idx = svec_length(d1) + 1
+#     S = zeros(T, side, side)
+#     @views svec_to_smat!(S[1:d1, 1:d1], s[1:(v_idx - 1)], sqrt(T(2)))
+#     S[(d1 + 1):end, (d1 + 1):end] += 2 * s[v_idx] * I
+#     @views vec_copy_to!(S[1:d1, (d1 + 1):end], s[(v_idx + 1):end])
+#     S = Symmetric(S, :U)
+#     return M
+# end
+# function symvec(S::AbstractMatrix{T}, d1, d2) where {T <: Real}
+#     @assert d1 <= d2
+#     v_idx = svec_length(d1) + 1
+#     s = zeros(T, v_idx + 1 + d1 * d2)
+#     @views smat_to_svec!(s[1:(v_idx - 1)], S[1:d1, 1:d1], sqrt(T(2)))
+#     s[v_idx] = M[end, end] / 2
+#     @views vec_copy_to!(s[(v_idx + 1):end], S[1:d1, (d1 + 1):end])
+#     return v
+# end

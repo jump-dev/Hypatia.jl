@@ -1082,7 +1082,8 @@ function epinormspectral4(T; options...)
 end
 
 function matrixepipersquare1(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     Random.seed!(1)
     for is_complex in (false, true), (Xn, Xm) in [(1, 1), (1, 3), (2, 2), (2, 3)]
         R = (is_complex ? Complex{T} : T)
@@ -1120,7 +1121,8 @@ function matrixepipersquare1(T; options...)
 end
 
 function matrixepipersquare2(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
     for is_complex in (false, true)
@@ -1155,7 +1157,8 @@ function matrixepipersquare2(T; options...)
 end
 
 function matrixepipersquare3(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    # tol = sqrt(sqrt(eps(T)))
+    tol = 1e-4
     Random.seed!(1)
     (Xn, Xm) = (2, 4)
     for is_complex in (false, true)

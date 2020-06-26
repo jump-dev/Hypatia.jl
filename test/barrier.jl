@@ -91,15 +91,15 @@ function test_barrier_oracles(
         (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
         corr = CO.correction2(cone, primal_dir)
         @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
-        if dim < 5 && T in (Float32, Float64)
-            println("starting fd 3o")
-            FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
-            # check log-homog property that F'''(s)[s] = -2F''(s)
-            @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess atol=tol rtol=tol
-            FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
-            @show FD_corr ./ corr
-            @test FD_corr ≈ corr atol=tol rtol=tol
-        end
+        # if dim < 8 && T in (Float32, Float64)
+        #     println("starting fd 3o")
+        #     FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
+        #     # check log-homog property that F'''(s)[s] = -2F''(s)
+        #     @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess atol=tol rtol=tol
+        #     FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
+        #     @show FD_corr ./ corr
+        #     @test FD_corr ≈ corr atol=tol rtol=tol
+        # end
         println("done correction tests")
     end
 
@@ -310,24 +310,24 @@ end
 function test_matrixepipersquare_barrier(T::Type{<:Real})
     for (n, m) in [(1, 1), (1, 2), (2, 2), (2, 4), (3, 4)]
         # real matrixepipersquare barrier
-        per_idx = CO.svec_length(n) + 1
-        function R_barrier(s)
-            U = CO.svec_to_smat!(similar(s, n, n), s[1:(per_idx - 1)], sqrt(T(2)))
-            v = s[per_idx]
-            W = reshape(s[(per_idx + 1):end], n, m)
-            return -logdet(cholesky!(Symmetric(2 * v * U - W * W', :U))) + (n - 1) * log(v)
-        end
-        test_barrier_oracles(CO.MatrixEpiPerSquare{T, T}(n, m), R_barrier)
-
-        # # complex matrixepipersquare barrier
-        # per_idx = n ^ 2 + 1
-        # function C_barrier(s)
-        #     U = CO.svec_to_smat!(zeros(Complex{eltype(s)}, n, n), s[1:(per_idx - 1)], sqrt(T(2)))
+        # per_idx = CO.svec_length(n) + 1
+        # function R_barrier(s)
+        #     U = CO.svec_to_smat!(similar(s, n, n), s[1:(per_idx - 1)], sqrt(T(2)))
         #     v = s[per_idx]
-        #     W = CO.rvec_to_cvec!(zeros(Complex{eltype(s)}, n, m), s[(per_idx + 1):end])
-        #     return -logdet(cholesky!(Hermitian(2 * v * U - W * W', :U))) + (n - 1) * log(v)
+        #     W = reshape(s[(per_idx + 1):end], n, m)
+        #     return -logdet(cholesky!(Symmetric(2 * v * U - W * W', :U))) + (n - 1) * log(v)
         # end
-        # test_barrier_oracles(CO.MatrixEpiPerSquare{T, Complex{T}}(n, m), C_barrier)
+        # test_barrier_oracles(CO.MatrixEpiPerSquare{T, T}(n, m), R_barrier)
+
+        # complex matrixepipersquare barrier
+        per_idx = n ^ 2 + 1
+        function C_barrier(s)
+            U = CO.svec_to_smat!(zeros(Complex{eltype(s)}, n, n), s[1:(per_idx - 1)], sqrt(T(2)))
+            v = s[per_idx]
+            W = CO.rvec_to_cvec!(zeros(Complex{eltype(s)}, n, m), s[(per_idx + 1):end])
+            return -logdet(cholesky!(Hermitian(2 * v * U - W * W', :U))) + (n - 1) * log(v)
+        end
+        test_barrier_oracles(CO.MatrixEpiPerSquare{T, Complex{T}}(n, m), C_barrier)
     end
     return
 end
