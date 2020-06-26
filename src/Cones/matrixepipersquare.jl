@@ -320,11 +320,13 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::MatrixE
         @views U_prod = prod[U_idxs, i]
         @views W_prod = prod[W_idxs, i]
 
-        tmpd1d1 = 4 * abs2(v) * (Zi * U_arr * Zi) # TODO factor out
-        U_prod .+= smat_to_svec!(similar(U_prod), tmpd1d1, cone.rt2)
         tmpd1d1 .= 2 * (2 * v * cone.ZiUZi - cone.Zi)
-        U_prod .+= v_arr * smat_to_svec!(similar(U_prod), tmpd1d1, cone.rt2)
         prod[v_idx, i] += real(dot(tmpd1d1, U_arr))
+        @. tmpd1d1 *= v_arr
+
+        tmpd1d1 += 4 * abs2(v) * (Zi * U_arr * Zi) # TODO factor out
+        U_prod .+= smat_to_svec!(similar(U_prod), tmpd1d1, cone.rt2)
+
         tmpd1d1 = cone.Zi * W_arr * ZiW' # TODO factor out here and in other cones, symmetrized generic kronecker
         tmpd1d1 = tmpd1d1 + tmpd1d1'
         U_prod .-= 2 * v * smat_to_svec!(similar(U_prod), tmpd1d1, cone.rt2)
@@ -334,11 +336,8 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::MatrixE
 
         prod[v_idx, i] -= 4 * real(dot(cone.ZiUZiW, W_arr))
 
-        W_prod .-= 4 * v_arr * vec_copy_to!(similar(W_prod), cone.ZiUZiW)
-        tmpd1d2 = cone.Zi * U_arr * ZiW # TODO factor out here and in other cones, unsymmetrized generic kronecker
-        W_prod .-= 4 * v * vec_copy_to!(similar(W_prod), tmpd1d2)
-        tmpd1d2 = Zi * W_arr * cone.WtZiW + Zi * W_arr + ZiW * W_arr' * ZiW
-        W_prod .+= 2 * vec_copy_to!(similar(W_prod), tmpd1d2)
+        tmpd1d2 = 2 * (cone.fact_Z \ (W_arr * (cone.WtZiW + I) + (W * W_arr' - 2 * v * U_arr - 2 * v_arr * U) * ZiW))
+        W_prod .+= vec_copy_to!(similar(W_prod), tmpd1d2)
 
     end
     return prod
