@@ -22,6 +22,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
+    hess_prod_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
@@ -45,8 +46,10 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     Zi::Hermitian{R, Matrix{R}}
     ZiW::Matrix{R}
     ZiUZi::Hermitian{R, Matrix{R}}
-    tmpmm::Matrix{R}
-    tmpnn::Matrix{R}
+    WtZiW::Hermitian{R, Matrix{R}}
+    tmpd2d2::Matrix{R}
+    tmpd1d1::Matrix{R}
+    ZiUZiW::Matrix{R}
 
     function MatrixEpiPerSquare{T, R}(
         d1::Int,
@@ -74,6 +77,9 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
+reset_data(cone::MatrixEpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated =
+    cone.hess_fact_updated = cone.hess_prod_updated = false)
+
 # TODO only allocate the fields we use
 function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
@@ -96,8 +102,10 @@ function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}
     cone.Z = Hermitian(zeros(R, d1, d1), :U)
     cone.ZiW = Matrix{R}(undef, d1, d2)
     cone.ZiUZi = Hermitian(zeros(R, d1, d1), :U)
-    cone.tmpmm = Matrix{R}(undef, d2, d2)
-    cone.tmpnn = Matrix{R}(undef, d1, d1)
+    cone.WtZiW = Hermitian(zeros(R, d2, d2), :U)
+    cone.tmpd2d2 = Matrix{R}(undef, d2, d2)
+    cone.tmpd1d1 = Matrix{R}(undef, d1, d1)
+    cone.ZiUZiW = Matrix{R}(undef, d1, d2)
     return
 end
 
@@ -171,8 +179,22 @@ function update_grad(cone::MatrixEpiPerSquare)
     return cone.grad
 end
 
-function update_hess(cone::MatrixEpiPerSquare)
+function update_hess_prod(cone::MatrixEpiPerSquare) # TODO here and in other cones these are misleading names since also needed for just hess
     @assert cone.grad_updated
+    ZiUZi = cone.ZiUZi
+    ldiv!(ZiUZi.data, cone.fact_Z, cone.U)
+    rdiv!(ZiUZi.data, cone.fact_Z)
+    mul!(cone.WtZiW.data, cone.W', cone.ZiW) # TODO outer product
+    # TODO better to do ZiU * ZiW?
+    mul!(cone.ZiUZiW, cone.ZiUZi, cone.W)
+    cone.hess_prod_updated = true
+    return cone.hess_prod_updated
+end
+
+function update_hess(cone::MatrixEpiPerSquare)
+    if !cone.hess_prod_updated
+        update_hess_prod(cone)
+    end
     d1 = cone.d1
     d2 = cone.d2
     dim = cone.dim
@@ -183,16 +205,17 @@ function update_hess(cone::MatrixEpiPerSquare)
     W = cone.W
     v = cone.point[cone.v_idx]
     H = cone.hess.data
-    tmpmm = cone.tmpmm
+    tmpd2d2 = cone.tmpd2d2
     ZiUZi = cone.ZiUZi
-    tmpnn = cone.tmpnn
+    tmpd1d1 = cone.tmpd1d1
     Zi = cone.Zi
     ZiW = cone.ZiW
     idx_incr = (cone.is_complex ? 2 : 1)
 
     # H_W_W part
-    mul!(tmpmm, W', ZiW)
-    tmpmm += I # TODO inefficient
+    # TODO inefficient
+    copyto!(tmpd2d2, cone.WtZiW)
+    tmpd2d2 += I # TODO inefficient
 
     # TODO parallelize loops
     r_idx = v_idx + 1
@@ -200,10 +223,10 @@ function update_hess(cone::MatrixEpiPerSquare)
         c_idx = r_idx
         @inbounds for k in i:d2
             ZiWjk = ZiW[j, k]
-            tmpmmik = tmpmm[i, k]
+            tmpd2d2ik = tmpd2d2[i, k]
             lstart = (i == k ? j : 1)
             @inbounds for l in lstart:d1
-                term1 = Zi[l, j] * tmpmmik
+                term1 = Zi[l, j] * tmpd2d2ik
                 term2 = ZiW[l, i] * ZiWjk
                 hess_element(H, r_idx, c_idx, term1, term2)
                 c_idx += idx_incr
@@ -219,8 +242,6 @@ function update_hess(cone::MatrixEpiPerSquare)
     @. @views H_U_U *= 4 * abs2(v)
 
     # H_v_v part
-    ldiv!(ZiUZi.data, cone.fact_Z, U)
-    rdiv!(ZiUZi.data, cone.fact_Z)
     @views H[v_idx, v_idx] = 4 * dot(ZiUZi, U) - (d1 - 1) / v / v
 
     # H_U_W part
@@ -261,18 +282,66 @@ function update_hess(cone::MatrixEpiPerSquare)
     @. @views H[U_idxs, W_idxs] *= -2v
 
     # H_v_W part
-    # NOTE overwrites ZiW
-    # TODO better to do ZiU * ZiW?
-    mul!(ZiW, ZiUZi, W, -4, false)
-    @views vec_copy_to!(H[v_idx, W_idxs], ZiW)
+    @views vec_copy_to!(H[v_idx, W_idxs], cone.ZiUZiW)
+    @. @views H[v_idx, W_idxs] *= -4
 
     # H_U_v part
-    copyto!(tmpnn, ZiUZi)
-    axpby!(-2, Zi, 4v, tmpnn)
-    @views smat_to_svec!(H[U_idxs, v_idx], tmpnn, cone.rt2)
+    copyto!(tmpd1d1, ZiUZi)
+    axpby!(-2, Zi, 4v, tmpd1d1)
+    @views smat_to_svec!(H[U_idxs, v_idx], tmpd1d1, cone.rt2)
 
     cone.hess_updated = true
     return cone.hess
+end
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::MatrixEpiPerSquare)
+    if !cone.hess_prod_updated
+        update_hess_prod(cone)
+    end
+
+    U_idxs = cone.U_idxs
+    v_idx = cone.v_idx
+    W_idxs = cone.W_idxs
+    U = cone.U
+    W = cone.W
+    v = cone.point[cone.v_idx]
+    ZiUZi = cone.ZiUZi
+    tmpd1d1 = cone.tmpd1d1
+    Zi = cone.Zi
+    ZiW = cone.ZiW
+
+    prod .= 0
+
+    for i in 1:size(arr, 2)
+        U_arr = Hermitian(svec_to_smat!(similar(U.data), arr[U_idxs, i], cone.rt2))
+        W_arr = vec_copy_to!(similar(W), arr[W_idxs, i])
+        v_arr = arr[v_idx, i]
+
+        @views U_prod = prod[U_idxs, i]
+        @views W_prod = prod[W_idxs, i]
+
+        tmpd1d1 = 4 * abs2(v) * (Zi * U_arr * Zi) # TODO factor out
+        U_prod .+= smat_to_svec!(similar(U_prod), tmpd1d1, cone.rt2)
+        tmpd1d1 .= 2 * (2 * v * cone.ZiUZi - cone.Zi)
+        U_prod .+= v_arr * smat_to_svec!(similar(U_prod), tmpd1d1, cone.rt2)
+        prod[v_idx, i] += real(dot(tmpd1d1, U_arr))
+        tmpd1d1 = cone.Zi * W_arr * ZiW' # TODO factor out here and in other cones, symmetrized generic kronecker
+        tmpd1d1 = tmpd1d1 + tmpd1d1'
+        U_prod .-= 2 * v * smat_to_svec!(similar(U_prod), tmpd1d1, cone.rt2)
+
+        Hvv = 4 * dot(ZiUZi, U) - (cone.d1 - 1) / v / v # TODO factor into update_hess?
+        prod[v_idx, i] += Hvv * v_arr
+
+        prod[v_idx, i] -= 4 * real(dot(cone.ZiUZiW, W_arr))
+
+        W_prod .-= 4 * v_arr * vec_copy_to!(similar(W_prod), cone.ZiUZiW)
+        tmpd1d2 = cone.Zi * U_arr * ZiW # TODO factor out here and in other cones, unsymmetrized generic kronecker
+        W_prod .-= 4 * v * vec_copy_to!(similar(W_prod), tmpd1d2)
+        tmpd1d2 = Zi * W_arr * cone.WtZiW + Zi * W_arr + ZiW * W_arr' * ZiW
+        W_prod .+= 2 * vec_copy_to!(similar(W_prod), tmpd1d2)
+
+    end
+    return prod
 end
 
 # TODO reduce allocs
@@ -290,8 +359,8 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     v = cone.point[cone.v_idx]
 
     Zi = Hermitian(cone.Zi)
-    tau = Zi * W # TODO don't do that, cache, rename
-    Wtau = W' * tau # TODO don't do that, cache, rename
+    tau = cone.ZiW # TODO rename
+    WtZiW = cone.WtZiW
     ZiUZi = cone.ZiUZi
     ZiUZiUZi = Hermitian(ZiUZi * U * Zi)
     T = Float64
@@ -308,7 +377,7 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     v_dir = primal_dir[v_idx]
 
     ZiU = cone.fact_Z \ U # TODO cache or don't use
-    ZiUZiW = ZiU * tau
+    ZiUZiW = cone.ZiUZiW
 
     # uvv
     U_corr .+= 8 * abs2(v_dir) * smat_to_svec!(similar(U_corr), ZiUZi - 2 * v * ZiUZiUZi, cone.rt2)
@@ -344,10 +413,10 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
         Zi * W_dir * tau' * U_dir * tau +
         tau * W_dir' * Zi * U_dir * tau
     W_corr .+= -8 * v * vec_copy_to!(similar(W_corr), t1_uww_U)
-    # uww term 2, kron using Wtau, Zi, Zi and kron using I, Zi, Zi
-    t2_uww_W = Zi * W_dir * Wtau * W_dir' * Zi + Zi * W_dir * W_dir' * Zi
+    # uww term 2, kron using WtZiW, Zi, Zi and kron using I, Zi, Zi
+    t2_uww_W = Zi * W_dir * WtZiW * W_dir' * Zi + Zi * W_dir * W_dir' * Zi
     U_corr .+= -4 * v * smat_to_svec!(similar(U_corr), t2_uww_W, cone.rt2)
-    t2_uww_U = Zi * U_dir * Zi * W_dir * Wtau + Zi * U_dir * Zi * W_dir
+    t2_uww_U = Zi * U_dir * Zi * W_dir * WtZiW + Zi * U_dir * Zi * W_dir
     W_corr .+= -8 * v * vec_copy_to!(similar(W_corr), t2_uww_U)
 
     # uuv term1 kron of Zi and Zi
@@ -377,14 +446,14 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
 
     # www
     # copied from spectral norm cone
-    WtauI = W' * tau + I
+    WtZiWI = W' * tau + I
     Wdirtau = W_dir' * tau
     ZiWdir = cone.fact_Z \ W_dir
-    ZiWdirWtauI = ZiWdir * WtauI
+    ZiWdirWtZiWI = ZiWdir * WtZiWI
     terms_twww = 4 * (
-        tau * (Wdirtau * Wdirtau + W_dir' * ZiWdirWtauI) +
-        ZiWdirWtauI * Wdirtau +
-        ZiWdir * Wdirtau' * WtauI
+        tau * (Wdirtau * Wdirtau + W_dir' * ZiWdirWtZiWI) +
+        ZiWdirWtZiWI * Wdirtau +
+        ZiWdir * Wdirtau' * WtZiWI
         )
     W_corr .+= vec_copy_to!(similar(W_corr), terms_twww)
 
@@ -394,8 +463,8 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     W_corr .+= 16 * abs2(v_dir) * vec_copy_to!(similar(W_corr), vvw_W)
 
     # vww
-    # term 1 kron of ZiUZi and Wtau plus kron of ZiUZi and I
-    t1_vvw_W = ZiUZi * W_dir * Wtau + ZiUZi * W_dir
+    # term 1 kron of ZiUZi and WtZiW plus kron of ZiUZi and I
+    t1_vvw_W = ZiUZi * W_dir * WtZiW + ZiUZi * W_dir
     corr[v_idx] += -4 * real(dot(t1_vvw_W, W_dir))
     W_corr .+= -8 * v_dir * vec_copy_to!(similar(W_corr), t1_vvw_W)
     # term 2 kron of Zi and (W' * ZiU * tau)
