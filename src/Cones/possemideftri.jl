@@ -266,28 +266,6 @@ function update_nt(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} wher
     return
 end
 
-# # TODO think about whether mat5 can be removed
-# function correction(cone::PosSemidefTri, primal_dir::AbstractVector, dual_dir::AbstractVector)#, primal_point)
-#     @assert cone.grad_updated
-#
-#     S = copytri!(svec_to_smat!(cone.mat5, primal_dir, cone.rt2), 'U', cone.is_complex)
-#     Z = Hermitian(svec_to_smat!(cone.mat3, dual_dir, cone.rt2))
-#
-#     # TODO compare the following numerically
-#     # Pinv_S_Z = mul!(cone.work_mat3, ldiv!(cone.fact, S), Z)
-#     # Pinv_S_Z = ldiv!(cone.fact, mul!(cone.work_mat3, S, Z))
-#     # TODO reuse factorization if useful
-#     # fact = cholesky(Hermitian(svec_to_smat!(cone.work_mat3, primal_point, cone.rt2), :U))
-#     fact = cholesky(Hermitian(svec_to_smat!(cone.mat4, cone.point, cone.rt2), :U))
-#     Pinv_S_Z = mul!(cone.mat4, ldiv!(fact, S), Z)
-#
-#     Pinv_S_Z_symm = cone.mat5
-#     @. Pinv_S_Z_symm = (Pinv_S_Z + Pinv_S_Z') / 2
-#     smat_to_svec!(cone.correction, Pinv_S_Z_symm, cone.rt2)
-#
-#     return cone.correction
-# end
-
 function correction2(cone::PosSemidefTri, primal_dir::AbstractVector)
     @assert cone.grad_updated
 
