@@ -81,27 +81,27 @@ function test_barrier_oracles(
         end
     end
 
-    # # check 3rd order corrector agrees with ForwardDiff
-    # # too slow if cone is too large or not using BlasReals
-    # if CO.use_correction(cone)
-    #     println("starting correction tests: $dim")
-    #     # check correction satisfies log-homog property F'''(s)[s, s] = -2F''(s) * s = 2F'(s)
-    #     @test -CO.correction2(cone, point) ≈ grad atol=tol rtol=tol # TODO delete third arg
-    #     # check correction term agrees with directional 3rd derivative
-    #     (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
-    #     corr = CO.correction2(cone, primal_dir)
-    #     @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
-    #     # if dim < 8 && T in (Float32, Float64)
-    #     #     println("starting fd 3o")
-    #     #     FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
-    #     #     # check log-homog property that F'''(s)[s] = -2F''(s)
-    #     #     @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess atol=tol rtol=tol
-    #     #     FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
-    #     #     @show FD_corr ./ corr
-    #     #     @test FD_corr ≈ corr atol=tol rtol=tol
-    #     # end
-    #     println("done correction tests")
-    # end
+    # check 3rd order corrector agrees with ForwardDiff
+    # too slow if cone is too large or not using BlasReals
+    if CO.use_correction(cone)
+        println("starting correction tests: $dim")
+        # check correction satisfies log-homog property F'''(s)[s, s] = -2F''(s) * s = 2F'(s)
+        @test -CO.correction2(cone, point) ≈ grad atol=tol rtol=tol # TODO delete third arg
+        # check correction term agrees with directional 3rd derivative
+        (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
+        corr = CO.correction2(cone, primal_dir)
+        @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
+        if dim < 6 && T in (Float32, Float64)
+            println("starting fd 3o")
+            FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
+            # check log-homog property that F'''(s)[s] = -2F''(s)
+            @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess atol=tol rtol=tol
+            FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
+            @show FD_corr ./ corr
+            @test FD_corr ≈ corr atol=tol rtol=tol
+        end
+        println("done correction tests")
+    end
 
     return
 end
@@ -215,16 +215,12 @@ function test_hypoperlog_barrier(T::Type{<:Real})
         (u, v, w) = (s[1], s[2], s[3:end])
         return -log(v * sum(log(wj / v) for wj in w) - u) - sum(log, w) - length(w) * log(v)
     end
-
-
-
-    # TODO
-    for dim in [3]#, 5, 10]
+    for dim in [3, 5, 10]
         test_barrier_oracles(CO.HypoPerLog{T}(dim), barrier, init_tol = 1e-5)
     end
-    # for dim in [15, 65, 75, 100, 500]
-    #     test_barrier_oracles(CO.HypoPerLog{T}(dim), barrier, init_tol = 1e-1, init_only = true)
-    # end
+    for dim in [15, 65, 75, 100, 500]
+        test_barrier_oracles(CO.HypoPerLog{T}(dim), barrier, init_tol = 1e-1, init_only = true)
+    end
     return
 end
 
@@ -237,14 +233,14 @@ function test_episumperentropy_barrier(T::Type{<:Real})
         end
         test_barrier_oracles(CO.EpiSumPerEntropy{T}(dim), barrier, init_tol = 1e-5)
     end
-    # for w_dim in [15, 65, 75, 100, 500]
-    #     function barrier(s)
-    #         (u, v, w) = (s[1], s[2:2:(dim - 1)], s[3:2:dim])
-    #         return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) - sum(log(vi) + log(wi) for (vi, wi) in zip(v, w))
-    #     end
-    #     dim = 1 + 2 * w_dim
-    #     test_barrier_oracles(CO.EpiSumPerEntropy{T}(dim), barrier, init_tol = 1e-1, init_only = true)
-    # end
+    for w_dim in [15, 65, 75, 100, 500]
+        function barrier(s)
+            (u, v, w) = (s[1], s[2:2:(dim - 1)], s[3:2:dim])
+            return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) - sum(log(vi) + log(wi) for (vi, wi) in zip(v, w))
+        end
+        dim = 1 + 2 * w_dim
+        test_barrier_oracles(CO.EpiSumPerEntropy{T}(dim), barrier, init_tol = 1e-1, init_only = true)
+    end
     return
 end
 
@@ -279,9 +275,9 @@ function test_hypogeomean_barrier(T::Type{<:Real})
         else
             test_barrier_oracles(cone, barrier, init_tol = 1e-2, init_only = true)
         end
-        # # test initial point when all alphas are the same
-        # cone = CO.HypoGeomean{T}(fill(inv(T(dim - 1)), dim - 1))
-        # test_barrier_oracles(cone, barrier, init_tol = sqrt(eps(T)), init_only = true)
+        # test initial point when all alphas are the same
+        cone = CO.HypoGeomean{T}(fill(inv(T(dim - 1)), dim - 1))
+        test_barrier_oracles(cone, barrier, init_tol = sqrt(eps(T)), init_only = true)
     end
     return
 end
@@ -295,7 +291,6 @@ function test_epinormspectral_barrier(T::Type{<:Real})
         end
         test_barrier_oracles(CO.EpiNormSpectral{T, T}(n, m), R_barrier)
 
-        # TODO uncomment
         # complex epinormspectral barrier
         function C_barrier(s)
             u = s[1]
@@ -420,47 +415,47 @@ end
 
 function test_hypoperlogdettri_barrier(T::Type{<:Real})
     for side in [1, 2, 3, 4, 6, 10, 15, 20]
-        # # real logdet barrier
-        # dim = 2 + CO.svec_length(side)
-        # cone = CO.HypoPerLogdetTri{T, T}(dim)
-        # function R_barrier(s)
-        #     (u, v, W) = (s[1], s[2], zeros(eltype(s), side, side))
-        #     CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
-        #     return cone.sc_const * (-log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - (side + 1) * log(v))
-        # end
-        # if side <= 10
-        #     test_barrier_oracles(cone, R_barrier, init_tol = 1e-5)
-        # else
-        #     test_barrier_oracles(cone, R_barrier, init_tol = 1e-1, init_only = true)
-        # end
-
-        # try sc_const = 1 (not self-concordant)
+        # real logdet barrier
         dim = 2 + CO.svec_length(side)
-        cone = CO.HypoPerLogdetTri{T, T}(dim, sc_const = 1)
-        function R_barrier_sc1(s)
+        cone = CO.HypoPerLogdetTri{T, T}(dim)
+        function R_barrier(s)
             (u, v, W) = (s[1], s[2], zeros(eltype(s), side, side))
             CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
-            return -log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - (side + 1) * log(v)
+            return cone.sc_const * (-log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - (side + 1) * log(v))
         end
         if side <= 10
-            test_barrier_oracles(cone, R_barrier_sc1, init_tol = 1e-5)
+            test_barrier_oracles(cone, R_barrier, init_tol = 1e-5)
         else
-            test_barrier_oracles(cone, R_barrier_sc1, init_tol = 1e-1, init_only = true)
+            test_barrier_oracles(cone, R_barrier, init_tol = 1e-1, init_only = true)
         end
 
-        # # complex logdet barrier
-        # dim = 2 + side^2
-        # cone = CO.HypoPerLogdetTri{T, Complex{T}}(dim)
-        # function C_barrier(s)
-        #     (u, v, W) = (s[1], s[2], zeros(Complex{eltype(s)}, side, side))
+        # # try sc_const = 1 (not self-concordant)
+        # dim = 2 + CO.svec_length(side)
+        # cone = CO.HypoPerLogdetTri{T, T}(dim, sc_const = 1)
+        # function R_barrier_sc1(s)
+        #     (u, v, W) = (s[1], s[2], zeros(eltype(s), side, side))
         #     CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
-        #     return cone.sc_const * (-log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - (side + 1) * log(v))
+        #     return -log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - (side + 1) * log(v)
         # end
-        # if side <= 4
-        #     test_barrier_oracles(cone, C_barrier, init_tol = 1e-5)
+        # if side <= 10
+        #     test_barrier_oracles(cone, R_barrier_sc1, init_tol = 1e-5)
         # else
-        #     test_barrier_oracles(cone, C_barrier, init_tol = 1e-1, init_only = true)
+        #     test_barrier_oracles(cone, R_barrier_sc1, init_tol = 1e-1, init_only = true)
         # end
+
+        # complex logdet barrier
+        dim = 2 + side^2
+        cone = CO.HypoPerLogdetTri{T, Complex{T}}(dim)
+        function C_barrier(s)
+            (u, v, W) = (s[1], s[2], zeros(Complex{eltype(s)}, side, side))
+            CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
+            return cone.sc_const * (-log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - (side + 1) * log(v))
+        end
+        if side <= 4
+            test_barrier_oracles(cone, C_barrier, init_tol = 1e-5)
+        else
+            test_barrier_oracles(cone, C_barrier, init_tol = 1e-1, init_only = true)
+        end
     end
     return
 end

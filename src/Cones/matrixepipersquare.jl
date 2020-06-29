@@ -49,6 +49,10 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     WtZiW::Hermitian{R, Matrix{R}}
     tmpd2d2::Matrix{R}
     tmpd1d1::Matrix{R}
+    tmpd1d1b::Matrix{R}
+    tmpd1d1c::Matrix{R}
+    tmpd1d1d::Matrix{R}
+    tmpd1d2::Matrix{R}
     ZiUZiW::Matrix{R}
     Hvv::T
 
@@ -106,6 +110,10 @@ function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}
     cone.WtZiW = Hermitian(zeros(R, d2, d2), :U)
     cone.tmpd2d2 = Matrix{R}(undef, d2, d2)
     cone.tmpd1d1 = Matrix{R}(undef, d1, d1)
+    cone.tmpd1d1b = Matrix{R}(undef, d1, d1)
+    cone.tmpd1d1c = Matrix{R}(undef, d1, d1)
+    cone.tmpd1d1d = Matrix{R}(undef, d1, d1)
+    cone.tmpd1d2 = Matrix{R}(undef, d1, d2)
     cone.ZiUZiW = Matrix{R}(undef, d1, d2)
     return
 end
@@ -148,7 +156,7 @@ end
 function update_dual_feas(cone::MatrixEpiPerSquare)
     v = cone.dual_point[cone.v_idx]
     if v > 0
-        @views U = svec_to_smat!(cone.dual_U.data, cone.dual_point[cone.U_idxs], cone.rt2)
+        @views svec_to_smat!(cone.dual_U.data, cone.dual_point[cone.U_idxs], cone.rt2)
         F = cholesky!(cone.dual_U, check = false)
         isposdef(F) || return false
         @views W = vec_copy_to!(cone.dual_W, cone.dual_point[cone.W_idxs])
@@ -299,11 +307,10 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::MatrixE
     v2 = 2 * cone.point[cone.v_idx]
     ZiUZi = cone.ZiUZi
     tmpd1d1 = Hermitian(cone.tmpd1d1, :U)
-    # TODO prealloc
-    temp_U = similar(cone.U)
-    temp_U2 = similar(temp_U)
-    temp_U3 = similar(temp_U.data)
-    temp_W = similar(cone.W)
+    temp_U = Hermitian(cone.tmpd1d1b, :U)
+    temp_U2 = Hermitian(cone.tmpd1d1c, :U)
+    temp_U3 = cone.tmpd1d1d
+    temp_W = cone.tmpd1d2
 
     @inbounds for i in 1:size(arr, 2)
         @views svec_to_smat!(temp_U.data, arr[U_idxs, i], cone.rt2)
@@ -343,128 +350,60 @@ function correction2(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     v_idx = cone.v_idx
     W_idxs = cone.W_idxs
     U = cone.U
-    W = cone.W
     v = cone.point[cone.v_idx]
+    W = cone.W
 
-    Zi = Hermitian(cone.Zi)
-    tau = cone.ZiW # TODO rename
-    WtZiW = cone.WtZiW
-    ZiUZi = cone.ZiUZi
-    ZiUZiUZi = Hermitian(ZiUZi * U * Zi) # TODO outer prod
-    T = Float64
-    v_idx = cone.v_idx
+    @views U_dir = Hermitian(svec_to_smat!(similar(U.data), primal_dir[U_idxs], cone.rt2))
+    v_dir = primal_dir[v_idx]
+    @views W_dir = vec_copy_to!(similar(W), primal_dir[W_idxs])
 
-    third = zeros(dim, dim, dim)
-    third_debug = zeros(dim, dim, dim)
     corr = cone.correction
-    corr .= 0
     U_corr = view(corr, U_idxs)
     W_corr = view(corr, W_idxs)
-    @views U_dir = Hermitian(svec_to_smat!(similar(U.data), primal_dir[U_idxs], cone.rt2))
-    @views W_dir = vec_copy_to!(similar(W), primal_dir[W_idxs])
-    v_dir = primal_dir[v_idx]
 
-    ZiU = cone.fact_Z \ U # TODO cache or don't use
-    ZiUZiW = cone.ZiUZiW
+    v2 = 2 * v
+    vd2 = 2 * v_dir
+    Zi = cone.Zi
+    ZiW = cone.ZiW # TODO AKA tau
+    ZiU = cone.fact_Z \ U # TODO cache
+    ZiWd = cone.fact_Z \ W_dir
+    ZiUd = cone.fact_Z \ U_dir
+    ZiUZi = cone.ZiUZi
+    WtZiW = cone.WtZiW
+    ZiUZiUZi = Hermitian(ZiUZi * ZiU', :U)
+    ZiUZi2v = Hermitian(ZiUZi - v2 * ZiUZiUZi, :U)
+    WdWZi = W_dir * ZiW'
+    WdZiW = W_dir' * ZiW
+    UdZiW = U_dir * ZiW
+    ZiWdWZi = cone.fact_Z \ WdWZi
+    ZiWdWZi2 = Hermitian(ZiWdWZi + ZiWdWZi', :U)
+    ZiUdZiW = cone.fact_Z \ UdZiW
+    ZiUZiWdWZi = ZiU * ZiWdWZi
+    ZiUZiUdZiW = ZiU * ZiUdZiW + ZiUd * cone.ZiUZiW
+    ZiWdWZiUZi = ZiWdWZi * ZiU'
+    ZiWdWZiUZi2 = Hermitian(ZiWdWZiUZi + ZiWdWZiUZi', :U)
+    ZiUdZi = Hermitian(ZiUd / cone.fact_Z, :U)
+    ZiUZiUdZi = ZiU * ZiUdZi
+    ZiUZiUdZi2 = Hermitian(ZiUZiUdZi + ZiUZiUdZi')
+    ZiUdZiWdWZi = ZiUd * ZiWdWZi + ZiWdWZi * ZiUd'
+    WtZiWI = WtZiW + I
+    ZiWdWtZiWI = ZiWd * WtZiWI
+    vdZiUZiUZiW = vd2 * ZiUZiUZi * W
+    WdWtZiWI = W_dir * WtZiWI
+    ZiUZiWdWZiWI = ZiUZi * WdWtZiWI + (ZiWdWZiUZi2 + ZiUZiWdWZi') * W
+    vZiUZiUdZi2 = v * ZiUZiUdZi2 - ZiUdZi
 
-    # uvv
-    U_corr .+= 8 * abs2(v_dir) * smat_to_svec!(similar(U_corr), ZiUZi - 2 * v * ZiUZiUZi, cone.rt2)
-    corr[v_idx] += 16 * v_dir * dot(ZiUZi - 2 * v * ZiUZiUZi, U_dir)
+    Utemp = vd2 * (-vd2 * ZiUZi2v + ZiWdWZi2 - v2 * (ZiUZiWdWZi + ZiUZiWdWZi' + ZiWdWZiUZi2 - 2 * vZiUZiUdZi2)) + v2 * (ZiWdWZi * WdWZi + WdWZi' * ZiWdWZi2 + ZiWd * WtZiWI * ZiWd' + v2 * (v2 * (ZiUd * ZiUdZi) - ZiUdZiWdWZi - ZiUdZiWdWZi'))
+    smat_to_svec!(U_corr, Utemp, cone.rt2)
 
-    # uvw term 1, kron using Zi and tau
-    t1_uvw_W = Zi * W_dir * tau' + (Zi * W_dir * tau')'  # TODO could do reuse either of these two in corr[v_idx]
-    t1_uvw_U = Zi * U_dir * tau * 2
-    U_corr .+= -4 * v_dir * smat_to_svec!(similar(U_corr), t1_uvw_W, cone.rt2)
-    # corr[v_idx] += -4 * dot(U_dir, t1_uvw_W)
-    corr[v_idx] += -4 * real(dot(W_dir, t1_uvw_U))
-    W_corr .+= -4 * v_dir * vec_copy_to!(similar(W_corr), t1_uvw_U)
-    # uvw term 2, kron using ZiUZi and tau times v
-    t2_uvw_W = ZiUZi * W_dir * tau' + (ZiUZi * W_dir * tau')'  # TODO could do reuse either of these two in corr[v_idx]
-    t2_uvw_U = ZiUZi * U_dir * tau * 2
-    U_corr .+= 8 * v * v_dir * smat_to_svec!(similar(U_corr), t2_uvw_W, cone.rt2)
-    # corr[v_idx] += 8 * v * dot(U_dir, t2_uvw_W)
-    corr[v_idx] += 8 * v * real(dot(W_dir, t2_uvw_U))
-    W_corr .+= 8 * v * v_dir * vec_copy_to!(similar(W_corr), t2_uvw_U)
-    # uvw term 3, kron using ZiUZiW and Zi
-    t3_uvw_W = Zi * W_dir * ZiUZiW' + (Zi * W_dir * ZiUZiW')'  # TODO could do reuse either of these two in corr[v_idx]
-    t3_uvw_U = Zi * U_dir * ZiUZiW * 2
-    U_corr .+= 8 * v * v_dir * smat_to_svec!(similar(U_corr), t3_uvw_W, cone.rt2)
-    # corr[v_idx] += 8 * v * dot(U_dir, t3_uvw_W)
-    corr[v_idx] += 8 * v * real(dot(W_dir, t3_uvw_U))
-    W_corr .+= 8 * v * v_dir * vec_copy_to!(similar(W_corr), t3_uvw_U)
+    v_Wd_dot = -4 * (v * ZiUZiUdZiW + vdZiUZiUZiW) + ZiUZiWdWZiWI + 2 * ZiUdZiW
+    corr[v_idx] = v_dir * (-8 * dot(ZiUZi2v, U_dir) + (8 * real(dot(ZiUZiUZi, U)) - (d1 - 1) / v / v / v) * v_dir) +
+        (4 * v) * real(dot(vZiUZiUdZi2, U_dir)) + 2 * real(dot(v_Wd_dot, W_dir))
 
-    # uww term 1, kron using Zi, tau, tau
-    t1_uww_W = Zi * W_dir * tau' * W_dir * tau' + tau * W_dir' * Zi * W_dir * tau' + (Zi * W_dir * tau' * W_dir * tau')'
-    U_corr .+= -4 * v * smat_to_svec!(similar(U_corr), t1_uww_W, cone.rt2)
-    t1_uww_U =
-        Zi * U_dir * tau * W_dir' * tau +
-        Zi * W_dir * tau' * U_dir * tau +
-        tau * W_dir' * Zi * U_dir * tau
-    W_corr .+= -8 * v * vec_copy_to!(similar(W_corr), t1_uww_U)
-    # uww term 2, kron using WtZiW, Zi, Zi and kron using I, Zi, Zi
-    t2_uww_W = Zi * W_dir * WtZiW * W_dir' * Zi + Zi * W_dir * W_dir' * Zi
-    U_corr .+= -4 * v * smat_to_svec!(similar(U_corr), t2_uww_W, cone.rt2)
-    t2_uww_U = Zi * U_dir * Zi * W_dir * WtZiW + Zi * U_dir * Zi * W_dir
-    W_corr .+= -8 * v * vec_copy_to!(similar(W_corr), t2_uww_U)
-
-    # uuv term1 kron of Zi and Zi
-    t1_uuv_U = Zi * U_dir * Zi
-    U_corr .+= 16 * v * v_dir * smat_to_svec!(similar(U_corr), t1_uuv_U, cone.rt2)
-    corr[v_idx] += 8 * v * real(dot(U_dir, t1_uuv_U))
-    # uuv term2 kron of ZiUZi and Zi
-    t2_uuv_U = ZiUZi * U_dir * Zi + Zi * U_dir * ZiUZi
-    U_corr .+= -16 * abs2(v) * v_dir * smat_to_svec!(similar(U_corr), t2_uuv_U, cone.rt2)
-    corr[v_idx] += -8 * abs2(v) * real(dot(U_dir, t2_uuv_U))
-
-    # uuu
-    U_corr .+= -16 * v ^ 3 * smat_to_svec!(similar(U_corr), Zi * U_dir * Zi * U_dir * Zi, cone.rt2)
-
-    # uuw
-    uuv_UW = Zi * U_dir * Zi * W_dir * tau' + (Zi * U_dir * Zi * W_dir * tau')' + Zi * W_dir * tau' * U_dir * Zi + (Zi * W_dir * tau' * U_dir * Zi)'
-    U_corr .+= 8 * abs2(v) * smat_to_svec!(similar(U_corr), uuv_UW, cone.rt2)
-    uuv_UU = Zi * U_dir * Zi * U_dir * tau
-    W_corr .+= 16 * abs2(v) * vec_copy_to!(similar(W_corr), uuv_UU)
-
-    # Tvvv
-    third[v_idx, v_idx, v_idx] = -16 * real(tr(ZiU ^ 3)) + 2 * (d1 - 1) / v ^ 3
-
-    vvv = -16 * real(tr(ZiU ^ 3)) + 2 * (d1 - 1) / v ^ 3
-
-    corr[v_idx] += vvv * abs2(v_dir)
-
-    # www
-    # copied from spectral norm cone
-    WtZiWI = W' * tau + I
-    Wdirtau = W_dir' * tau
-    ZiWdir = cone.fact_Z \ W_dir
-    ZiWdirWtZiWI = ZiWdir * WtZiWI
-    terms_twww = 4 * (
-        tau * (Wdirtau * Wdirtau + W_dir' * ZiWdirWtZiWI) +
-        ZiWdirWtZiWI * Wdirtau +
-        ZiWdir * Wdirtau' * WtZiWI
-        )
-    W_corr .+= vec_copy_to!(similar(W_corr), terms_twww)
-
-    # vvw
-    vvw_W = ZiUZiUZi * W
-    corr[v_idx] += 32 * v_dir * real(dot(vvw_W, W_dir))
-    W_corr .+= 16 * abs2(v_dir) * vec_copy_to!(similar(W_corr), vvw_W)
-
-    # vww
-    # term 1 kron of ZiUZi and WtZiW plus kron of ZiUZi and I
-    t1_vvw_W = ZiUZi * W_dir * WtZiW + ZiUZi * W_dir
-    corr[v_idx] += -4 * real(dot(t1_vvw_W, W_dir))
-    W_corr .+= -8 * v_dir * vec_copy_to!(similar(W_corr), t1_vvw_W)
-    # term 2 kron of Zi and (W' * ZiU * tau)
-    t2_vvw_W = Zi * W_dir * (W' * ZiU * tau)
-    corr[v_idx] += -4 * real(dot(t2_vvw_W, W_dir))
-    W_corr .+= -8 * v_dir * vec_copy_to!(similar(W_corr), t2_vvw_W)
-    # term 3 kron of (ZiU * tau)' and tau
-    t3_vvw_W = (ZiU * tau) * W_dir' * tau + tau * W_dir' * (ZiU * tau)
-    corr[v_idx] += -4 * real(dot(t3_vvw_W, W_dir))
-    W_corr .+= -8 * v_dir * vec_copy_to!(similar(W_corr), t3_vvw_W)
-
-    corr ./= -2
+    Wtemp = (4 * v_dir) * (ZiUdZiW - v2 * ZiUZiUdZiW + ZiUZiWdWZiWI - vdZiUZiUZiW) +
+        (4 * v) * (ZiUdZiW * WdZiW + ZiWdWZi * UdZiW + WdWZi' * ZiUdZiW + ZiUdZi * WdWtZiWI - v2 * ZiUd * ZiUdZiW) +
+        -2 * (ZiW * WdZiW * WdZiW + WdWZi' * ZiWdWtZiWI + ZiWdWtZiWI * WdZiW + ZiWd * WdZiW' * WtZiWI)
+    vec_copy_to!(W_corr, Wtemp)
 
     return corr
 end
