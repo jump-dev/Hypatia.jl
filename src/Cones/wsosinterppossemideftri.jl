@@ -372,42 +372,43 @@ function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
             for l in 1:R, k in 1:l
                 idx_mn = 1
                 for n in 1:R, m in 1:n
-                    PlambdaPk_slice_ij = PlambdaPk[block_idxs(U, i), block_idxs(U, j)]
-                    PlambdaPk_slice_kl = PlambdaPk[block_idxs(U, k), block_idxs(U, l)]
-                    PlambdaPk_slice_mn = PlambdaPk[block_idxs(U, m), block_idxs(U, n)]
+
+                    PlambdaPk_slice_ik = PlambdaPk[block_idxs(U, i), block_idxs(U, k)]
+                    PlambdaPk_slice_il = PlambdaPk[block_idxs(U, i), block_idxs(U, l)]
+                    PlambdaPk_slice_im = PlambdaPk[block_idxs(U, i), block_idxs(U, m)]
+                    PlambdaPk_slice_in = PlambdaPk[block_idxs(U, i), block_idxs(U, n)]
+                    PlambdaPk_slice_jk = PlambdaPk[block_idxs(U, j), block_idxs(U, k)]
+                    PlambdaPk_slice_jl = PlambdaPk[block_idxs(U, j), block_idxs(U, l)]
+                    PlambdaPk_slice_jm = PlambdaPk[block_idxs(U, j), block_idxs(U, m)]
+                    PlambdaPk_slice_jn = PlambdaPk[block_idxs(U, j), block_idxs(U, n)]
+                    PlambdaPk_slice_km = PlambdaPk[block_idxs(U, k), block_idxs(U, m)]
+                    PlambdaPk_slice_kn = PlambdaPk[block_idxs(U, k), block_idxs(U, n)]
+                    PlambdaPk_slice_lm = PlambdaPk[block_idxs(U, l), block_idxs(U, m)]
+                    PlambdaPk_slice_ln = PlambdaPk[block_idxs(U, l), block_idxs(U, n)]
 
                     primal_dir_kl = Diagonal(primal_dir[block_idxs(U, idx_kl)])
                     primal_dir_mn = Diagonal(primal_dir[block_idxs(U, idx_mn)])
 
-                    # FIXME symmetrize. PlambdaPk slices should have two indices not four, and symmetrization based on third order skron. more lines of code than above.
-                    # up to eight lines of code for some combinations of ijklmn
-                    # M = PlambdaPk_slice_ij * primal_dir_kl * PlambdaPk_slice_kl * primal_dir_mn * PlambdaPk_slice_mn +
-                    #     PlambdaPk_slice_ij * primal_dir_kl * PlambdaPk_slice_kl * primal_dir_mn * PlambdaPk_slice_mn' +
-                    #     PlambdaPk_slice_ij * primal_dir_kl * PlambdaPk_slice_kl' * primal_dir_mn * PlambdaPk_slice_mn' +
-                    #     PlambdaPk_slice_ij * primal_dir_kl * PlambdaPk_slice_kl' * primal_dir_mn * PlambdaPk_slice_mn' +
-                    #     PlambdaPk_slice_ij' * primal_dir_kl * PlambdaPk_slice_kl * primal_dir_mn * PlambdaPk_slice_mn +
-                    #     PlambdaPk_slice_ij' * primal_dir_kl * PlambdaPk_slice_kl * primal_dir_mn * PlambdaPk_slice_mn' +
-                    #     PlambdaPk_slice_ij' * primal_dir_kl * PlambdaPk_slice_kl' * primal_dir_mn * PlambdaPk_slice_mn +
-                    #     PlambdaPk_slice_ij' * primal_dir_kl * PlambdaPk_slice_kl' * primal_dir_mn * PlambdaPk_slice_mn'
-                    M = PlambdaPk_slice_kl * primal_dir_kl * PlambdaPk_slice_ij * primal_dir_mn * PlambdaPk_slice_mn +
-                        PlambdaPk_slice_kl * primal_dir_kl * PlambdaPk_slice_ij * primal_dir_mn * PlambdaPk_slice_mn' +
-                        PlambdaPk_slice_kl * primal_dir_kl * PlambdaPk_slice_ij' * primal_dir_mn * PlambdaPk_slice_mn' +
-                        PlambdaPk_slice_kl * primal_dir_kl * PlambdaPk_slice_ij' * primal_dir_mn * PlambdaPk_slice_mn' +
-                        PlambdaPk_slice_kl' * primal_dir_kl * PlambdaPk_slice_ij * primal_dir_mn * PlambdaPk_slice_mn +
-                        PlambdaPk_slice_kl' * primal_dir_kl * PlambdaPk_slice_ij * primal_dir_mn * PlambdaPk_slice_mn' +
-                        PlambdaPk_slice_kl' * primal_dir_kl * PlambdaPk_slice_ij' * primal_dir_mn * PlambdaPk_slice_mn +
-                        PlambdaPk_slice_kl' * primal_dir_kl * PlambdaPk_slice_ij' * primal_dir_mn * PlambdaPk_slice_mn'
+                    M = PlambdaPk_slice_il * primal_dir_kl * PlambdaPk_slice_kn * primal_dir_mn * PlambdaPk_slice_jm' +
+                        PlambdaPk_slice_jl * primal_dir_kl * PlambdaPk_slice_kn * primal_dir_mn * PlambdaPk_slice_im' +
+                        PlambdaPk_slice_ik * primal_dir_kl * PlambdaPk_slice_ln * primal_dir_mn * PlambdaPk_slice_jm' +
+                        PlambdaPk_slice_jk * primal_dir_kl * PlambdaPk_slice_ln * primal_dir_mn * PlambdaPk_slice_im' +
+                        PlambdaPk_slice_il * primal_dir_kl * PlambdaPk_slice_km * primal_dir_mn * PlambdaPk_slice_jn' +
+                        PlambdaPk_slice_jl * primal_dir_kl * PlambdaPk_slice_km * primal_dir_mn * PlambdaPk_slice_in' +
+                        PlambdaPk_slice_ik * primal_dir_kl * PlambdaPk_slice_lm * primal_dir_mn * PlambdaPk_slice_jn' +
+                        PlambdaPk_slice_jk * primal_dir_kl * PlambdaPk_slice_lm * primal_dir_mn * PlambdaPk_slice_in'
                     # M = M + M'
-                    if (i == j) + (k == l) + (m == n) == 3
-                        M = M * (inv(sqrt(2))) / (2 * sqrt(2))
-                    elseif (i == j) + (k == l) + (m == n) == 2
-                        M = M * (inv(sqrt(2))) / (2)
-                    elseif (i == j) + (k == l) + (m == n) == 1
-                        M = M * (inv(sqrt(2))) / (sqrt(2))
+
+                    num_match = (i == j) + (k == l) + (m == n)
+                    if num_match == 3
+                        M = M * 1 / 4
+                    elseif num_match == 2
+                        M = M * sqrt(2) / 4
+                    elseif num_match == 1
+                        M = M * 2 / 4
                     else
-                        M = M * (inv(sqrt(2))) / (1)
+                        M = M * 2 * sqrt(2) / 4
                     end
-                    # PlambdaPk_slice_mn' + primal_dir_mn * PlambdaPk_slice_kl' * primal_dir_kl * PlambdaPk_slice_ij'
 
                     corr_ij .+= diag(M)
 
