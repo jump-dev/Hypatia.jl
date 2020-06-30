@@ -50,7 +50,7 @@ function test_barrier_oracles(
         point = CO.set_central_point(cone)
         dual_point = copy(point)
         @test load_reset_check(cone, point, dual_point)
-        # @test CO.in_neighborhood(cone, one(T), sqrt(sqrt(T(eps(T)))))
+        @test CO.in_neighborhood(cone, one(T), sqrt(sqrt(T(eps(T)))))
     # end
     init_only && return
 
@@ -62,7 +62,7 @@ function test_barrier_oracles(
     # test gradient and Hessian oracles
     perturb_scale(point, dual_point, noise, scale)
     @test load_reset_check(cone, point, dual_point)
-    # test_grad_hess(cone, point, dual_point, tol = tol)
+    test_grad_hess(cone, point, dual_point, tol = tol)
 
     # check gradient and Hessian agree with ForwardDiff
     CO.reset_data(cone)
@@ -169,7 +169,7 @@ function test_nonnegative_barrier(T::Type{<:Real})
 end
 
 function test_epinorminf_barrier(T::Type{<:Real})
-    for n in [1, 2, ]#3, 5]
+    for n in [1, 2, 3, 5]
         # real epinorminf cone
         function R_barrier(s)
             (u, w) = (s[1], s[2:end])
@@ -329,8 +329,8 @@ end
 
 function test_linmatrixineq_barrier(T::Type{<:Real})
     Random.seed!(1)
-    # Rs_list = [[T, T], [Complex{T}, Complex{T}], [T, Complex{T}, T], [Complex{T}, T, T]]
-    Rs_list = [[T, T], [T, T, T]]
+    Rs_list = [[T, T], [Complex{T}, Complex{T}], [T, Complex{T}, T], [Complex{T}, T, T]]
+    # Rs_list = [[T, T], [T, T, T]]
     for side in [2, 3, 5], Rs in Rs_list
         As = Vector{LinearAlgebra.HermOrSym{R, Matrix{R}} where {R <: Hypatia.RealOrComplex{T}}}(undef, length(Rs))
         A_1_half = rand(Rs[1], side, side)
@@ -374,7 +374,7 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
     Random.seed!(1)
     invrt2 = inv(sqrt(T(2)))
 
-    for side in [1, 2, 3, 4, 5, ]#10, 20, 40, 80]
+    for side in [1, 2, 3, 4, 5, 10, 20, 40, 80]
         # generate random sparsity pattern for lower triangle
         sparsity = inv(sqrt(side))
         (row_idxs, col_idxs, _) = findnz(tril!(sprand(Bool, side, side, sparsity)) + I)
@@ -414,7 +414,7 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
 end
 
 function test_hypoperlogdettri_barrier(T::Type{<:Real})
-    for side in [1, 2, 3, 4, 6, 10, 15, 20]
+    for side in [1, 2, 3, 5, 8]
         # real logdet barrier
         dim = 2 + CO.svec_length(side)
         cone = CO.HypoPerLogdetTri{T, T}(dim)
@@ -461,7 +461,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
 end
 
 function test_hyporootdettri_barrier(T::Type{<:Real})
-    for side in [1, 2, 3, 4, 5, 8]
+    for side in [1, 2, 3, 5, 8]
         # real rootdet barrier
         dim = 1 + CO.svec_length(side)
         cone = CO.HypoRootdetTri{T, T}(dim)

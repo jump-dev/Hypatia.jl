@@ -145,7 +145,6 @@ function update_hess_aux(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} w
     w = cone.w
 
     sumiden = zero(T)
-    usqr = abs2(u)
     @inbounds for (j, wj) in enumerate(w)
         wdenj = cone.wden[j]
         Huj = wdenj * -cone.uden[j]
@@ -165,8 +164,6 @@ function update_hess_aux(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} w
     t1 = (cone.n - 1) / u / u
     cone.Huu = sum(abs2, cone.uden) - t1 - sumiden
     @assert cone.Huu > 0
-    cone.schur = sumiden - t1
-    @assert cone.schur > 0
 
     cone.hess_aux_updated = true
     return
@@ -214,13 +211,25 @@ function update_inv_hess(cone::EpiNormInf{T}) where {T <: Real}
     minval = eps(T)
 
     Hi[1, 1] = 1
-    @views Hiu = Hi[1, 2:end]
-    vec_copy_to!(Hiu, wden)
-    Hiu .*= -u
+    usqr = abs2(u)
+    schur = (1 - cone.n) / usqr
+    @inbounds for (j, wj) in enumerate(cone.w)
+        u2pwj2 = T(0.5) * (usqr + abs2(wj))
+        iedge = u / u2pwj2 * wj
+        if cone.is_complex
+            (Hi[1, 2j], Hi[1, 2j + 1]) = reim(iedge)
+        else
+            Hi[1, j + 1] = iedge
+        end
+        schur += inv(u2pwj2)
+    end
+    rtschur = sqrt(max(schur, minval))
+    Hi[1, :] ./= rtschur
     @inbounds for j in 2:cone.dim, i in 2:j
         Hi[i, j] = Hi[1, j] * Hi[1, i]
     end
-    Hi ./= max(cone.schur, minval)
+    Hi[1, :] ./= rtschur
+
     if cone.is_complex
         @inbounds for j in 1:cone.n
             rerej = cone.Hrere[j]
