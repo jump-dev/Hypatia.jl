@@ -129,17 +129,17 @@ function update_feas(cone::EpiNormSpectral)
     return cone.is_feas
 end
 
-update_dual_feas(cone::EpiNormSpectral) = true
-# # TODO is there a faster way to check u >= nuc_norm, eg thru a cholesky?
-# function update_dual_feas(cone::EpiNormSpectral)
-#     u = cone.dual_point[1]
-#     if u <= 0
-#         return false
-#     end
-#     W = @views vec_copy_to!(similar(cone.W), cone.dual_point[2:end])
-#     nuc_norm = sum(svdvals(W))
-#     return (u >= nuc_norm)
-# end
+# TODO is there a faster way to check u >= nuc_norm, eg thru a cholesky?
+# update_dual_feas(cone::EpiNormSpectral) = true
+function update_dual_feas(cone::EpiNormSpectral)
+    u = cone.dual_point[1]
+    if u <= 0
+        return false
+    end
+    W = @views vec_copy_to!(similar(cone.W), cone.dual_point[2:end])
+    nuc_norm = sum(svdvals(W))
+    return (u >= nuc_norm)
+end
 
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
@@ -231,7 +231,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
 
         prod[1, j] = cone.Huu * arr_1j + real(dot(cone.HuW, tmpd1d2))
 
-        # prod_2j = 2 * cone.fact_Z \ (((tmpd1d2 * W' + W * tmpd1d2' - (2 * u * arr_1j) * I) / cone.fact_Z) * W + tmpd1d2)
         mul!(tmpd1d1, tmpd1d2, W')
         @inbounds for k in 1:cone.d1
             @inbounds for i in 1:k
@@ -247,7 +246,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     return prod
 end
 
-# TODO reduce allocs
 function correction2(cone::EpiNormSpectral, primal_dir::AbstractVector)
     @assert cone.hess_updated
 
@@ -256,36 +254,30 @@ function correction2(cone::EpiNormSpectral, primal_dir::AbstractVector)
     Zi = cone.Zi
     tau = cone.tau
     Zitau = cone.Zitau
+    WtauI = cone.Wtau
     u_dir = primal_dir[1]
-    @views W_dir = vec_copy_to!(similar(W), primal_dir[2:end])
-
-    # TODO use stored fields
-    WtauI = W' * tau + I
-    Wdirtau = W_dir' * tau
-    ZiWdir = cone.fact_Z \ W_dir
-    ZiWdirWtauI = ZiWdir * WtauI
-
-    terms_twww = 2 * (
-        tau * (Wdirtau * Wdirtau + W_dir' * ZiWdirWtauI) +
-        ZiWdirWtauI * Wdirtau +
-        ZiWdir * Wdirtau' * WtauI
-        )
-
-    terms47 = -2 * u * (cone.fact_Z \ ZiWdirWtauI + (ZiWdir * W' + tau * W_dir') * Zitau + Zitau * Wdirtau)
-    terms_Tuww = 2 * u_dir * terms47
-
-    term8 = 8 * u * u_dir * u * Zitau - 2 * u_dir * tau
-    ldiv!(cone.fact_Z, term8)
-    terms_Tuuw = u_dir * term8
-
+    tmpd1d2 = cone.tmpd1d2
+    tmpd1d1 = cone.tmpd1d1
+    tmpd2d2 = cone.tmpd2d2
+    @views W_dir = vec_copy_to!(tmpd1d2, primal_dir[2:end])
     corr = cone.correction
 
-    @views vec_copy_to!(corr[2:end], -(terms_twww + terms_Tuww + terms_Tuuw))
+    Wdtau = mul!(tmpd2d2, W_dir', tau)
+    ZiWd = cone.fact_Z \ W_dir
+    ZiWdWtauI = ZiWd * WtauI
 
-    corr[1] = -real(dot(W_dir, terms47 + 2 * term8))
+    Wtmp1 = -2 * u * (cone.fact_Z \ ZiWdWtauI + (ZiWd * W' + tau * W_dir') * Zitau + Zitau * Wdtau)
+    Wtmp2 = 4 * u * u_dir * u * Zitau - u_dir * tau
+    ldiv!(cone.fact_Z, Wtmp2)
+    Wtmp1 += Wtmp2
+
+    Wcorr = tau * (Wdtau * Wdtau + W_dir' * ZiWdWtauI) + ZiWdWtauI * Wdtau + ZiWd * Wdtau' * WtauI + u_dir * Wtmp1
+    Wcorr .*= -2
+    @views vec_copy_to!(corr[2:end], Wcorr)
+
     ZiLi = cone.fact_Z.L \ Zi
     trZi3 = sum(abs2, ZiLi)
-    corr[1] -= u * u_dir * (6 * cone.trZi2 - 8 * u * trZi3 * u) * u_dir + (cone.d1 - 1) * abs2(u_dir / u) / u
+    corr[1] = -real(dot(W_dir, Wtmp1 + 3 * Wtmp2)) - u * u_dir * (6 * cone.trZi2 - 8 * u * trZi3 * u) * u_dir - (cone.d1 - 1) * abs2(u_dir / u) / u
 
     return corr
 end

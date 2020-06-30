@@ -50,7 +50,7 @@ function test_barrier_oracles(
         point = CO.set_central_point(cone)
         dual_point = copy(point)
         @test load_reset_check(cone, point, dual_point)
-        @test CO.in_neighborhood(cone, one(T), sqrt(sqrt(T(eps(T)))))
+        # @test CO.in_neighborhood(cone, one(T), sqrt(sqrt(T(eps(T)))))
     # end
     init_only && return
 
@@ -69,17 +69,17 @@ function test_barrier_oracles(
     @test CO.is_feas(cone)
     grad = CO.grad(cone)
     hess = CO.hess(cone)
-    if dim < 13 # too slow if dimension is large
-        println("starting ForwardDiff tests: $dim")
-        fd_grad = ForwardDiff.gradient(barrier, point)
-        @test grad ≈ fd_grad atol=tol rtol=tol
-        println("done grad")
-        if !CO.use_scaling(cone)
-            fd_hess = ForwardDiff.hessian(barrier, point)
-            @test hess ≈ fd_hess atol=tol rtol=tol
-            println("done hess")
-        end
-    end
+    # if dim < 13 # too slow if dimension is large
+    #     println("starting ForwardDiff tests: $dim")
+    #     fd_grad = ForwardDiff.gradient(barrier, point)
+    #     @test grad ≈ fd_grad atol=tol rtol=tol
+    #     println("done grad")
+    #     if !CO.use_scaling(cone)
+    #         fd_hess = ForwardDiff.hessian(barrier, point)
+    #         @test hess ≈ fd_hess atol=tol rtol=tol
+    #         println("done hess")
+    #     end
+    # end
 
     # check 3rd order corrector agrees with ForwardDiff
     # too slow if cone is too large or not using BlasReals
@@ -91,15 +91,15 @@ function test_barrier_oracles(
         (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
         corr = CO.correction2(cone, primal_dir)
         @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
-        if dim < 6 && T in (Float32, Float64)
-            println("starting fd 3o")
-            FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
-            # check log-homog property that F'''(s)[s] = -2F''(s)
-            @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess atol=tol rtol=tol
-            FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
-            @show FD_corr ./ corr
-            @test FD_corr ≈ corr atol=tol rtol=tol
-        end
+        # if dim < 6 && T in (Float32, Float64)
+        #     println("starting fd 3o")
+        #     FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
+        #     # check log-homog property that F'''(s)[s] = -2F''(s)
+        #     @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess atol=tol rtol=tol
+        #     FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
+        #     @show FD_corr ./ corr
+        #     @test FD_corr ≈ corr atol=tol rtol=tol
+        # end
         println("done correction tests")
     end
 
@@ -225,7 +225,7 @@ function test_hypoperlog_barrier(T::Type{<:Real})
 end
 
 function test_episumperentropy_barrier(T::Type{<:Real})
-    for w_dim in [1, 2, 3]
+    for w_dim in [1, 2, 3, 10, 40, 100, 1000]
         dim = 1 + 2 * w_dim
         function barrier(s)
             (u, v, w) = (s[1], s[2:2:(dim - 1)], s[3:2:dim])
@@ -233,14 +233,14 @@ function test_episumperentropy_barrier(T::Type{<:Real})
         end
         test_barrier_oracles(CO.EpiSumPerEntropy{T}(dim), barrier, init_tol = 1e-5)
     end
-    for w_dim in [15, 65, 75, 100, 500]
-        function barrier(s)
-            (u, v, w) = (s[1], s[2:2:(dim - 1)], s[3:2:dim])
-            return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) - sum(log(vi) + log(wi) for (vi, wi) in zip(v, w))
-        end
-        dim = 1 + 2 * w_dim
-        test_barrier_oracles(CO.EpiSumPerEntropy{T}(dim), barrier, init_tol = 1e-1, init_only = true)
-    end
+    # for w_dim in [15, 65, 75, 100, 500]
+    #     function barrier(s)
+    #         (u, v, w) = (s[1], s[2:2:(dim - 1)], s[3:2:dim])
+    #         return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) - sum(log(vi) + log(wi) for (vi, wi) in zip(v, w))
+    #     end
+    #     dim = 1 + 2 * w_dim
+    #     test_barrier_oracles(CO.EpiSumPerEntropy{T}(dim), barrier, init_tol = 1e-1, init_only = true)
+    # end
     return
 end
 

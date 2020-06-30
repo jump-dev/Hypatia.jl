@@ -318,7 +318,7 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ep
     @. @views prod[1, :] = sqrt(cone.schur) * arr[1, :]
     if cone.is_complex
         for (j, oj) in enumerate(cone.offdiag)
-            # TODO cache these fields?
+            # TODO cache these fields
             erj = cone.edge[2j - 1]
             eij = cone.edge[2j]
             rtd1j = sqrt(cone.diag[2j - 1])
@@ -350,7 +350,7 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
     prod[1, :] ./= sqrt(cone.schur)
     if cone.is_complex
         for (j, oj) in enumerate(cone.offdiag)
-            # TODO cache these fields?
+            # TODO cache these fields
             rtd2j = sqrt(cone.diag[2j])
             rtdetj = sqrt(cone.detdiag[j])
             rtd2detj = rtd2j / rtdetj
