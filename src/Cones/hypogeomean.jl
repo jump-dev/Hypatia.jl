@@ -93,15 +93,15 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {
     return arr
 end
 
-function update_feas(cone::HypoGeomean)
+function update_feas(cone::HypoGeomean{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
 
-    if all(>(zero(u)), w)
+    if all(>(eps(T)), w)
         cone.wprod = exp(sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha)))
         cone.z = cone.wprod - u
-        cone.is_feas = (u < 0) || (cone.z > 0)
+        cone.is_feas = (cone.z > eps(T))
     else
         cone.is_feas = false
     end
@@ -110,15 +110,14 @@ function update_feas(cone::HypoGeomean)
     return cone.is_feas
 end
 
-function update_dual_feas(cone::HypoGeomean)
+function update_dual_feas(cone::HypoGeomean{T}) where {T}
     u = cone.dual_point[1]
     w = view(cone.dual_point, 2:cone.dim)
     alpha = cone.alpha
-    if u < 0 && all(>(zero(u)), w)
-        return u < exp(sum(alpha[i] * log(w[i] / alpha[i]) for i in eachindex(alpha)))
-    else
-        return false
+    if u < -eps(T) && all(>(eps(T)), w)
+        return eps(T) < exp(sum(alpha[i] * log(w[i] / alpha[i]) for i in eachindex(alpha))) - u
     end
+    return false
 end
 
 function update_grad(cone::HypoGeomean)

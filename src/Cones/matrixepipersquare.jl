@@ -134,11 +134,11 @@ function set_initial_point(arr::AbstractVector, cone::MatrixEpiPerSquare{T, R}) 
     return arr
 end
 
-function update_feas(cone::MatrixEpiPerSquare)
+function update_feas(cone::MatrixEpiPerSquare{T}) where {T}
     @assert !cone.feas_updated
     v = cone.point[cone.v_idx]
 
-    if v > 0
+    if v > eps(T)
         @views U = svec_to_smat!(cone.U.data, cone.point[cone.U_idxs], cone.rt2)
         @views W = vec_copy_to!(cone.W, cone.point[cone.W_idxs])
         copyto!(cone.Z.data, U)
@@ -153,18 +153,16 @@ function update_feas(cone::MatrixEpiPerSquare)
     return cone.is_feas
 end
 
-function update_dual_feas(cone::MatrixEpiPerSquare)
+function update_dual_feas(cone::MatrixEpiPerSquare{T}) where {T}
     v = cone.dual_point[cone.v_idx]
-    if v > 0
+    if v > eps(T)
         @views svec_to_smat!(cone.dual_U.data, cone.dual_point[cone.U_idxs], cone.rt2)
         F = cholesky!(cone.dual_U, check = false)
         isposdef(F) || return false
         @views W = vec_copy_to!(cone.dual_W, cone.dual_point[cone.W_idxs])
         LW = ldiv!(F.L, W)
         trLW = sum(abs2, LW)
-        if 2 * v >= trLW
-            return true
-        end
+        return (2 * v - trLW > eps(T))
     end
     return false
 end

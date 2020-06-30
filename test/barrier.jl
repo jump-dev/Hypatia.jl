@@ -62,24 +62,24 @@ function test_barrier_oracles(
     # test gradient and Hessian oracles
     perturb_scale(point, dual_point, noise, scale)
     @test load_reset_check(cone, point, dual_point)
-    test_grad_hess(cone, point, dual_point, tol = tol)
+    # test_grad_hess(cone, point, dual_point, tol = tol)
 
     # check gradient and Hessian agree with ForwardDiff
     CO.reset_data(cone)
     @test CO.is_feas(cone)
     grad = CO.grad(cone)
     hess = CO.hess(cone)
-    # if dim < 13 # too slow if dimension is large
-    #     println("starting ForwardDiff tests: $dim")
-    #     fd_grad = ForwardDiff.gradient(barrier, point)
-    #     @test grad ≈ fd_grad atol=tol rtol=tol
-    #     println("done grad")
-    #     if !CO.use_scaling(cone)
-    #         fd_hess = ForwardDiff.hessian(barrier, point)
-    #         @test hess ≈ fd_hess atol=tol rtol=tol
-    #         println("done hess")
-    #     end
-    # end
+    if dim < 13 # too slow if dimension is large
+        println("starting ForwardDiff tests: $dim")
+        fd_grad = ForwardDiff.gradient(barrier, point)
+        @test grad ≈ fd_grad atol=tol rtol=tol
+        println("done grad")
+        if !CO.use_scaling(cone)
+            fd_hess = ForwardDiff.hessian(barrier, point)
+            @test hess ≈ fd_hess atol=tol rtol=tol
+            println("done hess")
+        end
+    end
 
     # check 3rd order corrector agrees with ForwardDiff
     # too slow if cone is too large or not using BlasReals
@@ -169,7 +169,7 @@ function test_nonnegative_barrier(T::Type{<:Real})
 end
 
 function test_epinorminf_barrier(T::Type{<:Real})
-    for n in [1, 2, 3, 5]
+    for n in [1, 2, ]#3, 5]
         # real epinorminf cone
         function R_barrier(s)
             (u, w) = (s[1], s[2:end])

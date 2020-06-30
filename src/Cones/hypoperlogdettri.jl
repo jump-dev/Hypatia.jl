@@ -126,18 +126,18 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdetTri{T, R})
     return arr
 end
 
-function update_feas(cone::HypoPerLogdetTri)
+function update_feas(cone::HypoPerLogdetTri{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
 
-    if v > 0
+    if v > eps(T)
         svec_to_smat!(cone.mat, view(cone.point, 3:cone.dim), cone.rt2)
         cone.fact_mat = cholesky!(Hermitian(cone.mat, :U), check = false)
         if isposdef(cone.fact_mat)
             cone.ldWv = logdet(cone.fact_mat) - cone.side * log(v)
             cone.z = v * cone.ldWv - u
-            cone.is_feas = (cone.z > 0)
+            cone.is_feas = (cone.z > eps(T))
         else
             cone.is_feas = false
         end
@@ -149,13 +149,13 @@ function update_feas(cone::HypoPerLogdetTri)
     return cone.is_feas
 end
 
-function update_dual_feas(cone::HypoPerLogdetTri)
+function update_dual_feas(cone::HypoPerLogdetTri{T}) where {T}
     u = cone.dual_point[1]
     v = cone.dual_point[2]
-    if u < 0
+    if u < -eps(T)
         svec_to_smat!(cone.dual_mat, view(cone.dual_point, 3:cone.dim), cone.rt2)
         dual_fact = cholesky!(Hermitian(cone.dual_mat, :U), check = false)
-        return isposdef(dual_fact) && (v > u * (logdet(dual_fact) - cone.side * log(-u) + cone.side))
+        return isposdef(dual_fact) && (v - u * (logdet(dual_fact) - cone.side * log(-u) + cone.side) > eps(T))
     end
     return false
 end

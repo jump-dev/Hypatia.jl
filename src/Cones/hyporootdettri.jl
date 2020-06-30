@@ -121,7 +121,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T, R}) w
     return arr
 end
 
-function update_feas(cone::HypoRootdetTri)
+function update_feas(cone::HypoRootdetTri{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
 
@@ -130,7 +130,7 @@ function update_feas(cone::HypoRootdetTri)
     if isposdef(cone.fact_W)
         cone.rootdet = exp(logdet(cone.fact_W) / cone.side)
         cone.rootdetu = cone.rootdet - u
-        cone.is_feas = (cone.rootdetu > 0)
+        cone.is_feas = (cone.rootdetu > eps(T))
     else
         cone.is_feas = false
     end
@@ -140,15 +140,14 @@ function update_feas(cone::HypoRootdetTri)
 end
 
 # update_dual_feas(cone::HypoRootdetTri) = true
-function update_dual_feas(cone::HypoRootdetTri)
+function update_dual_feas(cone::HypoRootdetTri{T}) where {T}
     u = cone.dual_point[1]
-    if u < 0
+    if u < -eps(T)
         @views svec_to_smat!(cone.work_mat, cone.dual_point[2:end], cone.rt2)
         dual_fact_W = cholesky!(Hermitian(cone.work_mat, :U), check = false)
-        return isposdef(dual_fact_W) && (logdet(dual_fact_W) > cone.side * log(-u / cone.side))
-    else
-        return false
+        return isposdef(dual_fact_W) && (logdet(dual_fact_W) - cone.side * log(-u / cone.side) > eps(T))
     end
+    return false
 end
 
 function update_grad(cone::HypoRootdetTri)

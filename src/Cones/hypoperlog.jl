@@ -90,42 +90,16 @@ function update_feas(cone::HypoPerLog{T}) where {T}
     @assert !cone.feas_updated
 
     point = cone.point
-    # @show norm(point)
-    # cone.scal = norm(point) / sqrt(cone.nu)
-    # cone.scal = 1.0
-    # @show cone.scal
-    # point ./= cone.scal
-    # @show norm(point)
-
-    # mu_cone = dot(point, cone.dual_point) / cone.nu
-    # @show mu_cone
-
     u = point[1]
     v = point[2]
     w = view(point, 3:cone.dim)
-
-    # if v > 0 && all(>(0), w)
-    #     cone.lwv = sum(log(wi / v) for wi in w)
-    #     cone.vlwvu = v * cone.lwv - u
-    #     # @show cone.lwv
-    #     @show cone.vlwvu
-    #     cone.is_feas = (cone.vlwvu > 0)
-    # else
-    #     cone.is_feas = false
-    # end
-
     if v <= eps(T) || any(<=(eps(T)), w)
         cone.is_feas = false
     else
         cone.lwv = sum(log(wi / v) for wi in w)
         cone.vlwvu = v * cone.lwv - u
-        # cone.scal = cone.vlwvu
-        # cone.scal = 1
-        # cone.point = point / cone.scal
         cone.is_feas = (cone.vlwvu > eps(T))
     end
-
-
 
     cone.feas_updated = true
     return cone.is_feas
@@ -139,7 +113,7 @@ function update_dual_feas(cone::HypoPerLog{T}) where {T}
     return u < -eps(T) && w > eps(T) && v - u - u * log(-w / u) > eps(T)
 end
 
-function update_grad(cone::HypoPerLog)
+function update_grad(cone::HypoPerLog{T}) where {T}
     @assert cone.is_feas
     u = cone.point[1]
     v = cone.point[2]

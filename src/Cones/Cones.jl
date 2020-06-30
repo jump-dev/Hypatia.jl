@@ -482,23 +482,35 @@ function hess_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, t
     return
 end
 
-# function sparse_upper_arrow_block1(T::Type{<:Real}, w_dim::Int)
-#     dim = 2 * w_dim + 1
-#     nnz_tri = 2 * dim - 1 + w_dim
-#     I = Vector{Int}(undef, nnz_tri)
-#     J = Vector{Int}(undef, nnz_tri)
-#     idxs1 = 1:dim
-#     I[idxs1] .= 1
-#     J[idxs1] .= idxs1
-#     idxs2 = (dim + 1):(2 * dim - 1)
-#     I[idxs2] .= 2:dim
-#     J[idxs2] .= 2:dim
-#     idxs3 = (2 * dim):nnz_tri
-#     I[idxs3] .= 2:2:dim
-#     J[idxs3] .= 3:2:dim
-#     V = ones(T, nnz_tri)
-#     return sparse(I, J, V, dim, dim)
-# end
+function sparse_upper_arrow(T::Type{<:Real}, w_dim::Int)
+    dim = w_dim + 1
+    nnz_tri = 2 * dim - 1
+    I = Vector{Int}(undef, nnz_tri)
+    J = Vector{Int}(undef, nnz_tri)
+    idxs1 = 1:dim
+    I[idxs1] .= 1
+    J[idxs1] .= idxs1
+    idxs2 = (dim + 1):(2 * dim - 1)
+    I[idxs2] .= 2:dim
+    J[idxs2] .= 2:dim
+    V = ones(T, nnz_tri)
+    return sparse(I, J, V, dim, dim)
+end
+
+function factor_upper_arrow(uu, uw, ww, nzval)
+    minrt = eps(uu)
+    nzidx = 2
+    @inbounds for i in eachindex(ww)
+        wwi = sqrt(max(ww[i], minrt))
+        uwi = uw[i] / wwi
+        uu -= abs2(uwi)
+        nzval[nzidx] = uwi
+        nzval[nzidx + 1] = wwi
+        nzidx += 2
+    end
+    nzval[1] = sqrt(max(uu, minrt))
+    return nzval
+end
 
 function sparse_upper_arrow_block2(T::Type{<:Real}, w_dim::Int)
     dim = 2 * w_dim + 1

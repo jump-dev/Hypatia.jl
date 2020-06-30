@@ -608,8 +608,8 @@ function find_max_alpha(
             Cones.reset_data(cone_k)
 
             # TODO is_dual_feas function should fall back to a nbhd-like check (for ray maybe) if not using nbhd check
-            # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, mu_ls, max_nbhd))
-            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k))
+            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, mu_ls, max_nbhd))
+            # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k))
 
             cone_times[k] = time_ns() - time_k
             if !in_nbhd_k

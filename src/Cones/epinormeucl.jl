@@ -100,14 +100,15 @@ function set_initial_point(arr::AbstractVector, cone::EpiNormEucl{T}) where {T <
     return arr
 end
 
-function update_feas(cone::EpiNormEucl)
+# TODO refac with dual feas check
+function update_feas(cone::EpiNormEucl{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
 
-    if u > 0
+    if u > eps(T)
         w = view(cone.point, 2:cone.dim)
         cone.dist = abs2(u) - sum(abs2, w)
-        cone.is_feas = (cone.dist > 0)
+        cone.is_feas = (cone.dist > eps(T))
     else
         cone.is_feas = false
     end
@@ -116,18 +117,18 @@ function update_feas(cone::EpiNormEucl)
     return cone.is_feas
 end
 
-function update_dual_feas(cone::EpiNormEucl)
+function update_dual_feas(cone::EpiNormEucl{T}) where {T}
     u = cone.dual_point[1]
 
-    if u > 0
+    if u > eps(T)
         w = view(cone.dual_point, 2:cone.dim)
         cone.dual_dist = abs2(u) - sum(abs2, w)
-        dual_feas = (cone.dual_dist > 0)
+        dual_feas = (cone.dual_dist > eps(T))
     else
         dual_feas = false
     end
 
-    cone.dual_feas_updated = true
+    cone.dual_feas_updated = true # TODO most other cones don't have this?
     return dual_feas
 end
 

@@ -102,12 +102,12 @@ function update_feas(cone::Power{T}) where {T <: Real}
     @assert !cone.feas_updated
     m = length(cone.alpha)
     u = cone.point[1:m]
-    w = view(cone.point, (m + 1):cone.dim)
 
-    if all(>(zero(T)), u)
+    if all(>(eps(T)), u)
         cone.produ = exp(2 * sum(cone.alpha[i] * log(u[i]) for i in eachindex(cone.alpha)))
+        w = view(cone.point, (m + 1):cone.dim)
         cone.produw = cone.produ - sum(abs2, w)
-        cone.is_feas = (cone.produw > 0)
+        cone.is_feas = (cone.produw > eps(T))
     else
         cone.is_feas = false
     end
@@ -120,13 +120,12 @@ function update_dual_feas(cone::Power{T}) where {T <: Real}
     alpha = cone.alpha
     m = length(cone.alpha)
     u = cone.dual_point[1:m]
-    w = view(cone.dual_point, (m + 1):cone.dim)
-    if all(>(zero(T)), u)
+    if all(>(eps(T)), u)
         p = exp(2 * sum(alpha[i] * log(u[i] / alpha[i]) for i in eachindex(alpha)))
-        return p - sum(abs2, w) > 0
-    else
-        return false
+        w = view(cone.dual_point, (m + 1):cone.dim)
+        return (p - sum(abs2, w) > eps(T))
     end
+    return false
 end
 
 function update_grad(cone::Power)

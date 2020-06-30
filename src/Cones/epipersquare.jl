@@ -97,15 +97,16 @@ function set_initial_point(arr::AbstractVector, cone::EpiPerSquare)
     return arr
 end
 
-function update_feas(cone::EpiPerSquare)
+# TODO refac with dual feas check
+function update_feas(cone::EpiPerSquare{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
 
-    if u > 0 && v > 0
+    if u > eps(T) && v > eps(T)
         w = view(cone.point, 3:cone.dim)
         cone.dist = u * v - sum(abs2, w) / 2
-        cone.is_feas = (cone.dist > 0)
+        cone.is_feas = (cone.dist > eps(T))
     else
         cone.is_feas = false
     end
@@ -114,17 +115,16 @@ function update_feas(cone::EpiPerSquare)
     return cone.is_feas
 end
 
-function update_dual_feas(cone::EpiPerSquare)
+function update_dual_feas(cone::EpiPerSquare{T}) where {T}
     u = cone.dual_point[1]
     v = cone.dual_point[2]
 
-    if u > 0 && v > 0
+    if u > eps(T) && v > eps(T)
         w = view(cone.dual_point, 3:cone.dim)
         cone.dual_dist = u * v - sum(abs2, w) / 2
-        return cone.dual_dist > 0
-    else
-        return false
+        return cone.dual_dist > eps(T)
     end
+    return false
 end
 
 function update_grad(cone::EpiPerSquare)

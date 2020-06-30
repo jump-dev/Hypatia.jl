@@ -111,11 +111,11 @@ function set_initial_point(arr::AbstractVector, cone::EpiNormSpectral{T, R}) whe
     return arr
 end
 
-function update_feas(cone::EpiNormSpectral)
+function update_feas(cone::EpiNormSpectral{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
 
-    if u > 0
+    if u > eps(T)
         @views vec_copy_to!(cone.W, cone.point[2:end])
         copyto!(cone.Z, abs2(u) * I)
         mul!(cone.Z, cone.W, cone.W', -1, true)
@@ -131,14 +131,13 @@ end
 
 # TODO is there a faster way to check u >= nuc_norm, eg thru a cholesky?
 # update_dual_feas(cone::EpiNormSpectral) = true
-function update_dual_feas(cone::EpiNormSpectral)
+function update_dual_feas(cone::EpiNormSpectral{T}) where {T}
     u = cone.dual_point[1]
-    if u <= 0
-        return false
+    if u > eps(T)
+        W = @views vec_copy_to!(similar(cone.W), cone.dual_point[2:end])
+        return (u - sum(svdvals(W)) > eps(T))
     end
-    W = @views vec_copy_to!(similar(cone.W), cone.dual_point[2:end])
-    nuc_norm = sum(svdvals(W))
-    return (u >= nuc_norm)
+    return false
 end
 
 function update_grad(cone::EpiNormSpectral)

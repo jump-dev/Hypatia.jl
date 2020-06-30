@@ -13,7 +13,6 @@ TODO
 
 mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     max_neighborhood::T
     dim::Int
     w_dim::Int
@@ -53,13 +52,11 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     function EpiSumPerEntropy{T}(
         dim::Int;
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         max_neighborhood::Real = default_max_neighborhood(),
         ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.w_dim = div(dim - 1, 2)
@@ -105,30 +102,28 @@ function set_initial_point(arr::AbstractVector, cone::EpiSumPerEntropy)
     return arr
 end
 
-function update_feas(cone::EpiSumPerEntropy)
+function update_feas(cone::EpiSumPerEntropy{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
     @views v = cone.point[cone.v_idxs]
     @views w = cone.point[cone.w_idxs]
-
-    if all(vi -> vi > 0, v) && all(wi -> wi > 0, w)
+    if all(vi -> vi > eps(T), v) && all(wi -> wi > eps(T), w)
         @. cone.lwv = log(w / v)
         cone.z = u - dot(w, cone.lwv)
-        cone.is_feas = (cone.z > 0)
+        cone.is_feas = (cone.z > eps(T))
     else
         cone.is_feas = false
     end
-
     cone.feas_updated = true
     return cone.is_feas
 end
 
-function update_dual_feas(cone::EpiSumPerEntropy{T}) where {T <: Real}
+function update_dual_feas(cone::EpiSumPerEntropy{T}) where {T}
     u = cone.dual_point[1]
     @views v = cone.dual_point[cone.v_idxs]
     @views w = cone.dual_point[cone.w_idxs]
-    if all(vi -> vi > 0, v) && u > 0
-        return all(u * (1 + log(vi / u)) + wi > 0 for (vi, wi) in zip(v, w))
+    if all(vi -> vi > eps(T), v) && u > eps(T)
+        return all(u * (1 + log(vi / u)) + wi > eps(T) for (vi, wi) in zip(v, w))
     end
     return false
 end
@@ -272,7 +267,7 @@ function update_hess_sqrt_aux(cone::EpiSumPerEntropy{T}) where {T}
     return
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiSumPerEntropy{T}) where {T <: Real}
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
     cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
     copyto!(prod, arr)
     lmul!(cone.inv_hess_sqrt, lmul!(cone.inv_hess_sqrt', prod))
