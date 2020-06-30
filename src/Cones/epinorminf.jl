@@ -44,7 +44,6 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     Hrere::Vector{T}
     Hreim::Vector{T}
     Himim::Vector{T}
-    schur::T
 
     function EpiNormInf{T, R}(
         dim::Int;
@@ -93,7 +92,7 @@ use_correction(cone::EpiNormInf) = true
 
 get_nu(cone::EpiNormInf) = cone.n + 1
 
-function set_initial_point(arr::AbstractVector{T}, cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function set_initial_point(arr::AbstractVector{T}, cone::EpiNormInf{T}) where {T <: Real}
     arr .= 0
     arr[1] = sqrt(T(get_nu(cone)))
     return arr
@@ -122,7 +121,7 @@ function update_dual_feas(cone::EpiNormInf{T}) where {T}
     return false
 end
 
-function update_grad(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function update_grad(cone::EpiNormInf{T}) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
     w = cone.w
@@ -139,7 +138,7 @@ function update_grad(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
     return cone.grad
 end
 
-function update_hess_aux(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function update_hess_aux(cone::EpiNormInf{T}) where {T <: Real}
     @assert cone.grad_updated
     u = cone.point[1]
     w = cone.w
@@ -169,7 +168,7 @@ function update_hess_aux(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} w
     return
 end
 
-function update_hess(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function update_hess(cone::EpiNormInf{T}) where {T <: Real}
     cone.hess_aux_updated || update_hess_aux(cone)
 
     if !isdefined(cone, :hess)
@@ -301,7 +300,7 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
     return prod
 end
 
-function correction2(cone::EpiNormInf{T, R}, primal_dir::AbstractVector{T}) where {R <: RealOrComplex{T}} where {T <: Real}
+function correction2(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T <: Real}
     u = cone.point[1]
     udir = primal_dir[1]
     corr = cone.correction
