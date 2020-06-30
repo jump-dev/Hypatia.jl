@@ -33,8 +33,8 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
-    # "JuMP",
+    # "native",
+    "JuMP",
     ]
 
 # list of names of native examples to run
@@ -60,9 +60,9 @@ JuMP_example_names = [
     # "envelope",
     # "expdesign",
     # "lotkavolterra",
-    "lyapunovstability",
+    # "lyapunovstability",
     # "matrixcompletion",
-    "matrixquadratic",
+    # "matrixquadratic",
     # "matrixregression",
     # "maxvolume",
     # "muconvexity",
@@ -71,11 +71,11 @@ JuMP_example_names = [
     # "polynorm",
     # "portfolio",
     # "regionofattr",
-    # "robustgeomprog",
+    "robustgeomprog",
     # "secondorderpoly",
     # "semidefinitepoly",
     # "shapeconregr",
-    # "signomialmin",
+    "signomialmin",
     ]
 
 # start the tests
