@@ -3,7 +3,7 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 matrix epigraph of matrix square
 
-(U, v, W) in (S_+^n, R_+, R^(n, m)) such that 2 * U * v - W * W' in S_+^n
+(U, v, W) in (S_+^d1, R_+, R^(d1, d2)) such that 2 * U * v - W * W' in S_+^d1
 =#
 
 mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
@@ -11,16 +11,18 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_heuristic_neighborhood::Bool
     max_neighborhood::T
     dim::Int
-    n::Int
-    m::Int
+    d1::Int
+    d2::Int
     is_complex::Bool
     point::Vector{T}
+    dual_point::Vector{T}
     rt2::T
     timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
+    hess_prod_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
@@ -34,33 +36,41 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     U_idxs::UnitRange{Int}
     v_idx::Int
     W_idxs::UnitRange{Int}
-    U::Hermitian{R,Matrix{R}}
+    U::Hermitian{R, Matrix{R}}
     W::Matrix{R}
-    Z::Hermitian{R,Matrix{R}}
+    Z::Hermitian{R, Matrix{R}}
     fact_Z
     Zi::Hermitian{R, Matrix{R}}
     ZiW::Matrix{R}
-    tmpmm::Matrix{R}
-    tmpnn::Matrix{R}
+    ZiUZi::Hermitian{R, Matrix{R}}
+    WtZiW::Hermitian{R, Matrix{R}}
+    tmpd2d2::Matrix{R}
+    tmpd1d1::Matrix{R}
+    tmpd1d1b::Matrix{R}
+    tmpd1d1c::Matrix{R}
+    tmpd1d1d::Matrix{R}
+    tmpd1d2::Matrix{R}
+    ZiUZiW::Matrix{R}
+    Hvv::T
 
     function MatrixEpiPerSquare{T, R}(
-        n::Int,
-        m::Int;
+        d1::Int,
+        d2::Int;
         use_dual::Bool = false,
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
-        @assert 1 <= n <= m
+        @assert 1 <= d1 <= d2
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.max_neighborhood = max_neighborhood
         cone.is_complex = (R <: Complex)
-        cone.v_idx = (cone.is_complex ? n ^ 2 + 1 : svec_length(n) + 1)
-        cone.dim = cone.v_idx + (cone.is_complex ? 2 : 1) * n * m
-        cone.n = n
-        cone.m = m
+        cone.v_idx = (cone.is_complex ? d1 ^ 2 + 1 : svec_length(d1) + 1)
+        cone.dim = cone.v_idx + (cone.is_complex ? 2 : 1) * d1 * d2
+        cone.d1 = d1
+        cone.d2 = d2
         cone.rt2 = sqrt(T(2))
         cone.hess_fact_cache = hess_fact_cache
         cone.U_idxs = 1:(cone.v_idx - 1)
@@ -69,35 +79,45 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
+reset_data(cone::MatrixEpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.hess_prod_updated = false)
+
 # TODO only allocate the fields we use
 function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    n = cone.n
-    m = cone.m
-    cone.U = Hermitian(zeros(R, n, n), :U)
-    cone.W = zeros(R, n, m)
-    cone.Z = Hermitian(zeros(R, n, n), :U)
-    cone.ZiW = Matrix{R}(undef, n, m)
-    cone.tmpmm = Matrix{R}(undef, m, m)
-    cone.tmpnn = Matrix{R}(undef, n, n)
+    d1 = cone.d1
+    d2 = cone.d2
+    cone.U = Hermitian(zeros(R, d1, d1), :U)
+    cone.W = zeros(R, d1, d2)
+    cone.Z = Hermitian(zeros(R, d1, d1), :U)
+    cone.ZiW = Matrix{R}(undef, d1, d2)
+    cone.ZiUZi = Hermitian(zeros(R, d1, d1), :U)
+    cone.WtZiW = Hermitian(zeros(R, d2, d2), :U)
+    cone.tmpd2d2 = Matrix{R}(undef, d2, d2)
+    cone.tmpd1d1 = Matrix{R}(undef, d1, d1)
+    cone.tmpd1d1b = Matrix{R}(undef, d1, d1)
+    cone.tmpd1d1c = Matrix{R}(undef, d1, d1)
+    cone.tmpd1d1d = Matrix{R}(undef, d1, d1)
+    cone.tmpd1d2 = Matrix{R}(undef, d1, d2)
+    cone.ZiUZiW = Matrix{R}(undef, d1, d2)
     return
 end
 
-get_nu(cone::MatrixEpiPerSquare) = cone.n + 1
+get_nu(cone::MatrixEpiPerSquare) = cone.d1 + 1
 
 function set_initial_point(arr::AbstractVector, cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     incr = (cone.is_complex ? 2 : 1)
     arr .= 0
     k = 1
-    @inbounds for i in 1:cone.n
+    @inbounds for i in 1:cone.d1
         arr[k] = 1
         k += incr * i + 1
     end
@@ -105,11 +125,11 @@ function set_initial_point(arr::AbstractVector, cone::MatrixEpiPerSquare{T, R}) 
     return arr
 end
 
-function update_feas(cone::MatrixEpiPerSquare)
+function update_feas(cone::MatrixEpiPerSquare{T}) where {T}
     @assert !cone.feas_updated
     v = cone.point[cone.v_idx]
 
-    if v > 0
+    if v > eps(T)
         @views U = svec_to_smat!(cone.U.data, cone.point[cone.U_idxs], cone.rt2)
         @views W = vec_copy_to!(cone.W, cone.point[cone.W_idxs])
         copyto!(cone.Z.data, U)
@@ -124,6 +144,22 @@ function update_feas(cone::MatrixEpiPerSquare)
     return cone.is_feas
 end
 
+function update_dual_feas(cone::MatrixEpiPerSquare{T}) where {T}
+    v = cone.dual_point[cone.v_idx]
+    if v > eps(T)
+        @views svec_to_smat!(cone.tmpd1d1b, cone.dual_point[cone.U_idxs], cone.rt2)
+        F = cholesky!(Hermitian(cone.tmpd1d1b, :U), check = false)
+        isposdef(F) || return false
+        @views W = vec_copy_to!(cone.tmpd1d2, cone.dual_point[cone.W_idxs])
+        @show W
+        LW = ldiv!(F.U', W)
+        @show LW
+        trLW = sum(abs2, LW)
+        return (2 * v - trLW > eps(T))
+    end
+    return false
+end
+
 function update_grad(cone::MatrixEpiPerSquare)
     @assert cone.is_feas
     U = cone.U
@@ -133,8 +169,8 @@ function update_grad(cone::MatrixEpiPerSquare)
 
     Zi = cone.Zi = Hermitian(inv(cone.fact_Z), :U)
     @views smat_to_svec!(cone.grad[cone.U_idxs], Zi, cone.rt2)
-    @views cone.grad[cone.U_idxs] .*= -2v
-    cone.grad[cone.v_idx] = -2 * dot(Zi, U) + (cone.n - 1) / v
+    @views cone.grad[cone.U_idxs] .*= -2 * v
+    cone.grad[cone.v_idx] = -2 * dot(Zi, U) + (cone.d1 - 1) / v
     ldiv!(cone.ZiW, cone.fact_Z, W)
     @views vec_copy_to!(cone.grad[cone.W_idxs], cone.ZiW)
     @. @views cone.grad[cone.W_idxs] *= 2
@@ -143,38 +179,50 @@ function update_grad(cone::MatrixEpiPerSquare)
     return cone.grad
 end
 
-function update_hess(cone::MatrixEpiPerSquare)
+function update_hess_prod(cone::MatrixEpiPerSquare) # TODO here and in other cones these are misleading names since also needed for just hess
     @assert cone.grad_updated
-    n = cone.n
-    m = cone.m
-    dim = cone.dim
+    ZiUZi = cone.ZiUZi
+    ldiv!(ZiUZi.data, cone.fact_Z, cone.U)
+    rdiv!(ZiUZi.data, cone.fact_Z)
+    mul!(cone.WtZiW.data, cone.W', cone.ZiW) # TODO not used for hess prod
+    v = cone.point[cone.v_idx]
+    cone.Hvv = 4 * dot(ZiUZi, cone.U) - (cone.d1 - 1) / v / v
+    cone.hess_prod_updated = true
+    return cone.hess_prod_updated
+end
+
+function update_hess(cone::MatrixEpiPerSquare)
+    if !cone.hess_prod_updated
+        update_hess_prod(cone)
+    end
+    d1 = cone.d1
+    d2 = cone.d2
     U_idxs = cone.U_idxs
     v_idx = cone.v_idx
     W_idxs = cone.W_idxs
-    U = cone.U
-    W = cone.W
-    v = cone.point[cone.v_idx]
+    v = cone.point[v_idx]
     H = cone.hess.data
-    tmpmm = cone.tmpmm
-    tmpnn = cone.tmpnn
+    tmpd2d2 = cone.tmpd2d2
+    ZiUZi = cone.ZiUZi
+    tmpd1d1 = cone.tmpd1d1
     Zi = cone.Zi
     ZiW = cone.ZiW
     idx_incr = (cone.is_complex ? 2 : 1)
 
     # H_W_W part
-    mul!(tmpmm, W', ZiW)
-    tmpmm += I # TODO inefficient
+    copyto!(tmpd2d2, I)
+    tmpd2d2 .+= cone.WtZiW
 
     # TODO parallelize loops
     r_idx = v_idx + 1
-    for i in 1:m, j in 1:n
+    for i in 1:d2, j in 1:d1
         c_idx = r_idx
-        @inbounds for k in i:m
+        @inbounds for k in i:d2
             ZiWjk = ZiW[j, k]
-            tmpmmik = tmpmm[i, k]
+            tmpd2d2ik = tmpd2d2[i, k]
             lstart = (i == k ? j : 1)
-            @inbounds for l in lstart:n
-                term1 = Zi[l, j] * tmpmmik
+            @inbounds for l in lstart:d1
+                term1 = Zi[l, j] * tmpd2d2ik
                 term2 = ZiW[l, i] * ZiWjk
                 hess_element(H, r_idx, c_idx, term1, term2)
                 c_idx += idx_incr
@@ -190,18 +238,15 @@ function update_hess(cone::MatrixEpiPerSquare)
     @. @views H_U_U *= 4 * abs2(v)
 
     # H_v_v part
-    ldiv!(tmpnn, cone.fact_Z, U)
-    rdiv!(tmpnn, cone.fact_Z)
-    ZiUZi = Hermitian(tmpnn)
-    @views H[v_idx, v_idx] = 4 * dot(ZiUZi, U) - (cone.n - 1) / v / v
+    @views H[v_idx, v_idx] = cone.Hvv
 
     # H_U_W part
     # TODO parallelize loops
     # TODO use dispatch for complex part and clean up
     row_idx = 1
-    for i in 1:n, j in 1:i # U lower tri idxs
+    for i in 1:d1, j in 1:i # U lower tri idxs
         col_idx = v_idx + 1
-        for l in 1:m, k in 1:n # W idxs
+        for l in 1:d2, k in 1:d1 # W idxs
             @inbounds if cone.is_complex
                 term1 = Zi[k, i] * ZiW[j, l]
                 term2 = Zi[k, j] * ZiW[i, l]
@@ -224,25 +269,63 @@ function update_hess(cone::MatrixEpiPerSquare)
             end
             col_idx += idx_incr
         end
-        if i != j
-            row_idx += idx_incr
-        else
-            row_idx += 1
-        end
+        row_idx += (i == j ? 1 : idx_incr)
     end
-    @. @views H[U_idxs, W_idxs] *= -2v
+    @. @views H[U_idxs, W_idxs] *= -2 * v
 
     # H_v_W part
-    # NOTE overwrites ZiW
-    # TODO better to do ZiU * ZiW?
-    mul!(ZiW, ZiUZi, W, -4, false)
-    @views vec_copy_to!(H[v_idx, W_idxs], ZiW)
+    mul!(cone.ZiUZiW, cone.ZiUZi, cone.W)
+    @views vec_copy_to!(H[v_idx, W_idxs], cone.ZiUZiW)
+    @. @views H[v_idx, W_idxs] *= -4
 
     # H_U_v part
-    # NOTE overwrites ZiUZi
-    axpby!(-2, Zi, 4v, tmpnn)
-    @views smat_to_svec!(H[U_idxs, v_idx], tmpnn, cone.rt2)
+    copyto!(tmpd1d1, ZiUZi)
+    axpby!(-2, Zi, 4 * v, tmpd1d1)
+    @views smat_to_svec!(H[U_idxs, v_idx], tmpd1d1, cone.rt2)
 
     cone.hess_updated = true
     return cone.hess
+end
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::MatrixEpiPerSquare)
+    if !cone.hess_prod_updated
+        update_hess_prod(cone)
+    end
+
+    U_idxs = cone.U_idxs
+    v_idx = cone.v_idx
+    W_idxs = cone.W_idxs
+    v2 = 2 * cone.point[cone.v_idx]
+    ZiUZi = cone.ZiUZi
+    tmpd1d1 = Hermitian(cone.tmpd1d1, :U)
+    temp_U = Hermitian(cone.tmpd1d1b, :U)
+    temp_U2 = Hermitian(cone.tmpd1d1c, :U)
+    temp_U3 = cone.tmpd1d1d
+    temp_W = cone.tmpd1d2
+
+    @inbounds for i in 1:size(arr, 2)
+        @views svec_to_smat!(temp_U.data, arr[U_idxs, i], cone.rt2)
+        @views vec_copy_to!(temp_W, arr[W_idxs, i])
+        v_arr = arr[v_idx, i]
+        @views U_prod = prod[U_idxs, i]
+        @views W_prod = prod[W_idxs, i]
+
+        ldiv!(cone.fact_Z, temp_W)
+        mul!(temp_U3, temp_W, cone.ZiW')
+        copyto!(tmpd1d1.data, temp_U)
+        rdiv!(ldiv!(cone.fact_Z, tmpd1d1.data), cone.fact_Z)
+        @. temp_U2.data = temp_U3 + temp_U3' - v2 * tmpd1d1.data
+
+        copyto!(tmpd1d1, temp_U2)
+        axpy!(-2 * v_arr, ZiUZi.data, tmpd1d1.data)
+        vec_copy_to!(W_prod, mul!(temp_W, tmpd1d1, cone.W, 2, 2))
+
+        copyto!(tmpd1d1, ZiUZi)
+        axpby!(-2, cone.Zi.data, 2 * v2, tmpd1d1.data)
+        prod[v_idx, i] = real(dot(tmpd1d1, temp_U)) - 4 * real(dot(cone.U, temp_U3)) + cone.Hvv * v_arr
+        axpby!(-v2, temp_U2.data, v_arr, tmpd1d1.data)
+        smat_to_svec!(U_prod, tmpd1d1, cone.rt2)
+    end
+
+    return prod
 end

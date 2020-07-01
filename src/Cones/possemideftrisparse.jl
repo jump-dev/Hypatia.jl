@@ -33,6 +33,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     col_idxs::Vector{Int}
     is_complex::Bool
     point::Vector{T}
+    dual_point::Vector{T}
     rt2::T
     timer::TimerOutput
 
@@ -113,6 +114,7 @@ function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -303,6 +305,8 @@ function update_feas(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
     cone.feas_updated = true
     return cone.is_feas
 end
+
+update_dual_feas(cone::PosSemidefTriSparse) = true # TODO see how expensive the completable matrix feas test is
 
 function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     @assert cone.is_feas

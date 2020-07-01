@@ -21,6 +21,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     side::Int
     is_complex::Bool
     point::Vector{T}
+    dual_point::Vector{T}
     rt2::T
     timer::TimerOutput
 
@@ -75,6 +76,7 @@ function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} whe
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -110,6 +112,11 @@ function update_feas(cone::PosSemidefTri)
 
     cone.feas_updated = true
     return cone.is_feas
+end
+
+function update_dual_feas(cone::PosSemidefTri)
+    svec_to_smat!(cone.mat3, cone.dual_point, cone.rt2)
+    return isposdef(cholesky!(Hermitian(cone.mat3, :U), check = false))
 end
 
 function update_grad(cone::PosSemidefTri)

@@ -18,6 +18,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     dim::Int
     Ps::Vector{Matrix{R}}
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
@@ -36,7 +37,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tmpLL::Vector{Matrix{R}}
     tmpUL::Vector{Matrix{R}}
     tmpLU::Vector{Matrix{R}}
-    tmpUU::Matrix{R}
+    tmpUU::Matrix{R} # TODO for corrector, this can stay as a single matrix if we only use LU
     ΛF::Vector
 
     function WSOSInterpNonnegative{T, R}(
@@ -65,6 +66,7 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -112,6 +114,8 @@ function update_feas(cone::WSOSInterpNonnegative)
     cone.feas_updated = true
     return cone.is_feas
 end
+
+update_dual_feas(cone::WSOSInterpNonnegative) = true
 
 # TODO decide whether to compute the LUk' * LUk in grad or in hess (only diag needed for grad)
 # TODO can be done in parallel
