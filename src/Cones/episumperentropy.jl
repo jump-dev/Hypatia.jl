@@ -118,7 +118,7 @@ function update_feas(cone::EpiSumPerEntropy{T}) where {T}
     return cone.is_feas
 end
 
-function update_dual_feas(cone::EpiSumPerEntropy{T}) where {T}
+function is_dual_feas(cone::EpiSumPerEntropy{T}) where {T}
     u = cone.dual_point[1]
     @views v = cone.dual_point[cone.v_idxs]
     @views w = cone.dual_point[cone.w_idxs]

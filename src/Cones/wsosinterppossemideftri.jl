@@ -134,7 +134,7 @@ function update_feas(cone::WSOSInterpPosSemidefTri)
     return cone.is_feas
 end
 
-update_dual_feas(cone::WSOSInterpPosSemidefTri) = true
+is_dual_feas(cone::WSOSInterpPosSemidefTri) = true
 
 function update_grad(cone::WSOSInterpPosSemidefTri)
     @assert is_feas(cone)

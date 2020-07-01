@@ -105,7 +105,7 @@ function update_feas(cone::HypoGeomean{T}) where {T}
     return cone.is_feas
 end
 
-function update_dual_feas(cone::HypoGeomean{T}) where {T}
+function is_dual_feas(cone::HypoGeomean{T}) where {T}
     u = cone.dual_point[1]
     @views w = cone.dual_point[2:end]
     alpha = cone.alpha

@@ -145,7 +145,7 @@ function update_feas(cone::HypoPerLogdetTri{T}) where {T}
     return cone.is_feas
 end
 
-function update_dual_feas(cone::HypoPerLogdetTri{T}) where {T}
+function is_dual_feas(cone::HypoPerLogdetTri{T}) where {T}
     u = cone.dual_point[1]
     v = cone.dual_point[2]
     if u < -eps(T)

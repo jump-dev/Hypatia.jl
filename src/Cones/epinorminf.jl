@@ -107,7 +107,7 @@ function update_feas(cone::EpiNormInf{T}) where {T}
     return cone.is_feas
 end
 
-function update_dual_feas(cone::EpiNormInf{T}) where {T}
+function is_dual_feas(cone::EpiNormInf{T}) where {T}
     dp = cone.dual_point
     u = dp[1]
     if u > eps(T)

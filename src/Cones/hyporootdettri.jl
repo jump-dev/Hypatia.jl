@@ -135,8 +135,8 @@ function update_feas(cone::HypoRootdetTri{T}) where {T}
     return cone.is_feas
 end
 
-# update_dual_feas(cone::HypoRootdetTri) = true
-function update_dual_feas(cone::HypoRootdetTri{T}) where {T}
+# is_dual_feas(cone::HypoRootdetTri) = true
+function is_dual_feas(cone::HypoRootdetTri{T}) where {T}
     u = cone.dual_point[1]
     if u < -eps(T)
         @views svec_to_smat!(cone.work_mat, cone.dual_point[2:end], cone.rt2)

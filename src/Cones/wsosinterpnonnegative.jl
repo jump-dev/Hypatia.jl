@@ -115,7 +115,7 @@ function update_feas(cone::WSOSInterpNonnegative)
     return cone.is_feas
 end
 
-update_dual_feas(cone::WSOSInterpNonnegative) = true
+is_dual_feas(cone::WSOSInterpNonnegative) = true
 
 # TODO decide whether to compute the LUk' * LUk in grad or in hess (only diag needed for grad)
 # TODO can be done in parallel

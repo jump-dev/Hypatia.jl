@@ -96,8 +96,8 @@ function update_feas(cone::HypoPerLog{T}) where {T}
 end
 
 # TODO higher dim case
-update_dual_feas(cone::HypoPerLog) = true
-# function update_dual_feas(cone::HypoPerLog{T}) where {T}
+is_dual_feas(cone::HypoPerLog) = true
+# function is_dual_feas(cone::HypoPerLog{T}) where {T}
 #     @assert cone.dim == 3
 #     u = cone.dual_point[1]
 #     v = cone.dual_point[2]

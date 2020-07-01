@@ -113,7 +113,7 @@ function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
     return cone.is_feas
 end
 
-update_dual_feas(cone::LinMatrixIneq) = true # TODO use a dikin ellipsoid condition?
+is_dual_feas(cone::LinMatrixIneq) = true # TODO use a dikin ellipsoid condition?
 
 function update_grad(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert cone.is_feas

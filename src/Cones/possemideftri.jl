@@ -114,7 +114,7 @@ function update_feas(cone::PosSemidefTri)
     return cone.is_feas
 end
 
-function update_dual_feas(cone::PosSemidefTri)
+function is_dual_feas(cone::PosSemidefTri)
     svec_to_smat!(cone.mat3, cone.dual_point, cone.rt2)
     return isposdef(cholesky!(Hermitian(cone.mat3, :U), check = false))
 end
