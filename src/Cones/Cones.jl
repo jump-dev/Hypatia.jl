@@ -394,7 +394,7 @@ function sparse_upper_arrow(T::Type{<:Real}, w_dim::Int)
 end
 
 function factor_upper_arrow(uu, uw, ww, nzval)
-    minrt = eps(uu)
+    minrt = abs2(eps(uu))
     nzidx = 2
     @inbounds for i in eachindex(ww)
         wwi = sqrt(max(ww[i], minrt))
@@ -427,7 +427,7 @@ function sparse_upper_arrow_block2(T::Type{<:Real}, w_dim::Int)
 end
 
 function factor_upper_arrow_block2(uu, uv, uw, vv, vw, ww, nzval)
-    minrt = eps(uu)
+    minrt = abs2(eps(uu))
     nzidx = 1
     @inbounds for i in eachindex(ww)
         wwi = sqrt(max(ww[i], minrt))
