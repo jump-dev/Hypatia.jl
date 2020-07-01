@@ -9,6 +9,7 @@ barrier from "Primal-Dual Interior-Point Methods for Domain-Driven Formulations"
 
 TODO
 - write native tests for use_dual = true
+- add sparse idxs for inv hess, like nonnegative and epinorminf
 =#
 
 mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
@@ -121,7 +122,7 @@ function update_dual_feas(cone::EpiSumPerEntropy{T}) where {T}
     u = cone.dual_point[1]
     @views v = cone.dual_point[cone.v_idxs]
     @views w = cone.dual_point[cone.w_idxs]
-    if all(vi -> vi > eps(T), v) && u > eps(T)
+    if all(vi -> vi > eps(T), v) && (u > eps(T))
         return all(u * (1 + log(vi / u)) + wi > eps(T) for (vi, wi) in zip(v, w))
     end
     return false

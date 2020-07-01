@@ -13,9 +13,12 @@ using TimerOutputs
 # options to solvers
 timer = TimerOutput()
 default_solver_options = (
-    verbose = false,
-    iter_limit = 250,
+    # verbose = false,
+    verbose = true,
+    iter_limit = 150,
     timer = timer,
+    # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
+    system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
@@ -29,7 +32,7 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
@@ -49,29 +52,29 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
-    "conditionnum",
-    "contraction",
-    "densityest",
-    "envelope",
-    "expdesign",
-    "lotkavolterra",
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "muconvexity",
-    "nearestpsd",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    "regionofattr",
-    "robustgeomprog",
-    "secondorderpoly",
-    "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
+    # "centralpolymat",
+    # "conditionnum",
+    # "contraction",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # "lotkavolterra",
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # "maxvolume",
+    # "muconvexity",
+    # "nearestpsd",
+    # "polymin",
+    # "polynorm",
+    # "portfolio",
+    # "regionofattr",
+    # "robustgeomprog",
+    # "secondorderpoly",
+    # "semidefinitepoly",
+    "shapeconregr", # TODO regressions?
+    # "signomialmin",
     ]
 
 # start the tests
@@ -136,10 +139,11 @@ all_tests_time = time()
     end
 
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
-    show(perf, allrows = true, allcols = true)
-    println("\n")
-    show(timer)
-    println("\n")
+    @show sum(perf[:iters])
+    # show(perf, allrows = true, allcols = true)
+    # println("\n")
+    # show(timer)
+    # println("\n")
 end
 
 ;

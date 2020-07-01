@@ -127,8 +127,7 @@ function update_grad(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
     w = cone.w
 
     usqr = abs2(u)
-    minval = eps(T)
-    @. cone.den = max(T(0.5) * (usqr - abs2(w)), minval)
+    @. cone.den = T(0.5) * (usqr - abs2(w))
     @. cone.uden = u / cone.den
     @. cone.wden = w / cone.den
     cone.grad[1] = (length(w) - 1) / u - sum(cone.uden)
@@ -161,8 +160,7 @@ function update_hess_aux(cone::EpiNormInf{T}) where {T <: Real}
     end
 
     t1 = (cone.n - 1) / u / u
-    cone.Huu = sum(abs2, cone.uden) - t1 - sumiden
-    @assert cone.Huu > 0
+    cone.Huu = max(sum(abs2, cone.uden) - t1 - sumiden, eps(T))
 
     cone.hess_aux_updated = true
     return
@@ -222,7 +220,7 @@ function update_inv_hess(cone::EpiNormInf{T}) where {T <: Real}
         end
         schur += inv(u2pwj2)
     end
-    rtschur = sqrt(max(schur, minval))
+    rtschur = max(sqrt(schur), minval)
     Hi[1, :] ./= rtschur
     @inbounds for j in 2:cone.dim, i in 2:j
         Hi[i, j] = Hi[1, j] * Hi[1, i]

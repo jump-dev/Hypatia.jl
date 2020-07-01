@@ -264,14 +264,12 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::W
         arr_shufj = arr_shuf[:, j]
         for k in eachindex(cone.Ps)
             PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
-            for p in 1:U
-                for q in 1:U
-                    arr_mat = svec_to_smat!(zeros(T, R, R), arr_shufj[block_idxs(r_dim, q)], cone.rt2)
-                    PlambdaPk_slice = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[q]] for ii in 1:R, jj in 1:R]
-                    prod_mat = PlambdaPk_slice * Symmetric(arr_mat) * PlambdaPk_slice'
-                    tmp = smat_to_svec!(zeros(T, r_dim), prod_mat, cone.rt2)
-                    prod_shuf[block_idxs(r_dim, p), j] += tmp
-                end
+            for p in 1:U, q in 1:U
+                arr_mat = svec_to_smat!(zeros(T, R, R), arr_shufj[block_idxs(r_dim, q)], cone.rt2)
+                PlambdaPk_slice = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[q]] for ii in 1:R, jj in 1:R]
+                prod_mat = PlambdaPk_slice * Symmetric(arr_mat) * PlambdaPk_slice'
+                tmp = smat_to_svec!(zeros(T, r_dim), prod_mat, cone.rt2)
+                prod_shuf[block_idxs(r_dim, p), j] += tmp
             end
         end
     end
