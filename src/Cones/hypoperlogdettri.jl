@@ -22,6 +22,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     side::Int
     is_complex::Bool
     point::Vector{T}
+    dual_point::Vector{T}
     rt2::T
     sc_const::T
     timer::TimerOutput
@@ -41,7 +42,9 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     nbhd_tmp2::Vector{T}
 
     mat::Matrix{R}
-    mat2::Matrix{R}
+    dual_mat::Matrix{R}
+    mat2::Matrix{R} # TODO named differently in some cones, fix inconsistency
+    mat3::Matrix{R}
     fact_mat
     ldWv::T
     z::T
@@ -88,6 +91,7 @@ function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} 
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -95,7 +99,9 @@ function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} 
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.mat = Matrix{R}(undef, cone.side, cone.side)
+    cone.dual_mat = Matrix{R}(undef, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
+    cone.mat3 = similar(cone.mat)
     cone.Wi = similar(cone.mat)
     cone.Wivzi = similar(cone.mat)
     return
@@ -116,18 +122,18 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdetTri{T, R})
     return arr
 end
 
-function update_feas(cone::HypoPerLogdetTri)
+function update_feas(cone::HypoPerLogdetTri{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
 
-    if v > 0
+    if v > eps(T)
         svec_to_smat!(cone.mat, view(cone.point, 3:cone.dim), cone.rt2)
         cone.fact_mat = cholesky!(Hermitian(cone.mat, :U), check = false)
         if isposdef(cone.fact_mat)
             cone.ldWv = logdet(cone.fact_mat) - cone.side * log(v)
             cone.z = v * cone.ldWv - u
-            cone.is_feas = (cone.z > 0)
+            cone.is_feas = (cone.z > eps(T))
         else
             cone.is_feas = false
         end
@@ -139,14 +145,26 @@ function update_feas(cone::HypoPerLogdetTri)
     return cone.is_feas
 end
 
+function is_dual_feas(cone::HypoPerLogdetTri{T}) where {T}
+    u = cone.dual_point[1]
+    v = cone.dual_point[2]
+    if u < -eps(T)
+        svec_to_smat!(cone.dual_mat, view(cone.dual_point, 3:cone.dim), cone.rt2)
+        dual_fact = cholesky!(Hermitian(cone.dual_mat, :U), check = false)
+        return isposdef(dual_fact) && (v - u * (logdet(dual_fact) - cone.side * log(-u) + cone.side) > eps(T))
+    end
+    return false
+end
+
 function update_grad(cone::HypoPerLogdetTri)
     @assert cone.is_feas
     z = cone.z
     u = cone.point[1]
     v = cone.point[2]
 
-    copyto!(cone.Wi, cone.fact_mat.factors)
-    LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0))
+    # copyto!(cone.Wi, cone.fact_mat.factors)
+    # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0))
+    cone.Wi = inv(cone.fact_mat)
     cone.nLz = (cone.side - cone.ldWv) / z
     cone.ldWvuv = cone.ldWv - u / v
     cone.vzip1 = 1 + v / z

@@ -19,6 +19,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     side::Int
     is_complex::Bool
     point::Vector{T}
+    dual_point::Vector{T}
     rt2::T
     sc_const::T
     timer::TimerOutput
@@ -39,11 +40,12 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
 
     W::Matrix{R}
     work_mat::Matrix{R}
+    work_mat2::Matrix{R}
     fact_W
     Wi::Matrix{R}
     rootdet::T
     rootdetu::T
-    frac::T
+    sigma::T
     kron_const::T
     dot_const::T
 
@@ -84,6 +86,7 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -91,8 +94,9 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.W = zeros(R, cone.side, cone.side)
-    cone.Wi = zeros(R, cone.side, cone.side)
+    # cone.Wi = zeros(R, cone.side, cone.side)
     cone.work_mat = zeros(R, cone.side, cone.side)
+    cone.work_mat2 = zeros(R, cone.side, cone.side)
     return
 end
 
@@ -113,7 +117,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T, R}) w
     return arr
 end
 
-function update_feas(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function update_feas(cone::HypoRootdetTri{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
 
@@ -122,7 +126,7 @@ function update_feas(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} w
     if isposdef(cone.fact_W)
         cone.rootdet = exp(logdet(cone.fact_W) / cone.side)
         cone.rootdetu = cone.rootdet - u
-        cone.is_feas = (cone.rootdetu > 0)
+        cone.is_feas = (cone.rootdetu > eps(T))
     else
         cone.is_feas = false
     end
@@ -131,16 +135,29 @@ function update_feas(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} w
     return cone.is_feas
 end
 
+# is_dual_feas(cone::HypoRootdetTri) = true
+function is_dual_feas(cone::HypoRootdetTri{T}) where {T}
+    u = cone.dual_point[1]
+    if u < -eps(T)
+        @views svec_to_smat!(cone.work_mat, cone.dual_point[2:end], cone.rt2)
+        dual_fact_W = cholesky!(Hermitian(cone.work_mat, :U), check = false)
+        return isposdef(dual_fact_W) && (logdet(dual_fact_W) - cone.side * log(-u / cone.side) > eps(T))
+    end
+    return false
+end
+
 function update_grad(cone::HypoRootdetTri)
+    @assert cone.feas_updated
     @assert cone.is_feas
     u = cone.point[1]
 
     cone.grad[1] = cone.sc_const / cone.rootdetu
-    copyto!(cone.Wi, cone.fact_W.factors)
-    LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0))
+    # copyto!(cone.Wi, cone.fact_W.factors)
+    # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0)) # TODO inplace for bigfloat
+    cone.Wi = inv(cone.fact_W)
     @views smat_to_svec!(cone.grad[2:cone.dim], cone.Wi, cone.rt2)
-    cone.frac = cone.rootdet / cone.rootdetu / cone.side
-    @. cone.grad[2:end] *= -cone.sc_const * (cone.frac + 1)
+    cone.sigma = cone.rootdet / cone.rootdetu / cone.side
+    @. cone.grad[2:end] *= -cone.sc_const * (cone.sigma + 1)
 
     cone.grad_updated = true
     return cone.grad
@@ -214,14 +231,14 @@ end
 function update_hess_prod(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert cone.grad_updated
 
-    frac = cone.frac # rootdet / rootdetu / side
+    sigma = cone.sigma # rootdet / rootdetu / side
     # update constants used in the Hessian
-    cone.kron_const = frac + 1
-    cone.dot_const = frac * (frac - inv(T(cone.side)))
+    cone.kron_const = sigma + 1
+    cone.dot_const = sigma * (sigma - inv(T(cone.side)))
     # update first row in the Hessian
     hess = cone.hess.data
     @. hess[1, :] = cone.grad / cone.rootdetu
-    @. hess[1, 2:end] *= frac / cone.kron_const
+    @. hess[1, 2:end] *= sigma / cone.kron_const
 
     cone.hess_prod_updated = true
     return

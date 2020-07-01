@@ -16,8 +16,8 @@ include(joinpath(@__DIR__, "nativesets.jl"))
 
 all_reals = [
     Float64,
-    Float32,
-    BigFloat,
+    # Float32,
+    # BigFloat,
     ]
 default_reals = [
     Float64,
@@ -25,19 +25,19 @@ default_reals = [
 
 # system solvers tests options
 system_solvers_instance_names = vcat(
-    inst_preproc,
-    inst_infeas,
+    # inst_preproc,
+    # inst_infeas,
     # inst_cones_few, # NOTE subset of inst_cones_many
     inst_cones_many,
     )
 system_solvers = Dict(
-    "NaiveDense" => all_reals,
-    "NaiveSparse" => default_reals,
-    # "NaiveIndirect" => all_reals, # TODO fix
-    "NaiveElimDense" => all_reals,
-    "NaiveElimSparse" => default_reals,
-    "SymIndefDense" => all_reals,
-    "SymIndefSparse" => default_reals,
+    # "NaiveDense" => all_reals,
+    # "NaiveSparse" => default_reals,
+    # # "NaiveIndirect" => all_reals, # TODO fix
+    # "NaiveElimDense" => all_reals,
+    # "NaiveElimSparse" => default_reals,
+    # "SymIndefDense" => all_reals,
+    # "SymIndefSparse" => default_reals,
     "QRCholDense" => all_reals,
     )
 
@@ -52,8 +52,8 @@ preprocess_system_solver = "SymIndefDense"
 preprocess_reals = all_reals
 preprocess_options = (init_use_indirect = false, reduce = false)
 preprocess_flags = [
-    true,
-    false,
+    # true,
+    # false,
     ]
 
 # indirect initialization test options
@@ -67,8 +67,8 @@ init_use_indirect_system_solver = "SymIndefDense"
 init_use_indirect_reals = all_reals
 init_use_indirect_options = (preprocess = false, reduce = false)
 init_use_indirect_flags = [
-    true,
-    false,
+    # true,
+    # false,
     ]
 
 # reduce test options
@@ -82,18 +82,25 @@ reduce_system_solver = "QRCholDense"
 reduce_reals = all_reals
 reduce_options = (preprocess = true, init_use_indirect = false)
 reduce_flags = [
-    true,
-    false,
+    # true,
+    # false,
     ]
 
 # other solver options
 timer = TimerOutput()
+tol = 1e-7
 other_options = (
-    # verbose = true,
-    verbose = false,
-    iter_limit = 250,
+    verbose = true,
+    # verbose = false,
+    iter_limit = 100,
     time_limit = 6e1,
     timer = timer,
+    # TODO this is tighter than default
+    tol_feas = tol,
+    tol_rel_opt = tol,
+    tol_abs_opt = tol,
+    # preprocess = false,
+    # reduce = false,
     )
 
 @info("starting native tests")
@@ -122,6 +129,7 @@ function run_instance_options(T::Type{<:Real}, inst_name::String, sys_name::Stri
 end
 
 all_tests_time = time()
+global ITERS = 0
 
 @testset "native tests" begin
     for inst_name in system_solvers_instance_names, (sys_name, real_types) in system_solvers, T in real_types
@@ -143,7 +151,8 @@ all_tests_time = time()
     @printf("\nnative tests total time: %8.2e seconds\n\n", time() - all_tests_time)
     show(perf, allrows = true, allcols = true)
     println("\n")
-    show(timer)
-    println("\n")
+    # show(timer)
+    # println("\n")
+    @show ITERS
 end
 ;

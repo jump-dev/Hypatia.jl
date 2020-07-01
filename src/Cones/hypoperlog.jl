@@ -14,6 +14,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     max_neighborhood::T
     dim::Int
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
@@ -57,6 +58,7 @@ function setup_data(cone::HypoPerLog{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -75,16 +77,16 @@ function set_initial_point(arr::AbstractVector, cone::HypoPerLog)
     return arr
 end
 
-function update_feas(cone::HypoPerLog)
+function update_feas(cone::HypoPerLog{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
-    w = view(cone.point, 3:cone.dim)
+    @views w = cone.point[3:end]
 
-    if v > 0 && all(>(zero(u)), w)
+    if v > eps(T) && all(>(eps(T)), w)
         cone.lwv = sum(log(wi / v) for wi in w)
         cone.vlwvu = v * cone.lwv - u
-        cone.is_feas = (cone.vlwvu > 0)
+        cone.is_feas = (cone.vlwvu > eps(T))
     else
         cone.is_feas = false
     end
@@ -92,6 +94,19 @@ function update_feas(cone::HypoPerLog)
     cone.feas_updated = true
     return cone.is_feas
 end
+
+# TODO higher dim case
+is_dual_feas(cone::HypoPerLog) = true
+# function is_dual_feas(cone::HypoPerLog{T}) where {T}
+#     @assert cone.dim == 3
+#     u = cone.dual_point[1]
+#     v = cone.dual_point[2]
+#     @views w = cone.dual_point[3:end]
+#     if u < -eps(T) && all(>(eps(T)), w)
+#         return (v - u - u * log(-w / u) > eps(T))
+#     end
+#     return false
+# end
 
 function update_grad(cone::HypoPerLog)
     @assert cone.is_feas
@@ -104,7 +119,7 @@ function update_grad(cone::HypoPerLog)
     g[1] = inv(cone.vlwvu)
     cone.lvwnivlwvu = (d - cone.lwv) / cone.vlwvu
     g[2] = cone.lvwnivlwvu - d / v
-    gden = -1 - v / (cone.vlwvu)
+    gden = -1 - v / cone.vlwvu
     @. g[3:end] = gden / w
 
     cone.grad_updated = true
@@ -142,7 +157,7 @@ function update_hess(cone::HypoPerLog)
     return cone.hess
 end
 
-# see analysis in https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
+# see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
 function get_central_ray_hypoperlog(w_dim::Int)
     if w_dim <= 10
         # lookup points where x = f'(x)
@@ -174,7 +189,6 @@ const central_rays_hypoperlog = [
     -0.684585293  1.280747581  1.369956554;
     -0.684893372  1.293360445  1.373249434;
     ]
-
 
 # TODO add hess prod, inv hess etc functions
 # NOTE old EpiPerExp code below may be useful (cone vector is reversed)

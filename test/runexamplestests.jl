@@ -14,8 +14,11 @@ using TimerOutputs
 timer = TimerOutput()
 default_solver_options = (
     verbose = false,
-    iter_limit = 250,
+    # verbose = true,
+    iter_limit = 150,
     timer = timer,
+    # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
+    system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
@@ -136,10 +139,11 @@ all_tests_time = time()
     end
 
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
-    show(perf, allrows = true, allcols = true)
-    println("\n")
-    show(timer)
-    println("\n")
+    @show sum(perf[:iters])
+    # show(perf, allrows = true, allcols = true)
+    # println("\n")
+    # show(timer)
+    # println("\n")
 end
 
 ;

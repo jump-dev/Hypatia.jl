@@ -7,8 +7,8 @@ barrier -logdet(W) - sum(log(W_ij) for i in 1:n, j in 1:(i-1))
 where W = smat(w)
 
 TODO
-better description
-
+- improve description
+- complex generalization?
 =#
 
 mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
@@ -18,6 +18,7 @@ mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
     dim::Int
     side::Int
     point::Vector{T}
+    dual_point::Vector{T}
     rt2::T
     timer::TimerOutput
 
@@ -73,6 +74,7 @@ function setup_data(cone::DoublyNonnegative{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -150,6 +152,8 @@ function update_feas(cone::DoublyNonnegative)
     cone.feas_updated = true
     return cone.is_feas
 end
+
+is_dual_feas(cone::DoublyNonnegative) = true
 
 function update_grad(cone::DoublyNonnegative)
     @assert cone.is_feas

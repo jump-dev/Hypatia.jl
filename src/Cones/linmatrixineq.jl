@@ -15,6 +15,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     As::Vector
     is_complex::Bool
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
@@ -55,8 +56,9 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
             # @assert eltype(A_i) <: RealOrComplex{T}
             @assert ishermitian(A_i)
         end
-        @assert isposdef(first(As))
         @assert side > 0
+        @assert div(side * (side + 1), 2) >= dim # TODO necessary to ensure linear independence of As (but not sufficient)
+        @assert isposdef(first(As))
         cone = new{T}()
         cone.use_dual_barrier = use_dual
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
@@ -74,6 +76,7 @@ function setup_data(cone::LinMatrixIneq{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -109,6 +112,8 @@ function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
     cone.feas_updated = true
     return cone.is_feas
 end
+
+is_dual_feas(cone::LinMatrixIneq) = true # TODO use a dikin ellipsoid condition?
 
 function update_grad(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert cone.is_feas
