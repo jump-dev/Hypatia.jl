@@ -334,7 +334,7 @@ end
 #             PlambdaPk_slice_qr = [PlambdaPk[block_idxs(U, ii)[q], block_idxs(U, jj)[r]] for ii in 1:R, jj in 1:R]
 #             PlambdaPk_slice_rp = [PlambdaPk[block_idxs(U, ii)[r], block_idxs(U, jj)[p]] for ii in 1:R, jj in 1:R]
 #
-#             prod_mat = PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp
+#             prod_mat = PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp # O(R^3) done O(U^3) times
 #             prod_mat += prod_mat'
 #             corr_shuf[block_idxs(r_dim, p)] .+= smat_to_svec!(similar(corr, r_dim), prod_mat, cone.rt2)
 #         end
@@ -389,6 +389,7 @@ function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
                     primal_dir_kl = Diagonal(primal_dir[block_idxs(U, idx_kl)])
                     primal_dir_mn = Diagonal(primal_dir[block_idxs(U, idx_mn)])
 
+                    # at least O(U^3) even if we only get the diagonal, do this O(R^6) times (3 loops O(R^2))
                     M = PlambdaPk_slice_il * primal_dir_kl * PlambdaPk_slice_kn * primal_dir_mn * PlambdaPk_slice_jm' +
                         PlambdaPk_slice_jl * primal_dir_kl * PlambdaPk_slice_kn * primal_dir_mn * PlambdaPk_slice_im' +
                         PlambdaPk_slice_ik * primal_dir_kl * PlambdaPk_slice_ln * primal_dir_mn * PlambdaPk_slice_jm' +
