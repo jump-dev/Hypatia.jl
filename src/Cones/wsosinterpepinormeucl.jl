@@ -22,6 +22,7 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     U::Int
     Ps::Vector{Matrix{T}}
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
@@ -39,7 +40,6 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
 
     mat::Vector{Matrix{T}}
     matfact::Vector
-
     Λi_Λ::Vector{Vector{Matrix{T}}}
     Λ11::Vector{Matrix{T}}
     tmpLL::Vector{Matrix{T}}
@@ -83,6 +83,7 @@ function setup_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     R = cone.R
     Ps = cone.Ps
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -169,6 +170,8 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
     cone.feas_updated = true
     return cone.is_feas
 end
+
+update_dual_feas(cone::WSOSInterpEpiNormEucl) = true
 
 function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
     @assert cone.is_feas

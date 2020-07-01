@@ -20,7 +20,7 @@ function test_barrier_oracles(
     cone::CO.Cone{T},
     barrier::Function;
     noise::T = T(0.1),
-    scale::T = T(1e-2),
+    scale::T = T(1e-3),
     tol::Real = 1000eps(T),
     init_tol::Real = tol,
     init_only::Bool = false,
@@ -31,9 +31,12 @@ function test_barrier_oracles(
     CO.set_timer(cone, timer)
     dim = CO.dimension(cone)
     point = Vector{T}(undef, dim)
+    dual_point = copy(point)
     CO.set_initial_point(point, cone)
-    @test load_reset_check(cone, point)
+    CO.set_initial_point(dual_point, cone)
+    @test load_reset_check(cone, point, dual_point)
     @test cone.point == point
+    @test cone.dual_point == dual_point
 
     if isfinite(init_tol)
         # tests for centrality of initial point
@@ -45,42 +48,32 @@ function test_barrier_oracles(
     init_only && return
 
     # perturb and scale the initial point and check feasible
-    perturb_scale(point, noise, scale)
-    @test load_reset_check(cone, point)
+    perturb_scale(point, dual_point, noise, one(T))
+    @test load_reset_check(cone, point, dual_point)
 
     # test gradient and Hessian oracles
-    test_grad_hess(cone, point, tol = tol)
+    test_grad_hess(cone, point, dual_point, tol = tol)
 
     # check gradient and Hessian agree with ForwardDiff
-    if dim < 10 # too slow if dimension is large
+    CO.reset_data(cone)
+    @test CO.is_feas(cone)
+    @test CO.is_dual_feas(cone)
+    grad = CO.grad(cone)
+    hess = CO.hess(cone)
+    if dim < 13 # too slow if dimension is large
         grad = CO.grad(cone)
         fd_grad = ForwardDiff.gradient(barrier, point)
         @test grad ≈ fd_grad atol=tol rtol=tol
-
         hess = CO.hess(cone)
         fd_hess = ForwardDiff.hessian(barrier, point)
         @test hess ≈ fd_hess atol=tol rtol=tol
     end
 
-    # TODO decide whether to add
-    # # check 3rd order corrector agrees with ForwardDiff
-    # # too slow if cone is too large or not using BlasReals
-    # if CO.use_3order_corr(cone) && dim < 8 && T in (Float32, Float64)
-    #     FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
-    #     # check log-homog property that F'''(point)[point] = -2F''(point)
-    #     @test reshape(FD_3deriv * point, dim, dim) ≈ -2 * hess
-    #     # check correction term agrees with directional 3rd derivative
-    #     primal_dir = perturb_scale(zeros(T, dim), noise, one(T))
-    #     dual_dir = perturb_scale(zeros(T, dim), noise, one(T))
-    #     Hinv_z = CO.inv_hess_prod!(similar(dual_dir), dual_dir, cone)
-    #     FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * Hinv_z / -2
-    #     @test FD_corr ≈ CO.correction(cone, primal_dir, dual_dir) atol=tol rtol=tol
-    # end
-
     return
 end
 
-function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}; tol::Real = 1000eps(T)) where {T <: Real}
+function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T}; tol::Real = 1000eps(T)) where {T <: Real}
+    # TODO not currently using dual_point
     nu = CO.get_nu(cone)
     dim = length(point)
     grad = CO.grad(cone)
@@ -104,42 +97,28 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}; tol::Real = 1000eps(
     CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
     @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
 
-    dual_point = -grad + T(1e-3) * randn(length(grad))
-    @test CO.in_neighborhood(cone, dual_point, one(T))
-
     return
 end
 
-function load_reset_check(cone::CO.Cone{T}, point::Vector{T}) where {T <: Real}
+function load_reset_check(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T}) where {T <: Real}
     CO.load_point(cone, point)
+    CO.load_dual_point(cone, dual_point)
     CO.reset_data(cone)
-    return CO.is_feas(cone)
+    return CO.is_feas(cone) && CO.is_dual_feas(cone)
 end
 
-function perturb_scale(point::Vector{T}, noise::T, scale::T) where {T <: Real}
+function perturb_scale(point::Vector{T}, dual_point::Vector{T}, noise::T, scale::T) where {T <: Real}
     if !iszero(noise)
         @. point += 2 * noise * rand(T) - noise
+        @. dual_point += 2 * noise * rand(T) - noise
     end
     if !isone(scale)
         point .*= scale
     end
-    return point
+    return (point, dual_point)
 end
 
 # primitive cone barrier tests
-function test_doublynonnegative_barrier(T::Type{<:Real})
-    for side in [1, 2, 3, 6, 20, 50, 100, 200]
-        function barrier(s)
-            S = similar(s, side, side)
-            CO.svec_to_smat!(S, s, sqrt(T(2)))
-            offdiag_idxs = vcat([(sum(1:(i - 1)) + 1):(sum(1:i) - 1) for i in 2:side]...)
-            return -logdet(cholesky!(Symmetric(S, :U))) - sum(log.(s[offdiag_idxs]))
-        end
-        dim = CO.svec_length(side)
-        test_barrier_oracles(CO.DoublyNonnegative{T}(dim), barrier, init_tol = sqrt(eps(T)), init_only = (side > 6))
-    end
-    return
-end
 
 function test_nonnegative_barrier(T::Type{<:Real})
     barrier = (s -> -sum(log, s))
@@ -206,17 +185,15 @@ function test_hypoperlog_barrier(T::Type{<:Real})
 end
 
 function test_episumperentropy_barrier(T::Type{<:Real})
-    for w_dim in [3, 4, 6, 15, 65, 75, 100, 500]
-        function barrier(s)
-            (u, v, w) = (s[1], s[2:(w_dim + 1)], s[(w_dim + 2):dim])
-            return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) - sum(log(vi) + log(wi) for (vi, wi) in zip(v, w))
-        end
-        dim = 1 + 2 * w_dim
-        if dim <= 6
-            test_barrier_oracles(CO.EpiSumPerEntropy{T}(dim), barrier, init_tol = 1e-5)
-        else
-            test_barrier_oracles(CO.EpiSumPerEntropy{T}(dim), barrier, init_tol = 1e-1, init_only = true)
-        end
+    function barrier(s)
+        (u, v, w) = (s[1], s[2:2:(end - 1)], s[3:2:end])
+        return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) - sum(log(vi) + log(wi) for (vi, wi) in zip(v, w))
+    end
+    for w_dim in [1, 2, 3]
+        test_barrier_oracles(CO.EpiSumPerEntropy{T}(1 + 2 * w_dim), barrier, init_tol = 1e-5)
+    end
+    for w_dim in [15, 65, 75, 100, 500]
+        test_barrier_oracles(CO.EpiSumPerEntropy{T}(1 + 2 * w_dim), barrier, init_tol = 1e-1, init_only = true)
     end
     return
 end
@@ -273,31 +250,6 @@ function test_epinormspectral_barrier(T::Type{<:Real})
     return
 end
 
-function test_matrixepipersquare_barrier(T::Type{<:Real})
-    for (n, m) in [(1, 1), (1, 2), (2, 2), (2, 4), (3, 4)]
-        # real matrixepipersquare barrier
-        per_idx = CO.svec_length(n) + 1
-        function R_barrier(s)
-            U = CO.svec_to_smat!(similar(s, n, n), s[1:(per_idx - 1)], sqrt(T(2)))
-            v = s[per_idx]
-            W = reshape(s[(per_idx + 1):end], n, m)
-            return -logdet(cholesky!(Symmetric(2 * v * U - W * W', :U))) + (n - 1) * log(v)
-        end
-        test_barrier_oracles(CO.MatrixEpiPerSquare{T, T}(n, m), R_barrier)
-
-        # complex matrixepipersquare barrier
-        per_idx = n ^ 2 + 1
-        function C_barrier(s)
-            U = CO.svec_to_smat!(zeros(Complex{eltype(s)}, n, n), s[1:(per_idx - 1)], sqrt(T(2)))
-            v = s[per_idx]
-            W = CO.rvec_to_cvec!(zeros(Complex{eltype(s)}, n, m), s[(per_idx + 1):end])
-            return -logdet(cholesky!(Hermitian(2 * v * U - W * W', :U))) + (n - 1) * log(v)
-        end
-        test_barrier_oracles(CO.MatrixEpiPerSquare{T, Complex{T}}(n, m), C_barrier)
-    end
-    return
-end
-
 function test_linmatrixineq_barrier(T::Type{<:Real})
     Random.seed!(1)
     Rs_list = [[T, T], [Complex{T}, Complex{T}], [T, Complex{T}, T], [Complex{T}, T, T]]
@@ -308,14 +260,14 @@ function test_linmatrixineq_barrier(T::Type{<:Real})
         for i in 2:length(Rs)
             As[i] = Hermitian(rand(Rs[i], side, side), :U)
         end
-        barrier(s) = -logdet(cholesky!(sum(s_i * A_i for (s_i, A_i) in zip(s, As))))
+        barrier(s) = -logdet(cholesky!(Hermitian(sum(s_i * A_i for (s_i, A_i) in zip(s, As)), :U)))
         test_barrier_oracles(CO.LinMatrixIneq{T}(As), barrier, init_tol = Inf)
     end
     return
 end
 
 function test_possemideftri_barrier(T::Type{<:Real})
-    for side in [1, 2, 5]
+    for side in [1, 2, 3, 5]
         # real PSD cone
         function R_barrier(s)
             S = similar(s, side, side)
@@ -379,6 +331,45 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
             return -logdet(cholesky!(Hermitian(S, :L)))
         end
         test_barrier_oracles(CO.PosSemidefTriSparse{T, Complex{T}}(side, row_idxs, col_idxs), C_barrier)
+    end
+    return
+end
+
+function test_doublynonnegative_barrier(T::Type{<:Real})
+    for side in [1, 2, 3, 6, 20, 50]
+        function barrier(s)
+            S = similar(s, side, side)
+            CO.svec_to_smat!(S, s, sqrt(T(2)))
+            offdiags = vcat([div(i * (i - 1), 2) .+ (1:(i - 1)) for i in 2:side]...)
+            return -logdet(cholesky!(Hermitian(S, :U))) - sum(log, s[offdiags], init = zero(eltype(s)))
+        end
+        dim = CO.svec_length(side)
+        test_barrier_oracles(CO.DoublyNonnegative{T}(dim), barrier, init_tol = sqrt(eps(T)), init_only = (side > 6))
+    end
+    return
+end
+
+function test_matrixepipersquare_barrier(T::Type{<:Real})
+    for (n, m) in [(1, 1), (1, 2), (2, 2), (2, 4), (3, 4)]
+        # real matrixepipersquare barrier
+        per_idx = CO.svec_length(n) + 1
+        function R_barrier(s)
+            U = CO.svec_to_smat!(similar(s, n, n), s[1:(per_idx - 1)], sqrt(T(2)))
+            v = s[per_idx]
+            W = reshape(s[(per_idx + 1):end], n, m)
+            return -logdet(cholesky!(Symmetric(2 * v * U - W * W', :U))) + (n - 1) * log(v)
+        end
+        test_barrier_oracles(CO.MatrixEpiPerSquare{T, T}(n, m), R_barrier)
+
+        # complex matrixepipersquare barrier
+        per_idx = n ^ 2 + 1
+        function C_barrier(s)
+            U = CO.svec_to_smat!(zeros(Complex{eltype(s)}, n, n), s[1:(per_idx - 1)], sqrt(T(2)))
+            v = s[per_idx]
+            W = CO.rvec_to_cvec!(zeros(Complex{eltype(s)}, n, m), s[(per_idx + 1):end])
+            return -logdet(cholesky!(Hermitian(2 * v * U - W * W', :U))) + (n - 1) * log(v)
+        end
+        test_barrier_oracles(CO.MatrixEpiPerSquare{T, Complex{T}}(n, m), C_barrier)
     end
     return
 end
