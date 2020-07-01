@@ -207,7 +207,7 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
         end
 
         # (1, 1)-block
-        # gradient is diag of sum(-PΛiPs[i][i] for i in 1:R) + (R - 1) * Lambda_11 - Lambda_11
+        # gradient is diag of sum(-PΛiPs[i][i] for i in 1:R) + (R - 1) * (P Λ_11 \ P) - (P Λ_11 \ P)
         @inbounds for i in 1:U
             cone.grad[i] += UUk[i, i] * R2
             @inbounds for r in 1:R
