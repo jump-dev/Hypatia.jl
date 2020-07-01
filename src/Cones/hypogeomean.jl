@@ -16,6 +16,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     dim::Int
     alpha::Vector{T}
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
@@ -32,7 +33,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     nbhd_tmp2::Vector{T}
 
     wprod::T
-    wprodu::T
+    z::T
 
     function HypoGeomean{T}(
         alpha::Vector{T};
@@ -60,6 +61,7 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -85,15 +87,16 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoGeomean{T}) where {
     return arr
 end
 
-function update_feas(cone::HypoGeomean)
+function update_feas(cone::HypoGeomean{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
-    w = view(cone.point, 2:cone.dim)
+    @views w = cone.point[2:end]
+    alpha = cone.alpha
 
-    if all(>(zero(u)), w)
-        cone.wprod = exp(sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha)))
-        cone.wprodu = cone.wprod - u
-        cone.is_feas = (u < 0) || (cone.wprodu > 0)
+    if all(>(eps(T)), w)
+        @inbounds cone.wprod = exp(sum(alpha[i] * log(w[i]) for i in eachindex(alpha)))
+        cone.z = cone.wprod - u
+        cone.is_feas = (cone.z > eps(T))
     else
         cone.is_feas = false
     end
@@ -102,13 +105,24 @@ function update_feas(cone::HypoGeomean)
     return cone.is_feas
 end
 
+function is_dual_feas(cone::HypoGeomean{T}) where {T}
+    u = cone.dual_point[1]
+    @views w = cone.dual_point[2:end]
+    alpha = cone.alpha
+    if u < -eps(T) && all(>(eps(T)), w)
+        @inbounds dual_wprodu = exp(sum(alpha[i] * log(w[i] / alpha[i]) for i in eachindex(alpha))) - u
+        return (dual_wprodu > eps(T))
+    end
+    return false
+end
+
 function update_grad(cone::HypoGeomean)
     @assert cone.is_feas
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
 
-    cone.grad[1] = inv(cone.wprodu)
-    wwprodu = -cone.wprod / cone.wprodu
+    cone.grad[1] = inv(cone.z)
+    wwprodu = -cone.wprod / cone.z
     @. cone.grad[2:end] = (wwprodu * cone.alpha - 1) / w
 
     cone.grad_updated = true
@@ -120,18 +134,18 @@ function update_hess(cone::HypoGeomean)
     u = cone.point[1]
     w = view(cone.point, 2:cone.dim)
     alpha = cone.alpha
-    wprodu = cone.wprodu
-    wwprodu = cone.wprod / wprodu
+    z = cone.z
+    wwprodu = cone.wprod / z
     wwprodum1 = wwprodu - 1
     H = cone.hess.data
 
-    H[1, 1] = cone.grad[1] / wprodu
+    H[1, 1] = cone.grad[1] / z
     @inbounds for j in eachindex(w)
         j1 = j + 1
         wj = w[j]
         aj = alpha[j]
         awwwprodu = wwprodu / wj * aj
-        H[1, j1] = -awwwprodu / wprodu
+        H[1, j1] = -awwwprodu / z
         awwwprodum1 = awwwprodu * wwprodum1
         @inbounds for i in 1:(j - 1)
             H[i + 1, j1] = awwwprodum1 * alpha[i] / w[i]
@@ -142,6 +156,46 @@ function update_hess(cone::HypoGeomean)
     cone.hess_updated = true
     return cone.hess
 end
+
+# # TODO move into new cone with equal alphas
+# function update_inv_hess(cone::HypoGeomean{T}) where {T}
+#     @assert all(isequal(inv(T(cone.dim - 1))), cone.alpha)
+#     @assert !cone.inv_hess_updated
+#     u = cone.point[1]
+#     w = view(cone.point, 2:cone.dim)
+#     n = cone.dim - 1
+#     wprod = cone.wprod
+#     H = cone.inv_hess.data
+#     denom = n * (n + 1) * wprod - abs2(n) * u
+#     H[1, 1] = (n + 1) * abs2(wprod) / n + abs2(u) - 2 * wprod * u
+#     H[1, 2:end] = wprod .* w / n
+#     H[2:end, 2:end] = wprod * w * w'
+#     H[2:end, 2:end] .+= Diagonal(abs2.(w) .* cone.z .* abs2(n))
+#     H[2:end, 2:end] /= denom
+#
+#     cone.inv_hess_updated = true
+#     return cone.inv_hess
+# end
+#
+# function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeomean{T}) where {T}
+#     @assert all(isequal(inv(T(cone.dim - 1))), cone.alpha)
+#     dim = cone.dim
+#     u = cone.point[1]
+#     w = view(cone.point, 2:dim)
+#     n = dim - 1
+#     wprod = cone.wprod
+#
+#     @inbounds for j in 1:size(prod, 2)
+#         @views pa = dot(w, arr[2:dim, j]) * wprod
+#         @. prod[2:dim, j] = pa * w
+#         prod[1, j] = pa / n
+#     end
+#     @. @views prod[1, :] += ((n + 1) * abs2(wprod) / n + abs2(u) - 2 * wprod * u) * arr[1, :]
+#     @. @views prod[2:dim, :] += (abs2.(w) .* cone.z .* abs2(n)) * arr[2:dim, :]
+#     @. @views prod[2:dim, :] /= (n * (n + 1) * wprod - abs2(n) * u)
+#     @views mul!(prod[2:dim, :], w, arr[1, :]', wprod / n, true)
+#     return prod
+# end
 
 # see analysis in https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
 function get_central_ray_hypogeomean(alpha::Vector{<:Real})

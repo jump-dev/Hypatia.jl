@@ -14,6 +14,7 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     max_neighborhood::T
     dim::Int
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
@@ -24,7 +25,6 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Diagonal{T, Vector{T}}
     inv_hess::Diagonal{T, Vector{T}}
-
     correction::Vector{T}
 
     function Nonnegative{T}(
@@ -53,6 +53,7 @@ function setup_data(cone::Nonnegative{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Diagonal(zeros(T, dim))
     cone.inv_hess = Diagonal(zeros(T, dim))
@@ -64,12 +65,14 @@ get_nu(cone::Nonnegative) = cone.dim
 
 set_initial_point(arr::AbstractVector, cone::Nonnegative) = (arr .= 1)
 
-function update_feas(cone::Nonnegative)
+function update_feas(cone::Nonnegative{T}) where {T}
     @assert !cone.feas_updated
-    cone.is_feas = all(u -> (u > 0), cone.point)
+    cone.is_feas = all(>(eps(T)), cone.point)
     cone.feas_updated = true
     return cone.is_feas
 end
+
+is_dual_feas(cone::Nonnegative{T}) where {T} = all(>(eps(T)), cone.dual_point)
 
 function update_grad(cone::Nonnegative)
     @assert cone.is_feas

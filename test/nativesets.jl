@@ -21,7 +21,6 @@ inst_infeas = [
     ]
 
 inst_cones_few = [
-    "doublynonnegative1",
     "nonnegative1",
     "epinorminf1",
     "epinorminf6",
@@ -38,6 +37,7 @@ inst_cones_few = [
     "possemideftri5",
     "possemideftrisparse2",
     "possemideftrisparse5",
+    "doublynonnegative1",
     "hypoperlogdettri1",
     "hyporootdettri1",
     "wsosinterpnonnegative1",
@@ -46,9 +46,6 @@ inst_cones_few = [
     ]
 
 inst_cones_many = [
-    "doublynonnegative1",
-    "doublynonnegative2",
-    "doublynonnegative3",
     "nonnegative1",
     "nonnegative2",
     "nonnegative3",
@@ -95,9 +92,6 @@ inst_cones_many = [
     "epinormspectral2",
     "epinormspectral3",
     "epinormspectral4",
-    "matrixepipersquare1",
-    "matrixepipersquare2",
-    "matrixepipersquare3",
     "linmatrixineq1",
     "linmatrixineq2",
     "linmatrixineq3",
@@ -115,6 +109,12 @@ inst_cones_many = [
     "possemideftrisparse3",
     "possemideftrisparse4",
     "possemideftrisparse5",
+    "doublynonnegative1",
+    "doublynonnegative2",
+    "doublynonnegative3",
+    "matrixepipersquare1",
+    "matrixepipersquare2",
+    "matrixepipersquare3",
     "hypoperlogdettri1",
     "hypoperlogdettri2",
     "hypoperlogdettri3",

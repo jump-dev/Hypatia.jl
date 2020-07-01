@@ -74,6 +74,7 @@ function build_solve_check(
 
     solve_time = Solvers.get_solve_time(solver)
     num_iters = Solvers.get_num_iters(solver)
+    global ITERS += num_iters
 
     return (solver = solver, model = model, status = status,
         solve_time = solve_time, num_iters = num_iters,
@@ -158,56 +159,6 @@ function inconsistent2(T; options...)
     h = zeros(T, q)
 
     @test_throws ErrorException options.linear_model{T}(c, A, b, G, h, Cone{T}[Cones.Nonnegative{T}(q)])
-end
-
-function doublynonnegative1(T; options...)
-    tol = sqrt(sqrt(eps(T)))
-    n = q = 3
-    c = T[0, 1, 0]
-    A = T[1 0 0; 0 0 1]
-    b = ones(T, 2)
-    G = SparseMatrixCSC(-one(T) * I, q, n)
-    for use_dual in [true, false]
-        use_dual = false
-        h = (use_dual ? T[1, 0, 1] : zeros(T, q))
-        cones = Cone{T}[Cones.DoublyNonnegative{T}(q, use_dual = use_dual)]
-
-        r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
-        @test r.status == :Optimal
-        @test r.primal_obj ≈ 0 atol=tol rtol=tol
-        @test r.x ≈ T[1, 0, 1] atol=tol rtol=tol
-        @test r.s ≈ T[1, 0, 1] atol=tol rtol=tol
-    end
-end
-
-function doublynonnegative2(T; options...)
-    tol = sqrt(sqrt(eps(T)))
-    c = T[0, -1, 0]
-    A = T[1 0 0; 0 0 1]
-    b = T[1.0, 1.5]
-    G = Matrix{T}(-I, 3, 3)
-    h = [-inv(T(2)), zero(T), -inv(T(2))]
-    cones = Cone{T}[Cones.DoublyNonnegative{T}(3)]
-
-    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ -one(T) atol=tol rtol=tol
-    @test r.x[2] ≈ one(T) atol=tol rtol=tol
-end
-
-function doublynonnegative3(T; options...)
-    tol = sqrt(sqrt(eps(T)))
-    c = ones(T, 3)
-    A = T[1 0 1]
-    b = T[0]
-    G = Diagonal(-one(T) * I, 3)
-    h = zeros(T, 3)
-    cones = Cone{T}[Cones.PosSemidefTri{T, T}(3)]
-
-    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
-    @test r.status == :Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
-    @test norm(r.x) ≈ 0 atol=tol rtol=tol
 end
 
 function nonnegative1(T; options...)
@@ -317,7 +268,7 @@ function epinorminf3(T; options...)
     G = Diagonal(-one(T) * I, 6)
     h = zeros(T, 6)
 
-    for use_dual in (true, false)
+    for use_dual in (false, true)
         cones = Cone{T}[Cones.EpiNormInf{T, T}(6, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -347,7 +298,7 @@ function epinorminf5(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     c = T[1, 0, 0, 0, 0, 0]
-    A = rand(T(-9):T(9), 3, 6)
+    A = rand(T(-9):T(9), 6, 6)
     b = vec(sum(A, dims = 2))
     G = rand(T, 6, 6)
     h = vec(sum(G, dims = 2))
@@ -381,7 +332,7 @@ function epinorminf7(T; options...)
     G = Diagonal(-one(T) * I, 7)
     h = zeros(T, 7)
 
-    for use_dual in (true, false)
+    for use_dual in (false, true)
         cones = Cone{T}[Cones.EpiNormInf{T, Complex{T}}(7, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -540,9 +491,9 @@ function episumperentropy1(T; options...)
         G = zeros(T, dim, 1)
         G[1, 1] = -1
         h = zeros(T, dim)
-        h[2:(w_dim + 1)] .= 1
+        h[2:2:(end - 1)] .= 1
         w = rand(T, w_dim) .+ 1
-        h[(w_dim + 2):end] .= w
+        h[3:2:end] .= w
         cones = Cone{T}[Cones.EpiSumPerEntropy{T}(dim)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -558,8 +509,12 @@ function episumperentropy2(T; options...)
         c = fill(-one(T), w_dim)
         A = zeros(T, 0, w_dim)
         b = zeros(T, 0)
-        G = vcat(zeros(T, 1 + w_dim, w_dim), Matrix{T}(-I, w_dim, w_dim))
-        h = vcat(zero(T), ones(T, w_dim), zeros(T, w_dim))
+        G = zeros(T, dim, w_dim)
+        for i in 1:w_dim
+            G[2i + 1, i] = -1
+        end
+        h = zeros(T, dim)
+        h[2:2:(dim - 1)] .= 1
         cones = Cone{T}[Cones.EpiSumPerEntropy{T}(dim)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -576,8 +531,12 @@ function episumperentropy3(T; options...)
         c = fill(-one(T), w_dim)
         A = ones(T, 1, w_dim)
         b = T[dim]
-        G = vcat(zeros(T, 1, w_dim), Matrix{T}(-I, w_dim, w_dim), zeros(T, w_dim, w_dim))
-        h = vcat(zeros(T, 1 + w_dim), ones(T, w_dim))
+        G = zeros(T, dim, w_dim)
+        for i in 1:w_dim
+            G[2i, i] = -1
+        end
+        h = zeros(T, dim)
+        h[3:2:end] .= 1
         cones = Cone{T}[Cones.EpiSumPerEntropy{T}(dim)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -593,15 +552,15 @@ function episumperentropy4(T; options...)
     A = zeros(T, 0, 1)
     b = zeros(T, 0)
     G = Matrix{T}(-I, 5, 1)
-    h = T[0, 1, 5, 2, 3]
+    h = T[0, 1, 2, 5, 3]
     cones = Cone{T}[Cones.EpiSumPerEntropy{T}(5)]
 
     r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
     @test r.status == :Optimal
     entr = 2 * log(T(2)) + 3 * log(3 / T(5))
     @test r.primal_obj ≈ entr atol=tol rtol=tol
-    @test r.s ≈ [entr, 1, 5, 2, 3] atol=tol rtol=tol
-    @test r.z ≈ [1, 2, 3 / T(5), log(inv(T(2))) - 1, log(5 / T(3)) - 1] atol=tol rtol=tol
+    @test r.s ≈ [entr, 1, 2, 5, 3] atol=tol rtol=tol
+    @test r.z ≈ [1, 2, log(inv(T(2))) - 1, 3 / T(5), log(5 / T(3)) - 1] atol=tol rtol=tol
 end
 
 function episumperentropy5(T; options...)
@@ -609,15 +568,15 @@ function episumperentropy5(T; options...)
     c = T[0, -1]
     A = zeros(T, 0, 2)
     b = zeros(T, 0)
-    G = vcat(zeros(T, 4, 2), fill(-one(T), 3, 2), [-1, 0]')
-    h = T[0, 1, 1, 1, 0, 0, 0, 0]
+    G = vcat(zeros(T, 1, 2), repeat(T[0 0; -1 -1], 3), [-1, 0]')
+    h = T[0, 1, 0, 1, 0, 1, 0, 0]
     cones = Cone{T}[Cones.EpiSumPerEntropy{T}(7), Cones.Nonnegative{T}(1)]
 
     r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
     @test r.status == :Optimal
     @test r.primal_obj ≈ -1 atol=tol rtol=tol
     @test r.s ≈ [0, 1, 1, 1, 1, 1, 1, 0] atol=tol rtol=tol
-    @test r.z ≈ inv(T(3)) * [1, 1, 1, 1, -1, -1, -1, 3] atol=tol rtol=tol
+    @test r.z ≈ inv(T(3)) * [1, 1, -1, 1, -1, 1, -1, 3] atol=tol rtol=tol
 end
 
 function episumperentropy6(T; options...)
@@ -626,18 +585,20 @@ function episumperentropy6(T; options...)
     A = zeros(T, 0, 5)
     b = zeros(T, 0)
     G = sparse(
-        [2, 3, 4, 5, 6, 7, 5, 6, 7, 8, 9, 9, 9],
-        [2, 3, 4, 1, 1, 1, 5, 5, 5, 5, 2, 3, 4],
-        T[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1],
+        [3, 5, 7, 2, 9, 4, 9, 6, 9, 3, 5, 7, 8],
+        [1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 5],
+        T[-1, -1, -1, -1, 1, -1, 1, -1, 1, -1, -1, -1, -1],
         9, 5)
     h = vcat(zeros(T, 8), T(3))
+    h = zeros(T, 9)
+    h[9] = 3
     cones = Cone{T}[Cones.EpiSumPerEntropy{T}(7), Cones.Nonnegative{T}(2)]
 
     r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
     @test r.status == :Optimal
     @test r.primal_obj ≈ -1 atol=tol rtol=tol
     @test r.s ≈ [0, 1, 1, 1, 1, 1, 1, 0, 0] atol=tol rtol=tol
-    @test r.z ≈ inv(T(3)) * [1, 1, 1, 1, -1, -1, -1, 3, 1] atol=tol rtol=tol
+    @test r.z ≈ inv(T(3)) * [1, 1, -1, 1, -1, 1, -1, 3, 1] atol=tol rtol=tol
 end
 
 function hypoperlog1(T; options...)
@@ -768,7 +729,7 @@ function hypogeomean1(T; options...)
     G = Matrix{T}(-I, 3, 3)
     h = zeros(T, 3)
 
-    for use_dual in (true, false)
+    for use_dual in (false, true)
         cones = Cone{T}[Cones.HypoGeomean{T}(ones(T, 2) / 2, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -786,7 +747,7 @@ function hypogeomean2(T; options...)
     G = SparseMatrixCSC(-one(T) * I, l + 1, l + 1)
     h = zeros(T, l + 1)
 
-    for use_dual in (true, false)
+    for use_dual in (false, true)
         b = use_dual ? [-one(T)] : [one(T)]
         cones = Cone{T}[Cones.HypoGeomean{T}(fill(inv(T(l)), l), use_dual = use_dual)]
 
@@ -806,7 +767,7 @@ function hypogeomean3(T; options...)
     G = [zeros(T, 1, l); Matrix{T}(-I, l, l)]
     h = zeros(T, l + 1)
 
-    for use_dual in (true, false)
+    for use_dual in (false, true)
         cones = Cone{T}[Cones.HypoGeomean{T}(fill(inv(T(l)), l), use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -895,7 +856,7 @@ function power2(T; options...)
     G = Matrix{T}(-I, 4, 4)
     h = zeros(T, 4)
 
-    for use_dual in (true, false)
+    for use_dual in (false, true)
         cones = Cone{T}[Cones.Power{T}(ones(T, 2) / 2, 2, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -915,7 +876,7 @@ function power3(T; options...)
     G = SparseMatrixCSC(-T(10) * I, l + 2, l + 2)
     h = zeros(T, l + 2)
 
-    for use_dual in (true, false)
+    for use_dual in (false, true)
         b = [one(T), zero(T)]
         cones = Cone{T}[Cones.Power{T}(fill(inv(T(l)), l), 2, use_dual = use_dual)]
 
@@ -935,7 +896,7 @@ function power4(T; options...)
     G = [zeros(T, 3, l); Matrix{T}(-I, l, l)]
     h = zeros(T, l + 3)
 
-    for use_dual in (true, false)
+    for use_dual in (false, true)
         cones = Cone{T}[Cones.Power{T}(fill(inv(T(l)), l), 3, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -960,7 +921,7 @@ function epinormspectral1(T; options...)
         G = Matrix{T}(-I, dim + 1, dim + 1)
         h = vcat(zero(T), rand(T, dim))
 
-        for use_dual in (true, false)
+        for use_dual in (false, true)
             R = (is_complex ? Complex{T} : T)
             cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm, use_dual = use_dual)]
 
@@ -1003,7 +964,7 @@ function epinormspectral2(T; options...)
         G = vcat(zeros(T, 1, dim), Matrix{T}(-I, dim, dim))
         h = vcat(one(T), zeros(T, dim))
 
-        for use_dual in (true, false)
+        for use_dual in (false, true)
             cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm, use_dual = use_dual)]
             r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
             @test r.status == :Optimal
@@ -1029,7 +990,7 @@ function epinormspectral3(T; options...)
         G = vcat(zeros(T, 1, dim), Matrix{T}(-I, dim, dim))
         h = zeros(T, dim + 1)
 
-        for use_dual in (true, false)
+        for use_dual in (false, true)
             R = (is_complex ? Complex{T} : T)
             cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm, use_dual = use_dual)]
             r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
@@ -1053,7 +1014,7 @@ function epinormspectral4(T; options...)
     rt3 = sqrt(T(3))
     invrt2 = inv(rt2)
     invrt3 = inv(rt3)
-    for use_dual in (true, false)
+    for use_dual in (false, true)
         cones = Cone{T}[Cones.EpiNormSpectral{T, T}(2, 3, use_dual = use_dual)]
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
         @test r.status == :Optimal
@@ -1568,6 +1529,56 @@ function possemideftrisparse5(T; options...)
     @test r.s ≈ [0, invrt2 + invrt3, invrt2 + invrt3, invrt3, rt2, rt3, rt2, rt2, 0, rt2, -rt2, rt2] atol=tol rtol=tol
     invrt6 = invrt2 * invrt3
     @test r.z ≈ [1, inv2, inv2, inv2, inv2, inv2, -inv2, -inv2, 0, -invrt6, invrt6, -invrt6] atol=tol rtol=tol
+end
+
+function doublynonnegative1(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    n = q = 3
+    c = T[0, 1, 0]
+    A = T[1 0 0; 0 0 1]
+    b = ones(T, 2)
+    G = SparseMatrixCSC(-one(T) * I, q, n)
+    for use_dual in [false, true]
+        use_dual = false
+        h = (use_dual ? T[1, 0, 1] : zeros(T, q))
+        cones = Cone{T}[Cones.DoublyNonnegative{T}(q, use_dual = use_dual)]
+
+        r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ 0 atol=tol rtol=tol
+        @test r.x ≈ T[1, 0, 1] atol=tol rtol=tol
+        @test r.s ≈ T[1, 0, 1] atol=tol rtol=tol
+    end
+end
+
+function doublynonnegative2(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[0, -1, 0]
+    A = T[1 0 0; 0 0 1]
+    b = T[1.0, 1.5]
+    G = Matrix{T}(-I, 3, 3)
+    h = [-inv(T(2)), zero(T), -inv(T(2))]
+    cones = Cone{T}[Cones.DoublyNonnegative{T}(3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -one(T) atol=tol rtol=tol
+    @test r.x[2] ≈ one(T) atol=tol rtol=tol
+end
+
+function doublynonnegative3(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = ones(T, 3)
+    A = T[1 0 1]
+    b = T[0]
+    G = Diagonal(-one(T) * I, 3)
+    h = zeros(T, 3)
+    cones = Cone{T}[Cones.PosSemidefTri{T, T}(3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ 0 atol=tol rtol=tol
+    @test norm(r.x) ≈ 0 atol=tol rtol=tol
 end
 
 function hypoperlogdettri1(T; options...)

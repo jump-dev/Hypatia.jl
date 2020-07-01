@@ -17,6 +17,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     max_neighborhood::T
     dim::Int
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
@@ -60,6 +61,7 @@ function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -78,21 +80,33 @@ function set_initial_point(arr::AbstractVector, cone::EpiPerSquare)
     return arr
 end
 
-function update_feas(cone::EpiPerSquare)
+# TODO refac with dual feas check
+function update_feas(cone::EpiPerSquare{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
 
-    if u > 0 && v > 0
-        w = view(cone.point, 3:cone.dim)
+    if u > eps(T) && v > eps(T)
+        @views w = cone.point[3:end]
         cone.dist = u * v - sum(abs2, w) / 2
-        cone.is_feas = (cone.dist > 0)
+        cone.is_feas = (cone.dist > eps(T))
     else
         cone.is_feas = false
     end
 
     cone.feas_updated = true
     return cone.is_feas
+end
+
+function is_dual_feas(cone::EpiPerSquare{T}) where {T}
+    u = cone.dual_point[1]
+    v = cone.dual_point[2]
+
+    if u > eps(T) && v > eps(T)
+        @views w = cone.dual_point[3:end]
+        return (u * v - sum(abs2, w) / 2 > eps(T))
+    end
+    return false
 end
 
 function update_grad(cone::EpiPerSquare)

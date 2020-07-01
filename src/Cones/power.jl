@@ -17,6 +17,7 @@ mutable struct Power{T <: Real} <: Cone{T}
     alpha::Vector{T}
     n::Int
     point::Vector{T}
+    dual_point::Vector{T}
     timer::TimerOutput
 
     feas_updated::Bool
@@ -70,6 +71,7 @@ function setup_data(cone::Power{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -93,13 +95,12 @@ end
 function update_feas(cone::Power{T}) where {T <: Real}
     @assert !cone.feas_updated
     m = length(cone.alpha)
-    u = cone.point[1:m]
-    w = view(cone.point, (m + 1):cone.dim)
+    @views u = cone.point[1:m]
 
-    if all(>(zero(T)), u)
-        cone.produ = exp(2 * sum(cone.alpha[i] * log(u[i]) for i in eachindex(cone.alpha)))
-        cone.produw = cone.produ - sum(abs2, w)
-        cone.is_feas = (cone.produw > 0)
+    if all(>(eps(T)), u)
+        @inbounds cone.produ = exp(2 * sum(cone.alpha[i] * log(u[i]) for i in eachindex(cone.alpha)))
+        @views cone.produw = cone.produ - sum(abs2, cone.point[(m + 1):end])
+        cone.is_feas = (cone.produw > eps(T))
     else
         cone.is_feas = false
     end
@@ -108,11 +109,23 @@ function update_feas(cone::Power{T}) where {T <: Real}
     return cone.is_feas
 end
 
+function is_dual_feas(cone::Power{T}) where {T <: Real}
+    alpha = cone.alpha
+    m = length(cone.alpha)
+    @views u = cone.dual_point[1:m]
+    if all(>(eps(T)), u)
+        @inbounds p = exp(2 * sum(alpha[i] * log(u[i] / alpha[i]) for i in eachindex(alpha)))
+        @views w = cone.dual_point[(m + 1):end]
+        return (p - sum(abs2, w) > eps(T))
+    end
+    return false
+end
+
 function update_grad(cone::Power)
     @assert cone.is_feas
     m = length(cone.alpha)
-    u = cone.point[1:m]
-    w = view(cone.point, (m + 1):cone.dim)
+    @views u = cone.point[1:m]
+    @views w = cone.point[(m + 1):end]
 
     @. cone.aui = 2 * cone.alpha / u
     cone.produuw = cone.produ / cone.produw
@@ -128,8 +141,8 @@ end
 function update_hess(cone::Power)
     @assert cone.grad_updated
     m = length(cone.alpha)
-    u = cone.point[1:m]
-    w = view(cone.point, (m + 1):cone.dim)
+    @views u = cone.point[1:m]
+    @views w = cone.point[(m + 1):end]
     aui = cone.aui
     auiproduuw = cone.auiproduuw
     g = cone.grad
@@ -160,37 +173,38 @@ function update_hess(cone::Power)
     return cone.hess
 end
 
-# TODO update and benchmark to decide whether this improves speed/numerics
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
-#     @assert cone.grad_updated
-#     m = length(cone.alpha)
-#     dim = cone.dim
-#     u = cone.point[1:m]
-#     w = view(cone.point, (m + 1):dim)
-#     alpha = cone.alpha
-#     produw = cone.produw
-#     tmpm = cone.tmpm
-#     aui = cone.aui
-#     produuw = cone.produuw
-#     @. tmpm = 2 * produuw * aui / produw
-#
-#     @. @views prod[1:m, :] = aui * produuw * (produuw - 1)
-#     @. @views prod[(m + 1):dim, :] = 2 / produw
-#     @views @inbounds for i in 1:size(arr, 2)
-#         dotm = dot(aui, arr[1:m, i])
-#         dotn = dot(w, arr[(m + 1):dim, i])
-#         prod[1:m, i] .*= dotm
-#         prod[(m + 1):dim, i] .*= dotn
-#         @. prod[1:m, i] -= tmpm * dotn
-#         @. prod[(m + 1):dim, i] -= produuw * dotm
-#     end
-#     @. @views begin
-#         prod[1:m, :] += arr[1:m, :] * (produuw * aui + (1 - alpha) / u) / u
-#         prod[(m + 1):dim, :] *= w
-#         prod[(m + 1):dim, :] += arr[(m + 1):dim, :]
-#         prod[(m + 1):dim, :] *= 2
-#         prod[(m + 1):dim, :] /= produw
-#     end
-#
-#     return prod
-# end
+# TODO improve / cache more, and benchmark to decide whether this improves speed/numerics
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
+    @assert cone.grad_updated
+    m = length(cone.alpha)
+    dim = cone.dim
+    @views u = cone.point[1:m]
+    @views w = cone.point[(m + 1):end]
+    alpha = cone.alpha
+    produw = cone.produw
+    aui = cone.aui
+    produuw = cone.produuw
+    # tmpm = cone.tmpm
+    # @. tmpm = 2 * produuw * aui / produw # TODO cache
+    tmpm = 2 * produuw * aui ./ produw
+
+    @. @views prod[1:m, :] = aui * produuw * (produuw - 1) # TODO cache
+    @. @views prod[(m + 1):dim, :] = 2 / produw
+    @views @inbounds for i in 1:size(arr, 2)
+        dotm = dot(aui, arr[1:m, i])
+        dotn = dot(w, arr[(m + 1):dim, i])
+        prod[1:m, i] .*= dotm
+        prod[(m + 1):dim, i] .*= dotn
+        @. prod[1:m, i] -= tmpm * dotn
+        @. prod[(m + 1):dim, i] -= produuw * dotm
+    end
+    @. @views @inbounds begin
+        prod[1:m, :] += arr[1:m, :] * (produuw * aui + (1 - alpha) / u) / u # TODO cache?
+        prod[(m + 1):dim, :] *= w
+        prod[(m + 1):dim, :] += arr[(m + 1):dim, :]
+        prod[(m + 1):dim, :] *= 2
+        prod[(m + 1):dim, :] /= produw
+    end
+
+    return prod
+end
