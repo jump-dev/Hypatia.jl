@@ -144,16 +144,14 @@ function update_feas(cone::MatrixEpiPerSquare{T}) where {T}
     return cone.is_feas
 end
 
-function update_dual_feas(cone::MatrixEpiPerSquare{T}) where {T}
+function is_dual_feas(cone::MatrixEpiPerSquare{T}) where {T}
     v = cone.dual_point[cone.v_idx]
     if v > eps(T)
         @views svec_to_smat!(cone.tmpd1d1b, cone.dual_point[cone.U_idxs], cone.rt2)
         F = cholesky!(Hermitian(cone.tmpd1d1b, :U), check = false)
         isposdef(F) || return false
         @views W = vec_copy_to!(cone.tmpd1d2, cone.dual_point[cone.W_idxs])
-        @show W
         LW = ldiv!(F.U', W)
-        @show LW
         trLW = sum(abs2, LW)
         return (2 * v - trLW > eps(T))
     end

@@ -13,8 +13,8 @@ using TimerOutputs
 # options to solvers
 timer = TimerOutput()
 default_solver_options = (
-    # verbose = false,
-    verbose = true,
+    verbose = false,
+    # verbose = true,
     iter_limit = 150,
     timer = timer,
     # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
@@ -32,7 +32,7 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
+    "native",
     "JuMP",
     ]
 
@@ -52,29 +52,29 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    # "centralpolymat",
-    # "conditionnum",
-    # "contraction",
-    # "densityest",
-    # "envelope",
-    # "expdesign",
-    # "lotkavolterra",
-    # "lyapunovstability",
-    # "matrixcompletion",
-    # "matrixquadratic",
-    # "matrixregression",
-    # "maxvolume",
-    # "muconvexity",
-    # "nearestpsd",
-    # "polymin",
-    # "polynorm",
-    # "portfolio",
-    # "regionofattr",
-    # "robustgeomprog",
-    # "secondorderpoly",
-    # "semidefinitepoly",
-    "shapeconregr", # TODO regressions?
-    # "signomialmin",
+    "centralpolymat",
+    "conditionnum",
+    "contraction",
+    "densityest",
+    "envelope",
+    "expdesign",
+    "lotkavolterra",
+    "lyapunovstability",
+    "matrixcompletion",
+    "matrixquadratic",
+    "matrixregression",
+    "maxvolume",
+    "muconvexity",
+    "nearestpsd",
+    "polymin",
+    "polynorm",
+    "portfolio",
+    "regionofattr",
+    "robustgeomprog",
+    "secondorderpoly",
+    "semidefinitepoly",
+    "shapeconregr",
+    "signomialmin",
     ]
 
 # start the tests

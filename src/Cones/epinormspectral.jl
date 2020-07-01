@@ -128,8 +128,8 @@ function update_feas(cone::EpiNormSpectral{T}) where {T}
 end
 
 # TODO is there a faster way to check u >= nuc_norm, eg thru a cholesky?
-# update_dual_feas(cone::EpiNormSpectral) = true
-function update_dual_feas(cone::EpiNormSpectral{T}) where {T}
+# is_dual_feas(cone::EpiNormSpectral) = true
+function is_dual_feas(cone::EpiNormSpectral{T}) where {T}
     u = cone.dual_point[1]
     if u > eps(T)
         W = @views vec_copy_to!(similar(cone.W), cone.dual_point[2:end])

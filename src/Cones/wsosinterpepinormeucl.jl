@@ -171,7 +171,7 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
     return cone.is_feas
 end
 
-update_dual_feas(cone::WSOSInterpEpiNormEucl) = true
+is_dual_feas(cone::WSOSInterpEpiNormEucl) = true
 
 function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
     @assert cone.is_feas

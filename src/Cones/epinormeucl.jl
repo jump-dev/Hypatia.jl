@@ -89,7 +89,7 @@ function update_feas(cone::EpiNormEucl{T}) where {T}
     return cone.is_feas
 end
 
-function update_dual_feas(cone::EpiNormEucl{T}) where {T}
+function is_dual_feas(cone::EpiNormEucl{T}) where {T}
     u = cone.dual_point[1]
     if u > eps(T)
         w = view(cone.dual_point, 2:cone.dim)

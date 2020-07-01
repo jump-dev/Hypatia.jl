@@ -153,7 +153,7 @@ function update_feas(cone::DoublyNonnegative)
     return cone.is_feas
 end
 
-update_dual_feas(cone::DoublyNonnegative) = true
+is_dual_feas(cone::DoublyNonnegative) = true
 
 function update_grad(cone::DoublyNonnegative)
     @assert cone.is_feas

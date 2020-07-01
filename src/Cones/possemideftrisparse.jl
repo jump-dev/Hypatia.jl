@@ -306,7 +306,7 @@ function update_feas(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
     return cone.is_feas
 end
 
-update_dual_feas(cone::PosSemidefTriSparse) = true # TODO see how expensive the completable matrix feas test is
+is_dual_feas(cone::PosSemidefTriSparse) = true # TODO see how expensive the completable matrix feas test is
 
 function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     @assert cone.is_feas

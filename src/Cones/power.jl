@@ -109,7 +109,7 @@ function update_feas(cone::Power{T}) where {T <: Real}
     return cone.is_feas
 end
 
-function update_dual_feas(cone::Power{T}) where {T <: Real}
+function is_dual_feas(cone::Power{T}) where {T <: Real}
     alpha = cone.alpha
     m = length(cone.alpha)
     @views u = cone.dual_point[1:m]
