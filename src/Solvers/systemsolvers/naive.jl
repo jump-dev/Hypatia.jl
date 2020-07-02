@@ -205,7 +205,7 @@ function update_lhs(system_solver::NaiveSparseSystemSolver, solver::Solver)
         H_k = Cones.hess(cone_k)
         for j in 1:Cones.dimension(cone_k)
             nz_rows = Cones.hess_nz_idxs_col(cone_k, j)
-            @. @views system_solver.lhs6.nzval[system_solver.hess_idxs[k][j]] = solver.mu * H_k[nz_rows, j]
+            @views copyto!(system_solver.lhs6.nzval[system_solver.hess_idxs[k][j]], H_k[nz_rows, j])
         end
     end
     system_solver.lhs6.nzval[system_solver.mtt_idx] = solver.mu / solver.tau / solver.tau
@@ -266,8 +266,7 @@ end
 
 function update_lhs(system_solver::NaiveDenseSystemSolver, solver::Solver)
     for (cone_k, lhs6_H_k) in zip(solver.model.cones, system_solver.lhs6_H_k)
-        H_k = Cones.hess(cone_k)
-        @. lhs6_H_k = solver.mu * H_k
+        copyto!(lhs6_H_k, Cones.hess(cone_k))
     end
     system_solver.lhs6[end, system_solver.tau_row] = solver.mu / solver.tau / solver.tau
 

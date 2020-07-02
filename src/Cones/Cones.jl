@@ -54,10 +54,12 @@ include("wsosinterpepinormeucl.jl")
 
 use_dual_barrier(cone::Cone) = cone.use_dual_barrier
 use_3order_corr(cone::Cone) = false
-load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
-load_dual_point(cone::Cone, point::AbstractVector) = copyto!(cone.dual_point, point)
 dimension(cone::Cone) = cone.dim
 set_timer(cone::Cone, timer::TimerOutput) = (cone.timer = timer)
+
+load_point(cone::Cone{T}, point::AbstractVector{T}, scal::T) where {T <: Real} = (@. cone.point = scal * point)
+load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
+load_dual_point(cone::Cone, point::AbstractVector) = copyto!(cone.dual_point, point)
 
 is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))
 # is_dual_feas(cone::Cone) = # TODO maybe write a fallback dual feas check that checks if ray of dual point intersects dikin ellipsoid at primal point
@@ -160,9 +162,10 @@ use_heuristic_neighborhood(cone::Cone) = cone.use_heuristic_neighborhood
 
 function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector, mu::Real) where {T <: Real}
     # norm(H^(-1/2) * (z + mu * grad))
+    rtmu = sqrt(mu) # TODO maybe make this the arg to function
     nbhd_tmp = cone.nbhd_tmp
     g = grad(cone)
-    @. nbhd_tmp = dual_point + mu * g
+    @. nbhd_tmp = dual_point + rtmu * g
 
     if use_heuristic_neighborhood(cone)
         nbhd = norm(nbhd_tmp, Inf) / norm(g, Inf)
@@ -187,7 +190,7 @@ function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector, mu::Real) wh
         end
     end
 
-    return (nbhd < mu * cone.max_neighborhood)
+    return (nbhd < rtmu * cone.max_neighborhood)
 end
 
 # utilities for arrays

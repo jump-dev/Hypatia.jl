@@ -168,7 +168,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
         return false
     end
 
-    return true # step succeeded
+    return true
 end
 
 # update the RHS for affine direction
@@ -189,7 +189,6 @@ function update_rhs_affine(stepper::CombinedStepper{T}, solver::Solver{T}) where
 
     # kap
     rhs[end] = -solver.kap
-    # TODO NT: -solver.tau
 
     return rhs
 end
@@ -202,14 +201,11 @@ function update_rhs_correction(stepper::CombinedStepper{T}, solver::Solver{T}) w
     stepper.rhs[1:stepper.tau_row] .= 0
 
     # s
+    rtmu = sqrt(solver.mu)
     for (k, cone_k) in enumerate(solver.model.cones)
         duals_k = solver.point.dual_views[k]
         grad_k = Cones.grad(cone_k)
-        @. stepper.s_rhs_k[k] = -duals_k - solver.mu * grad_k
-        # if Cones.use_3order_corr(cone_k)
-        #     # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
-        #     stepper.s_rhs_k[k] .-= Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k])
-        # end
+        @. stepper.s_rhs_k[k] = -duals_k - rtmu * grad_k
     end
 
     # kap
@@ -297,7 +293,6 @@ function apply_lhs(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: R
         # (pr bar) z_k + mu*H_k*s_k
         s_res_k = stepper.s_res_k[k]
         Cones.hess_prod!(s_res_k, stepper.primal_dir_k[k], cone_k)
-        lmul!(solver.mu, s_res_k)
         @. s_res_k += stepper.dual_dir_k[k]
     end
 
@@ -366,10 +361,11 @@ function find_max_alpha(
                 # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
                 sortperm!(cone_order, cone_times, initialized = true)
 
+                irt_mu_temp = inv(sqrt(mu_temp))
                 for k in cone_order
                     cone_k = cones[k]
                     time_k = time_ns()
-                    Cones.load_point(cone_k, primals_linesearch[k])
+                    Cones.load_point(cone_k, primals_linesearch[k], irt_mu_temp)
                     Cones.load_dual_point(cone_k, duals_linesearch[k])
                     Cones.reset_data(cone_k)
                     in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, duals_linesearch[k], mu_temp))
