@@ -54,8 +54,7 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
         else
             # G_k*x - (mu*H_k)\z_k = [-zrhs_k - (mu*H_k)\srhs_k, h_k]
             Cones.inv_hess_prod!(z3_k, s_k, cone_k)
-            @. z3_k /= -solver.mu
-            @. z3_k -= z_k
+            axpby!(-1, z_k, -1, z3_k)
         end
     end
 
@@ -198,13 +197,8 @@ function update_lhs(system_solver::SymIndefSparseSystemSolver, solver::Solver)
     for (k, cone_k) in enumerate(solver.model.cones)
         H_k = (Cones.use_dual_barrier(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
-            if Cones.use_dual_barrier(cone_k)
-                nz_rows = Cones.hess_nz_idxs_col_tril(cone_k, j)
-                @. @views system_solver.lhs3.nzval[system_solver.hess_idxs[k][j]] = H_k[nz_rows, j] * -solver.mu
-            else
-                nz_rows = Cones.inv_hess_nz_idxs_col_tril(cone_k, j)
-                @. @views system_solver.lhs3.nzval[system_solver.hess_idxs[k][j]] = H_k[nz_rows, j] / -solver.mu
-            end
+            nz_rows = (Cones.use_dual_barrier(cone_k) ? Cones.hess_nz_idxs_col_tril(cone_k, j) : Cones.inv_hess_nz_idxs_col_tril(cone_k, j))
+            @. @views system_solver.lhs3.nzval[system_solver.hess_idxs[k][j]] = -H_k[nz_rows, j]
         end
     end
 
@@ -271,11 +265,11 @@ function update_lhs(system_solver::SymIndefDenseSystemSolver, solver::Solver)
         if Cones.use_dual_barrier(cone_k)
             # G_k*x - mu*H_k*z_k = [-zrhs_k - srhs_k, h_k]
             H_k = Cones.hess(cone_k)
-            @. lhs3[z_rows_k, z_rows_k] = -solver.mu * H_k
+            @. lhs3[z_rows_k, z_rows_k] = -H_k
         else
             # G_k*x - (mu*H_k)\z_k = [-zrhs_k - (mu*H_k)\srhs_k, h_k]
             Hi_k = Cones.inv_hess(cone_k)
-            @. lhs3[z_rows_k, z_rows_k] = Hi_k / -solver.mu
+            @. lhs3[z_rows_k, z_rows_k] = -Hi_k
         end
     end
 
