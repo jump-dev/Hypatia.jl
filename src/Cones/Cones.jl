@@ -24,7 +24,7 @@ import Hypatia.sqrt_prod
 import Hypatia.inv_sqrt_prod
 import Hypatia.invert
 
-default_max_neighborhood() = 0.5
+default_max_neighborhood() = 0.7
 default_use_heuristic_neighborhood() = false
 
 # hessian_cache(T::Type{<:BlasReal}) = DenseSymCache{T}() # use Bunch Kaufman for BlasReals from start
@@ -160,9 +160,8 @@ inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
 use_heuristic_neighborhood(cone::Cone) = cone.use_heuristic_neighborhood
 
-function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector, mu::Real) where {T <: Real}
+function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector{T}, rtmu::T) where {T <: Real}
     # norm(H^(-1/2) * (z + mu * grad))
-    rtmu = sqrt(mu) # TODO maybe make this the arg to function
     nbhd_tmp = cone.nbhd_tmp
     g = grad(cone)
     @. nbhd_tmp = dual_point + rtmu * g
