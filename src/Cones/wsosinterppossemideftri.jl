@@ -42,6 +42,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     ΛFLP::Vector{Matrix{T}}
     tmpLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
+    mat::Matrix{T}
 
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
@@ -91,6 +92,7 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.ΛFL = Vector{Any}(undef, length(Ps))
     cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
+    cone.mat = zeros(T, R, R)
     return
 end
 
@@ -307,7 +309,9 @@ function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
     corr .= 0
     U = cone.U
     R = cone.R
+    UR = U * R
     dim = cone.dim
+    matRR = cone.mat
 
     r_dim = svec_length(R)
 
@@ -315,22 +319,19 @@ function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
     for k in eachindex(cone.Ps)
         PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
 
-        PlambdaP_dirs = [zeros(R, R) for p in 1:U, q in 1:U]
+        PlambdaP_dirs = [zeros(R, R) for p in 1:U, q in 1:U] # TODO
         for p in 1:U, q in 1:U
-            primal_dir_mat_q = Symmetric(svec_to_smat!(similar(corr, R, R), primal_dir[q:U:dim], cone.rt2))
-            PlambdaPk_slice_pq = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[q]] for ii in 1:R, jj in 1:R]
-            PlambdaP_dirs[p, q] = PlambdaPk_slice_pq * primal_dir_mat_q
+            primal_dir_mat_q = Symmetric(svec_to_smat!(matRR, primal_dir[q:U:dim], cone.rt2))
+            @views PlambdaPk_slice_pq = PlambdaPk[p:U:UR, q:U:UR]
+            mul!(PlambdaP_dirs[p, q], PlambdaPk_slice_pq, primal_dir_mat_q)
         end
 
         for p in 1:U
-            primal_dir_mat_p = Symmetric(svec_to_smat!(similar(corr, R, R), primal_dir[p:U:dim], cone.rt2))
+            primal_dir_mat_p = Symmetric(svec_to_smat!(matRR, primal_dir[p:U:dim], cone.rt2))
             for q in 1:U
-                primal_dir_mat_q = Symmetric(svec_to_smat!(similar(corr, R, R), primal_dir[q:U:dim], cone.rt2))
-                PlambdaPk_slice_pq = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[q]] for ii in 1:R, jj in 1:R]
                 pq_q = PlambdaP_dirs[p, q] # PlambdaPk_slice_pq * primal_dir_mat_q
-                qp_p = PlambdaPk_slice_pq' * primal_dir_mat_p
                 for r in 1:q
-                    PlambdaPk_slice_qr = [PlambdaPk[block_idxs(U, ii)[q], block_idxs(U, jj)[r]] for ii in 1:R, jj in 1:R]
+                    @views PlambdaPk_slice_qr = PlambdaPk[q:U:UR, r:U:UR]
                     r_rp = PlambdaP_dirs[p, r]'
 
                     # O(R^3) done O(U^3) times
