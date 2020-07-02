@@ -59,7 +59,7 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
             @. @views rhs4[z_rows_k] += rhs[s_rows_k]
         end
     end
-    # -c'x - b'y - h'z + mu/(taubar^2)*tau = taurhs + kaprhs
+    # -c'x - b'y - h'z + kapbar/taubar*tau = taurhs + kaprhs
     rhs4[end] += rhs[end]
 
     @timeit solver.timer "solve_subsystem" solve_subsystem(system_solver, sol4, rhs4)
@@ -72,10 +72,8 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     @. @views s = model.h * sol4[end] - rhs[(n + p) .+ (1:q)]
     @views mul!(s, model.G, sol[1:n], -1, true)
 
-    # kap = -mu/(taubar^2)*tau + kaprhs
-    sol[end] = -solver.mu / solver.tau * sol4[end] / solver.tau + rhs[end]
-    # TODO NT: kap = kapbar/taubar*(kaprhs - tau)
-    # sol[end] = kapontau * (rhs[end] - sol4[end])
+    # kap = -kapbar/taubar*tau + kaprhs
+    sol[end] = -solver.kap / solver.tau * sol4[end] + rhs[end]
 
     return sol
 end
@@ -188,9 +186,7 @@ function update_lhs(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
             @views copyto!(system_solver.lhs4.nzval[system_solver.hess_idxs[k][j]], H_k[nz_rows, j])
         end
     end
-    system_solver.lhs4.nzval[end] = solver.mu / solver.tau / solver.tau
-    # TODO NT:
-    # system_solver.lhs4.nzval[end] = solver.kap / solver.tau
+    system_solver.lhs4.nzval[end] = solver.kap / solver.tau
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs4)
 
@@ -253,8 +249,7 @@ function update_lhs(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver
             @views copyto!(lhs4[z_rows_k, z_rows_k], Cones.hess(cone_k))
         elseif system_solver.use_inv_hess
             # -G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k
-            Hi_k =
-            @views copyto!(lhs4[z_rows_k, z_rows_k], Cones.inv_hess(cone_k))
+            Hi_k = @views copyto!(lhs4[z_rows_k, z_rows_k], Cones.inv_hess(cone_k))
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
             @views Cones.hess_prod!(lhs4[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
@@ -262,7 +257,7 @@ function update_lhs(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver
             @views Cones.hess_prod!(lhs4[z_rows_k, end], model.h[idxs_k], cone_k)
         end
     end
-    lhs4[end, end] = solver.mu / solver.tau / solver.tau
+    lhs4[end, end] = solver.kap / solver.tau
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs4)
 
