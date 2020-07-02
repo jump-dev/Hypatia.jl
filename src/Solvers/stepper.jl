@@ -396,44 +396,44 @@ function find_max_alpha(
     return alpha
 end
 
-# TODO if p = 0, don't print y_feas
 function print_iteration_stats(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     if iszero(solver.num_iters)
-        @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
-            "iter", "p_obj", "d_obj", "abs_gap", "rel_gap",
-            "x_feas", "y_feas", "z_feas", "tau", "kap", "mu",
-            "gamma", "alpha",
-            )
-        @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-            solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.rel_gap,
-            solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu
-            )
+        if iszero(solver.model.p)
+            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
+                "iter", "p_obj", "d_obj", "rel_gap", "abs_gap",
+                "x_feas", "z_feas", "tau", "kap", "mu",
+                "gamma", "alpha",
+                )
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
+                solver.x_feas, solver.z_feas, solver.tau, solver.kap, solver.mu
+                )
+        else
+            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
+                "iter", "p_obj", "d_obj", "rel_gap", "abs_gap",
+                "x_feas", "y_feas", "z_feas", "tau", "kap", "mu",
+                "gamma", "alpha",
+                )
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
+                solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu
+                )
+        end
     else
-        @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-            solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.rel_gap,
-            solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu,
-            stepper.prev_gamma, stepper.prev_alpha,
-            )
+        if iszero(solver.model.p)
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
+                solver.x_feas, solver.z_feas, solver.tau, solver.kap, solver.mu,
+                stepper.prev_gamma, stepper.prev_alpha,
+                )
+        else
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
+                solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu,
+                stepper.prev_gamma, stepper.prev_alpha,
+                )
+        end
     end
     flush(stdout)
     return
 end
-
-# TODO experimental for BlockMatrix LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
-# TODO optimize... maybe need for each cone a 5-arg hess prod
-# import LinearAlgebra.mul!
-#
-# function mul!(y::AbstractVecOrMat{T}, A::Cones.Cone{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
-#     # TODO in-place
-#     ytemp = y * beta
-#     Cones.hess_prod!(y, x, A)
-#     rmul!(y, alpha)
-#     y .+= ytemp
-#     return y
-# end
-#
-# function mul!(y::AbstractVecOrMat{T}, solver::Solvers.Solver{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
-#     rmul!(y, beta)
-#     @. y += alpha * x / solver.tau * solver.mu / solver.tau
-#     return y
-# end
