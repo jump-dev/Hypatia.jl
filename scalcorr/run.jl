@@ -17,8 +17,8 @@ struct EntropyInstances <: InstanceSet end
 struct PolyhedralInstances <: InstanceSet end
 struct WSOSGeomeanInstances <: InstanceSet end
 
-run_in_bf = true
-# run_in_bf = false
+# run_in_bf = true
+run_in_bf = false
 T = (run_in_bf ? BigFloat : Float64)
 
 # options to solvers

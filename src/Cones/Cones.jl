@@ -75,7 +75,7 @@ use_scaling(::Cone) = false
 
 use_correction(::Cone) = false
 
-# scal_hess(cone::Cone{T}, mu::T) where {T <: Real} = (cone.scal_hess_updated ? cone.hess : update_scal_hess(cone, mu))
+scal_hess(cone::Cone{T}, mu::T) where {T <: Real} = (cone.scal_hess_updated ? cone.hess : update_scal_hess(cone, mu))
 
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 

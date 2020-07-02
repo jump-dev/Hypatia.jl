@@ -27,6 +27,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
+    old_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
     correction::Vector{T}
@@ -67,6 +68,7 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.old_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.correction = zeros(T, dim)
@@ -156,6 +158,8 @@ function update_hess(cone::HypoGeomean)
         end
         H[j1, j1] = (awwwprodu * (1 + aj * wwprodum1) + inv(wj)) / wj
     end
+
+    copyto!(cone.old_hess.data, H)
 
     cone.hess_updated = true
     return cone.hess

@@ -69,7 +69,7 @@ JuMP_example_names = [
     # "nearestpsd",
     # "polymin",
     # "polynorm",
-    "portfolio",
+    # "portfolio",
     # "regionofattr",
     # "robustgeomprog",
     # "secondorderpoly",

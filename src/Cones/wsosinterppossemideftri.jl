@@ -301,127 +301,151 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::W
 
 end
 
-# function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
-#     @assert cone.grad_updated
-#     corr = cone.correction
-#     U = cone.U
-#     R = cone.R
-#
-#     s_shuf = similar(primal_dir)
-#     corr_shuf = similar(corr)
-#     corr_shuf .= 0
-#     r_dim = svec_length(R)
-#
-#     # permute primal_dir
-#     idx_new = 1
-#     for u in 1:cone.U
-#         r_idx = 1
-#         for j in 1:cone.R, i in 1:j
-#             s_shuf[idx_new] = primal_dir[block_idxs(U, r_idx)[u]]
-#             r_idx += 1
-#             idx_new += 1
-#         end
-#     end
-#
-#     tmp = similar(corr, r_dim)
-#     tmp .= 0
-#     for k in eachindex(cone.Ps)
-#         PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
-#         for p in 1:U, q in 1:U, r in 1:U
-#             primal_dir_mat_q = Symmetric(svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, q)], cone.rt2))
-#             primal_dir_mat_r = Symmetric(svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, r)], cone.rt2))
-#             PlambdaPk_slice_pq = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[q]] for ii in 1:R, jj in 1:R]
-#             PlambdaPk_slice_qr = [PlambdaPk[block_idxs(U, ii)[q], block_idxs(U, jj)[r]] for ii in 1:R, jj in 1:R]
-#             PlambdaPk_slice_rp = [PlambdaPk[block_idxs(U, ii)[r], block_idxs(U, jj)[p]] for ii in 1:R, jj in 1:R]
-#
-#             prod_mat = PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp # O(R^3) done O(U^3) times
-#             prod_mat += prod_mat'
-#             corr_shuf[block_idxs(r_dim, p)] .+= smat_to_svec!(similar(corr, r_dim), prod_mat, cone.rt2)
-#         end
-#     end
-#
-#     r_idx = 1
-#     idx = 1
-#     for j in 1:cone.R, i in 1:j
-#         for u in 1:U
-#             corr[idx] = corr_shuf[block_idxs(r_dim, u)[r_idx]]
-#             idx += 1
-#         end
-#         r_idx += 1
-#     end
-#
-#     corr ./= 2
-#
-#     return corr
-# end
-
-
 function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
     @assert cone.grad_updated
     corr = cone.correction
     U = cone.U
     R = cone.R
-    corr .= 0
 
-    for p in eachindex(cone.Ps)
-        PlambdaPk = Symmetric(cone.PlambdaP[p], :U)
-        idx_ij = 1
-        for j in 1:R, i in 1:j
-            corr_ij = view(corr, block_idxs(U, idx_ij))
-            idx_kl = 1
-            for l in 1:R, k in 1:l
-                idx_mn = 1
-                for n in 1:R, m in 1:n
+    s_shuf = similar(primal_dir)
+    corr_shuf = similar(corr)
+    corr_shuf .= 0
+    r_dim = svec_length(R)
 
-                    PlambdaPk_slice_ik = PlambdaPk[block_idxs(U, i), block_idxs(U, k)]
-                    PlambdaPk_slice_il = PlambdaPk[block_idxs(U, i), block_idxs(U, l)]
-                    PlambdaPk_slice_im = PlambdaPk[block_idxs(U, i), block_idxs(U, m)]
-                    PlambdaPk_slice_in = PlambdaPk[block_idxs(U, i), block_idxs(U, n)]
-                    PlambdaPk_slice_jk = PlambdaPk[block_idxs(U, j), block_idxs(U, k)]
-                    PlambdaPk_slice_jl = PlambdaPk[block_idxs(U, j), block_idxs(U, l)]
-                    PlambdaPk_slice_jm = PlambdaPk[block_idxs(U, j), block_idxs(U, m)]
-                    PlambdaPk_slice_jn = PlambdaPk[block_idxs(U, j), block_idxs(U, n)]
-                    PlambdaPk_slice_km = PlambdaPk[block_idxs(U, k), block_idxs(U, m)]
-                    PlambdaPk_slice_kn = PlambdaPk[block_idxs(U, k), block_idxs(U, n)]
-                    PlambdaPk_slice_lm = PlambdaPk[block_idxs(U, l), block_idxs(U, m)]
-                    PlambdaPk_slice_ln = PlambdaPk[block_idxs(U, l), block_idxs(U, n)]
-
-                    primal_dir_kl = Diagonal(primal_dir[block_idxs(U, idx_kl)])
-                    primal_dir_mn = Diagonal(primal_dir[block_idxs(U, idx_mn)])
-
-                    # at least O(U^3) even if we only get the diagonal, do this O(R^6) times (3 loops O(R^2))
-                    M = PlambdaPk_slice_il * primal_dir_kl * PlambdaPk_slice_kn * primal_dir_mn * PlambdaPk_slice_jm' +
-                        PlambdaPk_slice_jl * primal_dir_kl * PlambdaPk_slice_kn * primal_dir_mn * PlambdaPk_slice_im' +
-                        PlambdaPk_slice_ik * primal_dir_kl * PlambdaPk_slice_ln * primal_dir_mn * PlambdaPk_slice_jm' +
-                        PlambdaPk_slice_jk * primal_dir_kl * PlambdaPk_slice_ln * primal_dir_mn * PlambdaPk_slice_im' +
-                        PlambdaPk_slice_il * primal_dir_kl * PlambdaPk_slice_km * primal_dir_mn * PlambdaPk_slice_jn' +
-                        PlambdaPk_slice_jl * primal_dir_kl * PlambdaPk_slice_km * primal_dir_mn * PlambdaPk_slice_in' +
-                        PlambdaPk_slice_ik * primal_dir_kl * PlambdaPk_slice_lm * primal_dir_mn * PlambdaPk_slice_jn' +
-                        PlambdaPk_slice_jk * primal_dir_kl * PlambdaPk_slice_lm * primal_dir_mn * PlambdaPk_slice_in'
-                    # M = M + M'
-
-                    num_match = (i == j) + (k == l) + (m == n)
-                    if num_match == 3
-                        M = M * 1 / 4
-                    elseif num_match == 2
-                        M = M * sqrt(2) / 4
-                    elseif num_match == 1
-                        M = M * 2 / 4
-                    else
-                        M = M * 2 * sqrt(2) / 4
-                    end
-
-                    corr_ij .+= diag(M)
-
-                    idx_mn += 1
-                end
-                idx_kl += 1
-            end
-            idx_ij += 1
+    # permute primal_dir
+    idx_new = 1
+    for u in 1:cone.U
+        r_idx = 1
+        for j in 1:cone.R, i in 1:j
+            s_shuf[idx_new] = primal_dir[block_idxs(U, r_idx)[u]]
+            r_idx += 1
+            idx_new += 1
         end
+    end
+
+    for k in eachindex(cone.Ps)
+        PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
+        for p in 1:U
+            primal_dir_mat_p = Symmetric(svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, p)], cone.rt2))
+            for q in 1:U
+                primal_dir_mat_q = Symmetric(svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, q)], cone.rt2))
+                PlambdaPk_slice_pq = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[q]] for ii in 1:R, jj in 1:R]
+                pq_q = PlambdaPk_slice_pq * primal_dir_mat_q
+                qp_p = PlambdaPk_slice_pq' * primal_dir_mat_p
+                for r in 1:q
+                    primal_dir_mat_r = Symmetric(svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, r)], cone.rt2))
+                    PlambdaPk_slice_qr = [PlambdaPk[block_idxs(U, ii)[q], block_idxs(U, jj)[r]] for ii in 1:R, jj in 1:R]
+                    PlambdaPk_slice_rp = [PlambdaPk[block_idxs(U, ii)[r], block_idxs(U, jj)[p]] for ii in 1:R, jj in 1:R]
+
+                    # O(R^3) done O(U^3) times
+                    prod_mat_p = pq_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp
+                    # prod_mat_q = qp_p * PlambdaPk_slice_rp' * primal_dir_mat_r * PlambdaPk_slice_qr'
+                    # if p != q
+                    #     prod_mat += qp_p * PlambdaPk_slice_rp' * primal_dir_mat_r * PlambdaPk_slice_qr'
+                    # end
+                    # prod_mat = PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp +
+                    #           PlambdaPk_slice_pr * primal_dir_mat_r * PlambdaPk_slice_rq * primal_dir_mat_q * PlambdaPk_slice_qp
+                    # prod_mat = PlambdaPk_slice_qp * primal_dir_mat_p * PlambdaPk_slice_pr * primal_dir_mat_r * PlambdaPk_slice_rq +
+                    #           PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp * primal_dir_mat_p * PlambdaPk_slice_pq
+                    prod_mat_p += prod_mat_p'
+                    # prod_mat_q += prod_mat_q'
+                    if q != r
+                        prod_mat_p *= 2
+                    end
+                    # if p != r
+                    #     prod_mat_q *= 2
+                    # end
+                    corr_shuf[block_idxs(r_dim, p)] .+= smat_to_svec!(similar(corr, r_dim), prod_mat_p, cone.rt2)
+                    # if p != q
+                    #     corr_shuf[block_idxs(r_dim, q)] .+= smat_to_svec!(similar(corr, r_dim), prod_mat_q, cone.rt2)
+                    # end
+                end
+            end
+        end
+    end
+
+    r_idx = 1
+    idx = 1
+    for j in 1:cone.R, i in 1:j
+        for u in 1:U
+            corr[idx] = corr_shuf[block_idxs(r_dim, u)[r_idx]]
+            idx += 1
+        end
+        r_idx += 1
     end
 
     corr ./= 2
 
     return corr
 end
+
+
+# function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
+#     @assert cone.grad_updated
+#     corr = cone.correction
+#     U = cone.U
+#     R = cone.R
+#     corr .= 0
+#
+#     for p in eachindex(cone.Ps)
+#         PlambdaPk = Symmetric(cone.PlambdaP[p], :U)
+#         idx_ij = 1
+#         for j in 1:R, i in 1:j
+#             corr_ij = view(corr, block_idxs(U, idx_ij))
+#             idx_kl = 1
+#             for l in 1:R, k in 1:l
+#                 idx_mn = 1
+#                 for n in 1:R, m in 1:n
+#
+#                     PlambdaPk_slice_ik = PlambdaPk[block_idxs(U, i), block_idxs(U, k)]
+#                     PlambdaPk_slice_il = PlambdaPk[block_idxs(U, i), block_idxs(U, l)]
+#                     PlambdaPk_slice_im = PlambdaPk[block_idxs(U, i), block_idxs(U, m)]
+#                     PlambdaPk_slice_in = PlambdaPk[block_idxs(U, i), block_idxs(U, n)]
+#                     PlambdaPk_slice_jk = PlambdaPk[block_idxs(U, j), block_idxs(U, k)]
+#                     PlambdaPk_slice_jl = PlambdaPk[block_idxs(U, j), block_idxs(U, l)]
+#                     PlambdaPk_slice_jm = PlambdaPk[block_idxs(U, j), block_idxs(U, m)]
+#                     PlambdaPk_slice_jn = PlambdaPk[block_idxs(U, j), block_idxs(U, n)]
+#                     PlambdaPk_slice_km = PlambdaPk[block_idxs(U, k), block_idxs(U, m)]
+#                     PlambdaPk_slice_kn = PlambdaPk[block_idxs(U, k), block_idxs(U, n)]
+#                     PlambdaPk_slice_lm = PlambdaPk[block_idxs(U, l), block_idxs(U, m)]
+#                     PlambdaPk_slice_ln = PlambdaPk[block_idxs(U, l), block_idxs(U, n)]
+#
+#                     primal_dir_kl = Diagonal(primal_dir[block_idxs(U, idx_kl)])
+#                     primal_dir_mn = Diagonal(primal_dir[block_idxs(U, idx_mn)])
+#
+#                     # at least O(U^3) even if we only get the diagonal, do this O(R^6) times (3 loops O(R^2))
+#                     M = PlambdaPk_slice_il * primal_dir_kl * PlambdaPk_slice_kn * primal_dir_mn * PlambdaPk_slice_jm' +
+#                         PlambdaPk_slice_jl * primal_dir_kl * PlambdaPk_slice_kn * primal_dir_mn * PlambdaPk_slice_im' +
+#                         PlambdaPk_slice_ik * primal_dir_kl * PlambdaPk_slice_ln * primal_dir_mn * PlambdaPk_slice_jm' +
+#                         PlambdaPk_slice_jk * primal_dir_kl * PlambdaPk_slice_ln * primal_dir_mn * PlambdaPk_slice_im' +
+#                         PlambdaPk_slice_il * primal_dir_kl * PlambdaPk_slice_km * primal_dir_mn * PlambdaPk_slice_jn' +
+#                         PlambdaPk_slice_jl * primal_dir_kl * PlambdaPk_slice_km * primal_dir_mn * PlambdaPk_slice_in' +
+#                         PlambdaPk_slice_ik * primal_dir_kl * PlambdaPk_slice_lm * primal_dir_mn * PlambdaPk_slice_jn' +
+#                         PlambdaPk_slice_jk * primal_dir_kl * PlambdaPk_slice_lm * primal_dir_mn * PlambdaPk_slice_in'
+#                     # M = M + M'
+#
+#                     num_match = (i == j) + (k == l) + (m == n)
+#                     if num_match == 3
+#                         M = M * 1 / 4
+#                     elseif num_match == 2
+#                         M = M * sqrt(2) / 4
+#                     elseif num_match == 1
+#                         M = M * 2 / 4
+#                     else
+#                         M = M * 2 * sqrt(2) / 4
+#                     end
+#
+#                     corr_ij .+= diag(M)
+#
+#                     idx_mn += 1
+#                 end
+#                 idx_kl += 1
+#             end
+#             idx_ij += 1
+#         end
+#     end
+#
+#     corr ./= 2
+#
+#     return corr
+# end
