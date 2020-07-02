@@ -323,42 +323,37 @@ function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
         end
     end
 
+
     for k in eachindex(cone.Ps)
         PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
+
+        PlambdaP_dirs = [zeros(R, R) for p in 1:U, q in 1:U]
+        for p in 1:U, q in 1:U
+            primal_dir_mat_q = Symmetric(svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, q)], cone.rt2))
+            PlambdaPk_slice_pq = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[q]] for ii in 1:R, jj in 1:R]
+            PlambdaP_dirs[p, q] = PlambdaPk_slice_pq * primal_dir_mat_q
+        end
+
         for p in 1:U
             primal_dir_mat_p = Symmetric(svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, p)], cone.rt2))
             for q in 1:U
                 primal_dir_mat_q = Symmetric(svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, q)], cone.rt2))
                 PlambdaPk_slice_pq = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[q]] for ii in 1:R, jj in 1:R]
-                pq_q = PlambdaPk_slice_pq * primal_dir_mat_q
+                pq_q = PlambdaP_dirs[p, q] # PlambdaPk_slice_pq * primal_dir_mat_q
                 qp_p = PlambdaPk_slice_pq' * primal_dir_mat_p
                 for r in 1:q
                     primal_dir_mat_r = Symmetric(svec_to_smat!(similar(corr, R, R), s_shuf[block_idxs(r_dim, r)], cone.rt2))
                     PlambdaPk_slice_qr = [PlambdaPk[block_idxs(U, ii)[q], block_idxs(U, jj)[r]] for ii in 1:R, jj in 1:R]
                     PlambdaPk_slice_rp = [PlambdaPk[block_idxs(U, ii)[r], block_idxs(U, jj)[p]] for ii in 1:R, jj in 1:R]
+                    r_rp = PlambdaP_dirs[p, r]'
 
                     # O(R^3) done O(U^3) times
-                    prod_mat_p = pq_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp
-                    # prod_mat_q = qp_p * PlambdaPk_slice_rp' * primal_dir_mat_r * PlambdaPk_slice_qr'
-                    # if p != q
-                    #     prod_mat += qp_p * PlambdaPk_slice_rp' * primal_dir_mat_r * PlambdaPk_slice_qr'
-                    # end
-                    # prod_mat = PlambdaPk_slice_pq * primal_dir_mat_q * PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp +
-                    #           PlambdaPk_slice_pr * primal_dir_mat_r * PlambdaPk_slice_rq * primal_dir_mat_q * PlambdaPk_slice_qp
-                    # prod_mat = PlambdaPk_slice_qp * primal_dir_mat_p * PlambdaPk_slice_pr * primal_dir_mat_r * PlambdaPk_slice_rq +
-                    #           PlambdaPk_slice_qr * primal_dir_mat_r * PlambdaPk_slice_rp * primal_dir_mat_p * PlambdaPk_slice_pq
+                    prod_mat_p = pq_q * PlambdaPk_slice_qr * r_rp
                     prod_mat_p += prod_mat_p'
-                    # prod_mat_q += prod_mat_q'
                     if q != r
                         prod_mat_p *= 2
                     end
-                    # if p != r
-                    #     prod_mat_q *= 2
-                    # end
                     corr_shuf[block_idxs(r_dim, p)] .+= smat_to_svec!(similar(corr, r_dim), prod_mat_p, cone.rt2)
-                    # if p != q
-                    #     corr_shuf[block_idxs(r_dim, q)] .+= smat_to_svec!(similar(corr, r_dim), prod_mat_q, cone.rt2)
-                    # end
                 end
             end
         end

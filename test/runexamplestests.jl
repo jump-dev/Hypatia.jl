@@ -61,7 +61,7 @@ JuMP_example_names = [
     # "expdesign",
     # "lotkavolterra",
     # "lyapunovstability",
-    "matrixcompletion",
+    # "matrixcompletion",
     # "matrixquadratic",
     # "matrixregression",
     # "maxvolume",
@@ -75,7 +75,7 @@ JuMP_example_names = [
     # "secondorderpoly",
     # "semidefinitepoly",
     # "shapeconregr",
-    # "signomialmin",
+    "signomialmin",
     ]
 
 # start the tests
