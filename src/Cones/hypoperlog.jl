@@ -112,6 +112,8 @@ function update_dual_feas(cone::HypoPerLog{T}) where {T}
     if all(wi -> wi > eps(T), w) && u < -eps(T)
         # return all(v - u - u * log(-wi / u) > eps(T) for wi in w)
         return v - u * sum(log(-wi / u) + 1 for wi in w) > eps(T)
+    else
+        return false
     end
     # return u < -eps(T) && w > eps(T) && v - u - u * log(-w / u) > eps(T)
 end
