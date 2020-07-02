@@ -168,7 +168,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
         return false
     end
 
-    return true # step succeeded
+    return true
 end
 
 # update the RHS for affine direction
@@ -189,7 +189,6 @@ function update_rhs_affine(stepper::CombinedStepper{T}, solver::Solver{T}) where
 
     # kap
     rhs[end] = -solver.kap
-    # TODO NT: -solver.tau
 
     return rhs
 end
@@ -202,14 +201,11 @@ function update_rhs_correction(stepper::CombinedStepper{T}, solver::Solver{T}) w
     stepper.rhs[1:stepper.tau_row] .= 0
 
     # s
+    rtmu = sqrt(solver.mu)
     for (k, cone_k) in enumerate(solver.model.cones)
         duals_k = solver.point.dual_views[k]
         grad_k = Cones.grad(cone_k)
-        @. stepper.s_rhs_k[k] = -duals_k - solver.mu * grad_k
-        # if Cones.use_3order_corr(cone_k)
-        #     # TODO check math here for case of cone.use_dual true - should s and z be swapped then?
-        #     stepper.s_rhs_k[k] .-= Cones.correction(cone_k, stepper.primal_dir_k[k], stepper.dual_dir_k[k])
-        # end
+        @. stepper.s_rhs_k[k] = -duals_k - rtmu * grad_k
     end
 
     # kap
@@ -297,7 +293,6 @@ function apply_lhs(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: R
         # (pr bar) z_k + mu*H_k*s_k
         s_res_k = stepper.s_res_k[k]
         Cones.hess_prod!(s_res_k, stepper.primal_dir_k[k], cone_k)
-        lmul!(solver.mu, s_res_k)
         @. s_res_k += stepper.dual_dir_k[k]
     end
 
@@ -366,10 +361,11 @@ function find_max_alpha(
                 # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
                 sortperm!(cone_order, cone_times, initialized = true)
 
+                irt_mu_temp = inv(sqrt(mu_temp))
                 for k in cone_order
                     cone_k = cones[k]
                     time_k = time_ns()
-                    Cones.load_point(cone_k, primals_linesearch[k])
+                    Cones.load_point(cone_k, primals_linesearch[k], irt_mu_temp)
                     Cones.load_dual_point(cone_k, duals_linesearch[k])
                     Cones.reset_data(cone_k)
                     in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, duals_linesearch[k], mu_temp))
@@ -400,44 +396,44 @@ function find_max_alpha(
     return alpha
 end
 
-# TODO if p = 0, don't print y_feas
 function print_iteration_stats(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     if iszero(solver.num_iters)
-        @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
-            "iter", "p_obj", "d_obj", "abs_gap", "rel_gap",
-            "x_feas", "y_feas", "z_feas", "tau", "kap", "mu",
-            "gamma", "alpha",
-            )
-        @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-            solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.rel_gap,
-            solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu
-            )
+        if iszero(solver.model.p)
+            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
+                "iter", "p_obj", "d_obj", "rel_gap", "abs_gap",
+                "x_feas", "z_feas", "tau", "kap", "mu",
+                "gamma", "alpha",
+                )
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
+                solver.x_feas, solver.z_feas, solver.tau, solver.kap, solver.mu
+                )
+        else
+            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
+                "iter", "p_obj", "d_obj", "rel_gap", "abs_gap",
+                "x_feas", "y_feas", "z_feas", "tau", "kap", "mu",
+                "gamma", "alpha",
+                )
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
+                solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu
+                )
+        end
     else
-        @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-            solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.rel_gap,
-            solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu,
-            stepper.prev_gamma, stepper.prev_alpha,
-            )
+        if iszero(solver.model.p)
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
+                solver.x_feas, solver.z_feas, solver.tau, solver.kap, solver.mu,
+                stepper.prev_gamma, stepper.prev_alpha,
+                )
+        else
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
+                solver.x_feas, solver.y_feas, solver.z_feas, solver.tau, solver.kap, solver.mu,
+                stepper.prev_gamma, stepper.prev_alpha,
+                )
+        end
     end
     flush(stdout)
     return
 end
-
-# TODO experimental for BlockMatrix LHS: if block is a Cone then define mul as hessian product, if block is solver then define mul by mu/tau/tau
-# TODO optimize... maybe need for each cone a 5-arg hess prod
-# import LinearAlgebra.mul!
-#
-# function mul!(y::AbstractVecOrMat{T}, A::Cones.Cone{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
-#     # TODO in-place
-#     ytemp = y * beta
-#     Cones.hess_prod!(y, x, A)
-#     rmul!(y, alpha)
-#     y .+= ytemp
-#     return y
-# end
-#
-# function mul!(y::AbstractVecOrMat{T}, solver::Solvers.Solver{T}, x::AbstractVecOrMat{T}, alpha::Number, beta::Number) where {T <: Real}
-#     rmul!(y, beta)
-#     @. y += alpha * x / solver.tau * solver.mu / solver.tau
-#     return y
-# end

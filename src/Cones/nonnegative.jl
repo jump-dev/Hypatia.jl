@@ -131,8 +131,9 @@ inv_hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 
 function in_neighborhood(cone::Nonnegative, dual_point::AbstractVector, mu::Real)
-    mu_nbhd = mu * cone.max_neighborhood
-    return all(abs(si * zi - mu) < mu_nbhd for (si, zi) in zip(cone.point, dual_point))
+    rtmu = sqrt(mu) # TODO make this the arg
+    mu_nbhd = rtmu * cone.max_neighborhood
+    return all(abs(si * zi - rtmu) < mu_nbhd for (si, zi) in zip(cone.point, dual_point))
 end
 
 function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)

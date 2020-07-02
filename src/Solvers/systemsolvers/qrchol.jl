@@ -27,15 +27,13 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
         z_k = @view rhs[z_rows_k]
         z3_k = @view rhs3[z_rows_k]
         s_k = @view rhs[(dim3 + 1) .+ idxs_k]
-
         if Cones.use_dual_barrier(cone_k)
             z_temp_k = @view sol[z_rows_k]
             @. z_temp_k = -z_k - s_k
             Cones.inv_hess_prod!(z3_k, z_temp_k, cone_k)
-            z3_k ./= solver.mu
         else
             Cones.hess_prod!(z3_k, z_k, cone_k)
-            axpby!(-1, s_k, -solver.mu, z3_k)
+            axpby!(-1, s_k, -1, z3_k)
         end
     end
 
@@ -82,7 +80,7 @@ function solve_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solver{T}
 
         if !isempty(system_solver.Q2div)
             mul!(system_solver.GQ1x, system_solver.GQ1, y)
-            block_hess_prod.(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k, solver.mu)
+            block_hess_prod.(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k)
             mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
         end
     end
@@ -95,7 +93,7 @@ function solve_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solver{T}
     lmul!(solver.Ap_Q, x)
 
     mul!(system_solver.Gx, model.G, x)
-    block_hess_prod.(model.cones, system_solver.HGx_k, system_solver.Gx_k, solver.mu)
+    block_hess_prod.(model.cones, system_solver.HGx_k, system_solver.Gx_k)
 
     @. z = system_solver.HGx - z
 
@@ -108,13 +106,11 @@ function solve_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solver{T}
     return rhs3
 end
 
-function block_hess_prod(cone_k::Cones.Cone{T}, prod_k::AbstractVecOrMat{T}, arr_k::AbstractVecOrMat{T}, mu::T) where {T <: Real}
+function block_hess_prod(cone_k::Cones.Cone{T}, prod_k::AbstractVecOrMat{T}, arr_k::AbstractVecOrMat{T}) where {T <: Real}
     if Cones.use_dual_barrier(cone_k)
         Cones.inv_hess_prod!(prod_k, arr_k, cone_k)
-        @. prod_k /= mu
     else
         Cones.hess_prod!(prod_k, arr_k, cone_k)
-        @. prod_k *= mu
     end
     return
 end
@@ -170,8 +166,8 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     system_solver.y_rows = n .+ (1:p)
     system_solver.z_rows = (n + p) .+ (1:q)
 
-    system_solver.rhs3 = Vector{T}(undef, n + p + q)
-    system_solver.lhs1 = Symmetric(Matrix{T}(undef, nmp, nmp), :U)
+    system_solver.rhs3 = zeros(T, n + p + q)
+    system_solver.lhs1 = Symmetric(zeros(T, nmp, nmp), :U)
 
     num_cones = length(cone_idxs)
     system_solver.inv_hess_cones = sizehint!(Int[], num_cones)
@@ -186,8 +182,8 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     system_solver.HGQ2 = zeros(T, q, nmp)
     system_solver.QpbxGHbz = Vector{T}(undef, n)
     system_solver.Q2div = view(system_solver.QpbxGHbz, (p + 1):n)
-    system_solver.Gx = Vector{T}(undef, q)
-    system_solver.HGx = similar(system_solver.Gx)
+    system_solver.Gx = zeros(T, q)
+    system_solver.HGx = zeros(T, q)
     system_solver.HGQ2_k = [view(system_solver.HGQ2, idxs, :) for idxs in cone_idxs]
     system_solver.GQ2_k = [view(system_solver.GQ2, idxs, :) for idxs in cone_idxs]
     system_solver.HGx_k = [view(system_solver.HGx, idxs, :) for idxs in cone_idxs]
@@ -196,15 +192,15 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     if !iszero(p)
         system_solver.GQ1 = GQ[:, 1:p]
         system_solver.Q1pbxGHbz = view(system_solver.QpbxGHbz, 1:p)
-        system_solver.GQ1x = Vector{T}(undef, q)
-        system_solver.HGQ1x = similar(system_solver.GQ1x)
+        system_solver.GQ1x = zeros(T, q)
+        system_solver.HGQ1x = zeros(T, q)
         system_solver.HGQ1x_k = [view(system_solver.HGQ1x, idxs, :) for idxs in cone_idxs]
         system_solver.GQ1x_k = [view(system_solver.GQ1x, idxs, :) for idxs in cone_idxs]
     end
 
     load_matrix(system_solver.fact_cache, system_solver.lhs1)
 
-    system_solver.const_sol = similar(system_solver.rhs3)
+    system_solver.const_sol = zeros(T, length(system_solver.rhs3))
 
     return system_solver
 end
@@ -260,11 +256,6 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
             mul!(lhs, arr_k', prod_k, true, true)
         end
 
-        if !(isempty(inv_hess_cones) && isempty(inv_hess_sqrt_cones))
-            # divide by mu for inv_hess and inv_hess_sqrt cones
-            lhs ./= solver.mu
-        end
-
         # do hess and hess_sqrt cones
         if !isempty(hess_sqrt_cones)
             idx = 1
@@ -276,14 +267,14 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
                 idx += q_k
             end
             @views HGQ2_sub = system_solver.HGQ2[1:(idx - 1), :]
-            outer_prod(HGQ2_sub, lhs, solver.mu, true)
+            outer_prod(HGQ2_sub, lhs, true, true)
         end
 
         for k in hess_cones
             arr_k = system_solver.GQ2_k[k]
             prod_k = system_solver.HGQ2_k[k]
             Cones.hess_prod!(prod_k, arr_k, model.cones[k])
-            mul!(lhs, arr_k', prod_k, solver.mu, true)
+            mul!(lhs, arr_k', prod_k, true, true)
         end
     end
 
@@ -297,7 +288,10 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
         else
             system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
         end
-        update_fact(system_solver.fact_cache, system_solver.lhs1) # || @warn("QRChol Bunch-Kaufman factorization failed after recovery")
+        if !update_fact(system_solver.fact_cache, system_solver.lhs1)
+            system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
+            update_fact(system_solver.fact_cache, system_solver.lhs1) || @warn("QRChol Bunch-Kaufman factorization failed after recovery")
+        end
     end
 
     # update solution for fixed c,b,h part
@@ -306,7 +300,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
     const_sol[system_solver.y_rows] = model.b
     @views const_sol_z = const_sol[system_solver.z_rows]
     for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
-        @views block_hess_prod(cone_k, const_sol_z[idxs_k], model.h[idxs_k], solver.mu)
+        @views block_hess_prod(cone_k, const_sol_z[idxs_k], model.h[idxs_k])
     end
     solve_subsystem(system_solver, solver, const_sol)
 
