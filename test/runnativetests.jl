@@ -15,9 +15,9 @@ include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
 
 all_reals = [
-    # Float64,
+    Float64,
     # Float32,
-    BigFloat,
+    # BigFloat,
     ]
 default_reals = [
     Float64,
@@ -31,14 +31,14 @@ system_solvers_instance_names = vcat(
     inst_cones_many,
     )
 system_solvers = Dict(
-    # "NaiveDense" => all_reals,
+    "NaiveDense" => all_reals,
     # "NaiveSparse" => default_reals,
     # # "NaiveIndirect" => all_reals, # TODO fix
     # "NaiveElimDense" => all_reals,
     # "NaiveElimSparse" => default_reals,
     # "SymIndefDense" => all_reals,
     # "SymIndefSparse" => default_reals,
-    "QRCholDense" => all_reals,
+    # "QRCholDense" => all_reals,
     )
 
 # preprocessing test options

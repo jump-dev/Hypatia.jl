@@ -199,21 +199,29 @@ function solve(solver::Solver{T}) where {T <: Real}
         solver.rescale = true
         if solver.rescale
             rteps = sqrt(eps(T))
-            # TODO allow nonnegative rescaling to have d scalars
             solver.c_scale = c_scale = T[sqrt(max(rteps, abs(model.c[j]), maximum(abs, model.A[:, j]), maximum(abs, model.G[:, j]))) for j in 1:model.n]
             solver.b_scale = b_scale = T[sqrt(max(rteps, abs(model.b[i]), maximum(abs, model.A[i, :]))) for i in 1:model.p]
-            solver.h_scale = h_scale = T[sqrt(max(rteps, maximum(abs, model.h[idxs]), maximum(abs, model.G[idxs, :]))) for idxs in model.cone_idxs]
-            # c_scale = solver.c_scale = ones(size(model.c))
-            # b_scale = solver.b_scale = ones(size(model.b))
-            # h_scale = solver.h_scale = ones(size(model.h))
+            # solver.h_scale = h_scale = T[sqrt(max(rteps, maximum(abs, model.h[idxs]), maximum(abs, model.G[idxs, :]))) for idxs in model.cone_idxs]
+            h_scale = solver.h_scale = ones(T, model.q)
+            # c_scale = solver.c_scale = ones(T, size(model.c))
+            # b_scale = solver.b_scale = ones(T, size(model.b))
+            # h_scale = solver.h_scale = ones(T, size(model.h))
             model.c ./= c_scale
             model.b ./= b_scale
-            for (i, idxs) in enumerate(model.cone_idxs)
-                model.h[idxs] ./= h_scale[i]
-                @views model.G[idxs, :] ./= h_scale[i]
+            for (k, cone_k) in enumerate(model.cones)
+                idxs = model.cone_idxs[k]
+                if cone_k isa Cones.Nonnegative
+                    h_scale[idxs] = T[sqrt(max(rteps, maximum(abs, model.h[i]), maximum(abs, model.G[i, :]))) for i in idxs]
+                else
+                    scal = sqrt(max(rteps, maximum(abs, model.h[idxs]), maximum(abs, model.G[idxs, :])))
+                    h_scale[idxs] = fill(scal, length(idxs))
+                end
+                # model.h[idxs] ./= h_scale[i]
+                # @views model.G[idxs, :] ./= h_scale[i]
             end
+            model.h ./= h_scale
             model.A = model.A ./ c_scale' ./ b_scale
-            model.G = model.G ./ c_scale'
+            model.G = model.G ./ c_scale' ./ h_scale
         end
 
         @show norm(model.G)
@@ -430,18 +438,18 @@ get_primal_obj(solver::Solver) = solver.primal_obj
 get_dual_obj(solver::Solver) = solver.dual_obj
 
 function get_s(solver::Solver)
-    if solver.rescale
-        return vcat([solver.point.s[idxs] .* solver.h_scale[i] for (i, idxs) in enumerate(solver.model.cone_idxs)]...)
-    else
-        return copy(solver.point.s)
-    end
+    # if solver.rescale
+    #     return vcat([solver.point.s[idxs] .* solver.h_scale[i] for (i, idxs) in enumerate(solver.model.cone_idxs)]...)
+    # else
+        return copy(solver.point.s) .* (solver.rescale ? solver.h_scale : 1)
+    # end
 end
 function get_z(solver::Solver)
-    if solver.rescale
-        return vcat([solver.point.z[idxs] ./ solver.h_scale[i] for (i, idxs) in enumerate(solver.model.cone_idxs)]...)
-    else
-        return copy(solver.point.z)
-    end
+    # if solver.rescale
+    #     return vcat([solver.point.z[idxs] ./ solver.h_scale[i] for (i, idxs) in enumerate(solver.model.cone_idxs)]...)
+    # else
+        return copy(solver.point.z) ./ (solver.rescale ? solver.h_scale : 1)
+    # end
 end
 # get_z(solver::Solver) = copy(solver.point.z)
 
