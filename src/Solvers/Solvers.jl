@@ -109,6 +109,11 @@ mutable struct Solver{T <: Real}
     prev_is_slow::Bool
     prev_worst_res::T
 
+    rescale::Bool
+    b_scale
+    c_scale
+    h_scale
+
     function Solver{T}(;
         verbose::Bool = true,
         iter_limit::Int = 1000,
@@ -119,6 +124,7 @@ mutable struct Solver{T <: Real}
         tol_slow::Real = 1e-3,
         preprocess::Bool = true,
         reduce::Bool = true,
+        rescale::Bool = false,
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
         init_use_fallback::Bool = true,
@@ -146,6 +152,7 @@ mutable struct Solver{T <: Real}
         solver.tol_slow = tol_slow
         solver.preprocess = preprocess
         solver.reduce = reduce
+        solver.rescale = rescale
         solver.init_use_indirect = init_use_indirect
         solver.init_tol_qr = init_tol_qr
         solver.init_use_fallback = init_use_fallback
@@ -188,7 +195,30 @@ function solve(solver::Solver{T}) where {T <: Real}
         orig_model = solver.orig_model
         model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
 
-        @timeit solver.timer "init_cone" point = solver.point = initialize_cone_point(solver.orig_model.cones, solver.orig_model.cone_idxs, solver.timer)
+        @show norm(model.G)
+        solver.rescale = true
+        if solver.rescale
+            rteps = sqrt(eps(T))
+            # TODO allow nonnegative rescaling to have d scalars
+            solver.c_scale = c_scale = T[sqrt(max(rteps, abs(model.c[j]), maximum(abs, model.A[:, j]), maximum(abs, model.G[:, j]))) for j in 1:model.n]
+            solver.b_scale = b_scale = T[sqrt(max(rteps, abs(model.b[i]), maximum(abs, model.A[i, :]))) for i in 1:model.p]
+            solver.h_scale = h_scale = T[sqrt(max(rteps, maximum(abs, model.h[idxs]), maximum(abs, model.G[idxs, :]))) for idxs in model.cone_idxs]
+            # c_scale = solver.c_scale = ones(size(model.c))
+            # b_scale = solver.b_scale = ones(size(model.b))
+            # h_scale = solver.h_scale = ones(size(model.h))
+            model.c ./= c_scale
+            model.b ./= b_scale
+            for (i, idxs) in enumerate(model.cone_idxs)
+                model.h[idxs] ./= h_scale[i]
+                @views model.G[idxs, :] ./= h_scale[i]
+            end
+            model.A = model.A ./ c_scale' ./ b_scale
+            model.G = model.G ./ c_scale'
+        end
+
+        @show norm(model.G)
+
+        @timeit solver.timer "init_cone" point = solver.point = initialize_cone_point(solver.orig_model.cones, solver.orig_model.cone_idxs, solver.timer, solver)
 
         if solver.reduce
             # TODO don't find point / unnecessary stuff before reduce
@@ -399,8 +429,21 @@ get_num_iters(solver::Solver) = solver.num_iters
 get_primal_obj(solver::Solver) = solver.primal_obj
 get_dual_obj(solver::Solver) = solver.dual_obj
 
-get_s(solver::Solver) = copy(solver.point.s)
-get_z(solver::Solver) = copy(solver.point.z)
+function get_s(solver::Solver)
+    if solver.rescale
+        return vcat([solver.point.s[idxs] .* solver.h_scale[i] for (i, idxs) in enumerate(solver.model.cone_idxs)]...)
+    else
+        return copy(solver.point.s)
+    end
+end
+function get_z(solver::Solver)
+    if solver.rescale
+        return vcat([solver.point.z[idxs] ./ solver.h_scale[i] for (i, idxs) in enumerate(solver.model.cone_idxs)]...)
+    else
+        return copy(solver.point.z)
+    end
+end
+# get_z(solver::Solver) = copy(solver.point.z)
 
 function get_x(solver::Solver{T}) where {T <: Real}
     if solver.preprocess && !iszero(solver.orig_model.n) && !any(isnan, solver.point.x)
@@ -423,6 +466,11 @@ function get_x(solver::Solver{T}) where {T <: Real}
         x = copy(solver.point.x)
     end
 
+    if solver.rescale
+        x ./= solver.c_scale
+        # @show c_scale
+    end
+
     return x
 end
 
@@ -442,6 +490,10 @@ function get_y(solver::Solver{T}) where {T <: Real}
         end
     else
         y = copy(solver.point.y)
+    end
+
+    if solver.rescale
+        y ./= solver.b_scale
     end
 
     return y

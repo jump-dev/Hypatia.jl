@@ -34,7 +34,7 @@ function build_solve_check(
     solver::Solvers.Solver{T} = Solvers.Solver{T}(),
     tol::Real = sqrt(eps(T)),
     ) where {T <: Real}
-    model = Hypatia.Models.Model{T}(c, A, b, G, h, cones, obj_offset = obj_offset)
+    model = Hypatia.Models.Model{T}(copy(c), copy(A), copy(b), copy(G), copy(h), cones, obj_offset = obj_offset)
 
     Solvers.load(solver, model)
     Solvers.solve(solver)
