@@ -68,6 +68,8 @@ end
 
 use_heuristic_neighborhood(cone::DoublyNonnegative) = false
 
+use_correction(cone::DoublyNonnegative) = false # TODO
+
 reset_data(cone::DoublyNonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 function setup_data(cone::DoublyNonnegative{T}) where {T <: Real}

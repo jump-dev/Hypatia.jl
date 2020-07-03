@@ -53,6 +53,8 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     ZiUZiW::Matrix{R}
     Hvv::T
 
+    correction::Vector{T}
+
     function MatrixEpiPerSquare{T, R}(
         d1::Int,
         d2::Int;
@@ -108,6 +110,7 @@ function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}
     cone.tmpd1d1d = Matrix{R}(undef, d1, d1)
     cone.tmpd1d2 = Matrix{R}(undef, d1, d2)
     cone.ZiUZiW = Matrix{R}(undef, d1, d2)
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -326,4 +329,73 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::MatrixE
     end
 
     return prod
+end
+
+# TODO reduce allocs
+function correction(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
+    @assert cone.hess_updated
+    d1 = cone.d1
+    d2 = cone.d2
+    dim = cone.dim
+
+    U_idxs = cone.U_idxs
+    v_idx = cone.v_idx
+    W_idxs = cone.W_idxs
+    U = cone.U
+    v = cone.point[cone.v_idx]
+    W = cone.W
+
+    @views U_dir = Hermitian(svec_to_smat!(similar(U.data), primal_dir[U_idxs], cone.rt2))
+    v_dir = primal_dir[v_idx]
+    @views W_dir = vec_copy_to!(similar(W), primal_dir[W_idxs])
+
+    corr = cone.correction
+    U_corr = view(corr, U_idxs)
+    W_corr = view(corr, W_idxs)
+
+    v2 = 2 * v
+    vd2 = 2 * v_dir
+    Zi = cone.Zi
+    ZiW = cone.ZiW # TODO AKA tau
+    ZiU = cone.fact_Z \ U # TODO cache
+    ZiWd = cone.fact_Z \ W_dir
+    ZiUd = cone.fact_Z \ U_dir
+    ZiUZi = cone.ZiUZi
+    WtZiW = cone.WtZiW
+    ZiUZiUZi = Hermitian(ZiUZi * ZiU', :U)
+    ZiUZi2v = Hermitian(ZiUZi - v2 * ZiUZiUZi, :U)
+    WdWZi = W_dir * ZiW'
+    WdZiW = W_dir' * ZiW
+    UdZiW = U_dir * ZiW
+    ZiWdWZi = cone.fact_Z \ WdWZi
+    ZiWdWZi2 = Hermitian(ZiWdWZi + ZiWdWZi', :U)
+    ZiUdZiW = cone.fact_Z \ UdZiW
+    ZiUZiWdWZi = ZiU * ZiWdWZi
+    ZiUZiUdZiW = ZiU * ZiUdZiW + ZiUd * cone.ZiUZiW
+    ZiWdWZiUZi = ZiWdWZi * ZiU'
+    ZiWdWZiUZi2 = Hermitian(ZiWdWZiUZi + ZiWdWZiUZi', :U)
+    ZiUdZi = Hermitian(ZiUd / cone.fact_Z, :U)
+    ZiUZiUdZi = ZiU * ZiUdZi
+    ZiUZiUdZi2 = Hermitian(ZiUZiUdZi + ZiUZiUdZi')
+    ZiUdZiWdWZi = ZiUd * ZiWdWZi + ZiWdWZi * ZiUd'
+    WtZiWI = WtZiW + I
+    ZiWdWtZiWI = ZiWd * WtZiWI
+    vdZiUZiUZiW = vd2 * ZiUZiUZi * W
+    WdWtZiWI = W_dir * WtZiWI
+    ZiUZiWdWZiWI = ZiUZi * WdWtZiWI + (ZiWdWZiUZi2 + ZiUZiWdWZi') * W
+    vZiUZiUdZi2 = v * ZiUZiUdZi2 - ZiUdZi
+
+    Utemp = vd2 * (-vd2 * ZiUZi2v + ZiWdWZi2 - v2 * (ZiUZiWdWZi + ZiUZiWdWZi' + ZiWdWZiUZi2 - 2 * vZiUZiUdZi2)) + v2 * (ZiWdWZi * WdWZi + WdWZi' * ZiWdWZi2 + ZiWd * WtZiWI * ZiWd' + v2 * (v2 * (ZiUd * ZiUdZi) - ZiUdZiWdWZi - ZiUdZiWdWZi'))
+    smat_to_svec!(U_corr, Utemp, cone.rt2)
+
+    v_Wd_dot = -4 * (v * ZiUZiUdZiW + vdZiUZiUZiW) + ZiUZiWdWZiWI + 2 * ZiUdZiW
+    corr[v_idx] = v_dir * (-8 * dot(ZiUZi2v, U_dir) + (8 * real(dot(ZiUZiUZi, U)) - (d1 - 1) / v / v / v) * v_dir) +
+        (4 * v) * real(dot(vZiUZiUdZi2, U_dir)) + 2 * real(dot(v_Wd_dot, W_dir))
+
+    Wtemp = (4 * v_dir) * (ZiUdZiW - v2 * ZiUZiUdZiW + ZiUZiWdWZiWI - vdZiUZiUZiW) +
+        (4 * v) * (ZiUdZiW * WdZiW + ZiWdWZi * UdZiW + WdWZi' * ZiUdZiW + ZiUdZi * WdWtZiWI - v2 * ZiUd * ZiUdZiW) +
+        -2 * (ZiW * WdZiW * WdZiW + WdWZi' * ZiWdWtZiWI + ZiWdWtZiWI * WdZiW + ZiWd * WdZiW' * WtZiWI)
+    vec_copy_to!(W_corr, Wtemp)
+
+    return corr
 end

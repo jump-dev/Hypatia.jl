@@ -35,6 +35,8 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     fact
     sumAinvAs::Vector
 
+    correction::Vector{T}
+
     function LinMatrixIneq{T}(
         As::Vector;
         use_dual::Bool = false,
@@ -83,6 +85,7 @@ function setup_data(cone::LinMatrixIneq{T}) where {T <: Real}
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -140,4 +143,22 @@ function update_hess(cone::LinMatrixIneq)
 
     cone.hess_updated = true
     return cone.hess
+end
+
+function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
+    @assert cone.grad_updated
+    sumAinvAs = cone.sumAinvAs
+    corr = cone.correction
+    dim = cone.dim
+
+    tmp = similar(sumAinvAs[1])
+    tmp .= 0
+    @inbounds for j in 1:dim, k in 1:dim
+        mul!(tmp, sumAinvAs[j], sumAinvAs[k], primal_dir[j] * primal_dir[k], true)
+    end
+    @inbounds for i in 1:dim
+        corr[i] = real(dot(sumAinvAs[i], tmp'))
+    end
+
+    return corr
 end
