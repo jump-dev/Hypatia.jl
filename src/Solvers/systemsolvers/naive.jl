@@ -267,8 +267,8 @@ end
 function update_lhs(system_solver::NaiveDenseSystemSolver, solver::Solver)
     k = 1
     for (cone_k, lhs6_H_k) in zip(solver.model.cones, system_solver.lhs6_H_k)
-        # H_k = Cones.scal_hess(cone_k, solver.mu)
-        H_k = Cones.hess(cone_k)
+        H_k = Cones.scal_hess(cone_k, solver.mu)
+        # H_k = Cones.hess(cone_k)
         @. lhs6_H_k = H_k
         # println(k, " ", cone_k isa Cones.HypoPerLog ? "hypoperlog" : "nonneg")
         # println("norm(H) ", norm(H_k))

@@ -24,6 +24,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     dual_feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
+    scal_hess_updated::Bool
     nt_updated::Bool
     inv_hess_updated::Bool
     hess_sqrt_prod_updated::Bool
@@ -31,6 +32,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
+    scal_hess
     inv_hess::Symmetric{T, Matrix{T}}
     correction::Vector{T}
     nbhd_tmp::Vector{T}
@@ -65,7 +67,7 @@ end
 
 reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = cone.nt_updated = false)
 
-# use_scaling(::EpiPerSquare) = true # TODO update oracles
+use_scaling(::EpiPerSquare) = false # TODO update oracles
 
 use_correction(cone::EpiPerSquare) = true
 
@@ -76,6 +78,7 @@ function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.scal_hess = zeros(T, dim, dim)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.correction = zeros(T, dim)
     cone.hess_sqrt_vec = zeros(T, dim)

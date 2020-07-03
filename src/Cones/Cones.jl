@@ -51,7 +51,7 @@ include("wsosinterpnonnegative.jl")
 include("wsosinterppossemideftri.jl")
 include("wsosinterpepinormeucl.jl")
 
-# include("scalcorr.jl")
+include("scalcorr.jl")
 # include("newton.jl")
 
 use_dual_barrier(cone::Cone) = cone.use_dual_barrier
@@ -71,13 +71,9 @@ inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(
 
 # fallbacks
 
-use_scaling(::Cone) = false
-
 use_correction(::Cone) = false
 
-scal_hess(cone::Cone{T}, mu::T) where {T <: Real} = (cone.scal_hess_updated ? cone.hess : update_scal_hess(cone, mu))
-
-reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
+reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 update_hess_prod(cone::Cone) = nothing
 

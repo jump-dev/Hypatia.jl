@@ -24,6 +24,7 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     is_feas::Bool
     grad::Vector{T}
     hess::Diagonal{T, Vector{T}}
+    scal_hess::Diagonal{T, Vector{T}}
     inv_hess::Diagonal{T, Vector{T}}
     correction::Vector{T}
 
@@ -43,7 +44,7 @@ end
 
 use_correction(cone::Nonnegative) = true
 
-# use_scaling(cone::Nonnegative) = true
+use_scaling(cone::Nonnegative) = false
 
 reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = false)
 
@@ -55,6 +56,7 @@ function setup_data(cone::Nonnegative{T}) where {T <: Real}
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Diagonal(zeros(T, dim))
+    cone.scal_hess = Diagonal(zeros(T, dim))
     cone.inv_hess = Diagonal(zeros(T, dim))
     cone.correction = zeros(T, dim)
     return
@@ -152,16 +154,16 @@ end
 #     return all(cone.point .* cone.dual_point .> min_nbhd_mu) # TODO inefficient
 # end
 
-# function update_scal_hess(
-#     cone::Nonnegative{T},
-#     mu::T;
-#     ) where {T}
-#     @assert is_feas(cone)
-#     @assert !cone.scal_hess_updated
-#     @. cone.hess.diag = cone.dual_point / cone.point
-#     cone.scal_hess_updated = true
-#     return cone.hess
-# end
+function update_scal_hess(
+    cone::Nonnegative{T},
+    mu::T;
+    ) where {T}
+    @assert is_feas(cone)
+    @assert !cone.scal_hess_updated
+    @. cone.scal_hess.diag = cone.dual_point / cone.point
+    cone.scal_hess_updated = true
+    return cone.hess
+end
 #
 # function scal_hess_prod!(
 #     prod::AbstractVecOrMat{T},

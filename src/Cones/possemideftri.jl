@@ -35,6 +35,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
+    scal_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     correction::Vector{T}
     nbhd_tmp::Vector{T}
@@ -82,7 +83,7 @@ reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.dual_feas_updated = 
 
 use_correction(::PosSemidefTri) = true
 
-# use_scaling(::PosSemidefTri) = true
+use_scaling(::PosSemidefTri) = false
 
 function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
@@ -91,6 +92,7 @@ function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} whe
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.scal_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
@@ -162,8 +164,8 @@ end
 function update_scal_hess(cone::PosSemidefTri{T}, mu::T) where {T}
     @assert cone.grad_updated
     cone.nt_updated || update_nt(cone)
-    symm_kron(cone.hess.data, cone.scalmat_sqrti' * cone.scalmat_sqrti, cone.rt2) # TODO fix mul
-    cone.hess_updated = true
+    symm_kron(cone.scal_hess.data, cone.scalmat_sqrti' * cone.scalmat_sqrti, cone.rt2) # TODO fix mul
+    cone.scal_hess_updated = true
     return cone.hess
 end
 

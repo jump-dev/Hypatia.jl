@@ -23,11 +23,13 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     dual_feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
+    scal_hess_updated::Bool
     inv_hess_updated::Bool
     nt_updated::Bool
     is_feas::Bool
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
+    scal_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     correction::Vector{T}
     nbhd_tmp::Vector{T} # TODO rename
@@ -59,7 +61,7 @@ end
 
 reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.nt_updated = false)
 
-# use_scaling(::EpiNormEucl) = true
+use_scaling(::EpiNormEucl) = false
 
 use_correction(::EpiNormEucl) = true
 
@@ -72,6 +74,7 @@ function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     cone.scaled_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.scal_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
@@ -150,11 +153,11 @@ function update_scal_hess(cone::EpiNormEucl{T}, mu::T) where {T}
     # if cone.use_scaling
         # analogous to W as a function of nt_point_sqrt
         # H = (2 * J * nt_point * nt_point' * J - J) * constant
-        mul!(cone.hess.data, cone.nt_point, cone.nt_point', 2, false)
-        cone.hess.data[:, 1] *= -1
-        cone.hess += I # TODO inefficient
-        cone.hess.data[1, :] *= -1
-        cone.hess.data ./= cone.rt_dist_ratio
+        mul!(cone.scal_hess.data, cone.nt_point, cone.nt_point', 2, false)
+        cone.scal_hess.data[:, 1] *= -1
+        cone.scal_hess += I # TODO inefficient
+        cone.scal_hess.data[1, :] *= -1
+        cone.scal_hess.data ./= cone.rt_dist_ratio
     # else
     #     mul!(cone.hess.data, cone.grad, cone.grad', 2, false)
     #     cone.hess += inv(cone.dist) * I # TODO inefficient

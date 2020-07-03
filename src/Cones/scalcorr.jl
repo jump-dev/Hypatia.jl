@@ -1,15 +1,18 @@
 
 # TODO later move to Cones.jl or elsewhere
 
-use_scaling(cone::Cone) = false
+use_scaling(cone::Cone) = true
 
-use_correction(cone::Cone) = false
+function scal_hess(cone::Cone{T}, mu::T) where {T <: Real}
+    if use_scaling(cone)
+        return (cone.scal_hess_updated ? cone.scal_hess : update_scal_hess(cone, mu))
+    else
+        return hess(cone)
+    end
+end
 
-# scal_hess(cone::Cone{T}, mu::T) where {T} = (cone.scal_hess_updated ? cone.scal_hess : update_scal_hess(cone, mu))
-scal_hess(cone::Cone{T}, mu::T) where {T <: Real} = (cone.scal_hess_updated ? cone.hess : update_scal_hess(cone, mu))
-
-# use_update_1_default() = true
-use_update_1_default() = false
+use_update_1_default() = true
+# use_update_1_default() = false
 
 use_update_2_default() = false
 
@@ -50,54 +53,58 @@ function update_scal_hess(
     ) where {T}
     # @assert !cone.scal_hess_updated
     cone.scal_hess_updated = true
-    if !use_scaling(cone)
-        return hess(cone)
-    end
-
-    # s = cone.point
-    # z = cone.dual_point
-    # rtmu = sqrt(mu)
-    # # irtmu = inv(rtmu)
-    # # s = rtmu * s
-    #
-    # sz = rtmu * dot(s, z)
-    # nu = get_nu(cone)
-    #
-    # g = grad(cone)
-    # # scal_hess = mu * hess(cone)
-    # scal_hess = hess(cone)
-    #
-    # # TODO tune
-    # # update_tol = 1e-12
-    # # update_tol = eps(T)
-    # # update_tol = 1e-3 * sqrt(eps(T))
-    # update_tol = 1e5 * eps(T)
-    # denom_tol = 1e2 * eps(T)
-    #
-    # # first update
-    # if use_update_1 && norm(z + rtmu * g) > update_tol # TODO should this be more scale-independent? eg normalized, or check dot(Hs, z) / norm(Hs) / norm(z)
-    #     if sz > denom_tol
-    #         # scal_hess += inv(sz) * Symmetric(z * z') - (mu / nu) * Symmetric(g * g')
-    #         # za = inv(sqrt(sz)) * z
-    #         za = z / sqrt(sz)
-    #         # BLAS.syr!('U', one(T), za, scal_hess.data)
-    #         outer_prod1(za, scal_hess.data, one(T))
-    #         # scal_hess += Symmetric(za * za')
-    #         # gb = inv(sqrt(nu)) * g
-    #         # BLAS.syr!('U', -inv(nu), g, scal_hess.data)
-    #         outer_prod1(g, scal_hess.data, -inv(T(nu)))
-    #         # scal_hess -= Symmetric(gb * gb')
-    #         # if norm(scal_hess * rtmu * s - z) > 1e-4
-    #         #     println("large residual after 1st update on norm(scal_hess * s - z): $(norm(scal_hess * s - z))")
-    #         #     # error()
-    #         #     @show norm(scal_hess)
-    #         # end
-    #     # else
-    #     #     println("skipped 1st update (small denom: $sz)")
-    #     end
-    # # else
-    #     # println("skipped 1st update")
+    # if !use_scaling(cone)
+    #     return hess(cone)
     # end
+
+    s = cone.point
+    z = cone.dual_point
+    rtmu = sqrt(mu)
+    # irtmu = inv(rtmu)
+    # s = rtmu * s
+
+    sz = rtmu * dot(s, z)
+    nu = get_nu(cone)
+
+    g = grad(cone)
+    # scal_hess = mu * hess(cone)
+
+    scal_hess = cone.scal_hess # TODO Symmetric
+    LinearAlgebra.copytri!(scal_hess, 'U')
+    copyto!(scal_hess, hess(cone).data)
+
+    # TODO tune
+    # update_tol = 1e-12
+    # update_tol = eps(T)
+    # update_tol = 1e-3 * sqrt(eps(T))
+    update_tol = 1e5 * eps(T)
+    denom_tol = 1e2 * eps(T)
+
+
+    # first update
+    if use_update_1 && norm(z + rtmu * g) > update_tol # TODO should this be more scale-independent? eg normalized, or check dot(Hs, z) / norm(Hs) / norm(z)
+        if sz > denom_tol
+            # scal_hess += inv(sz) * Symmetric(z * z') - (mu / nu) * Symmetric(g * g')
+            # za = inv(sqrt(sz)) * z
+            za = z / sqrt(sz)
+            # BLAS.syr!('U', one(T), za, scal_hess.data)
+            outer_prod1(za, scal_hess, one(T))
+            # scal_hess += Symmetric(za * za')
+            # gb = inv(sqrt(nu)) * g
+            # BLAS.syr!('U', -inv(nu), g, scal_hess.data)
+            outer_prod1(g, scal_hess, -inv(T(nu)))
+            # scal_hess -= Symmetric(gb * gb')
+            # if norm(scal_hess * rtmu * s - z) > 1e-4
+            #     println("large residual after 1st update on norm(scal_hess * s - z): $(norm(scal_hess * s - z))")
+            #     # error()
+            #     @show norm(scal_hess)
+            # end
+        # else
+        #     println("skipped 1st update (small denom: $sz)")
+        end
+    # else
+        # println("skipped 1st update")
+    end
 
     # @show extrema(eigvals(scal_hess))
     # @show scal_hess
@@ -234,8 +241,9 @@ function update_scal_hess(
     # copyto!(cone.scal_hess, scal_hess)
     # copyto!(cone.hess, scal_hess)
     # return cone.scal_hess
+    @show norm(Symmetric(cone.scal_hess) - hess(cone))
 
-    return cone.hess
+    return Symmetric(cone.scal_hess)
 end
 
 # function update_scal_hess(
