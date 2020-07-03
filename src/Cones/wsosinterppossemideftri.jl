@@ -41,6 +41,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     ΛFLP::Vector{Matrix{T}}
     tmpLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
+    mat::Matrix{T}
 
     correction::Vector{T}
 
@@ -92,6 +93,7 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
     cone.correction = zeros(T, dim)
+    cone.mat = zeros(T, R, R)
     return
 end
 
