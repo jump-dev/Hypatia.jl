@@ -40,6 +40,8 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tmpUU::Matrix{R} # TODO for corrector, this can stay as a single matrix if we only use LU
     ΛF::Vector
 
+    correction::Vector{T}
+
     function WSOSInterpNonnegative{T, R}(
         U::Int,
         Ps::Vector{Matrix{R}};
@@ -79,6 +81,7 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     cone.tmpLU = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
     cone.tmpUU = Matrix{R}(undef, dim, dim)
     cone.ΛF = Vector{Any}(undef, length(Ps))
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -150,4 +153,17 @@ function update_hess(cone::WSOSInterpNonnegative)
 
     cone.hess_updated = true
     return cone.hess
+end
+
+function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
+    corr = cone.correction
+    corr .= 0
+    @inbounds for k in eachindex(cone.Ps)
+        # NOTE don't overwrite tmpLU or tmpUU
+        LpdU = (cone.tmpLU[k] * Diagonal(primal_dir)) * cone.tmpUU[k] # TODO allocs
+        @inbounds for j in 1:cone.dim
+            corr[j] += sum(abs2, view(LpdU, :, j))
+        end
+    end
+    return corr
 end

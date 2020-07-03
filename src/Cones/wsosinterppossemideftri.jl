@@ -42,6 +42,8 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     tmpLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
 
+    correction::Vector{T}
+
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
         U::Int,
@@ -89,6 +91,7 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.ΛFL = Vector{Any}(undef, length(Ps))
     cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -288,4 +291,51 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::W
     end
 
     return prod
+end
+
+function correction(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
+    @assert cone.grad_updated
+    corr = cone.correction
+    corr .= 0
+    U = cone.U
+    R = cone.R
+    UR = U * R
+    dim = cone.dim
+    matRR = cone.mat
+
+    r_dim = svec_length(R)
+
+    for k in eachindex(cone.Ps)
+        PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
+
+        PlambdaP_dirs = [zeros(R, R) for p in 1:U, q in 1:U] # TODO
+        for p in 1:U, q in 1:U
+            primal_dir_mat_q = Symmetric(svec_to_smat!(matRR, primal_dir[q:U:dim], cone.rt2))
+            @views PlambdaPk_slice_pq = PlambdaPk[p:U:UR, q:U:UR]
+            mul!(PlambdaP_dirs[p, q], PlambdaPk_slice_pq, primal_dir_mat_q)
+        end
+
+        for p in 1:U
+            primal_dir_mat_p = Symmetric(svec_to_smat!(matRR, primal_dir[p:U:dim], cone.rt2))
+            for q in 1:U
+                pq_q = PlambdaP_dirs[p, q] # PlambdaPk_slice_pq * primal_dir_mat_q
+                for r in 1:q
+                    @views PlambdaPk_slice_qr = PlambdaPk[q:U:UR, r:U:UR]
+                    r_rp = PlambdaP_dirs[p, r]'
+
+                    # O(R^3) done O(U^3) times
+                    prod_mat_p = pq_q * PlambdaPk_slice_qr * r_rp
+                    prod_mat_p += prod_mat_p'
+                    if q != r
+                        prod_mat_p *= 2
+                    end
+                    @views corr[p:U:dim] .+= smat_to_svec!(similar(corr, r_dim), prod_mat_p, cone.rt2)
+                end
+            end
+        end
+    end
+
+    corr ./= 2
+
+    return corr
 end

@@ -208,3 +208,62 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
 
     return prod
 end
+
+function correction(cone::Power, primal_dir::AbstractVector)
+    @assert cone.hess_updated
+
+    m = length(cone.alpha)
+    u = cone.point[1:m]
+    w = view(cone.point, (m + 1):cone.dim)
+    w_idxs = (m + 1):cone.dim
+    alpha = cone.alpha
+    T = eltype(cone.point)
+
+    produ = cone.produ # = exp(2 * sum(cone.alpha[i] * log(u[i]) for i in eachindex(cone.alpha)))
+    produw = cone.produw # = cone.produ - sum(abs2, w)
+    produuw = cone.produuw # = cone.produ / cone.produw
+    produuw_tw = produuw * (produuw - 1)
+    aui = cone.aui # @. cone.aui = 2 * cone.alpha / u
+
+    corr = cone.correction
+    corr .= 0
+    dim = cone.dim
+    u_corr = view(corr, 1:m)
+    w_corr = view(corr, w_idxs)
+    u_dir = view(primal_dir, 1:m)
+    w_dir = view(primal_dir, w_idxs)
+
+    wwdir = dot(w, w_dir)
+    auiudir = dot(aui, u_dir)
+
+    u_corr .+=
+        # uuu
+        produuw * (1 - produuw) * aui .*
+        ((2 * produuw - 1) * abs2(auiudir) + dot(aui ./ u, abs2.(u_dir)) .+ 2 * auiudir * u_dir ./ u) +
+        -2 * ((1 .- alpha) ./ u + produuw * aui) ./ u ./ u .* abs2.(u_dir) +
+        # uuw
+        2 * produuw / produw * aui .*
+        (wwdir * (
+        (2 * produuw - 1) * 2 * auiudir .+
+        2 * u_dir ./ u .+
+        # uww
+        -4 / produw * wwdir
+        ) .-
+        sum(abs2.(w_dir))
+        )
+
+    # w[wk] / produw / produw
+    w_corr .+=
+        # uuw
+        2 * produuw / produw * w .* ((2 * produuw - 1) * abs2(auiudir) + dot(aui ./ u, abs2.(u_dir))) +
+        # uww
+        -4 * produuw / produw * auiudir * (4  / produw * wwdir * w + w_dir) +
+        # www
+        4 / produw / produw * (
+        4 * abs2(wwdir) / produw * w +
+        2 * wwdir .* w_dir + sum(abs2.(w_dir)) .* w
+        )
+    corr ./= -2
+
+    return cone.correction
+end

@@ -43,6 +43,8 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_mat::Matrix{R}
     fact_mat
 
+    correction::Vector{T}
+
     function PosSemidefTri{T, R}(
         dim::Int;
         use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
@@ -86,6 +88,7 @@ function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} whe
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
     cone.mat4 = similar(cone.mat)
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -190,4 +193,16 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
     end
     return prod
+end
+
+function correction(cone::PosSemidefTri, primal_dir::AbstractVector)
+    @assert cone.grad_updated
+
+    S = copytri!(svec_to_smat!(cone.mat5, primal_dir, cone.rt2), 'U', cone.is_complex)
+    ldiv!(cone.fact_mat, S)
+    rdiv!(S, cone.fact_mat.U)
+    mul!(cone.mat3, S, S') # TODO use outer prod function
+    smat_to_svec!(cone.correction, cone.mat3, cone.rt2)
+
+    return cone.correction
 end
