@@ -36,12 +36,15 @@ mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
     nbhd_tmp2::Vector{T}
 
     mat::Matrix{T}
-    mat2::Matrix{T}
+    mat2::Matrix{T} # TODO rename to imply mutates fact_mat
     mat3::Matrix{T}
+    mat4::Matrix{T} # TODO could remove if we factorize mat instead of mat2, currently mat is not used in any other oracles
     offdiag_idxs
     inv_mat::Matrix{T}
     inv_vec::Vector{T}
     fact_mat
+
+    correction::Vector{T}
 
     function DoublyNonnegative{T}(
         dim::Int;
@@ -68,8 +71,6 @@ end
 
 use_heuristic_neighborhood(cone::DoublyNonnegative) = false
 
-use_correction(cone::DoublyNonnegative) = false # TODO
-
 reset_data(cone::DoublyNonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 function setup_data(cone::DoublyNonnegative{T}) where {T <: Real}
@@ -86,7 +87,9 @@ function setup_data(cone::DoublyNonnegative{T}) where {T <: Real}
     cone.mat = zeros(T, cone.side, cone.side)
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
+    cone.mat4 = similar(cone.mat)
     cone.inv_vec = zeros(T, svec_length(cone.side))
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -163,7 +166,6 @@ function update_grad(cone::DoublyNonnegative)
     cone.inv_mat = inv(cone.fact_mat)
     smat_to_svec!(cone.grad, cone.inv_mat, cone.rt2)
     cone.grad .*= -1
-    copytri!(cone.mat, 'U')
     @. @views cone.inv_vec[cone.offdiag_idxs] = inv(cone.point[cone.offdiag_idxs])
     @. cone.grad -= cone.inv_vec
 
@@ -188,6 +190,18 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::DoublyN
         ldiv!(cone.fact_mat, cone.mat3)
         smat_to_svec!(view(prod, :, i), cone.mat3, cone.rt2)
     end
-    @. @views prod[cone.offdiag_idxs, :] += arr[cone.offdiag_idxs, :] / cone.point[cone.offdiag_idxs, :] / cone.point[cone.offdiag_idxs, :]
+    @. @views prod[cone.offdiag_idxs, :] += arr[cone.offdiag_idxs, :] / cone.point[cone.offdiag_idxs] / cone.point[cone.offdiag_idxs]
     return prod
+end
+
+function correction(cone::DoublyNonnegative, primal_dir::AbstractVector)
+    @assert cone.grad_updated
+    S = copytri!(svec_to_smat!(cone.mat4, primal_dir, cone.rt2), 'U')
+    ldiv!(cone.fact_mat, S)
+    rdiv!(S, cone.fact_mat.U)
+    mul!(cone.mat3, S, S') # TODO use outer prod function
+    smat_to_svec!(cone.correction, cone.mat3, cone.rt2)
+    @. @views cone.correction[cone.offdiag_idxs] += abs2(primal_dir[cone.offdiag_idxs] / cone.point[cone.offdiag_idxs]) / cone.point[cone.offdiag_idxs]
+
+    return cone.correction
 end
