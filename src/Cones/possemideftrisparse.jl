@@ -125,6 +125,8 @@ function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T
     return
 end
 
+use_correction(::PosSemidefTriSparse) = false
+
 # setup symbolic factorization
 function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     side = cone.side
