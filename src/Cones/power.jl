@@ -39,6 +39,8 @@ mutable struct Power{T <: Real} <: Cone{T}
     aui::Vector{T}
     auiproduuw::Vector{T}
 
+    correction::Vector{T}
+
     function Power{T}(
         alpha::Vector{T},
         n::Int;
@@ -80,6 +82,7 @@ function setup_data(cone::Power{T}) where {T <: Real}
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.aui = zeros(length(cone.alpha))
     cone.auiproduuw = zeros(length(cone.alpha))
+    cone.correction = zeros(T, dim)
     return
 end
 
