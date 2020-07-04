@@ -309,7 +309,7 @@ function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}) whe
             corr_k = Cones.correction2(cone_k, prim_k_scal)
             corr_point = dot(corr_k, cone_k.point)
             corr_viol = abs(1 - irtrtmu * dot(prim_k_scal, H_prim_dir_k) / corr_point)
-            if (corr_point < eps(T)) || (corr_viol < 0.1)
+            if corr_viol < 0.001
                 @. stepper.s_rhs_k[k] += H_prim_dir_k + corr_k
             else
                 println("skip pred-corr: $corr_viol")
@@ -374,7 +374,7 @@ function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}) whe
             corr_k = Cones.correction2(cone_k, prim_k_scal)
             corr_point = dot(corr_k, cone_k.point)
             corr_viol = abs(1 - dot(prim_k_scal, H_prim_dir_k_scal) / corr_point)
-            if (corr_point < eps(T)) || (corr_viol < 0.1)
+            if corr_viol < 0.001
                 stepper.s_rhs_k[k] .+= corr_k
             else
                 println("skip cent-corr: $corr_viol")
