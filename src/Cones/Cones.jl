@@ -83,15 +83,19 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     return prod
 end
 
-function update_hess_fact(cone::Cone{T}) where {T <: Real}
+function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
     cone.hess_fact_updated && return true
     if !cone.hess_updated
         update_hess(cone)
     end
 
-    if !update_fact(cone.hess_fact_cache, cone.hess)
+    fact_success = update_fact(cone.hess_fact_cache, cone.hess)
+
+    if !fact_success
+        recover || return false
+        # TODO if Chol, try adding sqrt(eps(T)) to diag and re-factorize
         if T <: BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
-            # @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
+            @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
             cone.hess_fact_cache = DenseSymCache{T}()
             load_matrix(cone.hess_fact_cache, cone.hess)
         else
@@ -103,7 +107,7 @@ function update_hess_fact(cone::Cone{T}) where {T <: Real}
             end
         end
         if !update_fact(cone.hess_fact_cache, cone.hess)
-            # @warn("Hessian Bunch-Kaufman factorization failed after recovery")
+            @warn("Hessian Bunch-Kaufman factorization failed after recovery")
             return false
         end
     end
@@ -193,6 +197,63 @@ function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector{T}, rtmu::T, 
 
     return (nbhd < rtmu * max_nbhd)
 end
+
+
+# function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector{T}, rtmu::T, max_nbhd::T) where {T <: Real}
+#     # norm(H^(-1/2) * (z + mu * grad))
+#     nbhd_tmp = cone.nbhd_tmp
+#     g = rtmu * grad(cone)
+#     dp = copy(dual_point)
+#
+#     # TODO trying to see if ray intersects dikin ellipsoid
+#     # TODO find point on ray closest to g in the hessian norm
+#     gdp = dot(dp, g)
+#     # gdp = dot(dp, hess_prod!(similar(g), g, cone)) / mu
+#     # gdp = -dot(dp, cone.point)
+#     if gdp > 0
+#         return false
+#     end
+#
+#     # TODO this can be used to check feasibility rather than nbhd
+#     # scal = -gdp / sum(abs2, dp)
+#     # dp .*= scal
+#     # @show scal
+#
+#     @. nbhd_tmp = dp + g
+#
+#     # if use_heuristic_neighborhood(cone)
+#     #     error("shouldn't be using heuristic nbhd")
+#     #     nbhd = norm(nbhd_tmp, Inf) / norm(g, Inf)
+#     #     # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(nbhd_tmp, g)) # TODO try this neighborhood
+#     # else
+#         has_hess_fact_cache = hasfield(typeof(cone), :hess_fact_cache)
+#         if has_hess_fact_cache && !update_hess_fact(cone)
+#             return false
+#         end
+#         nbhd_tmp2 = cone.nbhd_tmp2
+#         if has_hess_fact_cache && cone.hess_fact_cache isa DenseSymCache{T}
+#             inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
+#             nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
+#             if nbhd_sqr < -eps(T) # TODO possibly loosen
+#                 # @warn("numerical failure: cone neighborhood is $nbhd_sqr")
+#                 return false
+#             end
+#             nbhd = sqrt(abs(nbhd_sqr))
+#         else
+#             inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
+#             nbhd = norm(nbhd_tmp2)
+#         end
+#     # end
+#
+#     # @show nbhd, typeof(cone)
+#     # return (nbhd < mu * cone.max_neighborhood)
+#     # return (nbhd < 0.5 * mu)
+#     # @show nbhd
+#     return (nbhd < rtmu * max_nbhd)
+#     # return (nbhd < max_nbhd)
+#     # return (nbhd < T(0.5))
+# end
+
 
 # utilities for arrays
 
