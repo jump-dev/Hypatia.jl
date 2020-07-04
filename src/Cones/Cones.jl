@@ -292,6 +292,7 @@ function set_central_point(cone::Cone{T}) where {T <: Real}
     return curr
 end
 
+# TODO functions for symmetric cones and others with easily computable conjugate gradients (geomean, rootdet)
 function update_dual_grad(cone::Cone{T}, mu::T) where {T <: Real}
     tol = 10 * sqrt(eps(T)) # TODO adjust
     max_iter = 40
@@ -301,13 +302,29 @@ function update_dual_grad(cone::Cone{T}, mu::T) where {T <: Real}
     nu = get_nu(cone)
     nnorm = Inf
     old_point = copy(cone.point)
+    eta = 1e-8
+    cone.dual_grad_inacc = false
 
     curr = cone.dual_grad
-    curr .= point * sqrt(mu) * nu / dot(point, dual_point) # because point has been scaled by irtmu
+    curr .= point * sqrt(mu) * nu / dot(point, dual_point) # point has been scaled by irtmu
 
     dir = similar(curr)
     iter = 0
-    while iter < max_iter && nnorm > 1e-8
+    while true
+
+        if dot(curr, dual_point) < eps(T) # dual_point is infeasible (or very close to)
+            cone.dual_grad_inacc = true
+            break
+        elseif nnorm < eta # successfully converged
+            break
+        elseif iter >= max_iter # too many iterations
+            cone.dual_grad_inacc = true
+            break
+        elseif nnorm < 0
+            cone.dual_grad_inacc = true
+            break
+        end
+
         load_point(cone, curr)
         reset_data(cone)
         @assert is_feas(cone)
@@ -320,9 +337,10 @@ function update_dual_grad(cone::Cone{T}, mu::T) where {T <: Real}
 
         curr = curr + alpha * dir
         iter += 1
+
+
     end
     curr .*= -1
-    @show dot(curr, dual_point)
 
     # TODO correct logic
     load_point(cone, old_point)

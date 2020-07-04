@@ -24,6 +24,7 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
 
     feas_updated::Bool
     grad_updated::Bool
+    dual_grad_updated::Bool
     hess_updated::Bool
     scal_hess_updated::Bool
     inv_hess_updated::Bool

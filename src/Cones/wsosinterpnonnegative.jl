@@ -23,12 +23,15 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
 
     feas_updated::Bool
     grad_updated::Bool
+    dual_grad_updated::Bool
     hess_updated::Bool
     scal_hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
+    dual_grad::Vector{T}
+    dual_grad_inacc::Bool
     hess::Symmetric{T, Matrix{T}}
     scal_hess
     inv_hess::Symmetric{T, Matrix{T}}
@@ -74,6 +77,7 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.scal_hess = zeros(T, dim, dim)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)

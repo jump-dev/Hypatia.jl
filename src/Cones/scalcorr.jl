@@ -14,7 +14,7 @@ end
 use_update_1_default() = true
 # use_update_1_default() = false
 
-use_update_2_default() = false
+use_update_2_default() = true
 
 
 
@@ -110,7 +110,7 @@ function update_scal_hess(
     # @show scal_hess
 
     # second update
-    use_simplifications = true # TODO use?
+    use_simplifications = false # TODO use?
     if use_update_2
         conj_g = dual_grad(cone, mu)
         gsgz = dot(g, conj_g)

@@ -86,7 +86,7 @@ function test_barrier_oracles(
     if CO.use_correction(cone)
         println("starting correction tests: $dim")
         # check correction satisfies log-homog property F'''(s)[s, s] = -2F''(s) * s = 2F'(s)
-        @test -CO.correction2(cone, point) ≈ grad atol=tol rtol=tol # TODO delete third arg
+        @test -CO.correction2(cone, point) ≈ grad atol=tol rtol=tol
         # check correction term agrees with directional 3rd derivative
         (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
         corr = CO.correction2(cone, primal_dir)
@@ -110,6 +110,7 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
     nu = CO.get_nu(cone)
     dim = length(point)
     grad = CO.grad(cone)
+    # mu = rand(T)
     dual_grad = CO.dual_grad(cone, one(T))
     hess = Matrix(CO.hess(cone))
     inv_hess = Matrix(CO.inv_hess(cone))

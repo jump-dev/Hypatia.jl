@@ -18,6 +18,7 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
 
     feas_updated::Bool
     grad_updated::Bool
+    dual_grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     scal_hess_updated::Bool
@@ -46,7 +47,7 @@ use_correction(cone::Nonnegative) = true
 
 use_scaling(cone::Nonnegative) = false
 
-reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = false)
+reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::Nonnegative{T}) where {T <: Real}

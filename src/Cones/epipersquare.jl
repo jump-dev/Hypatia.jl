@@ -23,6 +23,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     feas_updated::Bool
     dual_feas_updated::Bool
     grad_updated::Bool
+    dual_grad_updated::Bool
     hess_updated::Bool
     scal_hess_updated::Bool
     nt_updated::Bool
@@ -65,7 +66,8 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = cone.nt_updated = false)
+reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.dual_grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = cone.nt_updated = false)
 
 use_scaling(::EpiPerSquare) = false # TODO update oracles
 

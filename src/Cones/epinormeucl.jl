@@ -22,12 +22,15 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     feas_updated::Bool
     dual_feas_updated::Bool
     grad_updated::Bool
+    dual_grad_updated::Bool
     hess_updated::Bool
     scal_hess_updated::Bool
     inv_hess_updated::Bool
     nt_updated::Bool
     is_feas::Bool
     grad::Vector{T}
+    dual_grad::Vector{T}
+    dual_grad_inacc::Bool
     hess::Symmetric{T, Matrix{T}}
     scal_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
@@ -59,7 +62,7 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.nt_updated = false)
+reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.nt_updated = false)
 
 use_scaling(::EpiNormEucl) = false
 

@@ -20,6 +20,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
 
     feas_updated::Bool
     grad_updated::Bool
+    dual_grad_updated::Bool
     hess_updated::Bool
     scal_hess_updated::Bool
     inv_hess_updated::Bool
@@ -74,7 +75,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::LinMatrixIneq) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
+reset_data(cone::LinMatrixIneq) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::LinMatrixIneq{T}) where {T <: Real}
