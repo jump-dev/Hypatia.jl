@@ -84,7 +84,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-reset_data(cone::MatrixEpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated =
+reset_data(cone::MatrixEpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated =
     cone.hess_fact_updated = cone.hess_prod_updated = false)
 
 # TODO only allocate the fields we use

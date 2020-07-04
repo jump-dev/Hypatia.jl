@@ -66,6 +66,7 @@ is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))
 is_dual_feas(cone::Cone) = update_dual_feas(cone) # TODO field? like above
 # update_dual_feas(cone::Cone) = # TODO write a fallback dual feas check that checks if ray of dual point intersects dikin ellipsoid at primal point
 grad(cone::Cone) = (cone.grad_updated ? cone.grad : update_grad(cone))
+dual_grad(cone::Cone{T}, mu::T) where {T} = (cone.dual_grad_updated ? cone.dual_grad : update_dual_grad(cone, mu))
 hess(cone::Cone) = (cone.hess_updated ? cone.hess : update_hess(cone))
 inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(cone))
 
@@ -73,7 +74,7 @@ inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(
 
 use_correction(::Cone) = false
 
-reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
+reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 update_hess_prod(cone::Cone) = nothing
 
@@ -287,6 +288,47 @@ function set_central_point(cone::Cone{T}) where {T <: Real}
         iter += 1
     end
     # @show norm(curr + grad(cone))
+
+    return curr
+end
+
+function update_dual_grad(cone::Cone{T}, mu::T) where {T <: Real}
+    tol = 10 * sqrt(eps(T)) # TODO adjust
+    max_iter = 40
+    damp_tol = 0.33
+    point = cone.point
+    dual_point = cone.dual_point
+    nu = get_nu(cone)
+    nnorm = Inf
+    old_point = copy(cone.point)
+
+    curr = cone.dual_grad
+    curr .= point * sqrt(mu) * nu / dot(point, dual_point) # because point has been scaled by irtmu
+
+    dir = similar(curr)
+    iter = 0
+    while iter < max_iter && nnorm > 1e-8
+        load_point(cone, curr)
+        reset_data(cone)
+        @assert is_feas(cone)
+        g = grad(cone)
+
+        dir .= cholesky!(Symmetric(hess(cone))) \ -cone.dual_point + cone.point
+        nnorm = dot(dir, -cone.dual_point - g)
+
+        alpha = (abs(nnorm) > damp_tol ? inv(1 + abs(nnorm)) : one(T))
+
+        curr = curr + alpha * dir
+        iter += 1
+    end
+    curr .*= -1
+    @show dot(curr, dual_point)
+
+    # TODO correct logic
+    load_point(cone, old_point)
+    reset_data(cone)
+    update_feas(cone)
+    update_grad(cone)
 
     return curr
 end

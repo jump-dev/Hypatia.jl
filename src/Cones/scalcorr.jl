@@ -49,7 +49,7 @@ function update_scal_hess(
     cone::Cone{T},
     mu::T,
     use_update_1::Bool = use_update_1_default(),
-    # use_update_2::Bool = use_update_2_default(),
+    use_update_2::Bool = use_update_2_default(),
     ) where {T}
     # @assert !cone.scal_hess_updated
     cone.scal_hess_updated = true
@@ -66,7 +66,7 @@ function update_scal_hess(
     sz = rtmu * dot(s, z)
     nu = get_nu(cone)
 
-    g = grad(cone)
+    g = grad(cone) / rtmu # TODO scale
     # scal_hess = mu * hess(cone)
 
     scal_hess = cone.scal_hess # TODO Symmetric
@@ -110,62 +110,62 @@ function update_scal_hess(
     # @show scal_hess
 
     # second update
-    # use_simplifications = true # TODO use?
-    # if use_update_2
-    #     conj_g = dual_grad(cone, mu)
-    #     gsgz = dot(g, conj_g)
-    #     cone.dual_grad_inacc && @warn("dual grad inacc in 2nd update")
-    #     if !cone.dual_grad_inacc && norm(scal_hess * conj_g - g) > update_tol
-    #         mu_cone = sz / nu
-    #         # rtmu = sqrt(mu_cone)
-    #         # invrtmu = inv(rtmu)
-    #         # du_gap = invrtmu * z + rtmu * g
-    #         # pr_gap = invrtmu * s + rtmu * conj_g
-    #         du_gap = z + mu_cone * g
-    #         pr_gap = s + mu_cone * conj_g
-    #         # mu_cone * (mu_cone * gsgz - 2nu)
-    #         denom_a = (use_simplifications ? abs2(mu_cone) * gsgz - sz : dot(pr_gap, du_gap))
-    #         # denom_a = sz + abs2(mu_cone) * gsgz - 2 * nu * mu_cone
-    #         # @assert isapprox(denom_a, abs2(mu_cone) * gsgz - sz)
-    #
-    #         Hgz = hess(cone) * conj_g
-    #         if update_one_applied
-    #             # struggling with correcness of this
-    #             # rho = -conj_g - gsgz / nu * s
-    #             # @show norm(s' * mu * hess(cone) * -conj_g - gsgz * mu) # looks BAD
-    #             # @show norm(rho - (-conj_g - (s' * mu * hess(cone) * -conj_g) / (s' * mu * hess(cone) * s)  * s)) # looks BAD
-    #             # @show norm(scal_hess * -conj_g - (mu * hess(cone) * rho + 1 / mu_cone * z)) # looks BAD
-    #             # @show norm(scal_hess * pr_gap - (-mu * mu_cone * hess(cone) * rho)) # looks OK
-    #             # @show norm(scal_hess * pr_gap - (mu * mu_cone * (hess(cone) * conj_g - gsgz / nu * g))) # looks OK
-    #             H1pg = (use_simplifications ? mu * mu_cone * (Hgz - gsgz / nu * g) : scal_hess * pr_gap)
-    #             # @show norm(denom_b - mu * mu_cone^2 * (dot(conj_g, Hgz) - abs2(gsgz) / nu))
-    #             denom_b = mu * mu_cone * (dot(conj_g, Hgz) - abs2(gsgz) / nu) * mu_cone
-    #         else
-    #             # would need to work out alternative simplifications if we want to have this path
-    #             H1pg = scal_hess * pr_gap
-    #             denom_b = dot(pr_gap, H1pg)
-    #         end
-    #
-    #         if denom_a > denom_tol && denom_b > denom_tol
-    #             dga = du_gap / sqrt(denom_a)
-    #             scal_hess += Symmetric(dga * dga')
-    #             Hpga = H1pg / sqrt(denom_b)
-    #             scal_hess -= Symmetric(Hpga * Hpga')
-    #             # @show norm(scal_hess * s - z) / (1 + max(norm(s), norm(scal_hess * s)))
-    #             # @show norm(scal_hess * -conj_g + g) / (1 + max(norm(g), norm(scal_hess * -conj_g)))
-    #         else
-    #             @warn("skipped 2nd update (small denoms: $denom_a, $denom_b)")
-    #             @show norm(scal_hess * conj_g - g)
-    #         end
-    #         # @show norm(scal_hess * s - z) / (1 + max(norm(s), norm(scal_hess * s)))
-    #         # # @show norm(scal_hess * -conj_g + g)
-    #         # @show norm(scal_hess * -conj_g + g) / (1 + max(norm(g), norm(scal_hess * -conj_g)))
-    #         # @show norm(scal_hess * pr_gap - du_gap)
-    #         # norm(scal_hess * s - z) > 1e-3 || norm(scal_hess * -conj_g + g) > 1e-3  && error()
-    #     # else
-    #     #     @warn("skipped 2nd update (already satisfied)")
-    #     end
-    # end
+    use_simplifications = true # TODO use?
+    if use_update_2
+        conj_g = dual_grad(cone, mu)
+        gsgz = dot(g, conj_g)
+        cone.dual_grad_inacc && @warn("dual grad inacc in 2nd update")
+        if !cone.dual_grad_inacc && norm(scal_hess * conj_g - g) > update_tol
+            mu_cone = sz / nu
+            # rtmu = sqrt(mu_cone)
+            # invrtmu = inv(rtmu)
+            # du_gap = invrtmu * z + rtmu * g
+            # pr_gap = invrtmu * s + rtmu * conj_g
+            du_gap = z + mu_cone * g
+            pr_gap = s + mu_cone * conj_g
+            # mu_cone * (mu_cone * gsgz - 2nu)
+            denom_a = (use_simplifications ? abs2(mu_cone) * gsgz - sz : dot(pr_gap, du_gap))
+            # denom_a = sz + abs2(mu_cone) * gsgz - 2 * nu * mu_cone
+            # @assert isapprox(denom_a, abs2(mu_cone) * gsgz - sz)
+
+            Hgz = hess(cone) * conj_g
+            if update_one_applied
+                # struggling with correcness of this
+                # rho = -conj_g - gsgz / nu * s
+                # @show norm(s' * mu * hess(cone) * -conj_g - gsgz * mu) # looks BAD
+                # @show norm(rho - (-conj_g - (s' * mu * hess(cone) * -conj_g) / (s' * mu * hess(cone) * s)  * s)) # looks BAD
+                # @show norm(scal_hess * -conj_g - (mu * hess(cone) * rho + 1 / mu_cone * z)) # looks BAD
+                # @show norm(scal_hess * pr_gap - (-mu * mu_cone * hess(cone) * rho)) # looks OK
+                # @show norm(scal_hess * pr_gap - (mu * mu_cone * (hess(cone) * conj_g - gsgz / nu * g))) # looks OK
+                H1pg = (use_simplifications ? mu * mu_cone * (Hgz - gsgz / nu * g) : scal_hess * pr_gap)
+                # @show norm(denom_b - mu * mu_cone^2 * (dot(conj_g, Hgz) - abs2(gsgz) / nu))
+                denom_b = mu * mu_cone * (dot(conj_g, Hgz) - abs2(gsgz) / nu) * mu_cone
+            else
+                # would need to work out alternative simplifications if we want to have this path
+                H1pg = scal_hess * pr_gap
+                denom_b = dot(pr_gap, H1pg)
+            end
+
+            if denom_a > denom_tol && denom_b > denom_tol
+                dga = du_gap / sqrt(denom_a)
+                scal_hess += Symmetric(dga * dga')
+                Hpga = H1pg / sqrt(denom_b)
+                scal_hess -= Symmetric(Hpga * Hpga')
+                # @show norm(scal_hess * s - z) / (1 + max(norm(s), norm(scal_hess * s)))
+                # @show norm(scal_hess * -conj_g + g) / (1 + max(norm(g), norm(scal_hess * -conj_g)))
+            else
+                @warn("skipped 2nd update (small denoms: $denom_a, $denom_b)")
+                @show norm(scal_hess * conj_g - g)
+            end
+            # @show norm(scal_hess * s - z) / (1 + max(norm(s), norm(scal_hess * s)))
+            # # @show norm(scal_hess * -conj_g + g)
+            # @show norm(scal_hess * -conj_g + g) / (1 + max(norm(g), norm(scal_hess * -conj_g)))
+            # @show norm(scal_hess * pr_gap - du_gap)
+            # norm(scal_hess * s - z) > 1e-3 || norm(scal_hess * -conj_g + g) > 1e-3  && error()
+        # else
+        #     @warn("skipped 2nd update (already satisfied)")
+        end
+    end
 
     # TODO OLD:
 
@@ -241,7 +241,7 @@ function update_scal_hess(
     # copyto!(cone.scal_hess, scal_hess)
     # copyto!(cone.hess, scal_hess)
     # return cone.scal_hess
-    @show norm(Symmetric(cone.scal_hess) - hess(cone))
+    # @show norm(Symmetric(cone.scal_hess) - hess(cone))
 
     return Symmetric(cone.scal_hess)
 end

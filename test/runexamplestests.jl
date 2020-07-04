@@ -55,7 +55,7 @@ native_example_names = [
 JuMP_example_names = [
     # "centralpolymat",
     # "conditionnum",
-    # "contraction",
+    # # # "contraction",
     # "densityest",
     # "envelope",
     # "expdesign",
@@ -64,18 +64,18 @@ JuMP_example_names = [
     # "matrixcompletion",
     # "matrixquadratic",
     # "matrixregression",
-    # "maxvolume",
+    "maxvolume",
     # "muconvexity",
     # "nearestpsd",
     # "polymin",
-    # "polynorm",
+    # # # "polynorm",
     # "portfolio",
     # "regionofattr",
     # "robustgeomprog",
-    # "secondorderpoly",
+    # # # "secondorderpoly",
     # "semidefinitepoly",
     # "shapeconregr",
-    "signomialmin",
+    # "signomialmin",
     ]
 
 # start the tests

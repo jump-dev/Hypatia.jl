@@ -52,7 +52,7 @@ example_tests(::Type{SignomialMinJuMP{Float64}}, ::FastInstances) = begin
     relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
     return [
     ((:motzkin2,), nothing, options),
-    # ((:motzkin2,), ClassicConeOptimizer, options),
+    ((:motzkin2,), ClassicConeOptimizer, options),
     ((:motzkin3,), nothing, options),
     ((:CS16ex8_13,), nothing, options),
     ((:CS16ex8_14,), nothing, options),
@@ -61,12 +61,12 @@ example_tests(::Type{SignomialMinJuMP{Float64}}, ::FastInstances) = begin
     ((:CS16ex13,), nothing, options),
     ((:MCW19ex1_mod,), nothing, options),
     ((:MCW19ex8,), nothing, relaxed_options),
-    # ((:MCW19ex8,), ClassicConeOptimizer, relaxed_options),
+    ((:MCW19ex8,), ClassicConeOptimizer, relaxed_options),
     ((3, 2), nothing, options),
-    # ((3, 2), ClassicConeOptimizer, options),
+    ((3, 2), ClassicConeOptimizer, options),
     ((6, 6), nothing, options),
     ((20, 3), nothing, options),
-    # ((20, 3), ClassicConeOptimizer, options),
+    ((20, 3), ClassicConeOptimizer, options),
     ]
 end
 example_tests(::Type{SignomialMinJuMP{Float64}}, ::SlowInstances) = begin
