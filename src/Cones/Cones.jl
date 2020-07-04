@@ -330,8 +330,11 @@ function update_dual_grad(cone::Cone{T}, mu::T) where {T <: Real}
         @assert is_feas(cone)
         g = grad(cone)
 
-        dir .= cholesky!(Symmetric(hess(cone))) \ -cone.dual_point + cone.point
-        nnorm = dot(dir, -cone.dual_point - g)
+        Hiz = cholesky!(Symmetric(hess(cone))) \ cone.dual_point
+
+        dir .= -Hiz + cone.point
+        nnorm = dot(dual_point, Hiz) - 2 * dot(point, dual_point) + get_nu(cone)
+        # nnorm = dot(dir, -cone.dual_point - g)
 
         alpha = (abs(nnorm) > damp_tol ? inv(1 + abs(nnorm)) : one(T))
 

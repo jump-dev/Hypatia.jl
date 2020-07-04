@@ -35,7 +35,6 @@ function test_barrier_oracles(
     CO.set_initial_point(point, cone)
     CO.set_initial_point(dual_point, cone)
     @test load_reset_check(cone, point, dual_point)
-    @test cone.point == point
     @test cone.dual_point == dual_point
 
     # TODO adapt now that we have newton for initial point
@@ -63,6 +62,7 @@ function test_barrier_oracles(
     perturb_scale(point, dual_point, noise, scale)
     @test load_reset_check(cone, point, dual_point)
     test_grad_hess(cone, point, dual_point, tol = tol)
+    @test load_reset_check(cone, point, dual_point)
 
     # check gradient and Hessian agree with ForwardDiff
     CO.reset_data(cone)
@@ -106,18 +106,17 @@ function test_barrier_oracles(
     return
 end
 
-function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T}; tol::Real = 1000eps(T)) where {T <: Real}
+function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T}; irtmu::T = one(T), tol::Real = 1000eps(T)) where {T <: Real}
     nu = CO.get_nu(cone)
     dim = length(point)
     grad = CO.grad(cone)
-    # mu = rand(T)
-    dual_grad = CO.dual_grad(cone, one(T))
+    dual_grad = CO.dual_grad(cone, irtmu)
     hess = Matrix(CO.hess(cone))
     inv_hess = Matrix(CO.inv_hess(cone))
 
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
     @test hess * inv_hess ≈ I atol=tol rtol=tol
-    @test dot(dual_point, dual_grad) ≈ -nu atol=tol rtol=tol
+    @test dot(dual_point, dual_grad) ≈ -nu atol=1000tol rtol=1000tol
 
     prod_mat = similar(point, dim, dim)
     @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
@@ -134,19 +133,30 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
     @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
 
     if CO.use_scaling(cone)
-        scal_hess = CO.scal_hess(cone, one(T))
-        @test scal_hess * point ≈ dual_point atol=tol rtol=tol
-        @test scal_hess * dual_grad ≈ grad atol=tol rtol=tol
+        scal_hess = CO.scal_hess(cone, irtmu)
+        @test scal_hess * point ≈ dual_point atol=sqrt(tol) rtol=sqrt(tol)
+        # @test scal_hess * dual_grad ≈ grad atol=1000tol rtol=1000tol
         prod = similar(point)
-        @test CO.scal_hess_prod!(prod, point, cone, one(T)) ≈ dual_point atol=tol rtol=tol
-        @test CO.scal_hess_prod!(prod, dual_grad, cone, one(T)) ≈ grad atol=tol rtol=tol
+        @test CO.scal_hess_prod!(prod, point, cone, irtmu) ≈ dual_point atol=sqrt(tol) rtol=sqrt(tol)
+        # @test CO.scal_hess_prod!(prod, dual_grad, cone, irtmu) ≈ grad atol=1000tol rtol=1000tol
+
+        # repeat to check mu logic
+        irtmu = inv(sqrt(one(T)))
+        @test load_reset_check(cone, point, dual_point, irtmu)
+        scal_hess = CO.scal_hess(cone, irtmu)
+        @test scal_hess * point ≈ dual_point atol=sqrt(tol) rtol=sqrt(tol)
+        # @test scal_hess * dual_grad ≈ grad atol=1000tol rtol=1000tol
+        prod = similar(point)
+        @test CO.scal_hess_prod!(prod, point, cone, irtmu) ≈ dual_point atol=sqrt(tol) rtol=sqrt(tol)
+        # @test CO.scal_hess_prod!(prod, dual_grad, cone, irtmu) ≈ grad atol=1000tol rtol=1000tol
     end
 
     return
 end
 
-function load_reset_check(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T}) where {T <: Real}
+function load_reset_check(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T}; irtmu::T = one(T)) where {T <: Real}
     CO.load_point(cone, point)
+    CO.rescale_point(cone, irtmu)
     CO.load_dual_point(cone, dual_point)
     CO.reset_data(cone)
     return CO.is_feas(cone)

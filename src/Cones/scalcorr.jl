@@ -5,7 +5,8 @@ use_scaling(cone::Cone) = true
 
 function scal_hess(cone::Cone{T}, mu::T) where {T <: Real}
     if use_scaling(cone)
-        return (cone.scal_hess_updated ? cone.scal_hess : update_scal_hess(cone, mu))
+        @show cone.scal_hess_updated
+        return (cone.scal_hess_updated ? Symmetric(cone.scal_hess) : update_scal_hess(cone, mu)) # TODO make scal_hess type symmetric
     else
         return hess(cone)
     end
@@ -14,7 +15,7 @@ end
 use_update_1_default() = true
 # use_update_1_default() = false
 
-use_update_2_default() = true
+use_update_2_default() = false
 
 
 
@@ -60,8 +61,8 @@ function update_scal_hess(
     s = cone.point
     z = cone.dual_point
     rtmu = sqrt(mu)
-    # irtmu = inv(rtmu)
-    # s = rtmu * s
+    irtmu = inv(rtmu)
+    s = rtmu * s # TODO avoid remultiplying
 
     sz = rtmu * dot(s, z)
     nu = get_nu(cone)
@@ -84,6 +85,7 @@ function update_scal_hess(
     # first update
     if use_update_1 && norm(z + rtmu * g) > update_tol # TODO should this be more scale-independent? eg normalized, or check dot(Hs, z) / norm(Hs) / norm(z)
         if sz > denom_tol
+            @show dot(s, g)
             # scal_hess += inv(sz) * Symmetric(z * z') - (mu / nu) * Symmetric(g * g')
             # za = inv(sqrt(sz)) * z
             za = z / sqrt(sz)
@@ -378,6 +380,7 @@ function scal_hess_prod!(
     cone::Cone{T},
     mu::T;
     ) where {T}
+    return prod = scal_hess(cone, mu) * arr
     mul!(prod, scal_hess(cone, mu), arr)
     return prod
 end

@@ -21,6 +21,7 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
 
     feas_updated::Bool
     grad_updated::Bool
+    dual_grad_updated::Bool
     dual_grad_inacc::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
@@ -64,7 +65,7 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = 
+reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated =
     cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.hess_sqrt_aux_updated = false)
 
 # TODO only allocate the fields we use
