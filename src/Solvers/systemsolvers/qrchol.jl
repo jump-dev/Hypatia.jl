@@ -10,7 +10,7 @@ http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf (the dominating sub
 
 abstract type QRCholSystemSolver{T <: Real} <: SystemSolver{T} end
 
-function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, sol::Vector{T}, rhs::Vector{T}) where {T <: Real}
+function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, sol::Vector{T}, rhs::Vector{T}, use_nt::Bool) where {T <: Real}
     model = solver.model
     x_rows = system_solver.x_rows
     y_rows = system_solver.y_rows
@@ -44,10 +44,13 @@ function solve_system(system_solver::QRCholSystemSolver{T}, solver::Solver{T}, s
     const_sol = system_solver.const_sol
 
     # lift to get tau
-    # TODO NT way:
-    # tau_scal = solver.kap / solver.tau
-    # TODO SY way:
-    tau_scal = solver.mu / solver.tau / solver.tau
+    if use_nt
+        # TODO NT way:
+        tau_scal = solver.kap / solver.tau
+    else
+        # TODO SY way:
+        tau_scal = solver.mu / solver.tau / solver.tau
+    end
 
     @views tau_num = rhs[dim3 + 1] + rhs[end] + dot(model.c, sol3[x_rows]) + dot(model.b, sol3[y_rows]) + dot(model.h, sol3[z_rows])
     @views tau_denom = tau_scal - dot(model.c, const_sol[x_rows]) - dot(model.b, const_sol[y_rows]) - dot(model.h, const_sol[z_rows])
