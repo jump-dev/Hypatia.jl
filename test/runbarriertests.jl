@@ -17,7 +17,7 @@ barrier_testfuns = [
     test_linmatrixineq_barrier, # TODO experiencing ForwardDiff failures?
     test_possemideftri_barrier,
     test_possemideftrisparse_barrier,
-    test_doublynonnegative_barrier
+    test_doublynonnegative_barrier,
     test_matrixepipersquare_barrier,
     test_hypoperlogdettri_barrier,
     test_hyporootdettri_barrier,
@@ -28,8 +28,8 @@ barrier_testfuns = [
 
 real_types = [
     Float64,
-    Float32,
-    BigFloat,
+    # Float32,
+    # BigFloat,
     ]
 
 @info("starting barrier tests")

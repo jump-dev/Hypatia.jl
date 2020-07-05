@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 nonnegative orthant cone:
 w in R^n : w_i >= 0
@@ -130,12 +130,17 @@ hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 
-function in_neighborhood(cone::Nonnegative{T}, dual_point::AbstractVector{T}, rtmu::T) where {T <: Real}
-    mu_nbhd = rtmu * cone.max_neighborhood
-    return all(abs(si * zi - rtmu) < mu_nbhd for (si, zi) in zip(cone.point, dual_point))
+function in_neighborhood(cone::Nonnegative{T}, rtmu::T, max_nbhd::T) where {T <: Real}
+    mu_nbhd = rtmu * max_nbhd
+    return all(abs(si * zi - rtmu) < mu_nbhd for (si, zi) in zip(cone.point, cone.dual_point))
 end
 
-function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
-    @. cone.correction = primal_dir * dual_dir / cone.point
+# function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
+#     @. cone.correction = primal_dir * dual_dir / cone.point
+#     return cone.correction
+# end
+
+function correction(cone::Nonnegative, primal_dir::AbstractVector)
+    @. cone.correction = (primal_dir / cone.point)^2 / cone.point
     return cone.correction
 end

@@ -50,6 +50,8 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     temp1::Vector{T}
     temp2::Vector{T}
 
+    correction::Vector{T}
+
     function EpiSumPerEntropy{T}(
         dim::Int;
         use_dual::Bool = false,
@@ -90,6 +92,7 @@ function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
     cone.Hiww = zeros(T, w_dim)
     cone.temp1 = zeros(T, w_dim)
     cone.temp2 = zeros(T, w_dim)
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -291,6 +294,46 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ep
     cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
     ldiv!(prod, cone.inv_hess_sqrt, arr)
     return prod
+end
+
+function correction(cone::EpiSumPerEntropy, primal_dir::AbstractVector)
+    @assert cone.grad_updated
+    tau = cone.tau
+    z = cone.z
+    v_idxs = cone.v_idxs
+    w_idxs = cone.w_idxs
+    @views v = cone.point[v_idxs]
+    @views w = cone.point[w_idxs]
+    u_dir = primal_dir[1]
+    @views v_dir = primal_dir[v_idxs]
+    @views w_dir = primal_dir[w_idxs]
+    corr = cone.correction
+    @views v_corr = corr[v_idxs]
+    @views w_corr = corr[w_idxs]
+    wdw = cone.temp1
+    vdv = cone.temp2
+
+    i2z = inv(2 * z)
+    @. wdw = w_dir / w
+    @. vdv = v_dir / v
+    const0 = (u_dir + dot(w, vdv)) / z + dot(tau, w_dir)
+    const1 = abs2(const0) + sum(w[i] * abs2(vdv[i]) + w_dir[i] * (wdw[i] - 2 * vdv[i]) for i in eachindex(w)) / (2 * z)
+    corr[1] = const1 / z
+
+    # v
+    v_corr .= const1
+    @. v_corr += (const0 + vdv) * vdv - i2z * wdw * w_dir
+    @. v_corr *= w
+    @. v_corr += (z * vdv - w_dir) * vdv + (-const0 + i2z * w_dir) * w_dir
+    @. v_corr /= v
+    @. v_corr /= z
+
+    # w
+    @. w_corr = const1 * tau
+    @. w_corr += ((const0 - w * vdv / z) / z + (inv(w) + i2z) * wdw) * wdw
+    @. w_corr += (-const0 + w_dir / z - vdv / 2) / z * vdv
+
+    return corr
 end
 
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints

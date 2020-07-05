@@ -9,7 +9,7 @@ include(joinpath(@__DIR__, "../common_JuMP.jl"))
 struct PortfolioJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     num_stocks::Int
     epipernormeucl_constr::Bool # add an L2 ball constraint, else don't add
-    epinorminf_constrs::Bool # add L1 and Linfty ball constraints, elsle don't add
+    epinorminf_constrs::Bool # add L1 and Linfty ball constraints, else don't add
 end
 
 example_tests(::Type{PortfolioJuMP{Float64}}, ::MinimalInstances) = [

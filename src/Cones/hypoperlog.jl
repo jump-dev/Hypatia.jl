@@ -35,6 +35,8 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     lvwnivlwvu::T
     vwivlwvu::Vector{T}
 
+    correction::Vector{T}
+
     function HypoPerLog{T}(
         dim::Int;
         use_dual::Bool = false,
@@ -66,6 +68,7 @@ function setup_data(cone::HypoPerLog{T}) where {T <: Real}
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.vwivlwvu = zeros(T, dim - 2)
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -155,6 +158,73 @@ function update_hess(cone::HypoPerLog)
 
     cone.hess_updated = true
     return cone.hess
+end
+
+# TODO simplify and remove allocations
+function correction(cone::HypoPerLog, primal_dir::AbstractVector)
+    u = cone.point[1]
+    v = cone.point[2]
+    w = view(cone.point, 3:cone.dim)
+    u_dir = primal_dir[1]
+    v_dir = primal_dir[2]
+    w_dir = view(primal_dir, 3:cone.dim)
+
+    w_dim = length(w)
+    dim = cone.dim
+    z = v * sum(log(wi / v) for wi in w) - u
+    sumlogw = sum(log.(w))
+    dzdv = -w_dim * log(v) - w_dim + sumlogw
+
+    corr = cone.correction
+    corr .= 0
+    uuv = -2 / z ^ 3 * dzdv
+    s1_sqr = abs2(u_dir)
+    s2_sqr = abs2(v_dir)
+    w_wi = sum(w_dir[i] / w[i] for i in eachindex(w))
+    w_wi_sqr = abs2(w_wi)
+    w_sqr_wi_sqr = sum(w_dir[i] / w[i] * w_dir[i] / w[i] for i in eachindex(w))
+
+    # corr[1] += 2 / z ^ 3 * s1_sqr
+    # corr[1] += 2 * uuv * u_dir * v_dir
+    corr[2] += uuv * s1_sqr
+    uuw = -2 / z ^ 3 * v
+    corr[1] += 2 * u_dir * uuw * w_wi
+    corr[3:end] += uuw ./ w * s1_sqr
+    uvv = 2 / z ^ 3 * abs2(dzdv) + w_dim / v / abs2(z)
+    # corr[1] += uvv * s2_sqr
+    corr[2] += 2 * uvv * u_dir * v_dir
+    uvw = 2 / z ^ 3 * dzdv * v - 1 / abs2(z)
+    # corr[1] += 2 * v_dir * uvw * w_wi
+    corr[2] += 2 * u_dir * uvw * w_wi
+    corr[3:end] += 2 * u_dir *  v_dir * uvw ./ w
+    uww_1 = 2 * abs2(v) / z ^ 3
+    uww_2 = v / abs2(z)
+    # corr[1] += uww_1 * w_wi_sqr + uww_2 * w_sqr_wi_sqr
+    corr[3:end] += 2 * u_dir * (uww_1 * w_wi .+ uww_2 * w_dir ./ w) ./ w
+    # vvv
+    corr[2] += abs2(v_dir) * (-2 / z ^ 3 * dzdv ^ 3 - 3 / abs2(z) * dzdv * w_dim / v - w_dim / abs2(v) / z - 2 * w_dim / v ^ 3)
+    vvw = -2 / z ^ 3 * abs2(dzdv) * v + 2 / abs2(z) * dzdv - w_dim / abs2(z)
+    corr[2] += 2 * v_dir * vvw * w_wi
+    corr[3:end] += s2_sqr * vvw ./ w
+    vww_1 = -2 / z ^ 3 * abs2(v) * dzdv + 2 * v / abs2(z)
+    vww_2 = -inv(abs2(z)) * dzdv * v + 1 / z
+    corr[2] += vww_1 * w_wi_sqr + vww_2 * w_sqr_wi_sqr
+    corr[3:end] += 2 * v_dir * (vww_1 * w_wi .+ vww_2 * w_dir ./ w) ./ w
+    www_1 = -2 * v ^ 3 / z ^ 3
+    www_2 = -abs2(v / z)
+    www_3 = -2 * v / z - 2
+    corr[3:end] += www_1 * w_wi_sqr ./ w + www_2 * (2 * w_wi * w_dir ./ w ./ w + w_sqr_wi_sqr ./ w) +
+        www_3 * w_dir .* w_dir ./ w ./ w ./ w
+
+    corr[1] = (2 * (s1_sqr / z +
+        (-2 / z * dzdv) * u_dir * v_dir +
+        w_wi * ((v * (2 * v_dir * dzdv - 2 * u_dir + v * w_wi)) / z - v_dir)) +
+        (2 / z * abs2(dzdv) + w_dim / v) * s2_sqr +
+        v * w_sqr_wi_sqr) / z / z
+
+    corr ./= -2
+
+    return cone.correction
 end
 
 # see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints

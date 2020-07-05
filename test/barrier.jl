@@ -43,7 +43,7 @@ function test_barrier_oracles(
         minus_grad = -CO.grad(cone)
         @test dot(point, minus_grad) ≈ norm(point) * norm(minus_grad) atol=init_tol rtol=init_tol
         @test point ≈ minus_grad atol=init_tol rtol=init_tol
-        @test CO.in_neighborhood(cone, minus_grad, one(T))
+        @test CO.in_neighborhood(cone, one(T), one(T))
     end
     init_only && return
 
@@ -67,6 +67,20 @@ function test_barrier_oracles(
         hess = CO.hess(cone)
         fd_hess = ForwardDiff.hessian(barrier, point)
         @test hess ≈ fd_hess atol=tol rtol=tol
+    end
+
+    if CO.use_correction(cone)
+        # check correction satisfies log-homog property F'''(s)[s, s] = -2F''(s) * s = 2F'(s)
+        @test -CO.correction(cone, point) ≈ grad atol=tol rtol=tol
+        # check correction term agrees with directional 3rd derivative
+        (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
+        corr = CO.correction(cone, primal_dir)
+        @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
+        if dim < 6 && T in (Float32, Float64)
+            FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
+            FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
+            @test FD_corr ≈ corr atol=tol rtol=tol
+        end
     end
 
     return
