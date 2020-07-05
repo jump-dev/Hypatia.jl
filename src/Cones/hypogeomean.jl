@@ -113,7 +113,7 @@ function is_dual_feas(cone::HypoGeomean{T}) where {T}
     @views w = cone.dual_point[2:end]
     alpha = cone.alpha
     if u < -eps(T) && all(>(eps(T)), w)
-        @inbounds dual_wprodu = exp(sum(alpha[i] * log(w[i] / alpha[i]) for i in eachindex(alpha))) - u
+        @inbounds dual_wprodu = exp(sum(alpha[i] * log(w[i] / alpha[i]) for i in eachindex(alpha))) + u
         return (dual_wprodu > eps(T))
     end
     return false
