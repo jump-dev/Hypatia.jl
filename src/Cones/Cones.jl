@@ -166,11 +166,11 @@ inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
 use_heuristic_neighborhood(cone::Cone) = cone.use_heuristic_neighborhood
 
-function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector{T}, rtmu::T, max_nbhd::T) where {T <: Real}
+function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
     # norm(H^(-1/2) * (z + mu * grad))
     nbhd_tmp = cone.nbhd_tmp
     g = grad(cone)
-    @. nbhd_tmp = dual_point + rtmu * g
+    @. nbhd_tmp = cone.dual_point + rtmu * g
 
     if use_heuristic_neighborhood(cone)
         nbhd = norm(nbhd_tmp, Inf) / norm(g, Inf)

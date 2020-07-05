@@ -135,7 +135,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     # calculate centering factor gamma by finding distance pred_alpha for stepping in pred direction
     copyto!(stepper.dir, dir_pred)
-    @timeit timer "alpha_pred" stepper.prev_pred_alpha = pred_alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = Inf)
+    @timeit timer "alpha_pred" stepper.prev_pred_alpha = pred_alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = T(Inf))
 
     # TODO allow different function (heuristic) as option?
     # stepper.prev_gamma = gamma = abs2(1 - pred_alpha)
@@ -202,7 +202,7 @@ end
 #     @assert all(Cones.is_feas.(cones))
 #     Cones.grad.(cones)
 #     Cones.hess.(cones)
-#     # @assert all(Cones.in_neighborhood.(cones, point.dual_views, rtmu, T(0.7)))
+#     # @assert all(Cones.in_neighborhood.(cones, rtmu, T(0.7)))
 #
 #     update_lhs(solver.system_solver, solver)
 #
@@ -286,7 +286,7 @@ end
 #     use_corr = false
 #
 #     # TODO if use NT, only need nonsymm cones in nbhd
-#     if all(Cones.in_neighborhood.(cones, point.dual_views, rtmu, T(0.05)))
+#     if all(Cones.in_neighborhood.(cones, rtmu, T(0.05)))
 #         # predict
 #         # println("pred")
 #         update_rhs_pred(stepper, solver)
@@ -461,11 +461,13 @@ function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}, use_nt::
     system_solver = solver.system_solver
     timer = solver.timer
 
-    solve_system(system_solver, solver, dir, rhs, use_nt)
+    tau_scal = (use_nt ? solver.kap : solver.mu / solver.tau) / solver.tau
+
+    solve_system(system_solver, solver, dir, rhs, tau_scal)
 
     # use iterative refinement
     copyto!(dir_temp, dir)
-    res = apply_lhs(stepper, solver, use_nt) # modifies res
+    res = apply_lhs(stepper, solver, tau_scal) # modifies res
     res .-= rhs
     norm_inf = norm(res, Inf)
     norm_2 = norm(res, 2)
@@ -476,9 +478,9 @@ function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}, use_nt::
         if norm_inf < 100 * eps(T) # TODO change tolerance dynamically
             break
         end
-        solve_system(system_solver, solver, dir, res, use_nt)
+        solve_system(system_solver, solver, dir, res, tau_scal)
         axpby!(true, dir_temp, -1, dir)
-        res = apply_lhs(stepper, solver, use_nt) # modifies res
+        res = apply_lhs(stepper, solver, tau_scal) # modifies res
         res .-= rhs
         # @show res
 
@@ -507,7 +509,7 @@ function get_directions(stepper::CombinedStepper{T}, solver::Solver{T}, use_nt::
 end
 
 # calculate residual on 6x6 linear system
-function apply_lhs(stepper::CombinedStepper{T}, solver::Solver{T}, use_nt::Bool) where {T <: Real}
+function apply_lhs(stepper::CombinedStepper{T}, solver::Solver{T}, tau_scal::T) where {T <: Real}
     model = solver.model
     tau_dir = stepper.dir[stepper.tau_row]
     kap_dir = stepper.dir[stepper.kap_row]
@@ -540,13 +542,7 @@ function apply_lhs(stepper::CombinedStepper{T}, solver::Solver{T}, use_nt::Bool)
         @. s_res_k += stepper.dual_dir_k[k]
     end
 
-    if use_nt
-        # TODO NT way:
-        stepper.res[stepper.kap_row] = solver.kap / solver.tau * tau_dir + kap_dir
-    else
-        # TODO SY way:
-        stepper.res[stepper.kap_row] = solver.mu / solver.tau * tau_dir / solver.tau + kap_dir
-    end
+    stepper.res[stepper.kap_row] = tau_scal * tau_dir + kap_dir
 
     return stepper.res
 end
@@ -615,7 +611,7 @@ end
 #                     Cones.load_point(cone_k, primals_ls[k], irt_mu_temp)
 #                     Cones.load_dual_point(cone_k, duals_ls[k])
 #                     Cones.reset_data(cone_k)
-#                     in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, duals_ls[k], mu_temp))
+#                     in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, mu_temp))
 #                     cone_times[k] = time_ns() - time_k
 #
 #                     if !in_nbhd_k
@@ -730,8 +726,8 @@ function find_max_alpha(
             Cones.load_dual_point(cone_k, duals_ls[k])
             Cones.reset_data(cone_k)
 
-            # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, duals_ls[k], rtmu, max_nbhd))
-            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, duals_ls[k], rtmu, max_nbhd)))
+            # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, rtmu, max_nbhd))
+            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
             # TODO is_dual_feas function should fall back to a nbhd-like check (for ray maybe) if not using nbhd check
             # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k))
 
