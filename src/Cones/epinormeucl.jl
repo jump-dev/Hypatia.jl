@@ -32,6 +32,8 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
 
     dist::T
 
+    correction::Vector{T}
+
     function EpiNormEucl{T}(
         dim::Int;
         use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
@@ -61,6 +63,7 @@ function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -205,4 +208,27 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}
     end
 
     return prod
+end
+
+jdot(x::AbstractVector, y::AbstractVector) = @views x[1] * y[1] - dot(x[2:end], y[2:end])
+
+function correction(cone::EpiNormEucl, primal_dir::AbstractVector)
+    @assert cone.grad_updated
+    dim = cone.dim
+    corr = cone.correction
+    point = cone.point
+
+    tmp = hess_prod!(cone.nbhd_tmp, primal_dir, cone)
+    tmp2 = cone.nbhd_tmp2
+    copyto!(tmp2, primal_dir)
+    @views tmp2[2:dim] .*= -1
+
+    corr .= point * dot(primal_dir, tmp)
+    @views corr[2:dim] .*= -1
+    corr .+= tmp * jdot(point, primal_dir)
+    corr .-= dot(point, tmp) * tmp2
+    corr ./= cone.dist
+    corr ./= 2
+
+    return corr
 end

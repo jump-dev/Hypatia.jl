@@ -35,6 +35,8 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     wprod::T
     z::T
 
+    correction::Vector{T}
+
     function HypoGeomean{T}(
         alpha::Vector{T};
         use_dual::Bool = false,
@@ -68,6 +70,7 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -196,6 +199,38 @@ end
 #     @views mul!(prod[2:dim, :], w, arr[1, :]', wprod / n, true)
 #     return prod
 # end
+
+function correction(cone::HypoGeomean, primal_dir::AbstractVector)
+    @assert cone.grad_updated # TODO reuse fields
+    dim = cone.dim
+    u = cone.point[1]
+    w = view(cone.point, 2:dim)
+    pi = cone.wprod # TODO rename
+    z = cone.z
+    alpha = cone.alpha
+    corr = cone.correction
+    u_dir = primal_dir[1]
+    w_dir = view(primal_dir, 2:dim)
+
+    piz = pi / z
+    wdw = w_dir ./ w
+    udz = u_dir / z
+    uuw1 = -2 * udz * piz
+    awdw = dot(alpha, wdw)
+    uww1 = awdw * piz * (2 * piz - 1)
+    awdw2 = sum(alpha[i] * abs2(wdw[i]) for i in eachindex(alpha))
+    corr[1] = (abs2(udz) + uuw1 * awdw + (uww1 * awdw + piz * awdw2) / 2) / -z
+    www1 = piz * (1 - piz)
+    all1 = (uuw1 * u_dir / z + www1 * awdw2 + awdw * u * piz * (1 - 2 * piz) / z * awdw) / -2 - udz * uww1
+    all2 = www1 * awdw + udz * piz
+    all3 = www1 + piz * u / z
+    @views wcorr = corr[2:end]
+    @. wcorr = all1 * alpha
+    @. wcorr += wdw * (((all3 * alpha + piz) * alpha + 1) * wdw - all2 * alpha) # TODO check this is fast - if not, use an explicit loop
+    wcorr ./= w
+
+    return corr
+end
 
 # see analysis in https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
 function get_central_ray_hypogeomean(alpha::Vector{<:Real})

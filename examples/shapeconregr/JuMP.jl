@@ -79,11 +79,10 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::MinimalInstances) = [
     ((1, 5, :func1, 2, 4, false, true, false, false, true), ClassicConeOptimizer),
     ]
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    relaxed_options = (tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+    options = (tol_feas = 1e-6, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
     ((:naics5811, 4, true, false, true, true, false), nothing, options),
-    ((:naics5811, 4, true, true, true, true, false), nothing, relaxed_options),
+    ((:naics5811, 4, true, true, true, true, false), nothing, options),
     ((:naics5811, 3, false, false, true, true, false), nothing, options),
     ((:naics5811, 3, false, true, true, true, false), ClassicConeOptimizer, options),
     ((:naics5811, 3, false, true, true, true, false), nothing, options),
@@ -95,8 +94,7 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     ((1, 100, :func1, 5, 80, true, false, false, true, false), nothing, options),
     ((1, 100, :func1, 5, 100, true, false, false, true, false), nothing, options),
     ((1, 200, :func4, 5, 100, true, false, false, true, false), nothing, options),
-    ((2, 50, :func1, 5, 3, true, false, true, true, false), nothing, options),
-    ((2, 50, :func1, 5, 10, true, false, true, true, false), nothing, options),
+    ((2, 50, :func1, 5, 5, true, false, true, true, false), nothing, options),
     ((2, 50, :func1, 5, 3, true, false, true, false, false), nothing, options),
     ((2, 50, :func1, 5, 3, true, false, false, true, false), nothing, options),
     ((2, 200, :func1, 0, 3, true, false, false, false, true), nothing, options),
@@ -110,11 +108,11 @@ example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::FastInstances) = begin
     ((2, 50, :func6, 5, 4, true, true, true, true, false), nothing, options),
     ((2, 50, :func7, 5, 4, false, false, true, true, false), nothing, options),
     ((2, 50, :func8, 5, 4, false, true, true, true, false), nothing, options),
-    ((4, 150, :func6, 0, 4, true, false, true, true, true), nothing, relaxed_options), # objective not tight enough
+    ((4, 150, :func6, 0, 4, true, false, true, true, true), nothing, options),
     ((4, 150, :func7, 0, 4, true, false, true, true, true), nothing, options),
     ((4, 150, :func7, 0, 4, true, true, true, true, true), nothing, options),
     ((4, 150, :func7, 0, 4, false, false, true, true, true), nothing, options),
-    ((3, 150, :func8, 0, 6, true, false, true, true, true), nothing, relaxed_options),
+    ((3, 150, :func8, 0, 6, true, false, true, true, true), nothing, options),
     ]
 end
 example_tests(::Type{ShapeConRegrJuMP{Float64}}, ::SlowInstances) = begin
