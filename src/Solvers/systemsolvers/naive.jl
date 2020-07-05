@@ -208,16 +208,22 @@ function update_lhs(system_solver::NaiveSparseSystemSolver, solver::Solver)
             @views copyto!(system_solver.lhs6.nzval[system_solver.hess_idxs[k][j]], H_k[nz_rows, j])
         end
     end
-    system_solver.lhs6.nzval[system_solver.mtt_idx] = solver.kap / solver.tau
+    system_solver.lhs6.nzval[system_solver.mtt_idx] = solver.mu / solver.tau / solver.tau # NOTE: mismatch when using NT for kaptau
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs6)
 
     return system_solver
 end
 
-function solve_system(system_solver::NaiveSparseSystemSolver, solver::Solver, sol6::Vector, rhs6::Vector)
-    inv_prod(system_solver.fact_cache, sol6, system_solver.lhs6, rhs6)
-    return sol6
+function solve_system(
+    system_solver::NaiveSparseSystemSolver,
+    solver::Solver{T},
+    sol::Vector{T},
+    rhs::Vector{T},
+    ::T,
+    ) where {T <: Real}
+    inv_prod(system_solver.fact_cache, sol, system_solver.lhs6, rhs)
+    return sol
 end
 
 #=
@@ -268,15 +274,21 @@ function update_lhs(system_solver::NaiveDenseSystemSolver, solver::Solver)
     for (cone_k, lhs6_H_k) in zip(solver.model.cones, system_solver.lhs6_H_k)
         copyto!(lhs6_H_k, Cones.hess(cone_k))
     end
-    system_solver.lhs6[end, system_solver.tau_row] = solver.kap / solver.tau
+    system_solver.lhs6[end, system_solver.tau_row] = solver.mu / solver.tau / solver.tau # NOTE: mismatch when using NT for kaptau
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs6)
 
     return system_solver
 end
 
-function solve_system(system_solver::NaiveDenseSystemSolver, solver::Solver, sol6::Vector, rhs6::Vector)
-    copyto!(sol6, rhs6)
-    inv_prod(system_solver.fact_cache, sol6)
-    return sol6
+function solve_system(
+    system_solver::NaiveDenseSystemSolver,
+    solver::Solver,
+    sol::Vector{T},
+    rhs::Vector{T},
+    ::T,
+    ) where {T <: Real}
+    copyto!(sol, rhs)
+    inv_prod(system_solver.fact_cache, sol)
+    return sol
 end

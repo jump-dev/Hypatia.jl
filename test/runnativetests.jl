@@ -95,7 +95,6 @@ other_options = (
     iter_limit = 100,
     time_limit = 6e1,
     timer = timer,
-    # TODO this is tighter than default
     tol_feas = tol,
     tol_rel_opt = tol,
     tol_abs_opt = tol,

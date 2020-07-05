@@ -27,7 +27,13 @@ A*x = [-yrhs, b]
 abstract type SymIndefSystemSolver{T <: Real} <: SystemSolver{T} end
 
 # TODO refac to use this for QRChol too
-function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T}, sol::Vector{T}, rhs::Vector{T}) where {T <: Real}
+function solve_system(
+    system_solver::SymIndefSystemSolver{T},
+    solver::Solver{T},
+    sol::Vector{T},
+    rhs::Vector{T},
+    tau_scal::T,
+    ) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
 
@@ -65,9 +71,8 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
     const_sol = system_solver.const_sol
 
     # lift to get tau
-    kapontau = solver.kap / solver.tau
     @views tau_num = rhs[dim3 + 1] + rhs[end] + dot(model.c, sol3[x_rows]) + dot(model.b, sol3[y_rows]) + dot(model.h, sol3[z_rows])
-    @views tau_denom = kapontau - dot(model.c, const_sol[x_rows]) - dot(model.b, const_sol[y_rows]) - dot(model.h, const_sol[z_rows])
+    @views tau_denom = tau_scal - dot(model.c, const_sol[x_rows]) - dot(model.b, const_sol[y_rows]) - dot(model.h, const_sol[z_rows])
     sol_tau = tau_num / tau_denom
 
     @. sol[1:dim3] = sol3 + sol_tau * const_sol
@@ -80,8 +85,8 @@ function solve_system(system_solver::SymIndefSystemSolver{T}, solver::Solver{T},
     @. @views s = model.h * sol_tau - rhs[z_rows]
     @views mul!(s, model.G, sol[x_rows], -1, true)
 
-    # kap = -kapontau*tau + kaprhs
-    sol[end] = -kapontau * sol_tau + rhs[end]
+    # kap = -tau_scal*tau + kaprhs
+    sol[end] = -tau_scal * sol_tau + rhs[end]
 
     return sol
 end

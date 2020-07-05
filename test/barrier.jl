@@ -43,7 +43,7 @@ function test_barrier_oracles(
         minus_grad = -CO.grad(cone)
         @test dot(point, minus_grad) ≈ norm(point) * norm(minus_grad) atol=init_tol rtol=init_tol
         @test point ≈ minus_grad atol=init_tol rtol=init_tol
-        @test CO.in_neighborhood(cone, minus_grad, one(T))
+        @test CO.in_neighborhood(cone, one(T), one(T))
     end
     init_only && return
 
