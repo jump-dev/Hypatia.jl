@@ -35,6 +35,8 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     nt_updated::Bool
     is_feas::Bool
     grad::Vector{T}
+    dual_grad::Vector{T}
+    dual_grad_inacc::Bool
     hess::Symmetric{T, Matrix{T}}
     scal_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
@@ -92,6 +94,7 @@ function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} whe
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.scal_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -153,6 +156,18 @@ function update_grad(cone::PosSemidefTri)
 
     cone.grad_updated = true
     return cone.grad
+end
+
+function update_dual_grad(cone::PosSemidefTri{T}, ::T) where {T <: Real}
+    # TODO @assert cone.is_feas
+    cone.dual_grad_inacc = false
+
+    dual_inv_mat = inv(cone.dual_fact_mat)
+    smat_to_svec!(cone.dual_grad, dual_inv_mat, cone.rt2)
+    cone.dual_grad .*= -1
+
+    cone.dual_grad_updated = true
+    return cone.dual_grad
 end
 
 function update_hess(cone::PosSemidefTri)

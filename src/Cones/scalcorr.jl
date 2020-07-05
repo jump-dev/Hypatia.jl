@@ -1,19 +1,18 @@
 
 # TODO later move to Cones.jl or elsewhere
 
-use_scaling(cone::Cone) = true
+use_scaling(cone::Cone) = false
 
 function scal_hess(cone::Cone{T}, mu::T) where {T <: Real}
     if use_scaling(cone)
-        @show cone.scal_hess_updated
         return (cone.scal_hess_updated ? Symmetric(cone.scal_hess) : update_scal_hess(cone, mu)) # TODO make scal_hess type symmetric
     else
         return hess(cone)
     end
 end
 
+# use_update_1_default() = true
 use_update_1_default() = true
-# use_update_1_default() = false
 
 use_update_2_default() = false
 
@@ -380,9 +379,7 @@ function scal_hess_prod!(
     cone::Cone{T},
     mu::T;
     ) where {T}
-    return prod = scal_hess(cone, mu) * arr
-    mul!(prod, scal_hess(cone, mu), arr)
-    return prod
+    return mul!(prod, scal_hess(cone, mu), arr)
 end
 
 function scal_hess_sqrt_prod!(

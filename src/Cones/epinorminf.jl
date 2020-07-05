@@ -30,6 +30,7 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_sqrt_aux_updated::Bool
     is_feas::Bool
     grad::Vector{T}
+    dual_grad::Vector{T}
     hess::Symmetric{T, SparseMatrixCSC{T, Int}}
     scal_hess
     inv_hess::Symmetric{T, Matrix{T}}
@@ -75,6 +76,7 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.dual_grad = zeros(T, dim)
     cone.scal_hess = zeros(T, dim, dim)
     cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)

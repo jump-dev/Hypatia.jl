@@ -19,11 +19,13 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     feas_updated::Bool
     grad_updated::Bool
     dual_grad_updated::Bool
+    dual_grad_inacc::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     scal_hess_updated::Bool
     is_feas::Bool
     grad::Vector{T}
+    dual_grad::Vector{T}
     hess::Diagonal{T, Vector{T}}
     scal_hess::Diagonal{T, Vector{T}}
     inv_hess::Diagonal{T, Vector{T}}
@@ -56,6 +58,7 @@ function setup_data(cone::Nonnegative{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.dual_grad = zeros(T, dim)
     cone.hess = Diagonal(zeros(T, dim))
     cone.scal_hess = Diagonal(zeros(T, dim))
     cone.inv_hess = Diagonal(zeros(T, dim))
@@ -81,6 +84,14 @@ function update_grad(cone::Nonnegative)
     @. cone.grad = -inv(cone.point)
     cone.grad_updated = true
     return cone.grad
+end
+
+function update_dual_grad(cone::Nonnegative{T}, ::T) where {T <: Real}
+    # TODO @assert cone.is_dual_feas
+    cone.dual_grad_inacc = false
+    @. cone.dual_grad = -inv(cone.dual_point)
+    cone.dual_grad_updated = true
+    return cone.dual_grad
 end
 
 function update_hess(cone::Nonnegative)

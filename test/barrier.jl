@@ -67,6 +67,7 @@ function test_barrier_oracles(
     # check gradient and Hessian agree with ForwardDiff
     CO.reset_data(cone)
     @test CO.is_feas(cone)
+    @test CO.is_dual_feas(cone)
     grad = CO.grad(cone)
     hess = CO.hess(cone)
     if dim < 13 # too slow if dimension is large
@@ -110,13 +111,15 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
     nu = CO.get_nu(cone)
     dim = length(point)
     grad = CO.grad(cone)
+    cone.dual_grad_inacc = true
     dual_grad = CO.dual_grad(cone, irtmu)
+    @test !cone.dual_grad_inacc
     hess = Matrix(CO.hess(cone))
     inv_hess = Matrix(CO.inv_hess(cone))
 
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
     @test hess * inv_hess ≈ I atol=tol rtol=tol
-    @test dot(dual_point, dual_grad) ≈ -nu atol=1000tol rtol=1000tol
+    @test dot(dual_point, dual_grad) ≈ -nu atol=sqrt(tol) rtol=sqrt(tol)
 
     prod_mat = similar(point, dim, dim)
     @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
@@ -142,13 +145,15 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
 
         # repeat to check mu logic
         irtmu = inv(sqrt(one(T)))
-        @test load_reset_check(cone, point, dual_point, irtmu)
+        @test load_reset_check(cone, point, dual_point, irtmu = irtmu)
         scal_hess = CO.scal_hess(cone, irtmu)
         @test scal_hess * point ≈ dual_point atol=sqrt(tol) rtol=sqrt(tol)
         # @test scal_hess * dual_grad ≈ grad atol=1000tol rtol=1000tol
         prod = similar(point)
         @test CO.scal_hess_prod!(prod, point, cone, irtmu) ≈ dual_point atol=sqrt(tol) rtol=sqrt(tol)
         # @test CO.scal_hess_prod!(prod, dual_grad, cone, irtmu) ≈ grad atol=1000tol rtol=1000tol
+    else
+        @test CO.scal_hess_prod!(prod, point, cone, irtmu) ≈ -grad atol=sqrt(tol) rtol=sqrt(tol)
     end
 
     return
@@ -159,7 +164,7 @@ function load_reset_check(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector
     CO.rescale_point(cone, irtmu)
     CO.load_dual_point(cone, dual_point)
     CO.reset_data(cone)
-    return CO.is_feas(cone)
+    return CO.is_feas(cone) && CO.is_dual_feas(cone)
 end
 
 function perturb_scale(point::Vector{T}, dual_point::Vector{T}, noise::T, scale::T) where {T <: Real}

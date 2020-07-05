@@ -32,6 +32,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     inv_hess_sqrt_prod_updated::Bool
     is_feas::Bool
     grad::Vector{T}
+    dual_grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     scal_hess
     inv_hess::Symmetric{T, Matrix{T}}
@@ -79,6 +80,7 @@ function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.scal_hess = zeros(T, dim, dim)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -123,6 +125,7 @@ end
 function update_dual_feas(cone::EpiPerSquare{T}) where {T}
     u = cone.dual_point[1]
     v = cone.dual_point[2]
+    cone.dual_feas_updated = true
 
     if u > eps(T) && v > eps(T)
         w = view(cone.dual_point, 3:cone.dim)
@@ -142,6 +145,18 @@ function update_grad(cone::EpiPerSquare)
 
     cone.grad_updated = true
     return cone.grad
+end
+
+function update_dual_grad(cone::EpiPerSquare{T}, ::T) where {T <: Real}
+    @assert cone.dual_feas_updated
+
+    @. cone.dual_grad = cone.dual_point / cone.dual_dist
+    g2 = cone.dual_grad[2]
+    cone.dual_grad[2] = -cone.dual_grad[1]
+    cone.dual_grad[1] = -g2
+
+    cone.dual_grad_updated = true
+    return cone.dual_grad
 end
 
 function update_hess(cone::EpiPerSquare)

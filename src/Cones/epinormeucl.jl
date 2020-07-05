@@ -76,6 +76,7 @@ function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     cone.dual_point = zeros(T, dim)
     cone.scaled_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.scal_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -134,7 +135,7 @@ function update_dual_feas(cone::EpiNormEucl{T}) where {T}
         dual_feas = false
     end
 
-    cone.dual_feas_updated = true # TODO most other cones don't have this?
+    cone.dual_feas_updated = true
     return dual_feas
 end
 
@@ -146,6 +147,17 @@ function update_grad(cone::EpiNormEucl)
 
     cone.grad_updated = true
     return cone.grad
+end
+
+function update_dual_grad(cone::EpiNormEucl{T}, ::T) where {T <: Real}
+    @assert cone.dual_feas_updated
+
+    @. cone.dual_grad = cone.dual_point / cone.dual_dist
+    cone.dual_grad[1] *= -1
+
+    cone.dual_grad_updated = true
+    cone.dual_grad_inacc = false
+    return cone.dual_grad
 end
 
 function update_scal_hess(cone::EpiNormEucl{T}, mu::T) where {T}
