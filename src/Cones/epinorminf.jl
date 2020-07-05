@@ -275,12 +275,37 @@ function update_hess_sqrt_aux(cone::EpiNormInf{T}) where {T}
     return
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
-    copyto!(prod, arr)
-    lmul!(cone.hess_sqrt, lmul!(cone.hess_sqrt', prod))
+function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, T}) where {T <: Real}
+    cone.hess_aux_updated || update_hess_aux(cone)
+    @views @inbounds begin
+        copyto!(prod[1, :], arr[1, :])
+        mul!(prod[1, :], arr[2:end, :]', cone.Hure, true, cone.Huu)
+        mul!(prod[2:end, :], cone.Hure, arr[1, :]')
+        @. prod[2:end, :] += cone.Hrere * arr[2:end, :]
+    end
     return prod
 end
+
+function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, Complex{T}}) where {T <: Real}
+    cone.hess_aux_updated || update_hess_aux(cone)
+    @views @inbounds begin
+        @. prod[1, :] = cone.Huu * arr[1, :]
+        mul!(prod[1, :], arr[2:2:end, :]', cone.Hure, true, true)
+        mul!(prod[1, :], arr[3:2:end, :]', cone.Huim, true, true)
+        mul!(prod[2:2:end, :], cone.Hure, arr[1, :]')
+        mul!(prod[3:2:end, :], cone.Huim, arr[1, :]')
+        @. prod[2:2:end, :] += cone.Hrere * arr[2:2:end, :] + cone.Hreim * arr[3:2:end, :]
+        @. prod[3:2:end, :] += cone.Himim * arr[3:2:end, :] + cone.Hreim * arr[2:2:end, :]
+    end
+    return prod
+end
+
+# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+#     cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
+#     copyto!(prod, arr)
+#     lmul!(cone.hess_sqrt, lmul!(cone.hess_sqrt', prod))
+#     return prod
+# end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
