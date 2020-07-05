@@ -34,7 +34,13 @@ A'*y + G'*z + c*tau = xrhs
 
 abstract type NaiveElimSystemSolver{T <: Real} <: SystemSolver{T} end
 
-function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}, sol::Vector{T}, rhs::Vector{T}) where {T <: Real}
+function solve_system(
+    system_solver::NaiveElimSystemSolver{T},
+    solver::Solver{T},
+    sol::Vector{T},
+    rhs::Vector{T},
+    tau_scal::T,
+    ) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
 
@@ -73,7 +79,7 @@ function solve_system(system_solver::NaiveElimSystemSolver{T}, solver::Solver{T}
     @views mul!(s, model.G, sol[1:n], -1, true)
 
     # kap = -kapbar/taubar*tau + kaprhs
-    sol[end] = -solver.kap / solver.tau * sol4[end] + rhs[end]
+    sol[end] = -tau_scal * sol4[end] + rhs[end]
 
     return sol
 end
@@ -186,7 +192,7 @@ function update_lhs(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
             @views copyto!(system_solver.lhs4.nzval[system_solver.hess_idxs[k][j]], H_k[nz_rows, j])
         end
     end
-    system_solver.lhs4.nzval[end] = solver.kap / solver.tau
+    system_solver.lhs4.nzval[end] = solver.mu / solver.tau / solver.tau # NOTE: mismatch when using NT for kaptau
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs4)
 
@@ -257,7 +263,7 @@ function update_lhs(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver
             @views Cones.hess_prod!(lhs4[z_rows_k, end], model.h[idxs_k], cone_k)
         end
     end
-    lhs4[end, end] = solver.kap / solver.tau
+    lhs4[end, end] = solver.mu / solver.tau / solver.tau # NOTE: mismatch when using NT for kaptau
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs4)
 

@@ -114,6 +114,8 @@ function setup_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     return
 end
 
+use_correction(::WSOSInterpEpiNormEucl) = false # TODO
+
 get_nu(cone::WSOSInterpEpiNormEucl) = 2 * sum(size(Psk, 2) for Psk in cone.Ps)
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormEucl)

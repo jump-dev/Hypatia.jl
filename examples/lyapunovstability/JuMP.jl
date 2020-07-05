@@ -48,6 +48,7 @@ example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::FastInstances) = begin
     ((10, 20, true, false), nothing, options),
     ((15, 15, false, true), nothing, options),
     ((15, 15, false, false), nothing, options),
+    ((25, 30, true, true), nothing, options),
     ((25, 30, true, false), nothing, options),
     ((30, 30, false, false), nothing, options),
     ]
@@ -55,7 +56,6 @@ end
 example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::SlowInstances) = begin
     options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
-    ((25, 30, true, true), nothing, options),
     ((30, 30, false, true), nothing, options),
     ]
 end

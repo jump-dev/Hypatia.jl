@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey and contributors
+Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 
 epigraph of perspective of (half) square function (AKA rotated second-order cone)
 (u in R, v in R_+, w in R^n) : u >= v*1/2*norm_2(w/v)^2
@@ -39,6 +39,8 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     hess_sqrt_vec::Vector{T}
     inv_hess_sqrt_vec::Vector{T}
 
+    correction::Vector{T}
+
     function EpiPerSquare{T}(
         dim::Int;
         use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
@@ -69,6 +71,7 @@ function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     cone.inv_hess_sqrt_vec = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -245,4 +248,29 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}
     @. @views prod[3:end, :] += arr[3:end, :] * rtdist
 
     return prod
+end
+
+rotated_jdot(x::AbstractVector, y::AbstractVector) = @views x[1] * y[2] + x[2] * y[1] - dot(x[3:end], y[3:end]) # TODO if only used once, don't make separate function
+
+# TODO allocs
+function correction(cone::EpiPerSquare, primal_dir::AbstractVector)
+    @assert cone.grad_updated
+    dim = cone.dim
+    corr = cone.correction
+    point = cone.point
+
+    tmp = hess_prod!(cone.nbhd_tmp, primal_dir, cone)
+    tmp2 = cone.nbhd_tmp2
+    copyto!(tmp2, primal_dir)
+    @views tmp2[3:dim] .*= -1
+    (tmp2[1], tmp2[2]) = (tmp2[2], tmp2[1])
+
+    corr .= point * dot(primal_dir, tmp)
+    corr[3:dim] .*= -1
+    (corr[1], corr[2]) = (corr[2], corr[1])
+    corr .+= tmp * rotated_jdot(point, primal_dir)
+    corr .-= dot(point, tmp) * tmp2
+    corr ./= 2 * cone.dist
+
+    return corr
 end
