@@ -198,7 +198,7 @@ function nonnegative3(T; options...)
     c = rand(T(0):T(9), n)
     A = rand(T(-9):T(9), p, n)
     b = vec(sum(A, dims = 2))
-    G = Diagonal(-one(T) * I, n)
+    G = -one(T) * I
     h = zeros(T, q)
     cones = Cone{T}[Cones.Nonnegative{T}(q)]
 
@@ -283,7 +283,7 @@ function epinorminf4(T; options...)
     c = T[0, 1, -1]
     A = T[1 0 0; 0 1 0]
     b = T[1, -0.4]
-    G = Diagonal(-one(T) * I, 3)
+    G = -one(T) * I
     h = zeros(T, 3)
     cones = Cone{T}[Cones.EpiNormInf{T, T}(3, use_dual = true)]
 
@@ -329,7 +329,7 @@ function epinorminf7(T; options...)
     c = T[1, 0, 0, 0, 0, 0, 0]
     A = zeros(T, 0, 7)
     b = zeros(T, 0)
-    G = Diagonal(-one(T) * I, 7)
+    G = -one(T) * I
     h = zeros(T, 7)
 
     for use_dual in (false, true)
@@ -382,7 +382,7 @@ function epinormeucl2(T; options...)
     c = T[0, -1, -1]
     A = T[1 0 0]
     b = T[0]
-    G = Diagonal(-one(T) * I, 3)
+    G = -one(T) * I
     h = zeros(T, 3)
     cones = Cone{T}[Cones.EpiNormEucl{T}(3)]
 
@@ -428,7 +428,7 @@ function epipersquare2(T; options...)
     c = T[0, 0, -1]
     A = T[1 0 0; 0 1 0]
     b = T[Tirt2 / 2, Tirt2]
-    G = Matrix{T}(-I, 3, 3)
+    G = -one(T) * I
     h = zeros(T, 3)
     cones = Cone{T}[Cones.EpiPerSquare{T}(3)]
 
@@ -607,7 +607,7 @@ function hypoperlog1(T; options...)
     c = T[1, 1, 1]
     A = T[0 1 0; 1 0 0]
     b = T[2, 1]
-    G = Matrix{T}(-I, 3, 3)
+    G = -one(T) * I
     h = zeros(T, 3)
     cones = Cone{T}[Cones.HypoPerLog{T}(3)]
 
@@ -726,7 +726,7 @@ function hypogeomean1(T; options...)
     c = T[-1, 0, 0]
     A = T[0 0 1; 0 1 0]
     b = T[0.5, 1]
-    G = Matrix{T}(-I, 3, 3)
+    G = -one(T) * I
     h = zeros(T, 3)
 
     for use_dual in (false, true)
@@ -817,7 +817,7 @@ function hypogeomean6(T; options...)
     c[1] = -1
     A = hcat(zeros(T, 9), Matrix{T}(I, 9, 9))
     b = ones(T, 9)
-    G = Matrix{T}(-I, 10, 10)
+    G = -one(T) * I
     h = zeros(T, 10)
     cones = Cone{T}[Cones.HypoGeomean{T}(fill(inv(T(9)), 9))]
 
@@ -853,7 +853,7 @@ function power2(T; options...)
     c = T[0, 0, -1, -1]
     A = T[0 1 0 0; 1 0 0 0]
     b = T[0.5, 1]
-    G = Matrix{T}(-I, 4, 4)
+    G = -one(T) * I
     h = zeros(T, 4)
 
     for use_dual in (false, true)
@@ -918,7 +918,7 @@ function epinormspectral1(T; options...)
         c = vcat(one(T), zeros(T, dim))
         A = hcat(zeros(T, dim, 1), Matrix{T}(I, dim, dim))
         b = rand(T, dim)
-        G = Matrix{T}(-I, dim + 1, dim + 1)
+        G = -one(T) * I
         h = vcat(zero(T), rand(T, dim))
 
         for use_dual in (false, true)
@@ -1224,7 +1224,7 @@ function possemideftri1(T; options...)
     c = T[0, -1, 0]
     A = T[1 0 0; 0 0 1]
     b = T[0.5, 1]
-    G = Matrix{T}(-I, 3, 3)
+    G = -one(T) * I
     h = zeros(T, 3)
     cones = Cone{T}[Cones.PosSemidefTri{T, T}(3)]
 
@@ -1401,7 +1401,7 @@ function possemideftrisparse1(T; options...)
     c = T[0, -1, 0]
     A = T[1 0 0; 0 0 1]
     b = T[0.5, 1]
-    G = Matrix{T}(-I, 3, 3)
+    G = -one(T) * I
     h = zeros(T, 3)
     row_idxs = [1, 2, 2]
     col_idxs = [1, 1, 2]
@@ -1556,7 +1556,7 @@ function doublynonnegative2(T; options...)
     c = T[0, -1, 0]
     A = T[1 0 0; 0 0 1]
     b = T[1.0, 1.5]
-    G = Matrix{T}(-I, 3, 3)
+    G = -one(T) * I
     h = [-inv(T(2)), zero(T), -inv(T(2))]
     cones = Cone{T}[Cones.DoublyNonnegative{T}(3)]
 

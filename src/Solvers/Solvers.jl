@@ -130,7 +130,7 @@ mutable struct Solver{T <: Real}
         tol_slow::Real = 1e-3,
         preprocess::Bool = true,
         reduce::Bool = true,
-        rescale = true,
+        rescale::Bool = true,
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
         init_use_fallback::Bool = true,
@@ -199,39 +199,11 @@ function solve(solver::Solver{T}) where {T <: Real}
     # preprocess and find initial point
     @timeit solver.timer "initialize" begin
         orig_model = solver.orig_model
-        model = solver.model = Models.Model{T}(
-            copy(orig_model.c),
-            copy(orig_model.A),
-            copy(orig_model.b),
-            copy(orig_model.G),
-            copy(orig_model.h),
-            orig_model.cones,
-            obj_offset = orig_model.obj_offset,
-            ) # copy original model to solver.model, which may be modified
-
-        solver.rescale = true # TODO delete
-        if solver.rescale
-            rteps = sqrt(eps(T))
-            solver.c_scale = c_scale = T[sqrt(max(rteps, abs(model.c[j]), maximum(abs, model.A[:, j]), maximum(abs, model.G[:, j]))) for j in 1:model.n]
-            solver.b_scale = b_scale = T[sqrt(max(rteps, abs(model.b[i]), maximum(abs, model.A[i, :]))) for i in 1:model.p]
-            h_scale = solver.h_scale = ones(T, model.q)
-            model.c .= orig_model.c ./ c_scale
-            model.b ./= b_scale
-            for (k, cone_k) in enumerate(model.cones)
-                idxs = model.cone_idxs[k]
-                if cone_k isa Cones.Nonnegative # TODO dispatch
-                    h_scale[idxs] = T[sqrt(max(rteps, maximum(abs, model.h[i]), maximum(abs, model.G[i, :]))) for i in idxs]
-                else
-                    scal = sqrt(max(rteps, maximum(abs, model.h[idxs]), maximum(abs, model.G[idxs, :])))
-                    h_scale[idxs] = fill(scal, length(idxs)) # TODO store point only
-                end
-            end
-            model.h ./= h_scale
-            model.A = model.A ./ c_scale' ./ b_scale
-            model.G = model.G ./ c_scale' ./ h_scale
-        end
+        model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
 
         @timeit solver.timer "init_cone" point = solver.point = initialize_cone_point(solver.orig_model.cones, solver.orig_model.cone_idxs, solver.timer)
+
+        solver.rescale && rescale_data(solver)
 
         if solver.reduce
             # TODO don't find point / unnecessary stuff before reduce
@@ -452,8 +424,15 @@ get_num_iters(solver::Solver) = solver.num_iters
 get_primal_obj(solver::Solver) = solver.primal_obj
 get_dual_obj(solver::Solver) = solver.dual_obj
 
-get_s(solver::Solver) = solver.point.s .* (solver.rescale ? solver.h_scale : 1)
-get_z(solver::Solver) = solver.point.z ./ (solver.rescale ? solver.h_scale : 1)
+function get_s(solver::Solver)
+    solver.rescale || return copy(solver.point.s)
+    return solver.point.s .* solver.h_scale
+end
+
+function get_z(solver::Solver)
+    solver.rescale || return copy(solver.point.z)
+    return solver.point.z ./ solver.h_scale
+end
 
 function get_x(solver::Solver{T}) where {T <: Real}
     if solver.preprocess && !iszero(solver.orig_model.n) && !any(isnan, solver.point.x)

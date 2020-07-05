@@ -98,6 +98,7 @@ other_options = (
     tol_feas = tol,
     tol_rel_opt = tol,
     tol_abs_opt = tol,
+    rescale = true,
     # preprocess = false,
     # reduce = false,
     )
