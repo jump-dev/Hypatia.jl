@@ -270,11 +270,34 @@ function update_inv_hess_sqrt_aux(cone::EpiSumPerEntropy{T}) where {T}
     return
 end
 
-# TODO write a hess prod that doesn't use inv_hess_sqrt, for better numerics
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
-    @warn "write a entropy cone hess prod that doesn't use inv_hess_sqrt" maxlog=5
-    cone.inv_hess_sqrt_aux_updated || update_inv_hess_sqrt_aux(cone)
-    ldiv!(cone.inv_hess_sqrt', ldiv!(prod, cone.inv_hess_sqrt, arr))
+    @assert cone.grad_updated # TODO update
+    v_idxs = cone.v_idxs
+    w_idxs = cone.w_idxs
+    @views v = cone.point[v_idxs]
+    @views w = cone.point[w_idxs]
+    z = cone.z
+    sigma = w ./ v / z # TODO update somewhere else
+    tau = cone.tau
+    @views u_arr = arr[1, :]
+    @views v_arr = arr[v_idxs, :]
+    @views w_arr = arr[w_idxs, :]
+
+    prod .= 0
+
+    @views mul!(prod[1, :], v_arr', sigma)
+    @views mul!(prod[1, :], w_arr', tau, true, true)
+    @. @views prod[1, :] += u_arr / z
+    @. @views prod[1, :] /= z
+
+    @views prod[v_idxs, :] .+= (sigma .* u_arr') / z
+    prod[v_idxs, :] .+= sigma .* (sigma' * v_arr) + (v_arr .* sigma + v_arr ./ v) ./ v
+    prod[v_idxs, :] .+= sigma .* (tau' * w_arr) - w_arr ./ v / z
+
+    @views prod[w_idxs, :] .+= (tau .* u_arr') / z
+    prod[w_idxs, :] .+= tau .* (tau' * w_arr) + (w_arr / z + w_arr ./ w) ./ w
+    prod[w_idxs, :] .+= tau .* (sigma' * v_arr) - v_arr ./ v / z
+
     return prod
 end
 
