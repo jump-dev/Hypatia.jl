@@ -26,6 +26,46 @@ function initialize_cone_point(cones::Vector{Cones.Cone{T}}, cone_idxs::Vector{U
     return point
 end
 
+# rescale the rows and columns of the conic data to get an equivalent conic problem
+function rescale_data(solver::Solver{T}) where {T <: Real}
+    model = solver.model
+    rteps = sqrt(eps(T))
+    maxabsmin(v::AbstractVecOrMat) = maximum(abs, v, init = rteps)
+    maxabsmincol(v::UniformScaling, ::Int) = max(abs(v.λ), rteps)
+    maxabsmincol(v::AbstractMatrix, j::Int) = maxabsmin(view(v, :, j))
+    maxabsminrow(v::UniformScaling, ::Int) = max(abs(v.λ), rteps)
+    maxabsminrow(v::AbstractMatrix, i::Int) = maxabsmin(view(v, i, :))
+    maxabsminrows(v::UniformScaling, ::UnitRange{Int}) = max(abs(v.λ), rteps)
+    maxabsminrows(v::AbstractMatrix, rows::UnitRange{Int}) = maxabsmin(view(v, rows, :))
+
+    @inbounds solver.c_scale = c_scale = T[sqrt(max(abs(model.c[j]), maxabsmincol(model.A, j), maxabsmincol(model.G, j))) for j in 1:model.n]
+    @inbounds solver.b_scale = b_scale = T[sqrt(max(abs(model.b[i]), maxabsminrow(model.A, i))) for i in 1:model.p]
+
+    h_scale = solver.h_scale = ones(T, model.q)
+    for (k, cone_k) in enumerate(model.cones)
+        idxs = model.cone_idxs[k]
+        if cone_k isa Cones.Nonnegative
+            for i in idxs
+                @inbounds h_scale[i] = sqrt(max(abs(model.h[i]), maxabsminrow(model.G, i)))
+            end
+        else
+            # TODO store single scale value only?
+            @inbounds h_scale[idxs] .= sqrt(max(maxabsmin(view(model.h, idxs)), maxabsminrows(model.G, idxs)))
+        end
+    end
+
+    cdiag = Diagonal(c_scale)
+    model.c = cdiag \ model.c
+    model.A = model.A / cdiag
+    model.A ./= b_scale
+    model.G = model.G / cdiag
+    model.G ./= h_scale
+    model.b = Diagonal(b_scale) \ model.b
+    model.h = Diagonal(h_scale) \ model.h
+
+    return solver.model
+end
+
 # optionally preprocess dual equalities and solve for x as least squares solution to Ax = b, Gx = h - s
 function find_initial_x(solver::Solver{T}) where {T <: Real}
     model = solver.model
