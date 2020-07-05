@@ -280,23 +280,22 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumP
     sigma = w ./ v / z # TODO update somewhere else
     tau = cone.tau
     @views u_arr = arr[1, :]
-    @views v_arr = arr[v_idxs, :]
-    @views w_arr = arr[w_idxs, :]
 
-    prod .= 0
-
-    @views mul!(prod[1, :], v_arr', sigma)
-    @views mul!(prod[1, :], w_arr', tau, true, true)
+    @views mul!(prod[1, :], arr[v_idxs, :]', sigma)
+    @views mul!(prod[1, :], arr[w_idxs, :]', tau, true, true)
     @. @views prod[1, :] += u_arr / z
     @. @views prod[1, :] /= z
 
-    @views prod[v_idxs, :] .+= (sigma .* u_arr') / z
-    prod[v_idxs, :] .+= sigma .* (sigma' * v_arr) + (v_arr .* sigma + v_arr ./ v) ./ v
-    prod[v_idxs, :] .+= sigma .* (tau' * w_arr) - w_arr ./ v / z
+    @inbounds for j in 1:size(prod, 2)
+        @views vj = arr[v_idxs, j]
+        @views wj = arr[w_idxs, j]
+        dotprods = dot(sigma, vj) + dot(tau, wj)
+        @. @views prod[v_idxs, j] = sigma * dotprods + (vj * sigma + vj / v) / v - wj / v / z
+        @. @views prod[w_idxs, j] = tau * dotprods + (wj / z + wj / w) / w - vj / v / z
+    end
 
-    @views prod[w_idxs, :] .+= (tau .* u_arr') / z
-    prod[w_idxs, :] .+= tau .* (tau' * w_arr) + (w_arr / z + w_arr ./ w) ./ w
-    prod[w_idxs, :] .+= tau .* (sigma' * v_arr) - v_arr ./ v / z
+    @. @views prod[v_idxs, :] += (sigma * u_arr') / z
+    @. @views prod[w_idxs, :] += (tau * u_arr') / z
 
     return prod
 end
