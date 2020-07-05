@@ -46,6 +46,7 @@ mutable struct Solver{T <: Real}
     tol_slow::T
     preprocess::Bool
     reduce::Bool
+    rescale::Bool
     init_use_indirect::Bool
     init_tol_qr::T
     init_use_fallback::Bool
@@ -114,6 +115,11 @@ mutable struct Solver{T <: Real}
     prev_y_feas::T
     prev_z_feas::T
 
+    # data scaling
+    b_scale::Vector{T}
+    c_scale::Vector{T}
+    h_scale::Vector{T}
+
     function Solver{T}(;
         verbose::Bool = true,
         iter_limit::Int = 1000,
@@ -124,6 +130,7 @@ mutable struct Solver{T <: Real}
         tol_slow::Real = 1e-3,
         preprocess::Bool = true,
         reduce::Bool = true,
+        rescale::Bool = true,
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
         init_use_fallback::Bool = true,
@@ -151,6 +158,7 @@ mutable struct Solver{T <: Real}
         solver.tol_slow = tol_slow
         solver.preprocess = preprocess
         solver.reduce = reduce
+        solver.rescale = rescale
         solver.init_use_indirect = init_use_indirect
         solver.init_tol_qr = init_tol_qr
         solver.init_use_fallback = init_use_fallback
@@ -194,6 +202,8 @@ function solve(solver::Solver{T}) where {T <: Real}
         model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
 
         @timeit solver.timer "init_cone" point = solver.point = initialize_cone_point(solver.orig_model.cones, solver.orig_model.cone_idxs, solver.timer)
+
+        solver.rescale && rescale_data(solver)
 
         if solver.reduce
             # TODO don't find point / unnecessary stuff before reduce
@@ -414,8 +424,15 @@ get_num_iters(solver::Solver) = solver.num_iters
 get_primal_obj(solver::Solver) = solver.primal_obj
 get_dual_obj(solver::Solver) = solver.dual_obj
 
-get_s(solver::Solver) = copy(solver.point.s)
-get_z(solver::Solver) = copy(solver.point.z)
+function get_s(solver::Solver)
+    solver.rescale || return copy(solver.point.s)
+    return solver.point.s .* solver.h_scale
+end
+
+function get_z(solver::Solver)
+    solver.rescale || return copy(solver.point.z)
+    return solver.point.z ./ solver.h_scale
+end
 
 function get_x(solver::Solver{T}) where {T <: Real}
     if solver.preprocess && !iszero(solver.orig_model.n) && !any(isnan, solver.point.x)
@@ -437,6 +454,9 @@ function get_x(solver::Solver{T}) where {T <: Real}
     else
         x = copy(solver.point.x)
     end
+    if solver.rescale
+        x ./= solver.c_scale
+    end
 
     return x
 end
@@ -457,6 +477,9 @@ function get_y(solver::Solver{T}) where {T <: Real}
         end
     else
         y = copy(solver.point.y)
+    end
+    if solver.rescale
+        y ./= solver.b_scale
     end
 
     return y
