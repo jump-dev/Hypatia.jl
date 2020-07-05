@@ -28,6 +28,7 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
+    dual_grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     scal_hess
     inv_hess::Symmetric{T, Matrix{T}}
@@ -38,6 +39,8 @@ mutable struct HypoGeomean{T <: Real} <: Cone{T}
 
     wprod::T
     z::T
+    dual_wprod::T
+    dual_z::T
 
     function HypoGeomean{T}(
         alpha::Vector{T};
@@ -69,6 +72,7 @@ function setup_data(cone::HypoGeomean{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.scal_hess = zeros(T, dim, dim)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -119,7 +123,7 @@ function update_dual_feas(cone::HypoGeomean{T}) where {T}
     w = view(cone.dual_point, 2:cone.dim)
     alpha = cone.alpha
     if u < -eps(T) && all(>(eps(T)), w)
-        return eps(T) < exp(sum(alpha[i] * log(w[i] / alpha[i]) for i in eachindex(alpha))) - u
+        return eps(T) < exp(sum(alpha[i] * log(w[i] / alpha[i]) for i in eachindex(alpha))) + u
     end
     return false
 end
@@ -136,6 +140,19 @@ function update_grad(cone::HypoGeomean)
     cone.grad_updated = true
     return cone.grad
 end
+
+# function update_dual_grad(cone::HypoGeomean)
+#     #  TODO assert dual_feas_updated
+#     u = cone.point[1]
+#     w = view(cone.point, 2:cone.dim)
+#
+#     cone.grad[1] = inv(cone.z)
+#     wwprodu = -cone.wprod / cone.z
+#     @. cone.grad[2:end] = (wwprodu * cone.alpha - 1) / w
+#
+#     cone.grad_updated = true
+#     return cone.grad
+# end
 
 function update_hess(cone::HypoGeomean)
     @assert cone.grad_updated
