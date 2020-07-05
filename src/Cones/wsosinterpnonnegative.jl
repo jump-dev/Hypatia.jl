@@ -37,8 +37,10 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tmpLL::Vector{Matrix{R}}
     tmpUL::Vector{Matrix{R}}
     tmpLU::Vector{Matrix{R}}
-    tmpUU::Matrix{R} # TODO for corrector, this can stay as a single matrix if we only use LU
+    tmpUU::Vector{Matrix{R}} # TODO for corrector, this can stay as a single matrix if we only use LU
     ΛF::Vector
+
+    correction::Vector{T}
 
     function WSOSInterpNonnegative{T, R}(
         U::Int,
@@ -77,8 +79,9 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     cone.tmpLL = [Matrix{R}(undef, size(Pk, 2), size(Pk, 2)) for Pk in Ps]
     cone.tmpUL = [Matrix{R}(undef, dim, size(Pk, 2)) for Pk in Ps]
     cone.tmpLU = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
-    cone.tmpUU = Matrix{R}(undef, dim, dim)
+    cone.tmpUU = [Matrix{R}(undef, dim, dim) for Pk in Ps]
     cone.ΛF = Vector{Any}(undef, length(Ps))
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -142,7 +145,7 @@ function update_hess(cone::WSOSInterpNonnegative)
     cone.hess .= 0
     @inbounds for k in eachindex(cone.Ps)
         LUk = cone.tmpLU[k]
-        UUk = mul!(cone.tmpUU, LUk', LUk)
+        UUk = mul!(cone.tmpUU[k], LUk', LUk) # TODO use syrk
         @inbounds for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end
@@ -150,4 +153,17 @@ function update_hess(cone::WSOSInterpNonnegative)
 
     cone.hess_updated = true
     return cone.hess
+end
+
+function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
+    corr = cone.correction
+    corr .= 0
+    @inbounds for k in eachindex(cone.Ps)
+        # NOTE don't overwrite tmpLU or tmpUU
+        LpdU = (cone.tmpLU[k] * Diagonal(primal_dir)) * cone.tmpUU[k] # TODO allocs
+        @inbounds for j in 1:cone.dim
+            corr[j] += sum(abs2, view(LpdU, :, j))
+        end
+    end
+    return corr
 end

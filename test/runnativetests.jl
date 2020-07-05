@@ -90,12 +90,11 @@ reduce_flags = [
 timer = TimerOutput()
 tol = 1e-7
 other_options = (
-    verbose = true,
-    # verbose = false,
+    # verbose = true,
+    verbose = false,
     iter_limit = 100,
     time_limit = 6e1,
     timer = timer,
-    # TODO this is tighter than default
     tol_feas = tol,
     tol_rel_opt = tol,
     tol_abs_opt = tol,

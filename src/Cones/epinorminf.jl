@@ -44,6 +44,8 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     Hreim::Vector{T}
     Himim::Vector{T}
 
+    correction::Vector{T}
+
     function EpiNormInf{T, R}(
         dim::Int;
         use_dual::Bool = false,
@@ -85,6 +87,7 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
         cone.Hreim = zeros(T, n)
         cone.Himim = zeros(T, n)
     end
+    cone.correction = zeros(T, dim)
     return
 end
 
@@ -296,6 +299,50 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
     cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
     ldiv!(prod, cone.hess_sqrt, arr)
     return prod
+end
+
+function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T <: Real}
+    u = cone.point[1]
+    udir = primal_dir[1]
+    corr = cone.correction
+
+    corr1 = T(-0.5) * u * udir * sum((3 - 2 * u / z * u) / z / z for z in cone.den) * udir - (cone.n - 1) * abs2(udir / u) / u
+    for i in 1:cone.n
+        deni = -4 * cone.den[i]
+        udeni = 2 * cone.uden[i]
+        suuw = udir * (-1 + udeni * u)
+        wi = cone.w[i]
+        wdeni = 2 * cone.wden[i]
+        if cone.is_complex
+            (wdenire, wdeniim) = reim(wdeni)
+            (wire, wiim) = reim(wi)
+            (dire, diim) = (primal_dir[2i], primal_dir[2i + 1])
+            uuwre = suuw * wdenire
+            uuwim = suuw * wdeniim
+            uimimre = 1 + wdenire * wire
+            uimimim = 1 + wdeniim * wiim
+            uimimrere = -udeni * uimimre * dire
+            uimimimim = -udeni * uimimim * diim
+            uimimimre = -udeni * wdeniim * wire
+            imimwrerere = wdenire * (2 + uimimre)
+            imimwimimim = wdeniim * (2 + uimimim)
+            imimwrereim = wdeniim * uimimre * dire
+            imimwimimre = wdenire * uimimim * diim
+            corr1 += (2 * (uuwre * dire + uuwim * diim) + uimimrere * dire + uimimimim * diim + 2 * uimimimre * diim * dire) / deni
+            corr[2i] = (udir * (2 * (uimimrere + uimimimre * diim) + uuwre) + (abs2(dire) * imimwrerere + diim * (2 * imimwrereim + imimwimimre))) / deni
+            corr[2i + 1] = (udir * (2 * (uimimimim + uimimimre * dire) + uuwim) + (abs2(diim) * imimwimimim + dire * (2 * imimwimimre + imimwrereim))) / deni
+        else
+            di = primal_dir[1 + i]
+            uuw = suuw * wdeni
+            uimim = 1 + wdeni * wi
+            uimim2 = -udeni * uimim * di
+            corr1 += di * (2 * uuw + uimim2) / deni
+            corr[1 + i] = (udir * (uuw + 2 * uimim2) + di * wdeni * (2 + uimim) * di) / deni
+        end
+    end
+    corr[1] = corr1
+
+    return corr
 end
 
 hess_nz_count(cone::EpiNormInf{<:Real, <:Real}) = 3 * cone.dim - 2
