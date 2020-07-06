@@ -511,6 +511,7 @@ function apply_lhs(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: R
         # (pr bar) z_k + mu*H_k*s_k
         # (du bar) mu*H_k*z_k + s_k
         s_res_k = stepper.s_res_k[k]
+        @show "iter ref"
         Cones.scal_hess_prod!(s_res_k, stepper.primal_dir_k[k], cone_k, solver.mu)
         # Cones.hess_prod!(s_res_k, stepper.primal_dir_k[k], cone_k)
         @. s_res_k += stepper.dual_dir_k[k]

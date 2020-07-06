@@ -51,23 +51,24 @@ function update_scal_hess(
     use_update_1::Bool = use_update_1_default(),
     use_update_2::Bool = use_update_2_default(),
     ) where {T}
-    # @assert !cone.scal_hess_updated
+    @assert !cone.scal_hess_updated
     cone.scal_hess_updated = true
     # if !use_scaling(cone)
     #     return hess(cone)
     # end
 
-    s = cone.point
+    s_cone = cone.point
     z = cone.dual_point
     rtmu = sqrt(mu)
     irtmu = inv(rtmu)
-    s = rtmu * s # TODO avoid remultiplying
+    s = rtmu * s_cone # TODO avoid remultiplying
 
-    sz = rtmu * dot(s, z)
+    sz = dot(s, z)
     nu = get_nu(cone)
 
     g = grad(cone) / rtmu
     # scal_hess = mu * hess(cone)
+    # @show (hess(cone) / mu * s) ./ -g
 
     scal_hess = cone.scal_hess
     copyto!(scal_hess.data, hess(cone).data)
@@ -81,7 +82,7 @@ function update_scal_hess(
 
 
     # first update
-    if use_update_1 && norm(z + rtmu * g) > update_tol # TODO should this be more scale-independent? eg normalized, or check dot(Hs, z) / norm(Hs) / norm(z)
+    if use_update_1 && norm(z + mu * g) > update_tol # TODO should this be more scale-independent? eg normalized, or check dot(Hs, z) / norm(Hs) / norm(z)
         if sz > denom_tol
             # scal_hess += inv(sz) * Symmetric(z * z') - (mu / nu) * Symmetric(g * g')
             # za = inv(sqrt(sz)) * z
@@ -91,7 +92,7 @@ function update_scal_hess(
             # scal_hess += Symmetric(za * za')
             # gb = inv(sqrt(nu)) * g
             # BLAS.syr!('U', -inv(nu), g, scal_hess.data)
-            outer_prod1(g, scal_hess.data, -inv(T(nu)))
+            outer_prod1(g, scal_hess.data, -mu / nu) # (mu*g)(mu*g)' / (mu * nu)
             # scal_hess -= Symmetric(gb * gb')
             update_one_applied = true
             if norm(scal_hess * s - z) > 1e-4
