@@ -135,7 +135,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     # calculate centering factor gamma by finding distance pred_alpha for stepping in pred direction
     copyto!(stepper.dir, dir_pred)
-    @timeit timer "alpha_pred" stepper.prev_pred_alpha = pred_alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = T(Inf))
+    @timeit timer "alpha_pred" stepper.prev_pred_alpha = pred_alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T)) # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
 
     # TODO allow different function (heuristic) as option?
     # stepper.prev_gamma = gamma = abs2(1 - pred_alpha)
@@ -379,12 +379,15 @@ function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}) whe
         corr_k = Cones.correction(cone_k, prim_k_scal)
         corr_point = dot(corr_k, cone_k.point)
         @assert !isnan(corr_point)
-        corr_viol = abs(1 - irtrtmu * dot(prim_k_scal, H_prim_dir_k) / corr_point)
+        corr_viol = abs(corr_point - irtrtmu * dot(prim_k_scal, H_prim_dir_k)) / abs(corr_point + 10eps(T))
         @assert !isnan(corr_viol)
+        # if corr_point < eps(T)
+        #     @show "pred ", corr_point
+        # end
         if corr_viol < 0.001
             @. stepper.s_rhs_k[k] += H_prim_dir_k + corr_k
-        # else
-        #     println("skip pred-corr: $corr_viol")
+        else
+            println("skip pred-corr: $corr_viol")
         end
     end
 
@@ -436,10 +439,13 @@ function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}) whe
         @assert !isnan(corr_point)
         corr_viol = abs(corr_point - dot(prim_k_scal, H_prim_dir_k_scal)) / abs(corr_point + 10eps(T))
         @assert !isnan(corr_viol)
+        # if corr_point < eps(T)
+        #     @show "cent ", corr_point
+        # end
         if corr_viol < 0.001
             stepper.s_rhs_k[k] .+= corr_k
-        # else
-        #     println("skip cent-corr: $corr_viol")
+        else
+            println("skip cent-corr: $corr_viol")
         end
     end
 
@@ -646,8 +652,8 @@ function find_max_alpha(
     prev_alpha::T,
     min_alpha::T,
     min_nbhd::T = T(0.01),
-    max_nbhd::T = one(T),
-    # max_nbhd::T = T(0.99),
+    # max_nbhd::T = one(T),
+    max_nbhd::T = T(0.99),
     ) where {T <: Real}
     cones = solver.model.cones
     cone_times = stepper.cone_times
@@ -665,7 +671,7 @@ function find_max_alpha(
     primals_ls = stepper.primal_views_ls
     duals_ls = stepper.dual_views_ls
 
-    alpha_reduce = T(0.95) # TODO tune, try larger
+    alpha_reduce = T(0.95) # TODO tune, maybe try smaller for pred_alpha since heuristic
     nup1 = solver.model.nu + 1
     sz_ks = zeros(T, length(cone_order)) # TODO prealloc
 
@@ -726,8 +732,8 @@ function find_max_alpha(
             Cones.load_dual_point(cone_k, duals_ls[k])
             Cones.reset_data(cone_k)
 
-            # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, rtmu, max_nbhd))
-            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
+            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, rtmu, max_nbhd))
+            # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
             # TODO is_dual_feas function should fall back to a nbhd-like check (for ray maybe) if not using nbhd check
             # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k))
 
