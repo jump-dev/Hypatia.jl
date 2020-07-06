@@ -32,7 +32,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     dual_grad::Vector{T}
     dual_grad_inacc::Bool
     hess::Symmetric{T, Matrix{T}}
-    scal_hess
+    scal_hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
     correction::Vector{T}
@@ -85,7 +85,7 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.grad = similar(cone.point)
     cone.dual_grad = similar(cone.point)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.scal_hess = zeros(T, dim, dim)
+    cone.scal_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.correction = zeros(T, dim)

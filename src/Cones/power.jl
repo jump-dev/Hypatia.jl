@@ -83,7 +83,7 @@ function setup_data(cone::Power{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.scal_hess = zeros(T, dim, dim)
+    cone.scal_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)

@@ -82,7 +82,7 @@ function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.dual_grad = zeros(T, dim)
-    cone.scal_hess = zeros(T, dim, dim)
+    cone.scal_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)

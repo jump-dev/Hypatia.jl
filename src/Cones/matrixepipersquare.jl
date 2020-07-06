@@ -99,7 +99,7 @@ function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}
     cone.grad = zeros(T, dim)
     cone.dual_grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.scal_hess = zeros(T, dim, dim)
+    cone.scal_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.correction = zeros(T, dim)
