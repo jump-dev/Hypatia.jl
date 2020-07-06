@@ -111,7 +111,7 @@ function update_scal_hess(
     # @show scal_hess
 
     # second update
-    use_simplifications = false # TODO use?
+    use_simplifications = false # TODO use? TODO might need updating for how mu is used
     if use_update_2
         conj_g = dual_grad(cone, mu)
         gsgz = dot(g, conj_g)
@@ -129,7 +129,7 @@ function update_scal_hess(
             # denom_a = sz + abs2(mu_cone) * gsgz - 2 * nu * mu_cone
             # @assert isapprox(denom_a, abs2(mu_cone) * gsgz - sz)
 
-            Hgz = hess(cone) * conj_g
+            Hgz = hess(cone) * conj_g / mu
             if update_one_applied
                 # struggling with correcness of this
                 # rho = -conj_g - gsgz / nu * s

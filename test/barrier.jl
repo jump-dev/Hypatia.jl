@@ -116,10 +116,11 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
     @test !cone.dual_grad_inacc
     hess = Matrix(CO.hess(cone))
     inv_hess = Matrix(CO.inv_hess(cone))
+    scal_tol = 1e-7
 
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
     @test hess * inv_hess ≈ I atol=tol rtol=tol
-    @test dot(dual_point, dual_grad) ≈ -nu atol=1e-8 rtol=1e-8
+    @test dot(dual_point, dual_grad) ≈ -nu atol=scal_tol rtol=scal_tol
 
     prod_mat = similar(point, dim, dim)
     @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
@@ -137,11 +138,11 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
 
     if CO.use_scaling(cone)
         scal_hess = CO.scal_hess(cone, irtmu)
-        @test scal_hess * point ≈ dual_point atol=sqrt(tol) rtol=sqrt(tol)
-        @test scal_hess * dual_grad ≈ grad atol=sqrt(tol) rtol=sqrt(tol)
+        @test scal_hess * point ≈ dual_point atol=scal_tol rtol=scal_tol
+        @test scal_hess * dual_grad ≈ grad atol=scal_tol rtol=scal_tol
         prod = similar(point)
-        @test CO.scal_hess_prod!(prod, point, cone, irtmu) ≈ dual_point atol=sqrt(tol) rtol=sqrt(tol)
-        @test CO.scal_hess_prod!(prod, dual_grad, cone, irtmu) ≈ grad atol=sqrt(tol) rtol=sqrt(tol)
+        @test CO.scal_hess_prod!(prod, point, cone, irtmu) ≈ dual_point atol=scal_tol rtol=scal_tol
+        @test CO.scal_hess_prod!(prod, dual_grad, cone, irtmu) ≈ grad atol=scal_tol rtol=scal_tol
 
         # repeat to check mu logic
         mu = rand(T)
@@ -149,13 +150,13 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
         irtmu = inv(rtmu)
         @test load_reset_check(cone, point, dual_point, irtmu = irtmu)
         scal_hess = CO.scal_hess(cone, mu)
-        @test scal_hess * point ≈ dual_point atol=sqrt(tol) rtol=sqrt(tol)
-        @test scal_hess * dual_grad ≈ grad atol=sqrt(tol) rtol=sqrt(tol)
+        @test scal_hess * point ≈ dual_point atol=scal_tol rtol=scal_tol
+        @test scal_hess * dual_grad ≈ grad * irtmu atol=scal_tol rtol=scal_tol
         prod = similar(point)
-        @test CO.scal_hess_prod!(prod, point, cone, mu) ≈ dual_point atol=sqrt(tol) rtol=sqrt(tol)
-        @test CO.scal_hess_prod!(prod, dual_grad, cone, mu) ≈ grad atol=sqrt(tol) rtol=sqrt(tol)
+        @test CO.scal_hess_prod!(prod, point, cone, mu) ≈ dual_point atol=scal_tol rtol=scal_tol
+        @test CO.scal_hess_prod!(prod, dual_grad, cone, mu) ≈ grad * irtmu atol=scal_tol rtol=scal_tol
     else
-        @test CO.scal_hess_prod!(prod, point, cone, mu) ≈ -grad atol=sqrt(tol) rtol=sqrt(tol)
+        @test CO.scal_hess_prod!(prod, point, cone, mu) ≈ -grad atol=scal_tol rtol=scal_tol
     end
 
     return
