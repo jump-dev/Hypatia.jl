@@ -18,6 +18,7 @@ default_solver_options = (
     iter_limit = 150,
     timer = timer,
     # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
+    # system_solver = Solvers.SymIndefDenseSystemSolver{Float64}(),
     system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
     )
 
