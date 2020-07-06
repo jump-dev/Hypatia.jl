@@ -1,7 +1,7 @@
 
 # TODO later move to Cones.jl or elsewhere
 
-use_scaling(cone::Cone) = false
+use_scaling(cone::Cone) = true
 
 function scal_hess(cone::Cone{T}, mu::T) where {T <: Real}
     if use_scaling(cone)
@@ -14,7 +14,7 @@ end
 # use_update_1_default() = true
 use_update_1_default() = true
 
-use_update_2_default() = false
+use_update_2_default() = true
 
 
 
@@ -66,12 +66,11 @@ function update_scal_hess(
     sz = rtmu * dot(s, z)
     nu = get_nu(cone)
 
-    g = grad(cone) / rtmu # TODO scale
+    g = grad(cone) / rtmu
     # scal_hess = mu * hess(cone)
 
-    scal_hess = cone.scal_hess # TODO Symmetric
-    LinearAlgebra.copytri!(scal_hess, 'U')
-    copyto!(scal_hess, hess(cone).data)
+    scal_hess = cone.scal_hess
+    copyto!(scal_hess.data, hess(cone).data)
 
     # TODO tune
     # update_tol = 1e-12
@@ -84,27 +83,27 @@ function update_scal_hess(
     # first update
     if use_update_1 && norm(z + rtmu * g) > update_tol # TODO should this be more scale-independent? eg normalized, or check dot(Hs, z) / norm(Hs) / norm(z)
         if sz > denom_tol
-            @show dot(s, g)
             # scal_hess += inv(sz) * Symmetric(z * z') - (mu / nu) * Symmetric(g * g')
             # za = inv(sqrt(sz)) * z
             za = z / sqrt(sz)
             # BLAS.syr!('U', one(T), za, scal_hess.data)
-            outer_prod1(za, scal_hess, one(T))
+            outer_prod1(za, scal_hess.data, one(T))
             # scal_hess += Symmetric(za * za')
             # gb = inv(sqrt(nu)) * g
             # BLAS.syr!('U', -inv(nu), g, scal_hess.data)
-            outer_prod1(g, scal_hess, -inv(T(nu)))
+            outer_prod1(g, scal_hess.data, -inv(T(nu)))
             # scal_hess -= Symmetric(gb * gb')
-            # if norm(scal_hess * rtmu * s - z) > 1e-4
-            #     println("large residual after 1st update on norm(scal_hess * s - z): $(norm(scal_hess * s - z))")
-            #     # error()
-            #     @show norm(scal_hess)
-            # end
-        # else
-        #     println("skipped 1st update (small denom: $sz)")
+            update_one_applied = true
+            if norm(scal_hess * s - z) > 1e-4
+                println("large residual after 1st update on norm(scal_hess * s - z): $(norm(scal_hess * s - z))")
+                # error()
+                @show norm(scal_hess)
+            end
+        else
+            println("skipped 1st update (small denom: $sz)")
         end
-    # else
-        # println("skipped 1st update")
+    else
+        println("skipped 1st update")
     end
 
     # @show extrema(eigvals(scal_hess))
@@ -141,6 +140,7 @@ function update_scal_hess(
                 H1pg = (use_simplifications ? mu * mu_cone * (Hgz - gsgz / nu * g) : scal_hess * pr_gap)
                 # @show norm(denom_b - mu * mu_cone^2 * (dot(conj_g, Hgz) - abs2(gsgz) / nu))
                 denom_b = mu * mu_cone * (dot(conj_g, Hgz) - abs2(gsgz) / nu) * mu_cone
+                # @show denom_b - dot(pr_gap, scal_hess * pr_gap)
             else
                 # would need to work out alternative simplifications if we want to have this path
                 H1pg = scal_hess * pr_gap
@@ -149,9 +149,9 @@ function update_scal_hess(
 
             if denom_a > denom_tol && denom_b > denom_tol
                 dga = du_gap / sqrt(denom_a)
-                scal_hess += Symmetric(dga * dga')
+                scal_hess.data .+= Symmetric(dga * dga')
                 Hpga = H1pg / sqrt(denom_b)
-                scal_hess -= Symmetric(Hpga * Hpga')
+                scal_hess.data .-= Symmetric(Hpga * Hpga')
                 # @show norm(scal_hess * s - z) / (1 + max(norm(s), norm(scal_hess * s)))
                 # @show norm(scal_hess * -conj_g + g) / (1 + max(norm(g), norm(scal_hess * -conj_g)))
             else
@@ -244,7 +244,7 @@ function update_scal_hess(
     # return cone.scal_hess
     # @show norm(Symmetric(cone.scal_hess) - hess(cone))
 
-    return Symmetric(cone.scal_hess)
+    return cone.scal_hess
 end
 
 # function update_scal_hess(

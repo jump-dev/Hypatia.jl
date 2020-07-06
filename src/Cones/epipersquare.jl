@@ -24,6 +24,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     dual_feas_updated::Bool
     grad_updated::Bool
     dual_grad_updated::Bool
+    dual_grad_inacc::Bool
     hess_updated::Bool
     scal_hess_updated::Bool
     nt_updated::Bool
@@ -149,6 +150,7 @@ end
 
 function update_dual_grad(cone::EpiPerSquare{T}, ::T) where {T <: Real}
     @assert cone.dual_feas_updated
+    cone.dual_grad_inacc = false
 
     @. cone.dual_grad = cone.dual_point / cone.dual_dist
     g2 = cone.dual_grad[2]

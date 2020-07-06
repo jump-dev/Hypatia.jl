@@ -27,6 +27,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     feas_updated::Bool
     grad_updated::Bool
     dual_grad_updated::Bool
+    dual_grad_inacc::Bool
     hess_updated::Bool
     scal_hess_updated::Bool
     inv_hess_updated::Bool
