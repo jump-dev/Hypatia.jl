@@ -348,7 +348,7 @@ function update_dual_grad(cone::Cone{T}, mu::T) where {T <: Real}
 
         alpha = (abs(nnorm) > damp_tol ? inv(1 + abs(nnorm)) : one(T))
 
-        curr = curr + alpha * dir
+        curr .+= alpha * dir
         iter += 1
 
 

@@ -14,7 +14,7 @@ end
 # use_update_1_default() = true
 use_update_1_default() = true
 
-use_update_2_default() = false
+use_update_2_default() = true
 
 
 
