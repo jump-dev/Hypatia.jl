@@ -108,6 +108,88 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     return stepper
 end
 
+# # original combined stepper
+# function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+#     point = solver.point
+#     timer = solver.timer
+#
+#     # update linear system solver factorization and helpers
+#     Cones.grad.(solver.model.cones)
+#     @timeit timer "update_lhs" update_lhs(solver.system_solver, solver)
+#
+#     # calculate centering direction and keep in dir_cent
+#     @timeit timer "rhs_cent" update_rhs_cent(stepper, solver)
+#     @timeit timer "dir_cent" get_directions(stepper, solver, false, iter_ref_steps = 3)
+#     dir_cent = copy(stepper.dir) # TODO
+#     @timeit timer "rhs_centcorr" update_rhs_centcorr(stepper, solver)
+#     @timeit timer "dir_centcorr" get_directions(stepper, solver, false, iter_ref_steps = 3)
+#     dir_centcorr = copy(stepper.dir) # TODO
+#     # copyto!(stepper.dir_cent, stepper.dir)
+#
+#     # calculate affine/prediction direction and keep in dir
+#     @timeit timer "rhs_pred" update_rhs_pred(stepper, solver)
+#     @timeit timer "dir_pred" get_directions(stepper, solver, true, iter_ref_steps = 3)
+#     dir_pred = copy(stepper.dir) # TODO
+#     @timeit timer "rhs_predcorr" update_rhs_predcorr(stepper, solver)
+#     @timeit timer "dir_predcorr" get_directions(stepper, solver, true, iter_ref_steps = 3)
+#     dir_predcorr = copy(stepper.dir) # TODO
+#
+#     # calculate centering factor gamma by finding distance pred_alpha for stepping in pred direction
+#     copyto!(stepper.dir, dir_pred)
+#     @timeit timer "alpha_pred" stepper.prev_pred_alpha = pred_alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T)) # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
+#
+#     # TODO allow different function (heuristic) as option?
+#     # stepper.prev_gamma = gamma = abs2(1 - pred_alpha)
+#     stepper.prev_gamma = gamma = 1 - pred_alpha
+#
+#     # calculate combined direction and keep in dir
+#     # axpby!(gamma, stepper.dir_cent, 1 - gamma, stepper.dir)
+#     @. stepper.dir = gamma * (dir_cent + pred_alpha * dir_centcorr) + (1 - gamma) * (dir_pred + pred_alpha * dir_predcorr) # TODO
+#
+#     # find distance alpha for stepping in combined direction
+#     @timeit timer "alpha_comb" alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
+#
+#     if iszero(alpha)
+#         # could not step far in combined direction, so attempt a pure centering step
+#         solver.verbose && println("performing centering step")
+#         # copyto!(stepper.dir, stepper.dir_cent)
+#         @. stepper.dir = dir_cent + dir_centcorr
+#
+#         # find distance alpha for stepping in centering direction
+#         @timeit timer "alpha_cent" alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-6))
+#
+#         if iszero(alpha)
+#             copyto!(stepper.dir, dir_cent)
+#             @timeit timer "alpha_cent2" alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-6))
+#
+#             if iszero(alpha)
+#                 @warn("numerical failure: could not step in centering direction; terminating")
+#                 solver.status = :NumericalFailure
+#                 return false
+#             end
+#         end
+#     end
+#     stepper.prev_alpha = alpha
+#
+#     # step distance alpha in combined direction
+#     @. point.x += alpha * stepper.x_dir
+#     @. point.y += alpha * stepper.y_dir
+#     @. point.z += alpha * stepper.z_dir
+#     @. point.s += alpha * stepper.s_dir
+#     solver.tau += alpha * stepper.dir[stepper.tau_row]
+#     solver.kap += alpha * stepper.dir[stepper.kap_row]
+#     calc_mu(solver)
+#
+#     if solver.tau <= zero(T) || solver.kap <= zero(T) || solver.mu <= zero(T)
+#         @warn("numerical failure: tau is $(solver.tau), kappa is $(solver.kap), mu is $(solver.mu); terminating")
+#         solver.status = :NumericalFailure
+#         return false
+#     end
+#
+#     return true
+# end
+
+# stepper using line search between cent and pred points
 function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
     timer = solver.timer
@@ -116,67 +198,158 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     Cones.grad.(solver.model.cones)
     @timeit timer "update_lhs" update_lhs(solver.system_solver, solver)
 
+    z_dir = stepper.z_dir
+    s_dir = stepper.s_dir
+
     # calculate centering direction and keep in dir_cent
     @timeit timer "rhs_cent" update_rhs_cent(stepper, solver)
     @timeit timer "dir_cent" get_directions(stepper, solver, false, iter_ref_steps = 3)
     dir_cent = copy(stepper.dir) # TODO
+    tau_cent = stepper.dir[stepper.tau_row]
+    kap_cent = stepper.dir[stepper.kap_row]
+    z_cent = copy(z_dir)
+    s_cent = copy(s_dir)
+
     @timeit timer "rhs_centcorr" update_rhs_centcorr(stepper, solver)
     @timeit timer "dir_centcorr" get_directions(stepper, solver, false, iter_ref_steps = 3)
     dir_centcorr = copy(stepper.dir) # TODO
     # copyto!(stepper.dir_cent, stepper.dir)
+    tau_centcorr = stepper.dir[stepper.tau_row]
+    kap_centcorr = stepper.dir[stepper.kap_row]
+    z_centcorr = copy(z_dir)
+    s_centcorr = copy(s_dir)
 
     # calculate affine/prediction direction and keep in dir
     @timeit timer "rhs_pred" update_rhs_pred(stepper, solver)
     @timeit timer "dir_pred" get_directions(stepper, solver, true, iter_ref_steps = 3)
     dir_pred = copy(stepper.dir) # TODO
+    tau_pred = stepper.dir[stepper.tau_row]
+    kap_pred = stepper.dir[stepper.kap_row]
+    z_pred = copy(z_dir)
+    s_pred = copy(s_dir)
+
     @timeit timer "rhs_predcorr" update_rhs_predcorr(stepper, solver)
     @timeit timer "dir_predcorr" get_directions(stepper, solver, true, iter_ref_steps = 3)
     dir_predcorr = copy(stepper.dir) # TODO
+    tau_predcorr = stepper.dir[stepper.tau_row]
+    kap_predcorr = stepper.dir[stepper.kap_row]
+    z_predcorr = copy(z_dir)
+    s_predcorr = copy(s_dir)
 
-    # calculate centering factor gamma by finding distance pred_alpha for stepping in pred direction
-    copyto!(stepper.dir, dir_pred)
-    @timeit timer "alpha_pred" stepper.prev_pred_alpha = pred_alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T)) # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
+    # TODO check cent point (step 1) is acceptable
 
-    # TODO allow different function (heuristic) as option?
-    # stepper.prev_gamma = gamma = abs2(1 - pred_alpha)
-    stepper.prev_gamma = gamma = 1 - pred_alpha
+    # TODO start with beta = 0.9999 for pred factor, and decrease until point satisfies nbhd
+    cones = solver.model.cones
+    cone_times = stepper.cone_times
+    cone_order = stepper.cone_order
+    z = solver.point.z
+    s = solver.point.s
+    tau = solver.tau
+    kap = solver.kap
+    # z_dir = stepper.z_dir
+    # s_dir = stepper.s_dir
+    # tau_dir = stepper.dir[stepper.tau_row]
+    # kap_dir = stepper.dir[stepper.kap_row]
+    z_ls = stepper.z_ls
+    s_ls = stepper.s_ls
+    primals_ls = stepper.primal_views_ls
+    duals_ls = stepper.dual_views_ls
+    sz_ks = zeros(T, length(cone_order)) # TODO prealloc
+    tau_ls = zero(T)
+    kap_ls = zero(T)
 
-    # calculate combined direction and keep in dir
-    # axpby!(gamma, stepper.dir_cent, 1 - gamma, stepper.dir)
-    @. stepper.dir = gamma * (dir_cent + pred_alpha * dir_centcorr) + (1 - gamma) * (dir_pred + pred_alpha * dir_predcorr) # TODO
+    nup1 = solver.model.nu + 1
+    max_nbhd = T(0.99)
+    # max_nbhd = T(0.9)
+    min_nbhd = T(0.01)
+    beta_decrease = T(0.95)
 
-    # find distance alpha for stepping in combined direction
-    @timeit timer "alpha_comb" alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
+    beta = max(T(0.1), min(stepper.prev_gamma * T(1.4), one(T))) # TODO option for parameter
+    beta *= T(0.9999)
 
-    if iszero(alpha)
-        # could not step far in combined direction, so attempt a pure centering step
-        solver.verbose && println("performing centering step")
-        # copyto!(stepper.dir, stepper.dir_cent)
-        @. stepper.dir = dir_cent + dir_centcorr
+    beta /= beta_decrease
+    while beta > 0
+        if beta < T(1e-2)
+            beta = zero(T)
+        end
+        beta *= beta_decrease
+        betam1 = 1 - beta
 
-        # find distance alpha for stepping in centering direction
-        @timeit timer "alpha_cent" alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-6))
+        tau_ls = tau + betam1 * (tau_cent + betam1 * tau_centcorr) + beta * (tau_pred + beta * tau_predcorr)
+        kap_ls = kap + betam1 * (kap_cent + betam1 * kap_centcorr) + beta * (kap_pred + beta * kap_predcorr)
+        # tau_ls = tau + betam1 * (tau_cent + tau_centcorr) + beta * (tau_pred + beta * tau_predcorr)
+        # kap_ls = kap + betam1 * (kap_cent + kap_centcorr) + beta * (kap_pred + beta * kap_predcorr)
+        taukap_ls = tau_ls * kap_ls
+        (tau_ls < eps(T) || kap_ls < eps(T) || taukap_ls < eps(T)) && continue
 
-        if iszero(alpha)
-            copyto!(stepper.dir, dir_cent)
-            @timeit timer "alpha_cent2" alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-6))
+        # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
+        sortperm!(cone_order, cone_times, initialized = true) # NOTE stochastic
 
-            if iszero(alpha)
-                @warn("numerical failure: could not step in centering direction; terminating")
-                solver.status = :NumericalFailure
-                return false
+        @. z_ls = z + betam1 * (z_cent + betam1 * z_centcorr) + beta * (z_pred + beta * z_predcorr)
+        @. s_ls = s + betam1 * (s_cent + betam1 * s_centcorr) + beta * (s_pred + beta * s_predcorr)
+        # @. z_ls = z + betam1 * (z_cent + z_centcorr) + beta * (z_pred + beta * z_predcorr)
+        # @. s_ls = s + betam1 * (s_cent + s_centcorr) + beta * (s_pred + beta * s_predcorr)
+
+        for k in cone_order
+            sz_ks[k] = dot(primals_ls[k], duals_ls[k])
+        end
+        any(<(eps(T)), sz_ks) && continue
+
+        mu_ls = (sum(sz_ks) + taukap_ls) / nup1
+        (mu_ls < eps(T)) && continue
+
+        # TODO experiment with SY nbhd for tau-kappa
+        (abs(taukap_ls - mu_ls) > max_nbhd * mu_ls) && continue
+
+        min_nbhd_mu = min_nbhd * mu_ls
+        (taukap_ls < min_nbhd_mu) && continue
+        any(sz_ks[k] < min_nbhd_mu * Cones.get_nu(cones[k]) for k in cone_order) && continue
+
+        rtmu = sqrt(mu_ls)
+        irtmu = inv(rtmu)
+        in_nbhd = true
+        for k in cone_order
+            cone_k = cones[k]
+            time_k = time_ns()
+
+            Cones.load_point(cone_k, primals_ls[k], irtmu)
+            Cones.load_dual_point(cone_k, duals_ls[k])
+            Cones.reset_data(cone_k)
+
+            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, rtmu, max_nbhd))
+            # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
+            # TODO is_dual_feas function should fall back to a nbhd-like check (for ray maybe) if not using nbhd check
+            # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k))
+
+            cone_times[k] = time_ns() - time_k
+            if !in_nbhd_k
+                in_nbhd = false
+                break
             end
         end
+        in_nbhd && break
     end
-    stepper.prev_alpha = alpha
 
-    # step distance alpha in combined direction
-    @. point.x += alpha * stepper.x_dir
-    @. point.y += alpha * stepper.y_dir
-    @. point.z += alpha * stepper.z_dir
-    @. point.s += alpha * stepper.s_dir
-    solver.tau += alpha * stepper.dir[stepper.tau_row]
-    solver.kap += alpha * stepper.dir[stepper.kap_row]
+    # TODO if zero not feasible, do backwards line search
+
+    stepper.prev_gamma = gamma = beta # TODO
+
+    # step to combined point
+    copyto!(point.z, z_ls)
+    copyto!(point.s, s_ls)
+    solver.tau = tau_ls
+    solver.kap = kap_ls
+
+    # TODO improve
+    betam1 = 1 - beta
+    @. stepper.dir = betam1 * (dir_cent + betam1 * dir_centcorr)
+    # @. stepper.dir = betam1 * (dir_cent + dir_centcorr)
+    @. point.x += stepper.x_dir
+    @. point.y += stepper.y_dir
+    @. stepper.dir = beta * (dir_pred + beta * dir_predcorr)
+    @. point.x += stepper.x_dir
+    @. point.y += stepper.y_dir
+
     calc_mu(solver)
 
     if solver.tau <= zero(T) || solver.kap <= zero(T) || solver.mu <= zero(T)
@@ -187,6 +360,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     return true
 end
+
 
 # function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 #     cones = solver.model.cones
@@ -386,8 +560,8 @@ function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}) whe
         # end
         if corr_viol < 0.001
             @. stepper.s_rhs_k[k] += H_prim_dir_k + corr_k
-        else
-            println("skip pred-corr: $corr_viol")
+        # else
+        #     println("skip pred-corr: $corr_viol")
         end
     end
 
@@ -444,8 +618,8 @@ function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}) whe
         # end
         if corr_viol < 0.001
             stepper.s_rhs_k[k] .+= corr_k
-        else
-            println("skip cent-corr: $corr_viol")
+        # else
+        #     println("skip cent-corr: $corr_viol")
         end
     end
 
@@ -697,11 +871,11 @@ function find_max_alpha(
         end
         alpha *= alpha_reduce
 
-        # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
-        sortperm!(cone_order, cone_times, initialized = true) # NOTE stochastic
-
         taukap_ls = (tau + alpha * tau_dir) * (kap + alpha * kap_dir)
         (taukap_ls < eps(T)) && continue
+
+        # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
+        sortperm!(cone_order, cone_times, initialized = true) # NOTE stochastic
 
         @. z_ls = z + alpha * z_dir
         @. s_ls = s + alpha * s_dir
