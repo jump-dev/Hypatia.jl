@@ -109,6 +109,8 @@ function update_feas(cone::HypoGeomean{T}) where {T}
 
     if all(>(eps(T)), w)
         cone.wprod = exp(sum(cone.alpha[i] * log(w[i]) for i in eachindex(cone.alpha)))
+        # @show abs2(cone.wprod)
+        # @show cone.wprod / (cone.dim - 1) + 1
         cone.z = cone.wprod - u
         cone.is_feas = (cone.z > eps(T))
     else
@@ -144,6 +146,7 @@ function update_grad(cone::HypoGeomean)
     return cone.grad
 end
 
+# dual_point'dual_grad off by 2?????
 # function update_dual_grad(cone::HypoGeomean{T}, ::T) where {T <: Real}
 #     #  TODO assert dual_feas_updated
 #     u = cone.dual_point[1]
@@ -151,11 +154,12 @@ end
 #     cone.dual_grad_inacc = false
 #
 #     cone.dual_grad[1] = -inv(cone.dual_z) + inv(u)
-#     @. cone.dual_grad[2:end] = -cone.dual_wprod / cone.z / w * cone.alpha - inv(w) * (1 - cone.alpha)
-#     @show dot(cone.dual_point, cone.dual_grad)
+#     @. cone.dual_grad[2:end] = -cone.dual_wprod / cone.dual_z / w * cone.alpha - inv(w) * (1 - cone.alpha)
+#     # @show cone.dual_point
 #
 #     cone.dual_grad_updated = true
-#     @show cone.dual_grad
+#     # @show cone.dual_grad
+#     # @show dot(cone.dual_point, cone.dual_grad)
 #     return cone.dual_grad
 # end
 

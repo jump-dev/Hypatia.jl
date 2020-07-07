@@ -151,7 +151,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
         get_directions(stepper, solver, iter_ref_steps = 3)
     end
 
-    max_nbhd = T(0.7) # TODO tune
+    max_nbhd = T(1.0) # TODO tune
 
     # gamma and combined direction
     stepper.prev_aff_alpha = aff_alpha = find_max_alpha(stepper, solver, true, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2), max_nbhd = max_nbhd)

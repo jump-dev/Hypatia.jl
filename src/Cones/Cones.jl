@@ -360,6 +360,7 @@ function update_dual_grad(cone::Cone{T}, mu::T) where {T <: Real}
     reset_data(cone)
     update_feas(cone)
     update_grad(cone)
+    update_hess(cone) # TODO epinormeucl and matrixepipersquare have assert hess_updated in corrector, relevant fields should be refactored
 
     return curr
 end

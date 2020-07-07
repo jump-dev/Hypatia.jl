@@ -156,7 +156,7 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
         @test CO.scal_hess_prod!(prod, point, cone, mu) ≈ dual_point atol=scal_tol rtol=scal_tol
         @test CO.scal_hess_prod!(prod, dual_grad, cone, mu) ≈ grad * irtmu atol=scal_tol rtol=scal_tol
     else
-        @test CO.scal_hess_prod!(prod, point, cone, mu) ≈ -grad atol=scal_tol rtol=scal_tol
+        @test CO.scal_hess_prod!(prod, point, cone, one(T)) ≈ -grad atol=scal_tol rtol=scal_tol
     end
 
     return

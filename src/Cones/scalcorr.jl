@@ -14,7 +14,7 @@ end
 # use_update_1_default() = true
 use_update_1_default() = true
 
-use_update_2_default() = true
+use_update_2_default() = false
 
 
 
@@ -82,6 +82,7 @@ function update_scal_hess(
 
 
     # first update
+    update_one_applied = false
     if use_update_1 && norm(z + mu * g) > update_tol # TODO should this be more scale-independent? eg normalized, or check dot(Hs, z) / norm(Hs) / norm(z)
         if sz > denom_tol
             # scal_hess += inv(sz) * Symmetric(z * z') - (mu / nu) * Symmetric(g * g')
