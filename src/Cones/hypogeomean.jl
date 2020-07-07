@@ -146,24 +146,24 @@ function update_grad(cone::HypoGeomean)
     return cone.grad
 end
 
-# dual_point'dual_grad off by 2?????
-function update_dual_grad2(cone::HypoGeomean{T}, mu::T) where {T <: Real}
-    #  TODO assert dual_feas_updated
-    u = cone.dual_point[1]
-    w = view(cone.dual_point, 2:cone.dim)
-    cone.dual_grad_inacc = false
-
-    cone.dual_grad[1] = -inv(cone.dual_z) - inv(u)
-    @. cone.dual_grad[2:end] = (-cone.dual_wprod / cone.dual_z * cone.alpha - (1 - cone.alpha)) / w
-    grad1 = copy(cone.dual_grad)
-
-    # grad2 = update_dual_grad2(cone, mu)
-
-    # @show grad2 ./ grad1
-
-    cone.dual_grad_updated = true
-    return cone.dual_grad
-end
+# sc barrier with parameter dim but not conjugate to the primal barrier
+# function update_dual_grad(cone::HypoGeomean{T}, mu::T) where {T <: Real}
+#     #  TODO assert dual_feas_updated
+#     u = cone.dual_point[1]
+#     w = view(cone.dual_point, 2:cone.dim)
+#     cone.dual_grad_inacc = false
+#
+#     cone.dual_grad[1] = -inv(cone.dual_z) - inv(u)
+#     @. cone.dual_grad[2:end] = (-cone.dual_wprod / cone.dual_z * cone.alpha - (1 - cone.alpha)) / w
+#     grad1 = copy(cone.dual_grad)
+#
+#     grad2 = update_dual_grad2(cone, mu)
+#
+#     @show grad2 ./ grad1
+#
+#     cone.dual_grad_updated = true
+#     return cone.dual_grad
+# end
 
 function update_hess(cone::HypoGeomean)
     @assert cone.grad_updated
