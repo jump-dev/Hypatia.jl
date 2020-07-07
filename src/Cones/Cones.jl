@@ -100,7 +100,7 @@ function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
         recover || return false
         # TODO if Chol, try adding sqrt(eps(T)) to diag and re-factorize
         if T <: BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
-            @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
+            # @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
             cone.hess_fact_cache = DenseSymCache{T}()
             load_matrix(cone.hess_fact_cache, cone.hess)
         else
@@ -253,6 +253,50 @@ end
 #     # return (nbhd < T(0.5))
 # end
 
+# newton for central initial point
+# TODO don't run if cone has known central initial point
+# TODO remove allocs
+function set_central_point(cone::Cone{T}) where {T <: Real}
+    tol = cbrt(eps(T)) # TODO adjust
+    max_iter = 10 # TODO make it depend on sqrt(nu)?
+    damp_tol = 0.2 # TODO tune
+    nu = get_nu(cone)
+
+    curr = zeros(T, dimension(cone))
+    set_initial_point(curr, cone)
+    curr .*= sqrt(nu / sum(abs2, curr)) # rescale norm as a heuristic
+
+    dir = similar(curr)
+    iter = 0
+    while iter < max_iter
+        load_point(cone, curr)
+        reset_data(cone)
+        @assert is_feas(cone)
+        g = grad(cone)
+
+        tmp = -curr - g
+        # @show norm(tmp)
+        if norm(tmp, Inf) < tol # TODO tune
+            iter > 0 && println("final iter $iter, $(norm(tmp, Inf))")
+            break
+        end
+
+        dir .= cholesky!(Symmetric(hess(cone) + I)) \ tmp # TODO make more efficient, maybe add to cone.hess directly and use hess fact
+        # inv_hess_prod!(dir, tmp, cone) # cannot use
+
+        nnorm = dot(tmp, dir)
+        @assert nnorm > 0
+        alpha = (abs(nnorm) > damp_tol ? inv(1 + abs(nnorm)) : one(T))
+        # @show alpha
+        # @show nnorm
+
+        curr = curr + alpha * dir
+        iter += 1
+    end
+    # @show norm(curr + grad(cone))
+
+    return curr
+end
 
 # utilities for arrays
 
