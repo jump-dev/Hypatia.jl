@@ -240,7 +240,7 @@ function test_extra(inst::PolyMinNative{T}, result::NamedTuple) where T
     @test result.status == :Optimal
     if result.status == :Optimal && !isnan(inst.true_min)
         # check objective value is correct
-        tol = eps(T)^0.2
+        tol = eps(T)^0.1
         true_min = (inst.use_primal ? -1 : 1) * inst.true_min
         @test result.primal_obj ≈ true_min atol = tol rtol = tol
     end

@@ -48,6 +48,8 @@ use_3order_corr(cone::Nonnegative) = cone.use_3order_corr
 
 reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
+use_sqrt_oracles(cone::Nonnegative) = true
+
 # TODO only allocate the fields we use
 function setup_data(cone::Nonnegative{T}) where {T <: Real}
     reset_data(cone)

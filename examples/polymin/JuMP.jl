@@ -128,7 +128,7 @@ function test_extra(inst::PolyMinJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     if JuMP.termination_status(model) == MOI.OPTIMAL && !isnan(inst.true_min)
         # check objective value is correct
-        tol = eps(T)^0.2
+        tol = eps(T)^0.1
         @test JuMP.objective_value(model) ≈ inst.true_min atol = tol rtol = tol
     end
 end

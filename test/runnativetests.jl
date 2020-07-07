@@ -88,17 +88,18 @@ reduce_flags = [
 
 # other solver options
 timer = TimerOutput()
-tol = 1e-7
+# tol = 1e-10
+# tol = 1e-7
 other_options = (
-    # verbose = true,
-    verbose = false,
+    verbose = true,
+    # verbose = false,
     iter_limit = 100,
     time_limit = 6e1,
     timer = timer,
-    tol_feas = tol,
-    tol_rel_opt = tol,
-    tol_abs_opt = tol,
-    rescale = true,
+    # tol_feas = tol,
+    # tol_rel_opt = tol,
+    # tol_abs_opt = tol,
+    # rescale = false,
     # preprocess = false,
     # reduce = false,
     )

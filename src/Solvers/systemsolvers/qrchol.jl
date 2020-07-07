@@ -227,15 +227,11 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
 
         # update hessian factorizations and partition of cones
         for (k, cone_k) in enumerate(model.cones)
-            if hasfield(typeof(cone_k), :hess_fact_cache) # TODO use dispatch or a function
-                Cones.update_hess_fact(cone_k)
-                if cone_k.hess_fact_cache isa DenseSymCache{T}
-                    cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_cones : hess_cones
-                    push!(cones_list, k)
-                    continue
-                end
+            if Cones.use_sqrt_oracles(cone_k)
+                cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_sqrt_cones : hess_sqrt_cones
+            else
+                cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_cones : hess_cones
             end
-            cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_sqrt_cones : hess_sqrt_cones
             push!(cones_list, k)
         end
 
@@ -296,7 +292,11 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
         end
         if !update_fact(system_solver.fact_cache, system_solver.lhs1)
             system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
-            update_fact(system_solver.fact_cache, system_solver.lhs1) || @warn("QRChol Bunch-Kaufman factorization failed after recovery")
+            if !update_fact(system_solver.fact_cache, system_solver.lhs1)
+                @warn("QRChol Bunch-Kaufman factorization failed after recovery")
+                @show system_solver.lhs1
+                @assert !any(isnan, system_solver.lhs1)
+            end
         end
     end
 
