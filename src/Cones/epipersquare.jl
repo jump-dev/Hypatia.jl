@@ -59,6 +59,8 @@ use_heuristic_neighborhood(cone::EpiPerSquare) = false
 
 reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = false)
 
+use_sqrt_oracles(cone::EpiPerSquare) = true
+
 function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim

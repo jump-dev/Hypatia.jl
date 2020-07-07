@@ -74,6 +74,8 @@ use_heuristic_neighborhood(cone::PosSemidefTri) = false
 
 reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
+use_sqrt_oracles(cone::PosSemidefTri) = true
+
 function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
     dim = cone.dim

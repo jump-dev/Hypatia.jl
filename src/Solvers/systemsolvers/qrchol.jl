@@ -225,22 +225,8 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
         hess_cones = empty!(system_solver.hess_cones)
         hess_sqrt_cones = empty!(system_solver.hess_sqrt_cones)
 
-        # # update hessian factorizations and partition of cones
-        # for (k, cone_k) in enumerate(model.cones)
-        #     if hasfield(typeof(cone_k), :hess_fact_cache) # TODO use dispatch or a function
-        #         Cones.update_hess_fact(cone_k)
-        #         if cone_k.hess_fact_cache isa DenseSymCache{T}
-        #             cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_cones : hess_cones
-        #             push!(cones_list, k)
-        #             continue
-        #         end
-        #     end
-        #     cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_sqrt_cones : hess_sqrt_cones
-        #     push!(cones_list, k)
-        # end
         # update hessian factorizations and partition of cones
         for (k, cone_k) in enumerate(model.cones)
-            # @show Cones.use_sqrt_oracles(cone_k)
             if Cones.use_sqrt_oracles(cone_k)
                 cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_sqrt_cones : hess_sqrt_cones
             else

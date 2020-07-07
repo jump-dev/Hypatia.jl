@@ -28,10 +28,10 @@ example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::FastInstances) = begin
     options = (tol_feas = 1e-6, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
     return [
     ((5, 10), nothing, options),
-    # ((5, 10), ClassicConeOptimizer), nothing, options),
+    ((5, 10), ClassicConeOptimizer), nothing, options),
     ((10, 20), nothing, options),
     ((20, 40), nothing, options),
-    # ((40, 80),),
+    ((40, 80),),
     ]
 end
 example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::SlowInstances) = [

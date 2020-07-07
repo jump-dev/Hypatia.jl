@@ -52,6 +52,8 @@ use_heuristic_neighborhood(cone::EpiNormEucl) = false
 
 reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
+use_sqrt_oracles(cone::EpiNormEucl) = true
+
 # TODO only allocate the fields we use
 function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     reset_data(cone)
