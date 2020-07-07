@@ -11,8 +11,6 @@ barrier from "Interior-Point Polynomial Algorithms in Convex Programming" by Nes
 = -logdet(u^2*I_n - W*W') + (n - 1) log(u)
 =#
 
-import GenericLinearAlgebra.svdvals
-
 mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
     use_heuristic_neighborhood::Bool
@@ -131,8 +129,7 @@ function update_feas(cone::EpiNormSpectral{T}) where {T}
 end
 
 # TODO is there a faster way to check u >= nuc_norm, eg thru a cholesky?
-# is_dual_feas(cone::EpiNormSpectral) = true
-function is_dual_feas(cone::EpiNormSpectral{T}) where {T}
+function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: BlasReal}
     u = cone.dual_point[1]
     if u > eps(T)
         W = @views vec_copy_to!(similar(cone.W), cone.dual_point[2:end])
@@ -140,6 +137,7 @@ function is_dual_feas(cone::EpiNormSpectral{T}) where {T}
     end
     return false
 end
+is_dual_feas(cone::EpiNormSpectral) = true # NOTE svdvals too slow for non-BLAS types
 
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas

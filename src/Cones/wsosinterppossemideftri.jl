@@ -295,7 +295,7 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::W
     return prod
 end
 
-function correction(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
+function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where {T}
     @assert cone.grad_updated
     corr = cone.correction
     corr .= 0
@@ -310,15 +310,15 @@ function correction(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
     for k in eachindex(cone.Ps)
         PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
 
-        PlambdaP_dirs = [zeros(R, R) for p in 1:U, q in 1:U] # TODO
+        PlambdaP_dirs = [zeros(T, R, R) for p in 1:U, q in 1:U] # TODO
         for p in 1:U, q in 1:U
-            primal_dir_mat_q = Symmetric(svec_to_smat!(matRR, primal_dir[q:U:dim], cone.rt2))
+            @views primal_dir_mat_q = Symmetric(svec_to_smat!(matRR, primal_dir[q:U:dim], cone.rt2))
             @views PlambdaPk_slice_pq = PlambdaPk[p:U:UR, q:U:UR]
             mul!(PlambdaP_dirs[p, q], PlambdaPk_slice_pq, primal_dir_mat_q)
         end
 
         for p in 1:U
-            primal_dir_mat_p = Symmetric(svec_to_smat!(matRR, primal_dir[p:U:dim], cone.rt2))
+            @views primal_dir_mat_p = Symmetric(svec_to_smat!(matRR, primal_dir[p:U:dim], cone.rt2))
             for q in 1:U
                 pq_q = PlambdaP_dirs[p, q] # PlambdaPk_slice_pq * primal_dir_mat_q
                 for r in 1:q

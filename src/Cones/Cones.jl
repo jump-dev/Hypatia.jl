@@ -71,6 +71,11 @@ inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(
 
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
+function use_sqrt_oracles(cone::Cone)
+    cone.hess_fact_updated || update_hess_fact(cone; recover = true)
+    return (cone.hess_fact_cache isa DensePosDefCache)
+end
+
 use_correction(::Cone) = true
 
 update_hess_prod(cone::Cone) = nothing
@@ -189,32 +194,10 @@ function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
         nbhd = sqrt(abs(nbhd_sqr))
     end
 
-    # has_hess_fact_cache = hasfield(typeof(cone), :hess_fact_cache)
-    # if has_hess_fact_cache && !update_hess_fact(cone)
-    #     return false
-    # end
-    # nbhd_tmp2 = cone.nbhd_tmp2
-    # if has_hess_fact_cache && cone.hess_fact_cache isa DenseSymCache{T}
-    #     inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
-    #     nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
-    #     if nbhd_sqr < -eps(T) # TODO possibly loosen
-    #         # @warn("numerical failure: cone neighborhood is $nbhd_sqr")
-    #         return false
-    #     end
-    #     @show nbhd_tmp
-    #     @show nbhd_tmp2
-    #     @show nbhd_sqr
-    #
-    #     nbhd = sqrt(abs(nbhd_sqr))
-    # else
-    #     inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
-    #     nbhd = norm(nbhd_tmp2)
-    # end
-
     return (nbhd < rtmu * max_nbhd)
 end
 
-
+# TODO cleanup / remove if not using
 # function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector{T}, rtmu::T, max_nbhd::T) where {T <: Real}
 #     # norm(H^(-1/2) * (z + mu * grad))
 #     nbhd_tmp = cone.nbhd_tmp
@@ -478,7 +461,7 @@ function factor_upper_arrow(uu, uw, ww, nzval)
     nzidx = 2
     @inbounds for i in eachindex(ww)
         ww1i = ww[i]
-        ww1i < minval && return false
+        ww1i < eps(uu) && return false
         wwi = sqrt(ww1i)
         uwi = uw[i] / wwi
         uu -= abs2(uwi)
@@ -514,12 +497,12 @@ function factor_upper_arrow_block2(uu, uv, uw, vv, vw, ww, nzval)
     nzidx = 1
     @inbounds for i in eachindex(ww)
         ww1i = ww[i]
-        ww1i < minval && return false
+        ww1i < eps(uu) && return false
         wwi = sqrt(ww1i)
         vwi = vw[i] / wwi
         uwi = uw[i] / wwi
         vv2i = vv[i] - abs2(vwi)
-        vv2i < minval && return false
+        vv2i < eps(uu) && return false
         vvi = sqrt(vv2i)
         uvi = (uv[i] - vwi * uwi) / vvi
         uu -= abs2(uwi) + abs2(uvi)

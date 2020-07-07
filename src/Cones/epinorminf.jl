@@ -119,7 +119,7 @@ function update_feas(cone::EpiNormInf{T}) where {T}
     u = cone.point[1]
     @views vec_copy_to!(cone.w, cone.point[2:end])
 
-    cone.is_feas = (u > eps(T) && u - norm(cone.w, Inf) > eps(T))
+    cone.is_feas = (u > eps(T) && abs2(u) - maximum(abs2, cone.w) > eps(T))
 
     cone.feas_updated = true
     return cone.is_feas
@@ -143,12 +143,15 @@ function update_grad(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
     @assert cone.is_feas
     u = cone.point[1]
     w = cone.w
+    den = cone.den
 
-    usqr = abs2(u)
-    @. cone.den = T(0.5) * (usqr - abs2(w))
-    @. cone.uden = u / cone.den
-    @. cone.wden = w / cone.den
-    cone.grad[1] = (length(w) - 1) / u - sum(cone.uden)
+    for (j, wj) in enumerate(w)
+        absw = abs(wj)
+        den[j] = T(0.5) * (u - absw) * (u + absw)
+    end
+    @. cone.uden = u / den
+    @. cone.wden = w / den
+    cone.grad[1] = (cone.n - 1) / u - sum(cone.uden)
     @views vec_copy_to!(cone.grad[2:end], cone.wden)
 
     cone.grad_updated = true
@@ -159,26 +162,24 @@ function update_hess_aux(cone::EpiNormInf{T}) where {T <: Real}
     @assert cone.grad_updated
     u = cone.point[1]
     w = cone.w
+    uden = cone.uden
 
-    sumiden = zero(T)
-    @inbounds for (j, wj) in enumerate(w)
-        wdenj = cone.wden[j]
-        Huj = wdenj * -cone.uden[j]
+    @inbounds for (j, wdenj) in enumerate(cone.wden)
+        udenj = uden[j]
         invdenj = inv(cone.den[j])
         if cone.is_complex
-            (cone.Hure[j], cone.Huim[j]) = reim(Huj)
-            cone.Hrere[j] = abs2(real(wdenj)) + invdenj
-            cone.Himim[j] = abs2(imag(wdenj)) + invdenj
-            cone.Hreim[j] = real(wdenj) * imag(wdenj)
+            (wdre, wdim) = reim(wdenj)
+            cone.Hure[j] = -wdre * udenj
+            cone.Huim[j] = -wdim * udenj
+            cone.Hrere[j] = abs2(wdre) + invdenj
+            cone.Himim[j] = abs2(wdim) + invdenj
+            cone.Hreim[j] = wdre * wdim
         else
-            cone.Hure[j] = Huj
+            cone.Hure[j] = -wdenj * udenj
             cone.Hrere[j] = abs2(wdenj) + invdenj
         end
-        sumiden += invdenj
     end
-
-    t1 = (cone.n - 1) / u / u
-    cone.Huu = max(sum(abs2, cone.uden) - t1 - sumiden, eps(T))
+    cone.Huu = sum(abs2, uden) - ((cone.n - 1) / u + sum(uden)) / u
 
     cone.hess_aux_updated = true
     return
@@ -233,10 +234,10 @@ function update_inv_hess_aux(cone::EpiNormInf{T}) where {T <: Real}
         end
         schur += inv(u2pwj2)
     end
-    cone.schur = max(schur, eps(T))
+    cone.schur = schur
 
     if cone.is_complex
-        @. cone.idet = max(cone.Hrere * cone.Himim - abs2(cone.Hreim), eps(T))
+        @. cone.idet = cone.Hrere * cone.Himim - abs2(cone.Hreim)
     end
 
     cone.inv_hess_aux_updated = true
@@ -251,7 +252,6 @@ function update_inv_hess(cone::EpiNormInf{T}) where {T <: Real}
     Hi = cone.inv_hess.data
     wden = cone.wden
     u = cone.point[1]
-    minval = eps(T)
 
     Hi[1, 1] = 1
     @inbounds for j in 1:cone.n
@@ -282,7 +282,7 @@ function update_inv_hess(cone::EpiNormInf{T}) where {T <: Real}
     else
         @inbounds for (j, rerej) in enumerate(cone.Hrere)
             vj = j + 1
-            Hi[vj, vj] += inv(max(rerej, minval))
+            Hi[vj, vj] += inv(rerej)
         end
     end
 
@@ -308,7 +308,7 @@ function update_hess_sqrt_aux(cone::EpiNormInf{T}) where {T}
         cone.no_sqrts = !factor_upper_arrow(cone.Huu, cone.Hure, cone.Hrere, cone.hess_sqrt.data.nzval)
     end
 
-    cone.no_sqrts && println("no sqrt")
+    cone.no_sqrts && println("no sqrt") # TODO remove later
 
     cone.hess_sqrt_aux_updated = true
     return
@@ -403,7 +403,9 @@ function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T
     udir = primal_dir[1]
     corr = cone.correction
 
-    corr1 = T(-0.5) * u * udir * sum((3 - 2 * u / z * u) / z / z for z in cone.den) * udir - (cone.n - 1) * abs2(udir / u) / u
+    u3 = T(1.5) / u
+    udu = udir / u
+    corr1 = -udir * sum(z * (u3 - z) * z for z in cone.uden) * udir - udu * (cone.n - 1) / u * udu
     for i in 1:cone.n
         deni = -4 * cone.den[i]
         udeni = 2 * cone.uden[i]
