@@ -136,7 +136,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     get_directions(stepper, solver, iter_ref_steps = 3)
     # if solver.mu > 1e-5
     if use_corr
-        update_rhs_centcorr(stepper, solver)
+        update_rhs_centcorr(stepper, solver, stepper.prev_aff_alpha)
         get_directions(stepper, solver, iter_ref_steps = 3)
     end
     dir_cent = copy(stepper.dir)
@@ -146,8 +146,8 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     get_directions(stepper, solver, iter_ref_steps = 3)
     # if solver.mu > 1e-5
     if use_corr
-        # update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha) # TODO
-        update_rhs_predcorr(stepper, solver)
+        update_rhs_predcorr(stepper, solver, stepper.prev_aff_alpha) # TODO
+        # update_rhs_predcorr(stepper, solver)
         get_directions(stepper, solver, iter_ref_steps = 3)
     end
 
@@ -155,8 +155,8 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     # gamma and combined direction
     stepper.prev_aff_alpha = aff_alpha = find_max_alpha(stepper, solver, true, prev_alpha = stepper.prev_aff_alpha, min_alpha = T(1e-2), max_nbhd = max_nbhd)
-    stepper.prev_gamma = gamma = (1 - aff_alpha) # TODO tune function - power 1 seemed better than 2
-    # stepper.prev_gamma = gamma = (1 - aff_alpha)^2
+    # stepper.prev_gamma = gamma = (1 - aff_alpha) # TODO tune function - power 1 seemed better than 2
+    stepper.prev_gamma = gamma = (1 - aff_alpha)^2
     axpby!(gamma, dir_cent, 1 - gamma, stepper.dir)
 
     # alpha step length
@@ -287,7 +287,7 @@ end
 
 # TODO just add to s_k parts of pred rhs
 # update the RHS for affine-corr direction
-function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}, prev_alpha::T = one(T)) where {T <: Real}
     rhs = stepper.rhs
 
     # x, y, z, tau
@@ -310,7 +310,7 @@ function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}) whe
             corr_point = dot(corr_k, cone_k.point)
             corr_viol = abs(1 - irtrtmu * dot(prim_k_scal, H_prim_dir_k) / corr_point)
             if corr_viol < 0.001
-                @. stepper.s_rhs_k[k] += H_prim_dir_k + corr_k
+                @. stepper.s_rhs_k[k] += (H_prim_dir_k + corr_k) * abs2(prev_alpha)
             else
                 println("skip pred-corr: $corr_viol")
             end
@@ -350,7 +350,7 @@ function update_rhs_cent(stepper::CombinedStepper{T}, solver::Solver{T}) where {
 end
 
 # update the RHS for cent-corr direction
-function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
+function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}, alpha::T = one(T)) where {T <: Real}
     rhs = stepper.rhs
 
     # x, y, z, tau
@@ -375,7 +375,7 @@ function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}) whe
             corr_point = dot(corr_k, cone_k.point)
             corr_viol = abs(1 - dot(prim_k_scal, H_prim_dir_k_scal) / corr_point)
             if corr_viol < 0.001
-                stepper.s_rhs_k[k] .+= corr_k
+                stepper.s_rhs_k[k] .+= corr_k * abs2(alpha)
             else
                 println("skip cent-corr: $corr_viol")
             end
@@ -608,6 +608,11 @@ function find_max_alpha(
             Cones.reset_data(cone_k)
 
             # TODO is_dual_feas function should fall back to a nbhd-like check (for ray maybe) if not using nbhd check
+            # if affine_phase
+            #     in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k))
+            # else
+            #     in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && sz_ks[k] > mu_ls * Cones.get_nu(cone_k) * 0.5)
+            # end
             in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, mu_ls, max_nbhd))
             # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k))
 

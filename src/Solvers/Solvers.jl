@@ -196,7 +196,7 @@ function solve(solver::Solver{T}) where {T <: Real}
         model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
 
         @show norm(model.G)
-        solver.rescale = false
+        solver.rescale = true
         if solver.rescale
             rteps = sqrt(eps(T))
             solver.c_scale = c_scale = T[sqrt(max(rteps, abs(model.c[j]), maximum(abs, model.A[:, j]), maximum(abs, model.G[:, j]))) for j in 1:model.n]

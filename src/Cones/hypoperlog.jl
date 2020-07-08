@@ -311,6 +311,7 @@ function correction(
     return cone.correction
 end
 
+
 function correction2(
     cone::HypoPerLog{T},
     primal_dir::AbstractVector{T},
