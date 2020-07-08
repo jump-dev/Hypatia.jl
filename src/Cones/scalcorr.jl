@@ -8,7 +8,7 @@ use_correction(cone::Cone) = false
 # scal_hess(cone::Cone{T}, mu::T) where {T} = (cone.scal_hess_updated ? cone.scal_hess : update_scal_hess(cone, mu))
 scal_hess(cone::Cone{T}, mu::T) where {T} = (cone.scal_hess_updated ? cone.hess : update_scal_hess(cone, mu))
 
-use_update_1_default() = true
+use_update_1_default() = false
 # use_update_2_default() = false
 
 

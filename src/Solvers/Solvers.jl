@@ -186,7 +186,7 @@ function solve(solver::Solver{T}) where {T <: Real}
     # preprocess and find initial point
     @timeit solver.timer "initialize" begin
         orig_model = solver.orig_model
-        model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
+        model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset, rescale = false) # copy original model to solver.model, which may be modified
 
         @timeit solver.timer "init_cone" point = solver.point = initialize_cone_point(solver.orig_model.cones, solver.orig_model.cone_idxs, solver.timer)
 
@@ -397,8 +397,8 @@ get_num_iters(solver::Solver) = solver.num_iters
 get_primal_obj(solver::Solver) = solver.primal_obj
 get_dual_obj(solver::Solver) = solver.dual_obj
 
-get_s(solver::Solver) = copy(solver.point.s)
-get_z(solver::Solver) = copy(solver.point.z)
+get_s(solver::Solver) = copy(solver.point.s) .* (solver.orig_model.rescale ? solver.orig_model.h_scale : 1)
+get_z(solver::Solver) = copy(solver.point.z) ./ (solver.orig_model.rescale ? solver.orig_model.h_scale : 1)
 
 function get_x(solver::Solver{T}) where {T <: Real}
     if solver.preprocess && !iszero(solver.orig_model.n) && !any(isnan, solver.point.x)
@@ -421,6 +421,10 @@ function get_x(solver::Solver{T}) where {T <: Real}
         x = copy(solver.point.x)
     end
 
+    if solver.orig_model.rescale
+        x ./= solver.orig_model.c_scale
+    end
+
     return x
 end
 
@@ -440,6 +444,10 @@ function get_y(solver::Solver{T}) where {T <: Real}
         end
     else
         y = copy(solver.point.y)
+    end
+
+    if solver.orig_model.rescale
+        y ./= solver.orig_model.b_scale
     end
 
     return y

@@ -85,6 +85,10 @@ mutable struct Model{T <: Real}
     cones::Vector{Cones.Cone{T}}
     cone_idxs::Vector{UnitRange{Int}}
     nu::T
+    rescale
+    b_scale
+    c_scale
+    h_scale
 
     function Model{T}(
         c::Vector{T},
@@ -102,14 +106,29 @@ mutable struct Model{T <: Real}
         model.p = length(b)
         model.q = length(h)
         model.obj_offset = obj_offset
+        model.cones = cones
+        model.cone_idxs = build_cone_idxs(model.q, model.cones)
+        model.rescale = rescale
         if rescale
             # TODO might need to move to solver because model gets reformed a lot in some scripts
             # @show norm(A)
             # @show norm(G)
             rteps = sqrt(eps(T))
-            c_scale = T[sqrt(max(rteps, abs(c[j]), maximum(abs, A[:, j]), maximum(abs, G[:, j]))) for j in 1:model.n]
-            b_scale = T[sqrt(max(rteps, abs(b[i]), maximum(abs, A[i, :]))) for i in 1:model.p]
-            h_scale = T[sqrt(max(rteps, abs(h[i]), maximum(abs, G[i, :]))) for i in 1:model.q]
+            model.c_scale = c_scale = T[sqrt(max(rteps, abs(c[j]), maximum(abs, A[:, j]), maximum(abs, G[:, j]))) for j in 1:model.n]
+            model.b_scale = b_scale = T[sqrt(max(rteps, abs(b[i]), maximum(abs, A[i, :]))) for i in 1:model.p]
+            # h_scale = T[sqrt(max(rteps, abs(h[i]), maximum(abs, G[i, :]))) for i in 1:model.q]
+            model.h_scale = h_scale = zeros(model.q)
+            for k in eachindex(cones)
+                idxs = model.cone_idxs[k]
+                if cones[k] isa Cones.Nonnegative
+                    for i in idxs
+                        h_scale[i] = sqrt(max(rteps, abs(h[i]), maximum(abs, G[i, :])))
+                    end
+                else
+                    scal = sqrt(max(rteps, maximum(abs, h[idxs]), maximum(abs, G[idxs, :])))
+                    h_scale[idxs] = fill(scal, length(idxs))
+                end
+            end
             # c_mat = Diagonal(c_scale)
             # b_mat = Diagonal(b_scale)
             # h_mat = Diagonal(h_scale)
@@ -126,8 +145,6 @@ mutable struct Model{T <: Real}
         model.b = b
         model.G = G
         model.h = h
-        model.cones = cones
-        model.cone_idxs = build_cone_idxs(model.q, model.cones)
         model.nu = isempty(cones) ? zero(T) : sum(Cones.get_nu, cones)
 
         return model
