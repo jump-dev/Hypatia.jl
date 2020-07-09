@@ -357,11 +357,12 @@ function correction2(
 
     const1 = abs2(u_dir - dzdv * v_dir)
     const2 = v * w_sqr_wi_sqr
-    const3 = v * w_wi_sqr / z / z
+    const3 = 2 * v * w_wi_sqr / z
     const4 = v_dir * dzdv
     const5 = 2 * (const4 - u_dir)
     const6 = dzdv * v / z
     const7 = 2 * dzdv - w_dim
+    const8 = ((u_dir - dzdv * v_dir) * v / z + v_dir) / z
 
     corr[1] = ((
         const1 +
@@ -376,15 +377,15 @@ function correction2(
         -w_dim * v_dir * (const5 + const4) / v / z / z  +
         2 * w_wi * (v_dir * const7 - u_dir) / z / z +
         -abs2(v_dir) * w_dim * (1 / z + 2 / v) / v / v +
-        2 * const3 + (w_sqr_wi_sqr - const2 * dzdv / z) / z
+        (const3 + w_sqr_wi_sqr - const2 * dzdv / z) / z
 
     corr[3:end] = (
-        uuw * s1_sqr +
-        2 * u_dir *  v_dir * (2 * const6 - 1) / z / z +
-        s2_sqr * (const7 - 2 * dzdv * const6) / z / z) ./ w +
-        2 * ((u_dir * uww_1 + v_dir * vww_1) * w_wi .+ (u_dir * uww_2 + v_dir * vww_2) * w_dir ./ w) ./ w +
-        (-2 * const3 .- (2 * w_wi * w_dir ./ w .+ w_sqr_wi_sqr) / z) * abs2(v) / z ./ w +
-            (-2 * v / z - 2) * w_dir .* w_dir ./ w ./ w ./ w
+        -2 * v * const1 / z .+
+        -2 * u_dir * v_dir .+
+        s2_sqr * const7) ./ w / z / z +
+        (2 * v * w_wi / z .+ w_dir ./ w) * const8 * 2 ./ w +
+        (-const3 .- 2 * w_wi * w_dir ./ w .- w_sqr_wi_sqr) * abs2(v) / z / z ./ w +
+            -(v / z + 1) * 2 * w_dir .* w_dir ./ w ./ w ./ w
 
     corr ./= -2
 
