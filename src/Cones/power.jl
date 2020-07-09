@@ -39,6 +39,7 @@ mutable struct Power{T <: Real} <: Cone{T}
     produuw::T
     aui::Vector{T}
     auiproduuw::Vector{T}
+    tmpm::Vector{T}
 
     function Power{T}(
         alpha::Vector{T},
@@ -80,8 +81,10 @@ function setup_data(cone::Power{T}) where {T <: Real}
     cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.aui = zeros(length(cone.alpha))
-    cone.auiproduuw = zeros(length(cone.alpha))
+    m = length(cone.alpha)
+    cone.aui = zeros(m)
+    cone.auiproduuw = zeros(m)
+    cone.tmpm = zeros(m)
     return
 end
 
@@ -179,33 +182,25 @@ end
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
     @assert cone.grad_updated
     m = length(cone.alpha)
-    dim = cone.dim
     @views u = cone.point[1:m]
     @views w = cone.point[(m + 1):end]
-    alpha = cone.alpha
-    produw = cone.produw
     aui = cone.aui
     produuw = cone.produuw
-    # tmpm = cone.tmpm
-    # @. tmpm = 2 * produuw * aui / produw # TODO cache
-    tmpm = 2 * produuw * aui ./ produw
+    w_idxs = (m + 1):cone.dim
+    produwi2 = 2 / cone.produw
+    const1 = 2 * produuw - 1
+    tmpm = cone.tmpm
+    @. tmpm = (1 + const1 * cone.alpha) / u / u
 
-    @. @views prod[1:m, :] = aui * produuw * (produuw - 1) # TODO cache
-    @. @views prod[(m + 1):dim, :] = 2 / produw
     @views @inbounds for i in 1:size(arr, 2)
-        dotm = dot(aui, arr[1:m, i])
-        dotn = dot(w, arr[(m + 1):dim, i])
-        prod[1:m, i] .*= dotm
-        prod[(m + 1):dim, i] .*= dotn
-        @. prod[1:m, i] -= tmpm * dotn
-        @. prod[(m + 1):dim, i] -= produuw * dotm
-    end
-    @. @views @inbounds begin
-        prod[1:m, :] += arr[1:m, :] * (produuw * aui + (1 - alpha) / u) / u # TODO cache?
-        prod[(m + 1):dim, :] *= w
-        prod[(m + 1):dim, :] += arr[(m + 1):dim, :]
-        prod[(m + 1):dim, :] *= 2
-        prod[(m + 1):dim, :] /= produw
+        arr_u = arr[1:m, i]
+        arr_w = arr[w_idxs, i]
+        dot1 = -produuw * dot(aui, arr_u)
+        dot2 = dot1 + produwi2 * dot(w, arr_w)
+        dot3 = dot1 - produuw * dot2
+        dot4 = produwi2 * dot2
+        @. prod[1:m, i] = dot3 * aui + tmpm * arr_u
+        @. prod[w_idxs, i] = dot4 * w + produwi2 * arr_w
     end
 
     return prod
@@ -213,59 +208,40 @@ end
 
 function correction(cone::Power, primal_dir::AbstractVector)
     @assert cone.hess_updated
-
     m = length(cone.alpha)
-    u = cone.point[1:m]
-    w = view(cone.point, (m + 1):cone.dim)
-    w_idxs = (m + 1):cone.dim
-    alpha = cone.alpha
-    T = eltype(cone.point)
-
-    produ = cone.produ # = exp(2 * sum(cone.alpha[i] * log(u[i]) for i in eachindex(cone.alpha)))
-    produw = cone.produw # = cone.produ - sum(abs2, w)
-    produuw = cone.produuw # = cone.produ / cone.produw
-    produuw_tw = produuw * (produuw - 1)
-    aui = cone.aui # @. cone.aui = 2 * cone.alpha / u
-
+    @views u = cone.point[1:m]
+    @views w = cone.point[(m + 1):end]
     corr = cone.correction
-    corr .= 0
-    dim = cone.dim
-    u_corr = view(corr, 1:m)
-    w_corr = view(corr, w_idxs)
-    u_dir = view(primal_dir, 1:m)
-    w_dir = view(primal_dir, w_idxs)
+    @views u_corr = corr[1:m]
+    @views w_corr = corr[(m + 1):end]
+    @views u_dir = primal_dir[1:m]
+    @views w_dir = primal_dir[(m + 1):end]
+    alpha = cone.alpha
+    produw = cone.produw
+    produuw = cone.produuw
 
-    wwdir = dot(w, w_dir)
-    auiudir = dot(aui, u_dir)
+    wwd = 2 * dot(w, w_dir)
+    udu = cone.tmpm
+    @. udu = u_dir / u
+    audu = dot(alpha, udu)
+    const8 = 2 * produuw - 1
+    const1 = 2 * const8 * abs2(audu) + sum(ai * udui * udui for (ai, udui) in zip(alpha, udu))
+    const15 = wwd / produw
+    const10 = sum(abs2, w_dir) + wwd * const15
 
-    u_corr .+=
-        # uuu
-        produuw * (1 - produuw) * aui .*
-        ((2 * produuw - 1) * abs2(auiudir) + dot(aui ./ u, abs2.(u_dir)) .+ 2 * auiudir * u_dir ./ u) +
-        -2 * ((1 .- alpha) ./ u + produuw * aui) ./ u ./ u .* abs2.(u_dir) +
-        # uuw
-        2 * produuw / produw * aui .*
-        (wwdir * (
-        (2 * produuw - 1) * 2 * auiudir .+
-        2 * u_dir ./ u .+
-        # uww
-        -4 / produw * wwdir
-        ) .-
-        sum(abs2.(w_dir))
-        )
+    const11 = -2 * produuw * (1 - produuw)
+    const12 = -2 * produuw / produw
+    const13 = const11 * const1 + const12 * (2 * wwd * const8 * audu - const10)
+    const14 = const11 * 2 * audu + const12 * wwd
+    @. u_corr = udu .+ alpha .* (const8 * udu .+ const14)
+    u_corr .*= udu
+    @. u_corr += const13 * alpha
+    u_corr ./= u
 
-    # w[wk] / produw / produw
-    w_corr .+=
-        # uuw
-        2 * produuw / produw * w .* ((2 * produuw - 1) * abs2(auiudir) + dot(aui ./ u, abs2.(u_dir))) +
-        # uww
-        -4 * produuw / produw * auiudir * (4  / produw * wwdir * w + w_dir) +
-        # www
-        4 / produw / produw * (
-        4 * abs2(wwdir) / produw * w +
-        2 * wwdir .* w_dir + sum(abs2.(w_dir)) .* w
-        )
-    corr ./= -2
+    const2 = -2 * const12 * audu
+    const6 = 2 * const2 * const15 + const12 * const1 - 2 / produw * const10 / produw
+    const7 = const2 - 2 / produw * wwd / produw
+    @. w_corr = const7 * w_dir + const6 * w
 
     return cone.correction
 end
