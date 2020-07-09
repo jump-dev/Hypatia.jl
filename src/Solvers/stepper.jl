@@ -386,8 +386,8 @@ function update_rhs_predcorr(stepper::CombinedStepper{T}, solver::Solver{T}) whe
         # end
         if corr_viol < 0.001
             @. stepper.s_rhs_k[k] += H_prim_dir_k + corr_k
-        else
-            println("skip pred-corr: $corr_viol")
+        # else
+        #     println("skip pred-corr: $corr_viol")
         end
     end
 
@@ -444,8 +444,8 @@ function update_rhs_centcorr(stepper::CombinedStepper{T}, solver::Solver{T}) whe
         # end
         if corr_viol < 0.001
             stepper.s_rhs_k[k] .+= corr_k
-        else
-            println("skip cent-corr: $corr_viol")
+        # else
+        #     println("skip cent-corr: $corr_viol")
         end
     end
 
