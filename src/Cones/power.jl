@@ -30,6 +30,7 @@ mutable struct Power{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -38,8 +39,6 @@ mutable struct Power{T <: Real} <: Cone{T}
     produuw::T
     aui::Vector{T}
     auiproduuw::Vector{T}
-
-    correction::Vector{T}
 
     function Power{T}(
         alpha::Vector{T},
@@ -77,12 +76,12 @@ function setup_data(cone::Power{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    load_matrix(cone.hess_fact_cache, cone.hess)
     cone.aui = zeros(length(cone.alpha))
     cone.auiproduuw = zeros(length(cone.alpha))
-    cone.correction = zeros(T, dim)
     return
 end
 

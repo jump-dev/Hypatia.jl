@@ -30,6 +30,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -38,8 +39,6 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     denom::T
     hess_sqrt_vec::Vector{T}
     inv_hess_sqrt_vec::Vector{T}
-
-    correction::Vector{T}
 
     function EpiPerSquare{T}(
         dim::Int;
@@ -71,9 +70,9 @@ function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.hess_sqrt_vec = zeros(T, dim)
     cone.inv_hess_sqrt_vec = zeros(T, dim)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.correction = zeros(T, dim)
     return
 end
 
@@ -162,7 +161,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
     @inbounds for j in 1:size(prod, 2)
         uj = arr[1, j]
         vj = arr[2, j]
-        wj = @view arr[3:end, j]
+        @views wj = arr[3:end, j]
         ga = (dot(w, wj) - v * uj - u * vj) / cone.dist
         prod[1, j] = -ga * v - vj
         prod[2, j] = -ga * u - uj
@@ -252,26 +251,26 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}
     return prod
 end
 
-rotated_jdot(x::AbstractVector, y::AbstractVector) = @views x[1] * y[2] + x[2] * y[1] - dot(x[3:end], y[3:end]) # TODO if only used once, don't make separate function
-
-# TODO allocs
 function correction(cone::EpiPerSquare, primal_dir::AbstractVector)
     @assert cone.grad_updated
     dim = cone.dim
     corr = cone.correction
     point = cone.point
+    u = point[1]
+    v = point[2]
+    u_dir = primal_dir[1]
+    v_dir = primal_dir[2]
+    @views w = point[3:end]
+    @views w_dir = primal_dir[3:end]
 
-    tmp = hess_prod!(cone.nbhd_tmp, primal_dir, cone)
-    tmp2 = cone.nbhd_tmp2
-    copyto!(tmp2, primal_dir)
-    @views tmp2[3:dim] .*= -1
-    (tmp2[1], tmp2[2]) = (tmp2[2], tmp2[1])
-
-    corr .= point * dot(primal_dir, tmp)
-    corr[3:dim] .*= -1
-    (corr[1], corr[2]) = (corr[2], corr[1])
-    corr .+= tmp * rotated_jdot(point, primal_dir)
-    corr .-= dot(point, tmp) * tmp2
+    jdotpd = u * v_dir + v * u_dir - dot(w, w_dir)
+    hess_prod!(corr, primal_dir, cone)
+    dotdHd = -dot(primal_dir, corr)
+    dotpHd = dot(point, corr)
+    corr .*= jdotpd
+    @. @views corr[3:end] += dotdHd * w + dotpHd * w_dir
+    corr[1] += -dotdHd * v - dotpHd * v_dir
+    corr[2] += -dotdHd * u - dotpHd * u_dir
     corr ./= 2 * cone.dist
 
     return corr

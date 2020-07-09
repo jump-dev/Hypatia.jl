@@ -53,7 +53,6 @@ include("wsosinterppossemideftri.jl")
 include("wsosinterpepinormeucl.jl")
 
 use_dual_barrier(cone::Cone) = cone.use_dual_barrier
-use_3order_corr(cone::Cone) = false
 dimension(cone::Cone) = cone.dim
 set_timer(cone::Cone, timer::TimerOutput) = (cone.timer = timer)
 

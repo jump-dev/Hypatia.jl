@@ -36,6 +36,7 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     inv_hess::Symmetric{T, SparseMatrixCSC{T, Int}}
     inv_hess_sqrt::UpperTriangular{T, SparseMatrixCSC{T, Int}}
     no_sqrts::Bool
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -50,8 +51,6 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     Hiww::Vector{T}
     temp1::Vector{T}
     temp2::Vector{T}
-
-    correction::Vector{T}
 
     function EpiSumPerEntropy{T}(
         dim::Int;
@@ -88,6 +87,7 @@ function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.lwv = zeros(T, w_dim)
@@ -99,7 +99,6 @@ function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
     cone.Hiww = zeros(T, w_dim)
     cone.temp1 = zeros(T, w_dim)
     cone.temp2 = zeros(T, w_dim)
-    cone.correction = zeros(T, dim)
     cone.no_sqrts = false
     return
 end

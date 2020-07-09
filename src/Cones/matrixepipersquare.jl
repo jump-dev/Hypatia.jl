@@ -30,6 +30,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -52,8 +53,6 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     tmpd1d2::Matrix{R}
     ZiUZiW::Matrix{R}
     Hvv::T
-
-    correction::Vector{T}
 
     function MatrixEpiPerSquare{T, R}(
         d1::Int,
@@ -93,6 +92,7 @@ function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     d1 = cone.d1
@@ -110,7 +110,6 @@ function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}
     cone.tmpd1d1d = Matrix{R}(undef, d1, d1)
     cone.tmpd1d2 = Matrix{R}(undef, d1, d2)
     cone.ZiUZiW = Matrix{R}(undef, d1, d2)
-    cone.correction = zeros(T, dim)
     return
 end
 
