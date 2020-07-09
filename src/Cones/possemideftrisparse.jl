@@ -67,6 +67,8 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     temp_blocks
     rel_idxs
 
+    correction
+
     function PosSemidefTriSparse{T, R}(
         side::Int,
         row_idxs::Vector{Int},
@@ -117,6 +119,7 @@ function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.correction = zeros(T, dim)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
@@ -125,7 +128,7 @@ function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T
     return
 end
 
-use_correction(::PosSemidefTriSparse) = false
+use_correction(::PosSemidefTriSparse) = true
 
 # setup symbolic factorization
 function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
@@ -564,6 +567,75 @@ function _hess_step3(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
     end
 
     return temp_blocks
+end
+
+function third_skron(i, j, k, l, m, n, Wi::Symmetric{T, Matrix{T}}) where {T}
+    rt2 = sqrt(T(2))
+    t1 = Wi[i, m] * Wi[n, k] * Wi[l, j] + Wi[i, k] * Wi[l, m] * Wi[n, j]
+    if m != n
+        t1 += Wi[i, n] * Wi[m, k] * Wi[l, j] + Wi[i, k] * Wi[l, n] * Wi[m, j]
+        if k != l
+            t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j] + Wi[i, n] * Wi[m, l] * Wi[k, j] + Wi[i, l] * Wi[k, n] * Wi[m, j]  #################
+            if i != j
+                t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] +
+                    Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i] +
+                    Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i] + Wi[j, n] * Wi[m, l] * Wi[k, i] + Wi[j, l] * Wi[k, n] * Wi[m, i]
+            end
+        elseif i != j
+            t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, n] * Wi[m, k] * Wi[l, i] + Wi[j, k] * Wi[l, n] * Wi[m, i]
+        end
+    elseif k != l
+        t1 += Wi[i, m] * Wi[n, l] * Wi[k, j] + Wi[i, l] * Wi[k, m] * Wi[n, j]
+        if i != j
+            t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i] + Wi[j, m] * Wi[n, l] * Wi[k, i] + Wi[j, l] * Wi[k, m] * Wi[n, i]
+        end
+    elseif i != j
+        t1 += Wi[j, m] * Wi[n, k] * Wi[l, i] + Wi[j, k] * Wi[l, m] * Wi[n, i]
+    end
+
+    num_match = (i == j) + (k == l) + (m == n)
+    if num_match == 0
+        t1 /= rt2 * 2
+    elseif num_match == 1
+        t1 /= 2
+    elseif num_match == 2
+        t1 /= rt2
+    end
+
+    return t1
+end
+
+function correction(cone::PosSemidefTriSparse{T, R}, primal_dir::AbstractVector{T}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+    point = cone.point
+    lift = zeros(T, cone.side, cone.side)
+    for (i, j, v) in zip(cone.row_idxs, cone.col_idxs, point)
+        lift[i, j] = v / (i == j ? 1 : cone.rt2)
+    end
+    corr = cone.correction
+    Xi = inv(Symmetric(lift, :L))
+
+    side = cone.side
+    dim = cone.dim
+    third = zeros(dim, dim, dim)
+    idx1 = 1
+    for (i, j) in zip(cone.row_idxs, cone.col_idxs)
+        idx2 = 1
+        for (k, l) in zip(cone.row_idxs, cone.col_idxs)
+            idx3 = 1
+            for (m, n) in zip(cone.row_idxs, cone.col_idxs)
+                third[idx1, idx2, idx3] = third_skron(i, j, k, l, m, n, Xi)
+                idx3 += 1
+            end
+            idx2 += 1
+        end
+        idx1 +=1
+    end
+
+    corr .= reshape(reshape(third, dim^2, dim) * primal_dir, dim, dim) * primal_dir
+    corr ./= 2
+
+    return corr
+
 end
 
 function svec_to_smat_sparse!(blocks::Vector{Matrix{T}}, vec::AbstractVector{T}, cone::PosSemidefTriSparse{T, T}) where {T <: BlasReal}
