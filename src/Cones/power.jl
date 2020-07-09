@@ -82,9 +82,9 @@ function setup_data(cone::Power{T}) where {T <: Real}
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     m = length(cone.alpha)
-    cone.aui = zeros(m)
-    cone.auiproduuw = zeros(m)
-    cone.tmpm = zeros(m)
+    cone.aui = zeros(T, m)
+    cone.auiproduuw = zeros(T, m)
+    cone.tmpm = zeros(T, m)
     return
 end
 
