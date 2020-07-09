@@ -60,7 +60,7 @@ function test_barrier_oracles(
     @test CO.is_dual_feas(cone)
     grad = CO.grad(cone)
     hess = CO.hess(cone)
-    if dim < 13 # too slow if dimension is large
+    if dim < 8
         grad = CO.grad(cone)
         fd_grad = ForwardDiff.gradient(barrier, point)
         @test grad ≈ fd_grad atol=tol rtol=tol
@@ -76,7 +76,7 @@ function test_barrier_oracles(
         (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
         corr = CO.correction(cone, primal_dir)
         @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
-        if T == Float64 && dim < 7 && (!isa(cone, CO.EpiSumPerEntropy) || dim < 5)
+        if T == Float64 && dim < 6 && (!isa(cone, CO.EpiSumPerEntropy) || dim < 5)
             FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
             FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
             @test FD_corr ≈ corr atol=tol rtol=tol
