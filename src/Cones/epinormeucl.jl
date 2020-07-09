@@ -27,12 +27,11 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
     dist::T
-
-    correction::Vector{T}
 
     function EpiNormEucl{T}(
         dim::Int;
@@ -63,9 +62,9 @@ function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
     cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.correction = zeros(T, dim)
     return
 end
 
@@ -212,25 +211,24 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}
     return prod
 end
 
-jdot(x::AbstractVector, y::AbstractVector) = @views x[1] * y[1] - dot(x[2:end], y[2:end])
-
 function correction(cone::EpiNormEucl, primal_dir::AbstractVector)
     @assert cone.grad_updated
     dim = cone.dim
     corr = cone.correction
     point = cone.point
+    u = point[1]
+    u_dir = primal_dir[1]
+    @views w = point[2:end]
+    @views w_dir = primal_dir[2:end]
 
-    tmp = hess_prod!(cone.nbhd_tmp, primal_dir, cone)
-    tmp2 = cone.nbhd_tmp2
-    copyto!(tmp2, primal_dir)
-    @views tmp2[2:dim] .*= -1
-
-    corr .= point * dot(primal_dir, tmp)
-    @views corr[2:dim] .*= -1
-    corr .+= tmp * jdot(point, primal_dir)
-    corr .-= dot(point, tmp) * tmp2
-    corr ./= cone.dist
-    corr ./= 2
+    jdotpd = u * u_dir - dot(w, w_dir)
+    hess_prod!(corr, primal_dir, cone)
+    dotdHd = -dot(primal_dir, corr)
+    dotpHd = dot(point, corr)
+    corr .*= jdotpd
+    @. @views corr[2:end] += dotdHd * w + dotpHd * w_dir
+    corr[1] += -dotdHd * u - dotpHd * u_dir
+    corr ./= 2 * cone.dist
 
     return corr
 end

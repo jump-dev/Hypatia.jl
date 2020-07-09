@@ -34,6 +34,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -50,8 +51,6 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     tmpd1d2::Matrix{R}
     tmpd1d1::Matrix{R}
     tmpd2d2::Matrix{R}
-
-    correction::Vector{T}
 
     function EpiNormSpectral{T, R}(
         d1::Int,
@@ -87,6 +86,7 @@ function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} w
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.W = Matrix{R}(undef, cone.d1, cone.d2)
@@ -98,7 +98,6 @@ function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} w
     cone.tmpd1d2 = Matrix{R}(undef, cone.d1, cone.d2)
     cone.tmpd1d1 = Matrix{R}(undef, cone.d1, cone.d1)
     cone.tmpd2d2 = Matrix{R}(undef, cone.d2, cone.d2)
-    cone.correction = zeros(T, dim)
     return
 end
 

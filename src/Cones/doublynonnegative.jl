@@ -32,6 +32,7 @@ mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -43,8 +44,6 @@ mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
     inv_mat::Matrix{T}
     inv_vec::Vector{T}
     fact_mat
-
-    correction::Vector{T}
 
     function DoublyNonnegative{T}(
         dim::Int;
@@ -82,6 +81,7 @@ function setup_data(cone::DoublyNonnegative{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.mat = zeros(T, cone.side, cone.side)
@@ -89,7 +89,6 @@ function setup_data(cone::DoublyNonnegative{T}) where {T <: Real}
     cone.mat3 = similar(cone.mat)
     cone.mat4 = similar(cone.mat)
     cone.inv_vec = zeros(T, svec_length(cone.side))
-    cone.correction = zeros(T, dim)
     return
 end
 
@@ -190,18 +189,23 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::DoublyN
         ldiv!(cone.fact_mat, cone.mat3)
         smat_to_svec!(view(prod, :, i), cone.mat3, cone.rt2)
     end
-    @. @views prod[cone.offdiag_idxs, :] += arr[cone.offdiag_idxs, :] / cone.point[cone.offdiag_idxs] / cone.point[cone.offdiag_idxs]
+    offdiags = cone.offdiag_idxs
+    @views point_offdiags = cone.point[offdiags]
+    @. @views prod[offdiags, :] += arr[offdiags, :] / point_offdiags / point_offdiags
     return prod
 end
 
 function correction(cone::DoublyNonnegative, primal_dir::AbstractVector)
     @assert cone.grad_updated
+
     S = copytri!(svec_to_smat!(cone.mat4, primal_dir, cone.rt2), 'U')
     ldiv!(cone.fact_mat, S)
     rdiv!(S, cone.fact_mat.U)
     mul!(cone.mat3, S, S') # TODO use outer prod function
     smat_to_svec!(cone.correction, cone.mat3, cone.rt2)
-    @. @views cone.correction[cone.offdiag_idxs] += abs2(primal_dir[cone.offdiag_idxs] / cone.point[cone.offdiag_idxs]) / cone.point[cone.offdiag_idxs]
+    offdiags = cone.offdiag_idxs
+    @views point_offdiags = cone.point[offdiags]
+    @. @views cone.correction[offdiags] += abs2(primal_dir[offdiags] / point_offdiags) / point_offdiags
 
     return cone.correction
 end

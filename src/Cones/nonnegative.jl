@@ -10,7 +10,6 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 
 mutable struct Nonnegative{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_3order_corr::Bool
     max_neighborhood::T
     dim::Int
     point::Vector{T}
@@ -35,7 +34,6 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
         @assert dim >= 1
         cone = new{T}()
         cone.use_dual_barrier = use_dual
-        cone.use_3order_corr = false # TODO maybe make it a function rather than a field
         cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         return cone
@@ -43,8 +41,6 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
 end
 
 use_heuristic_neighborhood(cone::Nonnegative) = false
-
-use_3order_corr(cone::Nonnegative) = cone.use_3order_corr
 
 reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
@@ -123,6 +119,11 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
     return prod
 end
 
+function correction(cone::Nonnegative, primal_dir::AbstractVector)
+    @. cone.correction = abs2(primal_dir / cone.point) / cone.point
+    return cone.correction
+end
+
 hess_nz_count(cone::Nonnegative) = cone.dim
 hess_nz_count_tril(cone::Nonnegative) = cone.dim
 inv_hess_nz_count(cone::Nonnegative) = cone.dim
@@ -135,14 +136,4 @@ inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 function in_neighborhood(cone::Nonnegative{T}, rtmu::T, max_nbhd::T) where {T <: Real}
     mu_nbhd = rtmu * max_nbhd
     return all(abs(si * zi - rtmu) < mu_nbhd for (si, zi) in zip(cone.point, cone.dual_point))
-end
-
-# function correction(cone::Nonnegative, primal_dir::AbstractVector, dual_dir::AbstractVector)
-#     @. cone.correction = primal_dir * dual_dir / cone.point
-#     return cone.correction
-# end
-
-function correction(cone::Nonnegative, primal_dir::AbstractVector)
-    @. cone.correction = (primal_dir / cone.point)^2 / cone.point
-    return cone.correction
 end
