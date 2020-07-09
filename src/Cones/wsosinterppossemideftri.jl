@@ -30,6 +30,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -42,8 +43,6 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     tmpLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
     mat::Matrix{T}
-
-    correction::Vector{T}
 
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
@@ -82,6 +81,7 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.rt2 = sqrt(T(2))
@@ -92,7 +92,6 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.ΛFL = Vector{Any}(undef, length(Ps))
     cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
-    cone.correction = zeros(T, dim)
     cone.mat = zeros(T, R, R)
     return
 end

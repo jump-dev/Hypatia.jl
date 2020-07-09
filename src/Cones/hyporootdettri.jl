@@ -35,6 +35,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -48,8 +49,6 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     sigma::T
     kron_const::T
     dot_const::T
-
-    correction::Vector{T}
 
     function HypoRootdetTri{T, R}(
         dim::Int;
@@ -93,13 +92,13 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.W = zeros(R, cone.side, cone.side)
     # cone.Wi = zeros(R, cone.side, cone.side)
     cone.work_mat = zeros(R, cone.side, cone.side)
     cone.work_mat2 = zeros(R, cone.side, cone.side)
-    cone.correction = zeros(T, dim)
     return
 end
 
