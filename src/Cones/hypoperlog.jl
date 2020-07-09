@@ -339,48 +339,72 @@ function correction2(
     w_wi_sqr = abs2(w_wi)
     w_sqr_wi_sqr = sum(w_dir[i] / w[i] * w_dir[i] / w[i] for i in eachindex(w))
 
-    # corr[1] += 2 / z ^ 3 * s1_sqr
-    # corr[1] += 2 * uuv * u_dir * v_dir
-    corr[2] += uuv * s1_sqr
+    # corr[2] += uuv * s1_sqr
     uuw = -2 / z ^ 3 * v
     corr[1] += 2 * u_dir * uuw * w_wi
-    corr[3:end] += uuw ./ w * s1_sqr
+    # corr[3:end] += uuw ./ w * s1_sqr
     uvv = 2 / z ^ 3 * abs2(dzdv) + w_dim / v / abs2(z)
     # corr[1] += uvv * s2_sqr
-    corr[2] += 2 * uvv * u_dir * v_dir
+    # corr[2] += 2 * uvv * u_dir * v_dir
     uvw = 2 / z ^ 3 * dzdv * v - 1 / abs2(z)
     # corr[1] += 2 * v_dir * uvw * w_wi
-    corr[2] += 2 * u_dir * uvw * w_wi
-    corr[3:end] += 2 * u_dir *  v_dir * uvw ./ w
+    # corr[2] += 2 * u_dir * uvw * w_wi
+    # corr[3:end] += 2 * u_dir *  v_dir * uvw ./ w
     uww_1 = 2 * abs2(v) / z ^ 3
     uww_2 = v / abs2(z)
     # corr[1] += uww_1 * w_wi_sqr + uww_2 * w_sqr_wi_sqr
-    corr[3:end] += 2 * u_dir * (uww_1 * w_wi .+ uww_2 * w_dir ./ w) ./ w
+    # corr[3:end] += 2 * u_dir * (uww_1 * w_wi .+ uww_2 * w_dir ./ w) ./ w
     # vvv
-    corr[2] += abs2(v_dir) * (-2 / z ^ 3 * dzdv ^ 3 - 3 / abs2(z) * dzdv * w_dim / v - w_dim / abs2(v) / z - 2 * w_dim / v ^ 3)
+    # corr[2] += abs2(v_dir) * (-2 / z ^ 3 * dzdv ^ 3 - 3 / abs2(z) * dzdv * w_dim / v - w_dim / abs2(v) / z - 2 * w_dim / v ^ 3)
     vvw = -2 / z ^ 3 * abs2(dzdv) * v + 2 / abs2(z) * dzdv - w_dim / abs2(z)
-    corr[2] += 2 * v_dir * vvw * w_wi
-    corr[3:end] += s2_sqr * vvw ./ w
+    # corr[2] += 2 * v_dir * vvw * w_wi
+    # corr[3:end] += s2_sqr * vvw ./ w
     vww_1 = -2 / z ^ 3 * abs2(v) * dzdv + 2 * v / abs2(z)
     vww_2 = -inv(abs2(z)) * dzdv * v + 1 / z
-    corr[2] += vww_1 * w_wi_sqr + vww_2 * w_sqr_wi_sqr
-    corr[3:end] += 2 * v_dir * (vww_1 * w_wi .+ vww_2 * w_dir ./ w) ./ w
+    # corr[2] += vww_1 * w_wi_sqr + vww_2 * w_sqr_wi_sqr
+    # corr[3:end] += 2 * v_dir * (vww_1 * w_wi .+ vww_2 * w_dir ./ w) ./ w
     www_1 = -2 * v ^ 3 / z ^ 3
     www_2 = -abs2(v / z)
     www_3 = -2 * v / z - 2
-    corr[3:end] += www_1 * w_wi_sqr ./ w + www_2 * (2 * w_wi * w_dir ./ w ./ w + w_sqr_wi_sqr ./ w) +
-        www_3 * w_dir .* w_dir ./ w ./ w ./ w
+    # corr[3:end] += www_1 * w_wi_sqr ./ w + www_2 * (2 * w_wi * w_dir ./ w ./ w + w_sqr_wi_sqr ./ w) +
+    #     www_3 * w_dir .* w_dir ./ w ./ w ./ w
 
-    corr[1] = (2 * (s1_sqr / z +
-        (-2 / z * dzdv) * u_dir * v_dir +
-        w_wi * ((v * (2 * v_dir * dzdv - 2 * u_dir + v * w_wi)) / z - v_dir)) +
-        (2 / z * abs2(dzdv) + w_dim / v) * s2_sqr +
-        v * w_sqr_wi_sqr) / z / z
+    const1 = abs2(u_dir - dzdv * v_dir)
+    const2 = v * w_sqr_wi_sqr
+    const3 = v * w_wi_sqr / z / z
+    const4 = v_dir * dzdv
+
+    corr[1] = ((
+        const1 +
+        w_wi * v * (2 * const4 - 2 * u_dir + v * w_wi)
+        ) * 2 / z +
+        -2 * w_wi * v_dir +
+        w_dim * s2_sqr / v +
+        const2) / z / z
+
+    corr[2] =
+        -2 * dzdv * (const1 + w_wi_sqr * abs2(v) - 2 * v * u_dir * w_wi) / z ^ 3 +
+        w_dim * v_dir * (2 * u_dir - 3 * const4) / v / z / z  +
+        -2 * u_dir * w_wi / z / z +
+        abs2(v_dir) * (-w_dim / abs2(v) / z - 2 * w_dim / v ^ 3) +
+        2 * v_dir * vvw * w_wi +
+        2 * const3 + (w_sqr_wi_sqr - const2 * dzdv / z) / z
+
+    corr[3:end] = (
+        # -v * abs2(const1) / z ^ 3 +
+        uuw * s1_sqr +
+        2 * u_dir *  v_dir * (2 * dzdv * v / z - 1) / z / z +
+        s2_sqr * (-2 / z ^ 3 * abs2(dzdv) * v + 2 / abs2(z) * dzdv - w_dim / abs2(z))) ./ w +
+        2 * ((u_dir * uww_1 + v_dir * vww_1) * w_wi .+ (u_dir * uww_2 + v_dir * vww_2) * w_dir ./ w) ./ w +
+        -2 * abs2(v) * const3 / z ./ w + www_2 * (2 * w_wi * w_dir ./ w .+ w_sqr_wi_sqr) ./ w +
+            www_3 * w_dir .* w_dir ./ w ./ w ./ w
 
     corr ./= -2
 
     return cone.correction
 end
+
+use_scaling(::HypoPerLog) = false
 
 
 # # attempt correction without assumptions on H/scaling matrix
