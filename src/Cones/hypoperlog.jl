@@ -97,18 +97,16 @@ function update_feas(cone::HypoPerLog{T}) where {T}
     return cone.is_feas
 end
 
-# TODO higher dim case
-is_dual_feas(cone::HypoPerLog) = true
-# function is_dual_feas(cone::HypoPerLog{T}) where {T}
-#     @assert cone.dim == 3
-#     u = cone.dual_point[1]
-#     v = cone.dual_point[2]
-#     @views w = cone.dual_point[3:end]
-#     if u < -eps(T) && all(>(eps(T)), w)
-#         return (v - u - u * log(-w / u) > eps(T))
-#     end
-#     return false
-# end
+function update_dual_feas(cone::HypoPerLog{T}) where {T}
+    u = cone.dual_point[1]
+    v = cone.dual_point[2]
+    @views w = cone.dual_point[3:cone.dim]
+    if all(>(eps(T)), w) && u < -eps(T)
+        return (v - u * sum(log(-wi / u) + 1 for wi in w) > eps(T))
+    else
+        return false
+    end
+end
 
 function update_grad(cone::HypoPerLog)
     @assert cone.is_feas
@@ -159,12 +157,10 @@ function update_hess(cone::HypoPerLog)
     return cone.hess
 end
 
-# TODO simplify and remove allocations
 function correction(
     cone::HypoPerLog{T},
     primal_dir::AbstractVector{T},
     ) where {T <: Real}
-
     u = cone.point[1]
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
