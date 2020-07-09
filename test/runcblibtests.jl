@@ -91,9 +91,9 @@ all_tests_time = time()
     end
 
     @printf("\ncblib tests total time: %8.2e seconds\n\n", time() - all_tests_time)
-    @show sum(perf[:iters])
     show(perf, allrows = true, allcols = true)
     println("\n")
+    @show sum(perf[:iters])
     # show(timer)
     # println("\n")
 end
