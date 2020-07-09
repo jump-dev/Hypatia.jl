@@ -92,15 +92,44 @@ function test(
         hypatia_opt = get_inner_optimizer(model)
         result = process_result(hypatia_opt.model, hypatia_opt.solver)
     else
-        result = process_result_JuMP(model)
+        result = process_result(model)
     end
 
     return (extender, build_time, result)
 end
 
+# run a CBF instance with a given solver and return solve info
+function test(
+    inst::String, # a CBF file name
+    extender = nothing, # MOI.Utilities.@model-defined optimizer with subset of cones if using extended formulation
+    solver_options = (), # additional non-default solver options specific to the example
+    solver::Type{<:MOI.AbstractOptimizer} = Hypatia.Optimizer,
+    )
+    cbf_file = joinpath(cblib_dir, inst * ".cbf.gz")
+    # model = MOI.FileFormats.CBF.Model()
+    # MOI.read_from_file(model, cbf_file)
+    model = JuMP.read_from_file(cbf_file)
+
+    # delete integer constraints
+    int_cons = JuMP.all_constraints(model, JuMP.VariableRef, MOI.Integer)
+    JuMP.delete.(model, int_cons)
+
+    opt = solver{Float64}(; solver_options...)
+    if !isnothing(extender)
+        # use MOI automated extended formulation
+        opt = MOI.Bridges.full_bridge_optimizer(MOI.Utilities.CachingOptimizer(extender{Float64}(), opt), Float64)
+    end
+    JuMP.set_optimizer(model, () -> opt)
+    JuMP.optimize!(model)
+
+    @test JuMP.termination_status(model) == MOI.OPTIMAL # TODO some may be infeasible
+
+    return process_result(model)
+end
+
 # return solve information and certificate violations
 # TODO finish natural space certificate checks and delete unused code
-function process_result_JuMP(model::JuMP.Model)
+function process_result(model::JuMP.Model)
     solve_time = JuMP.solve_time(model)
     num_iters = MOI.get(model, MOI.BarrierIterations())
     primal_obj = JuMP.objective_value(model)
@@ -111,8 +140,6 @@ function process_result_JuMP(model::JuMP.Model)
     hypatia_model = hypatia_opt.model
     (ext_n, ext_p, ext_q) = (hypatia_model.n, hypatia_model.p, hypatia_model.q)
     hypatia_status = Solvers.get_status(hypatia_opt.solver)
-    # @show (ext_n, ext_p, ext_q)
-    # @show typeof.(hypatia_model.cones)
 
     # get Hypatia native model in natural space from MOI.copy_to without extension
     model_backend = JuMP.backend(model)
@@ -122,8 +149,6 @@ function process_result_JuMP(model::JuMP.Model)
 
     # get native certificates in natural space
     (nat_n, nat_p, nat_q) = (nat_hypatia_model.n, nat_hypatia_model.p, nat_hypatia_model.q)
-    # @show (nat_n, nat_p, nat_q)
-    # @show typeof.(nat_hypatia_model.cones)
     x = Vector{Float64}(undef, nat_n)
     y = Vector{Float64}(undef, nat_p)
     z = Vector{Float64}(undef, nat_q)
