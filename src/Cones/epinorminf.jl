@@ -32,6 +32,7 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_sqrt::UpperTriangular{T, SparseMatrixCSC{T, Int}}
     no_sqrts::Bool
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -49,8 +50,6 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     Hiuim::Vector{T}
     schur::T
     idet::Vector{T}
-
-    correction::Vector{T}
 
     function EpiNormInf{T, R}(
         dim::Int;
@@ -85,6 +84,7 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     n = cone.n
@@ -102,7 +102,6 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
         cone.Hiuim = zeros(T, n)
         cone.idet = zeros(T, n)
     end
-    cone.correction = zeros(T, dim)
     return
 end
 
@@ -406,7 +405,7 @@ function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T
     u3 = T(1.5) / u
     udu = udir / u
     corr1 = -udir * sum(z * (u3 - z) * z for z in cone.uden) * udir - udu * (cone.n - 1) / u * udu
-    for i in 1:cone.n
+    @inbounds for i in 1:cone.n
         deni = -4 * cone.den[i]
         udeni = 2 * cone.uden[i]
         suuw = udir * (-1 + udeni * u)

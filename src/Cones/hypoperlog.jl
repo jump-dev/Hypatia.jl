@@ -27,6 +27,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -34,8 +35,6 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     vlwvu::T
     lvwnivlwvu::T
     vwivlwvu::Vector{T}
-
-    correction::Vector{T}
 
     function HypoPerLog{T}(
         dim::Int;
@@ -65,10 +64,10 @@ function setup_data(cone::HypoPerLog{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.vwivlwvu = zeros(T, dim - 2)
-    cone.correction = zeros(T, dim)
     return
 end
 

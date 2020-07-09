@@ -38,6 +38,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -53,8 +54,6 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     ldWvuv::T
     vzip1::T
     Wivzi::Matrix{R}
-
-    correction::Vector{T}
 
     function HypoPerLogdetTri{T, R}(
         dim::Int;
@@ -99,6 +98,7 @@ function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} 
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+    cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
     cone.mat = Matrix{R}(undef, cone.side, cone.side)
@@ -107,7 +107,6 @@ function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} 
     cone.mat3 = similar(cone.mat)
     cone.Wi = similar(cone.mat)
     cone.Wivzi = similar(cone.mat)
-    cone.correction = zeros(T, dim)
     return
 end
 
