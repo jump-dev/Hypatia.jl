@@ -49,6 +49,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     sigma::T
     kron_const::T
     dot_const::T
+    tmpw::Vector{T}
 
     function HypoRootdetTri{T, R}(
         dim::Int;
@@ -99,6 +100,7 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     # cone.Wi = zeros(R, cone.side, cone.side)
     cone.work_mat = zeros(R, cone.side, cone.side)
     cone.work_mat2 = zeros(R, cone.side, cone.side)
+    cone.tmpw = zeros(T, dim - 1)
     return
 end
 
@@ -137,7 +139,6 @@ function update_feas(cone::HypoRootdetTri{T}) where {T}
     return cone.is_feas
 end
 
-# is_dual_feas(cone::HypoRootdetTri) = true
 function is_dual_feas(cone::HypoRootdetTri{T}) where {T}
     u = cone.dual_point[1]
     if u < -eps(T)
@@ -269,46 +270,42 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
     return prod
 end
 
-# TODO allocs and simplifications
-# TODO try to reuse fields already calculated for g and H
-function correction(cone::HypoRootdetTri, primal_dir::AbstractVector)
+function correction(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}) where T
     @assert cone.grad_updated
     u_dir = primal_dir[1]
     @views w_dir = primal_dir[2:end]
-
-    side = cone.side
+    corr = cone.correction
+    @views w_corr = corr[2:end]
     sigma = cone.sigma
-    w_dim = cone.dim - 1
     z = cone.rootdetu
-    T = typeof(z)
+    tmpw = cone.tmpw
 
-    vec_Wi = smat_to_svec!(zeros(T, w_dim), cone.Wi, cone.rt2) # TODO allocates
+    vec_Wi = smat_to_svec!(tmpw, cone.Wi, cone.rt2)
     S = copytri!(svec_to_smat!(cone.work_mat, w_dir, cone.rt2), 'U', cone.is_complex)
     dot_Wi_S = dot(vec_Wi, w_dir)
     ldiv!(cone.fact_W, S)
     dot_skron = real(dot(S, S'))
+    dot_wdwi = dot(vec_Wi, w_dir)
 
     rdiv!(S, cone.fact_W.U)
-    mul!(cone.work_mat2, S, S') # TODO use outer prod function
-    term1 = smat_to_svec!(zeros(T, w_dim), cone.work_mat2, cone.rt2) # TODO allocates
-    term1 .*= -2 * (sigma + 1)
+    mul!(cone.work_mat2, S, S')
+    @views smat_to_svec!(w_corr, cone.work_mat2, cone.rt2)
+    w_corr .*= -2 * (sigma + 1)
+
+    ssigma = inv(T(cone.side)) - sigma
+    scal1 = sigma * ssigma
+    scal2 = dot_Wi_S * (ssigma - sigma)
+    udz = u_dir / z
+    scal4 = 2 * udz * sigma
+    scal5 = scal1 * (dot_skron - scal2 * dot_Wi_S) - scal4 * (scal2 + udz)
+    scal6 = 2 * dot_Wi_S * scal1 + scal4
+    @. w_corr += scal5 * vec_Wi
 
     skron2 = rdiv!(S, cone.fact_W.U')
-    vec_skron2 = smat_to_svec!(zeros(T, w_dim), skron2, cone.rt2) # TODO allocates
-    scal1 = sigma * (inv(T(side)) - sigma)
-    term2 = (dot_skron * scal1) * vec_Wi + (2 * dot_Wi_S * scal1) * vec_skron2
+    vec_skron2 = smat_to_svec!(tmpw, skron2, cone.rt2)
 
-    scal2 = dot_Wi_S * (inv(T(side)) - sigma - sigma)
-    scal3 = -scal1 * scal2 * dot_Wi_S
-    term3 = scal3 * vec_Wi
-
-    scal4 = 2 * u_dir / z * sigma
-    term4ab = vec_skron2 - scal2 * vec_Wi
-    term4 = scal4 * term4ab
-
-    corr = cone.correction
-    corr[2:end] = term1 + term2 + (scal3 * vec_Wi) + term4 + (-scal4 * u_dir / z * vec_Wi) # TODO simplify by combining like terms in sub-terms
-    corr[1] = (sigma * dot(term4ab, w_dir) + 2 * (-scal4 * dot(vec_Wi, w_dir) + abs2(u_dir / z))) / z
+    @. w_corr += scal6 * vec_skron2
+    corr[1] = (sigma * (dot(vec_skron2, w_dir) - (scal2 + 4 * udz) * dot_wdwi) + 2 * abs2(udz)) / z
     corr *= cone.sc_const / -2
 
     return corr
