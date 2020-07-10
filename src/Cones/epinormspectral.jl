@@ -49,8 +49,12 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     Wtau::Matrix{R}
     Zitau::Matrix{R}
     tmpd1d2::Matrix{R}
+    tmpd1d2b::Matrix{R}
+    tmpd1d2c::Matrix{R}
+    tmpd1d2d::Matrix{R}
     tmpd1d1::Matrix{R}
     tmpd2d2::Matrix{R}
+    tmpd2d2b::Matrix{R}
 
     function EpiNormSpectral{T, R}(
         d1::Int,
@@ -89,15 +93,19 @@ function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} w
     cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.W = Matrix{R}(undef, cone.d1, cone.d2)
-    cone.Z = Matrix{R}(undef, cone.d1, cone.d1)
-    cone.tau = Matrix{R}(undef, cone.d1, cone.d2)
-    cone.HuW = Matrix{R}(undef, cone.d1, cone.d2)
-    cone.Wtau = Matrix{R}(undef, cone.d2, cone.d2)
-    cone.Zitau = Matrix{R}(undef, cone.d1, cone.d2)
-    cone.tmpd1d2 = Matrix{R}(undef, cone.d1, cone.d2)
-    cone.tmpd1d1 = Matrix{R}(undef, cone.d1, cone.d1)
-    cone.tmpd2d2 = Matrix{R}(undef, cone.d2, cone.d2)
+    cone.W = zeros(R, cone.d1, cone.d2)
+    cone.Z = zeros(R, cone.d1, cone.d1)
+    cone.tau = zeros(R, cone.d1, cone.d2)
+    cone.HuW = zeros(R, cone.d1, cone.d2)
+    cone.Wtau = zeros(R, cone.d2, cone.d2)
+    cone.Zitau = zeros(R, cone.d1, cone.d2)
+    cone.tmpd1d2 = zeros(R, cone.d1, cone.d2)
+    cone.tmpd1d2b = zeros(R, cone.d1, cone.d2)
+    cone.tmpd1d2c = zeros(R, cone.d1, cone.d2)
+    cone.tmpd1d2d = zeros(R, cone.d1, cone.d2)
+    cone.tmpd1d1 = zeros(R, cone.d1, cone.d1)
+    cone.tmpd2d2 = zeros(R, cone.d2, cone.d2)
+    cone.tmpd2d2b = zeros(R, cone.d2, cone.d2)
     return
 end
 
@@ -225,9 +233,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     @inbounds for j in 1:size(prod, 2)
         arr_1j = arr[1, j]
         @views vec_copy_to!(tmpd1d2, arr[2:end, j])
-
         prod[1, j] = cone.Huu * arr_1j + real(dot(cone.HuW, tmpd1d2))
-
         mul!(tmpd1d1, tmpd1d2, W')
         @inbounds for k in 1:cone.d1
             @inbounds for i in 1:k
@@ -248,33 +254,51 @@ function correction(cone::EpiNormSpectral, primal_dir::AbstractVector)
 
     u = cone.point[1]
     W = cone.W
+    u_dir = primal_dir[1]
+    @views W_dir = vec_copy_to!(cone.tmpd1d2, primal_dir[2:end])
+    corr = cone.correction
+
     Zi = cone.Zi
     tau = cone.tau
     Zitau = cone.Zitau
     WtauI = cone.Wtau
-    u_dir = primal_dir[1]
-    tmpd1d2 = cone.tmpd1d2
+    tmpd1d2b = cone.tmpd1d2b
+    tmpd1d2c = cone.tmpd1d2c
+    tmpd1d2d = cone.tmpd1d2d
     tmpd1d1 = cone.tmpd1d1
     tmpd2d2 = cone.tmpd2d2
-    @views W_dir = vec_copy_to!(tmpd1d2, primal_dir[2:end])
-    corr = cone.correction
+    tmpd2d2b = cone.tmpd2d2b
 
-    Wdtau = mul!(tmpd2d2, W_dir', tau)
-    ZiWd = cone.fact_Z \ W_dir
-    ZiWdWtauI = ZiWd * WtauI
+    mul!(tmpd2d2b, W_dir', tau)
+    ldiv!(tmpd1d2d, cone.fact_Z, W_dir)
+    mul!(tmpd1d2b, tmpd1d2d, WtauI)
+    mul!(tmpd1d2c, tmpd1d2d, tmpd2d2b')
+    mul!(tmpd1d1, tmpd1d2d, W')
+    mul!(tmpd2d2, tmpd2d2b, tmpd2d2b)
 
-    Wtmp1 = -2 * u * (cone.fact_Z \ ZiWdWtauI + (ZiWd * W' + tau * W_dir') * Zitau + Zitau * Wdtau)
-    Wtmp2 = 4 * u * u_dir * u * Zitau - u_dir * tau
-    ldiv!(cone.fact_Z, Wtmp2)
-    Wtmp1 += Wtmp2
+    mul!(tmpd2d2, W_dir', tmpd1d2b, true, true)
+    mul!(tmpd1d2d, tau, tmpd2d2)
+    mul!(tmpd1d2d, tmpd1d2c, WtauI, true, true)
+    mul!(tmpd1d2d, tmpd1d2b, tmpd2d2b, true, true)
 
-    Wcorr = tau * (Wdtau * Wdtau + W_dir' * ZiWdWtauI) + ZiWdWtauI * Wdtau + ZiWd * Wdtau' * WtauI + u_dir * Wtmp1
-    Wcorr .*= -2
-    @views vec_copy_to!(corr[2:end], Wcorr)
+    ldiv!(cone.fact_Z, tmpd1d2b)
+    mul!(tmpd1d2b, Zitau, tmpd2d2b, true, true)
 
-    ZiLi = cone.fact_Z.L \ Zi
-    trZi3 = sum(abs2, ZiLi)
-    corr[1] = -real(dot(W_dir, Wtmp1 + 3 * Wtmp2)) - u * u_dir * (6 * cone.trZi2 - 8 * u * trZi3 * u) * u_dir - (cone.d1 - 1) * abs2(u_dir / u) / u
+    mul!(tmpd1d1, tau, W_dir', true, true)
+    mul!(tmpd1d2b, tmpd1d1, Zitau, true, true)
+    tmpd1d2b .*= -2 * u
+
+    const1 = 4 * u * u_dir * u
+    @. tmpd1d2c = const1 * Zitau - u_dir * tau
+    ldiv!(cone.fact_Z, tmpd1d2c)
+    tmpd1d2b .+= tmpd1d2c
+
+    axpby!(-2 * u_dir, tmpd1d2b, -2, tmpd1d2d)
+    @views vec_copy_to!(corr[2:end], tmpd1d2d)
+
+    trZi3 = sum(abs2, ldiv!(tmpd1d1, cone.fact_Z.L, Zi))
+    @. tmpd1d2b += 3 * tmpd1d2c
+    corr[1] = -real(dot(W_dir, tmpd1d2b)) - u * u_dir * (6 * cone.trZi2 - 8 * u * trZi3 * u) * u_dir - (cone.d1 - 1) * abs2(u_dir / u) / u
 
     return corr
 end
