@@ -34,7 +34,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     lwv::T
     vlwvu::T
     lvwnivlwvu::T
-    vwivlwvu::Vector{T}
+    tmpw::Vector{T}
 
     function HypoPerLog{T}(
         dim::Int;
@@ -67,7 +67,7 @@ function setup_data(cone::HypoPerLog{T}) where {T <: Real}
     cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.vwivlwvu = zeros(T, dim - 2)
+    cone.tmpw = zeros(T, dim - 2)
     return
 end
 
@@ -97,15 +97,14 @@ function update_feas(cone::HypoPerLog{T}) where {T}
     return cone.is_feas
 end
 
-function update_dual_feas(cone::HypoPerLog{T}) where {T}
+function is_dual_feas(cone::HypoPerLog{T}) where {T}
     u = cone.dual_point[1]
     v = cone.dual_point[2]
     @views w = cone.dual_point[3:cone.dim]
     if all(>(eps(T)), w) && u < -eps(T)
-        return (v - u * sum(log(-wi / u) + 1 for wi in w) > eps(T))
-    else
-        return false
+        return (v - u * (length(w) + sum(log(-wi / u) for wi in w)) > eps(T))
     end
+    return false
 end
 
 function update_grad(cone::HypoPerLog)
@@ -132,23 +131,23 @@ function update_hess(cone::HypoPerLog)
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
     d = length(w)
-    vwivlwvu = cone.vwivlwvu
+    tmpw = cone.tmpw
     lvwnivlwvu = cone.lvwnivlwvu
     g = cone.grad
     H = cone.hess.data
 
     vivlwvu = v / cone.vlwvu
-    @. vwivlwvu = vivlwvu / w
+    @. tmpw = vivlwvu / w
     H[1, 1] = abs2(g[1])
     H[1, 2] = lvwnivlwvu / cone.vlwvu
-    @. H[1, 3:end] = -vwivlwvu / cone.vlwvu
+    @. H[1, 3:end] = -tmpw / cone.vlwvu
     H[2, 2] = abs2(lvwnivlwvu) + d * (g[1] + inv(v)) / v
     hden = (-v * lvwnivlwvu - 1) / cone.vlwvu
     @. H[2, 3:end] = hden / w
     @inbounds for j in 1:d
         j2 = 2 + j
         @inbounds for i in 1:j
-            H[2 + i, j2] = vwivlwvu[i] * vwivlwvu[j]
+            H[2 + i, j2] = tmpw[i] * tmpw[j]
         end
         H[j2, j2] -= g[j2] / w[j]
     end
@@ -157,60 +156,46 @@ function update_hess(cone::HypoPerLog)
     return cone.hess
 end
 
-function correction(
-    cone::HypoPerLog{T},
-    primal_dir::AbstractVector{T},
-    ) where {T <: Real}
+function correction(cone::HypoPerLog{T}, primal_dir::AbstractVector{T}) where {T <: Real}
     u = cone.point[1]
     v = cone.point[2]
-    w = view(cone.point, 3:cone.dim)
+    @views w = cone.point[3:end]
     u_dir = primal_dir[1]
     v_dir = primal_dir[2]
-    w_dir = view(primal_dir, 3:cone.dim)
+    @views w_dir = primal_dir[3:end]
+    corr = cone.correction
+    @views w_corr = corr[3:end]
 
     w_dim = length(w)
-    z = v * sum(log(wi / v) for wi in w) - u
-    sumlogw = sum(log.(w))
-    dzdv = -w_dim * log(v) - w_dim + sumlogw
-
-    corr = cone.correction
-    s1_sqr = abs2(u_dir)
-    s2_sqr = abs2(v_dir)
-    w_wi = sum(w_dir[i] / w[i] for i in eachindex(w))
-    w_wi_sqr = abs2(w_wi)
-    w_sqr_wi_sqr = sum(w_dir[i] / w[i] * w_dir[i] / w[i] for i in eachindex(w))
-
+    z = v * sum(log(wi / v) for wi in w) - u # TODO cache?
+    dzdv = -w_dim * log(v) - w_dim + sum(log, w)
+    wdw = cone.tmpw
+    @. wdw = w_dir / w
+    sumwdw = 2 * sum(wdw)
+    sum2wdw = sum(abs2, wdw)
+    vwdw = T(0.5) * v * sumwdw
+    vd2 = abs2(v_dir)
+    vz = v / z
     const1 = abs2(u_dir - dzdv * v_dir)
-    const2 = v * w_sqr_wi_sqr
-    const3 = 2 * v * w_wi_sqr / z
+    const3 = vwdw * sumwdw / z + sum2wdw
     const4 = v_dir * dzdv
     const5 = 2 * (const4 - u_dir)
-    const6 = dzdv * v / z
     const7 = 2 * dzdv - w_dim
-    const8 = ((u_dir - dzdv * v_dir) * v / z + v_dir) / z
+    const8 = 2 * ((u_dir - dzdv * v_dir) * vz + v_dir) / z
+    const9 = v * sum2wdw + 2 * (const1 + vwdw * (const5 + vwdw)) / z
+    const10 = ((-2 * u_dir * v_dir + vd2 * const7 - 2 * const1 / z * v) / z + 2 * const8 * vwdw) / z - abs2(vz) * const3
+    const11 = -abs2(vz) * sumwdw + const8
+    const12 = -2 * (vz + 1)
 
-    corr[1] = ((
-        const1 +
-        w_wi * v * (const5 + v * w_wi)
-        ) * 2 / z +
-        -2 * w_wi * v_dir +
-        w_dim * s2_sqr / v +
-        const2) / z / z
+    corr[1] = (const9 - sumwdw * v_dir + w_dim * vd2 / v) / z / z
 
-    corr[2] =
-        -2 * dzdv * (const1 + w_wi_sqr * abs2(v) + w_wi * v * const5) / z ^ 3 +
-        -w_dim * v_dir * (const5 + const4) / v / z / z  +
-        2 * w_wi * (v_dir * const7 - u_dir) / z / z +
-        -abs2(v_dir) * w_dim * (1 / z + 2 / v) / v / v +
-        (const3 + w_sqr_wi_sqr - const2 * dzdv / z) / z
+    corr[2] = ((-dzdv * const9 - w_dim * v_dir * (const5 + const4) / v + sumwdw * (v_dir * const7 - u_dir)) / z + const3) / z -
+        abs2(v_dir / v) * w_dim * (inv(z) + 2 / v)
 
-    @views corr[3:end] .= (
-        -2 * v * const1 / z .+
-        -2 * u_dir * v_dir .+
-        s2_sqr * const7) ./ w / z / z +
-        (2 * v * w_wi / z .+ w_dir ./ w) * const8 * 2 ./ w +
-        (-const3 .- 2 * w_wi * w_dir ./ w .- w_sqr_wi_sqr) * abs2(v) / z / z ./ w +
-            -(v / z + 1) * 2 * w_dir .* w_dir ./ w ./ w ./ w
+    @. w_corr = const11 .+ const12 * wdw
+    w_corr .*= wdw
+    w_corr .+= const10
+    w_corr ./= w
 
     corr ./= -2
 
