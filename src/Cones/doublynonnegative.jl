@@ -62,7 +62,7 @@ mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
         side = round(Int, sqrt(0.25 + 2 * dim) - 0.5)
         @assert side * (side + 1) == 2 * dim
         cone.side = side
-        cone.offdiag_idxs = vcat([(sum(1:(i - 1)) + 1):(sum(1:i) - 1) for i in 2:side]...) # TODO better way without splatting?
+        cone.offdiag_idxs = vcat([div(i * (i - 1), 2) .+ (1:(i - 1)) for i in 2:side]...)
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
@@ -88,7 +88,7 @@ function setup_data(cone::DoublyNonnegative{T}) where {T <: Real}
     cone.mat2 = similar(cone.mat)
     cone.mat3 = similar(cone.mat)
     cone.mat4 = similar(cone.mat)
-    cone.inv_vec = zeros(T, svec_length(cone.side))
+    cone.inv_vec = zeros(T, length(cone.offdiag_idxs))
     return
 end
 
@@ -138,13 +138,14 @@ function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegative{T}) w
         arr[k] = on_diag
         k += i + 1
     end
+
     return arr
 end
 
-function update_feas(cone::DoublyNonnegative)
+function update_feas(cone::DoublyNonnegative{T}) where {T}
     @assert !cone.feas_updated
 
-    if all(u -> (u > 0), cone.point)
+    if all(>(eps(T)), cone.point)
         svec_to_smat!(cone.mat, cone.point, cone.rt2)
         copyto!(cone.mat2, cone.mat)
         cone.fact_mat = cholesky!(Symmetric(cone.mat2, :U), check = false)
@@ -165,8 +166,8 @@ function update_grad(cone::DoublyNonnegative)
     cone.inv_mat = inv(cone.fact_mat)
     smat_to_svec!(cone.grad, cone.inv_mat, cone.rt2)
     cone.grad .*= -1
-    @. @views cone.inv_vec[cone.offdiag_idxs] = inv(cone.point[cone.offdiag_idxs])
-    @. cone.grad -= cone.inv_vec
+    @. @views cone.inv_vec = inv(cone.point[cone.offdiag_idxs])
+    @. cone.grad[cone.offdiag_idxs] -= cone.inv_vec
 
     cone.grad_updated = true
     return cone.grad
@@ -174,14 +175,18 @@ end
 
 function update_hess(cone::DoublyNonnegative)
     @assert cone.grad_updated
-    symm_kron(cone.hess.data, cone.inv_mat, cone.rt2)
-    cone.hess.data .+= Diagonal(abs2.(cone.inv_vec))
+    H = cone.hess.data
+    symm_kron(H, cone.inv_mat, cone.rt2)
+    for (inv_od, idx) in zip(cone.inv_vec, cone.offdiag_idxs)
+        H[idx, idx] += abs2(inv_od)
+    end
     cone.hess_updated = true
     return cone.hess
 end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::DoublyNonnegative)
     @assert is_feas(cone)
+
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat3, view(arr, :, i), cone.rt2)
         copytri!(cone.mat3, 'U')
@@ -192,6 +197,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::DoublyN
     offdiags = cone.offdiag_idxs
     @views point_offdiags = cone.point[offdiags]
     @. @views prod[offdiags, :] += arr[offdiags, :] / point_offdiags / point_offdiags
+
     return prod
 end
 
