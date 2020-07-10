@@ -233,7 +233,9 @@ function correction(cone::Power, primal_dir::AbstractVector)
     const12 = -2 * produuw / produw
     const13 = const11 * const1 + const12 * (2 * wwd * const8 * audu - const10)
     const14 = const11 * 2 * audu + const12 * wwd
-    @. u_corr = udu .+ alpha .* (const8 * udu .+ const14)
+    @. u_corr = const14 .+ const8 * udu
+    u_corr .*= alpha
+    u_corr .+= udu
     u_corr .*= udu
     @. u_corr += const13 * alpha
     u_corr ./= u
