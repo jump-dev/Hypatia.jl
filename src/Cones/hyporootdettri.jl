@@ -96,10 +96,11 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.W = zeros(R, cone.side, cone.side)
-    # cone.Wi = zeros(R, cone.side, cone.side)
-    cone.work_mat = zeros(R, cone.side, cone.side)
-    cone.work_mat2 = zeros(R, cone.side, cone.side)
+    side = cone.side
+    cone.W = zeros(R, side, side)
+    # cone.Wi = zeros(R, side, side)
+    cone.work_mat = zeros(R, side, side)
+    cone.work_mat2 = zeros(R, side, side)
     cone.tmpw = zeros(T, dim - 1)
     return
 end
