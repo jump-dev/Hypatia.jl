@@ -54,6 +54,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     ldWvuv::T
     vzip1::T
     Wivzi::Matrix{R}
+    tmpw::Vector{T}
 
     function HypoPerLogdetTri{T, R}(
         dim::Int;
@@ -101,12 +102,14 @@ function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} 
     cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.mat = Matrix{R}(undef, cone.side, cone.side)
-    cone.dual_mat = Matrix{R}(undef, cone.side, cone.side)
-    cone.mat2 = similar(cone.mat)
-    cone.mat3 = similar(cone.mat)
-    cone.Wi = similar(cone.mat)
-    cone.Wivzi = similar(cone.mat)
+    side = cone.side
+    cone.mat = zeros(R, side, side)
+    cone.dual_mat = zeros(R, side, side)
+    cone.mat2 = zeros(R, side, side)
+    cone.mat3 = zeros(R, side, side)
+    # cone.Wi = zeros(R, side, side)
+    cone.Wivzi = zeros(R, side, side)
+    cone.tmpw = zeros(T, dim - 2)
     return
 end
 
@@ -295,75 +298,57 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
     return prod
 end
 
-# TODO allocs and simplifications
-# TODO try to reuse fields already calculated for g and H
-function correction(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
+function correction(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}) where T
     @assert cone.grad_updated
-    v = cone.point[2]
-    z = cone.z
-    Wi = Symmetric(cone.Wi)
-    pi = cone.ldWv # TODO rename
-    vzip1 = cone.vzip1 # 1 + v / z
-    nLz = cone.nLz # (side - pi) / z, TODO relook at some subsitutions to delay division by z
-    d = cone.side # TODO rename
-    w_dim = cone.dim - 2
-
-    T = typeof(v) # TODO delete
-
     u_dir = primal_dir[1]
     v_dir = primal_dir[2]
     @views w_dir = primal_dir[3:end]
-    vec_Wi = smat_to_svec!(similar(primal_dir, w_dim), Wi, cone.rt2) # TODO allocates
-    S = copytri!(svec_to_smat!(cone.mat2, w_dir, cone.rt2), 'U', cone.is_complex)
+    corr = cone.correction
+    @views w_corr = corr[3:end]
+    v = cone.point[2]
+    z = cone.z
+    tmpw = cone.tmpw
+    Wi = Hermitian(cone.Wi, :U)
+    pi = cone.ldWv # TODO rename
+    nLz = cone.nLz
+    side = cone.side
+    w_dim = cone.dim - 2
+    vz = v / z
+    udz = u_dir / z
+    vdz = v_dir / z
 
+    vec_Wi = smat_to_svec!(tmpw, Wi, cone.rt2)
     dot_Wi_S = dot(vec_Wi, w_dir)
+    S = copytri!(svec_to_smat!(cone.mat2, w_dir, cone.rt2), 'U', cone.is_complex)
     ldiv!(cone.fact_mat, S)
     dot_skron = real(dot(S, S'))
 
+    const6 = 1 + v * nLz
+    uuw_scal = -2 * udz * vz / z
+    vvw_scal = -vdz * (2 * const6 * nLz + side / z)
+    uvw_scal =-2 * (2 * vz * nLz + inv(z)) / z
+    const8 = -2 * (1 + vz)
+    const10 = 2 * (vz * udz + vdz * const6)
+    const9 = -2 * abs2(vz) * dot_Wi_S + const10
+    const7 = uuw_scal + uvw_scal * v_dir
+    const11 = -vz * (vz * dot_skron + 2 * (abs2(vz * dot_Wi_S) - dot_Wi_S * const10)) + u_dir * const7 + vvw_scal * v_dir
+
+    @. w_corr = const11 * vec_Wi
     rdiv!(S, cone.fact_mat.U)
-    mul!(cone.mat3, S, S') # TODO use outer prod function
-    term1 = smat_to_svec!(zeros(T, w_dim), cone.mat3, cone.rt2) # TODO allocates
-    term1 .*= -2 * vzip1
-
+    mul!(cone.mat3, S, S')
+    vec_S2 = smat_to_svec!(tmpw, cone.mat3, cone.rt2)
+    @. w_corr += const8 * vec_S2
     skron2 = rdiv!(S, cone.fact_mat.U')
-    vec_skron2 = smat_to_svec!(zeros(T, w_dim), skron2, cone.rt2) # TODO allocates
-    scal1 = -abs2(v / z)
-    term2 = (dot_skron * scal1) * vec_Wi + (2 * dot_Wi_S * scal1) * vec_skron2
+    vec_skron2 = smat_to_svec!(tmpw, skron2, cone.rt2)
+    t4awd = (2 * vz * abs2(dot_Wi_S) + dot(vec_skron2, w_dir)) / z
+    @. w_corr += const9 * vec_skron2
 
-    scal2 = 2 * scal1 * v / z * abs2(dot_Wi_S)
-    term3 = scal2 * vec_Wi
-
-    # TODO factor like rootdet
-    # Tuww contribution to w part of correction
-    term4a = v * (2 * v * vec_Wi * dot_Wi_S / z + vec_skron2) / z / z
-    term4 = 2 * u_dir * term4a
-
-    # Tvww contribution to w part of correction
-    term5a = (1 + v * nLz) / z * (2 * v / z * dot_Wi_S * vec_Wi + vec_skron2)
-    term5 = 2 * v_dir * term5a
-
-    uuw_scal = -2 * u_dir * v / z ^ 3
-    vvw_scal = v_dir / abs2(z) * (2 * (pi - d) * (1 + v * nLz) - d)
-    uvw_scal = 2 * (-2 * v * nLz - 1) / z / z
-    corrw =
-        term1 + term2 + term3 + term4 + term5 +
-        uuw_scal * u_dir * vec_Wi + # uuw
-        vvw_scal * v_dir * vec_Wi + # vvw
-        uvw_scal * u_dir * v_dir * vec_Wi # uvw
-
-    Tuuu = 2 / z ^ 3
-    Tuuv = -2 / z ^ 3 * (pi - d)
-    Tuvv = (2 * abs2(nLz) + d / z / v) / z
-    corru = Tuuu * u_dir ^ 2 + Tuuv * u_dir * v_dir * 2 + # uuu + uuv
-        uuw_scal * dot(vec_Wi, w_dir) * 2 + # uuw
-        uvw_scal * dot(vec_Wi, w_dir) * v_dir + # uvw
-        dot(term4a, w_dir) + # uww
-        Tuvv * abs2(v_dir) # uvv
-    Tvvv = nLz * (2 * abs2(nLz) + 3 * d / v / z) - d / v / v / z  - 2 * (d + 1) / v ^ 3
-    corrv = Tvvv * abs2(v_dir) + Tuvv * u_dir * v_dir * 2 + vvw_scal * dot(vec_Wi, w_dir) * 2 + # vvv + uvv + wvv
-        Tuuv * abs2(u_dir) + dot(term5a, w_dir) + uvw_scal * dot(vec_Wi, w_dir) * u_dir # vuu + vww + vwu
-
-    corr = vcat(corru, corrv, corrw)
+    const2 = -2 * udz * (pi - side) / z / z
+    const3 = (2 * abs2(nLz) + side / z / v) * vdz
+    const5 = side / v / z
+    const4 = nLz * (2 * abs2(nLz) + 3 * const5) - (const5 + 2 * (side + 1) / abs2(v)) / v
+    corr[1] = 2 * abs2(udz) / z + (2 * const2 + const3) * v_dir + (uuw_scal + const7) * dot_Wi_S + vz * t4awd
+    corr[2] = const4 * abs2(v_dir) + (2 * vvw_scal + uvw_scal * u_dir) * dot_Wi_S + u_dir * (const2 + 2 * const3) + const6 * t4awd
 
     corr *= cone.sc_const / -2
 

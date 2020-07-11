@@ -360,7 +360,6 @@ function correction(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     ZiWd = cone.fact_Z \ W_dir
     ZiUd = cone.fact_Z \ U_dir
     ZiUZi = cone.ZiUZi
-    WtZiW = cone.WtZiW
     ZiUZiUZi = Hermitian(ZiUZi * ZiU', :U)
     ZiUZi2v = Hermitian(ZiUZi - v2 * ZiUZiUZi, :U)
     WdWZi = W_dir * ZiW'
@@ -372,27 +371,27 @@ function correction(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     ZiUZiWdWZi = ZiU * ZiWdWZi
     ZiUZiUdZiW = ZiU * ZiUdZiW + ZiUd * cone.ZiUZiW
     ZiWdWZiUZi = ZiWdWZi * ZiU'
-    ZiWdWZiUZi2 = Hermitian(ZiWdWZiUZi + ZiWdWZiUZi', :U)
+    ZiWdWZiUZi2 = ZiWdWZiUZi + ZiWdWZiUZi' + ZiUZiWdWZi'
     ZiUdZi = Hermitian(ZiUd / cone.fact_Z, :U)
     ZiUZiUdZi = ZiU * ZiUdZi
     ZiUZiUdZi2 = Hermitian(ZiUZiUdZi + ZiUZiUdZi')
     ZiUdZiWdWZi = ZiUd * ZiWdWZi + ZiWdWZi * ZiUd'
-    WtZiWI = WtZiW + I
+    WtZiWI = cone.WtZiW + I
     ZiWdWtZiWI = ZiWd * WtZiWI
     vdZiUZiUZiW = vd2 * ZiUZiUZi * W
     WdWtZiWI = W_dir * WtZiWI
-    ZiUZiWdWZiWI = ZiUZi * WdWtZiWI + (ZiWdWZiUZi2 + ZiUZiWdWZi') * W
+    ZiUZiWdWZiWI = ZiUZi * WdWtZiWI + ZiWdWZiUZi2 * W
     vZiUZiUdZi2 = v * ZiUZiUdZi2 - ZiUdZi
 
-    Utemp = vd2 * (-vd2 * ZiUZi2v + ZiWdWZi2 - v2 * (ZiUZiWdWZi + ZiUZiWdWZi' + ZiWdWZiUZi2 - 2 * vZiUZiUdZi2)) + v2 * (ZiWdWZi * WdWZi + WdWZi' * ZiWdWZi2 + ZiWd * WtZiWI * ZiWd' + v2 * (v2 * (ZiUd * ZiUdZi) - ZiUdZiWdWZi - ZiUdZiWdWZi'))
+    Utemp = vd2 * (-vd2 * ZiUZi2v + ZiWdWZi2 - v2 * (ZiUZiWdWZi + ZiWdWZiUZi2 - 2 * vZiUZiUdZi2)) + v2 * (ZiWdWZi * WdWZi + WdWZi' * ZiWdWZi2 + ZiWdWtZiWI * ZiWd' + v2 * (v2 * ZiUd * ZiUdZi - ZiUdZiWdWZi - ZiUdZiWdWZi'))
     smat_to_svec!(U_corr, Utemp, cone.rt2)
 
     v_Wd_dot = -4 * (v * ZiUZiUdZiW + vdZiUZiUZiW) + ZiUZiWdWZiWI + 2 * ZiUdZiW
-    corr[v_idx] = v_dir * (-8 * dot(ZiUZi2v, U_dir) + (8 * real(dot(ZiUZiUZi, U)) - (d1 - 1) / v / v / v) * v_dir) +
-        (4 * v) * real(dot(vZiUZiUdZi2, U_dir)) + 2 * real(dot(v_Wd_dot, W_dir))
+    corr[v_idx] = v_dir * (-8 * dot(ZiUZi2v, U_dir) + v_dir * (8 * real(dot(ZiUZiUZi, U)) - (d1 - 1) / v / v / v)) +
+        4 * v * real(dot(vZiUZiUdZi2, U_dir)) + 2 * real(dot(v_Wd_dot, W_dir))
 
-    Wtemp = (4 * v_dir) * (ZiUdZiW - v2 * ZiUZiUdZiW + ZiUZiWdWZiWI - vdZiUZiUZiW) +
-        (4 * v) * (ZiUdZiW * WdZiW + ZiWdWZi * UdZiW + WdWZi' * ZiUdZiW + ZiUdZi * WdWtZiWI - v2 * ZiUd * ZiUdZiW) +
+    Wtemp = 4 * v_dir * (ZiUdZiW - v2 * ZiUZiUdZiW + ZiUZiWdWZiWI - vdZiUZiUZiW) +
+        4 * v * (ZiUdZiW * WdZiW + ZiWdWZi * UdZiW + WdWZi' * ZiUdZiW + ZiUdZi * WdWtZiWI - v2 * ZiUd * ZiUdZiW) +
         -2 * (ZiW * WdZiW * WdZiW + WdWZi' * ZiWdWtZiWI + ZiWdWtZiWI * WdZiW + ZiWd * WdZiW' * WtZiWI)
     vec_copy_to!(W_corr, Wtemp)
 
