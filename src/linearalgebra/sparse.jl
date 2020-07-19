@@ -71,12 +71,17 @@ CHOLMODSymCache(; diag_pert::Float64 = sqrt(eps(Float64))) = CHOLMODSymCache{Flo
 int_type(::CHOLMODSymCache) = SuiteSparseInt
 
 function update_fact(cache::CHOLMODSymCache, A::SparseMatrixCSC{Float64, SuiteSparseInt})
-    A_symm = Symmetric(A, :L)
+    # @time A_symm = Symmetric(A, :L)
+    @time A_symm = SuiteSparse.CHOLMOD.Sparse(Symmetric(A, :L))
     if !cache.analyzed
-        cache.cholmod = SuiteSparse.CHOLMOD.ldlt(A_symm, check = false)
+        @time cache.cholmod = SuiteSparse.CHOLMOD.ldlt(A_symm, check = false)
         cache.analyzed = true
     else
-        ldlt!(cache.cholmod, A_symm, check = false)
+        # @time ldlt!(cache.cholmod, A_symm, check = false)
+        cm = SuiteSparse.CHOLMOD.defaults(SuiteSparse.CHOLMOD.common_struct[Threads.threadid()])
+        SuiteSparse.CHOLMOD.set_print_level(cm, 0)
+        SuiteSparse.CHOLMOD.change_factor!(cache.cholmod, false, false, true, false)
+        @time SuiteSparse.CHOLMOD.factorize_p!(A_symm, 0.0, cache.cholmod, cm)
     end
     if !issuccess(cache.cholmod)
         @warn("numerical failure: sparse factorization failed")

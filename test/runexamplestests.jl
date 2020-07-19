@@ -13,27 +13,30 @@ using TimerOutputs
 # options to solvers
 timer = TimerOutput()
 default_solver_options = (
-    verbose = false,
-    # verbose = true,
+    # verbose = false,
+    verbose = true,
     iter_limit = 150,
     timer = timer,
     # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
     # system_solver = Solvers.SymIndefDenseSystemSolver{Float64}(),
+    # system_solver = Solvers.SymIndefSparseSystemSolver{Float64}(),
     system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
+    # preprocess = false,
+    # reduce = false,
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    (MinimalInstances, Float64, 15),
+    # (MinimalInstances, Float64, 15),
     # (MinimalInstances, Float32, 15),
     # (MinimalInstances, BigFloat, 60),
-    (FastInstances, Float64, 15),
+    (FastInstances, Float64, 30),
     # (SlowInstances, Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
@@ -53,28 +56,28 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
-    "conditionnum",
-    "contraction",
-    "densityest",
-    "envelope",
-    "expdesign",
-    "lotkavolterra",
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "muconvexity",
-    "nearestpsd",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    "regionofattr",
-    "robustgeomprog",
-    "secondorderpoly",
-    "semidefinitepoly",
-    "shapeconregr",
+    # "centralpolymat",
+    # "conditionnum",
+    # "contraction",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # "lotkavolterra",
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # "maxvolume",
+    # "muconvexity",
+    # "nearestpsd",
+    # "polymin",
+    # "polynorm",
+    # "portfolio",
+    # "regionofattr",
+    # "robustgeomprog",
+    # "secondorderpoly",
+    # "semidefinitepoly",
+    # "shapeconregr",
     "signomialmin",
     ]
 
