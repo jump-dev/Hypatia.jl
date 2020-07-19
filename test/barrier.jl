@@ -314,7 +314,6 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
         @show side
         # generate random sparsity pattern for lower triangle
         sparsity = inv(sqrt(side))
-        # sparsity = 0.7
         (row_idxs, col_idxs, _) = findnz(tril!(sprand(Bool, side, side, sparsity)) + I)
 
         # real sparse PSD cone
