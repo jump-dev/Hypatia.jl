@@ -63,9 +63,13 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     F_blocks
     L_blocks
     S_blocks
+    L_pr_blocks
+    S_pr_blocks
     map_blocks
     temp_blocks
     rel_idxs
+
+    correction
 
     function PosSemidefTriSparse{T, R}(
         side::Int,
@@ -121,11 +125,12 @@ function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
+    cone.correction = zeros(T, dim)
     setup_symbfact(cone)
     return
 end
 
-use_correction(::PosSemidefTriSparse) = false
+use_correction(::PosSemidefTriSparse) = true
 
 # setup symbolic factorization
 function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
@@ -190,7 +195,9 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
     J_rows = cone.J_rows = Vector{Vector}(undef, num_super)
     F_blocks = cone.F_blocks = Vector{Matrix{R}}(undef, num_super)
     L_blocks = cone.L_blocks = Vector{Matrix{R}}(undef, num_super)
+    L_pr_blocks = cone.L_pr_blocks = Vector{Matrix{R}}(undef, num_super)
     S_blocks = cone.S_blocks = Vector{Matrix{R}}(undef, num_super)
+    S_pr_blocks = cone.S_pr_blocks = Vector{Matrix{R}}(undef, num_super)
     temp_blocks = cone.temp_blocks = Vector{Matrix{R}}(undef, num_super)
     rel_idxs = cone.rel_idxs = [Tuple{Int, Int}[] for k in 1:num_super]
     for k in reverse(1:num_super)
@@ -206,7 +213,9 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
         F_blocks[k] = zeros(R, num_row, num_row)
         num_below = num_row - num_col
         L_blocks[k] = zeros(R, num_row, num_col)
+        L_pr_blocks[k] = zeros(R, num_row, num_col)
         S_blocks[k] = zeros(R, num_below, num_below)
+        S_pr_blocks[k] = zeros(R, num_below, num_below)
         temp_blocks[k] = zeros(R, num_row, num_col)
 
         if num_row > num_col
@@ -510,22 +519,25 @@ function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
         num_row = cone.num_rows[k]
         idxs_n = 1:num_col
         temp_block = temp_blocks[k]
-
-        if num_row > num_col
-            idxs_a = (num_col + 1):num_row
-            @views temp_block_a = temp_block[idxs_a, :]
-            @views F_an = cone.F_blocks[k][idxs_a, idxs_n]
-            mul!(F_an, Hermitian(cone.S_blocks[k], :L), temp_block_a)
-            copyto!(temp_block_a, F_an)
-        end
+        L_pr_block = cone.L_pr_blocks[k]
 
         @views temp_block_n = temp_block[idxs_n, :]
         copytri!(temp_block_n, 'L', cone.is_complex)
         @views L_n = LowerTriangular(cone.L_blocks[k][idxs_n, :])
+        @views copyto!(L_pr_block[idxs_n, :], temp_block_n)
         ldiv!(L_n, temp_block_n)
         ldiv!(L_n', temp_block_n)
         rdiv!(temp_block, L_n')
         rdiv!(temp_block, L_n)
+
+        if num_row > num_col
+            idxs_a = (num_col + 1):num_row
+            @views temp_block_a = temp_block[idxs_a, :]
+            @views copyto!(L_pr_block[idxs_a, :], temp_block_a)
+            @views F_an = cone.F_blocks[k][idxs_a, idxs_n]
+            mul!(F_an, Hermitian(cone.S_blocks[k], :L), temp_block_a)
+            copyto!(temp_block_a, F_an)
+        end
     end
 
     return temp_blocks
@@ -552,7 +564,7 @@ function _hess_step3(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
             F_par = Hermitian(cone.F_blocks[cone.parents[k]], :L)
             rel_idx = cone.rel_idxs[k]
             for (i, j) in rel_idx, (i2, j2) in rel_idx # TODO only lower tri
-                F_aa.data[i, i2] = F_par[j, j2]
+                cone.S_pr_blocks[k][i, i2] = F_aa.data[i, i2] = F_par[j, j2] # TODO don't duplicate
             end
 
             mul!(F_nn.data, F_an', L_a, -1, true)
@@ -564,6 +576,94 @@ function _hess_step3(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
     end
 
     return temp_blocks
+end
+
+function correction(cone::PosSemidefTriSparse, primal_dir::AbstractVector)
+    @assert cone.grad_updated
+    temp_blocks = cone.temp_blocks
+
+    @views svec_to_smat_sparse!(temp_blocks, primal_dir, cone)
+    _hess_prod_blocks(cone, temp_blocks)
+
+    L_blocks = cone.L_blocks
+    S = cone.S_blocks
+    Lpp = deepcopy(temp_blocks)
+    Dpp = [zeros(num_col, num_col) for num_col in cone.num_cols]
+    Upp = [zeros(num_row - num_col, num_row - num_col) for (num_row, num_col) in zip(cone.num_rows, cone.num_cols)]
+    Vpp = [zeros(num_row - num_col, num_row - num_col) for (num_row, num_col) in zip(cone.num_rows, cone.num_cols)]
+    U_pp_sum = [zeros(num_row, num_row) for num_row in cone.num_rows]
+    R = deepcopy(temp_blocks)
+
+    for k in eachindex(cone.num_cols)
+        num_col = cone.num_cols[k]
+        num_row = cone.num_rows[k]
+        idxs_n = 1:num_col
+        idxs_a = (num_col + 1):num_row
+
+        @views L_a = cone.L_blocks[k][idxs_a, :]
+        D = cone.L_blocks[k][idxs_n, idxs_n] # TODO implicit
+        D = D * D'
+
+        P_block = Symmetric(U_pp_sum[k], :L)
+        @views P_aa = P_block.data[idxs_a, idxs_a]
+        @views P_an = P_block.data[idxs_a, idxs_n]
+        @views P_nn = P_block.data[idxs_n, idxs_n]
+        @views mul!(P_aa, L_a, P_an', -1, true)
+        @views mul!(P_an, L_a, P_nn, -1, true)
+        @views mul!(P_aa, P_an, L_a', -1, true)
+
+        @views D_pr = cone.L_pr_blocks[k][idxs_n, :]
+        @views L_pr = cone.L_pr_blocks[k][idxs_a, :]
+
+        Dpp[k] = P_block[idxs_n, idxs_n]
+        Lpp[k][idxs_a, :] = (P_block[idxs_a, idxs_n] - 2 * L_pr * D_pr) * inv(D)
+        Upp[k] = P_block[idxs_a, idxs_a] - 2 * L_pr * D * L_pr'
+
+        if num_row > num_col
+            U_pp_sum_par = U_pp_sum[cone.parents[k]]
+            rel_idx = cone.rel_idxs[k]
+            for (i, j) in rel_idx, (i2, j2) in rel_idx
+                U_pp_sum_par[j, j2] += Upp[k][i, i2]
+            end
+        end
+    end
+
+    for k in reverse(eachindex(cone.num_cols))
+        num_col = cone.num_cols[k]
+        num_row = cone.num_rows[k]
+        idxs_n = 1:num_col
+        D = cone.L_blocks[k][idxs_n, idxs_n] # TODO implicit
+        D = D * D'
+        S_pr_block = cone.S_pr_blocks[k]
+        idxs_a = (num_col + 1):num_row # TODO move
+        @views L_a = cone.L_blocks[k][idxs_a, :]
+        @views D_pr = cone.L_pr_blocks[k][idxs_n, :]
+        @views L_pr = cone.L_pr_blocks[k][idxs_a, :]
+
+        rel_idx = cone.rel_idxs[k]
+        for (i, j) in rel_idx, (i2, j2) in rel_idx
+            Vpp[k][i, i2] = R[cone.parents[k]][j, j2]
+        end
+
+        Q_block = [
+            -inv(D) * Dpp[k] * inv(D) + 2 * inv(D) * D_pr * inv(D) * D_pr * inv(D) + 2 * L_pr' * S[k] * L_pr     (-S[k] * Lpp[k][idxs_a, :] + 2 * S_pr_block * L_pr)'
+            (-S[k] * Lpp[k][idxs_a, :] + 2 * S_pr_block * L_pr)     Vpp[k]
+            ]
+
+        Q_block = Symmetric(Q_block, :L)
+        @views Q_aa = Q_block.data[idxs_a, idxs_a]
+        @views Q_an = Q_block.data[idxs_a, idxs_n]
+        @views Q_nn = Q_block.data[idxs_n, idxs_n]
+        mul!(Q_nn, Q_an', L_a, -1, true)
+        mul!(Q_an, Q_aa, L_a, -1, true)
+        mul!(Q_nn, L_a', Q_an, -1, true)
+        R[k] = Q_block
+    end
+
+    smat_to_svec_sparse!(cone.correction, R, cone)
+    cone.correction ./= 2
+
+    return cone.correction
 end
 
 function svec_to_smat_sparse!(blocks::Vector{Matrix{T}}, vec::AbstractVector{T}, cone::PosSemidefTriSparse{T, T}) where {T <: BlasReal}
