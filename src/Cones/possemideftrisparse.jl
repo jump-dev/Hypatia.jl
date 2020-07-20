@@ -589,16 +589,19 @@ end
 function correction(cone::PosSemidefTriSparse, primal_dir::AbstractVector)
     @assert cone.grad_updated
     temp_blocks = cone.temp_blocks
-
-    @views svec_to_smat_sparse!(temp_blocks, primal_dir, cone)
-    _hess_prod_blocks(cone, temp_blocks) # TODO maybe refactor more efficiently. reused outputs are L_pr and S_pr
-
     L_blocks = cone.L_blocks
     S = cone.S_blocks
     L_pr_pr = deepcopy(temp_blocks) # TODO allocate
 
+    @views svec_to_smat_sparse!(temp_blocks, primal_dir, cone)
+    _hess_prod_blocks(cone, temp_blocks) # TODO maybe refactor more efficiently. reused outputs are L_pr and S_pr
+
+
     for k in eachindex(cone.num_cols)
-        cone.F_blocks[k] .= 0
+        idxs_a = (cone.num_cols[k] + 1):cone.num_rows[k]
+        F_block = cone.F_blocks[k]
+        @. @views cone.S_pr_blocks[k] = F_block[idxs_a, idxs_a]
+        F_block .= 0
     end
 
     for k in eachindex(cone.num_cols)
@@ -629,8 +632,8 @@ function correction(cone::PosSemidefTriSparse, primal_dir::AbstractVector)
         @views L_pr_pr_a = L_pr_pr[k][idxs_a, :]
         @views L_pr_pr_a .= F_block[idxs_a, idxs_n]
         @views mul!(L_pr_pr_a, L_pr, D_pr, -2, true)
-        @views rdiv!(L_pr_pr_a, L_n)
         @views rdiv!(L_pr_pr_a, L_n')
+        @views rdiv!(L_pr_pr_a, L_n)
     end
 
     for k in reverse(eachindex(cone.num_cols))
@@ -647,8 +650,6 @@ function correction(cone::PosSemidefTriSparse, primal_dir::AbstractVector)
         temp_block = temp_blocks[k]
         @views temp_block_a = temp_block[idxs_a, :]
         @views temp_block_n = temp_block[idxs_n, :]
-        mul!(temp_block_a, S_pr_block, L_pr, 2, false)
-        mul!(temp_block_a, S[k], L_pr_pr[k][idxs_a, :], -1, true)
         @. @views temp_block_n = -L_pr_pr[k][idxs_n, :]
         ldiv!(L_n, D_pr)
         mul!(temp_block_n, D_pr', D_pr, 2, true)
@@ -658,6 +659,8 @@ function correction(cone::PosSemidefTriSparse, primal_dir::AbstractVector)
         rdiv!(temp_block_n, L_n)
         mul!(temp_block_a, S[k], L_pr)
         mul!(temp_block_n, L_pr', temp_block_a, 2, true)
+        mul!(temp_block_a, S_pr_block, L_pr, 2, false)
+        mul!(temp_block_a, S[k], L_pr_pr[k][idxs_a, :], -1, true)
 
         outer_L_prod_trans!(cone, k)
     end
