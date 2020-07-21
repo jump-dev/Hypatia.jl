@@ -516,7 +516,7 @@ function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
         @views temp_block_n = temp_block[idxs_n, :]
         copytri!(temp_block_n, 'L', cone.is_complex)
         @views L_n = LowerTriangular(cone.L_blocks[k][idxs_n, :])
-        @views copyto!(L_pr_block[idxs_n, :], temp_block_n)
+        @views copyto!(L_pr_block[idxs_n, :], temp_block_n) # TODO make this more transparent
         ldiv!(L_n, temp_block_n)
         ldiv!(L_n', temp_block_n)
         rdiv!(temp_block, L_n')
@@ -552,7 +552,7 @@ function _hess_step3(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
             F_aa.data .= 0
             F_par = Hermitian(cone.F_blocks[cone.parents[k]], :L)
             rel_idx = cone.rel_idxs[k]
-            for (i, j) in rel_idx, (i2, j2) in rel_idx
+            for (i, j) in rel_idx, (i2, j2) in rel_idx # TODO only lower tri
                 F_aa.data[i, i2] = F_par[j, j2]
             end
             mul!(F_nn.data, F_an', L_a, -1, true)

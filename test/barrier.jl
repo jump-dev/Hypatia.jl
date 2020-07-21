@@ -76,10 +76,10 @@ function test_barrier_oracles(
         (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
         corr = CO.correction(cone, primal_dir)
         @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
-        if T == Float64 && dim < 6 && (!isa(cone, CO.EpiSumPerEntropy) || dim < 5)
-            FD_3deriv = ForwardDiff.jacobian(x -> ForwardDiff.hessian(barrier, x), point)
-            FD_corr = reshape(FD_3deriv * primal_dir, dim, dim) * primal_dir / -2
-            @test FD_corr ≈ corr atol=tol rtol=tol
+
+        if T == Float64
+            barrier_dir(point, t) = barrier(point + t * primal_dir)
+            @test -2 * corr ≈ ForwardDiff.gradient(x -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(x, t), s), 0), point)
         end
     end
 
