@@ -327,22 +327,22 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
         test_barrier_oracles(CO.PosSemidefTriSparse{T, T}(side, row_idxs, col_idxs), R_barrier)
 
         # complex sparse PSD cone
-        # function C_barrier(s)
-        #     scal_s = zeros(Complex{eltype(s)}, length(row_idxs))
-        #     idx = 1
-        #     for i in eachindex(scal_s)
-        #         if row_idxs[i] == col_idxs[i]
-        #             scal_s[i] = s[idx]
-        #             idx += 1
-        #         else
-        #             scal_s[i] = invrt2 * Complex(s[idx], s[idx + 1])
-        #             idx += 2
-        #         end
-        #     end
-        #     S = Matrix(sparse(row_idxs, col_idxs, scal_s, side, side))
-        #     return -logdet(cholesky!(Hermitian(S, :L)))
-        # end
-        # test_barrier_oracles(CO.PosSemidefTriSparse{T, Complex{T}}(side, row_idxs, col_idxs), C_barrier)
+        function C_barrier(s)
+            scal_s = zeros(Complex{eltype(s)}, length(row_idxs))
+            idx = 1
+            for i in eachindex(scal_s)
+                if row_idxs[i] == col_idxs[i]
+                    scal_s[i] = s[idx]
+                    idx += 1
+                else
+                    scal_s[i] = invrt2 * Complex(s[idx], s[idx + 1])
+                    idx += 2
+                end
+            end
+            S = Matrix(sparse(row_idxs, col_idxs, scal_s, side, side))
+            return -logdet(cholesky!(Hermitian(S, :L)))
+        end
+        test_barrier_oracles(CO.PosSemidefTriSparse{T, Complex{T}}(side, row_idxs, col_idxs), C_barrier)
     end
     return
 end
