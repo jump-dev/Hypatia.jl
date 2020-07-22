@@ -77,10 +77,8 @@ function test_barrier_oracles(
         corr = CO.correction(cone, primal_dir)
         @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
 
-        if T == Float64
-            barrier_dir(point, t) = barrier(point + t * primal_dir)
-            @test -2 * corr ≈ ForwardDiff.gradient(x -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(x, t), s), 0), point)
-        end
+        barrier_dir(point, t) = barrier(point + t * primal_dir)
+        @test -2 * corr ≈ ForwardDiff.gradient(x -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(x, t), s), 0), point)
     end
 
     return
@@ -311,7 +309,6 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
     invrt2 = inv(sqrt(T(2)))
 
     for side in [1, 2, 3, 5, 10, 20, 40, 80]
-        @show side
         # generate random sparsity pattern for lower triangle
         sparsity = inv(sqrt(side))
         (row_idxs, col_idxs, _) = findnz(tril!(sprand(Bool, side, side, sparsity)) + I)
