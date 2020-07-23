@@ -63,9 +63,14 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     F_blocks
     L_blocks
     S_blocks
+    L_pr_blocks
+    S_pr_blocks
+    L_pr_pr_blocks
     map_blocks
     temp_blocks
     rel_idxs
+
+    correction
 
     function PosSemidefTriSparse{T, R}(
         side::Int,
@@ -121,11 +126,10 @@ function setup_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
+    cone.correction = zeros(T, dim)
     setup_symbfact(cone)
     return
 end
-
-use_correction(::PosSemidefTriSparse) = false
 
 # setup symbolic factorization
 function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
@@ -190,7 +194,10 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
     J_rows = cone.J_rows = Vector{Vector}(undef, num_super)
     F_blocks = cone.F_blocks = Vector{Matrix{R}}(undef, num_super)
     L_blocks = cone.L_blocks = Vector{Matrix{R}}(undef, num_super)
+    L_pr_blocks = cone.L_pr_blocks = Vector{Matrix{R}}(undef, num_super)
+    L_pr_pr_blocks = cone.L_pr_pr_blocks = Vector{Matrix{R}}(undef, num_super)
     S_blocks = cone.S_blocks = Vector{Matrix{R}}(undef, num_super)
+    S_pr_blocks = cone.S_pr_blocks = Vector{Matrix{R}}(undef, num_super)
     temp_blocks = cone.temp_blocks = Vector{Matrix{R}}(undef, num_super)
     rel_idxs = cone.rel_idxs = [Tuple{Int, Int}[] for k in 1:num_super]
     for k in reverse(1:num_super)
@@ -206,7 +213,10 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
         F_blocks[k] = zeros(R, num_row, num_row)
         num_below = num_row - num_col
         L_blocks[k] = zeros(R, num_row, num_col)
+        L_pr_blocks[k] = zeros(R, num_row, num_col)
+        L_pr_pr_blocks[k] = zeros(R, num_row, num_col)
         S_blocks[k] = zeros(R, num_below, num_below)
+        S_pr_blocks[k] = zeros(R, num_below, num_below)
         temp_blocks[k] = zeros(R, num_row, num_col)
 
         if num_row > num_col
@@ -451,9 +461,9 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemi
     return prod
 end
 
-function _hess_prod_blocks(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+function _hess_prod_blocks(cone::PosSemidefTriSparse, temp_blocks; save_L_pr::Bool = false)
     _hess_step1(cone, temp_blocks)
-    _hess_step2(cone, temp_blocks)
+    _hess_step2(cone, temp_blocks, save_L_pr)
     _hess_step3(cone, temp_blocks)
     return temp_blocks
 end
@@ -481,15 +491,9 @@ function _hess_step1(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
         temp_block = temp_blocks[k]
 
         if num_row > num_col
+            outer_L_prod!(cone, k)
             idxs_a = (num_col + 1):num_row
-            @views L_a = cone.L_blocks[k][idxs_a, :]
-            @views F_an = F_block[idxs_a, idxs_n]
             @views F_aa = Hermitian(F_block[idxs_a, idxs_a], :L)
-            @views F_nn = Hermitian(F_block[idxs_n, idxs_n], :L)
-
-            mul!(F_aa.data, L_a, F_an', -1, true)
-            mul!(F_an, L_a, F_nn, -1, true)
-            mul!(F_aa.data, F_an, L_a', -1, true)
 
             F_par = cone.F_blocks[cone.parents[k]]
             rel_idx = cone.rel_idxs[k]
@@ -504,28 +508,35 @@ function _hess_step1(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
     return temp_blocks
 end
 
-function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks, save_L_pr::Bool) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     for k in 1:length(cone.num_cols)
         num_col = cone.num_cols[k]
         num_row = cone.num_rows[k]
         idxs_n = 1:num_col
         temp_block = temp_blocks[k]
-
-        if num_row > num_col
-            idxs_a = (num_col + 1):num_row
-            @views temp_block_a = temp_block[idxs_a, :]
-            @views F_an = cone.F_blocks[k][idxs_a, idxs_n]
-            mul!(F_an, Hermitian(cone.S_blocks[k], :L), temp_block_a)
-            copyto!(temp_block_a, F_an)
-        end
+        L_pr_block = cone.L_pr_blocks[k]
 
         @views temp_block_n = temp_block[idxs_n, :]
         copytri!(temp_block_n, 'L', cone.is_complex)
         @views L_n = LowerTriangular(cone.L_blocks[k][idxs_n, :])
+        if save_L_pr
+            @views copyto!(L_pr_block[idxs_n, :], temp_block_n)
+        end
         ldiv!(L_n, temp_block_n)
         ldiv!(L_n', temp_block_n)
         rdiv!(temp_block, L_n')
         rdiv!(temp_block, L_n)
+
+        if num_row > num_col
+            idxs_a = (num_col + 1):num_row
+            @views temp_block_a = temp_block[idxs_a, :]
+            if save_L_pr
+                @views copyto!(L_pr_block[idxs_a, :], temp_block_a)
+            end
+            @views F_an = cone.F_blocks[k][idxs_a, idxs_n]
+            mul!(F_an, Hermitian(cone.S_blocks[k], :L), temp_block_a)
+            copyto!(temp_block_a, F_an)
+        end
     end
 
     return temp_blocks
@@ -537,33 +548,108 @@ function _hess_step3(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: R
         num_row = cone.num_rows[k]
         idxs_n = 1:num_col
         F_block = cone.F_blocks[k]
-        temp_block = temp_blocks[k]
-
-        F_block[:, idxs_n] = temp_block
-
+        temp_block = cone.temp_blocks[k]
+        @. @views F_block[:, idxs_n] = temp_block
         if num_row > num_col
             idxs_a = (num_col + 1):num_row
             @views L_a = cone.L_blocks[k][idxs_a, :]
-            @views F_an = F_block[idxs_a, idxs_n]
             @views F_aa = Hermitian(F_block[idxs_a, idxs_a], :L)
+            @views F_an = F_block[idxs_a, idxs_n]
             @views F_nn = Hermitian(F_block[idxs_n, idxs_n], :L)
-
             F_aa.data .= 0
             F_par = Hermitian(cone.F_blocks[cone.parents[k]], :L)
             rel_idx = cone.rel_idxs[k]
             for (i, j) in rel_idx, (i2, j2) in rel_idx # TODO only lower tri
                 F_aa.data[i, i2] = F_par[j, j2]
             end
-
             mul!(F_nn.data, F_an', L_a, -1, true)
             mul!(F_an, F_aa, L_a, -1, true)
             mul!(F_nn.data, L_a', F_an, -1, true)
         end
-
         @views copyto!(temp_block, F_block[:, idxs_n])
     end
 
     return temp_blocks
+end
+
+function outer_L_prod!(cone, k)
+    num_col = cone.num_cols[k]
+    num_row = cone.num_rows[k]
+    idxs_n = 1:num_col
+    F_block = cone.F_blocks[k]
+    idxs_a = (num_col + 1):num_row
+    @views L_a = cone.L_blocks[k][idxs_a, :]
+    @views F_aa = Hermitian(F_block[idxs_a, idxs_a], :L)
+    @views F_an = F_block[idxs_a, idxs_n]
+    @views F_nn = Hermitian(F_block[idxs_n, idxs_n], :L)
+    mul!(F_aa.data, L_a, F_an', -1, true)
+    mul!(F_an, L_a, F_nn, -1, true)
+    mul!(F_aa.data, F_an, L_a', -1, true)
+    return F_block
+end
+
+function correction(cone::PosSemidefTriSparse, primal_dir::AbstractVector)
+    @assert cone.grad_updated
+    temp_blocks = cone.temp_blocks
+
+    @views svec_to_smat_sparse!(temp_blocks, primal_dir, cone)
+    _hess_prod_blocks(cone, temp_blocks, save_L_pr = true)
+    for k in eachindex(cone.num_cols)
+        idxs_a = (cone.num_cols[k] + 1):cone.num_rows[k]
+        F_block = cone.F_blocks[k]
+        @. @views cone.S_pr_blocks[k] = F_block[idxs_a, idxs_a]
+        F_block .= 0
+    end
+
+    for k in eachindex(cone.num_cols)
+        num_col = cone.num_cols[k]
+        num_row = cone.num_rows[k]
+        idxs_n = 1:num_col
+        idxs_a = (num_col + 1):num_row
+        F_block = cone.F_blocks[k]
+        @views L_n = LowerTriangular(cone.L_blocks[k][idxs_n, :])
+        @views L_pr = cone.L_pr_blocks[k][idxs_a, :]
+        @views temp_block_a = temp_blocks[k][idxs_a, :]
+
+        if num_row > num_col
+            outer_L_prod!(cone, k)
+            @views F_aa = F_block[idxs_a, idxs_a]
+            mul!(temp_block_a, L_pr, L_n)
+            mul!(F_aa, temp_block_a, temp_block_a', -2, true)
+            F_par = cone.F_blocks[cone.parents[k]]
+            rel_idx = cone.rel_idxs[k]
+            for (i, j) in rel_idx, (i2, j2) in rel_idx
+                F_par[j, j2] += F_aa[i, i2]
+            end
+        end
+
+        # transform block from linearized factorization into block for linearized inverse
+        S = cone.S_blocks[k]
+        L_pr_pr = cone.L_pr_pr_blocks[k]
+        @views D_pr = cone.L_pr_blocks[k][idxs_n, :]
+        @views temp_block_n = temp_blocks[k][idxs_n, :]
+        @views copyto!(L_pr_pr, F_block[:, idxs_n])
+        @views L_pr_pr_a = L_pr_pr[idxs_a, :]
+        mul!(L_pr_pr_a, L_pr, D_pr, -2, true)
+        rdiv!(L_pr_pr_a, L_n')
+        rdiv!(L_pr_pr_a, L_n)
+        @. @views temp_block_n = -L_pr_pr[idxs_n, :]
+        ldiv!(L_n, D_pr)
+        mul!(temp_block_n, D_pr', D_pr, 2, true)
+        ldiv!(L_n, temp_block_n)
+        ldiv!(L_n', temp_block_n)
+        rdiv!(temp_block_n, L_n')
+        rdiv!(temp_block_n, L_n)
+        mul!(temp_block_a, S, L_pr)
+        mul!(temp_block_n, L_pr', temp_block_a, 2, true)
+        mul!(temp_block_a, cone.S_pr_blocks[k], L_pr, 2, false)
+        mul!(temp_block_a, S, L_pr_pr_a, -1, true)
+    end
+
+    _hess_step3(cone, temp_blocks)
+    smat_to_svec_sparse!(cone.correction, cone.temp_blocks, cone)
+    cone.correction ./= 2
+    return cone.correction
 end
 
 function svec_to_smat_sparse!(blocks::Vector{Matrix{T}}, vec::AbstractVector{T}, cone::PosSemidefTriSparse{T, T}) where {T <: BlasReal}
