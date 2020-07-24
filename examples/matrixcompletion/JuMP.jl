@@ -53,3 +53,12 @@ instances[MatrixCompletionJuMP]["slow"] = [
     ((18, 180, true),),
     ((18, 180, false),),
     ]
+
+# benchmark 1 instances
+instances[MatrixCompletionJuMP]["bench1"] = (
+    ((d1, d2, false), ext)
+    # for d1 in 10:5:55
+    for d1 in 10:5:15
+    for d2 in (5d1, 10d1)
+    for ext in (nothing, ClassicConeOptimizer)
+    )
