@@ -63,3 +63,11 @@ instances[MatrixQuadraticJuMP]["slow"] = [
     ((60, 80, true),),
     ((60, 80, false),),
     ]
+
+# benchmark 1 instances
+instances[MatrixQuadraticJuMP]["bench1"] = (
+    ((d1, 5d1, use_matrixepipersquare),)
+    # for d1 in 5:5:10
+    for d1 in 5:5:50
+    for use_matrixepipersquare in (false, true)
+    )

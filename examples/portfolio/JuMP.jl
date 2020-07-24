@@ -67,3 +67,11 @@ instances[PortfolioJuMP]["slow"] = [
     ((3000, false, true), ClassicConeOptimizer),
     ((3000, true, true),),
     ]
+
+# benchmark 1 instances
+instances[PortfolioJuMP]["bench1"] = (
+    ((num_stocks, false, true), ext)
+    # for num_stocks in 250:250:500
+    for num_stocks in 100:100:4000
+    for ext in (nothing, ClassicConeOptimizer)
+    )

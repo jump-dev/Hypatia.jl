@@ -130,3 +130,11 @@ instances[MatrixRegressionJuMP]["slow"] = [
     ((15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
     ((15, 20, 50, 0, 0.1, 0.1, 0, 0),),
     ]
+
+# benchmark 1 instances
+instances[MatrixRegressionJuMP]["bench1"] = (
+    ((ceil(Int, 1.1m), m, 5m, 0, 0.1, 0.1, 0, 0), ext)
+    # for m in 5:5:10
+    for m in 5:5:50
+    for ext in (nothing, ClassicConeOptimizer)
+    )

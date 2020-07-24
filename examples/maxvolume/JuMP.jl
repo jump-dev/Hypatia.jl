@@ -40,7 +40,7 @@ instances[MaxVolumeJuMP]["minimal"] = [
     ((2, true, true),),
     ((2, false, true),),
     ((2, false, true), ClassicConeOptimizer),
-    ((2, false, true), SOConeOptimizer),
+    ((2, false, true), SOPSDConeOptimizer),
     # ((2, false, true), ExpConeOptimizer), # TODO waiting for MOI bridges geomean to exp
     ]
 instances[MaxVolumeJuMP]["fast"] = [

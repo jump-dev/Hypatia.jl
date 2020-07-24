@@ -8,7 +8,6 @@ using Test
 import Random
 using LinearAlgebra
 import LinearAlgebra.BlasReal
-import DataStructures
 
 import Hypatia
 import Hypatia.ModelUtilities
