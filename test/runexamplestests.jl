@@ -16,8 +16,8 @@ using TimerOutputs
 # options to solvers
 timer = TimerOutput()
 default_solver_options = (
-    verbose = false,
-    # verbose = true,
+    # verbose = false,
+    verbose = true,
     iter_limit = 150,
     timer = timer,
     # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
@@ -27,16 +27,17 @@ default_solver_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    ("minimal", Float64, 15),
+    # ("minimal", Float64, 15),
     # ("minimal", Float32, 15),
     # ("minimal", BigFloat, 15),
-    ("fast", Float64, 15),
+    # ("fast", Float64, 15),
     # ("slow", Float64, 120),
+    ("bench1", Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
@@ -56,29 +57,29 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
-    "conditionnum",
-    "contraction",
-    "densityest",
-    "envelope",
-    "expdesign",
-    # "lotkavolterra", # TODO PolyJuMP error
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "muconvexity",
-    "nearestpsd",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    # "regionofattr", # TODO PolyJuMP error
-    "robustgeomprog",
-    "secondorderpoly",
-    "semidefinitepoly",
+    # "centralpolymat",
+    # "conditionnum",
+    # "contraction",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # # "lotkavolterra", # TODO PolyJuMP error
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # "maxvolume",
+    # "muconvexity",
+    # "nearestpsd",
+    # "polymin",
+    # "polynorm",
+    # "portfolio",
+    # # "regionofattr", # TODO PolyJuMP error
+    # "robustgeomprog",
+    # "secondorderpoly",
+    # "semidefinitepoly",
     "shapeconregr",
-    "signomialmin",
+    # "signomialmin",
     ]
 
 # start the tests
@@ -88,7 +89,7 @@ for (inst_set, real_T, time_limit) in instance_sets
 end
 
 # load instances
-instances = DataStructures.DefaultOrderedDict{Type{<:ExampleInstance}, DataStructures.DefaultOrderedDict{String, Vector{Tuple}}}(() -> DataStructures.DefaultOrderedDict{String, Vector{Tuple}}(() -> Tuple[]))
+instances = DataStructures.DefaultOrderedDict{Type{<:ExampleInstance}, Any}(() -> DataStructures.DefaultOrderedDict{String, Any}(() -> Tuple[]))
 for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
     include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
 end
@@ -124,7 +125,7 @@ all_tests_time = time()
         instances = ex_insts[inst_set]
         isempty(instances) && continue
         ex_type_T = ex_type{real_T}
-        println("\nstarting $(length(instances)) instances for $ex_type_T $inst_set\n")
+        println("\nstarting instances for $ex_type_T $inst_set\n")
         solver_options = (default_solver_options..., time_limit = time_limit)
         for (inst_num, inst) in enumerate(instances)
             test_info = "$ex_type_T $inst_set $inst_num: $inst"
