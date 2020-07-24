@@ -272,34 +272,34 @@ instances[ShapeConRegrJuMP]["slow"] = [
     ]
 
 # benchmark 1 instances
-bench1_m_d = [
+bench1_n_d = [
     (1, 10),
-    (1, 20),
-    (1, 30),
-    (1, 40),
-    (1, 50),
-    (1, 60),
+    # (1, 20),
+    # (1, 30),
+    # (1, 40),
+    # (1, 50),
+    # (1, 60),
     (2, 5),
-    (2, 10),
-    (2, 15),
-    (2, 20),
-    (3, 2),
-    (3, 4),
-    (3, 6),
-    (3, 8),
-    (4, 2),
-    (4, 3),
-    (4, 4),
-    (4, 5),
-    (6, 2),
-    (6, 3),
-    (8, 2),
-    (10, 2),
-    (12, 2),
-    (14, 2),
+    # (2, 10),
+    # (2, 15),
+    # (2, 20),
+    # (3, 2),
+    # (3, 4),
+    # (3, 6),
+    # (3, 8),
+    # (4, 2),
+    # (4, 3),
+    # (4, 4),
+    # (4, 5),
+    # (6, 2),
+    # (6, 3),
+    # (8, 2),
+    # (10, 2),
+    # (12, 2),
+    # (14, 2),
     ]
 instances[ShapeConRegrJuMP]["bench1"] = (
-    ((m, Int(ceil(1.1 * binomial(m + 2d, m))), :func4, 100.0, 2d, use_wsos, false, false, true, false),)
-    for (m, d) in bench1_m_d
+    ((n, Int(ceil(1.1 * binomial(n + 2d, n))), :func4, 100.0, 2d, use_wsos, false, false, true, false),)
+    for (n, d) in bench1_n_d
     for use_wsos in (false, true)
     )

@@ -15,7 +15,7 @@ using Printf
 using TimerOutputs
 
 # path to write results DataFrame to CSV, if any
-results_path = joinpath(@__DIR__, "ex_results.csv")
+results_path = joinpath(homedir(), "bench1", "bench1.csv")
 # results_path = nothing
 
 # options to solvers
@@ -32,32 +32,32 @@ default_solver_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    ("minimal", Float64, 15),
+    # ("minimal", Float64, 15),
     # ("minimal", Float32, 15),
     # ("minimal", BigFloat, 15),
     # ("fast", Float64, 15),
     # ("slow", Float64, 120),
-    # ("bench1", Float64, 120),
+    ("bench1", Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
+    "native",
     "JuMP",
     ]
 
 # list of names of native examples to run
 native_example_names = [
     "densityest",
-    "envelope",
-    "expdesign",
-    "linearopt",
-    "matrixcompletion",
-    "matrixregression",
-    "maxvolume",
+    # "envelope",
+    # "expdesign",
+    # "linearopt",
+    # "matrixcompletion",
+    # "matrixregression",
+    # "maxvolume",
     "polymin",
-    "portfolio",
-    "sparsepca",
+    # "portfolio",
+    # "sparsepca",
     ]
 
 # list of names of JuMP examples to run
@@ -67,15 +67,15 @@ JuMP_example_names = [
     # "contraction",
     # "densityest",
     # "envelope",
-    # "expdesign",
+    "expdesign",
     # # "lotkavolterra", # TODO PolyJuMP error
     # "lyapunovstability",
-    # "matrixcompletion",
+    "matrixcompletion",
     # "matrixquadratic",
     # "matrixregression",
     # "maxvolume",
     # "muconvexity",
-    # "nearestpsd",
+    "nearestpsd",
     # "polymin",
     # "polynorm",
     # "portfolio",

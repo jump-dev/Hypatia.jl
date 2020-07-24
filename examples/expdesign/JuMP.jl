@@ -93,3 +93,12 @@ instances[ExpDesignJuMP]["slow"] = [
     ((100, 200, 200, 10, false, true, false),),
     ((100, 200, 200, 10, false, false, true),),
     ]
+
+# benchmark 1 instances
+instances[ExpDesignJuMP]["bench1"] = (
+    ((q, 2q, 2q, 5, use_logdet, !use_logdet, false), ext)
+    # for q in 20:20:200
+    for q in 20:20:40
+    for use_logdet in (false, true)
+    for ext in (nothing, ClassicConeOptimizer)
+    )
