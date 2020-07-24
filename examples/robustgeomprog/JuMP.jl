@@ -19,26 +19,6 @@ struct RobustGeomProgJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     k::Int
 end
 
-example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, 3),),
-    ((2, 3), ClassicConeOptimizer),
-    ]
-
-example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-6, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    return [
-    ((5, 10), nothing, options),
-    ((5, 10), ClassicConeOptimizer, options),
-    ((10, 20), nothing, options),
-    ((20, 40), nothing, options),
-    ((40, 80),),
-    ]
-end
-example_tests(::Type{RobustGeomProgJuMP{Float64}}, ::SlowInstances) = [
-    ((40, 80), ClassicConeOptimizer),
-    ((100, 200),),
-    ]
-
 function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64} # TODO generic reals
     (n, k) = (inst.n, inst.k)
     @assert n < k # want some degrees of freedom for v
@@ -65,4 +45,18 @@ function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64} # TODO generic 
     return model
 end
 
-return RobustGeomProgJuMP
+instances[RobustGeomProgJuMP]["minimal"] = [
+    ((2, 3),),
+    ((2, 3), ClassicConeOptimizer),
+    ]
+instances[RobustGeomProgJuMP]["fast"] = [
+    ((5, 10),),
+    ((5, 10), ClassicConeOptimizer),
+    ((10, 20),),
+    ((20, 40),),
+    ((40, 80),),
+    ]
+instances[RobustGeomProgJuMP]["slow"] = [
+    ((40, 80), ClassicConeOptimizer),
+    ((100, 200),),
+    ]

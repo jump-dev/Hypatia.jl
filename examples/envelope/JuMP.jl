@@ -13,22 +13,6 @@ struct EnvelopeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     env_halfdeg::Int
 end
 
-example_tests(::Type{EnvelopeJuMP{Float64}}, ::MinimalInstances) = [
-    ((1, 2, 2, 2),),
-    ]
-example_tests(::Type{EnvelopeJuMP{Float64}}, ::FastInstances) = [
-    ((2, 2, 3, 2),),
-    ((3, 3, 3, 3),),
-    ((3, 3, 5, 4),),
-    ((5, 2, 5, 3),),
-    ((1, 30, 2, 30),),
-    ((10, 1, 3, 1),),
-    ]
-example_tests(::Type{EnvelopeJuMP{Float64}}, ::SlowInstances) = [
-    ((4, 6, 4, 5),),
-    ((2, 30, 4, 30),),
-    ]
-
 function build(inst::EnvelopeJuMP{T}) where {T <: Float64} # TODO generic reals
     n = inst.n
     @assert inst.rand_halfdeg <= inst.env_halfdeg
@@ -49,4 +33,18 @@ function build(inst::EnvelopeJuMP{T}) where {T <: Float64} # TODO generic reals
     return model
 end
 
-return EnvelopeJuMP
+instances[EnvelopeJuMP]["minimal"] = [
+    ((1, 2, 2, 2),),
+    ]
+instances[EnvelopeJuMP]["fast"] = [
+    ((2, 2, 3, 2),),
+    ((3, 3, 3, 3),),
+    ((3, 3, 5, 4),),
+    ((5, 2, 5, 3),),
+    ((1, 30, 2, 30),),
+    ((10, 1, 3, 1),),
+    ]
+instances[EnvelopeJuMP]["slow"] = [
+    ((4, 5, 4, 6),),
+    ((2, 30, 4, 30),),
+    ]

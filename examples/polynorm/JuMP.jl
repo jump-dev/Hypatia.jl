@@ -14,16 +14,6 @@ struct PolyNormJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     num_polys::Int
 end
 
-example_tests(::Type{PolyNormJuMP{Float64}}, ::MinimalInstances) = [
-    ((1, 2, 2),),
-    ]
-example_tests(::Type{PolyNormJuMP{Float64}}, ::FastInstances) = [
-    ((2, 2, 2),),
-    ((2, 1, 3),),
-    ]
-example_tests(::Type{PolyNormJuMP{Float64}}, ::SlowInstances) = [
-    ]
-
 function build(inst::PolyNormJuMP{T}) where {T <: Float64} # TODO generic reals
     (n, num_polys) = (inst.n, inst.num_polys)
 
@@ -47,4 +37,11 @@ function build(inst::PolyNormJuMP{T}) where {T <: Float64} # TODO generic reals
     return model
 end
 
-return PolyNormJuMP
+instances[PolyNormJuMP]["minimal"] = [
+    ((1, 2, 2),),
+    ]
+instances[PolyNormJuMP]["fast"] = [
+    ((2, 2, 2),),
+    ((2, 1, 3),),
+    ]
+instances[PolyNormJuMP]["slow"] = Tuple[]

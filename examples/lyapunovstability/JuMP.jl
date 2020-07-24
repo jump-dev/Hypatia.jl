@@ -30,33 +30,6 @@ struct LyapunovStabilityJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_matrixepipersquare::Bool # use matrixepipersquare cone, else PSD formulation
 end
 
-example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, 3, true, true),),
-    ((2, 3, true, false),),
-    ((2, 2, false, true),),
-    ((2, 2, false, false),),
-    ]
-example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-6, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    return [
-    ((5, 6, true, true), nothing, options),
-    ((5, 6, true, false), nothing, options),
-    ((5, 5, false, true), nothing, options),
-    ((5, 5, false, false), nothing, options),
-    ((10, 20, true, true), nothing, options),
-    ((10, 20, true, false), nothing, options),
-    ((15, 15, false, true), nothing, options),
-    ((15, 15, false, false), nothing, options),
-    ((30, 30, false, false), nothing, options),
-    ]
-end
-example_tests(::Type{LyapunovStabilityJuMP{Float64}}, ::SlowInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    return [
-    ((30, 30, false, true), nothing, options),
-    ]
-end
-
 function build(inst::LyapunovStabilityJuMP{T}) where {T <: Float64} # TODO generic reals
     (num_rows, num_cols) = (inst.num_rows, inst.num_cols)
 
@@ -95,4 +68,25 @@ function build(inst::LyapunovStabilityJuMP{T}) where {T <: Float64} # TODO gener
     return model
 end
 
-return LyapunovStabilityJuMP
+instances[LyapunovStabilityJuMP]["minimal"] = [
+    ((2, 3, true, true),),
+    ((2, 3, true, false),),
+    ((2, 2, false, true),),
+    ((2, 2, false, false),),
+    ]
+instances[LyapunovStabilityJuMP]["fast"] = [
+    ((5, 6, true, true),),
+    ((5, 6, true, false),),
+    ((5, 5, false, true),),
+    ((5, 5, false, false),),
+    ((10, 20, true, true),),
+    ((10, 20, true, false),),
+    ((15, 15, false, true),),
+    ((15, 15, false, false),),
+    ((30, 30, false, false),),
+    ((30, 30, false, true),),
+    ]
+instances[LyapunovStabilityJuMP]["slow"] = [
+    ((50, 50, false, false),),
+    ((50, 50, false, true),),
+    ]

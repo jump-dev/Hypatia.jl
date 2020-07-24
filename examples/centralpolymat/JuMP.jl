@@ -13,56 +13,6 @@ struct CentralPolyMatJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     logdet_obj::Bool # use logdet, else rootdet
 end
 
-example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::MinimalInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    return [
-    ((1, 2, false), nothing, options),
-    ((1, 2, false), ClassicConeOptimizer, options),
-    ((2, 2, true), nothing, options),
-    ((2, 2, true), ClassicConeOptimizer, options),
-    ]
-end
-example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    return [
-    ((1, 10, true), nothing, options),
-    ((1, 10, true), ClassicConeOptimizer, options),
-    ((1, 15, false), nothing, options),
-    ((1, 15, false), ClassicConeOptimizer, options),
-    ((2, 3, true), nothing, options),
-    ((2, 3, true), ClassicConeOptimizer, options),
-    ((2, 3, false), nothing, options),
-    ((2, 3, false), ClassicConeOptimizer, options),
-    ((2, 6, true), nothing, options),
-    ((2, 5, true), ClassicConeOptimizer, options),
-    ((2, 7, false), nothing, options),
-    ((2, 6, false), ClassicConeOptimizer, options),
-    ((3, 2, true), nothing, options),
-    ((3, 2, false), nothing, options),
-    ((3, 4, true), nothing, options),
-    ((3, 4, false), nothing, options),
-    ((7, 2, true), nothing, options),
-    ((7, 2, true), ClassicConeOptimizer, options),
-    ((7, 2, false), nothing, options),
-    ((7, 2, false), ClassicConeOptimizer, options),
-    ]
-end
-example_tests(::Type{CentralPolyMatJuMP{Float64}}, ::SlowInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    return [
-    ((1, 20, false), nothing, options),
-    ((2, 3, false), nothing, options),
-    ((2, 10, false), nothing, options),
-    ((2, 8, false), ClassicConeOptimizer, options),
-    ((3, 4, true), ClassicConeOptimizer, options),
-    ((3, 4, false), ClassicConeOptimizer, options),
-    ((3, 5, true), nothing, options),
-    ((3, 5, false), nothing, options),
-    ((6, 3, true), nothing, options),
-    ((6, 3, false), nothing, options),
-    ]
-end
-
 function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64} # TODO generic reals
     (n, halfdeg) = (inst.n, inst.halfdeg)
 
@@ -92,4 +42,43 @@ function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64} # TODO generic 
     return model
 end
 
-return CentralPolyMatJuMP
+instances[CentralPolyMatJuMP]["minimal"] = [
+    ((1, 2, false),),
+    ((1, 2, false), ClassicConeOptimizer),
+    ((2, 2, true),),
+    ((2, 2, true), ClassicConeOptimizer),
+    ]
+instances[CentralPolyMatJuMP]["fast"] = [
+    ((1, 10, true),),
+    ((1, 10, true), ClassicConeOptimizer),
+    ((1, 15, false),),
+    ((1, 15, false), ClassicConeOptimizer),
+    ((2, 3, true),),
+    ((2, 3, true), ClassicConeOptimizer),
+    ((2, 3, false),),
+    ((2, 3, false), ClassicConeOptimizer),
+    ((2, 6, true),),
+    ((2, 5, true), ClassicConeOptimizer),
+    ((2, 7, false),),
+    ((2, 6, false), ClassicConeOptimizer),
+    ((3, 2, true),),
+    ((3, 2, false),),
+    ((3, 4, true),),
+    ((3, 4, false),),
+    ((7, 2, true),),
+    ((7, 2, true), ClassicConeOptimizer),
+    ((7, 2, false),),
+    ((7, 2, false), ClassicConeOptimizer),
+    ]
+instances[CentralPolyMatJuMP]["slow"] = [
+    ((1, 20, false),),
+    ((2, 3, false),),
+    ((2, 10, false),),
+    ((2, 8, false), ClassicConeOptimizer),
+    ((3, 4, true), ClassicConeOptimizer),
+    ((3, 4, false), ClassicConeOptimizer),
+    ((3, 5, true),),
+    ((3, 5, false),),
+    ((6, 3, true),),
+    ((6, 3, false),),
+    ]

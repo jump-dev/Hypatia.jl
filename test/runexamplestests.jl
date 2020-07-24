@@ -24,11 +24,11 @@ default_solver_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    (MinimalInstances, Float64, 15),
-    # (MinimalInstances, Float32, 15),
-    # (MinimalInstances, BigFloat, 60),
-    (FastInstances, Float64, 15),
-    # (SlowInstances, Float64, 120),
+    ("minimal", Float64, 15),
+    # ("minimal", Float32, 15),
+    # ("minimal", BigFloat, 15),
+    # ("fast", Float64, 15),
+    # ("slow", Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names
@@ -59,7 +59,7 @@ JuMP_example_names = [
     "densityest",
     "envelope",
     "expdesign",
-    "lotkavolterra",
+    # "lotkavolterra", # TODO PolyJuMP error
     "lyapunovstability",
     "matrixcompletion",
     "matrixquadratic",
@@ -70,7 +70,7 @@ JuMP_example_names = [
     "polymin",
     "polynorm",
     "portfolio",
-    "regionofattr",
+    # "regionofattr", # TODO PolyJuMP error
     "robustgeomprog",
     "secondorderpoly",
     "semidefinitepoly",
@@ -84,15 +84,13 @@ for (inst_set, real_T, time_limit) in instance_sets
     @info("each $inst_set $real_T instance should take <$time_limit seconds")
 end
 
-example_types = Tuple{String, Type{<:ExampleInstance}}[]
-for mod_type in model_types, ex in eval(Symbol(mod_type, "_example_names"))
-    ex_type = include(joinpath(examples_dir, ex, mod_type * ".jl"))
-    push!(example_types, (ex, ex_type))
+for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
+    include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
 end
 
 perf = DataFrame(
     example = Type{<:ExampleInstance}[],
-    inst_set = Type{<:InstanceSet}[],
+    inst_set = String[],
     real_T = Type{<:Real}[],
     count = Int[],
     inst_data = Tuple[],
@@ -117,10 +115,10 @@ perf = DataFrame(
 all_tests_time = time()
 
 @testset "examples tests" begin
-    for (ex_name, ex_type) in example_types, (inst_set, real_T, time_limit) in instance_sets
-        ex_type_T = ex_type{real_T}
-        instances = example_tests(ex_type_T, inst_set())
+    for (ex_type, ex_insts) in instances, (inst_set, real_T, time_limit) in instance_sets
+        instances = ex_insts[inst_set]
         isempty(instances) && continue
+        ex_type_T = ex_type{real_T}
         println("\nstarting $(length(instances)) instances for $ex_type_T $inst_set\n")
         solver_options = (default_solver_options..., time_limit = time_limit)
         for (inst_num, inst) in enumerate(instances)
