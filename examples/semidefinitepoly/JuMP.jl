@@ -5,7 +5,6 @@ test whether a given matrix has a SOS decomposition,
 and use this procedure to check whether a polynomial is globally convex
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 include(joinpath(@__DIR__, "data.jl"))
 import SumOfSquares
 import PolyJuMP
@@ -28,35 +27,6 @@ function SemidefinitePolyJuMP{Float64}(
     args...)
     return SemidefinitePolyJuMP{Float64}(get_semidefinitepoly_data(matpoly)..., args...)
 end
-
-example_tests(::Type{SemidefinitePolyJuMP{Float64}}, ::MinimalInstances) = [
-    ((:matpoly2, true, true),),
-    ((:matpoly5, true, true),),
-    ((:matpoly5, true, false),),
-    ((:matpoly5, false, false),),
-    ]
-example_tests(::Type{SemidefinitePolyJuMP{Float64}}, ::FastInstances) = [
-    ((:matpoly1, true, true),),
-    ((:matpoly1, true, false),),
-    ((:matpoly1, false, false),),
-    ((:matpoly2, true, true),),
-    ((:matpoly2, true, false),),
-    ((:matpoly2, false, false),),
-    ((:matpoly3, true, true),),
-    ((:matpoly3, true, false),),
-    ((:matpoly3, false, false),),
-    ((:matpoly4, true, true),),
-    ((:matpoly4, true, false),),
-    ((:matpoly4, false, false),),
-    ((:matpoly6, true, true),),
-    ((:matpoly6, true, false),),
-    ((:matpoly6, false, false),),
-    ((:matpoly7, true, true),),
-    ((:matpoly7, true, false),),
-    ((:matpoly7, false, false),),
-    ]
-example_tests(::Type{SemidefinitePolyJuMP{Float64}}, ::SlowInstances) = [
-    ]
 
 function build(inst::SemidefinitePolyJuMP{T}) where {T <: Float64} # TODO generic reals
     (x, H) = (inst.x, inst.H)
@@ -99,4 +69,30 @@ function test_extra(inst::SemidefinitePolyJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) in (inst.is_feas ? (MOI.OPTIMAL,) : (MOI.INFEASIBLE, MOI.DUAL_INFEASIBLE))
 end
 
-return SemidefinitePolyJuMP
+instances[SemidefinitePolyJuMP]["minimal"] = [
+    ((:matpoly2, true, true),),
+    ((:matpoly5, true, true),),
+    ((:matpoly5, true, false),),
+    ((:matpoly5, false, false),),
+    ]
+instances[SemidefinitePolyJuMP]["fast"] = [
+    ((:matpoly1, true, true),),
+    ((:matpoly1, true, false),),
+    ((:matpoly1, false, false),),
+    ((:matpoly2, true, true),),
+    ((:matpoly2, true, false),),
+    ((:matpoly2, false, false),),
+    ((:matpoly3, true, true),),
+    ((:matpoly3, true, false),),
+    ((:matpoly3, false, false),),
+    ((:matpoly4, true, true),),
+    ((:matpoly4, true, false),),
+    ((:matpoly4, false, false),),
+    ((:matpoly6, true, true),),
+    ((:matpoly6, true, false),),
+    ((:matpoly6, false, false),),
+    ((:matpoly7, true, true),),
+    ((:matpoly7, true, false),),
+    ((:matpoly7, false, false),),
+    ]
+instances[SemidefinitePolyJuMP]["slow"] = Tuple[]

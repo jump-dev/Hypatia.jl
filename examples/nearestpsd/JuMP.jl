@@ -14,7 +14,6 @@ let E be a symmetric matrix sparsity pattern:
 adapted from "Decomposition methods for sparse matrix nearness problems" (2015) by Sun & Vandenberghe
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 using SparseArrays
 
 struct NearestPSDJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -23,45 +22,6 @@ struct NearestPSDJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_chordal_sparsity::Bool # use a chordal sparsity pattern, else use a general sparsity pattern
     use_sparsepsd::Bool # use sparse PSD cone formulation, else dense PSD formulation
 end
-
-example_tests(::Type{NearestPSDJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, false, true, true),),
-    ((2, false, false, true),),
-    ((2, true, true, true),),
-    ((2, true, false, true),),
-    ((2, false, true, false),),
-    ((2, false, false, false),),
-    ((2, true, true, false),),
-    ((2, true, false, false),),
-    ]
-example_tests(::Type{NearestPSDJuMP{Float64}}, ::FastInstances) = [
-    ((5, false, true, true),),
-    ((5, false, false, true),),
-    ((5, true, true, true),),
-    ((5, true, false, true),),
-    ((5, false, true, false),),
-    ((5, false, false, false),),
-    ((5, true, true, false),),
-    ((5, true, false, false),),
-    ((20, false, true, true),),
-    ((20, false, false, true),),
-    ((20, true, true, true),),
-    ((20, true, false, true),),
-    ((20, false, true, false),),
-    ((20, false, false, false),),
-    ((20, true, true, false),),
-    ((20, true, false, false),),
-    ((100, false, true, false),),
-    ((100, false, false, false),),
-    ]
-example_tests(::Type{NearestPSDJuMP{Float64}}, ::SlowInstances) = [
-    ((100, false, true, true),),
-    ((100, false, false, true),),
-    ((100, true, true, true),),
-    ((100, true, false, true),),
-    ((100, true, true, false),),
-    ((100, true, false, false),),
-    ]
 
 function build(inst::NearestPSDJuMP{T}) where {T <: Float64} # TODO generic reals
     side = inst.side
@@ -106,4 +66,50 @@ function build(inst::NearestPSDJuMP{T}) where {T <: Float64} # TODO generic real
     return model
 end
 
-return NearestPSDJuMP
+instances[NearestPSDJuMP]["minimal"] = [
+    ((2, false, true, true),),
+    ((2, false, false, true),),
+    ((2, true, true, true),),
+    ((2, true, false, true),),
+    ((2, false, true, false),),
+    ((2, false, false, false),),
+    ((2, true, true, false),),
+    ((2, true, false, false),),
+    ]
+instances[NearestPSDJuMP]["fast"] = [
+    ((5, false, true, true),),
+    ((5, false, false, true),),
+    ((5, true, true, true),),
+    ((5, true, false, true),),
+    ((5, false, true, false),),
+    ((5, false, false, false),),
+    ((5, true, true, false),),
+    ((5, true, false, false),),
+    ((20, false, true, true),),
+    ((20, false, false, true),),
+    ((20, true, true, true),),
+    ((20, true, false, true),),
+    ((20, false, true, false),),
+    ((20, false, false, false),),
+    ((20, true, true, false),),
+    ((20, true, false, false),),
+    ((100, false, true, false),),
+    ((100, false, false, false),),
+    ]
+instances[NearestPSDJuMP]["slow"] = [
+    ((100, false, true, true),),
+    ((100, false, false, true),),
+    ((100, true, true, true),),
+    ((100, true, false, true),),
+    ((100, true, true, false),),
+    ((100, true, false, false),),
+    ]
+
+# benchmark 1 instances
+instances[NearestPSDJuMP]["bench1"] = (
+    ((side, use_completable, false, use_sparsepsd),)
+    # for side in 50:50:100
+    for side in 50:50:500
+    for use_completable in (false, true)
+    for use_sparsepsd in (false, true)
+    )

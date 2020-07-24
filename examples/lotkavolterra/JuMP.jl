@@ -7,7 +7,6 @@ TODO
 - add random data generation
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import GSL: sf_gamma
 import DynamicPolynomials
 const DP = DynamicPolynomials
@@ -19,16 +18,6 @@ import PolyJuMP
 struct LotkaVolterraJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     deg::Int # polynomial degrees
 end
-
-example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::MinimalInstances) = [
-    ((2,),),
-    ]
-example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::FastInstances) = [
-    ((4,),),
-    ]
-example_tests(::Type{LotkaVolterraJuMP{Float64}}, ::SlowInstances) = [
-    ((6,),),
-    ]
 
 function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64} # TODO generic reals
     # parameters
@@ -76,10 +65,10 @@ function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64} # TODO generic r
         M * integrate_ball(rho_T, n))
 
     JuMP.@constraint(model, rho <= 0, domain = delta_X)
-    JuMP.@constraint(model, rho_T + brho * rho +
-        sum(DP.differentiate(rho * f[i], x_h[i]) / Q for i in 1:n) +
-        sum(sum(DP.differentiate(sigma[j] * f_u[i, j], x_h[i]) / Q for i in 1:n) for j in 1:m)
-        >= 1, domain = X)
+    # JuMP.@constraint(model, rho_T + brho * rho +
+    #     sum(DP.differentiate(rho * f[i], x_h[i]) / Q for i in 1:n) +
+    #     sum(sum(DP.differentiate(sigma[j] * f_u[i, j], x_h[i]) / Q for i in 1:n) for j in 1:m)
+    #     >= 1, domain = X)
     JuMP.@constraint(model, [i in 1:m], u_bar * rho >= sigma[i], domain = X)
     JuMP.@constraint(model, rho_T >= 0, domain = X)
     JuMP.@constraint(model, [i in 1:m], sigma[i] >= 0, domain = X)
@@ -87,4 +76,12 @@ function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64} # TODO generic r
     return model
 end
 
-return LotkaVolterraJuMP
+instances[LotkaVolterraJuMP]["minimal"] = [
+    ((2,),),
+    ]
+instances[LotkaVolterraJuMP]["fast"] = [
+    ((4,),),
+    ]
+instances[LotkaVolterraJuMP]["slow"] = [
+    ((6,),),
+    ]

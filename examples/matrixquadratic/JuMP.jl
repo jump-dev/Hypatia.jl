@@ -13,7 +13,6 @@ and also to the larger conic constraint [I X'; X Y] in S^{n + m}_+
 (see Lecture 4 of "Lectures on Convex Optimization" (2018) by Y. Nesterov)
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 using SparseArrays
 
 struct MatrixQuadraticJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -21,25 +20,6 @@ struct MatrixQuadraticJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     num_cols::Int
     use_matrixepipersquare::Bool # use matrixepipersquare cone, else PSD formulation
 end
-
-example_tests(::Type{MatrixQuadraticJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, 2, true),),
-    ((2, 2, false),),
-    ]
-example_tests(::Type{MatrixQuadraticJuMP{Float64}}, ::FastInstances) = [
-    ((2, 3, true),),
-    ((2, 3, false),),
-    ((5, 6, true),),
-    ((5, 6, false),),
-    ((10, 20, true),),
-    ((10, 20, false),),
-    ((20, 40, true),),
-    ((20, 40, false),),
-    ]
-example_tests(::Type{MatrixQuadraticJuMP{Float64}}, ::SlowInstances) = [
-    ((60, 80, true),),
-    ((60, 80, false),),
-    ]
 
 function build(inst::MatrixQuadraticJuMP{T}) where {T <: Float64} # TODO generic reals
     (num_rows, num_cols) = (inst.num_rows, inst.num_cols)
@@ -65,4 +45,29 @@ function build(inst::MatrixQuadraticJuMP{T}) where {T <: Float64} # TODO generic
     return model
 end
 
-return MatrixQuadraticJuMP
+instances[MatrixQuadraticJuMP]["minimal"] = [
+    ((2, 2, true),),
+    ((2, 2, false),),
+    ]
+instances[MatrixQuadraticJuMP]["fast"] = [
+    ((2, 3, true),),
+    ((2, 3, false),),
+    ((5, 6, true),),
+    ((5, 6, false),),
+    ((10, 20, true),),
+    ((10, 20, false),),
+    ((20, 40, true),),
+    ((20, 40, false),),
+    ]
+instances[MatrixQuadraticJuMP]["slow"] = [
+    ((60, 80, true),),
+    ((60, 80, false),),
+    ]
+
+# benchmark 1 instances
+instances[MatrixQuadraticJuMP]["bench1"] = (
+    ((d1, 5d1, use_matrixepipersquare),)
+    # for d1 in 5:5:10
+    for d1 in 5:5:50
+    for use_matrixepipersquare in (false, true)
+    )

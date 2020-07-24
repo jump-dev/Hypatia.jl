@@ -200,7 +200,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     return true
 end
-
+#
 # # stepper using line search between cent and pred points
 # function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 #     point = solver.point
@@ -261,16 +261,21 @@ end
 #
 #     # TODO check cent point (step 1) is acceptable
 #     @. stepper.dir = dir_cent + dir_centcorr
-#     alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(0.99))
+#     alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(0.1)) # TODO only check end point alpha = 1 maybe
 #     # TODO cleanup
-#     if iszero(alpha)
-#         @warn("could not do full step in centering-correction direction")
+#     if alpha < 0.99
+#         # @show alpha
+#         @warn("could not do full step in centering-correction direction ($alpha)")
 #         dir_centcorr .= 0
 #         stepper.dir .= 0
 #         tau_centcorr = stepper.dir[stepper.tau_row]
 #         kap_centcorr = stepper.dir[stepper.kap_row]
 #         z_centcorr = copy(z_dir)
 #         s_centcorr = copy(s_dir)
+#
+#         @. stepper.dir = dir_cent + dir_centcorr
+#         alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(0.1))
+#         @show alpha
 #     end
 #
 #     # TODO use a smarter line search, eg bisection
@@ -295,8 +300,9 @@ end
 #     kap_ls = zero(T)
 #
 #     nup1 = solver.model.nu + 1
-#     max_nbhd = T(0.99)
-#     # max_nbhd = one(T)
+#     # max_nbhd = T(0.99)
+#     # max_nbhd = T(0.9)
+#     max_nbhd = one(T)
 #     min_nbhd = T(0.01)
 #
 #     # beta_schedule = T[0.9999, 0.99, 0.97, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0]
@@ -445,19 +451,19 @@ end
 #
 #     update_lhs(solver.system_solver, solver)
 #
-#     # use_corr = true
-#     use_corr = false
+#     use_corr = true
+#     # use_corr = false
 #
 #     # TODO if use NT, only need nonsymm cones in nbhd
 #     if all(Cones.in_neighborhood.(cones, rtmu, T(0.05)))
 #         # predict
 #         update_rhs_pred(stepper, solver)
 #         get_directions(stepper, solver, true, iter_ref_steps = 3)
-#         dir_pred = copy(stepper.dir) # TODO
 #         if use_corr
+#             dir_nocorr = copy(stepper.dir) # TODO
 #             update_rhs_predcorr(stepper, solver)
 #             get_directions(stepper, solver, true, iter_ref_steps = 3)
-#             dir_predcorr = copy(stepper.dir) # TODO
+#             @. stepper.dir += dir_nocorr
 #         end
 #         pred = true
 #         stepper.prev_gamma = zero(T) # TODO print like "pred" in column, or "cent" otherwise
@@ -465,19 +471,22 @@ end
 #         # center
 #         update_rhs_cent(stepper, solver)
 #         get_directions(stepper, solver, false, iter_ref_steps = 3)
-#         dir_cent = copy(stepper.dir) # TODO
 #         if use_corr
+#             dir_nocorr = copy(stepper.dir) # TODO
 #             update_rhs_centcorr(stepper, solver)
 #             get_directions(stepper, solver, false, iter_ref_steps = 3)
-#             dir_centcorr = copy(stepper.dir) # TODO
+#             dir_corr = copy(stepper.dir) # TODO
+#             @. stepper.dir += dir_nocorr
 #         end
 #         pred = false
 #         stepper.prev_gamma = one(T)
 #     end
 #
 #     # alpha step length
-#     alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3), max_nbhd = T(0.99))
+#     # alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3), max_nbhd = T(0.99))
+#     alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
 #     # @show alpha
+#
 #     !pred && alpha < 0.98 && println(alpha)
 #     if iszero(alpha)
 #         @warn("very small alpha")

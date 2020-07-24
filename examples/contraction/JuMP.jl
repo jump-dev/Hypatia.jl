@@ -6,7 +6,6 @@ contraction analysis example adapted from
 Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import PolyJuMP
@@ -20,23 +19,6 @@ struct ContractionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_matrixwsos::Bool # use wsos matrix cone, else PSD formulation
     is_feas::Bool
 end
-
-example_tests(::Type{ContractionJuMP{Float64}}, ::MinimalInstances) = [
-    ((0.85, 2, 1e-3, true, false),),
-    ((0.85, 2, 1e-3, false, false),),
-    ]
-example_tests(::Type{ContractionJuMP{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    relaxed_options = (tol_feas = 1e-6, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
-    return [
-    ((0.77, 4, 1e-3, true, true), nothing, options),
-    ((0.77, 4, 1e-3, false, true), nothing, options),
-    ((0.85, 4, 1e-3, true, false), nothing, relaxed_options),
-    ((0.85, 4, 1e-3, false, false), nothing, options),
-    ]
-end
-example_tests(::Type{ContractionJuMP{Float64}}, ::SlowInstances) = [
-    ]
 
 function build(inst::ContractionJuMP{T}) where {T <: Float64} # TODO generic reals
     delta = inst.delta
@@ -84,4 +66,14 @@ function test_extra(inst::ContractionJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) == (inst.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 
-return ContractionJuMP
+instances[ContractionJuMP]["minimal"] = [
+    ((0.85, 2, 1e-3, true, false),),
+    ((0.85, 2, 1e-3, false, false),),
+    ]
+instances[ContractionJuMP]["fast"] = [
+    ((0.77, 4, 1e-3, true, true),),
+    ((0.77, 4, 1e-3, false, true),),
+    ((0.85, 4, 1e-3, true, false),),
+    ((0.85, 4, 1e-3, false, false),),
+    ]
+instances[ContractionJuMP]["slow"] = Tuple[]

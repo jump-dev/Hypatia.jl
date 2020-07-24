@@ -4,7 +4,6 @@ Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 see description in native.jl
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 using SparseArrays
 
 struct MatrixCompletionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -12,31 +11,6 @@ struct MatrixCompletionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     num_cols::Int
     nuclearnorm_obj::Bool # use nuclearnorm in the objective, else spectral norm
 end
-
-example_tests(::Type{MatrixCompletionJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, 3, true),),
-    ((2, 3, true), ClassicConeOptimizer),
-    ((2, 3, false),),
-    ((2, 3, false), ClassicConeOptimizer),
-    ]
-example_tests(::Type{MatrixCompletionJuMP{Float64}}, ::FastInstances) = [
-    ((5, 8, true),),
-    ((5, 8, true), ClassicConeOptimizer),
-    ((5, 8, false),),
-    ((5, 8, false), ClassicConeOptimizer),
-    ((12, 24, true),),
-    ((12, 24, false),),
-    ((14, 140, false),),
-    ]
-example_tests(::Type{MatrixCompletionJuMP{Float64}}, ::SlowInstances) = [
-    ((14, 140, false), ClassicConeOptimizer),
-    ((14, 140, true),),
-    ((14, 140, true), ClassicConeOptimizer),
-    ((40, 70, true),),
-    ((40, 70, false),),
-    ((18, 180, true),),
-    ((18, 180, false),),
-    ]
 
 function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64} # TODO generic reals
     (num_rows, num_cols) = (inst.num_rows, inst.num_cols)
@@ -55,4 +29,36 @@ function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64} # TODO generi
     return model
 end
 
-return MatrixCompletionJuMP
+instances[MatrixCompletionJuMP]["minimal"] = [
+    ((2, 3, true),),
+    ((2, 3, true), ClassicConeOptimizer),
+    ((2, 3, false),),
+    ((2, 3, false), ClassicConeOptimizer),
+    ]
+instances[MatrixCompletionJuMP]["fast"] = [
+    ((5, 8, true),),
+    ((5, 8, true), ClassicConeOptimizer),
+    ((5, 8, false),),
+    ((5, 8, false), ClassicConeOptimizer),
+    ((12, 24, true),),
+    ((12, 24, false),),
+    ((14, 140, false),),
+    ]
+instances[MatrixCompletionJuMP]["slow"] = [
+    ((14, 140, false), ClassicConeOptimizer),
+    ((14, 140, true),),
+    ((14, 140, true), ClassicConeOptimizer),
+    ((40, 70, true),),
+    ((40, 70, false),),
+    ((18, 180, true),),
+    ((18, 180, false),),
+    ]
+
+# benchmark 1 instances
+instances[MatrixCompletionJuMP]["bench1"] = (
+    ((d1, d2, false), ext)
+    # for d1 in 10:5:15
+    for d1 in 10:5:55
+    for d2 in (5d1, 10d1)
+    for ext in (nothing, ClassicConeOptimizer)
+    )

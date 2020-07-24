@@ -5,40 +5,11 @@ find maximum volume hypercube with edges parallel to the axes inside a polyhedro
 defined with l_1, l_infty, or l_2 ball constraints (different to native.jl)
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
-
 struct MaxVolumeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
     epipernormeucl_constr::Bool # add an L2 ball constraint, else don't add
     epinorminf_constrs::Bool # add L1 and Linfty ball constraints, else don't add
 end
-
-example_tests(::Type{MaxVolumeJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, true, false),),
-    ((2, true, true),),
-    ((2, false, true),),
-    ((2, false, true), ClassicConeOptimizer),
-    ((2, false, true), SOConeOptimizer),
-    # ((2, false, true), ExpConeOptimizer), # TODO waiting for MOI bridges geomean to exp
-    ]
-example_tests(::Type{MaxVolumeJuMP{Float64}}, ::FastInstances) = [
-    ((10, true, false),),
-    ((10, false, true),),
-    ((10, false, true), ClassicConeOptimizer),
-    ((10, true, true),),
-    ((100, true, false),),
-    ((100, false, true),),
-    ((100, false, true), ClassicConeOptimizer),
-    ((100, true, true),),
-    ((1000, true, false),),
-    ((1000, true, true),), # with bridges extended formulation will need to go into slow list
-    ]
-example_tests(::Type{MaxVolumeJuMP{Float64}}, ::SlowInstances) = [
-    ((1000, false, true), ClassicConeOptimizer),
-    ((2000, true, false),),
-    ((2000, false, true),),
-    ((2000, true, true),),
-    ]
 
 function build(inst::MaxVolumeJuMP{T}) where {T <: Float64} # TODO generic reals
     n = inst.n
@@ -64,4 +35,29 @@ function build(inst::MaxVolumeJuMP{T}) where {T <: Float64} # TODO generic reals
     return model
 end
 
-return MaxVolumeJuMP
+instances[MaxVolumeJuMP]["minimal"] = [
+    ((2, true, false),),
+    ((2, true, true),),
+    ((2, false, true),),
+    ((2, false, true), ClassicConeOptimizer),
+    ((2, false, true), SOPSDConeOptimizer),
+    # ((2, false, true), ExpConeOptimizer), # TODO waiting for MOI bridges geomean to exp
+    ]
+instances[MaxVolumeJuMP]["fast"] = [
+    ((10, true, false),),
+    ((10, false, true),),
+    ((10, false, true), ClassicConeOptimizer),
+    ((10, true, true),),
+    ((100, true, false),),
+    ((100, false, true),),
+    ((100, false, true), ClassicConeOptimizer),
+    ((100, true, true),),
+    ((1000, true, false),),
+    ((1000, true, true),), # with bridges extended formulation will need to go into slow list
+    ]
+instances[MaxVolumeJuMP]["slow"] = [
+    ((1000, false, true), ClassicConeOptimizer),
+    ((2000, true, false),),
+    ((2000, false, true),),
+    ((2000, true, true),),
+    ]

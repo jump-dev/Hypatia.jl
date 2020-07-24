@@ -13,8 +13,6 @@ if logdet_obj or rootdet_obj is true, F is the logdet or rootdet function
 if geomean_obj is true, we use a formulation from https://picos-api.gitlab.io/picos/optdes.html that finds an equivalent minimizer
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
-
 struct ExpDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     q::Int
     p::Int
@@ -23,49 +21,6 @@ struct ExpDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     logdet_obj::Bool # use formulation with logdet objective
     rootdet_obj::Bool # use formulation with rootdet objective
     geomean_obj::Bool # use formulation with geomean objective
-end
-
-example_tests(::Type{ExpDesignJuMP{Float64}}, ::MinimalInstances) = begin
-    options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
-    return [
-    ((2, 3, 4, 2, true, false, false), nothing, options),
-    ((2, 3, 4, 2, true, false, false), ClassicConeOptimizer),
-    ((2, 3, 4, 2, false, true, false),),
-    ((2, 3, 4, 2, false, true, false), ClassicConeOptimizer),
-    ((2, 3, 4, 2, false, false, true),),
-    ((2, 3, 4, 2, false, false, true), ClassicConeOptimizer),
-    ]
-end
-example_tests(::Type{ExpDesignJuMP{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
-    return [
-    ((3, 5, 7, 2, true, false, false), nothing, options),
-    ((3, 5, 7, 2, true, false, false), ClassicConeOptimizer),
-    ((3, 5, 7, 2, false, true, false),),
-    ((3, 5, 7, 2, false, true, false), ClassicConeOptimizer),
-    ((3, 5, 7, 2, false, false, true),),
-    ((3, 5, 7, 2, false, false, true), ClassicConeOptimizer),
-    ((5, 15, 25, 5, true, false, false), nothing, options),
-    ((5, 15, 25, 5, false, true, false),),
-    ((5, 15, 25, 5, false, false, true),),
-    ((10, 30, 50, 5, true, false, false), nothing, options),
-    ((10, 30, 50, 5, false, true, false),),
-    ((10, 30, 50, 5, false, false, true),),
-    ((25, 75, 125, 10, true, false, false), nothing, options),
-    ((25, 75, 125, 10, false, true, false),),
-    ((25, 75, 125, 10, false, false, true),),
-    ]
-end
-example_tests(::Type{ExpDesignJuMP{Float64}}, ::SlowInstances) = begin
-    options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
-    return [
-    ((25, 75, 125, 10, true, false, false), ClassicConeOptimizer),
-    ((25, 75, 125, 10, false, true, false), ClassicConeOptimizer),
-    ((25, 75, 125, 10, false, false, true), ClassicConeOptimizer),
-    ((100, 200, 200, 10, true, false, false), nothing, options),
-    ((100, 200, 200, 10, false, true, false),),
-    ((100, 200, 200, 10, false, false, true),),
-    ]
 end
 
 function build(inst::ExpDesignJuMP{T}) where {T <: Float64} # TODO generic reals
@@ -105,4 +60,45 @@ function build(inst::ExpDesignJuMP{T}) where {T <: Float64} # TODO generic reals
     return model
 end
 
-return ExpDesignJuMP
+instances[ExpDesignJuMP]["minimal"] = [
+    ((2, 3, 4, 2, true, false, false),),
+    ((2, 3, 4, 2, true, false, false), ClassicConeOptimizer),
+    ((2, 3, 4, 2, false, true, false),),
+    ((2, 3, 4, 2, false, true, false), ClassicConeOptimizer),
+    ((2, 3, 4, 2, false, false, true),),
+    ((2, 3, 4, 2, false, false, true), ClassicConeOptimizer),
+    ]
+instances[ExpDesignJuMP]["fast"] = [
+    ((3, 5, 7, 2, true, false, false),),
+    ((3, 5, 7, 2, true, false, false), ClassicConeOptimizer),
+    ((3, 5, 7, 2, false, true, false),),
+    ((3, 5, 7, 2, false, true, false), ClassicConeOptimizer),
+    ((3, 5, 7, 2, false, false, true),),
+    ((3, 5, 7, 2, false, false, true), ClassicConeOptimizer),
+    ((5, 15, 25, 5, true, false, false),),
+    ((5, 15, 25, 5, false, true, false),),
+    ((5, 15, 25, 5, false, false, true),),
+    ((10, 30, 50, 5, true, false, false),),
+    ((10, 30, 50, 5, false, true, false),),
+    ((10, 30, 50, 5, false, false, true),),
+    ((25, 75, 125, 10, true, false, false),),
+    ((25, 75, 125, 10, false, true, false),),
+    ((25, 75, 125, 10, false, false, true),),
+    ]
+instances[ExpDesignJuMP]["slow"] = [
+    ((25, 75, 125, 10, true, false, false), ClassicConeOptimizer),
+    ((25, 75, 125, 10, false, true, false), ClassicConeOptimizer),
+    ((25, 75, 125, 10, false, false, true), ClassicConeOptimizer),
+    ((100, 200, 200, 10, true, false, false),),
+    ((100, 200, 200, 10, false, true, false),),
+    ((100, 200, 200, 10, false, false, true),),
+    ]
+
+# benchmark 1 instances
+instances[ExpDesignJuMP]["bench1"] = (
+    ((q, 2q, 2q, 5, use_logdet, !use_logdet, false), ext)
+    # for q in 20:20:40
+    for q in 20:20:200
+    for use_logdet in (false, true)
+    for ext in (nothing, ClassicConeOptimizer)
+    )

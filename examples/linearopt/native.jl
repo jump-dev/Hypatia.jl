@@ -6,7 +6,6 @@ modified from https://github.com/dpapp-github/alfonso/blob/master/random_lp.m
 solves a simple linear optimization problem (LP) min c'x s.t. Ax = b, x >= 0
 =#
 
-include(joinpath(@__DIR__, "../common_native.jl"))
 using SparseArrays
 
 struct LinearOptNative{T <: Real} <: ExampleInstanceNative{T}
@@ -14,21 +13,6 @@ struct LinearOptNative{T <: Real} <: ExampleInstanceNative{T}
     n::Int
     nz_frac::Float64
 end
-
-example_tests(::Type{<:LinearOptNative{<:Real}}, ::MinimalInstances) = [
-    ((2, 4, 1.0),),
-    ((2, 4, 0.5),),
-    ]
-example_tests(::Type{LinearOptNative{Float64}}, ::FastInstances) = [
-    ((15, 20, 1.0),),
-    ((15, 20, 0.25),),
-    ((50, 100, 1.0),),
-    ((50, 100, 0.15),),
-    ]
-example_tests(::Type{LinearOptNative{Float64}}, ::SlowInstances) = [
-    ((500, 1000, 0.05),),
-    ((500, 1000, 1.0),),
-    ]
 
 function build(inst::LinearOptNative{T}) where {T <: Real}
     (m, n, nz_frac) = (inst.m, inst.n, inst.nz_frac)
@@ -47,4 +31,17 @@ function build(inst::LinearOptNative{T}) where {T <: Real}
     return model
 end
 
-return LinearOptNative
+instances[LinearOptNative]["minimal"] = [
+    ((2, 4, 1.0),),
+    ((2, 4, 0.5),),
+    ]
+instances[LinearOptNative]["fast"] = [
+    ((15, 20, 1.0),),
+    ((15, 20, 0.25),),
+    ((50, 100, 1.0),),
+    ((50, 100, 0.15),),
+    ]
+instances[LinearOptNative]["slow"] = [
+    ((500, 1000, 0.05),),
+    ((500, 1000, 1.0),),
+    ]

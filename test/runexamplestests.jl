@@ -5,16 +5,25 @@ run examples tests from the examples folder and display basic benchmarks
 =#
 
 examples_dir = joinpath(@__DIR__, "../examples")
+# TODO maybe put these common files in a module
 include(joinpath(examples_dir, "common.jl"))
-using DataFrames
+include(joinpath(examples_dir, "common_JuMP.jl"))
+include(joinpath(examples_dir, "common_native.jl"))
+import DataFrames
+import CSV
 using Printf
-using TimerOutputs
+import TimerOutputs
+import DataStructures
+
+# path to write results DataFrame to CSV, if any
+results_path = joinpath(homedir(), "bench1", "bench1.csv")
+# results_path = nothing
 
 # options to solvers
-timer = TimerOutput()
+timer = TimerOutputs.TimerOutput()
 default_solver_options = (
-    verbose = false,
-    # verbose = true,
+    # verbose = false,
+    verbose = true,
     iter_limit = 150,
     timer = timer,
     # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
@@ -24,16 +33,17 @@ default_solver_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    (MinimalInstances, Float64, 15),
-    # (MinimalInstances, Float32, 15),
-    # (MinimalInstances, BigFloat, 60),
-    (FastInstances, Float64, 15),
-    # (SlowInstances, Float64, 120),
+    # ("minimal", Float64, 15),
+    # ("minimal", Float32, 15),
+    # ("minimal", BigFloat, 15),
+    # ("fast", Float64, 15),
+    # ("slow", Float64, 120),
+    ("bench1", Float64, 1800),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
@@ -53,27 +63,27 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
-    "conditionnum",
-    "contraction",
+    # "centralpolymat",
+    # "conditionnum",
+    # "contraction",
     "densityest",
-    "envelope",
+    # "envelope",
     "expdesign",
-    "lotkavolterra",
-    "lyapunovstability",
+    # # "lotkavolterra", # TODO PolyJuMP error
+    # "lyapunovstability",
     "matrixcompletion",
     "matrixquadratic",
     "matrixregression",
-    "maxvolume",
-    "muconvexity",
+    # "maxvolume",
+    # "muconvexity",
     "nearestpsd",
     "polymin",
-    "polynorm",
+    # "polynorm",
     "portfolio",
-    "regionofattr",
-    "robustgeomprog",
-    "secondorderpoly",
-    "semidefinitepoly",
+    # # "regionofattr", # TODO PolyJuMP error
+    # "robustgeomprog",
+    # "secondorderpoly",
+    # "semidefinitepoly",
     "shapeconregr",
     "signomialmin",
     ]
@@ -84,15 +94,15 @@ for (inst_set, real_T, time_limit) in instance_sets
     @info("each $inst_set $real_T instance should take <$time_limit seconds")
 end
 
-example_types = Tuple{String, Type{<:ExampleInstance}}[]
-for mod_type in model_types, ex in eval(Symbol(mod_type, "_example_names"))
-    ex_type = include(joinpath(examples_dir, ex, mod_type * ".jl"))
-    push!(example_types, (ex, ex_type))
+# load instances
+instances = DataStructures.DefaultOrderedDict{Type{<:ExampleInstance}, Any}(() -> DataStructures.DefaultOrderedDict{String, Any}(() -> Tuple[]))
+for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
+    include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
 end
 
-perf = DataFrame(
+perf = DataFrames.DataFrame(
     example = Type{<:ExampleInstance}[],
-    inst_set = Type{<:InstanceSet}[],
+    inst_set = String[],
     real_T = Type{<:Real}[],
     count = Int[],
     inst_data = Tuple[],
@@ -117,11 +127,11 @@ perf = DataFrame(
 all_tests_time = time()
 
 @testset "examples tests" begin
-    for (ex_name, ex_type) in example_types, (inst_set, real_T, time_limit) in instance_sets
-        ex_type_T = ex_type{real_T}
-        instances = example_tests(ex_type_T, inst_set())
+    for (ex_type, ex_insts) in instances, (inst_set, real_T, time_limit) in instance_sets
+        instances = ex_insts[inst_set]
         isempty(instances) && continue
-        println("\nstarting $(length(instances)) instances for $ex_type_T $inst_set\n")
+        ex_type_T = ex_type{real_T}
+        println("\nstarting instances for $ex_type_T $inst_set\n")
         solver_options = (default_solver_options..., time_limit = time_limit)
         for (inst_num, inst) in enumerate(instances)
             test_info = "$ex_type_T $inst_set $inst_num: $inst"
@@ -140,11 +150,12 @@ all_tests_time = time()
     end
 
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
-    show(perf, allrows = true, allcols = true)
+    DataFrames.show(perf, allrows = true, allcols = true)
     println("\n")
     @show sum(perf[:iters])
     show(timer)
     println("\n")
+    isnothing(results_path) || CSV.write(results_path, perf, transform = (col, val) -> something(val, missing))
 end
 
 ;
