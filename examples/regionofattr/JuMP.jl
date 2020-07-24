@@ -18,25 +18,6 @@ struct RegionOfAttrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_wsos::Bool # use wsosinterpnonnegative cone, else PSD formulation
 end
 
-example_tests(::Type{RegionOfAttrJuMP{Float64}}, ::MinimalInstances) = [
-    ((4, true),),
-    ((4, false),),
-    ]
-example_tests(::Type{RegionOfAttrJuMP{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-5,)
-    return [
-    ((6, true), nothing, options),
-    ((6, false), nothing, options),
-    ((8, true), nothing, options),
-    ]
-end
-example_tests(::Type{RegionOfAttrJuMP{Float64}}, ::SlowInstances) = begin
-    options = (tol_feas = 1e-5,)
-    return [
-    ((8, false), nothing, options),
-    ]
-end
-
 function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64} # TODO generic reals
     deg = inst.deg
     DP.@polyvar x
@@ -86,4 +67,15 @@ function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64} # TODO generic re
     return model
 end
 
-return RegionOfAttrJuMP
+instances[RegionOfAttrJuMP]["minimal"] = [
+    ((4, true),),
+    ((4, false),),
+    ]
+instances[RegionOfAttrJuMP]["fast"] = [
+    ((6, true),),
+    ((6, false),),
+    ((8, true),),
+    ]
+instances[RegionOfAttrJuMP]["slow"] = [
+    ((8, false),),
+    ]

@@ -21,57 +21,6 @@ struct ExpDesignNative{T <: Real} <: ExampleInstanceNative{T}
     use_epinorminf::Bool
 end
 
-example_tests(::Type{ExpDesignNative{Float64}}, ::MinimalInstances) = begin
-    options = (tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
-    return [
-    ((2, 3, 4, 2, true, false, false, true, true, false), options),
-    ((2, 3, 4, 2, true, false, false, true, true, true), options),
-    ((2, 3, 4, 2, false, true, false, true, true, true),),
-    ((2, 3, 4, 2, false, false, true, true, true, true),),
-    ((2, 3, 4, 2, true, false, false, false, false, true), options),
-    ((2, 3, 4, 2, false, true, false, false, false, true),),
-    ]
-end
-example_tests(::Type{<:ExpDesignNative{<:Real}}, ::MinimalInstances) = [
-    ((2, 3, 4, 2, false, true, false, true, true, true),),
-    ((2, 3, 4, 2, false, false, true, true, true, true),),
-    ]
-example_tests(::Type{ExpDesignNative{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
-    return [
-    ((3, 5, 7, 2, true, false, false, true, true, false), options),
-    ((3, 5, 7, 2, true, false, false, true, true, true), options),
-    ((3, 5, 7, 2, false, true, false, true, true, true),),
-    ((3, 5, 7, 2, false, false, true, true, true, true),),
-    ((3, 5, 7, 2, true, false, false, false, false, true), options),
-    ((3, 5, 7, 2, false, true, false, false, false, true),),
-    ((5, 15, 25, 5, true, false, false, true, true, false), options),
-    ((5, 15, 25, 5, true, false, false, true, true, true), options),
-    ((5, 15, 25, 5, false, true, false, true, true, true),),
-    ((5, 15, 25, 5, false, false, true, true, true, true),),
-    ((5, 15, 25, 5, true, false, false, false, false, true), options),
-    ((5, 15, 25, 5, false, true, false, false, false, true),),
-    ((25, 75, 125, 5, true, false, false, true, true, false), options),
-    ((25, 75, 125, 5, true, false, false, true, true, true), options),
-    ((25, 75, 125, 5, false, true, false, true, true, true),),
-    ((25, 75, 125, 5, false, false, true, true, true, true),),
-    ((25, 75, 125, 5, true, false, false, false, false, true), options),
-    ((25, 75, 125, 5, false, true, false, false, false, true),),
-    ]
-end
-example_tests(::Type{ExpDesignNative{Float64}}, ::SlowInstances) = begin
-    options = (tol_feas = 1e-5, tol_rel_opt = 1e-5, tol_abs_opt = 1e-5)
-    return [
-    # TODO commented too slow
-    # ((100, 200, 200, 10, true, false, false, true, true, false),),
-    ((100, 200, 200, 10, true, false, false, true, true, true), options),
-    ((100, 200, 200, 10, false, true, false, true, true, true),),
-    ((100, 200, 200, 10, false, false, true, true, true, true),),
-    ((100, 200, 200, 10, true, false, false, false, false, true), options),
-    ((100, 200, 200, 10, false, true, false, false, false, true),),
-    ]
-end
-
 function build(inst::ExpDesignNative{T}) where {T <: Real}
     (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)
     @assert (p > q) && (n > q) && (n_max <= n)
@@ -293,4 +242,38 @@ function build(inst::ExpDesignNative{T}) where {T <: Real}
     return model
 end
 
-return ExpDesignNative
+instances[ExpDesignNative]["minimal"] = [
+    ((2, 3, 4, 2, true, false, false, true, true, false),),
+    ((2, 3, 4, 2, true, false, false, true, true, true),),
+    ((2, 3, 4, 2, false, true, false, true, true, true),),
+    ((2, 3, 4, 2, false, false, true, true, true, true),),
+    ((2, 3, 4, 2, true, false, false, false, false, true),),
+    ((2, 3, 4, 2, false, true, false, false, false, true),),
+    ]
+instances[ExpDesignNative]["fast"] = [
+    ((3, 5, 7, 2, true, false, false, true, true, false),),
+    ((3, 5, 7, 2, true, false, false, true, true, true),),
+    ((3, 5, 7, 2, false, true, false, true, true, true),),
+    ((3, 5, 7, 2, false, false, true, true, true, true),),
+    ((3, 5, 7, 2, true, false, false, false, false, true),),
+    ((3, 5, 7, 2, false, true, false, false, false, true),),
+    ((5, 15, 25, 5, true, false, false, true, true, false),),
+    ((5, 15, 25, 5, true, false, false, true, true, true),),
+    ((5, 15, 25, 5, false, true, false, true, true, true),),
+    ((5, 15, 25, 5, false, false, true, true, true, true),),
+    ((5, 15, 25, 5, true, false, false, false, false, true),),
+    ((5, 15, 25, 5, false, true, false, false, false, true),),
+    ((25, 75, 125, 5, true, false, false, true, true, false),),
+    ((25, 75, 125, 5, true, false, false, true, true, true),),
+    ((25, 75, 125, 5, false, true, false, true, true, true),),
+    ((25, 75, 125, 5, false, false, true, true, true, true),),
+    ((25, 75, 125, 5, true, false, false, false, false, true),),
+    ((25, 75, 125, 5, false, true, false, false, false, true),),
+    ]
+instances[ExpDesignNative]["slow"] = [
+    ((100, 200, 200, 10, true, false, false, true, true, true),),
+    ((100, 200, 200, 10, false, true, false, true, true, true),),
+    ((100, 200, 200, 10, false, false, true, true, true, true),),
+    ((100, 200, 200, 10, true, false, false, false, false, true),),
+    ((100, 200, 200, 10, false, true, false, false, false, true),),
+    ]

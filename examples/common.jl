@@ -8,6 +8,7 @@ using Test
 import Random
 using LinearAlgebra
 import LinearAlgebra.BlasReal
+import DataStructures
 
 import Hypatia
 import Hypatia.ModelUtilities
@@ -15,16 +16,10 @@ import Hypatia.Cones
 import Hypatia.Models
 import Hypatia.Solvers
 
-abstract type InstanceSet end
-# TODO instead of structs, these can be abstract types
-struct MinimalInstances <: InstanceSet end
-struct FastInstances <: InstanceSet end
-struct SlowInstances <: InstanceSet end
-struct LinearOperatorsInstances <: InstanceSet end
-
 abstract type ExampleInstance{T <: Real} end
 
-example_tests(::Type{<:ExampleInstance}, ::InstanceSet) = Tuple[]
+# dictionary of instances
+instances = DataStructures.DefaultOrderedDict{Type{<:ExampleInstance}, DataStructures.DefaultOrderedDict{String, Vector{Tuple}}}(() -> DataStructures.DefaultOrderedDict{String, Vector{Tuple}}(() -> Tuple[]))
 
 # NOTE this is a workaround for randn's lack of support for BigFloat
 Random.randn(R::Type{BigFloat}, dims::Vararg{Int, N} where N) = R.(randn(dims...))

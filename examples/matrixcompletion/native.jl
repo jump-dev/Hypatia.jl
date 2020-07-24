@@ -28,38 +28,6 @@ struct MatrixCompletionNative{T <: Real} <: ExampleInstanceNative{T}
     use_epinormspectral::Bool # use epinormspectral cone (or its dual), else PSD formulation
 end
 
-example_tests(::Type{<:MatrixCompletionNative{<:Real}}, ::MinimalInstances) = [
-    ((2, 3, true, true, true, true),),
-    ((2, 3, false, true, true, true),),
-    ((2, 3, true, false, true, true),),
-    ((2, 3, false, false, true, true),),
-    ((2, 3, true, true, false, true),),
-    ((2, 3, false, false, false, true),),
-    ((2, 3, true, true, false, false),),
-    ((2, 3, false, false, false, false),),
-    ]
-example_tests(::Type{MatrixCompletionNative{Float64}}, ::FastInstances) = [
-    ((12, 24, true, true, true, true),),
-    ((12, 24, false, true, true, true),),
-    ((12, 24, true, false, true, true),),
-    ((12, 24, false, false, true, true),),
-    ((12, 24, true, true, false, true),),
-    ((12, 24, false, false, false, true),),
-    ((12, 24, true, true, false, false),),
-    ((12, 24, false, false, false, false),),
-    ]
-example_tests(::Type{MatrixCompletionNative{Float64}}, ::SlowInstances) = [
-    # TODO add missing boolean combinations
-    ((14, 140, true, true, true, true),),
-    ((14, 140, true, true, false, true),),
-    ((14, 140, true, true, true, false),),
-    ((14, 140, true, true, false, false),),
-    ((18, 180, true, true, true, true),),
-    ((18, 180, true, true, false, true),),
-    ((18, 180, true, true, true, false),),
-    ((18, 180, true, true, false, false),),
-    ]
-
 function build(inst::MatrixCompletionNative{T}) where {T <: Real}
     (m, n) = (inst.m, inst.n)
     @assert m <= n
@@ -284,4 +252,34 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
     return model
 end
 
-return MatrixCompletionNative
+instances[MatrixCompletionNative]["minimal"] = [
+    ((2, 3, true, true, true, true),),
+    ((2, 3, false, true, true, true),),
+    ((2, 3, true, false, true, true),),
+    ((2, 3, false, false, true, true),),
+    ((2, 3, true, true, false, true),),
+    ((2, 3, false, false, false, true),),
+    ((2, 3, true, true, false, false),),
+    ((2, 3, false, false, false, false),),
+    ]
+instances[MatrixCompletionNative]["fast"] = [
+    ((12, 24, true, true, true, true),),
+    ((12, 24, false, true, true, true),),
+    ((12, 24, true, false, true, true),),
+    ((12, 24, false, false, true, true),),
+    ((12, 24, true, true, false, true),),
+    ((12, 24, false, false, false, true),),
+    ((12, 24, true, true, false, false),),
+    ((12, 24, false, false, false, false),),
+    ]
+instances[MatrixCompletionNative]["slow"] = [
+    # TODO add missing boolean combinations
+    ((14, 140, true, true, true, true),),
+    ((14, 140, true, true, false, true),),
+    ((14, 140, true, true, true, false),),
+    ((14, 140, true, true, false, false),),
+    ((18, 180, true, true, true, true),),
+    ((18, 180, true, true, false, true),),
+    ((18, 180, true, true, true, false),),
+    ((18, 180, true, true, false, false),),
+    ]

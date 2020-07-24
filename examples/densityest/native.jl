@@ -36,67 +36,6 @@ function DensityEstNative{T}(num_obs::Int, n::Int, args...) where {T <: Real}
     return DensityEstNative{T}(:Random, X, args...)
 end
 
-example_tests(::Type{<:DensityEstNative{<:BlasReal}}, ::MinimalInstances) = [
-    ((5, 1, 2, true, true, true),),
-    ((5, 1, 2, false, true, true),),
-    ((5, 2, 1, false, true, true),),
-    ((5, 1, 2, true, false, true),),
-    ((5, 1, 2, true, true, false),),
-    ((:iris, 2, true, true, true),),
-    ]
-example_tests(::Type{DensityEstNative{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    return [
-    ((50, 1, 4, true, true, true), options),
-    ((50, 1, 10, true, true, true), options),
-    ((50, 1, 50, true, true, true), options),
-    ((100, 1, 100, true, true, true), options),
-    ((500, 1, 500, true, true, true), options),
-    ((50, 2, 2, true, true, true), options),
-    ((200, 2, 20, true, true, true), options),
-    ((50, 2, 2, false, true, true), options),
-    ((50, 2, 2, true, false, true), options),
-    ((50, 2, 2, true, true, false), options),
-    ((500, 3, 14, true, true, true), options),
-    ((20, 4, 3, false, true, false),),
-    ((20, 4, 3, true, true, true),),
-    ((100, 8, 2, true, true, true), options),
-    ((100, 8, 2, false, true, true), options),
-    ((100, 8, 2, true, false, true), options),
-    ((100, 8, 2, true, true, false), options),
-    ((250, 4, 6, true, true, true), options),
-    ((250, 4, 6, false, true, true), options),
-    ((250, 4, 6, true, false, true), options),
-    ((250, 4, 6, true, true, false), options),
-    ((200, 32, 2, true, true, true), options),
-    ((:iris, 4, true, true, true), options),
-    ((:iris, 5, true, true, true), options),
-    ((:iris, 6, true, true, true), options),
-    ((:iris, 4, false, true, true), options),
-    ((:iris, 4, true, false, true), options),
-    ((:iris, 4, true, true, false), options),
-    ((:cancer, 4, true, true, true), options),
-    ((:cancer, 4, false, true, true), options),
-    ((:cancer, 4, true, false, true), options),
-    ((:cancer, 4, true, true, false), options),
-    ]
-end
-example_tests(::Type{DensityEstNative{Float64}}, ::SlowInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    return [
-    ((:cancer, 6, true, true, true), options),
-    # ((:cancer, 6, false, true, true), options),
-    ((:cancer, 6, true, false, true), options),
-    ((:cancer, 6, true, true, false), options),
-    ((500, 2, 60, true, true, true), options),
-    ((1000, 3, 20, true, true, true), options),
-    ((400, 5, 6, true, true, true), options),
-    ((400, 5, 6, false, true, true), options),
-    ((400, 5, 6, true, false, true), options),
-    ((400, 5, 6, true, true, false), options),
-    ]
-end
-
 function build(inst::DensityEstNative{T}) where {T <: Real}
     X = inst.X
     (num_obs, n) = size(X)
@@ -237,4 +176,57 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
     return model
 end
 
-return DensityEstNative
+instances[DensityEstNative]["minimal"] = [
+    ((5, 1, 2, true, true, true),),
+    ((5, 1, 2, false, true, true),),
+    ((5, 2, 1, false, true, true),),
+    ((5, 1, 2, true, false, true),),
+    ((5, 1, 2, true, true, false),),
+    ((:iris, 2, true, true, true),),
+    ]
+instances[DensityEstNative]["fast"] = [
+    ((50, 1, 4, true, true, true),),
+    ((50, 1, 10, true, true, true),),
+    ((50, 1, 50, true, true, true),),
+    ((100, 1, 100, true, true, true),),
+    ((500, 1, 500, true, true, true),),
+    ((50, 2, 2, true, true, true),),
+    ((200, 2, 20, true, true, true),),
+    ((50, 2, 2, false, true, true),),
+    ((50, 2, 2, true, false, true),),
+    ((50, 2, 2, true, true, false),),
+    ((500, 3, 14, true, true, true),),
+    ((20, 4, 3, false, true, false),),
+    ((20, 4, 3, true, true, true),),
+    ((100, 8, 2, true, true, true),),
+    ((100, 8, 2, false, true, true),),
+    ((100, 8, 2, true, false, true),),
+    ((100, 8, 2, true, true, false),),
+    ((250, 4, 6, true, true, true),),
+    ((250, 4, 6, false, true, true),),
+    ((250, 4, 6, true, false, true),),
+    ((250, 4, 6, true, true, false),),
+    ((200, 32, 2, true, true, true),),
+    ((:iris, 4, true, true, true),),
+    ((:iris, 5, true, true, true),),
+    ((:iris, 6, true, true, true),),
+    ((:iris, 4, false, true, true),),
+    ((:iris, 4, true, false, true),),
+    ((:iris, 4, true, true, false),),
+    ((:cancer, 4, true, true, true),),
+    ((:cancer, 4, false, true, true),),
+    ((:cancer, 4, true, false, true),),
+    ((:cancer, 4, true, true, false),),
+    ]
+instances[DensityEstNative]["slow"] = [
+    ((:cancer, 6, true, true, true),),
+    # ((:cancer, 6, false, true, true),),
+    ((:cancer, 6, true, false, true),),
+    ((:cancer, 6, true, true, false),),
+    ((500, 2, 60, true, true, true),),
+    ((1000, 3, 20, true, true, true),),
+    ((400, 5, 6, true, true, true),),
+    ((400, 5, 6, false, true, true),),
+    ((400, 5, 6, true, false, true),),
+    ((400, 5, 6, true, true, false),),
+    ]
