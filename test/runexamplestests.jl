@@ -10,8 +10,13 @@ include(joinpath(examples_dir, "common.jl"))
 include(joinpath(examples_dir, "common_JuMP.jl"))
 include(joinpath(examples_dir, "common_native.jl"))
 using DataFrames
+using CSV
 using Printf
 using TimerOutputs
+
+# path to write results DataFrame to CSV, if any
+results_path = joinpath(@__DIR__, "ex_results.csv")
+# results_path = nothing
 
 # options to solvers
 timer = TimerOutput()
@@ -27,12 +32,12 @@ default_solver_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    # ("minimal", Float64, 15),
+    ("minimal", Float64, 15),
     # ("minimal", Float32, 15),
     # ("minimal", BigFloat, 15),
     # ("fast", Float64, 15),
     # ("slow", Float64, 120),
-    ("bench1", Float64, 120),
+    # ("bench1", Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names
@@ -149,6 +154,7 @@ all_tests_time = time()
     @show sum(perf[:iters])
     show(timer)
     println("\n")
+    isnothing(results_path) || CSV.write(results_path, perf, transform = (col, val) -> something(val, missing))
 end
 
 ;
