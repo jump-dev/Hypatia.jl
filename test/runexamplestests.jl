@@ -9,17 +9,18 @@ examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "common.jl"))
 include(joinpath(examples_dir, "common_JuMP.jl"))
 include(joinpath(examples_dir, "common_native.jl"))
-using DataFrames
-using CSV
+import DataFrames
+import CSV
 using Printf
-using TimerOutputs
+import TimerOutputs
+import DataStructures
 
 # path to write results DataFrame to CSV, if any
 results_path = joinpath(homedir(), "bench1", "bench1.csv")
 # results_path = nothing
 
 # options to solvers
-timer = TimerOutput()
+timer = TimerOutputs.TimerOutput()
 default_solver_options = (
     # verbose = false,
     verbose = true,
@@ -37,27 +38,27 @@ instance_sets = [
     # ("minimal", BigFloat, 15),
     # ("fast", Float64, 15),
     # ("slow", Float64, 120),
-    ("bench1", Float64, 120),
+    ("bench1", Float64, 1800),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
 # list of names of native examples to run
 native_example_names = [
     "densityest",
-    # "envelope",
-    # "expdesign",
-    # "linearopt",
-    # "matrixcompletion",
-    # "matrixregression",
-    # "maxvolume",
+    "envelope",
+    "expdesign",
+    "linearopt",
+    "matrixcompletion",
+    "matrixregression",
+    "maxvolume",
     "polymin",
-    # "portfolio",
-    # "sparsepca",
+    "portfolio",
+    "sparsepca",
     ]
 
 # list of names of JuMP examples to run
@@ -65,26 +66,26 @@ JuMP_example_names = [
     # "centralpolymat",
     # "conditionnum",
     # "contraction",
-    # "densityest",
+    "densityest",
     # "envelope",
     "expdesign",
     # # "lotkavolterra", # TODO PolyJuMP error
     # "lyapunovstability",
     "matrixcompletion",
-    # "matrixquadratic",
-    # "matrixregression",
+    "matrixquadratic",
+    "matrixregression",
     # "maxvolume",
     # "muconvexity",
     "nearestpsd",
-    # "polymin",
+    "polymin",
     # "polynorm",
-    # "portfolio",
+    "portfolio",
     # # "regionofattr", # TODO PolyJuMP error
     # "robustgeomprog",
     # "secondorderpoly",
     # "semidefinitepoly",
     "shapeconregr",
-    # "signomialmin",
+    "signomialmin",
     ]
 
 # start the tests
@@ -99,7 +100,7 @@ for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
     include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
 end
 
-perf = DataFrame(
+perf = DataFrames.DataFrame(
     example = Type{<:ExampleInstance}[],
     inst_set = String[],
     real_T = Type{<:Real}[],
@@ -149,7 +150,7 @@ all_tests_time = time()
     end
 
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
-    show(perf, allrows = true, allcols = true)
+    DataFrames.show(perf, allrows = true, allcols = true)
     println("\n")
     @show sum(perf[:iters])
     show(timer)
