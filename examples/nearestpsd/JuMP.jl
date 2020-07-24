@@ -104,3 +104,11 @@ instances[NearestPSDJuMP]["slow"] = [
     ((100, true, true, false),),
     ((100, true, false, false),),
     ]
+
+# benchmark 1 instances
+instances[NearestPSDJuMP]["bench1"] = (
+    ((side, use_completable, false, use_sparsepsd),)
+    for side in 50:50:500
+    for use_completable in (false, true)
+    for use_sparsepsd in (false, true)
+    )
