@@ -18,9 +18,6 @@ import Hypatia.Solvers
 
 abstract type ExampleInstance{T <: Real} end
 
-# dictionary of instances
-instances = DataStructures.DefaultOrderedDict{Type{<:ExampleInstance}, DataStructures.DefaultOrderedDict{String, Vector{Tuple}}}(() -> DataStructures.DefaultOrderedDict{String, Vector{Tuple}}(() -> Tuple[]))
-
 # NOTE this is a workaround for randn's lack of support for BigFloat
 Random.randn(R::Type{BigFloat}, dims::Vararg{Int, N} where N) = R.(randn(dims...))
 Random.randn(R::Type{Complex{BigFloat}}, dims::Vararg{Int, N} where N) = R.(randn(ComplexF64, dims...))

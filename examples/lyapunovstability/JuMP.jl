@@ -21,8 +21,6 @@ originally a feasibility problem, a feasible P and t prove the existence of a Ly
 for the system x_dot = A*x+g(x), norm(g(x)) <= gamma*norm(x)
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
-
 struct LyapunovStabilityJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     num_rows::Int
     num_cols::Int

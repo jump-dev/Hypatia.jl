@@ -5,7 +5,6 @@ univariate cubic dynamical system
 example taken from "Convex computation of the region of attraction of polynomial control systems" by D. Henrion and M. Korda
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import SemialgebraicSets

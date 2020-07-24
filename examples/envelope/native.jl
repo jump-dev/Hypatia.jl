@@ -8,7 +8,6 @@ D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programm
 available at https://arxiv.org/abs/1712.01792
 =#
 
-include(joinpath(@__DIR__, "../common_native.jl"))
 using SparseArrays
 
 struct EnvelopeNative{T <: Real} <: ExampleInstanceNative{T}

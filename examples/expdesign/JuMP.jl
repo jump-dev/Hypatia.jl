@@ -13,8 +13,6 @@ if logdet_obj or rootdet_obj is true, F is the logdet or rootdet function
 if geomean_obj is true, we use a formulation from https://picos-api.gitlab.io/picos/optdes.html that finds an equivalent minimizer
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
-
 struct ExpDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     q::Int
     p::Int

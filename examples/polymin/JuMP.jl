@@ -4,7 +4,6 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 see description in examples/polymin/native.jl
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 include(joinpath(@__DIR__, "data.jl"))
 
 struct PolyMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}

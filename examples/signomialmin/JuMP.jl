@@ -29,7 +29,6 @@ which is equivalent to the feasibility problem over C in R^{m, m} and V in R^{m,
         [C_{k, k} + sum(V_{k, :}), C_{k, \k}, V_{k, :}] in RelEntr(1 + 2(m - 1))
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 include(joinpath(@__DIR__, "data.jl"))
 
 struct SignomialMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}

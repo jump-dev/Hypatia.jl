@@ -4,7 +4,6 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 see description in native.jl
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DelimitedFiles
 
 struct DensityEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}

@@ -8,8 +8,6 @@ TODO
 - describe formulation and options
 =#
 
-include(joinpath(@__DIR__, "../common_native.jl"))
-
 struct PortfolioNative{T <: Real} <: ExampleInstanceNative{T}
     num_stocks::Int
     epinormeucl_constr::Bool # add L2 ball constraints, else don't add

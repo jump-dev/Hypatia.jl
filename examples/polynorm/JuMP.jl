@@ -6,8 +6,6 @@ find a polynomial f such that f² >= Σᵢ gᵢ² where gᵢ are arbitrary polyn
 TODO add scalar SOS formulation
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
-
 struct PolyNormJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
     deg::Int

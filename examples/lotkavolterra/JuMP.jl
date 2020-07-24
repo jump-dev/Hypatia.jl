@@ -7,7 +7,6 @@ TODO
 - add random data generation
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import GSL: sf_gamma
 import DynamicPolynomials
 const DP = DynamicPolynomials

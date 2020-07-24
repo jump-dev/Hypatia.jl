@@ -12,8 +12,6 @@ the authors show that:
 where e = exp(1) and d(a, b) = sum_i a_i*log(a_i/b_i) is the relative entropy of a and b
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
-
 struct RobustGeomProgJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
     k::Int

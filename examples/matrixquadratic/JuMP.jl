@@ -13,7 +13,6 @@ and also to the larger conic constraint [I X'; X Y] in S^{n + m}_+
 (see Lecture 4 of "Lectures on Convex Optimization" (2018) by Y. Nesterov)
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 using SparseArrays
 
 struct MatrixQuadraticJuMP{T <: Real} <: ExampleInstanceJuMP{T}

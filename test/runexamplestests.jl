@@ -5,7 +5,10 @@ run examples tests from the examples folder and display basic benchmarks
 =#
 
 examples_dir = joinpath(@__DIR__, "../examples")
+# TODO maybe put these common files in a module
 include(joinpath(examples_dir, "common.jl"))
+include(joinpath(examples_dir, "common_JuMP.jl"))
+include(joinpath(examples_dir, "common_native.jl"))
 using DataFrames
 using Printf
 using TimerOutputs
@@ -27,7 +30,7 @@ instance_sets = [
     ("minimal", Float64, 15),
     # ("minimal", Float32, 15),
     # ("minimal", BigFloat, 15),
-    # ("fast", Float64, 15),
+    ("fast", Float64, 15),
     # ("slow", Float64, 120),
     ]
 
@@ -84,6 +87,8 @@ for (inst_set, real_T, time_limit) in instance_sets
     @info("each $inst_set $real_T instance should take <$time_limit seconds")
 end
 
+# load instances
+instances = DataStructures.DefaultOrderedDict{Type{<:ExampleInstance}, DataStructures.DefaultOrderedDict{String, Vector{Tuple}}}(() -> DataStructures.DefaultOrderedDict{String, Vector{Tuple}}(() -> Tuple[]))
 for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
     include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
 end
