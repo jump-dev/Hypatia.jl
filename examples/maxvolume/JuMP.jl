@@ -5,8 +5,6 @@ find maximum volume hypercube with edges parallel to the axes inside a polyhedro
 defined with l_1, l_infty, or l_2 ball constraints (different to native.jl)
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
-
 struct MaxVolumeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
     epipernormeucl_constr::Bool # add an L2 ball constraint, else don't add

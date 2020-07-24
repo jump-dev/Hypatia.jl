@@ -19,8 +19,6 @@ gamma*I - nu*M_0 - sum_i y_i*M_i in S_+
 we make F_0 and M_0 positive definite to ensure existence of a feasible solution
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
-
 struct ConditionNumJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     side::Int
     len_y::Int

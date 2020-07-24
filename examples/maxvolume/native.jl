@@ -4,8 +4,6 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 find maximum volume hypercube with edges parallel to the axes inside a polyhedron
 =#
 
-include(joinpath(@__DIR__, "../common_native.jl"))
-
 struct MaxVolumeNative{T <: Real} <: ExampleInstanceNative{T}
     n::Int
     use_hypogeomean::Bool # use hypogeomean cone for geomean objective

@@ -4,8 +4,6 @@ Copyright 2018, Chris Coey and contributors
 see description in examples/envelope/native.jl
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
-
 struct EnvelopeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
     rand_halfdeg::Int

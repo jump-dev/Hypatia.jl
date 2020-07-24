@@ -6,7 +6,6 @@ ie the largest mu such that p(x) - mu/2*||x||^2 is convex everywhere on given do
 see https://en.wikipedia.org/wiki/Convex_function#Strongly_convex_functions
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import SumOfSquares

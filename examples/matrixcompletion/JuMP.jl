@@ -4,7 +4,6 @@ Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 see description in native.jl
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 using SparseArrays
 
 struct MatrixCompletionJuMP{T <: Real} <: ExampleInstanceJuMP{T}

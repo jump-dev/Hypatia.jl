@@ -6,7 +6,6 @@ contraction analysis example adapted from
 Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import PolyJuMP

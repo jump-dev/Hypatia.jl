@@ -12,7 +12,6 @@ TODO
 - implement PSD formulation for complex case
 =#
 
-include(joinpath(@__DIR__, "../common_native.jl"))
 import Hypatia.BlockMatrix
 import Combinatorics
 include(joinpath(@__DIR__, "data.jl"))

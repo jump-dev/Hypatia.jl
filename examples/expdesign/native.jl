@@ -6,8 +6,6 @@ see description in examples/expdesign/JuMP.jl
 TODO describe options
 =#
 
-include(joinpath(@__DIR__, "../common_native.jl"))
-
 struct ExpDesignNative{T <: Real} <: ExampleInstanceNative{T}
     q::Int
     p::Int

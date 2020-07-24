@@ -4,8 +4,6 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 check a sufficient condition for pointwise membership of vector valued polynomials in the second order cone
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
-
 struct SecondOrderPolyJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     polys_name::Symbol
     deg::Int

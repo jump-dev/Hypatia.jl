@@ -14,7 +14,6 @@ let E be a symmetric matrix sparsity pattern:
 adapted from "Decomposition methods for sparse matrix nearness problems" (2015) by Sun & Vandenberghe
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 using SparseArrays
 
 struct NearestPSDJuMP{T <: Real} <: ExampleInstanceJuMP{T}

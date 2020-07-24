@@ -17,8 +17,6 @@ min 1/2(tr(W1) + tr(W2))
 from http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
 =#
 
-include(joinpath(@__DIR__, "../common_native.jl"))
-
 struct MatrixCompletionNative{T <: Real} <: ExampleInstanceNative{T}
     m::Int
     n::Int

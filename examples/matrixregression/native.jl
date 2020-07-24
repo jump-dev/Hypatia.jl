@@ -14,7 +14,6 @@ TODO
 - generalize for sparse Y,X but make sure qr factorization does not permute
 =#
 
-include(joinpath(@__DIR__, "../common_native.jl"))
 using SparseArrays
 
 struct MatrixRegressionNative{T <: Real} <: ExampleInstanceNative{T}

@@ -5,7 +5,6 @@ test whether a given matrix has a SOS decomposition,
 and use this procedure to check whether a polynomial is globally convex
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 include(joinpath(@__DIR__, "data.jl"))
 import SumOfSquares
 import PolyJuMP

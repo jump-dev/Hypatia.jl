@@ -4,8 +4,6 @@ Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 see description in native.jl
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
-
 struct PortfolioJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     num_stocks::Int
     epipernormeucl_constr::Bool # add an L2 ball constraint, else don't add

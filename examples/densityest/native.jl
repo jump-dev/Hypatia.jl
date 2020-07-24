@@ -9,7 +9,6 @@ find a density function f maximizing the log likelihood of the observations
     f ≥ 0
 =#
 
-include(joinpath(@__DIR__, "../common_native.jl"))
 import DelimitedFiles
 
 struct DensityEstNative{T <: Real} <: ExampleInstanceNative{T}
