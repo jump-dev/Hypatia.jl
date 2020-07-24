@@ -47,7 +47,7 @@ end
 
 use_correction(cone::Nonnegative) = true
 
-use_scaling(cone::Nonnegative) = false
+use_scaling(cone::Nonnegative) = true
 
 reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = false)
 
@@ -170,11 +170,12 @@ function update_scal_hess(
     cone::Nonnegative{T},
     mu::T;
     ) where {T}
+    @show mu
     @assert is_feas(cone)
     @assert !cone.scal_hess_updated
-    @. cone.scal_hess.diag = cone.dual_point / cone.point
+    @. cone.scal_hess.diag = cone.dual_point / (cone.point * sqrt(mu))
     cone.scal_hess_updated = true
-    return cone.hess
+    return cone.scal_hess
 end
 #
 # function scal_hess_prod!(

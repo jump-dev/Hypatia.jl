@@ -392,7 +392,7 @@ function correction2(
     return cone.correction
 end
 
-use_scaling(::HypoPerLog) = false
+use_scaling(::HypoPerLog) = true
 
 
 # # attempt correction without assumptions on H/scaling matrix

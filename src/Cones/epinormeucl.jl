@@ -62,9 +62,9 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.nt_updated = false)
+reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.dual_feas_updated = cone.grad_updated = cone.dual_grad_updated = cone.hess_updated = cone.scal_hess_updated = cone.inv_hess_updated = cone.nt_updated = false)
 
-use_scaling(::EpiNormEucl) = false
+use_scaling(::EpiNormEucl) = true
 
 use_correction(::EpiNormEucl) = true
 
@@ -185,12 +185,28 @@ function update_scal_hess(cone::EpiNormEucl{T}, mu::T) where {T}
     # cone.hess.data[1, 1] -= 2
     # cone.hess.data ./= cone.rt_dist_ratio
 
-    cone.hess_updated = true
-    return cone.hess
+    # old_point = copy(cone.point)
+    # cone.point .= cone.nt_point
+    # cone.feas_updated = cone.grad_updated = false
+    # update_feas(cone)
+    # update_grad(cone)
+    # update_hess(cone)
+    # cone.point .= old_point
+    # cone.feas_updated = cone.grad_updated = false
+    # update_feas(cone)
+    # update_grad(cone)
+    # cone.scal_hess.data .= cone.hess
+    # cone.scal_hess.data ./= cone.rt_dist_ratio
+
+    cone.scal_hess.data ./= sqrt(mu)
+
+
+    cone.scal_hess_updated = true
+    return cone.scal_hess
 end
 
  # NOTE not used
-function update_inv_scal_hess(cone::EpiNormEucl)
+function update_inv_scal_hess(cone::EpiNormEucl, mu::T) where {T}
     @assert cone.is_feas
     cone.nt_updated || update_nt(cone)
 

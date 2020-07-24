@@ -39,17 +39,17 @@ function test_barrier_oracles(
 
     # TODO adapt now that we have newton for initial point
     # if isfinite(init_tol)
-    #     # tests for centrality of initial point
-    #     minus_grad = -CO.grad(cone)
-    #     @test dot(point, minus_grad) ≈ norm(point) * norm(minus_grad) atol=init_tol rtol=init_tol
-    #     @test point ≈ minus_grad atol=init_tol rtol=init_tol
-    #     @test CO.in_neighborhood(cone, one(T), T(eps(T)^0.2))
+        # tests for centrality of initial point
+        minus_grad = -CO.grad(cone)
+        @test dot(point, minus_grad) ≈ norm(point) * norm(minus_grad) atol=init_tol rtol=init_tol
+        @test point ≈ minus_grad atol=init_tol rtol=init_tol
+        @test CO.in_neighborhood(cone, one(T), T(eps(T)^0.2))
     # else
-        # use newton to get better initial point
-        point = CO.set_central_point(cone)
-        dual_point = copy(point)
-        @test load_reset_check(cone, point, dual_point)
-        @test CO.in_neighborhood(cone, one(T), sqrt(sqrt(T(eps(T)))))
+    #     # use newton to get better initial point
+    #     point = CO.set_central_point(cone)
+    #     dual_point = copy(point)
+    #     @test load_reset_check(cone, point, dual_point)
+    #     # @test CO.in_neighborhood(cone, one(T), sqrt(sqrt(T(eps(T)))))
     # end
     init_only && return
 
@@ -137,18 +137,21 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
     @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
 
     if CO.use_scaling(cone)
-        scal_hess = CO.scal_hess(cone, irtmu)
+        mu = one(T)
+        # scal_hess = inv(CO.update_inv_scal_hess(cone, irtmu))
+        scal_hess = CO.scal_hess(cone, mu)
         @test scal_hess * point ≈ dual_point atol=scal_tol rtol=scal_tol
         @test scal_hess * dual_grad ≈ grad atol=scal_tol rtol=scal_tol
         prod = similar(point)
-        @test CO.scal_hess_prod!(prod, point, cone, irtmu) ≈ dual_point atol=scal_tol rtol=scal_tol
-        @test CO.scal_hess_prod!(prod, dual_grad, cone, irtmu) ≈ grad atol=scal_tol rtol=scal_tol
+        @test CO.scal_hess_prod!(prod, point, cone, mu) ≈ dual_point atol=scal_tol rtol=scal_tol
+        @test CO.scal_hess_prod!(prod, dual_grad, cone, mu) ≈ grad atol=scal_tol rtol=scal_tol
 
         # repeat to check mu logic
         mu = rand(T)
         rtmu = sqrt(mu)
         irtmu = inv(rtmu)
         @test load_reset_check(cone, point, dual_point, irtmu = irtmu)
+        CO.grad(cone)
         scal_hess = CO.scal_hess(cone, mu)
         @test scal_hess * point ≈ dual_point atol=scal_tol rtol=scal_tol
         @test scal_hess * dual_grad ≈ grad * irtmu atol=scal_tol rtol=scal_tol
@@ -226,8 +229,10 @@ function test_epipersquare_barrier(T::Type{<:Real})
     function barrier(s)
         (u, v, w) = (s[1], s[2], s[3:end])
         return -log(2 * u * v - sum(abs2, w))
+        # return -log(2 * u * v - sum(abs2, w)) / 2
     end
     for dim in [3, 4, 5, 7]
+        @show dim
         test_barrier_oracles(CO.EpiPerSquare{T}(dim), barrier)
     end
     return
