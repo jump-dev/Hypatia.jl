@@ -29,7 +29,6 @@ which is equivalent to the feasibility problem over C in R^{m, m} and V in R^{m,
         [C_{k, k} + sum(V_{k, :}), C_{k, \k}, V_{k, :}] in RelEntr(1 + 2(m - 1))
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 include(joinpath(@__DIR__, "data.jl"))
 
 struct SignomialMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -41,44 +40,6 @@ struct SignomialMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 SignomialMinJuMP{Float64}(sig_name::Symbol) = SignomialMinJuMP{Float64}(signomialmin_data[sig_name]...)
 SignomialMinJuMP{Float64}(m::Int, n::Int) = SignomialMinJuMP{Float64}(signomialmin_random(m, n)...)
-
-example_tests(::Type{SignomialMinJuMP{Float64}}, ::MinimalInstances) = [
-    ((:CS16ex12,),),
-    ((2, 2),),
-    ((2, 2), ClassicConeOptimizer),
-    ]
-example_tests(::Type{SignomialMinJuMP{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
-    return [
-    ((:motzkin2,), nothing, options),
-    ((:motzkin2,), ClassicConeOptimizer, options),
-    ((:motzkin3,), nothing, options),
-    ((:CS16ex8_13,), nothing, options),
-    ((:CS16ex8_14,), nothing, options),
-    ((:CS16ex18,), nothing, options),
-    ((:CS16ex12,), nothing, options),
-    ((:CS16ex13,), nothing, options),
-    ((:MCW19ex1_mod,), nothing, options),
-    ((:MCW19ex8,), nothing, relaxed_options),
-    ((:MCW19ex8,), ClassicConeOptimizer, relaxed_options),
-    ((3, 2), nothing, options),
-    ((3, 2), ClassicConeOptimizer, options),
-    ((6, 6), nothing, options),
-    ((20, 3), nothing, options),
-    ((20, 3), ClassicConeOptimizer, options),
-    ]
-end
-example_tests(::Type{SignomialMinJuMP{Float64}}, ::SlowInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    relaxed_options = (tol_feas = 1e-5, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
-    return [
-    ((10, 10), nothing, options),
-    ((10, 10), ClassicConeOptimizer, options),
-    ((20, 6), nothing, options),
-    ((40, 3), nothing, options),
-    ]
-end
 
 function build(inst::SignomialMinJuMP{T}) where {T <: Float64} # TODO generic reals
     (fc, fA, gc, gA) = (inst.fc, inst.fA, inst.gc, inst.gA)
@@ -160,4 +121,40 @@ function test_extra(inst::SignomialMinJuMP{T}, model::JuMP.Model) where T
     end
 end
 
-return SignomialMinJuMP
+instances[SignomialMinJuMP]["minimal"] = [
+    ((2, 2),),
+    ((2, 2), ClassicConeOptimizer),
+    ]
+instances[SignomialMinJuMP]["fast"] = [
+    ((:motzkin2,),),
+    ((:motzkin2,), ClassicConeOptimizer),
+    ((:motzkin3,),),
+    ((:CS16ex8_13,),),
+    ((:CS16ex8_14,),),
+    ((:CS16ex18,),),
+    ((:CS16ex12,),),
+    ((:CS16ex13,),),
+    ((:MCW19ex1_mod,),),
+    ((:MCW19ex8,),),
+    ((:MCW19ex8,), ClassicConeOptimizer),
+    ((3, 2),),
+    ((3, 2), ClassicConeOptimizer),
+    ((6, 6),),
+    ((20, 3),),
+    ((20, 3), ClassicConeOptimizer),
+    ]
+instances[SignomialMinJuMP]["slow"] = [
+    ((10, 10),),
+    ((10, 10), ClassicConeOptimizer),
+    ((20, 6),),
+    ((40, 3),),
+    ]
+
+# benchmark 1 instances
+instances[SignomialMinJuMP]["bench1"] = (
+    ((m, n), ext)
+    # for m in 3:3:3
+    for m in 3:3:30
+    for n in (div(m, 3), m, 3m)
+    for ext in (nothing, ClassicConeOptimizer)
+    )

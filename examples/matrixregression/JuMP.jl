@@ -4,7 +4,6 @@ Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 see description in native.jl
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 using SparseArrays
 
 struct MatrixRegressionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -35,35 +34,6 @@ function MatrixRegressionJuMP{Float64}(
     Y = X * A + Y_noise * randn(n, m)
     return MatrixRegressionJuMP{Float64}(Y, X, args...)
 end
-
-example_tests(::Type{MatrixRegressionJuMP{Float64}}, ::MinimalInstances) = [
-    ((2, 3, 4, 0, 0, 0, 0, 0),),
-    ((2, 3, 4, 0, 0, 0, 0, 0), ClassicConeOptimizer),
-    ((2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
-    ]
-example_tests(::Type{MatrixRegressionJuMP{Float64}}, ::FastInstances) = [
-    ((5, 3, 4, 0, 0, 0, 0, 0),),
-    ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
-    ((5, 3, 4, 0, 0.1, 0.1, 0, 0),),
-    ((3, 4, 5, 0, 0, 0, 0, 0),),
-    ((3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((3, 4, 5, 0, 0.1, 0.1, 0, 0),),
-    ((10, 20, 20, 0, 0, 0, 0, 0),),
-    ((10, 20, 20, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((10, 20, 20, 0, 0.1, 0.1, 0, 0),),
-    ((100, 8, 12, 0, 0, 0, 0, 0),),
-    ((100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
-    ((100, 8, 12, 0, 0.1, 0.1, 0, 0),),
-    ]
-example_tests(::Type{MatrixRegressionJuMP{Float64}}, ::SlowInstances) = [
-    ((15, 20, 50, 0, 0, 0, 0, 0),),
-    ((15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
-    ((15, 20, 50, 0, 0.1, 0.1, 0, 0),),
-    ]
 
 function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64} # TODO generic reals
     (Y, X) = (inst.Y, inst.X)
@@ -132,4 +102,39 @@ function test_extra(inst::MatrixRegressionJuMP{T}, model::JuMP.Model) where T
     end
 end
 
-return MatrixRegressionJuMP
+instances[MatrixRegressionJuMP]["minimal"] = [
+    ((2, 3, 4, 0, 0, 0, 0, 0),),
+    ((2, 3, 4, 0, 0, 0, 0, 0), ClassicConeOptimizer),
+    ((2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
+    ]
+instances[MatrixRegressionJuMP]["fast"] = [
+    ((5, 3, 4, 0, 0, 0, 0, 0),),
+    ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
+    ((5, 3, 4, 0, 0.1, 0.1, 0, 0),),
+    ((3, 4, 5, 0, 0, 0, 0, 0),),
+    ((3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((3, 4, 5, 0, 0.1, 0.1, 0, 0),),
+    ((10, 20, 20, 0, 0, 0, 0, 0),),
+    ((10, 20, 20, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((10, 20, 20, 0, 0.1, 0.1, 0, 0),),
+    ((100, 8, 12, 0, 0, 0, 0, 0),),
+    ((100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
+    ((100, 8, 12, 0, 0.1, 0.1, 0, 0),),
+    ]
+instances[MatrixRegressionJuMP]["slow"] = [
+    ((15, 20, 50, 0, 0, 0, 0, 0),),
+    ((15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
+    ((15, 20, 50, 0, 0.1, 0.1, 0, 0),),
+    ]
+
+# benchmark 1 instances
+instances[MatrixRegressionJuMP]["bench1"] = (
+    ((ceil(Int, 1.1m), m, 5m, 0, 0.1, 0.1, 0, 0), ext)
+    # for m in 5:5:10
+    for m in 5:5:50
+    for ext in (nothing, ClassicConeOptimizer)
+    )

@@ -4,7 +4,6 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 see description in native.jl
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DelimitedFiles
 
 struct DensityEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -20,50 +19,6 @@ end
 function DensityEstJuMP{Float64}(num_obs::Int, n::Int, args...)
     X = randn(num_obs, n)
     return DensityEstJuMP{Float64}(:Random, X, args...)
-end
-
-example_tests(::Type{DensityEstJuMP{Float64}}, ::MinimalInstances) = [
-    ((5, 1, 2, true),),
-    ((:iris, 2, true),),
-    ]
-example_tests(::Type{DensityEstJuMP{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    return [
-    ((10, 1, 5, true), nothing, options),
-    ((10, 1, 10, true), nothing, options),
-    ((100, 1, 20, true), nothing, options),
-    ((100, 1, 50, true), nothing, options),
-    ((100, 1, 100, true), nothing, options),
-    ((200, 1, 200, true), nothing, options),
-    ((500, 1, 500, true), nothing, options),
-    ((100, 2, 5, true), nothing, options),
-    ((100, 2, 10, true), nothing, options),
-    ((200, 2, 20, true), nothing, options),
-    ((50, 3, 2, true), nothing, options),
-    ((50, 3, 4, true), nothing, options),
-    ((500, 3, 14, true), nothing, options),
-    ((50, 4, 2, true), nothing, options),
-    ((100, 8, 2, true), nothing, options),
-    ((100, 8, 2, false), nothing, options),
-    ((250, 4, 4, true), nothing, options),
-    ((250, 4, 4, false), nothing, options),
-    ((200, 32, 2, false), nothing, options),
-    ((:iris, 4, true), nothing, options),
-    ((:iris, 5, true), nothing, options),
-    ((:iris, 6, true), nothing, options),
-    ((:iris, 4, false), nothing, options),
-    ((:cancer, 4, true), nothing, options),
-    ]
-end
-example_tests(::Type{DensityEstJuMP{Float64}}, ::SlowInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    return [
-    ((500, 2, 60, true), nothing, options),
-    ((1000, 3, 20, true), nothing, options),
-    ((200, 4, 4, false), nothing, options),
-    ((500, 4, 6, true), nothing, options),
-    ((500, 4, 6, false), nothing, options),
-    ]
 end
 
 function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic reals
@@ -116,4 +71,73 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
     return model
 end
 
-return DensityEstJuMP
+instances[DensityEstJuMP]["minimal"] = [
+    ((5, 1, 2, true),),
+    ((:iris, 2, true),),
+    ]
+instances[DensityEstJuMP]["fast"] = [
+    ((10, 1, 5, true),),
+    ((10, 1, 10, true),),
+    ((100, 1, 20, true),),
+    ((100, 1, 50, true),),
+    ((100, 1, 100, true),),
+    ((200, 1, 200, true),),
+    ((500, 1, 500, true),),
+    ((100, 2, 5, true),),
+    ((100, 2, 10, true),),
+    ((200, 2, 20, true),),
+    ((50, 3, 2, true),),
+    ((50, 3, 4, true),),
+    ((500, 3, 14, true),),
+    ((50, 4, 2, true),),
+    ((100, 8, 2, true),),
+    ((100, 8, 2, false),),
+    ((250, 4, 4, true),),
+    ((250, 4, 4, false),),
+    ((200, 32, 2, false),),
+    ((:iris, 4, true),),
+    ((:iris, 5, true),),
+    ((:iris, 6, true),),
+    ((:iris, 4, false),),
+    ((:cancer, 4, true),),
+    ]
+instances[DensityEstJuMP]["slow"] = [
+    ((500, 2, 60, true),),
+    ((1000, 3, 20, true),),
+    ((200, 4, 4, false),),
+    ((500, 4, 6, true),),
+    ((500, 4, 6, false),),
+    ]
+
+# benchmark 1 instances
+bench1_n_d = [
+    (1, 75),
+    (1, 150),
+    (1, 300),
+    (1, 600),
+    (1, 900),
+    (1, 1200),
+    (1, 1500),
+    (2, 10),
+    (2, 20),
+    (2, 30),
+    (2, 40),
+    (3, 3),
+    (3, 6),
+    (3, 9),
+    (3, 12),
+    (4, 2),
+    (4, 4),
+    (4, 6),
+    (8, 2),
+    (8, 3),
+    (16, 1),
+    (16, 2), # (16, 3) too large for quadrature weights
+    (32, 1), # (32, 2) too large for quadrature weights
+    (64, 1),
+    ]
+instances[DensityEstJuMP]["bench1"] = (
+    ((ceil(Int, 1.1 * binomial(n + 2d, n)), n, 2d, use_nat), ext)
+    for (n, d) in bench1_n_d
+    for (use_nat, ext) in ((false, ExpPSDConeOptimizer), (true, nothing))
+    )

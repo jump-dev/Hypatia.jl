@@ -8,8 +8,6 @@ TODO
 - describe formulation and options
 =#
 
-include(joinpath(@__DIR__, "../common_native.jl"))
-
 struct PortfolioNative{T <: Real} <: ExampleInstanceNative{T}
     num_stocks::Int
     epinormeucl_constr::Bool # add L2 ball constraints, else don't add
@@ -17,39 +15,6 @@ struct PortfolioNative{T <: Real} <: ExampleInstanceNative{T}
     use_epinorminf::Bool # use epinorminf cone, else nonnegative cones
     use_linops::Bool
 end
-
-example_tests(::Type{<:PortfolioNative{<:Real}}, ::MinimalInstances) = [
-    ((3, true, false, true, false),),
-    ((3, false, true, true, false),),
-    ((3, false, true, false, false),),
-    ((3, true, true, true, false),),
-    ]
-example_tests(::Type{PortfolioNative{Float64}}, ::FastInstances) = [
-    ((10, true, false, true, false),),
-    ((10, false, true, true, false),),
-    ((10, false, true, false, false),),
-    ((10, true, true, true, false),),
-    ((50, true, false, true, false),),
-    ((50, false, true, true, false),),
-    ((50, false, true, false, false),),
-    ((50, true, true, true, false),),
-    ((400, true, false, true, false),),
-    ((400, false, true, true, false),),
-    ((400, false, true, false, false),),
-    ((400, true, true, true, false),),
-    ]
-example_tests(::Type{PortfolioNative{Float64}}, ::SlowInstances) = [
-    ((3000, true, false, true, false),),
-    ((3000, false, true, true, false),),
-    ((3000, false, true, false, false),),
-    ((3000, true, true, true, false),),
-    ]
-example_tests(::Type{PortfolioNative{Float64}}, ::LinearOperatorsInstances) = [
-    ((20, true, false, true, true),),
-    ((20, false, true, true, true),),
-    ((20, false, true, false, true),),
-    ((20, true, true, true, true),),
-    ]
 
 function build(inst::PortfolioNative{T}) where {T <: Real}
     num_stocks = inst.num_stocks
@@ -170,4 +135,35 @@ function build(inst::PortfolioNative{T}) where {T <: Real}
     return model
 end
 
-return PortfolioNative
+instances[PortfolioNative]["minimal"] = [
+    ((3, true, false, true, false),),
+    ((3, false, true, true, false),),
+    ((3, false, true, false, false),),
+    ((3, true, true, true, false),),
+    ]
+instances[PortfolioNative]["fast"] = [
+    ((10, true, false, true, false),),
+    ((10, false, true, true, false),),
+    ((10, false, true, false, false),),
+    ((10, true, true, true, false),),
+    ((50, true, false, true, false),),
+    ((50, false, true, true, false),),
+    ((50, false, true, false, false),),
+    ((50, true, true, true, false),),
+    ((400, true, false, true, false),),
+    ((400, false, true, true, false),),
+    ((400, false, true, false, false),),
+    ((400, true, true, true, false),),
+    ]
+instances[PortfolioNative]["slow"] = [
+    ((3000, true, false, true, false),),
+    ((3000, false, true, true, false),),
+    ((3000, false, true, false, false),),
+    ((3000, true, true, true, false),),
+    ]
+instances[PortfolioNative]["linops"] = [
+    ((20, true, false, true, true),),
+    ((20, false, true, true, true),),
+    ((20, false, true, false, true),),
+    ((20, true, true, true, true),),
+    ]

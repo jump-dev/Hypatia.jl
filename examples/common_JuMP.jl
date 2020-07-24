@@ -14,7 +14,7 @@ MOI.Utilities.@model(ClassicConeOptimizer,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle, MOI.ExponentialCone, MOI.DualExponentialCone,),
+    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle, MOI.ExponentialCone,),
     (MOI.PowerCone, MOI.DualPowerCone,),
     (),
     (MOI.ScalarAffineFunction,),
@@ -23,12 +23,13 @@ MOI.Utilities.@model(ClassicConeOptimizer,
     true,
     )
 
-# SOCone only
-MOI.Utilities.@model(SOConeOptimizer,
+# SOCone and PSDCone only
+MOI.Utilities.@model(SOPSDConeOptimizer,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,),
+    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
+    MOI.PositiveSemidefiniteConeTriangle,),
     (),
     (),
     (MOI.ScalarAffineFunction,),
@@ -37,12 +38,12 @@ MOI.Utilities.@model(SOConeOptimizer,
     true,
     )
 
-# ExpCone only
-MOI.Utilities.@model(ExpConeOptimizer,
+# ExpCone and PSDCone only
+MOI.Utilities.@model(ExpPSDConeOptimizer,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-    MOI.ExponentialCone,),
+    MOI.ExponentialCone, MOI.PositiveSemidefiniteConeTriangle,),
     (),
     (),
     (MOI.ScalarAffineFunction,),

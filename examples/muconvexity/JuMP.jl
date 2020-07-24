@@ -6,7 +6,6 @@ ie the largest mu such that p(x) - mu/2*||x||^2 is convex everywhere on given do
 see https://en.wikipedia.org/wiki/Convex_function#Strongly_convex_functions
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import SumOfSquares
@@ -18,30 +17,6 @@ struct MuConvexityJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_matrixwsos::Bool # use wsosinterpposeideftricone, else PSD formulation
     true_mu::Real # optional true value of parameter for testing only
 end
-
-muconvexity_data = Dict(
-    :poly1 => (x -> (x[1] + 1)^2 * (x[1] - 1)^2),
-    :poly2 => (x -> sum(x .^ 4) - sum(x .^ 2)),
-    :dom1 => ModelUtilities.FreeDomain{Float64}(1),
-    :dom2 => ModelUtilities.Box{Float64}([-1.0], [1.0]),
-    :dom3 => ModelUtilities.FreeDomain{Float64}(3),
-    :dom4 => ModelUtilities.Ball{Float64}(ones(2), 5.0),
-    )
-
-example_tests(::Type{MuConvexityJuMP{Float64}}, ::MinimalInstances) = [
-    ((:poly1, :dom1, true, -4),),
-    ]
-example_tests(::Type{MuConvexityJuMP{Float64}}, ::FastInstances) = [
-    ((:poly1, :dom2, true, -4),),
-    ((:poly1, :dom1, false, -4),),
-    ((:poly1, :dom2, false, -4),),
-    ((:poly2, :dom3, true, -2),),
-    ((:poly2, :dom4, true, -2),),
-    ((:poly2, :dom3, false, -2),),
-    ((:poly2, :dom4, false, -2),),
-    ]
-example_tests(::Type{MuConvexityJuMP{Float64}}, ::SlowInstances) = [
-    ]
 
 function build(inst::MuConvexityJuMP{T}) where {T <: Float64} # TODO generic reals
     dom = muconvexity_data[inst.dom]
@@ -79,4 +54,25 @@ function test_extra(inst::MuConvexityJuMP{T}, model::JuMP.Model) where T
     end
 end
 
-return MuConvexityJuMP
+muconvexity_data = Dict(
+    :poly1 => (x -> (x[1] + 1)^2 * (x[1] - 1)^2),
+    :poly2 => (x -> sum(x .^ 4) - sum(x .^ 2)),
+    :dom1 => ModelUtilities.FreeDomain{Float64}(1),
+    :dom2 => ModelUtilities.Box{Float64}([-1.0], [1.0]),
+    :dom3 => ModelUtilities.FreeDomain{Float64}(3),
+    :dom4 => ModelUtilities.Ball{Float64}(ones(2), 5.0),
+    )
+
+instances[MuConvexityJuMP]["minimal"] = [
+    ((:poly1, :dom1, true, -4),),
+    ]
+instances[MuConvexityJuMP]["fast"] = [
+    ((:poly1, :dom2, true, -4),),
+    ((:poly1, :dom1, false, -4),),
+    ((:poly1, :dom2, false, -4),),
+    ((:poly2, :dom3, true, -2),),
+    ((:poly2, :dom4, true, -2),),
+    ((:poly2, :dom3, false, -2),),
+    ((:poly2, :dom4, false, -2),),
+    ]
+instances[MuConvexityJuMP]["slow"] = Tuple[]

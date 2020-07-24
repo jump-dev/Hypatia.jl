@@ -19,36 +19,10 @@ gamma*I - nu*M_0 - sum_i y_i*M_i in S_+
 we make F_0 and M_0 positive definite to ensure existence of a feasible solution
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
-
 struct ConditionNumJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     side::Int
     len_y::Int
     use_linmatrixineq::Bool # use linmatrixineq cone, else PSD formulation
-end
-
-example_tests(::Type{ConditionNumJuMP{Float64}}, ::MinimalInstances) = [
-    ((3, 2, true),),
-    ((3, 2, false),),
-    ]
-example_tests(::Type{ConditionNumJuMP{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-7, tol_abs_opt = 1e-7)
-    relaxed_options = (tol_feas = 1e-6, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-    return [
-    ((3, 4, true), nothing, options),
-    ((3, 4, false), nothing, options),
-    ((10, 15, true), nothing, options),
-    ((10, 15, false), nothing, options),
-    ((20, 10, true), nothing, relaxed_options),
-    ((100, 40, false), nothing, relaxed_options),
-    ]
-end
-example_tests(::Type{ConditionNumJuMP{Float64}}, ::SlowInstances) = begin
-    options = (tol_feas = 1e-5,)
-    return [
-    ((100, 10, true), nothing, options),
-    ((100, 40, true), nothing, options),
-    ]
 end
 
 function build(inst::ConditionNumJuMP{T}) where {T <: Float64} # TODO generic reals
@@ -86,4 +60,21 @@ function build(inst::ConditionNumJuMP{T}) where {T <: Float64} # TODO generic re
     return model
 end
 
-return ConditionNumJuMP
+tols7 = (tol_feas = 1e-7, tol_rel_opt = 1e-7, tol_abs_opt = 1e-7)
+tols6 = (tol_feas = 1e-6, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
+instances[ConditionNumJuMP]["minimal"] = [
+    ((3, 2, true),),
+    ((3, 2, false),),
+    ]
+instances[ConditionNumJuMP]["fast"] = [
+    ((3, 4, true), nothing, tols7),
+    ((3, 4, false), nothing, tols7),
+    ((10, 15, true), nothing, tols7),
+    ((10, 15, false), nothing, tols7),
+    ((20, 10, true), nothing, tols6),
+    ((100, 40, false), nothing, tols6),
+    ]
+instances[ConditionNumJuMP]["slow"] = [
+    ((100, 10, true), nothing, tols7),
+    ((100, 40, true), nothing, tols7),
+    ]

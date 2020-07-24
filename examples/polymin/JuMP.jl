@@ -4,7 +4,6 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 see description in examples/polymin/native.jl
 =#
 
-include(joinpath(@__DIR__, "../common_JuMP.jl"))
 include(joinpath(@__DIR__, "data.jl"))
 
 struct PolyMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -26,62 +25,6 @@ function PolyMinJuMP{Float64}(
     args...)
     return PolyMinJuMP{Float64}(random_interp_data(Float64, n, halfdeg)..., args...)
 end
-
-example_tests(::Type{PolyMinJuMP{Float64}}, ::MinimalInstances) = [
-    ((1, 2, true, true),),
-    ((1, 2, false, true),),
-    ((1, 2, false, false),),
-    ((:motzkin, 3, true, true),),
-    ]
-example_tests(::Type{PolyMinJuMP{Float64}}, ::FastInstances) = [
-    ((1, 3, true, true),),
-    ((1, 30, true, true),),
-    ((1, 30, false, true),),
-    ((1, 30, false, false),),
-    ((2, 8, true, true),),
-    ((3, 6, true, true),),
-    ((5, 3, true, true),),
-    ((10, 1, true, true),),
-    ((10, 1, false, true),),
-    ((10, 1, false, false),),
-    ((4, 4, true, true),),
-    ((4, 4, false, true),),
-    ((4, 4, false, false),),
-    ((:butcher, 2, true, true),),
-    ((:caprasse, 4, true, true),),
-    ((:goldsteinprice, 7, true, true),),
-    ((:goldsteinprice_ball, 6, true, true),),
-    ((:goldsteinprice_ellipsoid, 7, true, true),),
-    ((:heart, 2, true, true),),
-    ((:lotkavolterra, 3, true, true),),
-    ((:magnetism7, 2, true, true),),
-    ((:magnetism7_ball, 2, true, true),),
-    ((:motzkin, 3, true, true),),
-    ((:motzkin_ball, 3, true, true),),
-    ((:motzkin_ellipsoid, 3, true, true),),
-    ((:reactiondiffusion, 4, true, true),),
-    ((:robinson, 8, true, true),),
-    ((:robinson_ball, 8, true, true),),
-    ((:rosenbrock, 5, true, true),),
-    ((:rosenbrock_ball, 5, true, true),),
-    ((:schwefel, 2, true, true),),
-    ((:schwefel_ball, 2, true, true),),
-    ((:lotkavolterra, 3, false, true),),
-    ((:motzkin, 3, false, true),),
-    ((:motzkin_ball, 3, false, true),),
-    ((:schwefel, 2, false, true),),
-    ((:lotkavolterra, 3, false, false),),
-    ((:motzkin, 3, false, false),),
-    ((:motzkin_ball, 3, false, false),),
-    ]
-example_tests(::Type{PolyMinJuMP{Float64}}, ::SlowInstances) = [
-    ((4, 5, true, true),),
-    ((4, 5, false, true),),
-    ((4, 5, false, false),),
-    ((2, 30, true, true),),
-    ((2, 30, false, true),),
-    ((2, 30, false, false),),
-    ]
 
 function build(inst::PolyMinJuMP{T}) where {T <: Float64} # TODO generic reals
     (interp_vals, Ps, use_primal) = (inst.interp_vals, inst.Ps, inst.use_primal)
@@ -133,4 +76,91 @@ function test_extra(inst::PolyMinJuMP{T}, model::JuMP.Model) where T
     end
 end
 
-return PolyMinJuMP
+instances[PolyMinJuMP]["minimal"] = [
+    ((1, 2, true, true),),
+    ((1, 2, false, true),),
+    ((1, 2, false, false),),
+    ((:motzkin, 3, true, true),),
+    ]
+instances[PolyMinJuMP]["fast"] = [
+    ((1, 3, true, true),),
+    ((1, 30, true, true),),
+    ((1, 30, false, true),),
+    ((1, 30, false, false),),
+    ((2, 8, true, true),),
+    ((3, 6, true, true),),
+    ((5, 3, true, true),),
+    ((10, 1, true, true),),
+    ((10, 1, false, true),),
+    ((10, 1, false, false),),
+    ((4, 4, true, true),),
+    ((4, 4, false, true),),
+    ((4, 4, false, false),),
+    ((:butcher, 2, true, true),),
+    ((:caprasse, 4, true, true),),
+    ((:goldsteinprice, 7, true, true),),
+    ((:goldsteinprice_ball, 6, true, true),),
+    ((:goldsteinprice_ellipsoid, 7, true, true),),
+    ((:heart, 2, true, true),),
+    ((:lotkavolterra, 3, true, true),),
+    ((:magnetism7, 2, true, true),),
+    ((:magnetism7_ball, 2, true, true),),
+    ((:motzkin, 3, true, true),),
+    ((:motzkin_ball, 3, true, true),),
+    ((:motzkin_ellipsoid, 3, true, true),),
+    ((:reactiondiffusion, 4, true, true),),
+    ((:robinson, 8, true, true),),
+    ((:robinson_ball, 8, true, true),),
+    ((:rosenbrock, 5, true, true),),
+    ((:rosenbrock_ball, 5, true, true),),
+    ((:schwefel, 2, true, true),),
+    ((:schwefel_ball, 2, true, true),),
+    ((:lotkavolterra, 3, false, true),),
+    ((:motzkin, 3, false, true),),
+    ((:motzkin_ball, 3, false, true),),
+    ((:schwefel, 2, false, true),),
+    ((:lotkavolterra, 3, false, false),),
+    ((:motzkin, 3, false, false),),
+    ((:motzkin_ball, 3, false, false),),
+    ]
+instances[PolyMinJuMP]["slow"] = [
+    ((4, 5, true, true),),
+    ((4, 5, false, true),),
+    ((4, 5, false, false),),
+    ((2, 30, true, true),),
+    ((2, 30, false, true),),
+    ((2, 30, false, false),),
+    ]
+
+# benchmark 1 instances
+bench1_n_d = [
+    (1, 100),
+    (1, 200),
+    (1, 500),
+    (1, 1000),
+    (1, 1500),
+    (1, 2500),
+    (1, 3500),
+    (2, 15),
+    (2, 30),
+    (2, 45),
+    (2, 60),
+    (3, 6),
+    (3, 9),
+    (3, 12),
+    (3, 15),
+    (4, 4),
+    (4, 6),
+    (4, 8),
+    (8, 2),
+    (8, 3),
+    (16, 1),
+    (16, 2),
+    (32, 1),
+    (64, 1),
+    ]
+instances[PolyMinJuMP]["bench1"] = (
+    ((n, d, false, use_wsos),)
+    for (n, d) in bench1_n_d
+    for use_wsos in (false, true)
+    )

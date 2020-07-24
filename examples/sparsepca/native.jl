@@ -5,7 +5,6 @@ see "A Direct Formulation for Sparse PCA Using Semidefinite Programming" by
 Alexandre d’Aspremont, Laurent El Ghaoui, Michael I. Jordan, Gert R. G. Lanckriet
 =#
 
-include(joinpath(@__DIR__, "../common_native.jl"))
 import Hypatia.BlockMatrix
 import Distributions
 
@@ -16,36 +15,6 @@ struct SparsePCANative{T <: Real} <: ExampleInstanceNative{T}
     noise_ratio::Real
     use_linops::Bool
 end
-
-example_tests(::Type{<:SparsePCANative{<:Real}}, ::MinimalInstances) = [
-    ((3, 2, true, 0, false),),
-    ((3, 2, false, 0, false),),
-    ((3, 2, true, 10, false),),
-    ((3, 2, false, 10, false),),
-    ]
-example_tests(::Type{SparsePCANative{Float64}}, ::FastInstances) = [
-    ((5, 3, true, 0, false),),
-    ((5, 3, false, 0, false),),
-    ((5, 3, true, 10, false),),
-    ((5, 3, false, 10, false),),
-    ((30, 10, true, 0, false),),
-    ((30, 10, false, 0, false),),
-    ((30, 10, true, 10, false),),
-    ((30, 10, false, 10, false),),
-    ]
-example_tests(::Type{SparsePCANative{Float64}}, ::SlowInstances) = [
-    # TODO
-    ]
-example_tests(::Type{SparsePCANative{Float64}}, ::LinearOperatorsInstances) = [
-    ((5, 3, true, 0, true),),
-    ((5, 3, false, 0, true),),
-    ((5, 3, true, 10, true),),
-    ((5, 3, false, 10, true),),
-    ((30, 10, true, 0, true),),
-    ((30, 10, false, 0, true),),
-    ((30, 10, true, 10, true),),
-    ((30, 10, false, 10, true),),
-    ]
 
 function build(inst::SparsePCANative{T}) where {T <: Real}
     (p, k, noise_ratio) = (inst.p, inst.k, inst.noise_ratio)
@@ -155,4 +124,30 @@ function test_extra(inst::SparsePCANative, result::NamedTuple)
     end
 end
 
-return SparsePCANative
+instances[SparsePCANative]["minimal"] = [
+    ((3, 2, true, 0, false),),
+    ((3, 2, false, 0, false),),
+    ((3, 2, true, 10, false),),
+    ((3, 2, false, 10, false),),
+    ]
+instances[SparsePCANative]["fast"] = [
+    ((5, 3, true, 0, false),),
+    ((5, 3, false, 0, false),),
+    ((5, 3, true, 10, false),),
+    ((5, 3, false, 10, false),),
+    ((30, 10, true, 0, false),),
+    ((30, 10, false, 0, false),),
+    ((30, 10, true, 10, false),),
+    ((30, 10, false, 10, false),),
+    ]
+instances[SparsePCANative]["slow"] = Tuple[]
+instances[SparsePCANative]["linops"] = [
+    ((5, 3, true, 0, true),),
+    ((5, 3, false, 0, true),),
+    ((5, 3, true, 10, true),),
+    ((5, 3, false, 10, true),),
+    ((30, 10, true, 0, true),),
+    ((30, 10, false, 0, true),),
+    ((30, 10, true, 10, true),),
+    ((30, 10, false, 10, true),),
+    ]
