@@ -262,14 +262,17 @@ svec_idx(row::Int, col::Int) = (div((row - 1) * row, 2) + col)
 block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
 
 # TODO fix later, rt2::T doesn't work with tests using ForwardDiff
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where {T}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number, add::Bool = false) where {T}
     k = 1
     m = size(mat, 1)
+    if !add
+        vec .= 0
+    end
     for j in 1:m, i in 1:j
         @inbounds if i == j
-            vec[k] = mat[i, j]
+            vec[k] += mat[i, j]
         else
-            vec[k] = mat[i, j] * rt2
+            vec[k] += mat[i, j] * rt2
         end
         k += 1
     end
@@ -290,18 +293,21 @@ function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Numb
     return mat
 end
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where {T}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number, add::Bool = false) where {T}
     k = 1
     m = size(mat, 1)
+    if !add
+        vec .= 0
+    end
     for j in 1:m, i in 1:j
         @inbounds if i == j
-            vec[k] = real(mat[i, j])
+            vec[k] += real(mat[i, j])
             k += 1
         else
             ck = mat[i, j] * rt2
-            vec[k] = real(ck)
+            vec[k] += real(ck)
             k += 1
-            vec[k] = -imag(ck)
+            vec[k] -= imag(ck)
             k += 1
         end
     end
