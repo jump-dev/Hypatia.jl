@@ -134,6 +134,7 @@ instances[PolyMinJuMP]["slow"] = [
 
 # benchmark 1 instances
 bench1_n_d = [
+    (1, 4), # compile run
     (1, 100),
     (1, 200),
     (1, 500),
@@ -141,10 +142,12 @@ bench1_n_d = [
     (1, 1500),
     (1, 2500),
     (1, 3500),
+    (2, 3), # compile run
     (2, 15),
     (2, 30),
     (2, 45),
     (2, 60),
+    (3, 2), # compile run
     (3, 6),
     (3, 9),
     (3, 12),
