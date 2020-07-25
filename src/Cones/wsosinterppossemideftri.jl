@@ -41,6 +41,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     tmpRR::Matrix{T}
     tmpRR2::Matrix{T}
     tmpRR3::Matrix{T}
+    tmpRRUU::Vector{Vector{Matrix{T}}}
     ΛFL::Vector
     ΛFLP::Vector{Matrix{T}}
     tmpLU::Vector{Matrix{T}}
@@ -94,6 +95,7 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.tmpRR = zeros(T, R, R)
     cone.tmpRR2 = zeros(T, R, R)
     cone.tmpRR3 = zeros(T, R, R)
+    cone.tmpRRUU = [[zeros(T, R, R) for _ in 1:U] for _ in 1:U]
     cone.ΛFL = Vector{Any}(undef, length(Ps))
     cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
@@ -259,7 +261,7 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::W
         @inbounds for q in 1:U
             matRR3 .= 0
             @inbounds for p in 1:U
-                svec_to_smat!(arrmat, arr[p:U:dim, j], cone.rt2)
+                @views svec_to_smat!(arrmat, arr[p:U:dim, j], cone.rt2)
                 @inbounds for k in eachindex(cone.Ps)
                     PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
                     @views PlambdaPk_slice = PlambdaPk[q:U:UR, p:U:UR]
@@ -279,38 +281,38 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
     corr = cone.correction
     corr .= 0
     U = cone.U
-    R = cone.R
-    UR = U * R
+    UR = U * cone.R
     dim = cone.dim
+    PlambdaP_dirs = cone.tmpRRUU
     matRR = cone.tmpRR
+    matRR2 = cone.tmpRR2
+    matRR3 = cone.tmpRR3
 
-    r_dim = svec_length(R)
-
-    for k in eachindex(cone.Ps)
+    @inbounds for k in eachindex(cone.Ps)
         PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
 
-        PlambdaP_dirs = [zeros(T, R, R) for p in 1:U, q in 1:U] # TODO
-        for p in 1:U, q in 1:U
+        @inbounds for p in 1:U, q in 1:U
             @views primal_dir_mat_q = Symmetric(svec_to_smat!(matRR, primal_dir[q:U:dim], cone.rt2))
             @views PlambdaPk_slice_pq = PlambdaPk[p:U:UR, q:U:UR]
-            mul!(PlambdaP_dirs[p, q], PlambdaPk_slice_pq, primal_dir_mat_q)
+            mul!(PlambdaP_dirs[p][q], PlambdaPk_slice_pq, primal_dir_mat_q)
         end
 
-        for p in 1:U
+        @inbounds for p in 1:U
             @views primal_dir_mat_p = Symmetric(svec_to_smat!(matRR, primal_dir[p:U:dim], cone.rt2))
-            for q in 1:U
-                pq_q = PlambdaP_dirs[p, q] # PlambdaPk_slice_pq * primal_dir_mat_q
-                for r in 1:q
+            @inbounds for q in 1:U
+                pq_q = PlambdaP_dirs[p][q] # PlambdaPk_slice_pq * primal_dir_mat_q
+                @inbounds for r in 1:q
                     @views PlambdaPk_slice_qr = PlambdaPk[q:U:UR, r:U:UR]
-                    r_rp = PlambdaP_dirs[p, r]'
+                    r_rp = PlambdaP_dirs[p][r]'
 
                     # O(R^3) done O(U^3) times
-                    prod_mat_p = pq_q * PlambdaPk_slice_qr * r_rp
-                    prod_mat_p += prod_mat_p'
+                    mul!(matRR2, PlambdaPk_slice_qr, r_rp)
+                    mul!(matRR3, pq_q, matRR2)
+                    axpy!(true, matRR3, matRR3')
                     if q != r
-                        prod_mat_p *= 2
+                        matRR3 .*= 2
                     end
-                    @views corr[p:U:dim] .+= smat_to_svec!(similar(corr, r_dim), prod_mat_p, cone.rt2)
+                    @views smat_to_svec!(corr[p:U:dim], matRR3, cone.rt2, true)
                 end
             end
         end
