@@ -2,6 +2,9 @@
 Copyright 2019, Chris Coey and contributors
 
 run examples tests from the examples folder and display basic benchmarks
+
+to run benchmarks, use the bench1 instance set and run on cmd line:
+~/julia/julia test/runexamplestests.jl &> ~/bench1/bench1.txt
 =#
 
 examples_dir = joinpath(@__DIR__, "../examples")
@@ -124,6 +127,7 @@ perf = DataFrames.DataFrame(
     ext_q = Int[],
     )
 
+isnothing(results_path) || CSV.write(results_path, perf)
 all_tests_time = time()
 
 @testset "examples tests" begin
@@ -144,6 +148,7 @@ all_tests_time = time()
                     r.obj_diff, r.compl, r.x_viol, r.y_viol, r.z_viol,
                     r.n, r.p, r.q,
                     ))
+                isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append=true)
                 @printf("... %8.2e seconds\n", test_time)
             end
         end
@@ -155,7 +160,6 @@ all_tests_time = time()
     @show sum(perf[:iters])
     show(timer)
     println("\n")
-    isnothing(results_path) || CSV.write(results_path, perf, transform = (col, val) -> something(val, missing))
 end
 
 ;

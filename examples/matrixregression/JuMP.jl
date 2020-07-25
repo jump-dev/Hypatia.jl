@@ -134,7 +134,6 @@ instances[MatrixRegressionJuMP]["slow"] = [
 # benchmark 1 instances
 instances[MatrixRegressionJuMP]["bench1"] = (
     ((ceil(Int, 1.1m), m, 5m, 0, 0.1, 0.1, 0, 0), ext)
-    # for m in 5:5:10
-    for m in 5:5:50
+    for m in vcat(3, 5:5:50) # includes compile run
     for ext in (nothing, ClassicConeOptimizer)
     )

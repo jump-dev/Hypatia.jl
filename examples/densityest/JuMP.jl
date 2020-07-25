@@ -111,6 +111,7 @@ instances[DensityEstJuMP]["slow"] = [
 
 # benchmark 1 instances
 bench1_n_d = [
+    (1, 4), # compile run
     (1, 75),
     (1, 150),
     (1, 300),
@@ -118,10 +119,12 @@ bench1_n_d = [
     (1, 900),
     (1, 1200),
     (1, 1500),
+    (2, 3), # compile run
     (2, 10),
     (2, 20),
     (2, 30),
     (2, 40),
+    (3, 2), # compile run
     (3, 3),
     (3, 6),
     (3, 9),
