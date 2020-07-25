@@ -38,11 +38,13 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     rt2i::T
     tmpU::Vector{T}
     tmpLRLR::Vector{Symmetric{T, Matrix{T}}}
+    tmpRR::Matrix{T}
+    tmpRR2::Matrix{T}
+    tmpRR3::Matrix{T}
     ΛFL::Vector
     ΛFLP::Vector{Matrix{T}}
     tmpLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
-    mat::Matrix{T}
 
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
@@ -89,10 +91,12 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.tmpU = Vector{T}(undef, U)
     cone.tmpLRLR = [Symmetric(zeros(T, size(Pk, 2) * R, size(Pk, 2) * R), :L) for Pk in Ps]
     cone.tmpLU = [Matrix{T}(undef, size(Pk, 2), U) for Pk in Ps]
+    cone.tmpRR = zeros(T, R, R)
+    cone.tmpRR2 = zeros(T, R, R)
+    cone.tmpRR3 = zeros(T, R, R)
     cone.ΛFL = Vector{Any}(undef, length(Ps))
     cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
-    cone.mat = zeros(T, R, R)
     return
 end
 
@@ -243,28 +247,26 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::W
     @assert cone.grad_updated
     dim = cone.dim
     U = cone.U
-    R = cone.R
+    UR = U * cone.R
+    arrmat = cone.tmpRR
+    matRR2 = cone.tmpRR2
+    matRR3 = cone.tmpRR3
     prod .= 0
-    UR = U * R
-    r_dim = svec_length(R)
-    matRR = cone.mat
-    matRR2 = similar(cone.mat)
-    matRR3 = zeros(T, R, R)
+    matRR3 .= 0
 
     # O(U^2) outer products of size O(R), while hess side is O(R^2*U)
-    for j in 1:size(prod, 2)
-        for k in eachindex(cone.Ps)
-            PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
-            for q in 1:U
-                svec_to_smat!(matRR, arr[q:U:dim, j], cone.rt2)
-                for p in 1:U
-                    @views PlambdaPk_slice = PlambdaPk[p:U:UR, q:U:UR]
-                    mul!(matRR2, Symmetric(matRR), PlambdaPk_slice')
-                    prod_mat = mul!(matRR3, PlambdaPk_slice, matRR2)
-                    # prod_mat = PlambdaPk_slice * Symmetric(matRR) * PlambdaPk_slice'
-                    tmp = smat_to_svec!(zeros(T, r_dim), prod_mat, cone.rt2)
-                    @views prod[p:U:dim, j] += tmp
+    @inbounds for j in 1:size(prod, 2)
+        @inbounds for q in 1:U
+            matRR3 .= 0
+            @inbounds for p in 1:U
+                svec_to_smat!(arrmat, arr[p:U:dim, j], cone.rt2)
+                @inbounds for k in eachindex(cone.Ps)
+                    PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
+                    @views PlambdaPk_slice = PlambdaPk[q:U:UR, p:U:UR]
+                    mul!(matRR2, Symmetric(arrmat), PlambdaPk_slice')
+                    mul!(matRR3, PlambdaPk_slice, matRR2, true, true)
                 end
+                @views smat_to_svec!(prod[q:U:dim, j], matRR3, cone.rt2)
             end
         end
     end
@@ -280,7 +282,7 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
     R = cone.R
     UR = U * R
     dim = cone.dim
-    matRR = cone.mat
+    matRR = cone.tmpRR
 
     r_dim = svec_length(R)
 
