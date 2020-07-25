@@ -241,53 +241,31 @@ end
 
 function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::WSOSInterpPosSemidefTri{T}) where {T}
     @assert cone.grad_updated
+    dim = cone.dim
     U = cone.U
     R = cone.R
     prod .= 0
-
-    arr_shuf = similar(arr)
-    prod_shuf = similar(prod)
-    prod_shuf .= 0
+    UR = U * R
     r_dim = svec_length(R)
+    matRR = cone.mat
+    matRR2 = similar(cone.mat)
+    matRR3 = zeros(T, R, R)
 
-    # permute array
-    for k in 1:size(prod, 2)
-        idx_new = 1
-        for u in 1:cone.U
-            r_idx = 1
-            for j in 1:cone.R, i in 1:j
-                arr_shuf[idx_new, k] = arr[block_idxs(U, r_idx)[u], k]
-                r_idx += 1
-                idx_new += 1
-            end
-        end
-    end
-
-    # get permuted product, for a vector requires O(U^2) outer products of size O(R), while hess side is O(R^2*U)
+    # O(U^2) outer products of size O(R), while hess side is O(R^2*U)
     for j in 1:size(prod, 2)
-        arr_shufj = arr_shuf[:, j]
         for k in eachindex(cone.Ps)
             PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
-            for p in 1:U, q in 1:U
-                arr_mat = svec_to_smat!(zeros(T, R, R), arr_shufj[block_idxs(r_dim, q)], cone.rt2)
-                PlambdaPk_slice = [PlambdaPk[block_idxs(U, ii)[p], block_idxs(U, jj)[q]] for ii in 1:R, jj in 1:R]
-                prod_mat = PlambdaPk_slice * Symmetric(arr_mat) * PlambdaPk_slice'
-                tmp = smat_to_svec!(zeros(T, r_dim), prod_mat, cone.rt2)
-                prod_shuf[block_idxs(r_dim, p), j] += tmp
+            for q in 1:U
+                svec_to_smat!(matRR, arr[q:U:dim, j], cone.rt2)
+                for p in 1:U
+                    @views PlambdaPk_slice = PlambdaPk[p:U:UR, q:U:UR]
+                    mul!(matRR2, Symmetric(matRR), PlambdaPk_slice')
+                    prod_mat = mul!(matRR3, PlambdaPk_slice, matRR2)
+                    # prod_mat = PlambdaPk_slice * Symmetric(matRR) * PlambdaPk_slice'
+                    tmp = smat_to_svec!(zeros(T, r_dim), prod_mat, cone.rt2)
+                    @views prod[p:U:dim, j] += tmp
+                end
             end
-        end
-    end
-
-    # un-permute product
-    for k in 1:size(prod, 2)
-        r_idx = 1
-        idx = 1
-        for j in 1:cone.R, i in 1:j
-            for u in 1:U
-                prod[idx, k] = prod_shuf[block_idxs(r_dim, u)[r_idx], k]
-                idx += 1
-            end
-            r_idx += 1
         end
     end
 
