@@ -273,16 +273,19 @@ instances[ShapeConRegrJuMP]["slow"] = [
 
 # benchmark 1 instances
 bench1_n_d = [
+    (1, 3), # compile run
     (1, 10),
     (1, 20),
     (1, 30),
     (1, 40),
     (1, 50),
     (1, 60),
+    (2, 2), # compile run
     (2, 5),
     (2, 10),
     (2, 15),
     (2, 20),
+    (3, 1), # compile run
     (3, 2),
     (3, 4),
     (3, 6),
