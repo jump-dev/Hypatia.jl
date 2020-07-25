@@ -67,7 +67,6 @@ instances[MatrixQuadraticJuMP]["slow"] = [
 # benchmark 1 instances
 instances[MatrixQuadraticJuMP]["bench1"] = (
     ((d1, 5d1, use_matrixepipersquare),)
-    # for d1 in 5:5:10
-    for d1 in 5:5:50
+    for d1 in vcat(3, 5:5:50) # includes compile run
     for use_matrixepipersquare in (false, true)
     )

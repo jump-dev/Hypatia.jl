@@ -153,8 +153,7 @@ instances[SignomialMinJuMP]["slow"] = [
 # benchmark 1 instances
 instances[SignomialMinJuMP]["bench1"] = (
     ((m, n), ext)
-    # for m in 3:3:3
-    for m in 3:3:30
+    for m in vcat(1, 3:3:30) # includes compile run
     for n in (div(m, 3), m, 3m)
     for ext in (nothing, ClassicConeOptimizer)
     )
