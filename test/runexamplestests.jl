@@ -150,6 +150,8 @@ all_tests_time = time()
                     ))
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append=true)
                 @printf("... %8.2e seconds\n", test_time)
+                flush(stdout)
+                flush(stderr)
             end
         end
     end
