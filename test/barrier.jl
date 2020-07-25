@@ -105,6 +105,8 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
     @test CO.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
 
     prod_mat2 = Matrix(CO.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
+    # @test prod_mat2 ≈ inv(cholesky(hess).U)
+    @show norm(CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) - I)
     @test CO.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
     CO.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
     @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
@@ -301,6 +303,55 @@ function test_possemideftri_barrier(T::Type{<:Real})
     return
 end
 
+using SuiteSparse
+using SuiteSparse.CHOLMOD
+function chordal_fill(row_idxs, col_idxs)
+    side = maximum(row_idxs)
+    cm = CHOLMOD.defaults(CHOLMOD.common_struct[Base.Threads.threadid()])
+    unsafe_store!(CHOLMOD.common_print[], 0)
+    unsafe_store!(CHOLMOD.common_postorder[], 1)
+    unsafe_store!(CHOLMOD.common_supernodal[], 2)
+
+    fake_point = ones(length(row_idxs))
+    sparse_point = CHOLMOD.Sparse(Hermitian(sparse(row_idxs, col_idxs, fake_point), :L))
+    symb_mat = CHOLMOD.fact_(sparse_point, cm)
+
+    f = unsafe_load(pointer(symb_mat))
+
+    num_super = Int(f.nsuper)
+    supers = [unsafe_load(f.super, i) + 1 for i in 1:num_super]
+    push!(supers, side + 1)
+    fs = [unsafe_load(f.s, i) + 1 for i in 1:Int(f.ssize)]
+    fpi = [unsafe_load(f.pi, i) + 1 for i in 1:num_super]
+    push!(fpi, length(fs) + 1)
+
+    num_cols = Vector{Int}(undef, num_super)
+    num_rows = Vector{Int}(undef, num_super)
+    J_rows = Vector{Vector}(undef, num_super)
+
+    for k in reverse(1:num_super)
+        num_col = num_cols[k] = supers[k + 1] - supers[k]
+        num_row = num_rows[k] = fpi[k + 1] - fpi[k] # n rows
+        J_k = J_rows[k] = fs[fpi[k]:(fpi[k + 1] - 1)]
+    end
+
+    filled_rows = Int[]
+    filled_cols = Int[]
+    perm = symb_mat.p
+
+    for k in eachindex(num_rows)
+        for i in 1:num_rows[k], j in 1:min(i, num_cols[k])
+            (row, col) = (symb_mat.p[J_rows[k][i]], symb_mat.p[supers[k] + j - 1])
+            if row < col
+                (row, col) = (col, row)
+            end
+            push!(filled_rows, row)
+            push!(filled_cols, col)
+        end
+    end
+    return (filled_rows, filled_cols, perm)
+end
+
 function test_possemideftrisparse_barrier(T::Type{<:Real})
     if !(T <: LinearAlgebra.BlasReal)
         return # only works with BLAS real types
@@ -309,9 +360,13 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
     invrt2 = inv(sqrt(T(2)))
 
     for side in [1, 2, 3, 5, 10, 20, 40, 80]
+        @show side
         # generate random sparsity pattern for lower triangle
         sparsity = inv(sqrt(side))
         (row_idxs, col_idxs, _) = findnz(tril!(sprand(Bool, side, side, sparsity)) + I)
+        # @show (row_idxs, col_idxs)
+        # @show chordal_fill(row_idxs, col_idxs)
+        (row_idxs, col_idxs, perm) = chordal_fill(row_idxs, col_idxs)
 
         # real sparse PSD cone
         function R_barrier(s)
@@ -324,25 +379,25 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
             S = Matrix(sparse(row_idxs, col_idxs, scal_s, side, side))
             return -logdet(cholesky(Symmetric(S, :L)))
         end
-        test_barrier_oracles(CO.PosSemidefTriSparse{T, T}(side, row_idxs, col_idxs), R_barrier)
+        test_barrier_oracles(CO.PosSemidefTriSparse{T, T}(side, row_idxs, col_idxs, perm = perm), R_barrier)
 
         # complex sparse PSD cone
-        function C_barrier(s)
-            scal_s = zeros(Complex{eltype(s)}, length(row_idxs))
-            idx = 1
-            for i in eachindex(scal_s)
-                if row_idxs[i] == col_idxs[i]
-                    scal_s[i] = s[idx]
-                    idx += 1
-                else
-                    scal_s[i] = invrt2 * Complex(s[idx], s[idx + 1])
-                    idx += 2
-                end
-            end
-            S = Matrix(sparse(row_idxs, col_idxs, scal_s, side, side))
-            return -logdet(cholesky!(Hermitian(S, :L)))
-        end
-        test_barrier_oracles(CO.PosSemidefTriSparse{T, Complex{T}}(side, row_idxs, col_idxs), C_barrier)
+        # function C_barrier(s)
+        #     scal_s = zeros(Complex{eltype(s)}, length(row_idxs))
+        #     idx = 1
+        #     for i in eachindex(scal_s)
+        #         if row_idxs[i] == col_idxs[i]
+        #             scal_s[i] = s[idx]
+        #             idx += 1
+        #         else
+        #             scal_s[i] = invrt2 * Complex(s[idx], s[idx + 1])
+        #             idx += 2
+        #         end
+        #     end
+        #     S = Matrix(sparse(row_idxs, col_idxs, scal_s, side, side))
+        #     return -logdet(cholesky!(Hermitian(S, :L)))
+        # end
+        # test_barrier_oracles(CO.PosSemidefTriSparse{T, Complex{T}}(side, row_idxs, col_idxs), C_barrier)
     end
     return
 end

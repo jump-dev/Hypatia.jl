@@ -36,6 +36,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     dual_point::Vector{T}
     rt2::T
     timer::TimerOutput
+    perm::Union{Nothing, Vector{Int}}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -78,6 +79,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
         row_idxs::Vector{Int},
         col_idxs::Vector{Int};
         use_dual::Bool = false,
+        perm::Union{Nothing, Vector{Int}} = nothing,
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
@@ -112,6 +114,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
         cone.col_idxs = col_idxs
         cone.rt2 = sqrt(T(2))
         cone.hess_fact_cache = hess_fact_cache
+        cone.perm = perm
         return cone
     end
 end
@@ -149,7 +152,7 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
     for l in 1:dim_R
         sparse_point_map[Int(unsafe_load(sx_ptr, l))] = l
     end
-    symb_mat = cone.symb_mat = CHOLMOD.fact_(sparse_point, cm)
+    symb_mat = cone.symb_mat = CHOLMOD.fact_(sparse_point, cm, perm = cone.perm, userperm_only = !isnothing(cone.perm))
 
     f = unsafe_load(pointer(symb_mat))
     @assert f.n == cone.side
@@ -261,6 +264,22 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
         col_idx = col - supers[super] + 1
         map_blocks[i] = (super, row_idx, col_idx, row != col, swapped)
     end
+
+    filled_rows = Int[]
+    filled_cols = Int[]
+    perm = symb_mat.p
+    for k in eachindex(num_rows)
+        for i in 1:num_rows[k], j in 1:min(i, num_cols[k])
+            (row, col) = (symb_mat.p[J_rows[k][i]], symb_mat.p[supers[k] + j - 1])
+            if row < col
+                (row, col) = (col, row)
+            end
+            push!(filled_rows, row)
+            push!(filled_cols, col)
+        end
+    end
+    @show length(filled_rows)
+    @show length(cone.row_idxs)
 
     return
 end
@@ -406,7 +425,7 @@ function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
             # real part j
             temp_blocks[super_j][row_idx_j, col_idx_j] = (scal_j ? invrt2 : 1)
             _hess_step1(cone, temp_blocks, cone.ancestors[super_j])
-            _hess_step2(cone, temp_blocks, cone.ancestors[super_j], false)
+            _hess_step2(cone, temp_blocks, cone.ancestors[super_j], false, false)
             out_blocks = _hess_step3(cone, temp_blocks)
             H_idx_i = 1
             for i in 1:j
@@ -431,7 +450,7 @@ function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
                 end
                 temp_blocks[super_j][row_idx_j, col_idx_j] = (scal_j ? invrt2 : 1) * im
                 _hess_step1(cone, temp_blocks, cone.ancestors[super_j])
-                _hess_step2(cone, temp_blocks, cone.ancestors[super_j], false)
+                _hess_step2(cone, temp_blocks, cone.ancestors[super_j], false, false)
                 out_blocks = _hess_step3(cone, temp_blocks)
                 H_idx_i = 1
                 for i in 1:j
@@ -452,7 +471,7 @@ function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
         else
             temp_blocks[super_j][row_idx_j, col_idx_j] = (scal_j ? invrt2 : 1)
             _hess_step1(cone, temp_blocks, cone.ancestors[super_j])
-            _hess_step2(cone, temp_blocks, cone.ancestors[super_j], false)
+            _hess_step2(cone, temp_blocks, cone.ancestors[super_j], false, false)
             out_blocks = _hess_step3(cone, temp_blocks)
 
             for i in 1:j
@@ -475,10 +494,33 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemi
     @inbounds for i in 1:size(arr, 2)
         @views svec_to_smat_sparse!(temp_blocks, arr[:, i], cone)
         _hess_step1(cone, temp_blocks, eachindex(cone.num_cols))
-        _hess_step2(cone, temp_blocks, eachindex(cone.num_cols), false)
+        _hess_step2(cone, temp_blocks, eachindex(cone.num_cols), false, false)
         _hess_step3(cone, temp_blocks)
         @views smat_to_svec_sparse!(prod[:, i], temp_blocks, cone)
     end
+    return prod
+end
+
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTriSparse)
+    @assert cone.grad_updated
+    temp_blocks = cone.temp_blocks
+    @inbounds for i in 1:size(arr, 2)
+        @views svec_to_smat_sparse!(temp_blocks, arr[:, i], cone)
+        _hess_step1(cone, temp_blocks, eachindex(cone.num_cols))
+        _hess_step2(cone, temp_blocks, eachindex(cone.num_cols), false, true)
+        @views smat_to_svec_sparse!(prod[:, i], temp_blocks, cone)
+    end
+
+    tmp_2 = deepcopy(temp_blocks)
+    vec_2 = @views smat_to_svec_sparse!(zeros(size(prod, 1)), tmp_2, cone)
+    @views svec_to_smat_sparse!(tmp_2, vec_2, cone)
+    for (b1, b2, num_col) in zip(tmp_2, temp_blocks, cone.num_cols)
+        @views copytri!(b1[1:num_col, 1:num_col], 'L')
+        @views copytri!(b2[1:num_col, 1:num_col], 'L')
+        @show norm(b1 - b2)
+        @assert b1 ≈ b2
+    end
+
     return prod
 end
 
@@ -495,7 +537,6 @@ function _hess_step1(cone::PosSemidefTriSparse{T, R}, temp_blocks, supernode_lis
 
         F_block[idxs_a, idxs_a] .= 0
         F_block[:, idxs_n] = temp_block
-        temp_block .= 0 # in case of application to sparse vector
     end
 
     for k in supernode_list
@@ -523,7 +564,7 @@ function _hess_step1(cone::PosSemidefTriSparse{T, R}, temp_blocks, supernode_lis
     return temp_blocks
 end
 
-function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks, supernode_list, save_L_pr::Bool) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks, supernode_list, save_L_pr::Bool, take_sqrt::Bool) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     for k in supernode_list
         num_col = cone.num_cols[k]
         num_row = cone.num_rows[k]
@@ -538,9 +579,13 @@ function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks, supernode_lis
             @views copyto!(L_pr_block[idxs_n, :], temp_block_n)
         end
         ldiv!(L_n, temp_block_n)
-        ldiv!(L_n', temp_block_n)
+        if !take_sqrt
+            ldiv!(L_n', temp_block_n)
+        end
         rdiv!(temp_block, L_n')
-        rdiv!(temp_block, L_n)
+        if !take_sqrt
+            rdiv!(temp_block, L_n)
+        end
 
         if num_row > num_col
             idxs_a = (num_col + 1):num_row
@@ -549,7 +594,12 @@ function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks, supernode_lis
                 @views copyto!(L_pr_block[idxs_a, :], temp_block_a)
             end
             @views F_an = cone.F_blocks[k][idxs_a, idxs_n]
-            mul!(F_an, Hermitian(cone.S_blocks[k], :L), temp_block_a)
+            if take_sqrt
+                S = cholesky(Hermitian(cone.S_blocks[k], :L)).L
+            else
+                S = Hermitian(cone.S_blocks[k], :L)
+            end
+            mul!(F_an, S', temp_block_a)
             copyto!(temp_block_a, F_an)
         end
     end
@@ -609,7 +659,7 @@ function correction(cone::PosSemidefTriSparse, primal_dir::AbstractVector)
 
     @views svec_to_smat_sparse!(temp_blocks, primal_dir, cone)
     _hess_step1(cone, temp_blocks, eachindex(cone.num_cols))
-    _hess_step2(cone, temp_blocks, eachindex(cone.num_cols), true)
+    _hess_step2(cone, temp_blocks, eachindex(cone.num_cols), true, false)
     _hess_step3(cone, temp_blocks)
     for k in eachindex(cone.num_cols)
         idxs_a = (cone.num_cols[k] + 1):cone.num_rows[k]
