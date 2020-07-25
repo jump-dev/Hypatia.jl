@@ -495,7 +495,6 @@ function _hess_step1(cone::PosSemidefTriSparse{T, R}, temp_blocks, supernode_lis
 
         F_block[idxs_a, idxs_a] .= 0
         F_block[:, idxs_n] = temp_block
-        temp_block .= 0 # in case of application to sparse vector
     end
 
     for k in supernode_list
