@@ -66,29 +66,29 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    # "centralpolymat",
-    # "conditionnum",
-    # "contraction",
-    "densityest",
-    # "envelope",
-    "expdesign",
-    # # "lotkavolterra", # TODO PolyJuMP error
-    # "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
+    # # "centralpolymat",
+    # # "conditionnum",
+    # # "contraction",
+    # "densityest",
+    # # "envelope",
+    # "expdesign",
+    # # # "lotkavolterra", # TODO PolyJuMP error
+    # # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
     "matrixregression",
-    # "maxvolume",
-    # "muconvexity",
-    "nearestpsd",
-    "polymin",
-    # "polynorm",
-    "portfolio",
-    # # "regionofattr", # TODO PolyJuMP error
-    # "robustgeomprog",
-    # "secondorderpoly",
-    # "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
+    # # "maxvolume",
+    # # "muconvexity",
+    # "nearestpsd",
+    # "polymin",
+    # # "polynorm",
+    # "portfolio",
+    # # # "regionofattr", # TODO PolyJuMP error
+    # # "robustgeomprog",
+    # # "secondorderpoly",
+    # # "semidefinitepoly",
+    # "shapeconregr",
+    # "signomialmin",
     ]
 
 # start the tests
