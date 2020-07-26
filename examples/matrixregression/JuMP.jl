@@ -43,40 +43,45 @@ function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64} # TODO generi
     @assert size(X, 1) == data_n
     @assert data_p >= data_m
 
-    Qhalf = (data_n > data_p) ? qr(X).R : X # dimension reduction via QR if helpful
-
     model = JuMP.Model()
     JuMP.@variable(model, A[1:data_p, 1:data_m])
     JuMP.@variable(model, loss)
-    JuMP.@constraint(model, vcat(loss, 0.5, vec(Qhalf * A)) in JuMP.RotatedSecondOrderCone())
-    obj = (loss / 2 - dot(X' * Y, A)) / data_n
+    if data_n > data_p
+        # dimension reduction via QR
+        F = qr(X, Val(true))
+        loss_mat = (F.Q' * Y)[1:data_p, :] - F.R[1:data_p, 1:data_p] * F.P' * A
+    else
+        loss_mat = Y - X * A
+    end
+    JuMP.@constraint(model, vcat(loss, 1, vec(loss_mat) / sqrt(data_n)) in JuMP.RotatedSecondOrderCone())
+    # JuMP.@constraint(model, vcat(loss, vec(loss_mat)) in MOI.NormOneCone(1 + length(loss_mat)))
 
+    obj = loss
     if !iszero(inst.lam_fro)
         JuMP.@variable(model, t_fro)
-        JuMP.@constraint(model, vcat(t_fro, vec(A)) in JuMP.SecondOrderCone())
-        obj += inst.lam_fro * t_fro
+        JuMP.@constraint(model, vcat(t_fro, inst.lam_fro * vec(A)) in JuMP.SecondOrderCone())
+        obj += t_fro
     end
     if !iszero(inst.lam_nuc)
         JuMP.@variable(model, t_nuc)
-        JuMP.@constraint(model, vcat(t_nuc, vec(A)) in MOI.NormNuclearCone(data_p, data_m))
-        obj += inst.lam_nuc * t_nuc
+        JuMP.@constraint(model, vcat(t_nuc, inst.lam_nuc * vec(A)) in MOI.NormNuclearCone(data_p, data_m))
+        obj += t_nuc
     end
     if !iszero(inst.lam_las)
         JuMP.@variable(model, t_las)
-        JuMP.@constraint(model, vcat(t_las, vec(A)) in MOI.NormOneCone(data_p * data_m + 1))
-        obj += inst.lam_las * t_las
+        JuMP.@constraint(model, vcat(t_las, inst.lam_las * vec(A)) in MOI.NormOneCone(data_p * data_m + 1))
+        obj += t_las
     end
     if !iszero(inst.lam_glr)
         JuMP.@variable(model, t_glr[1:data_p])
-        JuMP.@constraint(model, [i = 1:data_p], vcat(t_glr[i], A[i, :]) in JuMP.SecondOrderCone())
-        obj += inst.lam_glr * sum(t_glr)
+        JuMP.@constraint(model, [i = 1:data_p], vcat(t_glr[i], inst.lam_glr * A[i, :]) in JuMP.SecondOrderCone())
+        obj += sum(t_glr)
     end
     if !iszero(inst.lam_glc)
         JuMP.@variable(model, t_glc[1:data_m])
-        JuMP.@constraint(model, [i = 1:data_m], vcat(t_glc[i], A[:, i]) in JuMP.SecondOrderCone())
-        obj += inst.lam_glc * sum(t_glc)
+        JuMP.@constraint(model, [i = 1:data_m], vcat(t_glc[i], inst.lam_glc * A[:, i]) in JuMP.SecondOrderCone())
+        obj += sum(t_glc)
     end
-
     JuMP.@objective(model, Min, obj)
 
     model.ext[:A_var] = A # save for use in tests
@@ -90,7 +95,7 @@ function test_extra(inst::MatrixRegressionJuMP{T}, model::JuMP.Model) where T
         # check objective value is correct
         (Y, X) = (inst.Y, inst.X)
         A_opt = JuMP.value.(model.ext[:A_var])
-        loss = (sum(abs2, X * A_opt) / 2 - dot(X' * Y, A_opt)) / size(Y, 1)
+        loss = sum(abs2, Y - X * A_opt) / (2 * size(Y, 1))
         obj_result = loss +
             inst.lam_fro * norm(vec(A_opt), 2) +
             inst.lam_nuc * sum(svd(A_opt).S) +
@@ -105,8 +110,8 @@ end
 instances[MatrixRegressionJuMP]["minimal"] = [
     ((2, 3, 4, 0, 0, 0, 0, 0),),
     ((2, 3, 4, 0, 0, 0, 0, 0), ClassicConeOptimizer),
-    ((2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
+    ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
     ]
 instances[MatrixRegressionJuMP]["fast"] = [
     ((5, 3, 4, 0, 0, 0, 0, 0),),
@@ -119,10 +124,10 @@ instances[MatrixRegressionJuMP]["fast"] = [
     ((10, 20, 20, 0, 0, 0, 0, 0),),
     ((10, 20, 20, 0.1, 0.1, 0.1, 0.2, 0.2),),
     ((10, 20, 20, 0, 0.1, 0.1, 0, 0),),
-    ((100, 8, 12, 0, 0, 0, 0, 0),),
-    ((100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
-    ((100, 8, 12, 0, 0.1, 0.1, 0, 0),),
+    ((50, 8, 12, 0, 0, 0, 0, 0),),
+    ((50, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((50, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
+    ((50, 8, 12, 0, 0.1, 0.1, 0, 0),),
     ]
 instances[MatrixRegressionJuMP]["slow"] = [
     ((15, 20, 50, 0, 0, 0, 0, 0),),
@@ -133,7 +138,7 @@ instances[MatrixRegressionJuMP]["slow"] = [
 
 # benchmark 1 instances
 instances[MatrixRegressionJuMP]["bench1"] = (
-    ((ceil(Int, 1.1m), m, 5m, 0, 0.1, 0.1, 0, 0), ext)
-    for m in vcat(3, 5:5:40) # includes compile run
+    ((ceil(Int, 6m), m, 5m, 0, 0.2, 0, 0, 0), ext)
+    for m in vcat(3, 5:5:55) # includes compile run
     for ext in (nothing, ClassicConeOptimizer)
     )
