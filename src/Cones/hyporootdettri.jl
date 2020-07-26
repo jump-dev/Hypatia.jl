@@ -254,7 +254,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
     return prod
 end
 
-# TODO might not be worth using this
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
     H = cone.inv_hess.data
     rootdet = cone.rootdet
