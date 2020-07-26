@@ -40,10 +40,12 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     nbhd_tmp2::Vector{T}
 
     W::Matrix{R}
+    tmpW::Matrix{R}
     work_mat::Matrix{R}
     work_mat2::Matrix{R}
     fact_W
     Wi::Matrix{R}
+    Wi_vec::Vector{T}
     rootdet::T
     rootdetu::T
     sigma::T
@@ -98,6 +100,8 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     cone.nbhd_tmp2 = zeros(T, dim)
     side = cone.side
     cone.W = zeros(R, side, side)
+    cone.tmpW = zeros(R, side, side)
+    cone.Wi_vec = zeros(T, dim - 1)
     # cone.Wi = zeros(R, side, side)
     cone.work_mat = zeros(R, side, side)
     cone.work_mat2 = zeros(R, side, side)
@@ -115,9 +119,8 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T, R}) w
     const3 = -const2 * (side + 1 + const1) / 2side
     incr = (cone.is_complex ? 2 : 1)
     k = 2
-    # arr[1] = -0.5411961001461969
     @inbounds for i in 1:side
-        arr[k] = const3 # 1.3065629648763768
+        arr[k] = const3
         k += incr * i + 1
     end
     return arr
@@ -128,7 +131,8 @@ function update_feas(cone::HypoRootdetTri{T}) where {T}
     u = cone.point[1]
 
     @views svec_to_smat!(cone.W, cone.point[2:end], cone.rt2)
-    cone.fact_W = cholesky!(Hermitian(copy(cone.W), :U), check = false) # mutates W, which isn't used anywhere else
+    copyto!(cone.tmpW, cone.W)
+    cone.fact_W = cholesky!(Hermitian(cone.tmpW, :U), check = false) # mutates W, which isn't used anywhere else
     if isposdef(cone.fact_W)
         cone.rootdet = exp(logdet(cone.fact_W) / cone.side)
         cone.rootdetu = cone.rootdet - u
@@ -160,9 +164,9 @@ function update_grad(cone::HypoRootdetTri)
     # copyto!(cone.Wi, cone.fact_W.factors)
     # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0)) # TODO inplace for bigfloat
     cone.Wi = inv(cone.fact_W)
-    @views smat_to_svec!(cone.grad[2:cone.dim], cone.Wi, cone.rt2)
+    smat_to_svec!(cone.Wi_vec, cone.Wi, cone.rt2)
     cone.sigma = cone.rootdet / cone.rootdetu / cone.side
-    @. cone.grad[2:end] *= -cone.sc_const * (cone.sigma + 1)
+    @. @views cone.grad[2:end] = -cone.Wi_vec * cone.sc_const * (cone.sigma + 1)
 
     cone.grad_updated = true
     return cone.grad
@@ -175,12 +179,13 @@ function update_hess(cone::HypoRootdetTri)
     Wi = cone.Wi
     H = cone.hess.data
     side = cone.side
-    wi = smat_to_svec!(zeros(cone.dim - 1), Wi, cone.rt2) # TODO save from grad
+    Wi_vec = cone.Wi_vec
+    @views Hww = H[2:end, 2:end]
 
-    @views symm_kron(H[2:end, 2:end], Wi, cone.rt2)
-    @views H[2:end, 2:end] .*= cone.kron_const
-    @views mul!(H[2:end, 2:end], wi, wi', cone.dot_const, true)
-    @. H[2:end, 2:end] *= cone.sc_const
+    symm_kron(Hww, Wi, cone.rt2)
+    Hww .*= cone.kron_const
+    mul!(Hww, Wi_vec, Wi_vec', cone.dot_const, true)
+    Hww .*= cone.sc_const
 
     cone.hess_updated = true
     return cone.hess
@@ -193,13 +198,14 @@ function update_inv_hess(cone::HypoRootdetTri)
     side = cone.side
     W = Hermitian(cone.W, :U)
     @views w = cone.point[2:end]
+    @views Hww = H[2:end, 2:end]
 
     H[1, 1] = abs2(rootdetu) + abs2(rootdet) / side
-    @views symm_kron(H[2:end, 2:end], W, cone.rt2)
-    @views H[2:end, 2:end] .*= rootdetu * abs2(side)
-    @views mul!(H[2:end, 2:end], w, w', rootdet, true)
+    symm_kron(Hww, W, cone.rt2)
+    Hww .*= rootdetu * abs2(side)
+    mul!(Hww, w, w', rootdet, true)
     denom = side * (side * rootdetu + rootdet) # abs2(side) * rootdetu + side * rootdet # TODO could write using cone.u, check if this is better because rootdetu is derived from u
-    @views H[2:end, 2:end] /= denom
+    Hww ./= denom
 
     @views H[1, 2:end] = rootdet * w / side
     H ./= cone.sc_const
@@ -248,6 +254,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
     return prod
 end
 
+# TODO might not be worth using this
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
     H = cone.inv_hess.data
     rootdet = cone.rootdet
@@ -255,17 +262,26 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hyp
     side = cone.side
     W = Hermitian(cone.W, :U)
     @views w = cone.point[2:end]
+    const1 = rootdet / side
 
-    H11 = abs2(rootdetu) + abs2(rootdet) / side
-    denom = side * (side * rootdetu + rootdet)
+    denom = side * (side * rootdetu + rootdet) # TODO could write using cone.u, check if this is better because rootdetu is derived from u
 
     @inbounds for i in 1:size(arr, 2)
-        arr_w = arr[2:end, i]
-        arr_W = Hermitian(svec_to_smat!(similar(W.data), arr[2:end, i], cone.rt2), :U)
-        prod[1, i] = H11 * arr[1, i] + dot(arr_w, w) * rootdet / side
-        v = smat_to_svec!(zeros(cone.dim - 1), W * arr_W * W, cone.rt2)
-        prod[2:end, i] = arr[1, i] * cone.point[2:end] * rootdet / side + (v * rootdetu * abs2(side) + w * dot(w, arr_w) * rootdet) / denom
+        @views arr_w = arr[2:end, i]
+        @views prod_w = prod[2:end, i]
+        Hermitian(svec_to_smat!(cone.work_mat, arr[2:end, i], cone.rt2), :U)
+        copytri!(cone.work_mat, 'U', cone.is_complex)
+        mul!(cone.work_mat2, cone.work_mat, W)
+        mul!(cone.work_mat, W, cone.work_mat2, rootdetu * abs2(side), false)
+
+        smat_to_svec!(prod_w, cone.work_mat, cone.rt2)
+        prod_w .+= dot(w, arr_w) * rootdet .* w
+        prod_w ./= denom
     end
+    H11 = abs2(rootdetu) + rootdet * const1
+    @. @views prod[1, :] = H11 * arr[1, :]
+    @views mul!(prod[1, :]', w', arr[2:end, :], const1, true)
+    @views mul!(prod[2:cone.dim, :], w, arr[1, :]', const1, true)
 
     prod ./= cone.sc_const
     return prod
