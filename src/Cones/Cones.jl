@@ -276,20 +276,6 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Numb
     return vec
 end
 
-function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where {T}
-    k = 1
-    m = size(mat, 1)
-    for j in 1:m, i in 1:j
-        @inbounds if i == j
-            vec[k] += mat[i, j]
-        else
-            vec[k] += mat[i, j] * rt2
-        end
-        k += 1
-    end
-    return vec
-end
-
 function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Number) where {T}
     k = 1
     m = size(mat, 1)
@@ -316,24 +302,6 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, 
             vec[k] = real(ck)
             k += 1
             vec[k] = -imag(ck)
-            k += 1
-        end
-    end
-    return vec
-end
-
-function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where {T}
-    k = 1
-    m = size(mat, 1)
-    for j in 1:m, i in 1:j
-        @inbounds if i == j
-            vec[k] += real(mat[i, j])
-            k += 1
-        else
-            ck = mat[i, j] * rt2
-            vec[k] += real(ck)
-            k += 1
-            vec[k] -= imag(ck)
             k += 1
         end
     end
@@ -386,19 +354,29 @@ vec_copy_to!(v1::AbstractVecOrMat{Complex{T}}, v2::AbstractVecOrMat{T}) where {T
 function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T) where {T <: Real}
     side = size(mat, 1)
     k = 1
-    for i in 1:side, j in 1:i
+    @inbounds for i in 1:side
+        for j in 1:(i - 1)
+            k2 = 1
+            for i2 in 1:side
+                k2 > k && continue
+                for j2 in 1:(i2 - 1)
+                    scal = (i == j ? 1 : rt2) * (i2 == j2 ? 1 : rt2) / 2
+                    H[k2, k] = scal * (mat[i, i2] * mat[j, j2] + mat[i, j2] * mat[j, i2])
+                    k2 += 1
+                end
+                H[k2, k] = rt2 * mat[i, i2] * mat[j, i2]
+                k2 += 1
+            end
+            k += 1
+        end
         k2 = 1
-        @inbounds for i2 in 1:side, j2 in 1:i2
-            if (i == j) && (i2 == j2)
-                H[k2, k] = abs2(mat[i2, i])
-            elseif (i != j) && (i2 != j2)
-                H[k2, k] = mat[i2, i] * mat[j, j2] + mat[j2, i] * mat[j, i2]
-            else
-                H[k2, k] = rt2 * mat[i2, i] * mat[j, j2]
+        for i2 in 1:side
+            k2 > k && continue
+            for j2 in 1:(i2 - 1)
+                H[k2, k] = rt2 * mat[i, j2] * mat[i, i2]
+                k2 += 1
             end
-            if k2 == k
-                break
-            end
+            H[k2, k] = abs2(mat[i, i2])
             k2 += 1
         end
         k += 1
