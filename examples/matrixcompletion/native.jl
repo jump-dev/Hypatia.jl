@@ -1,6 +1,8 @@
 #=
 Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
+TODO write proper description of the model
+
 references minimizing the nuclear norm:
 Minimization of a Particular Singular Value by Alborz Alavian and Michael Rotkowitz
 The Power of Convex Relaxation Emmanuel J. Candes and Terence Tao

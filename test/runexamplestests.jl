@@ -74,9 +74,9 @@ JuMP_example_names = [
     # "expdesign",
     # # # "lotkavolterra", # TODO PolyJuMP error
     # # "lyapunovstability",
-    # "matrixcompletion",
+    "matrixcompletion",
     # "matrixquadratic",
-    "matrixregression",
+    # "matrixregression",
     # # "maxvolume",
     # # "muconvexity",
     # "nearestpsd",
