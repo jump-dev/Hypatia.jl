@@ -175,57 +175,11 @@ function update_hess(cone::HypoRootdetTri)
     Wi = cone.Wi
     H = cone.hess.data
     side = cone.side
+    wi = smat_to_svec!(zeros(cone.dim - 1), Wi, cone.rt2) # TODO save from grad
 
-    idx_incr = (cone.is_complex ? 2 : 1)
-    for i in 1:side
-        for j in 1:(i - 1)
-            row_idx = (cone.is_complex ? (i - 1)^2 + 2j : 1 + div((i - 1) * i, 2) + j)
-            col_idx = row_idx
-            @inbounds for k in i:side
-                @inbounds for l in (i == k ? j : 1):(k - 1)
-                    terma = Wi[k, i] * Wi[j, l]
-                    termb = Wi[l, i] * Wi[j, k]
-                    Wiji = Wi[j, i]
-                    Wilk = Wi[l, k]
-                    term1 = (terma + termb) * cone.kron_const + Wiji * 2 * real(Wilk) * cone.dot_const
-                    H[row_idx, col_idx] = real(term1)
-                    @inbounds if cone.is_complex
-                        H[row_idx + 1, col_idx] = -imag(term1)
-                        term2 = (terma - termb) * cone.kron_const - Wiji * 2im * imag(Wilk) * cone.dot_const
-                        H[row_idx, col_idx + 1] = imag(term2)
-                        H[row_idx + 1, col_idx + 1] = real(term2)
-                    end
-                    col_idx += idx_incr
-                end
-
-                l = k
-                term = cone.rt2 * (Wi[i, k] * Wi[k, j] * cone.kron_const + Wi[i, j] * Wi[k, k] * cone.dot_const)
-                H[row_idx, col_idx] = real(term)
-                @inbounds if cone.is_complex
-                    H[row_idx + 1, col_idx] = imag(term)
-                end
-                col_idx += 1
-            end
-        end
-
-        j = i
-        row_idx = (cone.is_complex ? (i - 1)^2 + 2j : 1 + div((i - 1) * i, 2) + j)
-        col_idx = row_idx
-        @inbounds for k in i:side
-            @inbounds for l in (i == k ? j : 1):(k - 1)
-                term = cone.rt2 * (Wi[k, i] * Wi[j, l] * cone.kron_const + Wi[i, j] * Wi[k, l] * cone.dot_const)
-                H[row_idx, col_idx] = real(term)
-                @inbounds if cone.is_complex
-                    H[row_idx, col_idx + 1] = imag(term)
-                end
-                col_idx += idx_incr
-            end
-
-            l = k
-            H[row_idx, col_idx] = abs2(Wi[k, i]) * cone.kron_const + real(Wi[i, i] * Wi[k, k]) * cone.dot_const
-            col_idx += 1
-        end
-    end
+    @views symm_kron(H[2:end, 2:end], Wi, cone.rt2)
+    @views H[2:end, 2:end] .*= cone.kron_const
+    @views mul!(H[2:end, 2:end], wi, wi', cone.dot_const, true)
     @. H[2:end, 2:end] *= cone.sc_const
 
     cone.hess_updated = true
@@ -237,23 +191,17 @@ function update_inv_hess(cone::HypoRootdetTri)
     rootdet = cone.rootdet
     rootdetu = cone.rootdetu
     side = cone.side
-    W = Symmetric(cone.W, :U)
+    W = Hermitian(cone.W, :U)
+    @views w = cone.point[2:end]
 
     H[1, 1] = abs2(rootdetu) + abs2(rootdet) / side
-    denom = side * (side * rootdetu + rootdet) # abs2(side) * rootdetu + side * rootdet
-    idx1 = 2
-    for j in 1:side, i in 1:j
-        idx2 = 2
-        for l in 1:side, k in 1:l
-            scal = (i == j ? 1 : sqrt(2)) * (k == l ? 1 : sqrt(2))
-            H[idx1, idx2] = rootdet * W[i, j] * W[k, l] * scal
-            H[idx1, idx2] += (W[k, i] * W[j, l] + W[i, l] * W[j, k]) * scal / 2 * rootdetu * abs2(side)
-            H[idx1, idx2] /= denom
-            idx2 += 1
-        end
-        idx1 += 1
-    end
-    @views H[1, 2:end] = rootdet * cone.point[2:end] / side
+    @views symm_kron(H[2:end, 2:end], W, cone.rt2)
+    @views H[2:end, 2:end] .*= rootdetu * abs2(side)
+    @views mul!(H[2:end, 2:end], w, w', rootdet, true)
+    denom = side * (side * rootdetu + rootdet) # abs2(side) * rootdetu + side * rootdet # TODO could write using cone.u, check if this is better because rootdetu is derived from u
+    @views H[2:end, 2:end] /= denom
+
+    @views H[1, 2:end] = rootdet * w / side
     H ./= cone.sc_const
 
     cone.inv_hess_updated = true
