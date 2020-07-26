@@ -170,8 +170,8 @@ end
 #     n = cone.dim - 1
 #     wprod = cone.wprod
 #     H = cone.inv_hess.data
-#     denom = n * (n + 1) * wprod - abs2(n) * u
-#     H[1, 1] = (n + 1) * abs2(wprod) / n + abs2(u) - 2 * wprod * u
+#     denom = n * (n + 1) * wprod - abs2(n) * u # equivalent to n * (n * cone.z + wprod) but z derived from u
+#     H[1, 1] = abs2(cone.z) + abs2(wprod) / n  #(n + 1) * abs2(wprod) / n + abs2(u) - 2 * wprod * u
 #     H[1, 2:end] = wprod .* w / n
 #     H[2:end, 2:end] = wprod * w * w'
 #     H[2:end, 2:end] .+= Diagonal(abs2.(w) .* cone.z .* abs2(n))
@@ -180,7 +180,7 @@ end
 #     cone.inv_hess_updated = true
 #     return cone.inv_hess
 # end
-#
+
 # function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeomean{T}) where {T}
 #     @assert all(isequal(inv(T(cone.dim - 1))), cone.alpha)
 #     dim = cone.dim
