@@ -276,6 +276,20 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Numb
     return vec
 end
 
+function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where {T}
+    k = 1
+    m = size(mat, 1)
+    for j in 1:m, i in 1:j
+        @inbounds if i == j
+            vec[k] += mat[i, j]
+        else
+            vec[k] += mat[i, j] * rt2
+        end
+        k += 1
+    end
+    return vec
+end
+
 function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Number) where {T}
     k = 1
     m = size(mat, 1)
@@ -302,6 +316,24 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, 
             vec[k] = real(ck)
             k += 1
             vec[k] = -imag(ck)
+            k += 1
+        end
+    end
+    return vec
+end
+
+function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where {T}
+    k = 1
+    m = size(mat, 1)
+    for j in 1:m, i in 1:j
+        @inbounds if i == j
+            vec[k] += real(mat[i, j])
+            k += 1
+        else
+            ck = mat[i, j] * rt2
+            vec[k] += real(ck)
+            k += 1
+            vec[k] -= imag(ck)
             k += 1
         end
     end
