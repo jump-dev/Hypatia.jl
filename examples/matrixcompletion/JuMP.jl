@@ -52,7 +52,7 @@ instances[MatrixCompletionJuMP]["slow"] = [
 # benchmark 1 instances
 instances[MatrixCompletionJuMP]["bench1"] = (
     ((d1, d2), ext)
-    for d1 in vcat(3, 10:5:55) # includes compile run
+    for d1 in vcat(3, 10:5:50) # includes compile run
     for d2 in (5d1, 10d1)
     for ext in (nothing, ClassicConeOptimizer)
     )
