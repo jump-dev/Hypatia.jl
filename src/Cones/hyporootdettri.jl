@@ -111,6 +111,8 @@ end
 
 get_nu(cone::HypoRootdetTri) = (cone.side + 1) * cone.sc_const
 
+use_sqrt_oracles(::HypoRootdetTri) = false
+
 function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
     side = cone.side
