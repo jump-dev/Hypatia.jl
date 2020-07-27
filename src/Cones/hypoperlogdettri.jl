@@ -115,14 +115,16 @@ end
 
 get_nu(cone::HypoPerLogdetTri) = 2 * cone.sc_const * (cone.side + 1)
 
+# [-0.827838399, 0.805102005, 1.290927713]
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
     # NOTE if not using theta = 16, rescaling the ray yields central ray
     (arr[1], arr[2], w) = (sqrt(cone.sc_const) / T(16)) * get_central_ray_hypoperlogdettri(cone.side)
     incr = (cone.is_complex ? 2 : 1)
     k = 3
+    (arr[1], arr[2]) = [-0.827838399, 0.805102005]
     @inbounds for i in 1:cone.side
-        arr[k] = w
+        arr[k] = 1.290927713 # w
         k += incr * i + 1
     end
     return arr
@@ -201,6 +203,51 @@ function update_hess(cone::HypoPerLogdetTri)
 
     cone.hess_updated = true
     return cone.hess
+end
+
+# H[1, 2] = abs2(v) * (v * abs2(lwv) - (u + (d - 1) * v) * lwv + d * u) / d / (vlwvu + 2 * v)
+# H[1, 3:end] = w * v * (d * vlwvu + lwv * v) / d / (vlwvu + 2 * v)
+# H[1, 1] = (1 - dot(H[1, 2:end], cone.hess[1, 2:end])) / cone.hess[1, 1] # TODO complicated but doable
+# H[2, 2] = abs2(v) * (vlwvu + v) / d / (vlwvu + 2 * v)
+# H[2, 3:end] = abs2(v) * w ./ d / (vlwvu + 2 * v)
+# H[3:end, 3:end] = abs2(v) / d / (vlwvu + 2 * v) / (vlwvu + v) * w * w'
+# H[3:end, 3:end] += Diagonal(abs2.(w) * vlwvu / (vlwvu + v))
+
+function update_inv_hess(cone::HypoPerLogdetTri)
+    Wivzi = cone.Wivzi
+    H = cone.inv_hess.data
+    side = cone.side
+    ldWv = cone.ldWv
+    z = cone.z
+    u = cone.point[1]
+    v = cone.point[2]
+    w = cone.point[3:end]
+    W = Hermitian(svec_to_smat!(similar(cone.Wi), w, cone.rt2), :U)
+    hess(cone)
+
+    H .= 0
+
+    H[1, 2] = abs2(v) * (v * abs2(ldWv) - (u + (side - 1) * v) * ldWv + side * u) / side / ((side + 1) * (z + v) + side * v) * side
+    H[1, 3:end] .= w * v * ((side + 1) * z + ldWv * v) / side / ((side + 1) * (z + v) + side * v) * side
+    H[1, 1] = (1 - dot(H[1, 2:end] / cone.sc_const, cone.hess[1, 2:end])) / cone.hess[1, 1] * cone.sc_const # TODO complicated but doable. also needs to account for mu before trying in alg.
+    H[2, 2] = abs2(v) * (z + v) / ((side + 1) * (z + v) + side * v)
+    H[2, 3:end] .= abs2(v) * w ./ ((side + 1) * (z + v) + side * v)
+
+    # H[3:end, 3:end] = abs2(v) / d / (z + 2 * v) / (z + v) * w * w'
+    # H[3:end, 3:end] += Diagonal(abs2.(w) * z / (z + v))
+
+    @views Hww = H[3:cone.dim, 3:cone.dim]
+    symm_kron(Hww, W, cone.rt2)
+    Hww .*= z / (z + v)
+    mul!(Hww, w, w', abs2(v) / ((side + 1) * (z + v) + side * v) / (z + v), true)
+
+    # @show H
+    H ./= cone.sc_const
+
+    # @show cone.inv_hess ./ cone.hess
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
 end
 
 # update first two rows of the Hessian

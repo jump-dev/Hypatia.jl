@@ -156,6 +156,43 @@ function update_hess(cone::HypoPerLog)
     return cone.hess
 end
 
+function update_inv_hess(cone::HypoPerLog)
+    # @assert cone.grad_updated
+    u = cone.point[1]
+    v = cone.point[2]
+    w = view(cone.point, 3:cone.dim)
+    d = length(w)
+    tmpw = cone.tmpw
+    # lvwnivlwvu = cone.lvwnivlwvu
+    # g = cone.grad
+    H = cone.inv_hess.data
+    lwv = cone.lwv
+    vlwvu = cone.vlwvu
+
+
+    H .= 0
+
+    H[1, 2] = abs2(v) * (v * abs2(lwv) - (u + (d - 1) * v) * lwv + d * u) / d / (vlwvu + 2 * v)
+    H[1, 3:end] = w * v * (d * vlwvu + lwv * v) / d / (vlwvu + 2 * v)
+    check = w * v *(2 * lwv - u) / (vlwvu + 2 * v)
+    # @show check - H[1, 3:end]
+    H[1, 1] = (1 - dot(H[1, 2:end], cone.hess[1, 2:end])) / cone.hess[1, 1] # TODO complicated but doable
+    H[2, 2] = abs2(v) * (vlwvu + v) / d / (vlwvu + 2 * v)
+    H[2, 3:end] = abs2(v) * w ./ d / (vlwvu + 2 * v)
+    H[3:end, 3:end] = abs2(v) / d / (vlwvu + 2 * v) / (vlwvu + v) * w * w'
+    H[3:end, 3:end] += Diagonal(abs2.(w) * vlwvu / (vlwvu + v))
+    # check = w * w' * (vlwvu + v) / (vlwvu + 2 * v)
+    # @show H[3:end, 3:end] - check
+    # @show u, v, w
+
+    # @show cone.inv_hess ./ hess(cone)
+    @show cone.inv_hess
+    error()
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
 function correction(cone::HypoPerLog{T}, primal_dir::AbstractVector{T}) where {T <: Real}
     u = cone.point[1]
     v = cone.point[2]
