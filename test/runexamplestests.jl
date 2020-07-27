@@ -27,7 +27,7 @@ timer = TimerOutputs.TimerOutput()
 default_solver_options = (
     # verbose = false,
     verbose = true,
-    iter_limit = 150,
+    iter_limit = 250,
     timer = timer,
     # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
     # system_solver = Solvers.SymIndefDenseSystemSolver{Float64}(),
@@ -66,29 +66,29 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    # "centralpolymat",
-    # "conditionnum",
-    # "contraction",
-    "densityest",
-    # "envelope",
-    "expdesign",
-    # # "lotkavolterra", # TODO PolyJuMP error
-    # "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    # "maxvolume",
-    # "muconvexity",
+    # # "centralpolymat",
+    # # "conditionnum",
+    # # "contraction",
+    # "densityest",
+    # # "envelope",
+    # "expdesign",
+    # # # "lotkavolterra", # TODO PolyJuMP error
+    # # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # # "maxvolume",
+    # # "muconvexity",
     "nearestpsd",
-    "polymin",
-    # "polynorm",
-    "portfolio",
-    # # "regionofattr", # TODO PolyJuMP error
+    # "polymin",
+    # # "polynorm",
+    # "portfolio",
+    # # # "regionofattr", # TODO PolyJuMP error
     # "robustgeomprog",
-    # "secondorderpoly",
-    # "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
+    # # "secondorderpoly",
+    # # "semidefinitepoly",
+    # "shapeconregr",
+    # "signomialmin",
     ]
 
 # start the tests
@@ -150,6 +150,8 @@ all_tests_time = time()
                     ))
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append=true)
                 @printf("... %8.2e seconds\n", test_time)
+                flush(stdout)
+                flush(stderr)
             end
         end
     end

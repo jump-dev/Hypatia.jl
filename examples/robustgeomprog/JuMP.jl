@@ -51,6 +51,7 @@ instances[RobustGeomProgJuMP]["fast"] = [
     ((5, 10),),
     ((5, 10), ClassicConeOptimizer),
     ((10, 20),),
+    ((10, 20), ClassicConeOptimizer),
     ((20, 40),),
     ((40, 80),),
     ]

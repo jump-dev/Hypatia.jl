@@ -279,8 +279,8 @@ end
 instances[MatrixRegressionNative]["minimal"] = [
     ((false, 2, 3, 4, 0, 0, 0, 0, 0),),
     ((false, 2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((true, 2, 3, 4, 0, 0, 0, 0, 0),),
-    ((true, 2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((true, 5, 3, 4, 0, 0, 0, 0, 0),),
+    ((true, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
     ]
 instances[MatrixRegressionNative]["fast"] = [
     ((false, 5, 3, 4, 0, 0, 0, 0, 0),),

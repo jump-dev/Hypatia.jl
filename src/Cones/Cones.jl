@@ -180,13 +180,13 @@ function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
     if use_heuristic_neighborhood(cone)
         nbhd = norm(nbhd_tmp, Inf) / norm(g, Inf)
         # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(nbhd_tmp, g)) # TODO try this neighborhood
-    elseif Cones.use_sqrt_oracles(cone)
-        inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
-        nbhd = norm(nbhd_tmp2)
+    # elseif Cones.use_sqrt_oracles(cone) # NOTE can force factorization when we don't need it - better to use inv hess prod
+    #     inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
+    #     nbhd = norm(nbhd_tmp2)
     else
         inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
         nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
-        if nbhd_sqr < -eps(T) # TODO possibly loosen
+        if nbhd_sqr < -100eps(T) # TODO possibly loosen
             # @warn("numerical failure: cone neighborhood is $nbhd_sqr")
             return false
         end

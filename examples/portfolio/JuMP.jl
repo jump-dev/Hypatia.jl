@@ -71,6 +71,6 @@ instances[PortfolioJuMP]["slow"] = [
 # benchmark 1 instances
 instances[PortfolioJuMP]["bench1"] = (
     ((num_stocks, false, true), ext)
-    for num_stocks in vcat(10, 100:100:4000) # includes compile run
+    for num_stocks in vcat(10, 500:500:11000) # includes compile run
     for ext in (nothing, ClassicConeOptimizer)
     )
