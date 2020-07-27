@@ -40,10 +40,12 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     nbhd_tmp2::Vector{T}
 
     W::Matrix{R}
+    tmpW::Matrix{R}
     work_mat::Matrix{R}
     work_mat2::Matrix{R}
     fact_W
     Wi::Matrix{R}
+    Wi_vec::Vector{T}
     rootdet::T
     rootdetu::T
     sigma::T
@@ -98,6 +100,8 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     cone.nbhd_tmp2 = zeros(T, dim)
     side = cone.side
     cone.W = zeros(R, side, side)
+    cone.tmpW = zeros(R, side, side)
+    cone.Wi_vec = zeros(T, dim - 1)
     # cone.Wi = zeros(R, side, side)
     cone.work_mat = zeros(R, side, side)
     cone.work_mat2 = zeros(R, side, side)
@@ -127,7 +131,8 @@ function update_feas(cone::HypoRootdetTri{T}) where {T}
     u = cone.point[1]
 
     @views svec_to_smat!(cone.W, cone.point[2:end], cone.rt2)
-    cone.fact_W = cholesky!(Hermitian(cone.W, :U), check = false) # mutates W, which isn't used anywhere else
+    copyto!(cone.tmpW, cone.W)
+    cone.fact_W = cholesky!(Hermitian(cone.tmpW, :U), check = false) # mutates W, which isn't used anywhere else
     if isposdef(cone.fact_W)
         cone.rootdet = exp(logdet(cone.fact_W) / cone.side)
         cone.rootdetu = cone.rootdet - u
@@ -159,9 +164,9 @@ function update_grad(cone::HypoRootdetTri)
     # copyto!(cone.Wi, cone.fact_W.factors)
     # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0)) # TODO inplace for bigfloat
     cone.Wi = inv(cone.fact_W)
-    @views smat_to_svec!(cone.grad[2:cone.dim], cone.Wi, cone.rt2)
+    smat_to_svec!(cone.Wi_vec, cone.Wi, cone.rt2)
     cone.sigma = cone.rootdet / cone.rootdetu / cone.side
-    @. cone.grad[2:end] *= -cone.sc_const * (cone.sigma + 1)
+    @. @views cone.grad[2:end] = -cone.Wi_vec * cone.sc_const * (cone.sigma + 1)
 
     cone.grad_updated = true
     return cone.grad
@@ -174,61 +179,39 @@ function update_hess(cone::HypoRootdetTri)
     Wi = cone.Wi
     H = cone.hess.data
     side = cone.side
+    Wi_vec = cone.Wi_vec
+    @views Hww = H[2:end, 2:end]
 
-    idx_incr = (cone.is_complex ? 2 : 1)
-    for i in 1:side
-        for j in 1:(i - 1)
-            row_idx = (cone.is_complex ? (i - 1)^2 + 2j : 1 + div((i - 1) * i, 2) + j)
-            col_idx = row_idx
-            @inbounds for k in i:side
-                @inbounds for l in (i == k ? j : 1):(k - 1)
-                    terma = Wi[k, i] * Wi[j, l]
-                    termb = Wi[l, i] * Wi[j, k]
-                    Wiji = Wi[j, i]
-                    Wilk = Wi[l, k]
-                    term1 = (terma + termb) * cone.kron_const + Wiji * 2 * real(Wilk) * cone.dot_const
-                    H[row_idx, col_idx] = real(term1)
-                    @inbounds if cone.is_complex
-                        H[row_idx + 1, col_idx] = -imag(term1)
-                        term2 = (terma - termb) * cone.kron_const - Wiji * 2im * imag(Wilk) * cone.dot_const
-                        H[row_idx, col_idx + 1] = imag(term2)
-                        H[row_idx + 1, col_idx + 1] = real(term2)
-                    end
-                    col_idx += idx_incr
-                end
-
-                l = k
-                term = cone.rt2 * (Wi[i, k] * Wi[k, j] * cone.kron_const + Wi[i, j] * Wi[k, k] * cone.dot_const)
-                H[row_idx, col_idx] = real(term)
-                @inbounds if cone.is_complex
-                    H[row_idx + 1, col_idx] = imag(term)
-                end
-                col_idx += 1
-            end
-        end
-
-        j = i
-        row_idx = (cone.is_complex ? (i - 1)^2 + 2j : 1 + div((i - 1) * i, 2) + j)
-        col_idx = row_idx
-        @inbounds for k in i:side
-            @inbounds for l in (i == k ? j : 1):(k - 1)
-                term = cone.rt2 * (Wi[k, i] * Wi[j, l] * cone.kron_const + Wi[i, j] * Wi[k, l] * cone.dot_const)
-                H[row_idx, col_idx] = real(term)
-                @inbounds if cone.is_complex
-                    H[row_idx, col_idx + 1] = imag(term)
-                end
-                col_idx += idx_incr
-            end
-
-            l = k
-            H[row_idx, col_idx] = abs2(Wi[k, i]) * cone.kron_const + real(Wi[i, i] * Wi[k, k]) * cone.dot_const
-            col_idx += 1
-        end
-    end
-    @. H[2:end, 2:end] *= cone.sc_const
+    symm_kron(Hww, Wi, cone.rt2)
+    Hww .*= cone.kron_const
+    mul!(Hww, Wi_vec, Wi_vec', cone.dot_const, true)
+    Hww .*= cone.sc_const
 
     cone.hess_updated = true
     return cone.hess
+end
+
+function update_inv_hess(cone::HypoRootdetTri)
+    H = cone.inv_hess.data
+    rootdet = cone.rootdet
+    rootdetu = cone.rootdetu
+    side = cone.side
+    W = Hermitian(cone.W, :U)
+    @views w = cone.point[2:end]
+    @views Hww = H[2:end, 2:end]
+
+    H[1, 1] = abs2(rootdetu) + abs2(rootdet) / side
+    symm_kron(Hww, W, cone.rt2)
+    Hww .*= rootdetu * abs2(side)
+    mul!(Hww, w, w', rootdet, true)
+    denom = side * (side * rootdetu + rootdet) # abs2(side) * rootdetu + side * rootdet # TODO could write using cone.u, check if this is better because rootdetu is derived from u
+    Hww ./= denom
+
+    @views H[1, 2:end] = rootdet * w / side
+    H ./= cone.sc_const
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
 end
 
 # update first row of the Hessian
@@ -268,6 +251,38 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
     end
     @views mul!(prod[2:cone.dim, :], cone.hess[2:end, 1], arr[1, :]', true, cone.sc_const * cone.kron_const)
 
+    return prod
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
+    H = cone.inv_hess.data
+    rootdet = cone.rootdet
+    rootdetu = cone.rootdetu
+    side = cone.side
+    W = Hermitian(cone.W, :U)
+    @views w = cone.point[2:end]
+    const1 = rootdet / side
+
+    denom = side * (side * rootdetu + rootdet) # TODO could write using cone.u, check if this is better because rootdetu is derived from u
+
+    @inbounds for i in 1:size(arr, 2)
+        @views arr_w = arr[2:end, i]
+        @views prod_w = prod[2:end, i]
+        Hermitian(svec_to_smat!(cone.work_mat, arr[2:end, i], cone.rt2), :U)
+        copytri!(cone.work_mat, 'U', cone.is_complex)
+        mul!(cone.work_mat2, cone.work_mat, W)
+        mul!(cone.work_mat, W, cone.work_mat2, rootdetu * abs2(side), false)
+
+        smat_to_svec!(prod_w, cone.work_mat, cone.rt2)
+        prod_w .+= dot(w, arr_w) * rootdet .* w
+        prod_w ./= denom
+    end
+    H11 = abs2(rootdetu) + rootdet * const1
+    @. @views prod[1, :] = H11 * arr[1, :]
+    @views mul!(prod[1, :]', w', arr[2:end, :], const1, true)
+    @views mul!(prod[2:cone.dim, :], w, arr[1, :]', const1, true)
+
+    prod ./= cone.sc_const
     return prod
 end
 
