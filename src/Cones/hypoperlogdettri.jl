@@ -190,61 +190,13 @@ function update_hess(cone::HypoPerLogdetTri)
     end
     Wi = cone.Wi
     Wivzi = cone.Wivzi
-    rt2 = cone.rt2
     H = cone.hess.data
     side = cone.side
-
-    idx_incr = (cone.is_complex ? 2 : 1)
-    for i in 1:side
-        for j in 1:(i - 1)
-            row_idx = (cone.is_complex ? 1 + (i - 1)^2 + 2j : 2 + div((i - 1) * i, 2) + j)
-            col_idx = row_idx
-            @inbounds for k in i:side
-                @inbounds for l in (i == k ? j : 1):(k - 1)
-                    terma = Wi[k, i] * Wi[j, l]
-                    termb = Wi[l, i] * Wi[j, k]
-                    Wiji = Wivzi[j, i]
-                    Wilk = Wivzi[l, k]
-                    term1 = (terma + termb) * cone.vzip1 + Wiji * 2 * real(Wilk)
-                    H[row_idx, col_idx] = real(term1)
-                    @inbounds if cone.is_complex
-                        H[row_idx + 1, col_idx] = -imag(term1)
-                        term2 = (terma - termb) * cone.vzip1 - Wiji * 2im * imag(Wilk)
-                        H[row_idx, col_idx + 1] = imag(term2)
-                        H[row_idx + 1, col_idx + 1] = real(term2)
-                    end
-                    col_idx += idx_incr
-                end
-
-                l = k
-                term = cone.rt2 * (Wi[i, k] * Wi[k, j] * cone.vzip1 + Wivzi[i, j] * Wivzi[k, k])
-                H[row_idx, col_idx] = real(term)
-                @inbounds if cone.is_complex
-                    H[row_idx + 1, col_idx] = imag(term)
-                end
-                col_idx += 1
-            end
-        end
-
-        j = i
-        row_idx = (cone.is_complex ? 1 + (i - 1)^2 + 2j : 2 + div((i - 1) * i, 2) + j)
-        col_idx = row_idx
-        @inbounds for k in i:side
-            @inbounds for l in (i == k ? j : 1):(k - 1)
-                term = cone.rt2 * (Wi[k, i] * Wi[j, l] * cone.vzip1 + Wivzi[i, j] * Wivzi[k, l])
-                H[row_idx, col_idx] = real(term)
-                @inbounds if cone.is_complex
-                    H[row_idx, col_idx + 1] = imag(term)
-                end
-                col_idx += idx_incr
-            end
-
-            l = k
-            H[row_idx, col_idx] = abs2(Wi[k, i]) * cone.vzip1 + real(Wivzi[i, i] * Wivzi[k, k])
-            col_idx += 1
-        end
-    end
-
+    @views Hww = cone.hess.data[3:cone.dim, 3:cone.dim]
+    symm_kron(Hww, Wi, cone.rt2)
+    Hww .*= cone.vzip1
+    Wivzi_vec = smat_to_svec!(cone.tmpw, Wivzi, cone.rt2)
+    mul!(Hww, Wivzi_vec, Wivzi_vec', true, true)
     @. @views cone.hess.data[3:cone.dim, :] *= cone.sc_const
 
     cone.hess_updated = true
