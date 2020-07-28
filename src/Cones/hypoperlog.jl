@@ -162,20 +162,24 @@ function update_inv_hess(cone::HypoPerLog)
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
     d = length(w)
-    tmpw = cone.tmpw
     H = cone.inv_hess.data
     lwv = cone.lwv
     vlwvu = cone.vlwvu
-    denom = (vlwvu + 2 * v)
+    const1 = vlwvu / v
+    const2 = vlwvu + v
+    denom = (const1 + 2) * d / v
 
-    H[1, 2] = abs2(v) * (v * abs2(lwv) - (u + (d - 1) * v) * lwv + d * u) / d / denom
-    H[1, 3:end] = w * v * (d * vlwvu + lwv * v) / d / denom
-    H[1, 1] = (1 - dot(H[1, 2:end], cone.hess[1, 2:end])) / cone.hess[1, 1] # TODO complicated but doable
-    H[2, 2] = abs2(v) * (vlwvu + v) / d / denom
-    H[2, 3:end] = abs2(v) * w ./ d / denom
-    H[3:end, 3:end] = abs2(v) / d / denom / (vlwvu + v) * w * w'
-    H[3:end, 3:end] += Diagonal(abs2.(w) * vlwvu / (vlwvu + v))
-
+    H[1, 2] = v * lwv * (lwv - d + 1) - u * lwv + d * u
+    @. @views H[1, 3:end] = w * (d * const1 + lwv)
+    @views H[1, 1] = (denom - dot(H[1, 2:end], cone.hess[1, 2:end])) / cone.hess[1, 1] # TODO complicated but doable
+    H[2, 2] = const2
+    @. @views H[2, 3:end] = w
+    @views mul!(H[3:end, 3:end], w, w')
+    H ./= denom
+    for j in 3:cone.dim
+        H[j, j] += abs2(w[j - 2]) * vlwvu
+    end
+    @views H[3:end, :] ./= const2
 
     cone.inv_hess_updated = true
     return cone.inv_hess
