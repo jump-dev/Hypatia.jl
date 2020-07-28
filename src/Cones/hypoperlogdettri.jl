@@ -215,9 +215,8 @@ function update_inv_hess(cone::HypoPerLogdetTri)
     w = cone.point[3:end]
     W = Hermitian(svec_to_smat!(cone.mat2, w, cone.rt2), :U)
 
-    denom = (side + 1) * (z + v) + side * v
-
     update_inv_hess_prod(cone)
+    denom = (2 * side + 1) * v + (side + 1) * z
     @views Hww = H[3:cone.dim, 3:cone.dim]
     symm_kron(Hww, W, cone.rt2)
     Hww .*= z
@@ -265,15 +264,15 @@ function update_inv_hess_prod(cone::HypoPerLogdetTri)
     u = cone.point[1]
     v = cone.point[2]
     w = cone.point[3:end]
+    const1 = (side + 1) * z / v
+    denom = (const1 + 2 * side + 1) / v
 
-    denom = (side + 1) * (z + v) + side * v
-
-    H[1, 2] = abs2(v) * (v * abs2(ldWv) - (u + (side - 1) * v) * ldWv + side * u) / denom
-    H[1, 3:end] .= w * v * ((side + 1) * z + ldWv * v) / denom
-    H[1, 1] = (1 - dot(H[1, 2:end] / cone.sc_const, cone.hess[1, 2:end])) / cone.hess[1, 1] * cone.sc_const # TODO complicated but doable
-    H[2, 2] = abs2(v) * (z + v) / denom
-    H[2, 3:end] .= abs2(v) * w ./ denom
-    H[1:2, :] ./= cone.sc_const
+    H[1, 2] = ldWv * (v * (ldWv - side + 1) - u) + side * u
+    @. @views H[1, 3:end] = w * (const1 + ldWv)
+    @views H[1, 1] = (denom * cone.sc_const - dot(H[1, 2:end], cone.hess[1, 2:end])) / cone.hess[1, 1] # TODO complicated but doable
+    H[2, 2] = z + v
+    @views H[2, 3:end] .= w
+    @views H[1:2, :] ./= cone.sc_const * denom
 
     cone.inv_hess_prod_updated = true
     return
