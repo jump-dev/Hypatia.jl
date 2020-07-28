@@ -268,7 +268,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hyp
     @inbounds for i in 1:size(arr, 2)
         @views arr_w = arr[2:end, i]
         @views prod_w = prod[2:end, i]
-        Hermitian(svec_to_smat!(cone.work_mat, arr[2:end, i], cone.rt2), :U)
+        Hermitian(svec_to_smat!(cone.work_mat, arr_w, cone.rt2), :U)
         copytri!(cone.work_mat, 'U', cone.is_complex)
         mul!(cone.work_mat2, cone.work_mat, W)
         mul!(cone.work_mat, W, cone.work_mat2, rootdetu * abs2(side), false)
