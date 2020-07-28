@@ -47,6 +47,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     dual_mat::Matrix{R}
     mat2::Matrix{R} # TODO named differently in some cones, fix inconsistency
     mat3::Matrix{R}
+    mat4::Matrix{R}
     fact_mat
     ldWv::T
     z::T
@@ -108,6 +109,7 @@ function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} 
     cone.dual_mat = zeros(R, side, side)
     cone.mat2 = zeros(R, side, side)
     cone.mat3 = zeros(R, side, side)
+    cone.mat4 = zeros(R, side, side)
     # cone.Wi = zeros(R, side, side)
     cone.Wivzi = zeros(R, side, side)
     cone.tmpw = zeros(T, dim - 2)
@@ -212,7 +214,7 @@ function update_inv_hess(cone::HypoPerLogdetTri)
     side = cone.side
     z = cone.z
     v = cone.point[2]
-    w = cone.point[3:end]
+    @views w = cone.point[3:end]
     W = Hermitian(svec_to_smat!(cone.mat2, w, cone.rt2), :U)
 
     update_inv_hess_prod(cone)
@@ -309,9 +311,9 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hyp
     z = cone.z
     v = cone.point[2]
     @views w = cone.point[3:end]
-    W = Hermitian(svec_to_smat!(similar(cone.mat2), w, cone.rt2), :U)
+    W = Hermitian(svec_to_smat!(cone.mat4, w, cone.rt2), :U)
 
-    denom = ((side + 1) * (z + v) + side * v)
+    denom = (2 * side + 1) * v + (side + 1) * z
     @views mul!(prod[1:2, :], cone.inv_hess[1:2, :], arr)
     @inbounds for i in 1:size(arr, 2)
         @views arr_w = arr[3:end, i]
