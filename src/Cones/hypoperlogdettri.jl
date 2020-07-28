@@ -32,6 +32,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_updated::Bool
     inv_hess_updated::Bool
     hess_prod_updated::Bool
+    inv_hess_prod_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
@@ -88,7 +89,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
+reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = cone.hess_fact_updated = false)
 
 function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
@@ -115,16 +116,14 @@ end
 
 get_nu(cone::HypoPerLogdetTri) = 2 * cone.sc_const * (cone.side + 1)
 
-# [-0.827838399, 0.805102005, 1.290927713]
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
     # NOTE if not using theta = 16, rescaling the ray yields central ray
     (arr[1], arr[2], w) = (sqrt(cone.sc_const) / T(16)) * get_central_ray_hypoperlogdettri(cone.side)
     incr = (cone.is_complex ? 2 : 1)
     k = 3
-    (arr[1], arr[2]) = [-0.827838399, 0.805102005]
     @inbounds for i in 1:cone.side
-        arr[k] = 1.290927713 # w
+        arr[k] = w
         k += incr * i + 1
     end
     return arr
@@ -205,46 +204,26 @@ function update_hess(cone::HypoPerLogdetTri)
     return cone.hess
 end
 
-# H[1, 2] = abs2(v) * (v * abs2(lwv) - (u + (d - 1) * v) * lwv + d * u) / d / (vlwvu + 2 * v)
-# H[1, 3:end] = w * v * (d * vlwvu + lwv * v) / d / (vlwvu + 2 * v)
-# H[1, 1] = (1 - dot(H[1, 2:end], cone.hess[1, 2:end])) / cone.hess[1, 1] # TODO complicated but doable
-# H[2, 2] = abs2(v) * (vlwvu + v) / d / (vlwvu + 2 * v)
-# H[2, 3:end] = abs2(v) * w ./ d / (vlwvu + 2 * v)
-# H[3:end, 3:end] = abs2(v) / d / (vlwvu + 2 * v) / (vlwvu + v) * w * w'
-# H[3:end, 3:end] += Diagonal(abs2.(w) * vlwvu / (vlwvu + v))
-
 function update_inv_hess(cone::HypoPerLogdetTri)
-    Wivzi = cone.Wivzi
+    if !cone.inv_hess_prod_updated
+        update_inv_hess_prod(cone)
+    end
     H = cone.inv_hess.data
     side = cone.side
-    ldWv = cone.ldWv
     z = cone.z
-    u = cone.point[1]
     v = cone.point[2]
     w = cone.point[3:end]
-    W = Hermitian(svec_to_smat!(similar(cone.Wi), w, cone.rt2), :U)
-    hess(cone)
+    W = Hermitian(svec_to_smat!(cone.mat2, w, cone.rt2), :U)
 
-    H .= 0
+    denom = ((side + 1) * (z + v) + side * v)
 
-    H[1, 2] = abs2(v) * (v * abs2(ldWv) - (u + (side - 1) * v) * ldWv + side * u) / side / ((side + 1) * (z + v) + side * v) * side
-    H[1, 3:end] .= w * v * ((side + 1) * z + ldWv * v) / side / ((side + 1) * (z + v) + side * v) * side
-    H[1, 1] = (1 - dot(H[1, 2:end] / cone.sc_const, cone.hess[1, 2:end])) / cone.hess[1, 1] * cone.sc_const # TODO complicated but doable. also needs to account for mu before trying in alg.
-    H[2, 2] = abs2(v) * (z + v) / ((side + 1) * (z + v) + side * v)
-    H[2, 3:end] .= abs2(v) * w ./ ((side + 1) * (z + v) + side * v)
-
-    # H[3:end, 3:end] = abs2(v) / d / (z + 2 * v) / (z + v) * w * w'
-    # H[3:end, 3:end] += Diagonal(abs2.(w) * z / (z + v))
-
+    update_inv_hess_prod(cone)
     @views Hww = H[3:cone.dim, 3:cone.dim]
     symm_kron(Hww, W, cone.rt2)
-    Hww .*= z / (z + v)
-    mul!(Hww, w, w', abs2(v) / ((side + 1) * (z + v) + side * v) / (z + v), true)
-
-    # @show H
-    H ./= cone.sc_const
-
-    # @show cone.inv_hess ./ cone.hess
+    Hww .*= z
+    mul!(Hww, w, w', abs2(v) / denom, true)
+    Hww ./= (z + v)
+    Hww ./= cone.sc_const
 
     cone.inv_hess_updated = true
     return cone.inv_hess
@@ -274,6 +253,32 @@ function update_hess_prod(cone::HypoPerLogdetTri)
     return
 end
 
+function update_inv_hess_prod(cone::HypoPerLogdetTri)
+    # TODO remove with explicit expression for (1,1) element
+    if !cone.hess_prod_updated
+        update_hess_prod(cone)
+    end
+    H = cone.inv_hess.data
+    side = cone.side
+    ldWv = cone.ldWv
+    z = cone.z
+    u = cone.point[1]
+    v = cone.point[2]
+    w = cone.point[3:end]
+
+    denom = ((side + 1) * (z + v) + side * v)
+
+    H[1, 2] = abs2(v) * (v * abs2(ldWv) - (u + (side - 1) * v) * ldWv + side * u) / denom
+    H[1, 3:end] .= w * v * ((side + 1) * z + ldWv * v) / denom
+    H[1, 1] = (1 - dot(H[1, 2:end] / cone.sc_const, cone.hess[1, 2:end])) / cone.hess[1, 1] * cone.sc_const # TODO complicated but doable
+    H[2, 2] = abs2(v) * (z + v) / denom
+    H[2, 3:end] .= abs2(v) * w ./ denom
+    H[1:2, :] ./= cone.sc_const
+
+    cone.inv_hess_prod_updated = true
+    return
+end
+
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdetTri)
     if !cone.hess_prod_updated
         update_hess_prod(cone)
@@ -293,6 +298,34 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         smat_to_svec!(view(prod, 3:cone.dim, i), cone.mat2, cone.rt2)
     end
     @views mul!(prod[3:cone.dim, :], cone.hess[3:cone.dim, 1:2], arr[1:2, :], true, cone.vzip1 * cone.sc_const)
+
+    return prod
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdetTri)
+    if !cone.inv_hess_prod_updated
+        update_inv_hess_prod(cone)
+    end
+    side = cone.side
+    z = cone.z
+    v = cone.point[2]
+    @views w = cone.point[3:end]
+    W = Hermitian(svec_to_smat!(similar(cone.mat2), w, cone.rt2), :U)
+
+    denom = ((side + 1) * (z + v) + side * v)
+    @views mul!(prod[1:2, :], cone.inv_hess[1:2, :], arr)
+    @inbounds for i in 1:size(arr, 2)
+        @views arr_w = arr[3:end, i]
+        @views prod_w = prod[3:end, i]
+        Hermitian(svec_to_smat!(cone.mat2, arr_w, cone.rt2), :U)
+        copytri!(cone.mat2, 'U', cone.is_complex)
+        mul!(cone.mat3, cone.mat2, W)
+        mul!(cone.mat2, W, cone.mat3, z, false)
+        smat_to_svec!(prod_w, cone.mat2, cone.rt2)
+        prod_w .+= dot(w, arr_w) * abs2(v) .* w / denom
+        prod_w ./= (z + v) * cone.sc_const
+    end
+    @views mul!(prod[3:cone.dim, :], cone.inv_hess[3:cone.dim, 1:2], arr[1:2, :], true, true)
 
     return prod
 end
