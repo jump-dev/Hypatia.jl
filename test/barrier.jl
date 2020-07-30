@@ -416,7 +416,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
         else
             test_barrier_oracles(cone, R_barrier, init_tol = 1e-1, init_only = true)
         end
-
+        
         # try sc_const = 1 (not self-concordant)
         cone = CO.HypoPerLogdetTri{T, T}(dim, sc_const = 1)
         function R_barrier_sc1(s)
