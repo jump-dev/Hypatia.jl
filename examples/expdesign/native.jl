@@ -120,7 +120,7 @@ function build(inst::ExpDesignNative{T}) where {T <: Real}
         for i in 1:q
             G_geo[i, sum(1:i)] = -1
         end
-        push!(cones, Cones.HypoGeomean{T}(fill(inv(T(q)), q)))
+        push!(cones, Cones.HypoGeoMean{T}(1 + q))
         G_soc_epi = zeros(T, pq + p, p)
         G_soc = zeros(T, pq + p, pq)
         epi_idx = 1
@@ -191,7 +191,7 @@ function build(inst::ExpDesignNative{T}) where {T <: Real}
         for i in 1:q
             G_geo[i, diag_idx(i)] = -1
         end
-        push!(cones, Cones.HypoGeomean{T}(fill(inv(T(q)), q)))
+        push!(cones, Cones.HypoGeoMean{T}(1 + q))
         # all conic constraints
         G = [
             G_norminf   zeros(T, size(G_norminf, 1), num_trivars + 1);

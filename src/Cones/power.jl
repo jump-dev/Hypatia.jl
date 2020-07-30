@@ -178,7 +178,6 @@ function update_hess(cone::Power)
     return cone.hess
 end
 
-# TODO improve / cache more, and benchmark to decide whether this improves speed/numerics
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
     @assert cone.grad_updated
     m = length(cone.alpha)
