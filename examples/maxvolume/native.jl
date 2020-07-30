@@ -36,7 +36,7 @@ function build(inst::MaxVolumeNative{T}) where {T <: Real}
     if inst.use_hypogeomean
         G = -Matrix{T}(I, n + 1, n + 1)
         h = zeros(T, n + 1)
-        cones = Cones.Cone{T}[Cones.HypoGeomean{T}(fill(inv(T(n)), n))]
+        cones = Cones.Cone{T}[Cones.HypoGeoMean{T}(1 + n)]
     elseif inst.use_power
         @assert n > 2
         cones = Cones.Cone{T}[]

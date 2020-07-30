@@ -108,7 +108,7 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
                 zeros(T, num_obs) -X_pts_polys
                 ]
             h_likl = zeros(T, 1 + num_obs)
-            push!(cones, Cones.HypoGeomean{T}(fill(inv(T(num_obs)), num_obs)))
+            push!(cones, Cones.HypoGeoMean{T}(1 + num_obs))
             A_ext = zeros(T, 0, num_obs)
         else
             num_ext_geom_vars = 1 + num_obs

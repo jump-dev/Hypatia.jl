@@ -730,7 +730,7 @@ function hypogeomean1(T; options...)
     h = zeros(T, 3)
 
     for use_dual in (false, true)
-        cones = Cone{T}[Cones.HypoGeomean{T}(ones(T, 2) / 2, use_dual = use_dual)]
+        cones = Cone{T}[Cones.HypoGeoMean{T}(3, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
         @test r.status == :Optimal
@@ -749,7 +749,7 @@ function hypogeomean2(T; options...)
 
     for use_dual in (false, true)
         b = use_dual ? [-one(T)] : [one(T)]
-        cones = Cone{T}[Cones.HypoGeomean{T}(fill(inv(T(l)), l), use_dual = use_dual)]
+        cones = Cone{T}[Cones.HypoGeoMean{T}(l + 1, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
         @test r.status == :Optimal
@@ -768,7 +768,7 @@ function hypogeomean3(T; options...)
     h = zeros(T, l + 1)
 
     for use_dual in (false, true)
-        cones = Cone{T}[Cones.HypoGeomean{T}(fill(inv(T(l)), l), use_dual = use_dual)]
+        cones = Cone{T}[Cones.HypoGeoMean{T}(l + 1, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
         @test r.status == :Optimal
@@ -784,7 +784,7 @@ function hypogeomean4(T; options...)
     b = zeros(T, 0)
     G = vcat(Matrix{T}(-I, 4, 4), T[0, 1, 1, 1]')
     h = T[0, 0, 0, 0, 3]
-    cones = Cone{T}[Cones.HypoGeomean{T}(fill(inv(T(3)), 3)), Cones.Nonnegative{T}(1)]
+    cones = Cone{T}[Cones.HypoGeoMean{T}(4), Cones.Nonnegative{T}(1)]
 
     r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
     @test r.status == :Optimal
@@ -801,7 +801,7 @@ function hypogeomean5(T; options...)
     b = zeros(T, 0)
     G = sparse([1, 2, 3], [1, 2, 2], T[-1, -1, 1], 3, 2)
     h = T[0, 0, 2]
-    cones = Cone{T}[Cones.HypoGeomean{T}([one(T)]), Cones.Nonnegative{T}(1)]
+    cones = Cone{T}[Cones.HypoGeoMean{T}(2), Cones.Nonnegative{T}(1)]
 
     r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
     @test r.status == :Optimal
@@ -819,7 +819,116 @@ function hypogeomean6(T; options...)
     b = ones(T, 9)
     G = -one(T) * I
     h = zeros(T, 10)
-    cones = Cone{T}[Cones.HypoGeomean{T}(fill(inv(T(9)), 9))]
+    cones = Cone{T}[Cones.HypoGeoMean{T}(10)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    @test r.x ≈ ones(T, 10) atol=tol rtol=tol
+    @test r.z ≈ vcat(-one(T), fill(inv(T(9)), 9)) atol=tol rtol=tol
+    @test r.y ≈ fill(inv(T(9)), 9) atol=tol rtol=tol
+end
+
+# TODO test with non-equal alphas
+function hypopowermean1(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[-1, 0, 0]
+    A = T[0 0 1; 0 1 0]
+    b = T[0.5, 1]
+    G = -one(T) * I
+    h = zeros(T, 3)
+
+    for use_dual in (false, true)
+        cones = Cone{T}[Cones.HypoPowerMean{T}(ones(T, 2) / 2, use_dual = use_dual)]
+
+        r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ (use_dual ? 0 : -inv(sqrt(T(2)))) atol=tol rtol=tol
+        @test r.x[2:3] ≈ [1, 0.5] atol=tol rtol=tol
+    end
+end
+
+function hypopowermean2(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    l = 4
+    c = vcat(zero(T), ones(T, l))
+    A = T[one(T) zeros(T, 1, l)]
+    G = SparseMatrixCSC(-one(T) * I, l + 1, l + 1)
+    h = zeros(T, l + 1)
+
+    for use_dual in (false, true)
+        b = use_dual ? [-one(T)] : [one(T)]
+        cones = Cone{T}[Cones.HypoPowerMean{T}(fill(inv(T(l)), l), use_dual = use_dual)]
+
+        r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ (use_dual ? 1 : l) atol=tol rtol=tol
+        @test r.x[2:end] ≈ (use_dual ? fill(inv(T(l)), l) : ones(l)) atol=tol rtol=tol
+    end
+end
+
+function hypopowermean3(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    l = 4
+    c = ones(T, l)
+    A = zeros(T, 0, l)
+    b = zeros(T, 0)
+    G = [zeros(T, 1, l); Matrix{T}(-I, l, l)]
+    h = zeros(T, l + 1)
+
+    for use_dual in (false, true)
+        cones = Cone{T}[Cones.HypoPowerMean{T}(fill(inv(T(l)), l), use_dual = use_dual)]
+
+        r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+        @test r.status == :Optimal
+        @test r.primal_obj ≈ 0 atol=tol rtol=tol
+        @test norm(r.x) ≈ 0 atol=tol rtol=tol
+    end
+end
+
+function hypopowermean4(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[-1, 0, 0, 0]
+    A = zeros(T, 0, 4)
+    b = zeros(T, 0)
+    G = vcat(Matrix{T}(-I, 4, 4), T[0, 1, 1, 1]')
+    h = T[0, 0, 0, 0, 3]
+    cones = Cone{T}[Cones.HypoPowerMean{T}(fill(inv(T(3)), 3)), Cones.Nonnegative{T}(1)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    @test r.x ≈ [1, 1, 1, 1] atol=tol rtol=tol
+    @test r.s ≈ [1, 1, 1, 1, 0] atol=tol rtol=tol
+    @test r.z ≈ vcat(-1, fill(inv(T(3)), 4)) atol=tol rtol=tol
+end
+
+function hypopowermean5(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = T[-2, 0]
+    A = zeros(T, 0, 2)
+    b = zeros(T, 0)
+    G = sparse([1, 2, 3], [1, 2, 2], T[-1, -1, 1], 3, 2)
+    h = T[0, 0, 2]
+    cones = Cone{T}[Cones.HypoPowerMean{T}([one(T)]), Cones.Nonnegative{T}(1)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ -4 atol=tol rtol=tol
+    @test r.x ≈ [2, 2] atol=tol rtol=tol
+    @test r.s ≈ [2, 2, 0] atol=tol rtol=tol
+    @test r.z ≈ [-2, 2, 2] atol=tol rtol=tol
+end
+
+function hypopowermean6(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    c = zeros(T, 10)
+    c[1] = -1
+    A = hcat(zeros(T, 9), Matrix{T}(I, 9, 9))
+    b = ones(T, 9)
+    G = -one(T) * I
+    h = zeros(T, 10)
+    cones = Cone{T}[Cones.HypoPowerMean{T}(fill(inv(T(9)), 9))]
 
     r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
     @test r.status == :Optimal

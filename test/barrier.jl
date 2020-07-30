@@ -34,7 +34,7 @@ function test_barrier_oracles(
     dual_point = copy(point)
     CO.set_initial_point(point, cone)
     CO.set_initial_point(dual_point, cone)
-    @test load_reset_check(cone, point, dual_point)
+    load_reset_check(cone, point, dual_point)
     @test cone.point == point
     @test cone.dual_point == dual_point
 
@@ -49,7 +49,7 @@ function test_barrier_oracles(
 
     # perturb and scale the initial point and check feasible
     perturb_scale(point, dual_point, noise, one(T))
-    @test load_reset_check(cone, point, dual_point)
+    load_reset_check(cone, point, dual_point)
 
     # test gradient and Hessian oracles
     test_grad_hess(cone, point, dual_point, tol = tol)
@@ -116,7 +116,9 @@ function load_reset_check(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector
     CO.load_point(cone, point)
     CO.load_dual_point(cone, dual_point)
     CO.reset_data(cone)
-    return CO.is_feas(cone) && CO.is_dual_feas(cone)
+    @test CO.is_feas(cone)
+    @test CO.is_dual_feas(cone)
+    return
 end
 
 function perturb_scale(point::Vector{T}, dual_point::Vector{T}, noise::T, scale::T) where {T <: Real}
@@ -210,6 +212,37 @@ function test_episumperentropy_barrier(T::Type{<:Real})
     return
 end
 
+function test_hypogeomean_barrier(T::Type{<:Real})
+    Random.seed!(1)
+    for dim in [2, 3, 5, 8]
+        invn = inv(T(dim - 1))
+        function barrier(s)
+            (u, w) = (s[1], s[2:end])
+            return -log(exp(sum(invn * log(w[j]) for j in eachindex(w))) - u) - sum(log, w)
+        end
+        test_barrier_oracles(CO.HypoGeoMean{T}(dim), barrier)
+    end
+    return
+end
+
+function test_hypopowermean_barrier(T::Type{<:Real})
+    Random.seed!(1)
+    for dim in [2, 3, 5, 15, 90, 120, 500]
+        alpha = rand(T, dim - 1) .+ 1
+        alpha ./= sum(alpha)
+        function barrier(s)
+            (u, w) = (s[1], s[2:end])
+            return -log(exp(sum(alpha[j] * log(w[j]) for j in eachindex(w))) - u) - sum(log, w)
+        end
+        cone = CO.HypoPowerMean{T}(alpha)
+        test_barrier_oracles(cone, barrier, init_tol = 1e-2, init_only = (dim > 5))
+        # test initial point when all alphas are the same
+        cone = CO.HypoPowerMean{T}(fill(inv(T(dim - 1)), dim - 1))
+        test_barrier_oracles(cone, barrier, init_tol = sqrt(eps(T)), init_only = true)
+    end
+    return
+end
+
 function test_power_barrier(T::Type{<:Real})
     Random.seed!(1)
     for (m, n) in [(2, 1), (2, 3), (4, 1), (4, 4)]
@@ -217,27 +250,9 @@ function test_power_barrier(T::Type{<:Real})
         alpha ./= sum(alpha)
         function barrier(s)
             (u, w) = (s[1:m], s[(m + 1):end])
-            return -log(prod(u[j] ^ (2 * alpha[j]) for j in eachindex(u)) - sum(abs2, w)) - sum((1 - alpha[j]) * log(u[j]) for j in eachindex(u))
+            return -log(exp(2 * sum(alpha[j] * log(u[j]) for j in eachindex(u))) - sum(abs2, w)) - sum((1 - alpha[j]) * log(u[j]) for j in eachindex(u))
         end
         test_barrier_oracles(CO.Power{T}(alpha, n), barrier)
-    end
-    return
-end
-
-function test_hypogeomean_barrier(T::Type{<:Real})
-    Random.seed!(1)
-    for dim in [2, 3, 5, 15, 90, 120, 500]
-        alpha = rand(T, dim - 1) .+ 1
-        alpha ./= sum(alpha)
-        function barrier(s)
-            (u, w) = (s[1], s[2:end])
-            return -log(prod(w[j] ^ alpha[j] for j in eachindex(w)) - u) - sum(log(wi) for wi in w)
-        end
-        cone = CO.HypoGeomean{T}(alpha)
-        test_barrier_oracles(cone, barrier, init_tol = 1e-2, init_only = (dim > 5))
-        # test initial point when all alphas are the same
-        cone = CO.HypoGeomean{T}(fill(inv(T(dim - 1)), dim - 1))
-        test_barrier_oracles(cone, barrier, init_tol = sqrt(eps(T)), init_only = true)
     end
     return
 end

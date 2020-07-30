@@ -19,8 +19,8 @@ import TimerOutputs
 import DataStructures
 
 # path to write results DataFrame to CSV, if any
-results_path = joinpath(homedir(), "bench1", "bench1.csv")
-# results_path = nothing
+# results_path = joinpath(homedir(), "bench1", "bench1.csv")
+results_path = nothing
 
 # options to solvers
 timer = TimerOutputs.TimerOutput()
@@ -36,17 +36,17 @@ default_solver_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    # ("minimal", Float64, 15),
+    ("minimal", Float64, 15),
     # ("minimal", Float32, 15),
     # ("minimal", BigFloat, 15),
-    # ("fast", Float64, 15),
+    ("fast", Float64, 15),
     # ("slow", Float64, 120),
-    ("bench1", Float64, 1800),
+    # ("bench1", Float64, 1800),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
+    "native",
     "JuMP",
     ]
 
@@ -66,29 +66,29 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    # # "centralpolymat",
-    # # "conditionnum",
-    # # "contraction",
-    # "densityest",
-    # # "envelope",
-    # "expdesign",
-    # # # "lotkavolterra", # TODO PolyJuMP error
-    # # "lyapunovstability",
-    # "matrixcompletion",
-    # "matrixquadratic",
-    # "matrixregression",
-    # # "maxvolume",
-    # # "muconvexity",
+    "centralpolymat",
+    "conditionnum",
+    "contraction",
+    "densityest",
+    "envelope",
+    "expdesign",
+    # "lotkavolterra", # TODO PolyJuMP error
+    "lyapunovstability",
+    "matrixcompletion",
+    "matrixquadratic",
+    "matrixregression",
+    "maxvolume",
+    "muconvexity",
     "nearestpsd",
-    # "polymin",
-    # # "polynorm",
-    # "portfolio",
-    # # # "regionofattr", # TODO PolyJuMP error
-    # "robustgeomprog",
-    # # "secondorderpoly",
-    # # "semidefinitepoly",
-    # "shapeconregr",
-    # "signomialmin",
+    "polymin",
+    "polynorm",
+    "portfolio",
+    # "regionofattr", # TODO PolyJuMP error
+    "robustgeomprog",
+    "secondorderpoly",
+    "semidefinitepoly",
+    "shapeconregr",
+    "signomialmin",
     ]
 
 # start the tests
