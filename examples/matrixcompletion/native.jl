@@ -192,7 +192,7 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
                 G_norm;
                 prepad  G_geo  postpad
                 ]
-            push!(cones, Cones.HypoGeomean{T}(fill(inv(T(num_unknown)), num_unknown)))
+            push!(cones, Cones.HypoGeoMean{T}(1 + num_unknown))
         else
             # number of 3-dimensional power cones needed is num_unknown - 1, number of new variables is num_unknown - 2
             # first num_unknown columns overlap with G_norm, column for the epigraph variable of the spectral cone added later
