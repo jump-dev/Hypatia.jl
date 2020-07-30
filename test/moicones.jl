@@ -88,11 +88,9 @@ function test_moi_cones(T::Type{<:Real})
     @testset "GeometricMeanCone" begin
         moi_cone = MOI.GeometricMeanCone(3)
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa CO.HypoGeomean{T}
+        @test hyp_cone isa CO.HypoGeoMean{T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
         @test !CO.use_dual_barrier(hyp_cone)
-        iT2 = inv(T(2))
-        @test hyp_cone.alpha == T[iT2, iT2]
     end
 
     @testset "RelativeEntropyCone" begin
@@ -178,16 +176,6 @@ function test_moi_cones(T::Type{<:Real})
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 4
     end
 
-    @testset "Power" begin
-        alpha = rand(T, 2)
-        alpha ./= sum(alpha)
-        moi_cone = HYP.PowerCone{T}(alpha, 3)
-        hyp_cone = HYP.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa CO.Power{T}
-        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 5
-        @test hyp_cone.alpha == alpha
-    end
-
     @testset "HypoPerLog" begin
         moi_cone = HYP.HypoPerLogCone{T}(4)
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
@@ -202,13 +190,30 @@ function test_moi_cones(T::Type{<:Real})
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 4
     end
 
-    @testset "HypoGeomean" begin
+    @testset "HypoGeoMean" begin
+        moi_cone = HYP.HypoGeoMeanCone{T}(3)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.HypoGeoMean{T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
+    end
+
+    @testset "HypoPowerMean" begin
         alpha = rand(T, 2)
         alpha ./= sum(alpha)
-        moi_cone = HYP.HypoGeomeanCone{T}(alpha)
+        moi_cone = HYP.HypoPowerMeanCone{T}(alpha)
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa CO.HypoGeomean{T}
+        @test hyp_cone isa CO.HypoPowerMean{T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
+        @test hyp_cone.alpha == alpha
+    end
+
+    @testset "Power" begin
+        alpha = rand(T, 2)
+        alpha ./= sum(alpha)
+        moi_cone = HYP.PowerCone{T}(alpha, 3)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.Power{T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 5
         @test hyp_cone.alpha == alpha
     end
 
