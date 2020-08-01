@@ -20,9 +20,7 @@ end
 function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64} # TODO generic reals
     (n, k) = (inst.n, inst.k)
     @assert n < k # want some degrees of freedom for v
-    B = randn(T, k, n) # linear constraint matrix
-    alphas = rand(T, k) .+ 1 # for entropy constraint for set C
-
+    B = randn(T, k, n) # GP powers matrix
     model = JuMP.Model()
     JuMP.@variable(model, t)
     JuMP.@objective(model, Min, t)
@@ -33,12 +31,7 @@ function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64} # TODO generic 
     JuMP.@constraint(model, B' * v .== 0)
 
     # use bounded convex set C of R_+^k excluding origin (note that the entropy constraint already forces c >= 0)
-    # satisfy a geomean constraint (note c = ones(k) is feasible and origin is excluded)
-    JuMP.@constraint(model, vcat(1, c) in MOI.GeometricMeanCone(1 + k))
-    # satisfy an entropy constraint with perspective vector alphas (note c = ones(k) is feasible and no c variable can go to infinity)
-    @assert all(alphas .> 1e-5)
-    alphas /= sum(alphas)
-    JuMP.@constraint(model, vcat(-sum(log, alphas), alphas, c) in MOI.RelativeEntropyCone(1 + 2k))
+    JuMP.@constraint(model, vcat(sqrt(k) / 2, 1 .- c) in MOI.NormOneCone(1 + k))
 
     return model
 end
@@ -53,7 +46,11 @@ instances[RobustGeomProgJuMP]["fast"] = [
     ((10, 20),),
     ((10, 20), ClassicConeOptimizer),
     ((20, 40),),
+    ((20, 40), ClassicConeOptimizer),
     ((40, 80),),
+    ((40, 80), ClassicConeOptimizer),
+    ((100, 150),),
+    ((100, 150), ClassicConeOptimizer),
     ]
 instances[RobustGeomProgJuMP]["slow"] = [
     ((40, 80), ClassicConeOptimizer),
