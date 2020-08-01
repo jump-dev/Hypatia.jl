@@ -56,7 +56,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     function HypoRootdetTri{T, R}(
         dim::Int;
         use_dual::Bool = false,
-        sc_const::Real = T(25) / T(9),
+        sc_const::Real = 25 / T(9),
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
