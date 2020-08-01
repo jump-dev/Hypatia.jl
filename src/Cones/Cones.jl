@@ -100,7 +100,7 @@ function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
         recover || return false
         # TODO if Chol, try adding sqrt(eps(T)) to diag and re-factorize
         if T <: BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
-            # @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
+            @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
             cone.hess_fact_cache = DenseSymCache{T}()
             load_matrix(cone.hess_fact_cache, cone.hess)
         else
@@ -185,7 +185,7 @@ function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
     #     inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
     #     nbhd = norm(nbhd_tmp2)
     else
-        inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
+        @timeit cone.timer "inv_hess" inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
         nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
         if nbhd_sqr < -100eps(T) # TODO possibly loosen
             # @warn("numerical failure: cone neighborhood is $nbhd_sqr")

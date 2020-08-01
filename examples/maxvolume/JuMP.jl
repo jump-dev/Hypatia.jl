@@ -56,8 +56,8 @@ instances[MaxVolumeJuMP]["fast"] = [
     ((1000, true, true),), # with bridges extended formulation will need to go into slow list
     ]
 instances[MaxVolumeJuMP]["slow"] = [
-    ((1000, false, true), ClassicConeOptimizer),
-    ((2000, true, false),),
+    # ((1000, false, true), ClassicConeOptimizer),
+    # ((2000, true, false),),
     ((2000, false, true),),
-    ((2000, true, true),),
+    # ((2000, true, true),),
     ]

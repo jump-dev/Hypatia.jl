@@ -47,6 +47,19 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     tmpLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
 
+    UU1
+    UU2
+    UU3
+    UU4
+    UU5
+    UU6
+    UU7
+    UU8
+    UU9
+    UU10
+    UU11
+    UU12
+
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
         U::Int,
@@ -99,6 +112,18 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.ΛFL = Vector{Any}(undef, length(Ps))
     cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
+    cone.UU1 = zeros(U, U)
+    cone.UU2 = zeros(U, U)
+    cone.UU3 = zeros(U, U)
+    cone.UU4 = zeros(U, U)
+    cone.UU5 = zeros(U, U)
+    cone.UU6 = zeros(U, U)
+    cone.UU7 = zeros(U, U)
+    cone.UU8 = zeros(U, U)
+    cone.UU9 = zeros(U, U)
+    cone.UU10 = zeros(U, U)
+    cone.UU11 = zeros(U, U)
+    cone.UU12 = zeros(U, U)
     return
 end
 
@@ -245,47 +270,127 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     return cone.hess
 end
 
-function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where {T}
+# function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where {T}
+#     @assert cone.grad_updated
+#     corr = cone.correction
+#     corr .= 0
+#     U = cone.U
+#     UR = U * cone.R
+#     dim = cone.dim
+#     PlambdaP_dirs = cone.tmpRRUU
+#     matRR = cone.tmpRR
+#     matRR2 = cone.tmpRR2
+#     matRR3 = cone.tmpRR3
+#
+#     @inbounds for k in eachindex(cone.Ps)
+#         PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
+#
+#         @inbounds for p in 1:U, q in 1:U
+#             @views primal_dir_mat_q = Symmetric(svec_to_smat!(matRR, primal_dir[q:U:dim], cone.rt2))
+#             @views PlambdaPk_slice_pq = PlambdaPk[p:U:UR, q:U:UR]
+#             mul!(PlambdaP_dirs[p][q], PlambdaPk_slice_pq, primal_dir_mat_q)
+#         end
+#
+#         @inbounds for p in 1:U
+#             @views primal_dir_mat_p = Symmetric(svec_to_smat!(matRR, primal_dir[p:U:dim], cone.rt2))
+#             @inbounds for q in 1:U
+#                 pq_q = PlambdaP_dirs[p][q] # PlambdaPk_slice_pq * primal_dir_mat_q
+#                 @inbounds for r in 1:q
+#                     @views PlambdaPk_slice_qr = PlambdaPk[q:U:UR, r:U:UR]
+#                     r_rp = PlambdaP_dirs[p][r]'
+#
+#                     # O(R^3) done O(U^3) times
+#                     mul!(matRR2, PlambdaPk_slice_qr, r_rp)
+#                     mul!(matRR3, pq_q, matRR2)
+#                     axpy!(true, matRR3, matRR3')
+#                     if q != r
+#                         matRR3 .*= 2
+#                     end
+#                     @views smat_to_svec_add!(corr[p:U:dim], matRR3, cone.rt2)
+#                 end
+#             end
+#         end
+#     end
+#     corr ./= 2
+#
+#     return corr
+# end
+
+function correction(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
     @assert cone.grad_updated
     corr = cone.correction
-    corr .= 0
     U = cone.U
-    UR = U * cone.R
-    dim = cone.dim
-    PlambdaP_dirs = cone.tmpRRUU
-    matRR = cone.tmpRR
-    matRR2 = cone.tmpRR2
-    matRR3 = cone.tmpRR3
+    R = cone.R
+    corr .= 0
 
-    @inbounds for k in eachindex(cone.Ps)
-        PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
+    for p in eachindex(cone.Ps)
+        PlambdaPk = Symmetric(cone.PlambdaP[p], :U)
+        idx_kl = 1
+        for l in 1:R, k in 1:l
+            idx_mn = 1
+            for n in 1:R, m in 1:n
+                @views primal_dir_kl = Diagonal(primal_dir[block_idxs(U, idx_kl)])
+                @views primal_dir_mn = Diagonal(primal_dir[block_idxs(U, idx_mn)])
+                @views PlambdaPk_slice_km = PlambdaPk[block_idxs(U, k), block_idxs(U, m)]
+                @views PlambdaPk_slice_kn = PlambdaPk[block_idxs(U, k), block_idxs(U, n)]
+                @views PlambdaPk_slice_lm = PlambdaPk[block_idxs(U, l), block_idxs(U, m)]
+                @views PlambdaPk_slice_ln = PlambdaPk[block_idxs(U, l), block_idxs(U, n)]
 
-        @inbounds for p in 1:U, q in 1:U
-            @views primal_dir_mat_q = Symmetric(svec_to_smat!(matRR, primal_dir[q:U:dim], cone.rt2))
-            @views PlambdaPk_slice_pq = PlambdaPk[p:U:UR, q:U:UR]
-            mul!(PlambdaP_dirs[p][q], PlambdaPk_slice_pq, primal_dir_mat_q)
-        end
+                mul!(cone.UU5, PlambdaPk_slice_kn, primal_dir_mn)
+                mid1 = mul!(cone.UU1, primal_dir_kl, cone.UU5)
+                mul!(cone.UU5, PlambdaPk_slice_ln, primal_dir_mn)
+                mid2 = mul!(cone.UU2, primal_dir_kl, cone.UU5)
+                mul!(cone.UU5, PlambdaPk_slice_km, primal_dir_mn)
+                mid3 = mul!(cone.UU3, primal_dir_kl, cone.UU5)
+                mul!(cone.UU5, PlambdaPk_slice_lm, primal_dir_mn)
+                mid4 = mul!(cone.UU4, primal_dir_kl, cone.UU5)
 
-        @inbounds for p in 1:U
-            @views primal_dir_mat_p = Symmetric(svec_to_smat!(matRR, primal_dir[p:U:dim], cone.rt2))
-            @inbounds for q in 1:U
-                pq_q = PlambdaP_dirs[p][q] # PlambdaPk_slice_pq * primal_dir_mat_q
-                @inbounds for r in 1:q
-                    @views PlambdaPk_slice_qr = PlambdaPk[q:U:UR, r:U:UR]
-                    r_rp = PlambdaP_dirs[p][r]'
+                idx_ij = 1
+                for j in 1:R, i in 1:j
+                    corr_ij = view(corr, block_idxs(U, idx_ij))
 
-                    # O(R^3) done O(U^3) times
-                    mul!(matRR2, PlambdaPk_slice_qr, r_rp)
-                    mul!(matRR3, pq_q, matRR2)
-                    axpy!(true, matRR3, matRR3')
-                    if q != r
-                        matRR3 .*= 2
+                    @views PlambdaPk_slice_ik = PlambdaPk[block_idxs(U, i), block_idxs(U, k)]
+                    @views PlambdaPk_slice_il = PlambdaPk[block_idxs(U, i), block_idxs(U, l)]
+                    @views PlambdaPk_slice_im = PlambdaPk[block_idxs(U, i), block_idxs(U, m)]
+                    @views PlambdaPk_slice_in = PlambdaPk[block_idxs(U, i), block_idxs(U, n)]
+                    @views PlambdaPk_slice_jk = PlambdaPk[block_idxs(U, j), block_idxs(U, k)]
+                    @views PlambdaPk_slice_jl = PlambdaPk[block_idxs(U, j), block_idxs(U, l)]
+                    @views PlambdaPk_slice_jm = PlambdaPk[block_idxs(U, j), block_idxs(U, m)]
+                    @views PlambdaPk_slice_jn = PlambdaPk[block_idxs(U, j), block_idxs(U, n)]
+
+                    right1 = mul!(cone.UU5, mid1, PlambdaPk_slice_jm')
+                    right2 = mul!(cone.UU6, mid1, PlambdaPk_slice_im')
+                    right3 = mul!(cone.UU7, mid2, PlambdaPk_slice_jm')
+                    right4 = mul!(cone.UU8, mid2, PlambdaPk_slice_im')
+                    right5 = mul!(cone.UU9, mid3, PlambdaPk_slice_jn')
+                    right6 = mul!(cone.UU10, mid3, PlambdaPk_slice_in')
+                    right7 = mul!(cone.UU11, mid4, PlambdaPk_slice_jn')
+                    right8 = mul!(cone.UU12, mid4, PlambdaPk_slice_in')
+
+                    m_diag = zeros(U)
+                    for u in 1:U
+                        @timeit cone.timer "dot" @views m_diag[u] =
+                            dot(PlambdaPk_slice_il[u, :], right1[:, u]) +
+                            dot(PlambdaPk_slice_jl[u, :], right2[:, u]) +
+                            dot(PlambdaPk_slice_ik[u, :], right3[:, u]) +
+                            dot(PlambdaPk_slice_jk[u, :], right4[:, u]) +
+                            dot(PlambdaPk_slice_il[u, :], right5[:, u]) +
+                            dot(PlambdaPk_slice_jl[u, :], right6[:, u]) +
+                            dot(PlambdaPk_slice_ik[u, :], right7[:, u]) +
+                            dot(PlambdaPk_slice_jk[u, :], right8[:, u])
                     end
-                    @views smat_to_svec_add!(corr[p:U:dim], matRR3, cone.rt2)
+                    m_diag .*= (i == j ? 1 : sqrt(2)) * (k == l ? 1 : sqrt(2)) * (m == n ? 1 : sqrt(2)) / 4
+
+
+                    corr_ij .+= m_diag
+                    idx_ij += 1
                 end
+                idx_mn += 1
             end
+            idx_kl += 1
         end
     end
+
     corr ./= 2
 
     return corr

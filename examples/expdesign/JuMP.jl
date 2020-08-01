@@ -97,7 +97,7 @@ instances[ExpDesignJuMP]["slow"] = [
 # benchmark 1 instances
 instances[ExpDesignJuMP]["bench1"] = (
     ((q, 2q, 2q, 5, use_logdet, !use_logdet, false), ext)
-    for q in vcat(3, 20:20:220) # includes compile run
-    for use_logdet in (false, true)
-    for ext in (nothing, ClassicConeOptimizer)
+    for q in vcat(3,) # 20:20:20) #220) # includes compile run
+    for use_logdet in (true,)
+    for ext in (nothing,) #, ClassicConeOptimizer)
     )

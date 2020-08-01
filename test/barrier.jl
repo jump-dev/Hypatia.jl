@@ -416,7 +416,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
         else
             test_barrier_oracles(cone, R_barrier, init_tol = 1e-1, init_only = true)
         end
-        
+
         # try sc_const = 1 (not self-concordant)
         cone = CO.HypoPerLogdetTri{T, T}(dim, sc_const = 1)
         function R_barrier_sc1(s)
@@ -431,18 +431,18 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
         end
 
         # complex logdet barrier
-        dim = 2 + side^2
-        cone = CO.HypoPerLogdetTri{T, Complex{T}}(dim)
-        function C_barrier(s)
-            (u, v, W) = (s[1], s[2], zeros(Complex{eltype(s)}, side, side))
-            CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
-            return cone.sc_const * (-log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - (side + 1) * log(v))
-        end
-        if side <= 5
-            test_barrier_oracles(cone, C_barrier, init_tol = 1e-5)
-        else
-            test_barrier_oracles(cone, C_barrier, init_tol = 1e-1, init_only = true)
-        end
+        # dim = 2 + side^2
+        # cone = CO.HypoPerLogdetTri{T, Complex{T}}(dim)
+        # function C_barrier(s)
+        #     (u, v, W) = (s[1], s[2], zeros(Complex{eltype(s)}, side, side))
+        #     CO.svec_to_smat!(W, s[3:end], sqrt(T(2)))
+        #     return cone.sc_const * (-log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - (side + 1) * log(v))
+        # end
+        # if side <= 5
+        #     test_barrier_oracles(cone, C_barrier, init_tol = 1e-5)
+        # else
+        #     test_barrier_oracles(cone, C_barrier, init_tol = 1e-1, init_only = true)
+        # end
     end
     return
 end

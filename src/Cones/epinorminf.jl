@@ -383,7 +383,7 @@ end
 # end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
+    @timeit cone.timer "sqrt_aux" cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
     @assert !cone.no_sqrts
     copyto!(prod, arr)
     lmul!(cone.hess_sqrt', prod)
@@ -393,7 +393,7 @@ end
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
     @assert !cone.no_sqrts
-    ldiv!(prod, cone.hess_sqrt, arr)
+    @timeit cone.timer "ldiv" ldiv!(prod, cone.hess_sqrt, arr)
     return prod
 end
 

@@ -244,18 +244,18 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
                 arr_k = system_solver.GQ2_k[k]
                 q_k = size(arr_k, 1)
                 @views prod_k = system_solver.HGQ2[idx:(idx + q_k - 1), :]
-                Cones.inv_hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
+                @timeit solver.timer "ihsp" Cones.inv_hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
                 idx += q_k
             end
             @views HGQ2_sub = system_solver.HGQ2[1:(idx - 1), :]
-            outer_prod(HGQ2_sub, lhs, true, false)
+            @timeit solver.timer "outer_prod" outer_prod(HGQ2_sub, lhs, true, false)
         end
 
         for k in inv_hess_cones
             arr_k = system_solver.GQ2_k[k]
             prod_k = system_solver.HGQ2_k[k]
-            Cones.inv_hess_prod!(prod_k, arr_k, model.cones[k])
-            mul!(lhs, arr_k', prod_k, true, true)
+            @timeit solver.timer "inv_hess_prod" Cones.inv_hess_prod!(prod_k, arr_k, model.cones[k])
+            @timeit solver.timer "ihp_mul" mul!(lhs, arr_k', prod_k, true, true)
         end
 
         # do hess and hess_sqrt cones
@@ -265,18 +265,18 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
                 arr_k = system_solver.GQ2_k[k]
                 q_k = size(arr_k, 1)
                 @views prod_k = system_solver.HGQ2[idx:(idx + q_k - 1), :]
-                Cones.hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
+                @timeit solver.timer "ihsp" Cones.hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
                 idx += q_k
             end
             @views HGQ2_sub = system_solver.HGQ2[1:(idx - 1), :]
-            outer_prod(HGQ2_sub, lhs, true, true)
+            @timeit solver.timer "outer_prod" outer_prod(HGQ2_sub, lhs, true, true)
         end
 
         for k in hess_cones
             arr_k = system_solver.GQ2_k[k]
             prod_k = system_solver.HGQ2_k[k]
-            Cones.hess_prod!(prod_k, arr_k, model.cones[k])
-            mul!(lhs, arr_k', prod_k, true, true)
+            @timeit solver.timer "hess_prod" Cones.hess_prod!(prod_k, arr_k, model.cones[k])
+            @timeit solver.timer "hp_mul" mul!(lhs, arr_k', prod_k, true, true)
         end
     end
 
@@ -306,7 +306,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
     const_sol[system_solver.y_rows] = model.b
     @views const_sol_z = const_sol[system_solver.z_rows]
     for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
-        @views block_hess_prod(cone_k, const_sol_z[idxs_k], model.h[idxs_k])
+        @timeit solver.timer "bhp" @views block_hess_prod(cone_k, const_sol_z[idxs_k], model.h[idxs_k])
     end
     solve_subsystem(system_solver, solver, const_sol)
 

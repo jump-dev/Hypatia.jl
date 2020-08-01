@@ -42,9 +42,9 @@ instances[MatrixCompletionJuMP]["fast"] = [
     ((12, 20),),
     ]
 instances[MatrixCompletionJuMP]["slow"] = [
-    ((12, 24), ClassicConeOptimizer),
+    # ((12, 24), ClassicConeOptimizer),
     ((14, 140),),
-    ((14, 140), ClassicConeOptimizer),
+    # ((14, 140), ClassicConeOptimizer),
     ((40, 70),),
     ((18, 180),),
     ]
