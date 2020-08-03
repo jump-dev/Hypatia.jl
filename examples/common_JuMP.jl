@@ -10,7 +10,7 @@ import JuMP
 const MOI = JuMP.MOI
 
 # SOCone, PSDCone, ExpCone, PowerCone only
-MOI.Utilities.@model(ClassicConeOptimizer,
+MOI.Utilities.@model(StandardConeOptimizer,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,

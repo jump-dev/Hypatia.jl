@@ -108,39 +108,3 @@ instances[DensityEstJuMP]["slow"] = [
     ((500, 4, 6, true),),
     ((500, 4, 6, false),),
     ]
-
-# benchmark 1 instances
-bench1_n_d = [
-    (1, 4), # compile run
-    (1, 75),
-    (1, 150),
-    (1, 300),
-    (1, 600),
-    (1, 900),
-    (1, 1200),
-    (1, 1500),
-    (2, 3), # compile run
-    (2, 10),
-    (2, 20),
-    (2, 30),
-    (2, 40),
-    (3, 2), # compile run
-    (3, 3),
-    (3, 6),
-    (3, 9),
-    (3, 12),
-    (4, 2),
-    (4, 4),
-    (4, 6),
-    (8, 2),
-    (8, 3),
-    (16, 1),
-    (16, 2), # (16, 3) too large for quadrature weights
-    (32, 1), # (32, 2) too large for quadrature weights
-    (64, 1),
-    ]
-instances[DensityEstJuMP]["bench1"] = (
-    ((ceil(Int, 1.1 * binomial(n + 2d, n)), n, 2d, use_nat), ext)
-    for (n, d) in bench1_n_d
-    for (use_nat, ext) in ((false, ExpPSDConeOptimizer), (true, nothing))
-    )

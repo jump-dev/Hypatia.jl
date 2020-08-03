@@ -62,19 +62,19 @@ end
 
 instances[ExpDesignJuMP]["minimal"] = [
     ((2, 3, 4, 2, true, false, false),),
-    ((2, 3, 4, 2, true, false, false), ClassicConeOptimizer),
+    ((2, 3, 4, 2, true, false, false), StandardConeOptimizer),
     ((2, 3, 4, 2, false, true, false),),
-    ((2, 3, 4, 2, false, true, false), ClassicConeOptimizer),
+    ((2, 3, 4, 2, false, true, false), StandardConeOptimizer),
     ((2, 3, 4, 2, false, false, true),),
-    ((2, 3, 4, 2, false, false, true), ClassicConeOptimizer),
+    ((2, 3, 4, 2, false, false, true), StandardConeOptimizer),
     ]
 instances[ExpDesignJuMP]["fast"] = [
     ((3, 5, 7, 2, true, false, false),),
-    ((3, 5, 7, 2, true, false, false), ClassicConeOptimizer),
+    ((3, 5, 7, 2, true, false, false), StandardConeOptimizer),
     ((3, 5, 7, 2, false, true, false),),
-    ((3, 5, 7, 2, false, true, false), ClassicConeOptimizer),
+    ((3, 5, 7, 2, false, true, false), StandardConeOptimizer),
     ((3, 5, 7, 2, false, false, true),),
-    ((3, 5, 7, 2, false, false, true), ClassicConeOptimizer),
+    ((3, 5, 7, 2, false, false, true), StandardConeOptimizer),
     ((5, 15, 25, 5, true, false, false),),
     ((5, 15, 25, 5, false, true, false),),
     ((5, 15, 25, 5, false, false, true),),
@@ -86,18 +86,10 @@ instances[ExpDesignJuMP]["fast"] = [
     ((25, 75, 125, 10, false, false, true),),
     ]
 instances[ExpDesignJuMP]["slow"] = [
-    ((25, 75, 125, 10, true, false, false), ClassicConeOptimizer),
-    ((25, 75, 125, 10, false, true, false), ClassicConeOptimizer),
-    ((25, 75, 125, 10, false, false, true), ClassicConeOptimizer),
+    ((25, 75, 125, 10, true, false, false), StandardConeOptimizer),
+    ((25, 75, 125, 10, false, true, false), StandardConeOptimizer),
+    ((25, 75, 125, 10, false, false, true), StandardConeOptimizer),
     ((100, 200, 200, 10, true, false, false),),
     ((100, 200, 200, 10, false, true, false),),
     ((100, 200, 200, 10, false, false, true),),
     ]
-
-# benchmark 1 instances
-instances[ExpDesignJuMP]["bench1"] = (
-    ((q, 2q, 2q, 5, use_logdet, !use_logdet, false), ext)
-    for q in vcat(3, 20:20:220) # includes compile run
-    for use_logdet in (false, true)
-    for ext in (nothing, ClassicConeOptimizer)
-    )
