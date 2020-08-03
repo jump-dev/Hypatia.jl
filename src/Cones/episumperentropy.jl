@@ -59,6 +59,7 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
         max_neighborhood::Real = default_max_neighborhood(),
         ) where {T <: Real}
         @assert dim >= 3
+        @assert isodd(dim)
         cone = new{T}()
         cone.use_dual_barrier = use_dual
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
