@@ -184,10 +184,10 @@ function test_moi_cones(T::Type{<:Real})
     end
 
     @testset "EpiSumPerEntropy" begin
-        moi_cone = HYP.EpiSumPerEntropyCone{T}(4)
+        moi_cone = HYP.EpiSumPerEntropyCone{T}(5)
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
         @test hyp_cone isa CO.EpiSumPerEntropy{T}
-        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 4
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 5
     end
 
     @testset "HypoGeoMean" begin
