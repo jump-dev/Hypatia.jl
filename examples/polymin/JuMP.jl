@@ -131,39 +131,3 @@ instances[PolyMinJuMP]["slow"] = [
     ((2, 30, false, true),),
     ((2, 30, false, false),),
     ]
-
-# benchmark 1 instances
-bench1_n_d = [
-    (1, 4), # compile run
-    (1, 100),
-    (1, 200),
-    (1, 500),
-    (1, 1000),
-    (1, 1500),
-    (1, 2500),
-    (1, 3500),
-    (2, 3), # compile run
-    (2, 15),
-    (2, 30),
-    (2, 45),
-    (2, 60),
-    (3, 2), # compile run
-    (3, 6),
-    (3, 9),
-    (3, 12),
-    (3, 15),
-    (4, 4),
-    (4, 6),
-    (4, 8),
-    (8, 2),
-    (8, 3),
-    (16, 1),
-    (16, 2),
-    (32, 1),
-    (64, 1),
-    ]
-instances[PolyMinJuMP]["bench1"] = (
-    ((n, d, false, use_wsos),)
-    for (n, d) in bench1_n_d
-    for use_wsos in (false, true)
-    )

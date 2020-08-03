@@ -123,11 +123,11 @@ end
 
 instances[SignomialMinJuMP]["minimal"] = [
     ((2, 2),),
-    ((2, 2), ClassicConeOptimizer),
+    ((2, 2), StandardConeOptimizer),
     ]
 instances[SignomialMinJuMP]["fast"] = [
     ((:motzkin2,),),
-    ((:motzkin2,), ClassicConeOptimizer),
+    ((:motzkin2,), StandardConeOptimizer),
     ((:motzkin3,),),
     ((:CS16ex8_13,),),
     ((:CS16ex8_14,),),
@@ -136,24 +136,16 @@ instances[SignomialMinJuMP]["fast"] = [
     ((:CS16ex13,),),
     ((:MCW19ex1_mod,),),
     ((:MCW19ex8,),),
-    ((:MCW19ex8,), ClassicConeOptimizer),
+    ((:MCW19ex8,), StandardConeOptimizer),
     ((3, 2),),
-    ((3, 2), ClassicConeOptimizer),
+    ((3, 2), StandardConeOptimizer),
     ((6, 6),),
     ((20, 3),),
-    ((20, 3), ClassicConeOptimizer),
+    ((20, 3), StandardConeOptimizer),
     ]
 instances[SignomialMinJuMP]["slow"] = [
     ((10, 10),),
-    ((10, 10), ClassicConeOptimizer),
+    ((10, 10), StandardConeOptimizer),
     ((20, 6),),
     ((40, 3),),
     ]
-
-# benchmark 1 instances
-instances[SignomialMinJuMP]["bench1"] = (
-    ((m, n), ext)
-    for m in vcat(1, 3:3:30) # includes compile run
-    for n in (div(m, 3), m, 3m)
-    for ext in (nothing, ClassicConeOptimizer)
-    )

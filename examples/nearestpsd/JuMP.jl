@@ -104,11 +104,3 @@ instances[NearestPSDJuMP]["slow"] = [
     ((100, true, true, false),),
     ((100, true, false, false),),
     ]
-
-# benchmark 1 instances
-instances[NearestPSDJuMP]["bench1"] = (
-    ((side, use_completable, false, use_sparsepsd),)
-    for side in vcat(40, 50:50:800) # includes compile run
-    for use_completable in (false, true)
-    for use_sparsepsd in (false, true)
-    )

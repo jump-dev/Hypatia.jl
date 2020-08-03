@@ -38,13 +38,13 @@ end
 instances[PortfolioJuMP]["minimal"] = [
     ((3, true, false),),
     ((3, false, true),),
-    ((3, false, true), ClassicConeOptimizer),
+    ((3, false, true), StandardConeOptimizer),
     ((3, true, true),),
     ]
 instances[PortfolioJuMP]["fast"] = [
     ((10, true, false),),
     ((10, false, true),),
-    ((10, false, true), ClassicConeOptimizer),
+    ((10, false, true), StandardConeOptimizer),
     ((10, true, true),),
     ((50, true, false),),
     ((50, false, true),),
@@ -54,23 +54,16 @@ instances[PortfolioJuMP]["fast"] = [
     ((400, true, true),),
     ((400, true, false),),
     ((400, false, true),),
-    ((400, false, true), ClassicConeOptimizer),
+    ((400, false, true), StandardConeOptimizer),
     ((400, true, true),),
     ]
 instances[PortfolioJuMP]["slow"] = [
     ((1000, true, false),),
     ((1000, false, true),),
-    ((1000, false, true), ClassicConeOptimizer),
+    ((1000, false, true), StandardConeOptimizer),
     ((1000, true, true),),
     ((3000, true, false),),
     ((3000, false, true),),
-    ((3000, false, true), ClassicConeOptimizer),
+    ((3000, false, true), StandardConeOptimizer),
     ((3000, true, true),),
     ]
-
-# benchmark 1 instances
-instances[PortfolioJuMP]["bench1"] = (
-    ((num_stocks, false, true), ext)
-    for num_stocks in vcat(10, 500:500:11000) # includes compile run
-    for ext in (nothing, ClassicConeOptimizer)
-    )
