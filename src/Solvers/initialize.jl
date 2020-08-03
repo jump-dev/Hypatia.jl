@@ -54,14 +54,20 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
         end
     end
 
-    cdiag = Diagonal(c_scale)
-    model.c = cdiag \ model.c
-    model.A = model.A / cdiag
-    model.A ./= b_scale
-    model.G = model.G / cdiag
-    model.G ./= h_scale
-    model.b = Diagonal(b_scale) \ model.b
-    model.h = Diagonal(h_scale) \ model.h
+    if !isempty(model.c)
+        cdiag = Diagonal(c_scale)
+        model.c = cdiag \ model.c
+        model.A = model.A / cdiag
+        model.G = model.G / cdiag
+    end
+    if !isempty(model.b)
+        model.b = Diagonal(b_scale) \ model.b
+        model.A ./= b_scale
+    end
+    if !isempty(model.h)
+        model.h = Diagonal(h_scale) \ model.h
+        model.G ./= h_scale
+    end
 
     return solver.model
 end
