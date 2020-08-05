@@ -52,43 +52,44 @@ model_types = [
 
 # list of names of native examples to run
 native_example_names = [
-    "densityest",
-    "envelope",
-    "expdesign",
-    "linearopt",
-    "matrixcompletion",
-    "matrixregression",
-    "maxvolume",
-    "polymin",
-    "portfolio",
-    "sparsepca",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # "linearopt",
+    # "matrixcompletion",
+    # "matrixregression",
+    # "maxvolume",
+    # "polymin",
+    # "portfolio",
+    # "sparsepca",
     ]
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
-    "conditionnum",
-    "contraction",
-    "densityest",
-    "envelope",
-    "expdesign",
-    # "lotkavolterra", # TODO PolyJuMP error
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "muconvexity",
-    "nearestpsd",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    # "regionofattr", # TODO PolyJuMP error
-    "robustgeomprog",
-    "secondorderpoly",
-    "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
+    # "centralpolymat",
+    # "conditionnum",
+    # "contraction",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # # "lotkavolterra", # TODO PolyJuMP error
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # "maxvolume",
+    # "muconvexity",
+    # "nearestpsd",
+    # "polymin",
+    # "polynorm",
+    # "portfolio",
+    # # "regionofattr", # TODO PolyJuMP error
+    # "robustgeomprog",
+    # "secondorderpoly",
+    # "semidefinitepoly",
+    # "shapeconregr",
+    # "signomialmin",
+    "thetanumber",
     ]
 
 # start the tests
