@@ -5,7 +5,6 @@ strengthening of the theta function towards the stability number of a graph
 
 TODO
 add sparse PSD formulation
-
 =#
 
 using SparseArrays
@@ -18,7 +17,6 @@ end
 
 function build(inst::StabilityNumber{T}) where {T <: Float64} # TODO generic reals
     (side, use_dnn) = (inst.side, inst.use_dnn)
-
     sparsity = 1 - 1.0 / side
     inv_graph = tril!(sprandn(side, side, sparsity)) + Diagonal(ones(side))
     (row_idxs, col_idxs, A_vals) = findnz(inv_graph)
@@ -37,7 +35,6 @@ function build(inst::StabilityNumber{T}) where {T <: Float64} # TODO generic rea
         JuMP.@constraint(model, [X_vec...] in MOI.PositiveSemidefiniteConeTriangle(side))
         JuMP.@constraint(model, [X_vec...] .>= 0)
     end
-
 
     return model
 end
