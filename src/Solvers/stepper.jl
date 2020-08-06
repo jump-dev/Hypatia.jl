@@ -129,6 +129,9 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     Cones.grad.(solver.model.cones)
     @timeit timer "update_lhs" update_lhs(solver.system_solver, solver)
 
+    @show minimum(abs, cone.point[3] for cone in solver.model.cones if cone isa Cones.HypoPerLog)
+    @show maximum(abs, cone.point[3] for cone in solver.model.cones if cone isa Cones.HypoPerLog)
+
     # calculate centering direction and keep in dir_cent
     @timeit timer "rhs_cent" update_rhs_cent(stepper, solver)
     @timeit timer "dir_cent" get_directions(stepper, solver, false, iter_ref_steps = 3)
@@ -875,7 +878,7 @@ function find_max_alpha(
         (taukap_ls < eps(T)) && continue
 
         # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
-        sortperm!(cone_order, cone_times, initialized = true) # NOTE stochastic
+        # sortperm!(cone_order, cone_times, initialized = true) # NOTE stochastic
 
         @. z_ls = z + alpha * z_dir
         @. s_ls = s + alpha * s_dir

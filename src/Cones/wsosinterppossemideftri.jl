@@ -102,6 +102,8 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     return
 end
 
+use_correction(::WSOSInterpPosSemidefTri) = true
+
 get_nu(cone::WSOSInterpPosSemidefTri) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpPosSemidefTri)

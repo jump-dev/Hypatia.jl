@@ -14,6 +14,7 @@ cone_from_moi(::Type{T}, cone::MOI.NormOneCone) where {T <: Real} = Cones.EpiNor
 cone_from_moi(::Type{T}, cone::MOI.SecondOrderCone) where {T <: Real} = Cones.EpiNormEucl{T}(MOI.dimension(cone))
 cone_from_moi(::Type{T}, cone::MOI.RotatedSecondOrderCone) where {T <: Real} = Cones.EpiPerSquare{T}(MOI.dimension(cone))
 cone_from_moi(::Type{T}, cone::MOI.ExponentialCone) where {T <: Real} = Cones.HypoPerLog{T}(3)
+# cone_from_moi(::Type{T}, cone::MOI.ExponentialCone) where {T <: Real} = Cones.EpiSumPerEntropy{T}(3)
 cone_from_moi(::Type{T}, cone::MOI.DualExponentialCone) where {T <: Real} = Cones.HypoPerLog{T}(3, use_dual = true)
 cone_from_moi(::Type{T}, cone::MOI.PowerCone{T}) where {T <: Real} = Cones.Power{T}(T[cone.exponent, 1 - cone.exponent], 1)
 cone_from_moi(::Type{T}, cone::MOI.DualPowerCone{T}) where {T <: Real} = Cones.Power{T}(T[cone.exponent, 1 - cone.exponent], 1, use_dual = true)
@@ -64,6 +65,34 @@ function permute_affine(cone::MOI.RelativeEntropyCone, idxs::AbstractVector)
 
     return new_idxs
 end
+
+##############
+
+# needs_untransform(::MOI.ExponentialCone) = true
+#
+# function untransform_affine(::MOI.ExponentialCone, vals::AbstractVector)
+#     vals[1] *= -1
+#     vals[2], vals[3] = vals[3], vals[2]
+#     return vals
+# end
+#
+# function permute_affine(cone::MOI.ExponentialCone, idxs::AbstractVector)
+#     new_idxs = collect(idxs)
+#     new_idxs[2], new_idxs[3] = new_idxs[3], new_idxs[2]
+#     return new_idxs
+# end
+#
+# function rescale_affine(cone::MOI.ExponentialCone, vals::AbstractVector)
+#     vals[1] *= -1
+#     return vals
+# end
+#
+# function rescale_affine(cone::MOI.ExponentialCone, vals::AbstractVector, idxs::AbstractVector)
+#     vals[1] *= -1
+#     return vals
+# end
+
+#############################
 
 # transformations (transposition of matrix) for MOI rectangular matrix cones with matrix of more rows than columns
 

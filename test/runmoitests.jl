@@ -8,8 +8,8 @@ include(joinpath(@__DIR__, "moicones.jl"))
 
 real_types = [
     Float64,
-    Float32,
-    BigFloat,
+    # Float32,
+    # BigFloat,
     ]
 
 @info("starting MOI wrapper Hypatia cone tests")
@@ -24,13 +24,13 @@ end
 include(joinpath(@__DIR__, "moi.jl"))
 
 system_solvers = [
-    SO.NaiveDenseSystemSolver,
-    SO.NaiveSparseSystemSolver,
-    # SO.NaiveIndirectSystemSolver,
-    SO.NaiveElimDenseSystemSolver,
-    SO.NaiveElimSparseSystemSolver,
-    SO.SymIndefDenseSystemSolver,
-    SO.SymIndefSparseSystemSolver,
+    # SO.NaiveDenseSystemSolver,
+    # SO.NaiveSparseSystemSolver,
+    # # SO.NaiveIndirectSystemSolver,
+    # SO.NaiveElimDenseSystemSolver,
+    # SO.NaiveElimSparseSystemSolver,
+    # SO.SymIndefDenseSystemSolver,
+    # SO.SymIndefSparseSystemSolver,
     SO.QRCholDenseSystemSolver,
     ]
 

@@ -247,7 +247,7 @@ instances[ShapeConRegrJuMP]["fast"] = [
     ((3, 150, :func8, 0, 6, true, false, true, true, true),),
     ]
 instances[ShapeConRegrJuMP]["slow"] = [
-    ((:naics5811, 3, false, true, false, true, false), ClassicConeOptimizer),
+    # ((:naics5811, 3, false, true, false, true, false), ClassicConeOptimizer),
     ((:naics5811, 7, true, false, true, true, false),),
     ((:naics5811, 5, false, true, true, true, false), ClassicConeOptimizer),
     ((2, 200, :func1, 5, 20, true, false, true, true, false),),

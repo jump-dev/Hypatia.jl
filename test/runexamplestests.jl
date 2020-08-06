@@ -19,8 +19,8 @@ import TimerOutputs
 import DataStructures
 
 # path to write results DataFrame to CSV, if any
-# results_path = joinpath(homedir(), "bench1", "bench1.csv")
-results_path = nothing
+results_path = joinpath(homedir(), "bench1", "bench1.csv")
+# results_path = nothing
 
 # options to solvers
 timer = TimerOutputs.TimerOutput()
@@ -36,10 +36,11 @@ default_solver_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    ("minimal", Float64, 15),
+    # ("minimal", Float64, 15),
     # ("minimal", Float32, 15),
     # ("minimal", BigFloat, 15),
-    ("fast", Float64, 15),
+    ("fastnat", Float64, 30),
+    ("fastext", Float64, 30),
     # ("slow", Float64, 120),
     # ("bench1", Float64, 1800),
     ]
@@ -52,43 +53,44 @@ model_types = [
 
 # list of names of native examples to run
 native_example_names = [
-    "densityest",
-    "envelope",
-    "expdesign",
-    "linearopt",
-    "matrixcompletion",
-    "matrixregression",
-    "maxvolume",
-    "polymin",
-    "portfolio",
-    "sparsepca",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # "linearopt",
+    # "matrixcompletion",
+    # "matrixregression",
+    # "maxvolume",
+    # "polymin",
+    # "portfolio",
+    # "sparsepca",
     ]
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
-    "conditionnum",
-    "contraction",
-    "densityest",
-    "envelope",
-    "expdesign",
-    # "lotkavolterra", # TODO PolyJuMP error
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "muconvexity",
-    "nearestpsd",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    # "regionofattr", # TODO PolyJuMP error
+    # "balls",
+    # "centralpolymat",
+    # "conditionnum",
+    # "contraction",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # # "lotkavolterra", # TODO PolyJuMP error
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # "maxvolume",
+    # "muconvexity",
+    # "nearestpsd",
+    # "polymin",
+    # "polynorm",
+    # "portfolio",
+    # # "regionofattr", # TODO PolyJuMP error
     "robustgeomprog",
-    "secondorderpoly",
-    "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
+    # "secondorderpoly",
+    # "semidefinitepoly",
+    # "shapeconregr",
+    # "signomialmin",
     ]
 
 # start the tests
@@ -157,10 +159,10 @@ all_tests_time = time()
     end
 
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
-    DataFrames.show(perf, allrows = true, allcols = true)
+    # DataFrames.show(perf, allrows = true, allcols = true)
     println("\n")
     @show sum(perf[:iters])
-    show(timer)
+    # show(timer)
     println("\n")
 end
 

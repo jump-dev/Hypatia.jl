@@ -71,6 +71,8 @@ function setup_data(cone::HypoPerLog{T}) where {T <: Real}
     return
 end
 
+use_correction(::HypoPerLog) = true
+
 get_nu(cone::HypoPerLog) = 1 + 2 * (cone.dim - 2)
 
 function set_initial_point(arr::AbstractVector, cone::HypoPerLog)
