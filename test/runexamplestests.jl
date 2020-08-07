@@ -89,6 +89,7 @@ JuMP_example_names = [
     "semidefinitepoly",
     "shapeconregr",
     "signomialmin",
+    "stabilitynumber",
     ]
 
 # start the tests
