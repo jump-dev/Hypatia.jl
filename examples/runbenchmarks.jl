@@ -1,5 +1,5 @@
 #=
-Copyright 2019, Chris Coey and contributors
+Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
 run benchmarks from the examples folder
 to use the bench instance set and run on cmd line:
@@ -15,7 +15,7 @@ import CSV
 using Printf
 import TimerOutputs
 import DataStructures
-# import Mosek
+import Mosek
 
 # path to write results DataFrame to CSV, if any
 results_path = joinpath(homedir(), "bench", "bench.csv")
@@ -26,16 +26,16 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     verbose = true,
     iter_limit = 250,
     ))
-# mosek_solver = ("Mosek", Mosek.Optimizer, (
-#     verbose = true,
-#     ))
+mosek_solver = ("Mosek", Mosek.Optimizer, (
+    verbose = true,
+    ))
 
 # instance sets and solvers to run
 instance_sets = [
     ("nat", [hyp_solver,]),
     ("ext", [
         hyp_solver,
-        # mosek_solver,
+        mosek_solver,
         ]),
     ]
 
