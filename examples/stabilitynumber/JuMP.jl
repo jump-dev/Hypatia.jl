@@ -3,12 +3,10 @@ Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
 strengthening of the theta function towards the stability number of a graph
 
-TODO
-add sparse PSD formulation
+TODO add sparse PSD formulation
 =#
 
 using SparseArrays
-import Hypatia.ModelUtilities.vec_to_svec!
 
 struct StabilityNumber{T <: Real} <: ExampleInstanceJuMP{T}
     side::Int
@@ -31,7 +29,7 @@ function build(inst::StabilityNumber{T}) where {T <: Float64} # TODO generic rea
     X_vec = JuMP.AffExpr[X_lifted[i, j] for i in 1:side for j in 1:i]
     if inst.use_doublynonnegative
         cone_dim = length(X_vec)
-        JuMP.@constraint(model, X_vec .* vec_to_svec!(ones(cone_dim)) in Hypatia.DoublyNonnegativeTriCone{T}(cone_dim))
+        JuMP.@constraint(model, X_vec .* ModelUtilities.vec_to_svec!(ones(cone_dim)) in Hypatia.DoublyNonnegativeTriCone{T}(cone_dim))
     else
         JuMP.@constraint(model, X_vec in MOI.PositiveSemidefiniteConeTriangle(side))
         JuMP.@constraint(model, X[.!(diags)] .>= 0)
