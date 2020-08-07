@@ -270,6 +270,15 @@ HypoRootdetTriCone{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Rea
 MOI.dimension(cone::HypoRootdetTriCone where {T <: Real}) = cone.dim
 cone_from_moi(::Type{T}, cone::HypoRootdetTriCone{T, R}) where {R <: RealOrComplex{T}} where {T <: Real} = Cones.HypoRootdetTri{T, R}(cone.dim, use_dual = cone.use_dual)
 
+export DoublyNonnegativeTriCone
+struct DoublyNonnegativeTriCone{T <: Real} <: MOI.AbstractVectorSet
+    dim::Int
+    use_dual::Bool
+end
+DoublyNonnegativeTriCone{T}(dim::Int) where {T <: Real} = DoublyNonnegativeTriCone{T}(dim, false)
+MOI.dimension(cone::DoublyNonnegativeTriCone where {T <: Real}) = cone.dim
+cone_from_moi(::Type{T}, cone::DoublyNonnegativeTriCone{T}) where {T <: Real} = Cones.DoublyNonnegative{T}(cone.dim, use_dual = cone.use_dual)
+
 export WSOSInterpNonnegativeCone
 struct WSOSInterpNonnegativeCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     U::Int
@@ -344,6 +353,7 @@ const MOIOtherConesList(::Type{T}) where {T <: Real} = (
     HypoPerLogdetTriCone{T, Complex{T}},
     HypoRootdetTriCone{T, T},
     HypoRootdetTriCone{T, Complex{T}},
+    DoublyNonnegativeTriCone{T},
     WSOSInterpNonnegativeCone{T, T},
     WSOSInterpNonnegativeCone{T, Complex{T}},
     WSOSInterpPosSemidefTriCone{T},
@@ -389,6 +399,7 @@ const MOIOtherCones{T <: Real} = Union{
     HypoPerLogdetTriCone{T, Complex{T}},
     HypoRootdetTriCone{T, T},
     HypoRootdetTriCone{T, Complex{T}},
+    DoublyNonnegativeTriCone{T},
     WSOSInterpNonnegativeCone{T, T},
     WSOSInterpNonnegativeCone{T, Complex{T}},
     WSOSInterpPosSemidefTriCone{T},
