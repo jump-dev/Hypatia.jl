@@ -304,6 +304,13 @@ function test_moi_cones(T::Type{<:Real})
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 10
     end
 
+    @testset "DoublyNonnegative" begin
+        moi_cone = HYP.DoublyNonnegativeTriCone{T}(3)
+        hyp_cone = HYP.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa CO.DoublyNonnegative{T}
+        @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
+    end
+
     @testset "WSOSInterpNonnegative" begin
         Ps = [rand(T, 3, 2), rand(T, 3, 1)]
         moi_cone = HYP.WSOSInterpNonnegativeCone{T, T}(3, Ps)
