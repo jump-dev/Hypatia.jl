@@ -27,8 +27,8 @@ default_reals = [
 system_solvers_instance_names = vcat(
     # inst_preproc,
     # inst_infeas,
-    # inst_cones_few, # NOTE subset of inst_cones_many
-    inst_cones_many,
+    inst_cones_few, # NOTE subset of inst_cones_many
+    # inst_cones_many,
     )
 system_solvers = Dict(
     # "NaiveDense" => all_reals,
@@ -137,17 +137,17 @@ global ITERS = 0
         run_instance_options(T, inst_name, sys_name, "$inst_name system_solver = $sys_name $T")
     end
 
-    for inst_name in preprocess_instance_names, preprocess in preprocess_flags, T in preprocess_reals
-        run_instance_options(T, inst_name, preprocess_system_solver, "$inst_name preprocess = $preprocess $T"; preprocess = preprocess, preprocess_options...)
-    end
+    # for inst_name in preprocess_instance_names, preprocess in preprocess_flags, T in preprocess_reals
+    #     run_instance_options(T, inst_name, preprocess_system_solver, "$inst_name preprocess = $preprocess $T"; preprocess = preprocess, preprocess_options...)
+    # end
 
-    for inst_name in init_use_indirect_instance_names, init_use_indirect in init_use_indirect_flags, T in init_use_indirect_reals
-        run_instance_options(T, inst_name, init_use_indirect_system_solver, "$inst_name init_use_indirect = $init_use_indirect $T"; init_use_indirect = init_use_indirect, init_use_indirect_options...)
-    end
+    # for inst_name in init_use_indirect_instance_names, init_use_indirect in init_use_indirect_flags, T in init_use_indirect_reals
+    #     run_instance_options(T, inst_name, init_use_indirect_system_solver, "$inst_name init_use_indirect = $init_use_indirect $T"; init_use_indirect = init_use_indirect, init_use_indirect_options...)
+    # end
 
-    for inst_name in reduce_instance_names, reduce in reduce_flags, T in reduce_reals
-        run_instance_options(T, inst_name, reduce_system_solver, "$inst_name reduce = $reduce $T"; reduce = reduce, reduce_options...)
-    end
+    # for inst_name in reduce_instance_names, reduce in reduce_flags, T in reduce_reals
+    #     run_instance_options(T, inst_name, reduce_system_solver, "$inst_name reduce = $reduce $T"; reduce = reduce, reduce_options...)
+    # end
 
     @printf("\nnative tests total time: %8.2e seconds\n\n", time() - all_tests_time)
     show(perf, allrows = true, allcols = true)

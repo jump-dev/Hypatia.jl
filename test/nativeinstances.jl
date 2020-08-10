@@ -1239,6 +1239,30 @@ function matrixepipersquare3(T; options...)
     end
 end
 
+function matrixepiperentropy1(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    Random.seed!(1)
+    rt2 = sqrt(T(2))
+    side = 4
+    svec_dim = Cones.svec_length(side)
+    cone_dim = 2 * svec_dim + 1
+    c = T[1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    W = rand(T, side, side)
+    W = W * W'
+    V = rand(T, side, side)
+    V = V * V'
+    h = vcat(zero(T), Cones.smat_to_svec!(zeros(T, svec_dim), V, rt2), Cones.smat_to_svec!(zeros(T, svec_dim), W, rt2))
+    G = zeros(T, cone_dim, 1)
+    G[1, 1] = -1
+    cones = Cone{T}[Cones.MatrixEpiPerEntropy{T}(cone_dim)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ tr(W * log(W) - W * log(V)) atol=tol rtol=tol # TODO need https://github.com/JuliaLinearAlgebra/GenericLinearAlgebra.jl/issues/51 for BF
+end
+
 function linmatrixineq1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)

@@ -123,6 +123,14 @@ end
 
 function perturb_scale(point::Vector{T}, dual_point::Vector{T}, noise::T, scale::T) where {T <: Real}
     if !iszero(noise)
+        # # TODO undo when symmeterization is back
+        # vw_dim = div(length(point) - 1, 2)
+        # side = round(Int, sqrt(vw_dim))
+        # v = rand(T, side, side)
+        # w = rand(T, side, side)
+        # v = v + v'
+        # w = w + w'
+        # r = vcat(rand(T), vec(v), vec(w)) / 1000
         @. point += 2 * noise * rand(T) - noise
         @. dual_point += 2 * noise * rand(T) - noise
     end
@@ -277,6 +285,27 @@ function test_epinormspectral_barrier(T::Type{<:Real})
     return
 end
 
+function test_matrixepiperentropy_barrier(T::Type{<:Real})
+    Random.seed!(1)
+    rt2 = sqrt(T(2))
+    for side in 1:3
+        @show side
+        svec_dim = CO.svec_length(side)
+        # svec_dim = side ^ 2
+        function barrier(s)
+            u = s[1]
+            u = s[1]
+            V = Hermitian(CO.svec_to_smat!(similar(s, side, side), s[2:(svec_dim + 1)], rt2), :U)
+            W = Hermitian(CO.svec_to_smat!(similar(s, side, side), s[(svec_dim + 2):end], rt2), :U)
+            # V = reshape(s[2:(svec_dim + 1)], side, side)
+            # W = reshape(s[(svec_dim + 2):end], side, side)
+            return -log(u - tr(W * CO.logm(W) - W * CO.logm(V))) - logdet(V) - logdet(W)
+        end
+        test_barrier_oracles(CO.MatrixEpiPerEntropy{T}(2 * svec_dim + 1), barrier, init_tol = Inf)
+    end
+    return
+end
+
 function test_linmatrixineq_barrier(T::Type{<:Real})
     Random.seed!(1)
     Rs_list = [[T, T], [Complex{T}, Complex{T}], [T, Complex{T}, T], [Complex{T}, T, T]]
@@ -416,7 +445,7 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
         else
             test_barrier_oracles(cone, R_barrier, init_tol = 1e-1, init_only = true)
         end
-        
+
         # try sc_const = 1 (not self-concordant)
         cone = CO.HypoPerLogdetTri{T, T}(dim, sc_const = 1)
         function R_barrier_sc1(s)
