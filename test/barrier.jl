@@ -123,14 +123,6 @@ end
 
 function perturb_scale(point::Vector{T}, dual_point::Vector{T}, noise::T, scale::T) where {T <: Real}
     if !iszero(noise)
-        # # TODO undo when symmeterization is back
-        # vw_dim = div(length(point) - 1, 2)
-        # side = round(Int, sqrt(vw_dim))
-        # v = rand(T, side, side)
-        # w = rand(T, side, side)
-        # v = v + v'
-        # w = w + w'
-        # r = vcat(rand(T), vec(v), vec(w)) / 1000
         @. point += 2 * noise * rand(T) - noise
         @. dual_point += 2 * noise * rand(T) - noise
     end
