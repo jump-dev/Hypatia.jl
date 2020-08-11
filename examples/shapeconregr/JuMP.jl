@@ -20,7 +20,7 @@ struct ShapeConRegrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     X::Matrix{T}
     y::Vector{T}
     deg::Int
-    use_wsos::Bool # use WSOS cone formulation, else SDP formulation
+    formulation::Symbol
     use_L1_obj::Bool # in objective function use L1 norm, else L2 norm
     use_monotonicity::Bool # if true add monotonicity constraints, else don't
     use_convexity::Bool # if true add convexity constraints, else don't
@@ -204,9 +204,9 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
 
             gradient_interp = mono_profile[j] * g_points_polys' * regressor
 
-            if inst.use_wsos
+            if inst.formulation == :nat_wsos_mat
                 JuMP.@constraint(model, gradient_interp in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(mono_U, mono_Ps))
-            else
+            elseif inst.formulation == :ext
                 psd_vars = []
                 for (r, Pr) in enumerate(mono_Ps)
                     Lr = size(Pr, 2)
@@ -240,7 +240,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
 
         hessian_interp = conv_profile * vcat([(F \ V_H')' * regressor for V_H in V_Hs]...)
 
-        if inst.use_wsos
+        if inst.formulation == :nat_wsos_mat || n == 1
             if n == 1
                 conv_cone = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(conv_U, conv_Ps)
             else
@@ -248,7 +248,32 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
                 conv_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps)
             end
             JuMP.@constraint(model, hessian_interp in conv_cone)
-        else
+        elseif inst.formulation == :nat_wsos
+            svec_dim = div(n * (n + 1), 2)
+            ypts = zeros(svec_dim, n)
+            idx = 1
+            idx_jj = 1
+            # @show hessian_interp
+            for j in 1:n
+                idx_ii = 1
+                for i in 1:(j - 1)
+                    hessian_interp[Cones.block_idxs(conv_U, idx)] *= 2
+                    hessian_interp[Cones.block_idxs(conv_U, idx)] += hessian_interp[Cones.block_idxs(conv_U, idx_ii)] + hessian_interp[Cones.block_idxs(conv_U, idx_jj)]
+                    ypts[idx, i] = ypts[idx, j] = 1
+                    idx_ii += (i + 1)
+                    idx += 1
+                end
+                ypts[idx, j] = 1
+                idx += 1
+                idx_jj += (j + 1)
+            end
+            # @show hessian_interp
+            new_Ps = Matrix{Float64}[]
+            for P in conv_Ps
+                push!(new_Ps, kron(ypts, P))
+            end
+            JuMP.@constraint(model, hessian_interp in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(conv_U * svec_dim, new_Ps))
+        elseif inst.formulation == :ext
             psd_vars = []
             for (r, Pr) in enumerate(conv_Ps)
                 Lr = size(Pr, 2)

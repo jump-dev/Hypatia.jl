@@ -15,7 +15,7 @@ import PolyJuMP
 struct MuConvexityJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     poly::Symbol
     dom::Symbol
-    use_matrixwsos::Bool # use wsosinterpposeideftricone, else PSD formulation
+    formulation::Symbol
     true_mu::Real # optional true value of parameter for testing only
 end
 
@@ -56,15 +56,18 @@ function build(inst::MuConvexityJuMP{T}) where {T <: Float64} # TODO generic rea
     convpoly = poly - 0.5 * mu * sum(x.^2)
     H = DP.differentiate(convpoly, x, 2)
 
-    if inst.use_matrixwsos
+    if inst.formulation == :nat_wsos_mat
         d = div(maximum(DP.maxdegree.(H)) + 1, 2)
         (U, pts, Ps) = ModelUtilities.interpolate(dom, d)
         mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, U, Ps)
         H_interp = [H[i, j](x => pts[u, :]) for i in 1:n for j in 1:i for u in 1:U]
         JuMP.@constraint(model, ModelUtilities.vec_to_svec!(H_interp, rt2 = sqrt(2), incr = U) in mat_wsos_cone)
+    if inst.formulation == :nat_wsos
+    elseif inst.formulation == :ext
     else
-        PolyJuMP.setpolymodule!(model, SumOfSquares)
-        JuMP.@constraint(model, H in JuMP.PSDCone(), domain = ModelUtilities.get_domain_inequalities(dom, x))
+        error()
+        # PolyJuMP.setpolymodule!(model, SumOfSquares)
+        # JuMP.@constraint(model, H in JuMP.PSDCone(), domain = ModelUtilities.get_domain_inequalities(dom, x))
     end
 
     return model
