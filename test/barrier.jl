@@ -6,6 +6,7 @@ tests for primitive cone barrier oracles
 
 using Test
 import Random
+import GenericLinearAlgebra.eigen
 using LinearAlgebra
 using SparseArrays
 import ForwardDiff
@@ -278,20 +279,23 @@ function test_epinormspectral_barrier(T::Type{<:Real})
 end
 
 function test_matrixepiperentropy_barrier(T::Type{<:Real})
+    # TODO hack around https://github.com/JuliaLinearAlgebra/GenericLinearAlgebra.jl/issues/51 while using AD
+    function logm(A)
+        (vals, vecs) = eigen(Hermitian(A))
+        return vecs * Diagonal(log.(vals)) * vecs'
+    end
+
     Random.seed!(1)
     rt2 = sqrt(T(2))
     for side in 1:3
         @show side
         svec_dim = CO.svec_length(side)
-        # svec_dim = side ^ 2
         function barrier(s)
             u = s[1]
             u = s[1]
             V = Hermitian(CO.svec_to_smat!(similar(s, side, side), s[2:(svec_dim + 1)], rt2), :U)
             W = Hermitian(CO.svec_to_smat!(similar(s, side, side), s[(svec_dim + 2):end], rt2), :U)
-            # V = reshape(s[2:(svec_dim + 1)], side, side)
-            # W = reshape(s[(svec_dim + 2):end], side, side)
-            return -log(u - tr(W * CO.logm(W) - W * CO.logm(V))) - logdet(V) - logdet(W)
+            return -log(u - tr(W * logm(W) - W * logm(V))) - logdet(V) - logdet(W)
         end
         test_barrier_oracles(CO.MatrixEpiPerEntropy{T}(2 * svec_dim + 1), barrier, init_tol = Inf)
     end

@@ -7,18 +7,8 @@ by L. Faybusovich and C. Zhou
 
 
 TODO
-replace eigen decomposition
 initial point
 =#
-
-import GenericLinearAlgebra
-
-# TODO hack around https://github.com/JuliaLinearAlgebra/GenericLinearAlgebra.jl/issues/51 while using AD
-function logm(A)
-    (vals, vecs) = GenericLinearAlgebra.eigen(Hermitian(A))
-    # vals = Complex.(vals)
-    return vecs * Diagonal(log.(vals)) * vecs'
-end
 
 function grad_logm(V_vecs, diff_mat, sdim, side)
     ret = zeros(sdim, sdim)
@@ -103,6 +93,11 @@ mutable struct MatrixEpiPerEntropy{T <: Real} <: Cone{T}
     diff_mat
     V_fact
     W_fact
+    V_vals_log
+    W_vals_log
+    V_log
+    W_log
+    WV_log
 
     function MatrixEpiPerEntropy{T}(
         dim::Int;
@@ -141,6 +136,8 @@ function setup_data(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     side = cone.side
     cone.V = zeros(T, side, side)
     cone.W = zeros(T, side, side)
+    cone.Vi = zeros(T, side, side)
+    cone.Wi = zeros(T, side, side)
     cone.V_idxs = 2:(cone.vw_dim + 1)
     cone.W_idxs = (cone.vw_dim + 2):cone.dim
     cone.dzdV = zeros(T, cone.vw_dim)
@@ -148,6 +145,11 @@ function setup_data(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     cone.W_similar = zeros(T, side, side)
     cone.tmp = zeros(T, side, side)
     cone.diff_mat = zeros(T, side, side)
+    cone.V_vals_log = zeros(T, side)
+    cone.W_vals_log = zeros(T, side)
+    cone.V_log = zeros(T, side, side)
+    cone.W_log = zeros(T, side, side)
+    cone.WV_log = zeros(T, side, side)
     return
 end
 
@@ -173,8 +175,17 @@ function update_feas(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     vw_dim = cone.vw_dim
     @views V = Hermitian(svec_to_smat!(cone.V, point[2:(vw_dim + 1)], cone.rt2), :U)
     @views W = Hermitian(svec_to_smat!(cone.W, point[(vw_dim + 2):end], cone.rt2), :U)
-    if isposdef(V) && isposdef(W)
-        cone.z = point[1] - tr(W * logm(W) - W * logm(V))
+    (V_vals, V_vecs) = cone.V_fact = eigen(V)
+    (W_vals, W_vecs) = cone.W_fact = eigen(W)
+    if isposdef(cone.V_fact) && isposdef(cone.W_fact)
+        @. cone.V_vals_log = log(V_vals)
+        @. cone.W_vals_log = log(W_vals)
+        mul!(cone.tmp, V_vecs, Diagonal(cone.V_vals_log))
+        V_log = mul!(cone.V_log, cone.tmp, V_vecs')
+        mul!(cone.tmp, W_vecs, Diagonal(cone.W_vals_log))
+        W_log = mul!(cone.W_log, cone.tmp, W_vecs')
+        @. cone.WV_log = W_log - V_log
+        cone.z = point[1] - dot(W, Hermitian(cone.WV_log, :U))
         cone.is_feas = (cone.z > 0)
     else
         cone.is_feas = false
@@ -194,24 +205,27 @@ function update_grad(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     V = Hermitian(svec_to_smat!(cone.V, cone.point[V_idxs], rt2), :U)
     W = Hermitian(svec_to_smat!(cone.W, cone.point[W_idxs], rt2), :U)
     z = cone.z
-    (V_vals, V_vecs) = cone.V_fact = eigen(V)
-    (W_vals, W_vecs) = cone.W_fact = eigen(W)
-    Vi = cone.Vi = V_vecs * Diagonal(inv.(V_vals)) * V_vecs'
-    Wi = cone.Wi = W_vecs * Diagonal(inv.(W_vals)) * W_vecs'
+    (V_vals, V_vecs) = cone.V_fact
+    (W_vals, W_vecs) = cone.W_fact
+    ldiv!(cone.tmp, Diagonal(V_vals), V_vecs')
+    Vi = mul!(cone.Vi, V_vecs, cone.tmp)
+    ldiv!(cone.tmp, Diagonal(W_vals), W_vecs')
+    Wi = mul!(cone.Wi, W_vecs, cone.tmp)
 
     cone.grad[1] = -inv(z)
 
-    dzdW = logm(V) - logm(W) - I
-    grad_W = -dzdW / z - Wi
+    dzdW = cone.dzdW = -(cone.WV_log + I) / z
+    grad_W = -dzdW - Wi
     @views smat_to_svec!(cone.grad[W_idxs], grad_W, rt2)
 
     diff_mat = cone.diff_mat
     for j in 1:side, i in 1:j
         (vi, vj) = (V_vals[i], V_vals[j])
+        (lvi, lvj) = (cone.V_vals_log[i], cone.V_vals_log[j])
         if abs(vi - vj) < sqrt(eps(T))
             diff_mat[i, j] = inv(vi)
         else
-            diff_mat[i, j] = (log(vi) - log(vj)) / (vi - vj)
+            diff_mat[i, j] = (lvi - lvj) / (vi - vj)
         end
     end
     W_similar = cone.W_similar = V_vecs' * W * V_vecs
@@ -240,20 +254,15 @@ function update_hess(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     Wi = cone.Wi
     H = cone.hess.data
 
-    diff_mat_V = zeros(side, side)
+    diff_mat_V = cone.diff_mat
     diff_mat_W = zeros(side, side)
     for j in 1:side, i in 1:j
-        (vi, vj) = (V_vals[i], V_vals[j])
         (wi, wj) = (W_vals[i], W_vals[j])
-        if abs(vi - vj) < sqrt(eps(T))
-            diff_mat_V[i, j] = inv(vi)
-        else
-            diff_mat_V[i, j] = (log(vi) - log(vj)) / (vi - vj)
-        end
+        (lwi, lwj) = (cone.W_vals_log[i], cone.W_vals_log[j])
         if abs(wi - wj) < sqrt(eps(T))
             diff_mat_W[i, j] = inv(wi)
         else
-            diff_mat_W[i, j] = (log(wi) - log(wj)) / (wi - wj)
+            diff_mat_W[i, j] = (lwi - lwj) / (wi - wj)
         end
     end
     diff_mat_V = Hermitian(diff_mat_V, :U)
@@ -284,20 +293,19 @@ function update_hess(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     Hvv = dz_dV_sqr - dz_sqr_dV_sqr / z + ViVi
 
     dz_sqr_dW_sqr = grad_logm(W_vecs, diff_mat_W, vw_dim, side)
-    dz_dW = logm(V) - logm(W) - I
+    dz_dW = cone.dzdW
     dz_dW_vec = smat_to_svec!(zeros(vw_dim), dz_dW, rt2)
     dz_dW_sqr = dz_dW_vec * dz_dW_vec'
     WiWi = symm_kron(zeros(vw_dim, vw_dim), Wi, rt2)
-    Hww = dz_dW_sqr / z / z + dz_sqr_dW_sqr / z + WiWi
+    Hww = dz_dW_sqr + dz_sqr_dW_sqr / z + WiWi
 
-    # TODO more annoying to think about but possibly simplier to compute from dzdv
     dz_sqr_dW_dV = grad_logm(V_vecs, diff_mat_V, vw_dim, side)
     dz_dW_dz_dV = dz_dW_vec * dzdV'
-    Hwv = -dz_sqr_dW_dV / z - dz_dW_dz_dV / z
+    Hwv = -dz_sqr_dW_dV / z - dz_dW_dz_dV
 
     Huu = inv(z) / z
     Huv = -dzdV / z
-    Huw = dz_dW_vec / z / z
+    Huw = dz_dW_vec / z
 
     H[1, 1] = inv(z) / z
     @views H[1, V_idxs] .= Huv
