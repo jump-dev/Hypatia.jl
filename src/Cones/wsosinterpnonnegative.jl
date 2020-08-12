@@ -88,6 +88,7 @@ set_initial_point(arr::AbstractVector, cone::WSOSInterpNonnegative) = (arr .= 1)
 # TODO order the k indices so that fastest and most recently infeasible k are first
 # TODO can be done in parallel
 function update_feas(cone::WSOSInterpNonnegative)
+    @timeit cone.timer "feas" begin
     @assert !cone.feas_updated
     D = Diagonal(cone.point)
 
@@ -110,6 +111,7 @@ function update_feas(cone::WSOSInterpNonnegative)
     end
 
     cone.feas_updated = true
+    end
     return cone.is_feas
 end
 
@@ -117,6 +119,7 @@ end
 # TODO can be done in parallel
 # TODO may be faster (but less numerically stable) with explicit inverse here
 function update_grad(cone::WSOSInterpNonnegative)
+    @timeit cone.timer "grad" begin
     @assert cone.is_feas
 
     cone.grad .= 0
@@ -129,10 +132,12 @@ function update_grad(cone::WSOSInterpNonnegative)
     end
 
     cone.grad_updated = true
+    end
     return cone.grad
 end
 
 function update_hess(cone::WSOSInterpNonnegative)
+    @timeit cone.timer "hess" begin
     @assert cone.grad_updated
 
     cone.hess .= 0
@@ -145,5 +150,6 @@ function update_hess(cone::WSOSInterpNonnegative)
     end
 
     cone.hess_updated = true
+    end
     return cone.hess
 end
