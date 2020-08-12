@@ -36,7 +36,7 @@ default_solver_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    ("minimal", Float64, 15),
+    # ("minimal", Float64, 15),
     # ("minimal", Float32, 15),
     # ("minimal", BigFloat, 15),
     ("fast", Float64, 15),
@@ -52,44 +52,44 @@ model_types = [
 
 # list of names of native examples to run
 native_example_names = [
-    "densityest",
-    "envelope",
-    "expdesign",
-    "linearopt",
-    "matrixcompletion",
-    "matrixregression",
-    "maxvolume",
-    "polymin",
-    "portfolio",
-    "sparsepca",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # "linearopt",
+    # "matrixcompletion",
+    # "matrixregression",
+    # "maxvolume",
+    # "polymin",
+    # "portfolio",
+    # "sparsepca",
     ]
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
-    "conditionnum",
-    "contraction",
-    "densityest",
-    "envelope",
-    "expdesign",
-    # "lotkavolterra", # TODO PolyJuMP error
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "muconvexity",
-    "nearestpsd",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    # "regionofattr", # TODO PolyJuMP error
-    "robustgeomprog",
-    "secondorderpoly",
-    "semidefinitepoly",
+    # "centralpolymat",
+    # "conditionnum",
+    # "contraction",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # # "lotkavolterra", # TODO PolyJuMP error
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # "maxvolume",
+    # "muconvexity",
+    # "nearestpsd",
+    # "polymin",
+    # "polynorm",
+    # "portfolio",
+    # # "regionofattr", # TODO PolyJuMP error
+    # "robustgeomprog",
+    # "secondorderpoly",
+    # "semidefinitepoly",
     "shapeconregr",
-    "signomialmin",
-    "stabilitynumber",
+    # "signomialmin",
+    # "stabilitynumber",
     ]
 
 # start the tests
@@ -162,6 +162,10 @@ all_tests_time = time()
     println("\n")
     @show sum(perf[:iters])
     show(timer)
+    open("timer.txt", "a") do f
+        print(f, "\n")
+        TimerOutputs.print_timer(f, timer)
+    end
     println("\n")
 end
 
