@@ -90,7 +90,8 @@ mutable struct MatrixEpiPerEntropy{T <: Real} <: Cone{T}
     dzdW
     W_similar
     tmp
-    diff_mat
+    diff_mat_V
+    diff_mat_W
     V_fact
     W_fact
     V_vals_log
@@ -144,7 +145,8 @@ function setup_data(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     cone.dzdW = zeros(T, cone.vw_dim)
     cone.W_similar = zeros(T, side, side)
     cone.tmp = zeros(T, side, side)
-    cone.diff_mat = zeros(T, side, side)
+    cone.diff_mat_V = zeros(T, side, side)
+    cone.diff_mat_W = zeros(T, side, side)
     cone.V_vals_log = zeros(T, side)
     cone.W_vals_log = zeros(T, side)
     cone.V_log = zeros(T, side, side)
@@ -173,8 +175,8 @@ function update_feas(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     @assert !cone.feas_updated
     point = cone.point
     vw_dim = cone.vw_dim
-    @views V = Hermitian(svec_to_smat!(cone.V, point[2:(vw_dim + 1)], cone.rt2), :U)
-    @views W = Hermitian(svec_to_smat!(cone.W, point[(vw_dim + 2):end], cone.rt2), :U)
+    @views V = Hermitian(svec_to_smat!(cone.V, point[cone.V_idxs], cone.rt2), :U)
+    @views W = Hermitian(svec_to_smat!(cone.W, point[cone.W_idxs], cone.rt2), :U)
     (V_vals, V_vecs) = cone.V_fact = eigen(V)
     (W_vals, W_vecs) = cone.W_fact = eigen(W)
     if isposdef(cone.V_fact) && isposdef(cone.W_fact)
@@ -194,7 +196,23 @@ function update_feas(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     return cone.is_feas
 end
 
-is_dual_feas(cone::MatrixEpiPerEntropy) = true # TODO use a dikin ellipsoid condition?
+is_dual_feas(cone::MatrixEpiPerEntropy) = true
+# function is_dual_feas(cone::MatrixEpiPerEntropy{T}) where {T}
+#     vw_dim = cone.vw_dim
+#     u = cone.dual_point[1]
+#     @views V = Hermitian(svec_to_smat!(similar(cone.V), cone.dual_point[cone.V_idxs], cone.rt2), :U)
+#     @views W = Hermitian(svec_to_smat!(similar(cone.W), cone.dual_point[cone.W_idxs], cone.rt2), :U)
+#     (V_vals, V_vecs) = V_fact = eigen(V)
+#     if isposdef(V_fact) && (u > eps(T))
+#         # V_log = V_vecs * Diagonal(log.(V_vals)) * V_vecs'
+#         W_vals = eigvals(W)
+#         # return isposdef(u * (I + log(V / u)) + W)
+#         # return isposdef(u * (I + log(V) - I * log(u)) + W)
+#         return all(u * (1 + log(vi / u)) + wi > eps(T) for (vi, wi) in zip(V_vals, W_vals))
+#     end
+#     return false
+# end
+
 
 function update_grad(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     @assert cone.is_feas
@@ -202,8 +220,7 @@ function update_grad(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     rt2 = cone.rt2
     V_idxs = cone.V_idxs
     W_idxs = cone.W_idxs
-    V = Hermitian(svec_to_smat!(cone.V, cone.point[V_idxs], rt2), :U)
-    W = Hermitian(svec_to_smat!(cone.W, cone.point[W_idxs], rt2), :U)
+    W = Hermitian(cone.W, :U)
     z = cone.z
     (V_vals, V_vecs) = cone.V_fact
     (W_vals, W_vecs) = cone.W_fact
@@ -218,18 +235,18 @@ function update_grad(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     grad_W = -dzdW - Wi
     @views smat_to_svec!(cone.grad[W_idxs], grad_W, rt2)
 
-    diff_mat = cone.diff_mat
+    diff_mat_V = cone.diff_mat_V
     for j in 1:side, i in 1:j
         (vi, vj) = (V_vals[i], V_vals[j])
         (lvi, lvj) = (cone.V_vals_log[i], cone.V_vals_log[j])
         if abs(vi - vj) < sqrt(eps(T))
-            diff_mat[i, j] = inv(vi)
+            diff_mat_V[i, j] = inv(vi)
         else
-            diff_mat[i, j] = (lvi - lvj) / (vi - vj)
+            diff_mat_V[i, j] = (lvi - lvj) / (vi - vj)
         end
     end
     W_similar = cone.W_similar = V_vecs' * W * V_vecs
-    tmp = -V_vecs * (W_similar .* Hermitian(diff_mat, :U)) * V_vecs' / z
+    tmp = -V_vecs * (W_similar .* Hermitian(diff_mat_V, :U)) * V_vecs' / z
     dzdV = @views smat_to_svec!(cone.dzdV, tmp, rt2)
     grad_V = tmp - Vi
     @views smat_to_svec!(cone.grad[V_idxs], grad_V, rt2)
@@ -244,8 +261,6 @@ function update_hess(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     rt2 = cone.rt2
     V_idxs = cone.V_idxs
     W_idxs = cone.W_idxs
-    V = Hermitian(cone.V, :U)
-    W = Hermitian(cone.W, :U)
     z = cone.z
     vw_dim = cone.vw_dim
     (V_vals, V_vecs) = cone.V_fact
@@ -254,19 +269,17 @@ function update_hess(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     Wi = cone.Wi
     H = cone.hess.data
 
-    diff_mat_V = cone.diff_mat
-    diff_mat_W = zeros(side, side)
+    diff_mat_V = Hermitian(cone.diff_mat_V, :U)
+    diff_mat_W = Hermitian(cone.diff_mat_W, :U)
     for j in 1:side, i in 1:j
         (wi, wj) = (W_vals[i], W_vals[j])
         (lwi, lwj) = (cone.W_vals_log[i], cone.W_vals_log[j])
         if abs(wi - wj) < sqrt(eps(T))
-            diff_mat_W[i, j] = inv(wi)
+            diff_mat_W.data[i, j] = inv(wi)
         else
-            diff_mat_W[i, j] = (lwi - lwj) / (wi - wj)
+            diff_mat_W.data[i, j] = (lwi - lwj) / (wi - wj)
         end
     end
-    diff_mat_V = Hermitian(diff_mat_V, :U)
-    diff_mat_W = Hermitian(diff_mat_W, :U)
 
     diff_tensor_V = zeros(side, side, side)
     for k in 1:side, j in 1:k, i in 1:j
@@ -303,13 +316,10 @@ function update_hess(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     dz_dW_dz_dV = dz_dW_vec * dzdV'
     Hwv = -dz_sqr_dW_dV / z - dz_dW_dz_dV
 
-    Huu = inv(z) / z
-    Huv = -dzdV / z
-    Huw = dz_dW_vec / z
-
-    H[1, 1] = inv(z) / z
-    @views H[1, V_idxs] .= Huv
-    @views H[1, W_idxs] .= Huw
+    H[1, 1] = -cone.grad[1]
+    @views H[1, V_idxs] .= -dzdV
+    @views H[1, W_idxs] .= dz_dW_vec
+    @views H[1, :] ./= z
     @views H[V_idxs, V_idxs] .= Hvv
     @views H[V_idxs, W_idxs] .= Hwv'
     @views H[W_idxs, W_idxs] .= Hww
