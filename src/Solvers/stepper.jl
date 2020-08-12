@@ -875,7 +875,7 @@ function find_max_alpha(
         (taukap_ls < eps(T)) && continue
 
         # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
-        sortperm!(cone_order, cone_times, initialized = true) # NOTE stochastic
+        # sortperm!(cone_order, cone_times, initialized = true) # NOTE stochastic
 
         @. z_ls = z + alpha * z_dir
         @. s_ls = s + alpha * s_dir
