@@ -34,6 +34,7 @@ inst_cones_few = [
     # "epinormspectral1",
     # "matrixepipersquare1",
     "matrixepiperentropy1",
+    "matrixepiperentropy2",
     # "linmatrixineq1",
     # "possemideftri1",
     # "possemideftri5",

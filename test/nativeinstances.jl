@@ -1263,6 +1263,27 @@ function matrixepiperentropy1(T; options...)
     @test r.primal_obj ≈ tr(W * log(W) - W * log(V)) atol=tol rtol=tol # TODO need https://github.com/JuliaLinearAlgebra/GenericLinearAlgebra.jl/issues/51 for BF
 end
 
+function matrixepiperentropy2(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    Random.seed!(1)
+    rt2 = sqrt(T(2))
+    side = 3
+    svec_dim = Cones.svec_length(side)
+    cone_dim = 2 * svec_dim + 1
+    c = vcat(zeros(T, svec_dim), -ones(T, svec_dim))
+    A = hcat(Matrix{T}(I, svec_dim, svec_dim), zeros(T, svec_dim, svec_dim))
+    svec_I = Cones.smat_to_svec!(zeros(T, svec_dim), Matrix{T}(I, side, side), rt2)
+    b = svec_I
+    h = vcat(T(5), zeros(T, 2 * svec_dim))
+    G = vcat(zeros(T, 1, 2 * svec_dim), ModelUtilities.vec_to_svec!(Diagonal(-one(T) * I, 2 * svec_dim)))
+    cones = Cone{T}[Cones.MatrixEpiPerEntropy{T}(cone_dim)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == :Optimal
+    W = Hermitian(Cones.svec_to_smat!(zeros(T, side, side), r.s[(svec_dim + 2):end], rt2), :U)
+    @test tr(W * log(W)) ≈ T(5) atol=tol rtol=tol
+end
+
 function linmatrixineq1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
