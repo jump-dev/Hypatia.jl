@@ -45,10 +45,11 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     ΛFL::Vector
     ΛFLP::Vector{Matrix{T}}
     tmpLU::Vector{Matrix{T}}
-    PlambdaP::Vector{Matrix{T}}
+    PlambdaP::Vector
 
-    PlambdaP_blocks_U::Vector{Matrix{Matrix{T}}}
+    PlambdaP_blocks_U::Vector{Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}}
     PlambdaP_blocks_R::Vector{Matrix{Matrix{T}}}
+    blocks_R_updated::Bool
 
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
@@ -102,9 +103,9 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.ΛFL = Vector{Any}(undef, length(Ps))
     cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
-    cone.PlambdaP_blocks_U = [Matrix{Matrix{T}}(undef, R, R) for _ in eachindex(Ps)]
+    cone.PlambdaP_blocks_U = [Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}(undef, R, R) for _ in eachindex(Ps)]
     for k in eachindex(Ps), r in 1:R, s in 1:R
-        cone.PlambdaP_blocks_U[k][r, s] = zeros(T, U, U)
+        cone.PlambdaP_blocks_U[k][r, s] = view(cone.PlambdaP[k], block_idxs(U, r), block_idxs(U, s))
     end
     cone.PlambdaP_blocks_R = [Matrix{Matrix{T}}(undef, U, U) for _ in eachindex(Ps)]
     for k in eachindex(Ps), r in 1:U, s in 1:U
@@ -112,6 +113,8 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     end
     return
 end
+
+reset_data(cone::WSOSInterpPosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.blocks_R_updated = false)
 
 get_nu(cone::WSOSInterpPosSemidefTri) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
 
@@ -198,14 +201,7 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
             row_range = ((q - 1) * L + 1):(L * R)
             @inbounds @views mul!(PlambdaPk[block_p_idxs, block_q_idxs], ΛFLP[row_range, block_p_idxs]', ΛFLP[row_range, block_q_idxs])
         end
-
-        # TODO only upper triangle
-        @timeit cone.timer "views1" @inbounds for q in 1:R, p in 1:R
-            @views copyto!(cone.PlambdaP_blocks_U[k][p, q], Symmetric(PlambdaPk, :U)[block_idxs(U, p), block_idxs(U, q)])
-        end
-        @timeit cone.timer "views2" @inbounds for q in 1:U, p in 1:U
-            @views copyto!(cone.PlambdaP_blocks_R[k][p, q], Symmetric(PlambdaPk, :U)[p:U:(U * R), q:U:(U * R)])
-        end
+        LinearAlgebra.copytri!(PlambdaPk, 'U')
     end
 
     # update gradient
@@ -226,47 +222,17 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
     return cone.grad
 end
 
-# function update_hess(cone::WSOSInterpPosSemidefTri)
-#     @timeit cone.timer "hess" begin
-#     @assert cone.grad_updated
-#     R = cone.R
-#     U = cone.U
-#     H = cone.hess.data
-#
-#     H .= 0
-#     for p in 1:R, q in 1:p
-#         block = svec_idx(p, q)
-#         idxs = block_idxs(U, block)
-#         block_p_idxs = block_idxs(U, p)
-#         block_q_idxs = block_idxs(U, q)
-#
-#         for p2 in 1:R, q2 in 1:p2
-#             block2 = svec_idx(p2, q2)
-#             if block2 < block
-#                 continue
-#             end
-#             idxs2 = block_idxs(U, block2)
-#             block_p_idxs2 = block_idxs(U, p2)
-#             block_q_idxs2 = block_idxs(U, q2)
-#
-#             @views Hview = H[idxs, idxs2]
-#             for k in eachindex(cone.Ps)
-#                 PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
-#                 @inbounds @. @views Hview += PlambdaPk[block_p_idxs, block_p_idxs2] * PlambdaPk[block_q_idxs, block_q_idxs2]
-#                 if (p != q) && (p2 != q2)
-#                     @inbounds @. @views Hview += PlambdaPk[block_p_idxs, block_q_idxs2] * PlambdaPk[block_q_idxs, block_p_idxs2]
-#                 end
-#             end
-#             if xor(p == q, p2 == q2)
-#                 @. Hview *= cone.rt2
-#             end
-#         end
-#     end
-#
-#     cone.hess_updated = true
-#     end
-#     return cone.hess
-# end
+
+function update_blocks_R(cone::WSOSInterpPosSemidefTri)
+    @assert cone.grad_updated
+    U = cone.U
+    # TODO only upper triangle
+    @timeit cone.timer "views2" @inbounds for k in eachindex(cone.Ps), q in 1:U, p in 1:U
+        @views copyto!(cone.PlambdaP_blocks_R[k][p, q], cone.PlambdaP[k][p:U:(U * cone.R), q:U:(U * cone.R)])
+    end
+    cone.blocks_R_updated = true
+    return
+end
 
 function update_hess(cone::WSOSInterpPosSemidefTri)
     @timeit cone.timer "hess" begin
@@ -274,7 +240,6 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     R = cone.R
     U = cone.U
     H = cone.hess.data
-
     H .= 0
     @inbounds for p in 1:R
         for q in 1:p
@@ -308,58 +273,12 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     return cone.hess
 end
 
-
-# function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where {T}
-#     @timeit cone.timer "corr" begin
-#     @assert cone.grad_updated
-#     corr = cone.correction
-#     corr .= 0
-#     U = cone.U
-#     UR = U * cone.R
-#     dim = cone.dim
-#     PlambdaP_dirs = cone.tmpRRUU
-#     matRR = cone.tmpRR
-#     matRR2 = cone.tmpRR2
-#     matRR3 = cone.tmpRR3
-#
-#     @inbounds for k in eachindex(cone.Ps)
-#         PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
-#
-#         @inbounds for p in 1:U, q in 1:U
-#             @views primal_dir_mat_q = Symmetric(svec_to_smat!(matRR, primal_dir[q:U:dim], cone.rt2))
-#             @views PlambdaPk_slice_pq = PlambdaPk[p:U:UR, q:U:UR]
-#             mul!(PlambdaP_dirs[p][q], PlambdaPk_slice_pq, primal_dir_mat_q)
-#         end
-#
-#         @inbounds for p in 1:U
-#             @views primal_dir_mat_p = Symmetric(svec_to_smat!(matRR, primal_dir[p:U:dim], cone.rt2))
-#             @inbounds for q in 1:U
-#                 pq_q = PlambdaP_dirs[p][q] # PlambdaPk_slice_pq * primal_dir_mat_q
-#                 @inbounds for r in 1:q
-#                     @views PlambdaPk_slice_qr = PlambdaPk[q:U:UR, r:U:UR]
-#                     r_rp = PlambdaP_dirs[p][r]'
-#
-#                     # O(R^3) done O(U^3) times
-#                     mul!(matRR2, PlambdaPk_slice_qr, r_rp)
-#                     mul!(matRR3, pq_q, matRR2)
-#                     axpy!(true, matRR3, matRR3')
-#                     if q != r
-#                         matRR3 .*= 2
-#                     end
-#                     @views smat_to_svec_add!(corr[p:U:dim], matRR3, cone.rt2)
-#                 end
-#             end
-#         end
-#     end
-#     corr ./= 2
-#     end
-#
-#     return corr
-# end
-
 function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where {T}
     @timeit cone.timer "corr" begin
     @assert cone.grad_updated
+    if !cone.blocks_R_updated
+        update_blocks_R(cone)
+    end
     corr = cone.correction
     corr .= 0
     U = cone.U
