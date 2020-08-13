@@ -115,6 +115,7 @@ get_nu(cone::HypoPerLogdetTri) = cone.side + 2
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
+    # central point data are the same as for hypoperlog
     (arr[1], arr[2], w) = get_central_ray_hypoperlog(cone.side)
     incr = (cone.is_complex ? 2 : 1)
     k = 3
