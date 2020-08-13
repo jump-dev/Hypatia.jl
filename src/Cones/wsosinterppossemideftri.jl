@@ -47,11 +47,8 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     tmpLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
 
-    P_kron_I::Vector{Matrix{T}}
-    PlambdaP_blocks::Vector{Matrix{Matrix{T}}}
-    PlambdaP_blocks2::Vector{Matrix{Matrix{T}}}
-    ΛFL_blocks
-    ΛFLP_blocks
+    PlambdaP_blocks_U::Vector{Matrix{Matrix{T}}}
+    PlambdaP_blocks_R::Vector{Matrix{Matrix{T}}}
 
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
@@ -105,24 +102,13 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.ΛFL = Vector{Any}(undef, length(Ps))
     cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
-    cone.P_kron_I = [kron(Matrix(I, R, R), P) for P in cone.Ps]
-    cone.PlambdaP_blocks = [Matrix{Matrix{T}}(undef, R, R) for _ in eachindex(Ps)]
+    cone.PlambdaP_blocks_U = [Matrix{Matrix{T}}(undef, R, R) for _ in eachindex(Ps)]
     for k in eachindex(Ps), r in 1:R, s in 1:R
-        cone.PlambdaP_blocks[k][r, s] = zeros(T, U, U)
+        cone.PlambdaP_blocks_U[k][r, s] = zeros(T, U, U)
     end
-    cone.PlambdaP_blocks2 = [Matrix{Matrix{T}}(undef, U, U) for _ in eachindex(Ps)]
+    cone.PlambdaP_blocks_R = [Matrix{Matrix{T}}(undef, U, U) for _ in eachindex(Ps)]
     for k in eachindex(Ps), r in 1:U, s in 1:U
-        cone.PlambdaP_blocks2[k][r, s] = zeros(T, R, R)
-    end
-    cone.ΛFL_blocks = [Matrix{Matrix{T}}(undef, R, R) for _ in eachindex(Ps)]
-    for (k, Pk) in enumerate(Ps), r in 1:R, s in 1:R
-        L = size(Pk, 2)
-        cone.ΛFL_blocks[k][r, s] = zeros(T, L, L)
-    end
-    cone.ΛFLP_blocks = [Matrix{Matrix{T}}(undef, R, R) for _ in eachindex(Ps)]
-    for (k, Pk) in enumerate(Ps), r in 1:R, s in 1:R
-        L = size(Pk, 2)
-        cone.ΛFLP_blocks[k][r, s] = zeros(T, L, U)
+        cone.PlambdaP_blocks_R[k][r, s] = zeros(T, R, R)
     end
     return
 end
@@ -188,24 +174,20 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
             block_U_p_idxs = block_idxs(U, p)
             block_L_p_idxs = block_idxs(L, p)
             @views ΛFLP_pp = ΛFLP[block_L_p_idxs, block_U_p_idxs]
-            # ΛFLP_pp = cone.ΛFLP_blocks[k][p, p]
             # ΛFLP_pp = ΛFL_pp \ P'
             @views ldiv!(ΛFLP_pp, LowerTriangular(ΛFL[block_L_p_idxs, block_L_p_idxs]), cone.Ps[k]')
             # to get off-diagonals in ΛFLP, subtract known blocks aggregated in ΛFLP_qp
             @inbounds for q in (p + 1):R
                 block_L_q_idxs = block_idxs(L, q)
                 @views ΛFLP_qp = ΛFLP[block_L_q_idxs, block_U_p_idxs]
-                # ΛFLP_qp = cone.ΛFLP_blocks[k][q, p]
                 ΛFLP_qp .= 0
                 @inbounds for p2 in p:(q - 1)
                     block_L_p2_idxs = block_idxs(L, p2)
                     @views mul!(ΛFLP_qp, ΛFL[block_L_q_idxs, block_L_p2_idxs], ΛFLP[block_L_p2_idxs, block_U_p_idxs], -1, 1)
-                    # @views mul!(ΛFLP_qp, ΛFL[block_L_q_idxs, block_L_p2_idxs], cone.ΛFLP_blocks[k][p2, p], -1, 1)
                 end
                 @views ldiv!(LowerTriangular(ΛFL[block_L_q_idxs, block_L_q_idxs]), ΛFLP_qp)
             end
         end
-        # ΛFLP = ldiv!(ΛFLP, LowerTriangular(ΛFL), cone.P_kron_I[k]')
 
         # PlambdaP = ΛFLP' * ΛFLP
         PlambdaPk = cone.PlambdaP[k]
@@ -215,20 +197,14 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
             # since ΛFLP is block lower triangular rows only from max(p,q) start making a nonzero contribution to the product
             row_range = ((q - 1) * L + 1):(L * R)
             @inbounds @views mul!(PlambdaPk[block_p_idxs, block_q_idxs], ΛFLP[row_range, block_p_idxs]', ΛFLP[row_range, block_q_idxs])
-            # PlambdaPk[block_p_idxs, block_q_idxs] .= 0
-            # for r in q:R
-            #     @views mul!(PlambdaPk[block_p_idxs, block_q_idxs], cone.ΛFLP_blocks[k][r, p]', cone.ΛFLP_blocks[k][r, q], true, true)
-            # end
         end
-        # mul!(PlambdaPk, ΛFLP', ΛFLP)
+
         # TODO only upper triangle
         @timeit cone.timer "views1" @inbounds for q in 1:R, p in 1:R
-            block_p_idxs = block_idxs(U, p)
-            block_q_idxs = block_idxs(U, q)
-            @views copyto!(cone.PlambdaP_blocks[k][p, q], Symmetric(PlambdaPk, :U)[block_p_idxs, block_q_idxs])
+            @views copyto!(cone.PlambdaP_blocks_U[k][p, q], Symmetric(PlambdaPk, :U)[block_idxs(U, p), block_idxs(U, q)])
         end
         @timeit cone.timer "views2" @inbounds for q in 1:U, p in 1:U
-            @views copyto!(cone.PlambdaP_blocks2[k][p, q], Symmetric(PlambdaPk, :U)[p:U:(U * R), q:U:(U * R)])
+            @views copyto!(cone.PlambdaP_blocks_R[k][p, q], Symmetric(PlambdaPk, :U)[p:U:(U * R), q:U:(U * R)])
         end
     end
 
@@ -314,7 +290,7 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
 
                 @views Hview = H[idxs, idxs2]
                 for k in eachindex(cone.Ps)
-                    PlambdaPk = cone.PlambdaP_blocks[k]
+                    PlambdaPk = cone.PlambdaP_blocks_U[k]
                     @inbounds @. @views Hview += PlambdaPk[p, p2] * PlambdaPk[q, q2]
                     if (p != q) && (p2 != q2)
                         @inbounds @. @views Hview += PlambdaPk[p, q2] * PlambdaPk[q, p2]
@@ -395,7 +371,7 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
     matRR3 = cone.tmpRR3
 
     @inbounds for k in eachindex(cone.Ps)
-        PlambdaPk = cone.PlambdaP_blocks2[k]
+        PlambdaPk = cone.PlambdaP_blocks_R[k]
 
         @inbounds for p in 1:U, q in 1:U
             @views primal_dir_mat_q = Symmetric(svec_to_smat!(matRR, primal_dir[q:U:dim], cone.rt2))
