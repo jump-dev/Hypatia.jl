@@ -190,10 +190,10 @@ function test_hypoperlog_barrier(T::Type{<:Real})
         return -log(v * sum(log(wj / v) for wj in w) - u) - sum(log, w) - log(v)
     end
     for dim in [3, 5, 10]
-        test_barrier_oracles(CO.HypoPerLog{T}(dim), barrier, init_tol = NaN)
+        test_barrier_oracles(CO.HypoPerLog{T}(dim), barrier, init_tol = 1e-5)
     end
     for dim in [15, 65, 75, 100, 500]
-        test_barrier_oracles(CO.HypoPerLog{T}(dim), barrier, init_tol = NaN, init_only = true)
+        test_barrier_oracles(CO.HypoPerLog{T}(dim), barrier, init_tol = 1e-1, init_only = true)
     end
     return
 end
@@ -412,9 +412,9 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
             return -log(v * logdet(cholesky!(Symmetric(W / v, :U))) - u) - logdet(cholesky!(Symmetric(W, :U))) - log(v)
         end
         if side <= 5
-            test_barrier_oracles(cone, R_barrier, init_tol = NaN)
+            test_barrier_oracles(cone, R_barrier, init_tol = 1e-5)
         else
-            test_barrier_oracles(cone, R_barrier, init_tol = NaN, init_only = true)
+            test_barrier_oracles(cone, R_barrier, init_tol = 1e-1, init_only = true)
         end
 
         # complex logdet barrier
