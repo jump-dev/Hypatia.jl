@@ -104,11 +104,11 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
     cone.PlambdaP_blocks_U = [Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}(undef, R, R) for _ in eachindex(Ps)]
-    for k in eachindex(Ps), r in 1:R, s in 1:R
+    @inbounds for k in eachindex(Ps), r in 1:R, s in 1:R
         cone.PlambdaP_blocks_U[k][r, s] = view(cone.PlambdaP[k], block_idxs(U, r), block_idxs(U, s))
     end
     cone.PlambdaP_blocks_R = [Matrix{Matrix{T}}(undef, U, U) for _ in eachindex(Ps)]
-    for k in eachindex(Ps), r in 1:U, s in 1:U
+    @inbounds for k in eachindex(Ps), r in 1:U, s in 1:U
         cone.PlambdaP_blocks_R[k][r, s] = zeros(T, R, R)
     end
     return
