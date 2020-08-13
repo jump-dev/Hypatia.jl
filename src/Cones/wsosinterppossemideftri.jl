@@ -45,7 +45,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     ΛFL::Vector
     ΛFLP::Vector{Matrix{T}}
     tmpLU::Vector{Matrix{T}}
-    PlambdaP::Vector
+    PlambdaP::Vector{Matrix{T}}
 
     PlambdaP_blocks_U::Vector{Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}}
     PlambdaP_blocks_R::Vector{Matrix{Matrix{T}}}
