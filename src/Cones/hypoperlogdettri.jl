@@ -5,13 +5,11 @@ Copyright 2018, Chris Coey, Lea Kapelevich and contributors
 (u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
 (see equivalent MathOptInterface LogDetConeTriangle definition)
 
-barrier (self-concordance follows from theorem 5.1.4, "Interior-Point Polynomial Algorithms in Convex Programming" by Y. Nesterov and A. Nemirovski):
-theta^2 * (-log(v*logdet(W/v) - u) - logdet(W) - (n + 1) log(v))
-we use theta = 16
+barrier analogous to hypoperlog cone
+-log(v*logdet(W/v) - u) - logdet(W) - log(v)
 
 TODO
 - describe complex case
-- try to tune theta parameter
 - investigate numerics in inverse Hessian oracles
 =#
 
@@ -25,7 +23,6 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     rt2::T
-    sc_const::T
     timer::TimerOutput
 
     feas_updated::Bool
@@ -62,8 +59,6 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     function HypoPerLogdetTri{T, R}(
         dim::Int;
         use_dual::Bool = false,
-        # sc_const::Real = 256, # TODO reduce this
-        sc_const::Real = 25 / T(9), # NOTE not SC but works well (same as rootdet)
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
@@ -85,7 +80,6 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
             cone.is_complex = false
         end
         cone.side = side
-        cone.sc_const = sc_const
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
@@ -121,8 +115,7 @@ get_nu(cone::HypoPerLogdetTri) = cone.side + 2
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
-    # NOTE if not using theta = 16, rescaling the ray yields central ray
-    (arr[1], arr[2], w) = (sqrt(cone.sc_const) / T(16)) * get_central_ray_hypoperlogdettri(cone.side)
+    (arr[1], arr[2], w) = get_central_ray_hypoperlog(cone.side)
     incr = (cone.is_complex ? 2 : 1)
     k = 3
     @inbounds for i in 1:cone.side
@@ -384,30 +377,3 @@ function correction(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}) wh
 
     return corr
 end
-
-# see analysis in https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
-function get_central_ray_hypoperlogdettri(Wside::Int)
-    if Wside <= 10
-        # lookup points where x = f'(x)
-        return central_rays_hypoperlogdettri[Wside, :]
-    end
-    # use nonlinear fit for higher dimensions
-    x = log10(Wside)
-    u = -0.102485 * x ^ 4 + 0.908632 * x ^ 3 - 3.029054 * x ^ 2 + 4.528779 * x - 13.901470
-    v = 0.358933 * x ^ 3 - 2.592002 * x ^ 2 + 6.354740 * x + 17.280377
-    w = 0.027883 * x ^ 3 - 0.231444 * x ^ 2 + 0.652673 * x + 21.997811
-    return [u, v, w]
-end
-
-const central_rays_hypoperlogdettri = [
-    -14.06325335  17.86151855  22.52090275
-    -13.08878205  18.91121795  22.4393585
-    -12.54888342  19.60639116  22.40621157
-    -12.22471372  20.09640151  22.39805249
-    -12.01656536  20.45698931  22.40140061
-    -11.87537532  20.73162694  22.4097267
-    -11.77522327  20.9468238  22.41993593
-    -11.70152722  21.11948341  22.4305642
-    -11.64562635  21.26079849  22.44092946
-    -11.6021318  21.37842775  22.45073131
-    ]

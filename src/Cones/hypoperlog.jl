@@ -5,7 +5,7 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 (u in R, v in R_+, w in R_+^d) : u <= v*sum(log.(w/v))
 
 barrier modified from "Primal-Dual Interior-Point Methods for Domain-Driven Formulations" by Karimi & Tuncel, 2019
--log(sum_i v*log(w_i/v) - u) - sum_i log(w_i) - d*log(v)
+-log(sum_i v*log(w_i/v) - u) - sum_i log(w_i) - log(v)
 =#
 
 mutable struct HypoPerLog{T <: Real} <: Cone{T}
@@ -232,7 +232,7 @@ function correction(cone::HypoPerLog{T}, primal_dir::AbstractVector{T}) where {T
     return corr
 end
 
-# see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
+# see analysis in https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
 function get_central_ray_hypoperlog(w_dim::Int)
     if w_dim <= 10
         # lookup points where x = f'(x)
@@ -241,28 +241,28 @@ function get_central_ray_hypoperlog(w_dim::Int)
     # use nonlinear fit for higher dimensions
     x = inv(w_dim)
     if w_dim <= 70
-        u = -1.974777 * x ^ 2 + 0.413520 * x - 0.706751
-        v = -1.213389 * x + 1.413551
-        w = -0.406380 * x + 1.411894
+        u = 4.657876 * x ^ 2 - 3.116192 * x + 0.000647
+        v = 0.424682 * x + 0.553392
+        w = 0.760412 * x + 1.001795
     else
-        u = 0.405290 * x - 0.707011
-        v = -1.238597 * x + 1.414216
-        w = -0.511055 * x + 1.414163
+        u = -3.011166 * x - 0.000122
+        v = 0.395308 * x + 0.553955
+        w = 0.837545 * x + 1.000024
     end
     return [u, v, w]
 end
 
 const central_rays_hypoperlog = [
-    -0.827838399  0.805102005  1.290927713;
-    -0.751337431  0.980713381  1.317894791;
-    -0.716423551  1.079796942  1.331762729;
-    -0.699644766  1.144036715 1.341797042;
-    -0.69134357  1.188706149  1.349742329;
-    -0.687251501  1.221310686  1.3562255;
-    -0.685353717  1.246016352  1.361602711;
-    -0.684641818  1.265307905  1.366119586;
-    -0.684585293  1.280747581  1.369956554;
-    -0.684893372  1.293360445  1.373249434;
+    -0.827838387  0.805102007  1.290927686
+    -0.689607388  0.724605082  1.224617936
+    -0.584372665  0.68128058  1.182421942
+    -0.503499342  0.65448622  1.153053152
+    -0.440285893  0.636444224  1.131466926
+    -0.389979809  0.623569352  1.114979519
+    -0.349255921  0.613978276  1.102013921
+    -0.315769104  0.606589839  1.091577908
+    -0.287837744  0.600745284  1.083013
+    -0.264242734  0.596019009  1.075868782
     ]
 
 # TODO add hess prod, inv hess etc functions
