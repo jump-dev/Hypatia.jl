@@ -13,6 +13,7 @@ TODO
 
 setprecision(128)
 new_T = BigFloat
+# new_T = Float64
 
 mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool

@@ -13,14 +13,14 @@ using TimerOutputs
 # options to solvers
 timer = TimerOutput()
 default_solver_options = (
-    verbose = false,
+    verbose = true,
     iter_limit = 250,
     timer = timer,
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    (MinimalInstances, Float64, 15),
+    # (MinimalInstances, Float64, 15),
     # (MinimalInstances, Float32, 15),
     # (MinimalInstances, BigFloat, 60),
     (FastInstances, Float64, 15),

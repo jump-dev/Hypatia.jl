@@ -45,10 +45,6 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
 
     PlambdaP_blocks::Vector{Matrix{Matrix{T}}}
 
-    tmpRR::Matrix{T}
-    tmpRR2::Matrix{T}
-    tmpRR3::Matrix{T}
-
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
         U::Int,
@@ -100,9 +96,6 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     for k in eachindex(Ps), r in 1:R, s in 1:R
         cone.PlambdaP_blocks[k][r, s] = zeros(T, U, U)
     end
-    cone.tmpRR = zeros(T, R, R)
-    cone.tmpRR2 = zeros(T, R, R)
-    cone.tmpRR3 = zeros(T, R, R)
     return
 end
 

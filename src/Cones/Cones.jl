@@ -46,8 +46,10 @@ include("possemideftri.jl")
 include("possemideftrisparse.jl")
 include("hypoperlogdettri.jl")
 include("hyporootdettri.jl")
-include("wsosinterpnonnegative.jl")
-include("wsosinterppossemideftri.jl")
+# include("wsosinterpnonnegative.jl")
+# include("wsosinterppossemideftri.jl")
+include("wsosinterpnonnegative_BF.jl")
+include("wsosinterppossemideftri_BF.jl")
 include("wsosinterpepinormeucl.jl")
 
 use_dual_barrier(cone::Cone) = cone.use_dual_barrier
