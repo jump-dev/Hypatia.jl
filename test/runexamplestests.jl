@@ -123,9 +123,9 @@ perf = DataFrames.DataFrame(
     x_viol = Float64[],
     y_viol = Float64[],
     z_viol = Float64[],
-    ext_n = Int[],
-    ext_p = Int[],
-    ext_q = Int[],
+    n = Int[],
+    p = Int[],
+    q = Int[],
     )
 
 isnothing(results_path) || CSV.write(results_path, perf)

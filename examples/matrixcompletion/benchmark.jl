@@ -5,4 +5,4 @@ matrixcompletion_instances = [
     ]
 
 instances[MatrixCompletionJuMP]["nat"] = (nothing, matrixcompletion_instances)
-instances[MatrixCompletionJuMP]["ext"] = (ExpPSDConeOptimizer, matrixcompletion_instances)
+instances[MatrixCompletionJuMP]["ext"] = (StandardConeOptimizer, matrixcompletion_instances)
