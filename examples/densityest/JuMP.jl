@@ -71,11 +71,12 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
     return model
 end
 
-instances[DensityEstJuMP]["minimal"] = [
+instances = Dict()
+instances["minimal"] = [
     ((5, 1, 2, true),),
     ((:iris, 2, true),),
     ]
-instances[DensityEstJuMP]["fast"] = [
+instances["fast"] = [
     ((10, 1, 5, true),),
     ((10, 1, 10, true),),
     ((100, 1, 20, true),),
@@ -101,10 +102,11 @@ instances[DensityEstJuMP]["fast"] = [
     ((:iris, 4, false),),
     ((:cancer, 4, true),),
     ]
-instances[DensityEstJuMP]["slow"] = [
+instances["slow"] = [
     ((500, 2, 60, true),),
     ((1000, 3, 20, true),),
     ((200, 4, 4, false),),
     ((500, 4, 6, true),),
     ((500, 4, 6, false),),
     ]
+return (DensityEstJuMP, instances)
