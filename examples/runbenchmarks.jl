@@ -3,7 +3,7 @@ Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
 run benchmarks from the examples folder
 to use the bench instance set and run on cmd line:
-~/julia/julia test/runexamplestests.jl &> ~/bench/bench.txt
+~/julia/julia examples/runbenchmarks.jl &> ~/bench/bench.txt
 =#
 
 import DataFrames
