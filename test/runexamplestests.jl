@@ -23,7 +23,7 @@ instance_sets = [
     # (MinimalInstances, Float64, 15),
     # (MinimalInstances, Float32, 15),
     # (MinimalInstances, BigFloat, 60),
-    (FastInstances, Float64, 15),
+    (FastInstances, Float64, 1800),
     # (SlowInstances, Float64, 120),
     ]
 
@@ -53,7 +53,7 @@ JuMP_example_names = [
     # "conditionnum",
     # "contraction",
     # "densityest",
-    # "envelope",
+    "envelope",
     # "expdesign",
     # "lotkavolterra",
     # "lyapunovstability",
@@ -66,7 +66,7 @@ JuMP_example_names = [
     # "polymin",
     # "polynorm",
     # "portfolio",
-    "randompolymat",
+    # "randompolymat",
     # "regionofattr",
     # "robustgeomprog",
     # "secondorderpoly",

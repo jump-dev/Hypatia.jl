@@ -86,11 +86,17 @@ function build(inst::RandomPolyMatJuMP{T}) where {T <: Float64} # TODO generic r
     JuMP.@constraint(model, vcat(t, lambda) in JuMP.SecondOrderCone())
 
     # TODO do without
-    @polyvar x[1:n]
-    monos = monomials(x, 0:halfdeg)
-    half_mat = [dot(rand(L), monos) for _ in 1:R, _ in 1:R]
-    full_mat = half_mat + half_mat'
-    full_coeffs = [JuMP.AffExpr[full_mat[i, j](points[u, :]...) for u in 1:U] .+ lambda[Cones.block_idxs(U, Cones.svec_idx(i, j))] for j in 1:R, i in 1:R]
+    # @polyvar x[1:n]
+    # monos = monomials(x, 0:(2 * halfdeg))
+    # half_mat = [dot(randn(U), monos) for _ in 1:R, _ in 1:R]
+    # full_mat = half_mat + half_mat'
+    # full_coeffs = [JuMP.AffExpr[full_mat[i, j](points[u, :]...) for u in 1:U] .+ lambda[Cones.block_idxs(U, Cones.svec_idx(i, j))] for j in 1:R, i in 1:R]
+
+    full_mat = [randn(U) for _ in 1:R, _ in 1:R]
+    for j in 1:R, i in 1:j
+        full_mat[i, j] += full_mat[j, i]
+    end
+    full_coeffs = full_mat + [lambda[Cones.block_idxs(U, Cones.svec_idx(i, j))] for j in 1:R, i in 1:R]
 
     if inst.formulation == :nat_wsos_mat
         JuMP.@constraint(model, vcat([full_coeffs[i, j] * (i == j ? 1 : sqrt(2)) for j in 1:R for i in 1:j]...) in Hypatia.WSOSInterpPosSemidefTriCone{Float64}(R, U, Ps))
@@ -136,12 +142,12 @@ function test_extra(inst::RandomPolyMatJuMP{T}, model::JuMP.Model) where T
 end
 
 example_tests(::Type{RandomPolyMatJuMP{Float64}}, ::FastInstances) = begin
-    options = (tol_feas = 1e-7, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, verbose = true)
+    options = (tol_feas = 1e-8, tol_rel_opt = 1e-8, tol_abs_opt = 1e-8, verbose = true)
     relaxed_options = (tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
     return [
-    ((2, 2, 3, :nat_wsos_mat), nothing, options),
-    ((2, 2, 3, :nat_wsos), nothing, options),
-    ((2, 2, 3, :ext), nothing, options),
+    ((4, 2, 10, :nat_wsos_mat), nothing, options),
+    # ((2, 2, 15, :nat_wsos), nothing, options),
+    # ((2, 2, 3, :ext), nothing, options),
     ]
 end
 
