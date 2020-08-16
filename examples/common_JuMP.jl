@@ -74,10 +74,14 @@ function test(
     Random.seed!(rseed)
     inst = E(inst_data...)
     build_time = @elapsed model = build(inst)
+    flush(stdout)
+    flush(stderr)
 
     # solve and process result
     solver = solver_type(; default_solver_options..., solver_options...)
     result = solve_process(inst, model, solver, extender, test)
+    flush(stdout)
+    flush(stderr)
 
     return (extender, build_time, result)
 end
@@ -97,6 +101,8 @@ function solve_process(
     end
     JuMP.set_optimizer(model, () -> opt)
     JuMP.optimize!(model)
+    flush(stdout)
+    flush(stderr)
 
     if test
         # run tests for the example
@@ -151,6 +157,8 @@ function solve_process(
     opt = solver
     JuMP.set_optimizer(jump_model, () -> opt)
     JuMP.optimize!(jump_model)
+    flush(stdout)
+    flush(stderr)
 
     solve_time = JuMP.solve_time(jump_model)
     num_iters = MOI.get(jump_model, MOI.BarrierIterations())
@@ -205,6 +213,8 @@ function test(
     opt = solver_type(; solver_options...)
     JuMP.set_optimizer(model, () -> opt)
     JuMP.optimize!(model)
+    flush(stdout)
+    flush(stderr)
 
     @test JuMP.termination_status(model) == MOI.OPTIMAL # TODO some may be infeasible
 
