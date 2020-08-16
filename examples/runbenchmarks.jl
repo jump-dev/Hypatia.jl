@@ -67,7 +67,7 @@ JuMP_example_names = [
     # "nearestpsd",
     # "polymin",
     # "portfolio",
-    "shapeconregr",
+    # "shapeconregr",
     ]
 
 using Distributed
@@ -88,36 +88,33 @@ function get_worker()
 end
 
 function spawn_instance(worker, ex_type, inst, extender, solver)
-    time_inst = time()
-
     t = @spawnat worker test(ex_type{Float64}, inst, extender, solver[3], solver[2], test = false)
     sleep(1)
 
+    time_start = time()
     status = :ScriptError
     try
         is_killed = false
         while !isready(t)
-            sleep(1)
             if Sys.free_memory() < free_memory_limit
                 status = :KilledMemory
-                is_killed = true
-                break
-            elseif time() - time_inst > time_limit
+            elseif time() - time_start > time_limit
                 status = :KilledTime
-                is_killed = true
-                break
+            else
+                sleep(5)
+                continue
             end
-        end
-        time_inst = time() - time_inst
-        if is_killed
+            is_killed = true
             interrupt(worker)
-            status = :Killed
-        else
+            break
+        end
+        if !is_killed
             (_, build_time, r) = fetch(t)
             return (false, (build_time, r.status, r.solve_time, r.num_iters, r.primal_obj, r.dual_obj, r.obj_diff, r.compl, r.x_viol, r.y_viol, r.z_viol, r.n, r.p, r.q, r.cones))
         end
     catch e
         println(e)
+        status = :CaughtError
     end
 
     return (true, (NaN, status, NaN, 0, NaN, NaN, NaN, NaN, NaN, NaN, NaN, 0, 0, 0, String[]))
@@ -130,6 +127,7 @@ function run_benchmarks()
     @everywhere @eval using MosekTools
     @everywhere include(joinpath($examples_dir, "common.jl"))
     @everywhere include(joinpath($examples_dir, "common_JuMP.jl"))
+    sleep(1)
 
     perf = DataFrames.DataFrame(
         example = Type{<:ExampleInstance}[],
@@ -162,6 +160,7 @@ function run_benchmarks()
     for ex_name in JuMP_example_names
         @everywhere include(joinpath($examples_dir, $ex_name, "JuMP.jl"))
         @everywhere (ex_type, ex_insts) = include(joinpath($examples_dir, $ex_name, "benchmark.jl"))
+        sleep(1)
         for (inst_set, solvers) in instance_sets, solver in solvers
             haskey(ex_insts, inst_set) || continue
             (extender, inst_subsets) = ex_insts[inst_set]
@@ -170,8 +169,6 @@ function run_benchmarks()
             for inst_subset in inst_subsets
                 for (inst_num, inst) in enumerate(inst_subset)
                     println("\n$ex_type $inst_set $(solver[1]) $inst_num: $inst ...")
-
-                    sleep(1)
                     time_inst = @elapsed (is_killed, p) = spawn_instance(worker, ex_type, inst, extender, solver)
 
                     push!(perf, (ex_type, inst_set, inst_num, inst, solver[1], extender, time_inst, p...))
@@ -189,6 +186,7 @@ function run_benchmarks()
                             include(joinpath(examples_dir, ex_name, "JuMP.jl"))
                             include(joinpath(examples_dir, ex_name, "benchmark.jl"))
                         end
+                        sleep(1)
                         flush(stdout)
                         flush(stderr)
                         break
