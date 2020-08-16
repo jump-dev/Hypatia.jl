@@ -4,5 +4,7 @@ nearestpsd_insts(use_nat::Bool) = [
     for use_completable in (false, true)
     ]
 
-insts[NearestPSDJuMP]["nat"] = (nothing, nearestpsd_insts(true))
-insts[NearestPSDJuMP]["ext"] = (StandardConeOptimizer, nearestpsd_insts(false))
+insts = Dict()
+insts["nat"] = (nothing, nearestpsd_insts(true))
+insts["ext"] = (StandardConeOptimizer, nearestpsd_insts(false))
+return (NearestPSDJuMP, insts)

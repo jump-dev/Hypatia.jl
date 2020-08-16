@@ -107,13 +107,14 @@ function test_extra(inst::MatrixRegressionJuMP{T}, model::JuMP.Model) where T
     end
 end
 
-insts[MatrixRegressionJuMP]["minimal"] = [
+insts = Dict()
+insts["minimal"] = [
     ((2, 3, 4, 0, 0, 0, 0, 0),),
     ((2, 3, 4, 0, 0, 0, 0, 0), StandardConeOptimizer),
     ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
     ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), StandardConeOptimizer),
     ]
-insts[MatrixRegressionJuMP]["fast"] = [
+insts["fast"] = [
     ((5, 3, 4, 0, 0, 0, 0, 0),),
     ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
     ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), StandardConeOptimizer),
@@ -129,9 +130,10 @@ insts[MatrixRegressionJuMP]["fast"] = [
     ((50, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2), StandardConeOptimizer),
     ((50, 8, 12, 0, 0.1, 0.1, 0, 0),),
     ]
-insts[MatrixRegressionJuMP]["slow"] = [
+insts["slow"] = [
     ((15, 20, 50, 0, 0, 0, 0, 0),),
     ((15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),),
     ((15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2), StandardConeOptimizer),
     ((15, 20, 50, 0, 0.1, 0.1, 0, 0),),
     ]
+return (MatrixRegressionJuMP, insts)

@@ -198,7 +198,8 @@ shapeconregr_data = Dict(
     :func10 => (x -> sum(exp.(x))),
     )
 
-insts[ShapeConRegrJuMP]["minimal"] = [
+insts = Dict()
+insts["minimal"] = [
     ((:naics5811, 3, true, false, true, true, false),),
     ((:naics5811, 3, true, false, true, false, false),),
     ((:naics5811, 3, true, false, false, true, false),),
@@ -212,7 +213,7 @@ insts[ShapeConRegrJuMP]["minimal"] = [
     ((1, 5, :func8, 2, 4, false, true, true, true, false),),
     ((1, 5, :func1, 2, 4, false, true, false, false, true), StandardConeOptimizer),
     ]
-insts[ShapeConRegrJuMP]["fast"] = [
+insts["fast"] = [
     ((:naics5811, 4, true, false, true, true, false),),
     ((:naics5811, 4, true, true, true, true, false),),
     ((:naics5811, 3, false, false, true, true, false),),
@@ -246,7 +247,7 @@ insts[ShapeConRegrJuMP]["fast"] = [
     ((4, 150, :func7, 0, 4, false, false, true, true, true),),
     ((3, 150, :func8, 0, 6, true, false, true, true, true),),
     ]
-insts[ShapeConRegrJuMP]["slow"] = [
+insts["slow"] = [
     ((:naics5811, 3, false, true, false, true, false), StandardConeOptimizer),
     ((:naics5811, 7, true, false, true, true, false),),
     ((:naics5811, 5, false, true, true, true, false), StandardConeOptimizer),
@@ -270,3 +271,4 @@ insts[ShapeConRegrJuMP]["slow"] = [
     ((5, 500, :func10, 4, 4, false, true, true, false, false), StandardConeOptimizer),
     ((5, 500, :func10, 4, 4, false, true, true, true, false), StandardConeOptimizer),
     ]
+return (ShapeConRegrJuMP, insts)
