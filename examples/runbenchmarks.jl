@@ -61,8 +61,8 @@ instance_sets = [
 JuMP_example_names = [
     # "densityest",
     # "expdesign",
-    "matrixcompletion",
-    # "matrixquadratic",
+    # "matrixcompletion",
+    "matrixquadratic",
     # "matrixregression",
     # "nearestpsd",
     # "polymin",
