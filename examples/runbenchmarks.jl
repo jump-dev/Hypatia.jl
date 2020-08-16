@@ -62,12 +62,12 @@ JuMP_example_names = [
     # "densityest",
     # "expdesign",
     # "matrixcompletion",
-    "matrixquadratic",
+    # "matrixquadratic",
     # "matrixregression",
     # "nearestpsd",
     # "polymin",
     # "portfolio",
-    # "shapeconregr",
+    "shapeconregr",
     ]
 
 using Distributed

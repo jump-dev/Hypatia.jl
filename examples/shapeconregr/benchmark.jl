@@ -43,5 +43,7 @@ shapeconregr_insts(use_nat::Bool) = [
     for (n, ds) in shapeconregr_n_ds
     ]
 
-insts[ShapeConRegrJuMP]["nat"] = (nothing, shapeconregr_insts(true))
-insts[ShapeConRegrJuMP]["ext"] = (StandardConeOptimizer, shapeconregr_insts(false))
+insts = Dict()
+insts["nat"] = (nothing, shapeconregr_insts(true))
+insts["ext"] = (StandardConeOptimizer, shapeconregr_insts(false))
+return (ShapeConRegrJuMP, insts)

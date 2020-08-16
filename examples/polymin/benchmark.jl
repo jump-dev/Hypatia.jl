@@ -46,5 +46,7 @@ polymin_insts(use_nat::Bool) = [
     for (n, ds) in polymin_n_ds
     ]
 
-insts[PolyMinJuMP]["nat"] = (nothing, polymin_insts(true))
-insts[PolyMinJuMP]["ext"] = (StandardConeOptimizer, polymin_insts(false))
+insts = Dict()
+insts["nat"] = (nothing, polymin_insts(true))
+insts["ext"] = (StandardConeOptimizer, polymin_insts(false))
+return (PolyMinJuMP, insts)

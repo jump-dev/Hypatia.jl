@@ -66,7 +66,8 @@ function build(inst::NearestPSDJuMP{T}) where {T <: Float64} # TODO generic real
     return model
 end
 
-insts[NearestPSDJuMP]["minimal"] = [
+insts = Dict()
+insts["minimal"] = [
     ((2, false, true, true),),
     ((2, false, false, true),),
     ((2, true, true, true),),
@@ -76,7 +77,7 @@ insts[NearestPSDJuMP]["minimal"] = [
     ((2, true, true, false),),
     ((2, true, false, false),),
     ]
-insts[NearestPSDJuMP]["fast"] = [
+insts["fast"] = [
     ((5, false, true, true),),
     ((5, false, false, true),),
     ((5, true, true, true),),
@@ -96,7 +97,7 @@ insts[NearestPSDJuMP]["fast"] = [
     ((100, false, true, false),),
     ((100, false, false, false),),
     ]
-insts[NearestPSDJuMP]["slow"] = [
+insts["slow"] = [
     ((100, false, true, true),),
     ((100, false, false, true),),
     ((100, true, true, true),),
@@ -104,3 +105,4 @@ insts[NearestPSDJuMP]["slow"] = [
     ((100, true, true, false),),
     ((100, true, false, false),),
     ]
+return (NearestPSDJuMP, insts)

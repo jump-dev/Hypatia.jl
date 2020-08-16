@@ -81,13 +81,14 @@ function test_extra(inst::PolyMinJuMP{T}, model::JuMP.Model) where T
     end
 end
 
-insts[PolyMinJuMP]["minimal"] = [
+insts = Dict()
+insts["minimal"] = [
     ((1, 2, true, true),),
     ((1, 2, false, true),),
     ((1, 2, false, false),),
     ((:motzkin, 3, true, true),),
     ]
-insts[PolyMinJuMP]["fast"] = [
+insts["fast"] = [
     ((1, 3, true, true),),
     ((1, 30, true, true),),
     ((1, 30, false, true),),
@@ -128,7 +129,7 @@ insts[PolyMinJuMP]["fast"] = [
     ((:motzkin, 3, false, false),),
     ((:motzkin_ball, 3, false, false),),
     ]
-insts[PolyMinJuMP]["slow"] = [
+insts["slow"] = [
     ((4, 5, true, true),),
     ((4, 5, false, true),),
     ((4, 5, false, false),),
@@ -136,3 +137,4 @@ insts[PolyMinJuMP]["slow"] = [
     ((2, 30, false, true),),
     ((2, 30, false, false),),
     ]
+return (PolyMinJuMP, insts)

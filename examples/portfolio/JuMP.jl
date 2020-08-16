@@ -35,13 +35,14 @@ function build(inst::PortfolioJuMP{T}) where {T <: Float64} # TODO generic reals
     return model
 end
 
-insts[PortfolioJuMP]["minimal"] = [
+insts = Dict()
+insts["minimal"] = [
     ((3, true, false),),
     ((3, false, true),),
     ((3, false, true), StandardConeOptimizer),
     ((3, true, true),),
     ]
-insts[PortfolioJuMP]["fast"] = [
+insts["fast"] = [
     ((10, true, false),),
     ((10, false, true),),
     ((10, false, true), StandardConeOptimizer),
@@ -57,7 +58,7 @@ insts[PortfolioJuMP]["fast"] = [
     ((400, false, true), StandardConeOptimizer),
     ((400, true, true),),
     ]
-insts[PortfolioJuMP]["slow"] = [
+insts["slow"] = [
     ((1000, true, false),),
     ((1000, false, true),),
     ((1000, false, true), StandardConeOptimizer),
@@ -67,3 +68,4 @@ insts[PortfolioJuMP]["slow"] = [
     ((3000, false, true), StandardConeOptimizer),
     ((3000, true, true),),
     ]
+return (PortfolioJuMP, insts)
