@@ -90,7 +90,7 @@ end
 function spawn_instance(worker, ex_type, inst, extender, solver)
     time_inst = time()
 
-    t = @spawnat worker test(ex_type{Float64}, inst, extender, solver[3], solver[2])
+    t = @spawnat worker test(ex_type{Float64}, inst, extender, solver[3], solver[2], test = false)
     sleep(1)
 
     status = :ScriptError
@@ -110,6 +110,7 @@ function spawn_instance(worker, ex_type, inst, extender, solver)
         end
         time_inst = time() - time_inst
         if is_killed
+            interrupt(worker)
             status = :Killed
         else
             (_, build_time, r) = fetch(t)

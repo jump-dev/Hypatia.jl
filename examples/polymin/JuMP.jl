@@ -47,19 +47,24 @@ function build(inst::PolyMinJuMP{T}) where {T <: Float64} # TODO generic reals
     else
         if use_primal
             psd_vars = []
-            for (k, P) in enumerate(Ps)
-                Lk = size(P, 2)
-                psd_k = JuMP.@variable(model, [1:Lk, 1:Lk], Symmetric)
-                push!(psd_vars, psd_k)
-                JuMP.@SDconstraint(model, psd_k >= 0)
+            for Pr in Ps
+                Lr = size(Pr, 2)
+                psd_r = JuMP.@variable(model, [1:Lr, 1:Lr], Symmetric)
+                if Lr == 1
+                    # Mosek cannot handle 1x1 PSD constraints
+                    JuMP.@constraint(model, psd_r[1, 1] >= 0)
+                else
+                    JuMP.@SDconstraint(model, psd_r >= 0)
+                end
+                push!(psd_vars, psd_r)
             end
-            coeffs_lhs = JuMP.@expression(model, [u in 1:U], sum(sum(P[u, k] * P[u, l] * psd_k[k, l] * (k == l ? 1 : 2) for k in 1:size(Pr, 2) for l in 1:k) for (P, psd_k) in zip(Ps, psd_vars)))
+            coeffs_lhs = JuMP.@expression(model, [u in 1:U], sum(sum(Pr[u, k] * Pr[u, l] * psd_r[k, l] * (k == l ? 1 : 2) for k in 1:size(Pr, 2) for l in 1:k) for (Pr, psd_r) in zip(Ps, psd_vars)))
             JuMP.@constraint(model, coeffs_lhs .== interp_vals .- a)
         else
-            for P in Ps
-                L = size(P, 2)
-                psd_vec = [JuMP.@expression(model, sum(P[u, i] * P[u, j] * μ[u] for u in 1:U)) for i in 1:L for j in 1:i]
-                JuMP.@constraint(model, psd_vec in MOI.PositiveSemidefiniteConeTriangle(L))
+            for Pr in Ps
+                Lr = size(Pr, 2)
+                psd_r = [JuMP.@expression(model, sum(Pr[u, i] * Pr[u, j] * μ[u] for u in 1:U)) for i in 1:Lr for j in 1:i]
+                JuMP.@constraint(model, psd_r in MOI.PositiveSemidefiniteConeTriangle(Lr))
             end
         end
     end
