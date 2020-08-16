@@ -66,13 +66,13 @@ function build(inst::LyapunovStabilityJuMP{T}) where {T <: Float64} # TODO gener
     return model
 end
 
-instances[LyapunovStabilityJuMP]["minimal"] = [
+insts[LyapunovStabilityJuMP]["minimal"] = [
     ((2, 3, true, true),),
     ((2, 3, true, false),),
     ((2, 2, false, true),),
     ((2, 2, false, false),),
     ]
-instances[LyapunovStabilityJuMP]["fast"] = [
+insts[LyapunovStabilityJuMP]["fast"] = [
     ((5, 6, true, true),),
     ((5, 6, true, false),),
     ((5, 5, false, true),),
@@ -84,7 +84,7 @@ instances[LyapunovStabilityJuMP]["fast"] = [
     ((30, 30, false, false),),
     ((30, 30, false, true),),
     ]
-instances[LyapunovStabilityJuMP]["slow"] = [
+insts[LyapunovStabilityJuMP]["slow"] = [
     ((50, 50, false, false),),
     ((50, 50, false, true),),
     ]

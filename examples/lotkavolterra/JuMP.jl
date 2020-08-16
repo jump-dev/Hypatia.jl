@@ -76,12 +76,12 @@ function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64} # TODO generic r
     return model
 end
 
-instances[LotkaVolterraJuMP]["minimal"] = [
+insts[LotkaVolterraJuMP]["minimal"] = [
     ((2,),),
     ]
-instances[LotkaVolterraJuMP]["fast"] = [
+insts[LotkaVolterraJuMP]["fast"] = [
     ((4,),),
     ]
-instances[LotkaVolterraJuMP]["slow"] = [
+insts[LotkaVolterraJuMP]["slow"] = [
     ((6,),),
     ]

@@ -198,7 +198,7 @@ shapeconregr_data = Dict(
     :func10 => (x -> sum(exp.(x))),
     )
 
-instances[ShapeConRegrJuMP]["minimal"] = [
+insts[ShapeConRegrJuMP]["minimal"] = [
     ((:naics5811, 3, true, false, true, true, false),),
     ((:naics5811, 3, true, false, true, false, false),),
     ((:naics5811, 3, true, false, false, true, false),),
@@ -212,7 +212,7 @@ instances[ShapeConRegrJuMP]["minimal"] = [
     ((1, 5, :func8, 2, 4, false, true, true, true, false),),
     ((1, 5, :func1, 2, 4, false, true, false, false, true), StandardConeOptimizer),
     ]
-instances[ShapeConRegrJuMP]["fast"] = [
+insts[ShapeConRegrJuMP]["fast"] = [
     ((:naics5811, 4, true, false, true, true, false),),
     ((:naics5811, 4, true, true, true, true, false),),
     ((:naics5811, 3, false, false, true, true, false),),
@@ -246,7 +246,7 @@ instances[ShapeConRegrJuMP]["fast"] = [
     ((4, 150, :func7, 0, 4, false, false, true, true, true),),
     ((3, 150, :func8, 0, 6, true, false, true, true, true),),
     ]
-instances[ShapeConRegrJuMP]["slow"] = [
+insts[ShapeConRegrJuMP]["slow"] = [
     ((:naics5811, 3, false, true, false, true, false), StandardConeOptimizer),
     ((:naics5811, 7, true, false, true, true, false),),
     ((:naics5811, 5, false, true, true, true, false), StandardConeOptimizer),

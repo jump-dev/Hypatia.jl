@@ -1,7 +1,7 @@
 #=
 Copyright 2019, Chris Coey and contributors
 
-run native instance tests from test/nativeinstances.jl and display basic benchmarks
+run native instance tests from test/nativeinsts.jl and display basic benchmarks
 =#
 
 using Test
@@ -11,7 +11,7 @@ using TimerOutputs
 import Hypatia
 import Hypatia.Solvers
 
-include(joinpath(@__DIR__, "nativeinstances.jl"))
+include(joinpath(@__DIR__, "nativeinsts.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
 
 all_reals = [

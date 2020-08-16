@@ -133,12 +133,12 @@ function build(inst::MaxVolumeNative{T}) where {T <: Real}
     return model
 end
 
-instances[MaxVolumeNative]["minimal"] = [
+insts[MaxVolumeNative]["minimal"] = [
     ((2, true, false, false),),
     ((3, false, true, false),),
     ((2, false, false, true),),
     ]
-instances[MaxVolumeNative]["fast"] = [
+insts[MaxVolumeNative]["fast"] = [
     ((10, true, false, false),),
     ((10, false, true, false),),
     ((10, false, false, true),),
@@ -147,7 +147,7 @@ instances[MaxVolumeNative]["fast"] = [
     ((100, false, false, true),),
     ((1000, true, false, false),),
     ]
-instances[MaxVolumeNative]["slow"] = [
+insts[MaxVolumeNative]["slow"] = [
     ((1000, false, true, false),),
     ((1000, false, false, true),),
     ((1500, true, false, false),),

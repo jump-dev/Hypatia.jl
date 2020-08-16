@@ -32,16 +32,16 @@ function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64} # TODO generi
     return model
 end
 
-instances[MatrixCompletionJuMP]["minimal"] = [
+insts[MatrixCompletionJuMP]["minimal"] = [
     ((2, 3),),
     ((2, 3), StandardConeOptimizer),
     ]
-instances[MatrixCompletionJuMP]["fast"] = [
+insts[MatrixCompletionJuMP]["fast"] = [
     ((5, 8),),
     ((5, 8), StandardConeOptimizer),
     ((12, 20),),
     ]
-instances[MatrixCompletionJuMP]["slow"] = [
+insts[MatrixCompletionJuMP]["slow"] = [
     ((12, 24), StandardConeOptimizer),
     ((14, 140),),
     ((14, 140), StandardConeOptimizer),

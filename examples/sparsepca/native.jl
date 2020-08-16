@@ -124,13 +124,13 @@ function test_extra(inst::SparsePCANative, result::NamedTuple)
     end
 end
 
-instances[SparsePCANative]["minimal"] = [
+insts[SparsePCANative]["minimal"] = [
     ((3, 2, true, 0, false),),
     ((3, 2, false, 0, false),),
     ((3, 2, true, 10, false),),
     ((3, 2, false, 10, false),),
     ]
-instances[SparsePCANative]["fast"] = [
+insts[SparsePCANative]["fast"] = [
     ((5, 3, true, 0, false),),
     ((5, 3, false, 0, false),),
     ((5, 3, true, 10, false),),
@@ -140,8 +140,8 @@ instances[SparsePCANative]["fast"] = [
     ((30, 10, true, 10, false),),
     ((30, 10, false, 10, false),),
     ]
-instances[SparsePCANative]["slow"] = Tuple[]
-instances[SparsePCANative]["linops"] = [
+insts[SparsePCANative]["slow"] = Tuple[]
+insts[SparsePCANative]["linops"] = [
     ((5, 3, true, 0, true),),
     ((5, 3, false, 0, true),),
     ((5, 3, true, 10, true),),

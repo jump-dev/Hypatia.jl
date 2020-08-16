@@ -276,13 +276,13 @@ function test_extra(inst::MatrixRegressionNative{T}, result::NamedTuple) where T
     end
 end
 
-instances[MatrixRegressionNative]["minimal"] = [
+insts[MatrixRegressionNative]["minimal"] = [
     ((false, 2, 3, 4, 0, 0, 0, 0, 0),),
     ((false, 2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
     ((true, 5, 3, 4, 0, 0, 0, 0, 0),),
     ((true, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
     ]
-instances[MatrixRegressionNative]["fast"] = [
+insts[MatrixRegressionNative]["fast"] = [
     ((false, 5, 3, 4, 0, 0, 0, 0, 0),),
     ((false, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
     ((false, 5, 3, 4, 0, 0.1, 0.1, 0, 0),),
@@ -307,7 +307,7 @@ instances[MatrixRegressionNative]["fast"] = [
     ((true, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),),
     ((true, 100, 8, 12, 0, 0.1, 0.1, 0, 0),),
     ]
-instances[MatrixRegressionNative]["slow"] = [
+insts[MatrixRegressionNative]["slow"] = [
     ((false, 15, 20, 50, 0, 0, 0, 0, 0),),
     ((false, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),),
     ((false, 15, 20, 50, 0, 0.1, 0.1, 0, 0),),

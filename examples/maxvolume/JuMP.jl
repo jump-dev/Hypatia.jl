@@ -35,7 +35,7 @@ function build(inst::MaxVolumeJuMP{T}) where {T <: Float64} # TODO generic reals
     return model
 end
 
-instances[MaxVolumeJuMP]["minimal"] = [
+insts[MaxVolumeJuMP]["minimal"] = [
     ((2, true, false),),
     ((2, true, true),),
     ((2, false, true),),
@@ -43,7 +43,7 @@ instances[MaxVolumeJuMP]["minimal"] = [
     ((2, false, true), SOPSDConeOptimizer),
     # ((2, false, true), ExpConeOptimizer), # TODO waiting for MOI bridges geomean to exp
     ]
-instances[MaxVolumeJuMP]["fast"] = [
+insts[MaxVolumeJuMP]["fast"] = [
     ((10, true, false),),
     ((10, false, true),),
     ((10, false, true), StandardConeOptimizer),
@@ -55,7 +55,7 @@ instances[MaxVolumeJuMP]["fast"] = [
     ((1000, true, false),),
     ((1000, true, true),), # with bridges extended formulation will need to go into slow list
     ]
-instances[MaxVolumeJuMP]["slow"] = [
+insts[MaxVolumeJuMP]["slow"] = [
     ((1000, false, true), StandardConeOptimizer),
     ((2000, true, false),),
     ((2000, false, true),),

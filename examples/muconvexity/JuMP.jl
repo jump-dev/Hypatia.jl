@@ -63,10 +63,10 @@ muconvexity_data = Dict(
     :dom4 => ModelUtilities.Ball{Float64}(ones(2), 5.0),
     )
 
-instances[MuConvexityJuMP]["minimal"] = [
+insts[MuConvexityJuMP]["minimal"] = [
     ((:poly1, :dom1, true, -4),),
     ]
-instances[MuConvexityJuMP]["fast"] = [
+insts[MuConvexityJuMP]["fast"] = [
     ((:poly1, :dom2, true, -4),),
     ((:poly1, :dom1, false, -4),),
     ((:poly1, :dom2, false, -4),),
@@ -75,4 +75,4 @@ instances[MuConvexityJuMP]["fast"] = [
     ((:poly2, :dom3, false, -2),),
     ((:poly2, :dom4, false, -2),),
     ]
-instances[MuConvexityJuMP]["slow"] = Tuple[]
+insts[MuConvexityJuMP]["slow"] = Tuple[]

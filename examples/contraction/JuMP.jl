@@ -66,14 +66,14 @@ function test_extra(inst::ContractionJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) == (inst.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 
-instances[ContractionJuMP]["minimal"] = [
+insts[ContractionJuMP]["minimal"] = [
     ((0.85, 2, 1e-3, true, false),),
     ((0.85, 2, 1e-3, false, false),),
     ]
-instances[ContractionJuMP]["fast"] = [
+insts[ContractionJuMP]["fast"] = [
     ((0.77, 4, 1e-3, true, true),),
     ((0.77, 4, 1e-3, false, true),),
     ((0.85, 4, 1e-3, true, false),),
     ((0.85, 4, 1e-3, false, false),),
     ]
-instances[ContractionJuMP]["slow"] = Tuple[]
+insts[ContractionJuMP]["slow"] = Tuple[]

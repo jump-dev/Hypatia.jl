@@ -37,11 +37,11 @@ function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64} # TODO generic 
 end
 
 tols6 = (tol_feas = 1e-6, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-instances[RobustGeomProgJuMP]["minimal"] = [
+insts[RobustGeomProgJuMP]["minimal"] = [
     ((2, 3),),
     ((2, 3), StandardConeOptimizer),
     ]
-instances[RobustGeomProgJuMP]["fast"] = [
+insts[RobustGeomProgJuMP]["fast"] = [
     ((5, 10), nothing, tols6),
     ((5, 10), StandardConeOptimizer, tols6),
     ((10, 20), nothing, tols6),
@@ -53,7 +53,7 @@ instances[RobustGeomProgJuMP]["fast"] = [
     ((100, 150), nothing, tols6),
     ((100, 150), StandardConeOptimizer, tols6),
     ]
-instances[RobustGeomProgJuMP]["slow"] = [
+insts[RobustGeomProgJuMP]["slow"] = [
     ((40, 80), StandardConeOptimizer, tols6),
     ((100, 200), nothing, tols6),
     ]

@@ -70,11 +70,11 @@ all_tests_time = time()
 
 @testset "CBLIB tests" begin
     for (inst_set, extender, time_limit) in instance_sets
-        instances = eval(Symbol(inst_set))
-        isempty(instances) && continue
-        println("\nstarting $(length(instances)) instances for $inst_set with extender $extender\n")
+        insts = eval(Symbol(inst_set))
+        isempty(insts) && continue
+        println("\nstarting $(length(insts)) instances for $inst_set with extender $extender\n")
         solver_options = (default_solver_options..., time_limit = time_limit)
-        for (inst_num, inst) in enumerate(instances)
+        for (inst_num, inst) in enumerate(insts)
             test_info = "$inst_set $extender $inst_num: $inst"
             @testset "$test_info" begin
                 println(test_info, "...")

@@ -164,7 +164,7 @@ function test_extra(inst::PolyMinNative{T}, result::NamedTuple) where T
     end
 end
 
-instances[PolyMinNative]["minimal"] = [
+insts[PolyMinNative]["minimal"] = [
     ((false, 1, 2, true, true, false),),
     ((false, 1, 2, false, true, false),),
     ((false, 1, 2, false, false, false),),
@@ -173,7 +173,7 @@ instances[PolyMinNative]["minimal"] = [
     ((true, :abs1d, 1, false, true, false),),
     ((false, :motzkin, 3, false, true, false),),
     ]
-instances[PolyMinNative]["fast"] = [
+insts[PolyMinNative]["fast"] = [
     ((false, 1, 30, true, true, false),),
     ((false, 1, 30, false, true, false),),
     ((false, 1, 30, false, false, false),),
@@ -225,7 +225,7 @@ instances[PolyMinNative]["fast"] = [
     ((false, :motzkin, 3, false, false, false),),
     ((false, :motzkin_ball, 3, false, false, false),),
     ]
-instances[PolyMinNative]["slow"] = [
+insts[PolyMinNative]["slow"] = [
     ((false, 4, 5, true, true, false),),
     ((false, 4, 5, false, true, false),),
     ((false, 4, 5, false, false, false),),
@@ -233,7 +233,7 @@ instances[PolyMinNative]["slow"] = [
     ((false, 2, 30, false, true, false),),
     ((false, 2, 30, false, false, false),),
     ]
-instances[PolyMinNative]["linops"] = [
+insts[PolyMinNative]["linops"] = [
     ((false, 1, 8, true, true, true),),
     ((false, 2, 5, true, true, true),),
     ((false, 3, 3, true, true, true),),
