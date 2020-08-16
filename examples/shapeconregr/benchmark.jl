@@ -38,10 +38,10 @@ shapeconregr_n_ds = [
     (12, [2,]),
     (14, [2,]),
     ]
-shapeconregr_instances(use_nat::Bool) = [
+shapeconregr_insts(use_nat::Bool) = [
     [(n, ceil(Int, 1.1 * binomial(n + 2d, n)), :func4, 100.0, 2d, use_nat, false, false, true, false) for d in ds]
     for (n, ds) in shapeconregr_n_ds
     ]
 
-instances[ShapeConRegrJuMP]["nat"] = (nothing, shapeconregr_instances(true))
-instances[ShapeConRegrJuMP]["ext"] = (StandardConeOptimizer, shapeconregr_instances(false))
+insts[ShapeConRegrJuMP]["nat"] = (nothing, shapeconregr_insts(true))
+insts[ShapeConRegrJuMP]["ext"] = (StandardConeOptimizer, shapeconregr_insts(false))

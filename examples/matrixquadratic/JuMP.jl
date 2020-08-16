@@ -45,11 +45,11 @@ function build(inst::MatrixQuadraticJuMP{T}) where {T <: Float64} # TODO generic
     return model
 end
 
-instances[MatrixQuadraticJuMP]["minimal"] = [
+insts[MatrixQuadraticJuMP]["minimal"] = [
     ((2, 2, true),),
     ((2, 2, false),),
     ]
-instances[MatrixQuadraticJuMP]["fast"] = [
+insts[MatrixQuadraticJuMP]["fast"] = [
     ((2, 3, true),),
     ((2, 3, false),),
     ((5, 6, true),),
@@ -59,7 +59,7 @@ instances[MatrixQuadraticJuMP]["fast"] = [
     ((20, 40, true),),
     ((20, 40, false),),
     ]
-instances[MatrixQuadraticJuMP]["slow"] = [
+insts[MatrixQuadraticJuMP]["slow"] = [
     ((60, 80, true),),
     ((60, 80, false),),
     ]

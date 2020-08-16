@@ -121,11 +121,11 @@ function test_extra(inst::SignomialMinJuMP{T}, model::JuMP.Model) where T
     end
 end
 
-instances[SignomialMinJuMP]["minimal"] = [
+insts[SignomialMinJuMP]["minimal"] = [
     ((2, 2),),
     ((2, 2), StandardConeOptimizer),
     ]
-instances[SignomialMinJuMP]["fast"] = [
+insts[SignomialMinJuMP]["fast"] = [
     ((:motzkin2,),),
     ((:motzkin2,), StandardConeOptimizer),
     ((:motzkin3,),),
@@ -143,7 +143,7 @@ instances[SignomialMinJuMP]["fast"] = [
     ((20, 3),),
     ((20, 3), StandardConeOptimizer),
     ]
-instances[SignomialMinJuMP]["slow"] = [
+insts[SignomialMinJuMP]["slow"] = [
     ((10, 10),),
     ((10, 10), StandardConeOptimizer),
     ((20, 6),),

@@ -175,7 +175,7 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
     return model
 end
 
-instances[DensityEstNative]["minimal"] = [
+insts[DensityEstNative]["minimal"] = [
     ((5, 1, 2, true, true, true),),
     ((5, 1, 2, false, true, true),),
     ((5, 2, 1, false, true, true),),
@@ -183,7 +183,7 @@ instances[DensityEstNative]["minimal"] = [
     ((5, 1, 2, true, true, false),),
     ((:iris, 2, true, true, true),),
     ]
-instances[DensityEstNative]["fast"] = [
+insts[DensityEstNative]["fast"] = [
     ((50, 1, 4, true, true, true),),
     ((50, 1, 10, true, true, true),),
     ((50, 1, 50, true, true, true),),
@@ -217,7 +217,7 @@ instances[DensityEstNative]["fast"] = [
     ((:cancer, 4, true, false, true),),
     ((:cancer, 4, true, true, false),),
     ]
-instances[DensityEstNative]["slow"] = [
+insts[DensityEstNative]["slow"] = [
     ((:cancer, 6, true, true, true),),
     # ((:cancer, 6, false, true, true),),
     ((:cancer, 6, true, false, true),),

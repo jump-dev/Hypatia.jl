@@ -49,12 +49,12 @@ densityest_n_ds = [
     (64, 1),
     ],
     ]
-densityest_instances(use_nat::Bool) = [
+densityest_insts(use_nat::Bool) = [
     [(ceil(Int, 1.1 * binomial(n + 2d, n)), n, 2d, use_nat) for (n, d) in nds]
     for nds in densityest_n_ds
     ]
 
-instances = Dict()
-instances["nat"] = (nothing, densityest_instances(true))
-instances["ext"] = (StandardConeOptimizer, densityest_instances(false))
-return (DensityEstJuMP, instances)
+insts = Dict()
+insts["nat"] = (nothing, densityest_insts(true))
+insts["ext"] = (StandardConeOptimizer, densityest_insts(false))
+return (DensityEstJuMP, insts)

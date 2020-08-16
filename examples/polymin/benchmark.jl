@@ -41,10 +41,10 @@ polymin_n_ds = [
     (32, [1,]),
     (64, [1,]),
     ]
-polymin_instances(use_nat::Bool) = [
+polymin_insts(use_nat::Bool) = [
     [(n, d, false, use_nat) for d in ds]
     for (n, ds) in polymin_n_ds
     ]
 
-instances[PolyMinJuMP]["nat"] = (nothing, polymin_instances(true))
-instances[PolyMinJuMP]["ext"] = (StandardConeOptimizer, polymin_instances(false))
+insts[PolyMinJuMP]["nat"] = (nothing, polymin_insts(true))
+insts[PolyMinJuMP]["ext"] = (StandardConeOptimizer, polymin_insts(false))

@@ -52,11 +52,11 @@ function build(inst::EnvelopeNative{T}) where {T <: Real}
     return model
 end
 
-instances[EnvelopeNative]["minimal"] = [
+insts[EnvelopeNative]["minimal"] = [
     ((1, 2, 2, 2, true),),
     ((1, 2, 2, 2, false),),
     ]
-instances[EnvelopeNative]["fast"] = [
+insts[EnvelopeNative]["fast"] = [
     ((2, 2, 3, 2, true),),
     ((2, 2, 3, 2, false),),
     ((3, 3, 3, 3, true),),
@@ -68,7 +68,7 @@ instances[EnvelopeNative]["fast"] = [
     ((10, 1, 3, 1, true),),
     ((10, 1, 3, 1, false),),
     ]
-instances[EnvelopeNative]["slow"] = [
+insts[EnvelopeNative]["slow"] = [
     ((3, 3, 5, 4, false),),
     ((5, 2, 5, 3, false),),
     ((4, 6, 4, 5, true),),

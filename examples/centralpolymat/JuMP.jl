@@ -41,13 +41,13 @@ function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64} # TODO generic 
     return model
 end
 
-instances[CentralPolyMatJuMP]["minimal"] = [
+insts[CentralPolyMatJuMP]["minimal"] = [
     ((1, 2, false),),
     ((1, 2, false), StandardConeOptimizer),
     ((2, 2, true),),
     ((2, 2, true), StandardConeOptimizer),
     ]
-instances[CentralPolyMatJuMP]["fast"] = [
+insts[CentralPolyMatJuMP]["fast"] = [
     ((1, 10, true),),
     ((1, 10, true), StandardConeOptimizer),
     ((1, 15, false),),
@@ -69,7 +69,7 @@ instances[CentralPolyMatJuMP]["fast"] = [
     ((7, 2, false),),
     ((7, 2, false), StandardConeOptimizer),
     ]
-instances[CentralPolyMatJuMP]["slow"] = [
+insts[CentralPolyMatJuMP]["slow"] = [
     ((1, 20, false),),
     ((2, 3, false),),
     ((2, 10, false),),

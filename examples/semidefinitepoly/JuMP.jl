@@ -69,13 +69,13 @@ function test_extra(inst::SemidefinitePolyJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) in (inst.is_feas ? (MOI.OPTIMAL,) : (MOI.INFEASIBLE, MOI.DUAL_INFEASIBLE))
 end
 
-instances[SemidefinitePolyJuMP]["minimal"] = [
+insts[SemidefinitePolyJuMP]["minimal"] = [
     ((:matpoly2, true, true),),
     ((:matpoly5, true, true),),
     ((:matpoly5, true, false),),
     ((:matpoly5, false, false),),
     ]
-instances[SemidefinitePolyJuMP]["fast"] = [
+insts[SemidefinitePolyJuMP]["fast"] = [
     ((:matpoly1, true, true),),
     ((:matpoly1, true, false),),
     ((:matpoly1, false, false),),
@@ -95,4 +95,4 @@ instances[SemidefinitePolyJuMP]["fast"] = [
     ((:matpoly7, true, false),),
     ((:matpoly7, false, false),),
     ]
-instances[SemidefinitePolyJuMP]["slow"] = Tuple[]
+insts[SemidefinitePolyJuMP]["slow"] = Tuple[]

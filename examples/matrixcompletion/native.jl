@@ -252,7 +252,7 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
     return model
 end
 
-instances[MatrixCompletionNative]["minimal"] = [
+insts[MatrixCompletionNative]["minimal"] = [
     ((2, 3, true, true, true, true),),
     ((2, 3, false, true, true, true),),
     ((2, 3, true, false, true, true),),
@@ -262,7 +262,7 @@ instances[MatrixCompletionNative]["minimal"] = [
     ((2, 3, true, true, false, false),),
     ((2, 3, false, false, false, false),),
     ]
-instances[MatrixCompletionNative]["fast"] = [
+insts[MatrixCompletionNative]["fast"] = [
     ((12, 24, true, true, true, true),),
     ((12, 24, false, true, true, true),),
     ((12, 24, true, false, true, true),),
@@ -272,7 +272,7 @@ instances[MatrixCompletionNative]["fast"] = [
     ((12, 24, true, true, false, false),),
     ((12, 24, false, false, false, false),),
     ]
-instances[MatrixCompletionNative]["slow"] = [
+insts[MatrixCompletionNative]["slow"] = [
     # TODO add missing boolean combinations
     ((14, 140, true, true, true, true),),
     ((14, 140, true, true, false, true),),

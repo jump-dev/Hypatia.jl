@@ -99,7 +99,7 @@ for (inst_set, real_T, time_limit) in instance_sets
 end
 
 # load instances
-instances = DataStructures.DefaultOrderedDict{Type{<:ExampleInstance}, Any}(() -> DataStructures.DefaultOrderedDict{String, Any}(() -> Tuple[]))
+insts = DataStructures.DefaultOrderedDict{Type{<:ExampleInstance}, Any}(() -> DataStructures.DefaultOrderedDict{String, Any}(() -> Tuple[]))
 for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
     include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
 end
@@ -132,13 +132,13 @@ isnothing(results_path) || CSV.write(results_path, perf)
 all_tests_time = time()
 
 @testset "examples tests" begin
-    for (ex_type, ex_insts) in instances, (inst_set, real_T, time_limit) in instance_sets
-        instances = ex_insts[inst_set]
-        isempty(instances) && continue
+    for (ex_type, ex_insts) in insts, (inst_set, real_T, time_limit) in instance_sets
+        insts = ex_insts[inst_set]
+        isempty(insts) && continue
         ex_type_T = ex_type{real_T}
         println("\nstarting instances for $ex_type_T $inst_set\n")
         solver_options = (default_solver_options..., time_limit = time_limit)
-        for (inst_num, inst) in enumerate(instances)
+        for (inst_num, inst) in enumerate(insts)
             test_info = "$ex_type_T $inst_set $inst_num: $inst"
             @testset "$test_info" begin
                 println(test_info, "...")
