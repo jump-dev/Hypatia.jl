@@ -4,5 +4,7 @@ matrixcompletion_insts = [
     for f in (5, 10)
     ]
 
-insts[MatrixCompletionJuMP]["nat"] = (nothing, matrixcompletion_insts)
-insts[MatrixCompletionJuMP]["ext"] = (StandardConeOptimizer, matrixcompletion_insts)
+insts = Dict()
+insts["nat"] = (nothing, matrixcompletion_insts)
+insts["ext"] = (StandardConeOptimizer, matrixcompletion_insts)
+return (MatrixCompletionJuMP, insts)
