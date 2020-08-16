@@ -67,6 +67,7 @@ function test(
     solver_options = (), # additional non-default solver options specific to the example
     solver_type = Hypatia.Optimizer;
     default_solver_options = (), # default solver options
+    test::Bool = true,
     rseed::Int = 1,
     )
     # setup instance and model
@@ -76,7 +77,7 @@ function test(
 
     # solve and process result
     solver = solver_type(; default_solver_options..., solver_options...)
-    result = solve_process(inst, model, solver, extender)
+    result = solve_process(inst, model, solver, extender, test)
 
     return (extender, build_time, result)
 end
@@ -86,6 +87,7 @@ function solve_process(
     model,
     solver::Hypatia.Optimizer,
     extender,
+    test::Bool,
     )
     # setup Hypatia model
     opt = hyp_opt = solver
@@ -96,8 +98,10 @@ function solve_process(
     JuMP.set_optimizer(model, () -> opt)
     JuMP.optimize!(model)
 
-    # run tests for the example
-    test_extra(inst, model)
+    if test
+        # run tests for the example
+        test_extra(inst, model)
+    end
 
     # use process result
     return process_result(hyp_opt.model, hyp_opt.solver)
@@ -108,6 +112,7 @@ function solve_process(
     model,
     solver,
     extender,
+    test::Bool,
     )
     # setup Hypatia model
     opt = hyp_opt = Hypatia.Optimizer()

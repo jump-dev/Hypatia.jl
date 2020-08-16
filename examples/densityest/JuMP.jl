@@ -58,11 +58,16 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
     else
         # PSD formulation
         psd_vars = []
-        for (r, Pr) in enumerate(Ps)
+        for Pr in Ps
             Lr = size(Pr, 2)
             psd_r = JuMP.@variable(model, [1:Lr, 1:Lr], Symmetric)
+            if Lr == 1
+                # Mosek cannot handle 1x1 PSD constraints
+                JuMP.@constraint(model, psd_r[1, 1] >= 0)
+            else
+                JuMP.@SDconstraint(model, psd_r >= 0)
+            end
             push!(psd_vars, psd_r)
-            JuMP.@SDconstraint(model, psd_r >= 0)
         end
         coeffs_lhs = JuMP.@expression(model, [u in 1:U], sum(sum(Pr[u, k] * Pr[u, l] * psd_r[k, l] * (k == l ? 1 : 2) for k in 1:size(Pr, 2) for l in 1:k) for (Pr, psd_r) in zip(Ps, psd_vars)))
         JuMP.@constraint(model, coeffs_lhs .== f_pts)
