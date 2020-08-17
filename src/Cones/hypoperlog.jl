@@ -6,11 +6,12 @@ Copyright 2019, Chris Coey, Lea Kapelevich and contributors
 
 barrier modified from "Primal-Dual Interior-Point Methods for Domain-Driven Formulations" by Karimi & Tuncel, 2019
 -log(sum_i v*log(w_i/v) - u) - sum_i log(w_i) - d*log(v)
+
+TODO add inv hess prod oracle
 =#
 
 mutable struct HypoPerLog{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     max_neighborhood::T
     dim::Int
     point::Vector{T}
@@ -39,20 +40,20 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     function HypoPerLog{T}(
         dim::Int;
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
+
+use_heuristic_neighborhood(cone::HypoPerLog) = false
 
 # TODO only allocate the fields we use
 function setup_data(cone::HypoPerLog{T}) where {T <: Real}

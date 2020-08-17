@@ -7,7 +7,7 @@ requires that HSL.jl be installed and built successfully; Requires.jl handles th
 
 import HSL
 
-include(joinpath(@__DIR__, "nativeinsts.jl"))
+include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
 
 const SO = Hypatia.Solvers

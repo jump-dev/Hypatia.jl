@@ -11,7 +11,6 @@ barrier from "Constructing self-concordant barriers for convex cones" by Yu. Nes
 
 mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     max_neighborhood::T
     dim::Int
     point::Vector{T}
@@ -40,20 +39,20 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     function HypoGeoMean{T}(
         dim::Int;
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim >= 2
         cone = new{T}()
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
+
+use_heuristic_neighborhood(cone::HypoGeoMean) = false
 
 function setup_data(cone::HypoGeoMean{T}) where {T <: Real}
     reset_data(cone)

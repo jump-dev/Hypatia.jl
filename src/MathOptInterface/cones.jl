@@ -44,6 +44,20 @@ function untransform_affine(::MOI.RelativeEntropyCone, vals::AbstractVector)
     return vals
 end
 
+# function permute_affine(cone::MOI.RelativeEntropyCone, idxs::AbstractVector)
+#     dim = MOI.dimension(cone)
+#     w_dim = div(dim - 1, 2)
+#     new_idxs = collect(idxs)
+#     for (i, idx) in enumerate(idxs)
+#         if idx != 1
+#             new_idx = 2 * idx - 1 - (idx < w_dim ? 1 : 2 * w_dim)
+#             new_idxs[i] = new_idx
+#         end
+#     end
+#     return new_idxs
+# end
+
+
 function permute_affine(cone::MOI.RelativeEntropyCone, idxs::AbstractVector)
     dim = MOI.dimension(cone)
     w_dim = div(dim - 1, 2)
@@ -56,6 +70,7 @@ function permute_affine(cone::MOI.RelativeEntropyCone, idxs::AbstractVector)
     end
     return new_idxs
 end
+
 
 # transformations (transposition of matrix) for MOI rectangular matrix cones with matrix of more rows than columns
 

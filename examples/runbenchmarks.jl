@@ -21,7 +21,9 @@ results_path = joinpath(homedir(), "bench", "bench.csv")
 # results_path = nothing
 
 free_memory_limit = 16 * 2^30 # keep at least X GB of RAM available
-time_limit = 1800 * 1.1
+base_time_limit = 1800
+solver_time_limit = 1.1 * base_time_limit
+process_time_limit = 1.5 * base_time_limit
 
 num_threads = Threads.nthreads()
 blas_num_threads = LinearAlgebra.BLAS.get_num_threads()
@@ -34,7 +36,7 @@ tol = 1e-7
 hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     verbose = true,
     iter_limit = 250,
-    time_limit = time_limit,
+    solver_time_limit = solver_time_limit,
     tol_abs_opt = tol,
     tol_rel_opt = tol,
     tol_feas = tol,
@@ -42,7 +44,7 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
 mosek_solver = ("Mosek", Mosek.Optimizer, (
     QUIET = false,
     MSK_IPAR_NUM_THREADS = blas_num_threads,
-    MSK_DPAR_OPTIMIZER_MAX_TIME = time_limit,
+    MSK_DPAR_OPTIMIZER_MAX_TIME = solver_time_limit,
     MSK_DPAR_INTPNT_CO_TOL_PFEAS = tol,
     MSK_DPAR_INTPNT_CO_TOL_DFEAS = tol,
     MSK_DPAR_INTPNT_CO_TOL_REL_GAP = tol,
@@ -98,7 +100,7 @@ function spawn_instance(worker, ex_type, inst, extender, solver)
         while !isready(t)
             if Sys.free_memory() < free_memory_limit
                 status = :KilledMemory
-            elseif time() - time_start > time_limit
+            elseif time() - time_start > process_time_limit
                 status = :KilledTime
             else
                 sleep(5)

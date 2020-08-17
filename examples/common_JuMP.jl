@@ -196,7 +196,6 @@ function solve_process(
         x_viol = x_viol, y_viol = y_viol, z_viol = z_viol)
 end
 
-
 # run a CBF instance with a given solver and return solve info
 function test(
     inst::String, # a CBF file name
