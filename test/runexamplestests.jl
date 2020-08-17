@@ -2,13 +2,9 @@
 Copyright 2019, Chris Coey and contributors
 
 run examples tests from the examples folder and display basic benchmarks
-
-to run benchmarks, use the bench1 instance set and run on cmd line:
-~/julia/julia test/runexamplestests.jl &> ~/bench1/bench1.txt
 =#
 
 examples_dir = joinpath(@__DIR__, "../examples")
-# TODO maybe put these common files in a module
 include(joinpath(examples_dir, "common.jl"))
 include(joinpath(examples_dir, "common_JuMP.jl"))
 include(joinpath(examples_dir, "common_native.jl"))
@@ -19,7 +15,7 @@ import TimerOutputs
 import DataStructures
 
 # path to write results DataFrame to CSV, if any
-# results_path = joinpath(homedir(), "bench1", "bench1.csv")
+# results_path = joinpath(homedir(), "bench", "bench.csv")
 results_path = nothing
 
 # options to solvers
@@ -41,12 +37,11 @@ instance_sets = [
     # ("minimal", BigFloat, 15),
     ("fast", Float64, 15),
     # ("slow", Float64, 120),
-    # ("bench1", Float64, 1800),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
@@ -66,30 +61,30 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
-    "conditionnum",
-    "contraction",
+    # "centralpolymat",
+    # "conditionnum",
+    # "contraction",
     "densityest",
-    "envelope",
-    "expdesign",
-    # "lotkavolterra", # TODO PolyJuMP error
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "muconvexity",
-    "nearestpsd",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    # "regionofattr", # TODO PolyJuMP error
-    "robustgeomprog",
-    "secondorderpoly",
-    "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
-    "stabilitynumber",
+    # "envelope",
+    # "expdesign",
+    # # "lotkavolterra", # TODO PolyJuMP error
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # "maxvolume",
+    # "muconvexity",
+    # "nearestpsd",
+    # "polymin",
+    # "polynorm",
+    # "portfolio",
+    # # "regionofattr", # TODO PolyJuMP error
+    # "robustgeomprog",
+    # "secondorderpoly",
+    # "semidefinitepoly",
+    # "shapeconregr",
+    # "signomialmin",
+    # "stabilitynumber",
     ]
 
 # start the tests
@@ -149,7 +144,7 @@ all_tests_time = time()
                     r.obj_diff, r.compl, r.x_viol, r.y_viol, r.z_viol,
                     r.n, r.p, r.q,
                     ))
-                isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append=true)
+                isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
                 @printf("... %8.2e seconds\n", test_time)
                 flush(stdout)
                 flush(stderr)

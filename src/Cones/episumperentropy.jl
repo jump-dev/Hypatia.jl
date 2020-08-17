@@ -14,7 +14,6 @@ TODO
 
 mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     max_neighborhood::T
     dim::Int
     w_dim::Int
@@ -55,14 +54,12 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     function EpiSumPerEntropy{T}(
         dim::Int;
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         max_neighborhood::Real = default_max_neighborhood(),
         ) where {T <: Real}
         @assert dim >= 3
         @assert isodd(dim)
         cone = new{T}()
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.w_dim = div(dim - 1, 2)
@@ -71,6 +68,8 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
         return cone
     end
 end
+
+use_heuristic_neighborhood(cone::EpiSumPerEntropy) = false
 
 reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_aux_updated = cone.inv_hess_sqrt_aux_updated = false)
 

@@ -25,7 +25,7 @@ import Hypatia.inv_sqrt_prod
 import Hypatia.invert
 
 default_max_neighborhood() = 0.7
-default_use_heuristic_neighborhood() = false
+default_use_heuristic_neighborhood() = true
 
 # hessian_cache(T::Type{<:BlasReal}) = DenseSymCache{T}() # use Bunch Kaufman for BlasReals from start
 hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}()
