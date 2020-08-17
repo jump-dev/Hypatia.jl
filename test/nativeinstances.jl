@@ -1284,6 +1284,47 @@ function matrixepiperentropy2(T; options...)
     @test tr(W * log(W)) ≈ T(5) atol=tol rtol=tol
 end
 
+function matrixepiperentropy3(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    Random.seed!(1)
+    rt2 = sqrt(T(2))
+    side = 3
+    svec_dim = Cones.svec_length(side)
+    cone_dim = 2 * svec_dim + 1
+    c = vcat(zeros(T, svec_dim + 1), ones(T, svec_dim))
+    A = hcat(one(T), zeros(T, 1, 2 * svec_dim))
+    b = [zero(T)]
+    h = zeros(T, cone_dim)
+    G = Diagonal(-one(T) * I, cone_dim)
+    cones = Cone{T}[Cones.MatrixEpiPerEntropy{T}(cone_dim)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
+    @test r.s[1] ≈ zero(T) atol=tol rtol=tol
+    @test r.s[(svec_dim + 2):end] ≈ zeros(T, svec_dim) atol=tol rtol=tol
+end
+
+function matrixepiperentropy4(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    Random.seed!(1)
+    rt2 = sqrt(T(2))
+    side = 3
+    svec_dim = Cones.svec_length(side)
+    cone_dim = 2 * svec_dim + 1
+    c = vcat(zero(T), ones(T, svec_dim), zeros(T, svec_dim))
+    A = hcat(one(T), zeros(T, 1, 2 * svec_dim))
+    b = [zero(T)]
+    h = zeros(T, cone_dim)
+    G = Diagonal(-one(T) * I, cone_dim)
+    cones = Cone{T}[Cones.MatrixEpiPerEntropy{T}(cone_dim)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == :Optimal
+    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
+    @test r.s ≈ zeros(T, cone_dim) atol=tol rtol=tol
+end
+
 function linmatrixineq1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
