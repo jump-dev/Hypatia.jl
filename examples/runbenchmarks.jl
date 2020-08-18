@@ -21,7 +21,7 @@ results_path = joinpath(homedir(), "bench", "bench.csv")
 # results_path = nothing
 
 free_memory_limit = 16 * 2^30 # keep at least X GB of RAM available
-base_time_limit = 1800
+base_time_limit = 60
 solver_time_limit = 1.1 * base_time_limit
 process_time_limit = 1.5 * base_time_limit
 
@@ -61,7 +61,7 @@ instance_sets = [
 
 # models to run
 JuMP_example_names = [
-    # "densityest",
+    "densityest",
     # "expdesign",
     # "matrixcompletion",
     # "matrixquadratic",
@@ -89,15 +89,22 @@ function get_worker()
     return workers()[end]
 end
 
+function kill_workers()
+    for w in workers()[2:end]
+        run(`kill -SIGKILL $(remotecall_fetch(getpid, w))`)
+    end
+end
+
 function spawn_instance(worker, ex_type, inst, extender, solver)
-    t = @spawnat worker test(ex_type{Float64}, inst, extender, solver[3], solver[2], test = false)
+    f = Future()
+    @async put!(f, @fetchfrom worker test(ex_type{Float64}, inst, extender, solver[3], solver[2], test = false))
     sleep(1)
 
     time_start = time()
     status = :ScriptError
     try
         is_killed = false
-        while !isready(t)
+        while !isready(f)
             if Sys.free_memory() < free_memory_limit
                 status = :KilledMemory
             elseif time() - time_start > process_time_limit
@@ -106,12 +113,22 @@ function spawn_instance(worker, ex_type, inst, extender, solver)
                 sleep(5)
                 continue
             end
+
             is_killed = true
-            interrupt(worker)
+            for _ in 1:3
+                @warn("interrupting")
+                interrupt(worker)
+                isready(f) && break
+                sleep(5)
+            end
+            @warn("process interrupt too slow; using SIGKILL")
+            kill_workers()
+            sleep(1)
             break
         end
+
         if !is_killed
-            (_, build_time, r) = fetch(t)
+            (_, build_time, r) = fetch(f)
             return (false, (build_time, r.status, r.solve_time, r.num_iters, r.primal_obj, r.dual_obj, r.obj_diff, r.compl, r.x_viol, r.y_viol, r.z_viol, r.n, r.p, r.q, r.cones))
         end
     catch e
@@ -125,6 +142,7 @@ end
 function run_benchmarks()
     @info("starting benchmark runs")
 
+    kill_workers()
     worker = get_worker()
     @everywhere @eval using MosekTools
     @everywhere include(joinpath($examples_dir, "common.jl"))
@@ -198,8 +216,8 @@ function run_benchmarks()
         end
     end
 
-    flush(stdout)
-    flush(stderr)
+    kill_workers()
+
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)
     DataFrames.show(perf, allrows = true, allcols = true)
     println("\n")

@@ -64,7 +64,12 @@ function build(inst::PolyMinJuMP{T}) where {T <: Float64} # TODO generic reals
             for Pr in Ps
                 Lr = size(Pr, 2)
                 psd_r = [JuMP.@expression(model, sum(Pr[u, i] * Pr[u, j] * μ[u] for u in 1:U)) for i in 1:Lr for j in 1:i]
-                JuMP.@constraint(model, psd_r in MOI.PositiveSemidefiniteConeTriangle(Lr))
+                if Lr == 1
+                    # Mosek cannot handle 1x1 PSD constraints
+                    JuMP.@constraint(model, psd_r[1] >= 0)
+                else
+                    JuMP.@constraint(model, psd_r in MOI.PositiveSemidefiniteConeTriangle(Lr))
+                end
             end
         end
     end
