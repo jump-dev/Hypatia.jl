@@ -238,29 +238,27 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     U = cone.U
     H = cone.hess.data
     H .= 0
-    @inbounds for p in 1:R
-        for q in 1:p
-            block = svec_idx(p, q)
-            idxs = block_idxs(U, block)
+    @inbounds for p in 1:R, q in 1:p
+        block = svec_idx(p, q)
+        idxs = block_idxs(U, block)
 
-            for p2 in 1:R, q2 in 1:p2
-                block2 = svec_idx(p2, q2)
-                if block2 < block
-                    continue
-                end
-                idxs2 = block_idxs(U, block2)
+        for p2 in 1:R, q2 in 1:p2
+            block2 = svec_idx(p2, q2)
+            if block2 < block
+                continue
+            end
+            idxs2 = block_idxs(U, block2)
 
-                @views Hview = H[idxs, idxs2]
-                for k in eachindex(cone.Ps)
-                    PlambdaPk = cone.PlambdaP_blocks_U[k]
-                    @inbounds @. @views Hview += PlambdaPk[p, p2] * PlambdaPk[q, q2]
-                    if (p != q) && (p2 != q2)
-                        @inbounds @. @views Hview += PlambdaPk[p, q2] * PlambdaPk[q, p2]
-                    end
+            @views Hview = H[idxs, idxs2]
+            for k in eachindex(cone.Ps)
+                PlambdaPk = cone.PlambdaP_blocks_U[k]
+                @inbounds @. @views Hview += PlambdaPk[p, p2] * PlambdaPk[q, q2]
+                if (p != q) && (p2 != q2)
+                    @inbounds @. @views Hview += PlambdaPk[p, q2] * PlambdaPk[q, p2]
                 end
-                if xor(p == q, p2 == q2)
-                    @. Hview *= cone.rt2
-                end
+            end
+            if xor(p == q, p2 == q2)
+                @. Hview *= cone.rt2
             end
         end
     end
