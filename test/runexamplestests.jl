@@ -162,10 +162,6 @@ all_tests_time = time()
     println("\n")
     @show sum(perf[:iters])
     show(timer)
-    open("timer.txt", "a") do f
-        print(f, "\n")
-        TimerOutputs.print_timer(f, timer)
-    end
     println("\n")
 end
 
