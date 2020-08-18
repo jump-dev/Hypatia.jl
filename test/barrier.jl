@@ -78,7 +78,7 @@ function test_barrier_oracles(
         @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
 
         barrier_dir(point, t) = barrier(point + t * primal_dir)
-        @test -2 * corr ≈ ForwardDiff.gradient(x -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(x, t), s), 0), point)
+        @test -2 * corr ≈ ForwardDiff.gradient(x -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(x, t), s), 0), point) atol=tol rtol=tol
     end
 
     return
@@ -426,9 +426,9 @@ function test_hypoperlogdettri_barrier(T::Type{<:Real})
             return -log(v * logdet(cholesky!(Hermitian(W / v, :U))) - u) - logdet(cholesky!(Hermitian(W, :U))) - log(v)
         end
         if side <= 5
-            test_barrier_oracles(cone, C_barrier, init_tol = NaN)
+            test_barrier_oracles(cone, C_barrier, init_tol = 1e-5)
         else
-            test_barrier_oracles(cone, C_barrier, init_tol = NaN, init_only = true)
+            test_barrier_oracles(cone, C_barrier, init_tol = 1e-1, init_only = true)
         end
     end
     return
