@@ -161,7 +161,6 @@ end
 is_dual_feas(cone::WSOSInterpPosSemidefTri) = true
 
 function update_grad(cone::WSOSInterpPosSemidefTri)
-    @timeit cone.timer "grad" begin
     @assert is_feas(cone)
     U = cone.U
     R = cone.R
@@ -218,7 +217,6 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
     end
 
     cone.grad_updated = true
-    end
     return cone.grad
 end
 
@@ -227,7 +225,7 @@ function update_blocks_R(cone::WSOSInterpPosSemidefTri)
     @assert cone.grad_updated
     U = cone.U
     # TODO only upper triangle
-    @timeit cone.timer "views2" @inbounds for k in eachindex(cone.Ps), q in 1:U, p in 1:U
+    @inbounds for k in eachindex(cone.Ps), q in 1:U, p in 1:U
         @views copyto!(cone.PlambdaP_blocks_R[k][p, q], cone.PlambdaP[k][p:U:(U * cone.R), q:U:(U * cone.R)])
     end
     cone.blocks_R_updated = true
@@ -235,7 +233,6 @@ function update_blocks_R(cone::WSOSInterpPosSemidefTri)
 end
 
 function update_hess(cone::WSOSInterpPosSemidefTri)
-    @timeit cone.timer "hess" begin
     @assert cone.grad_updated
     R = cone.R
     U = cone.U
@@ -269,12 +266,10 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     end
 
     cone.hess_updated = true
-    end
     return cone.hess
 end
 
 function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where {T}
-    @timeit cone.timer "corr" begin
     @assert cone.grad_updated
     if !cone.blocks_R_updated
         update_blocks_R(cone)
@@ -319,7 +314,6 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
         end
     end
     corr ./= 2
-    end
 
     return corr
 end
