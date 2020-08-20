@@ -116,7 +116,7 @@ function update_feas(cone::WSOSInterpPosSemidefTri)
     @assert !cone.feas_updated
 
     cone.is_feas = true
-    @inbounds Threads.@threads for k in eachindex(cone.Ps)
+    @inbounds for k in eachindex(cone.Ps)
         Pk = cone.Ps[k]
         LU = cone.tmpLU[k]
         L = size(Pk, 2)
@@ -144,7 +144,6 @@ function update_feas(cone::WSOSInterpPosSemidefTri)
 end
 
 function update_grad(cone::WSOSInterpPosSemidefTri)
-    @timeit cone.timer "grad" begin
     @assert is_feas(cone)
     U = cone.U
     R = cone.R
@@ -156,36 +155,38 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
         ΛFLP = cone.ΛFLP[k]
 
         # given cholesky L factor ΛFL, get ΛFLP = ΛFL \ kron(I, P')
-        # @inbounds for p in 1:R
-        #     block_U_p_idxs = block_idxs(U, p)
-        #     block_L_p_idxs = block_idxs(L, p)
-        #     @views ΛFLP_pp = ΛFLP[block_L_p_idxs, block_U_p_idxs]
-        #     # ΛFLP_pp = ΛFL_pp \ P'
-        #     @views ldiv!(ΛFLP_pp, LowerTriangular(ΛFL[block_L_p_idxs, block_L_p_idxs]), cone.Ps[k]')
-        #     # to get off-diagonals in ΛFLP, subtract known blocks aggregated in ΛFLP_qp
-        #     @inbounds for q in (p + 1):R
-        #         block_L_q_idxs = block_idxs(L, q)
-        #         @views ΛFLP_qp = ΛFLP[block_L_q_idxs, block_U_p_idxs]
-        #         ΛFLP_qp .= 0
-        #         @inbounds for p2 in p:(q - 1)
-        #             block_L_p2_idxs = block_idxs(L, p2)
-        #             @views mul!(ΛFLP_qp, ΛFL[block_L_q_idxs, block_L_p2_idxs], ΛFLP[block_L_p2_idxs, block_U_p_idxs], -1, 1)
-        #         end
-        #         @views ldiv!(LowerTriangular(ΛFL[block_L_q_idxs, block_L_q_idxs]), ΛFLP_qp)
-        #     end
-        # end
-        ΛFLP = ldiv!(ΛFLP, LowerTriangular(ΛFL), cone.P_kron_I[k]')
+        @inbounds for p in 1:R
+            block_U_p_idxs = block_idxs(U, p)
+            block_L_p_idxs = block_idxs(L, p)
+            @views ΛFLP_pp = ΛFLP[block_L_p_idxs, block_U_p_idxs]
+            # ΛFLP_pp = ΛFL_pp \ P'
+            @views ldiv!(ΛFLP_pp, LowerTriangular(ΛFL[block_L_p_idxs, block_L_p_idxs]), cone.Ps[k]')
+            # to get off-diagonals in ΛFLP, subtract known blocks aggregated in ΛFLP_qp
+            @inbounds for q in (p + 1):R
+                block_L_q_idxs = block_idxs(L, q)
+                @views ΛFLP_qp = ΛFLP[block_L_q_idxs, block_U_p_idxs]
+                ΛFLP_qp .= 0
+                @inbounds for p2 in p:(q - 1)
+                    block_L_p2_idxs = block_idxs(L, p2)
+                    @views mul!(ΛFLP_qp, ΛFL[block_L_q_idxs, block_L_p2_idxs], ΛFLP[block_L_p2_idxs, block_U_p_idxs], -1, 1)
+                end
+                @views ldiv!(LowerTriangular(ΛFL[block_L_q_idxs, block_L_q_idxs]), ΛFLP_qp)
+            end
+        end
+        # ΛFLP = ldiv!(ΛFLP, LowerTriangular(ΛFL), cone.P_kron_I[k]')
 
         # PlambdaP = ΛFLP' * ΛFLP
         PlambdaPk = cone.PlambdaP[k]
-        # for p in 1:R, q in p:R
-        #     block_p_idxs = block_idxs(U, p)
-        #     block_q_idxs = block_idxs(U, q)
-        #     # since ΛFLP is block lower triangular rows only from max(p,q) start making a nonzero contribution to the product
-        #     row_range = ((q - 1) * L + 1):(L * R)
-        #     @inbounds @views mul!(PlambdaPk[block_p_idxs, block_q_idxs], ΛFLP[row_range, block_p_idxs]', ΛFLP[row_range, block_q_idxs])
-        # end
-        mul!(PlambdaPk, ΛFLP', ΛFLP)
+        for p in 1:R, q in p:R
+            block_p_idxs = block_idxs(U, p)
+            block_q_idxs = block_idxs(U, q)
+            # since ΛFLP is block lower triangular rows only from max(p,q) start making a nonzero contribution to the product
+            row_range = ((q - 1) * L + 1):(L * R)
+            @inbounds @views mul!(PlambdaPk[block_p_idxs, block_q_idxs], ΛFLP[row_range, block_p_idxs]', ΛFLP[row_range, block_q_idxs])
+        end
+        LinearAlgebra.copytri!(PlambdaPk, 'U')
+        # mul!(PlambdaPk, ΛFLP', ΛFLP)
+
         @inbounds for q in 1:R, p in 1:R
             block_p_idxs = block_idxs(U, p)
             block_q_idxs = block_idxs(U, q)
@@ -202,12 +203,11 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
         for i in 1:U
             block_p_i = block_p + i
             block_q_i = block_q + i
-            @inbounds cone.grad[idx + i] = scal * sum(PlambdaPk[block_q_i, block_p_i] for PlambdaPk in cone.PlambdaP) # not faster to sum over Ps first?
+            @inbounds cone.grad[idx + i] = scal * sum(PlambdaPk[block_q_i, block_p_i] for PlambdaPk in cone.PlambdaP)
         end
     end
 
     cone.grad_updated = true
-    end
     return cone.grad
 end
 
