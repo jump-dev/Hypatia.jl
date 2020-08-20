@@ -81,6 +81,7 @@ function build(inst::RandomPolyMatJuMP{T}) where {T <: Float64} # TODO generic r
     (U, points, Ps, V) = ModelUtilities.interpolate(free_dom, halfdeg, calc_V = true)
 
     model = JuMP.Model()
+    # coefficients without svec scaling
     JuMP.@variable(model, lambda[1:(U * svec_dim)])
     JuMP.@variable(model, t)
     JuMP.@constraint(model, vcat(t, lambda) in JuMP.SecondOrderCone())
