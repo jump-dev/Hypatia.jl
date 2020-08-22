@@ -45,6 +45,10 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
 
     PlambdaP_blocks::Vector{Matrix{Matrix{T}}}
 
+    tmpRR
+    tmpRR2
+    tmpRR3
+
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
         U::Int,
@@ -96,6 +100,9 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     for k in eachindex(Ps), r in 1:R, s in 1:R
         cone.PlambdaP_blocks[k][r, s] = zeros(T, U, U)
     end
+    cone.tmpRR = zeros(T, R, R)
+    cone.tmpRR2 = zeros(T, R, R)
+    cone.tmpRR3 = zeros(T, R, R)
     return
 end
 
@@ -295,3 +302,34 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     end
     return cone.hess
 end
+
+# function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::WSOSInterpPosSemidefTri{T}) where {T}
+#     @assert cone.grad_updated
+#     dim = cone.dim
+#     U = cone.U
+#     UR = U * cone.R
+#     arrmat = cone.tmpRR
+#     matRR2 = cone.tmpRR2
+#     matRR3 = cone.tmpRR3
+#     prod .= 0
+#     matRR3 .= 0
+#
+#     # O(U^2) outer products of size O(R), while hess side is O(R^2*U)
+#     @inbounds for j in 1:size(prod, 2)
+#         @inbounds for q in 1:U
+#             matRR3 .= 0
+#             @inbounds for p in 1:U
+#                 @views svec_to_smat!(arrmat, arr[p:U:dim, j], cone.rt2)
+#                 @inbounds for k in eachindex(cone.Ps)
+#                     PlambdaPk = Symmetric(cone.PlambdaP[k], :U)
+#                     @views PlambdaPk_slice = PlambdaPk[q:U:UR, p:U:UR]
+#                     mul!(matRR2, Symmetric(arrmat), PlambdaPk_slice')
+#                     mul!(matRR3, PlambdaPk_slice, matRR2, true, true)
+#                 end
+#                 @views smat_to_svec!(prod[q:U:dim, j], matRR3, cone.rt2)
+#             end
+#         end
+#     end
+#
+#     return prod
+# end
