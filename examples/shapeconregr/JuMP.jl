@@ -19,8 +19,9 @@ struct ShapeConRegrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     X::Matrix{T}
     y::Vector{T}
     deg::Int
-    use_wsosinterppossemideftri::Bool # use WSOS matrix cone formulation if applicable, else use WSOS or SDP formulation
-    use_wsosinterpnonnegative::Bool # use WSOS cone formulation, else SDP formulation
+    # use_wsosinterppossemideftri::Bool # use WSOS matrix cone formulation if applicable, else use WSOS or SDP formulation
+    # use_wsosinterpnonnegative::Bool # use WSOS cone formulation, else SDP formulation
+    formulation::Symbol
     use_L1_obj::Bool # in objective function use L1 norm, else L2 norm
     use_monotonicity::Bool # if true add monotonicity constraints, else don't
     use_convexity::Bool # if true add convexity constraints, else don't
@@ -146,7 +147,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
 
         hessian_interp = conv_profile * vcat([(F \ V_H')' * regressor for V_H in V_Hs]...)
 
-        if inst.use_wsosinterppossemideftri
+        if inst.formulation == :nat_wsos_mat
             if n == 1
                 conv_cone = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(conv_U, conv_Ps)
             else
@@ -154,7 +155,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
                 conv_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, conv_U, conv_Ps)
             end
             JuMP.@constraint(model, hessian_interp in conv_cone)
-        elseif inst.use_wsosinterpnonnegative
+        elseif inst.formulation == :nat_wsos
             svec_dim = div(n * (n + 1), 2)
             ypts = zeros(svec_dim, n)
             idx = 1
@@ -177,7 +178,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
                 push!(new_Ps, kron(ypts, P))
             end
             JuMP.@constraint(model, hessian_interp in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(conv_U * svec_dim, new_Ps))
-        else
+        elseif inst.formulation == :ext
             psd_vars = []
             for (r, Pr) in enumerate(conv_Ps)
                 Lr = size(Pr, 2)
@@ -194,6 +195,8 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic re
                 coeffs_lhs = JuMP.@expression(model, [u in 1:conv_U], sum(sum(conv_Ps[r][u, k] * conv_Ps[r][u, l] * psd_vars[r][(x1 - 1) * Ls[r] + k, (x2 - 1) * Ls[r] + l] for k in 1:Ls[r] for l in 1:Ls[r]) for r in eachindex(Ls)))
                 JuMP.@constraint(model, coeffs_lhs .== hessian_interp[conv_U .* (offset - 1) .+ (1:conv_U)])
             end
+        else
+            error()
         end
     end
 
@@ -222,114 +225,116 @@ shapeconregr_data = Dict(
     :func10 => (x -> sum(exp.(x))),
     )
 
-instances[ShapeConRegrJuMP]["minimal"] = [
-    ((:naics5811, 3, true, false, false, true, true, false),),
-    ((:naics5811, 3, true, false, false, true, false, false),),
-    ((:naics5811, 3, true, false, false, false, true, false),),
-    ((1, 5, :func1, 2, 5, true, false, false, true, true, false),),
-    ((2, 5, :func2, 2, 4, true, false, false, true, false, false),),
-    ((3, 5, :func3, 2, 3, true, false, false, false, true, false),),
-    ((1, 5, :func4, 2, 4, true, false, false, false, false, true),),
-    ((1, 5, :func5, 2, 4, true, false, true, true, true, false),),
-    ((1, 5, :func6, 2, 4, false, false, false, true, true, false),),
-    ((1, 5, :func7, 2, 4, false, false, true, true, true, false), ClassicConeOptimizer),
-    ((1, 5, :func8, 2, 4, false, false, true, true, true, false),),
-    ((1, 5, :func1, 2, 4, false, false, true, false, false, true), ClassicConeOptimizer),
-    ((1, 5, :func5, 2, 4, false, true, true, true, true, false),),
-    ((1, 5, :func6, 2, 4, false, true, false, true, true, false),),
-    ]
-instances[ShapeConRegrJuMP]["fast"] = [
-    ((:naics5811, 4, true, false, false, true, true, false),),
-    ((:naics5811, 4, true, false, true, true, true, false),),
-    ((:naics5811, 3, false, false, false, true, true, false),),
-    ((:naics5811, 3, false, false, true, true, true, false), ClassicConeOptimizer),
-    ((:naics5811, 3, false, false, true, true, true, false),),
-    ((:naics5811, 3, false, false, false, true, true, false),),
-    ((:naics5811, 3, false, false, true, true, false, false), ClassicConeOptimizer),
-    ((1, 100, :func1, 5, 10, true, false, false, true, true, false),),
-    ((1, 100, :func1, 5, 20, false, false, false, false, true, false),),
-    ((1, 100, :func1, 5, 50, true, false, false, false, true, false),),
-    ((1, 100, :func1, 5, 80, true, false, false, false, true, false),),
-    ((1, 100, :func1, 5, 100, true, false, false, false, true, false),),
-    ((1, 200, :func4, 5, 100, true, false, false, false, true, false),),
-    ((2, 50, :func1, 5, 5, true, false, false, true, true, false),),
-    ((2, 50, :func1, 5, 3, true, false, false, true, false, false),),
-    ((2, 50, :func1, 5, 3, true, false, false, false, true, false),),
-    ((2, 200, :func1, 0, 3, true, false, false, false, false, true),),
-    ((2, 50, :func2, 5, 3, true, false, true, true, true, false),),
-    ((2, 50, :func3, 10, 3, false, false, true, false, true, false),),
-    ((2, 50, :func3, 10, 3, true, false, true, false, true, false),),
-    ((2, 50, :func3, 5, 3, false, false, true, true, true, false), ClassicConeOptimizer),
-    ((2, 50, :func4, 5, 3, false, false, true, true, true, false),),
-    ((2, 50, :func4, 5, 3, false, false, true, true, true, false), ClassicConeOptimizer),
-    ((2, 50, :func5, 5, 4, true, false, false, true, true, false),),
-    ((2, 50, :func6, 5, 4, true, false, true, true, true, false),),
-    ((2, 50, :func7, 5, 4, false, false, false, true, true, false),),
-    ((2, 50, :func8, 5, 4, false, false, true, true, true, true, false),),
-    ((4, 150, :func6, 0, 4, true, false, false, true, true, true),),
-    ((4, 150, :func7, 0, 4, true, false, false, true, true, true),),
-    ((4, 150, :func7, 0, 4, true, false, true, true, true, true),),
-    ((4, 150, :func7, 0, 4, false, false, false, true, true, true),),
-    ((3, 150, :func8, 0, 6, true, false, false, true, true, true),),
-    ((2, 50, :func3, 10, 3, false, true, true, false, true, false),),
-    ]
-instances[ShapeConRegrJuMP]["slow"] = [
-    ((:naics5811, 3, false, false, true, false, true, false), ClassicConeOptimizer),
-    ((:naics5811, 7, true, false, false, true, true, false),),
-    ((:naics5811, 5, false, false, true, true, true, false), ClassicConeOptimizer),
-    ((2, 200, :func1, 5, 20, true, false, false, true, true, false),),
-    ((2, 5000, :func1, 5, 40, true, false, false, false, true, false),),
-    ((4, 150, :func6, 0, 4, false, false, false, true, true, true),),
-    ((4, 150, :func6, 0, 4, false, false, true, true, true, true), ClassicConeOptimizer),
-    ((3, 500, :func8, 0, 6, false, false, false, true, true, true),),
-    ((3, 500, :func8, 0, 6, false, false, false, true, false, true),),
-    ((3, 500, :func8, 0, 6, false, false, false, false, true, true),),
-    ((3, 500, :func8, 0, 6, false, false, true, true, true, true), ClassicConeOptimizer),
-    ((3, 500, :func8, 0, 6, false, false, true, true, false, true), ClassicConeOptimizer),
-    ((3, 500, :func8, 0, 6, false, false, true, false, true, true), ClassicConeOptimizer),
-    ((5, 500, :func9, 9, 4, false, false, true, true, true, false),),
-    ((5, 500, :func9, 9, 4, true, false, true, true, true, false),),
-    ((5, 500, :func9, 9, 4, false, false, true, true, true, false), ClassicConeOptimizer),
-    ((5, 500, :func10, 4, 4, false, false, true, true, true, false),),
-    ((5, 500, :func10, 4, 4, false, true, false, true, true, false),),
-    ((5, 500, :func10, 4, 4, false, false, true, false, true, false), ClassicConeOptimizer),
-    ((5, 500, :func10, 4, 4, false, false, true, false, false, false), ClassicConeOptimizer),
-    ((5, 500, :func10, 4, 4, false, false, true, true, false, false), ClassicConeOptimizer),
-    ((5, 500, :func10, 4, 4, false, false, true, true, true, false), ClassicConeOptimizer),
-    ]
+# instances[ShapeConRegrJuMP]["minimal"] = [
+#     ((:naics5811, 3, true, false, false, true, true, false),),
+#     ((:naics5811, 3, true, false, false, true, false, false),),
+#     ((:naics5811, 3, true, false, false, false, true, false),),
+#     ((1, 5, :func1, 2, 5, true, false, false, true, true, false),),
+#     ((2, 5, :func2, 2, 4, true, false, false, true, false, false),),
+#     ((3, 5, :func3, 2, 3, true, false, false, false, true, false),),
+#     ((1, 5, :func4, 2, 4, true, false, false, false, false, true),),
+#     ((1, 5, :func5, 2, 4, true, false, true, true, true, false),),
+#     ((1, 5, :func6, 2, 4, false, false, false, true, true, false),),
+#     ((1, 5, :func7, 2, 4, false, false, true, true, true, false), ClassicConeOptimizer),
+#     ((1, 5, :func8, 2, 4, false, false, true, true, true, false),),
+#     ((1, 5, :func1, 2, 4, false, false, true, false, false, true), ClassicConeOptimizer),
+#     ((1, 5, :func5, 2, 4, false, true, true, true, true, false),),
+#     ((1, 5, :func6, 2, 4, false, true, false, true, true, false),),
+#     ]
+# instances[ShapeConRegrJuMP]["fast"] = [
+#     ((:naics5811, 4, true, false, false, true, true, false),),
+#     ((:naics5811, 4, true, false, true, true, true, false),),
+#     ((:naics5811, 3, false, false, false, true, true, false),),
+#     ((:naics5811, 3, false, false, true, true, true, false), ClassicConeOptimizer),
+#     ((:naics5811, 3, false, false, true, true, true, false),),
+#     ((:naics5811, 3, false, false, false, true, true, false),),
+#     ((:naics5811, 3, false, false, true, true, false, false), ClassicConeOptimizer),
+#     ((1, 100, :func1, 5, 10, true, false, false, true, true, false),),
+#     ((1, 100, :func1, 5, 20, false, false, false, false, true, false),),
+#     ((1, 100, :func1, 5, 50, true, false, false, false, true, false),),
+#     ((1, 100, :func1, 5, 80, true, false, false, false, true, false),),
+#     ((1, 100, :func1, 5, 100, true, false, false, false, true, false),),
+#     ((1, 200, :func4, 5, 100, true, false, false, false, true, false),),
+#     ((2, 50, :func1, 5, 5, true, false, false, true, true, false),),
+#     ((2, 50, :func1, 5, 3, true, false, false, true, false, false),),
+#     ((2, 50, :func1, 5, 3, true, false, false, false, true, false),),
+#     ((2, 200, :func1, 0, 3, true, false, false, false, false, true),),
+#     ((2, 50, :func2, 5, 3, true, false, true, true, true, false),),
+#     ((2, 50, :func3, 10, 3, false, false, true, false, true, false),),
+#     ((2, 50, :func3, 10, 3, true, false, true, false, true, false),),
+#     ((2, 50, :func3, 5, 3, false, false, true, true, true, false), ClassicConeOptimizer),
+#     ((2, 50, :func4, 5, 3, false, false, true, true, true, false),),
+#     ((2, 50, :func4, 5, 3, false, false, true, true, true, false), ClassicConeOptimizer),
+#     ((2, 50, :func5, 5, 4, true, false, false, true, true, false),),
+#     ((2, 50, :func6, 5, 4, true, false, true, true, true, false),),
+#     ((2, 50, :func7, 5, 4, false, false, false, true, true, false),),
+#     ((2, 50, :func8, 5, 4, false, false, true, true, true, true, false),),
+#     ((4, 150, :func6, 0, 4, true, false, false, true, true, true),),
+#     ((4, 150, :func7, 0, 4, true, false, false, true, true, true),),
+#     ((4, 150, :func7, 0, 4, true, false, true, true, true, true),),
+#     ((4, 150, :func7, 0, 4, false, false, false, true, true, true),),
+#     ((3, 150, :func8, 0, 6, true, false, false, true, true, true),),
+#     ((2, 50, :func3, 10, 3, false, true, true, false, true, false),),
+#     ]
+# instances[ShapeConRegrJuMP]["slow"] = [
+#     ((:naics5811, 3, false, false, true, false, true, false), ClassicConeOptimizer),
+#     ((:naics5811, 7, true, false, false, true, true, false),),
+#     ((:naics5811, 5, false, false, true, true, true, false), ClassicConeOptimizer),
+#     ((2, 200, :func1, 5, 20, true, false, false, true, true, false),),
+#     ((2, 5000, :func1, 5, 40, true, false, false, false, true, false),),
+#     ((4, 150, :func6, 0, 4, false, false, false, true, true, true),),
+#     ((4, 150, :func6, 0, 4, false, false, true, true, true, true), ClassicConeOptimizer),
+#     ((3, 500, :func8, 0, 6, false, false, false, true, true, true),),
+#     ((3, 500, :func8, 0, 6, false, false, false, true, false, true),),
+#     ((3, 500, :func8, 0, 6, false, false, false, false, true, true),),
+#     ((3, 500, :func8, 0, 6, false, false, true, true, true, true), ClassicConeOptimizer),
+#     ((3, 500, :func8, 0, 6, false, false, true, true, false, true), ClassicConeOptimizer),
+#     ((3, 500, :func8, 0, 6, false, false, true, false, true, true), ClassicConeOptimizer),
+#     ((5, 500, :func9, 9, 4, false, false, true, true, true, false),),
+#     ((5, 500, :func9, 9, 4, true, false, true, true, true, false),),
+#     ((5, 500, :func9, 9, 4, false, false, true, true, true, false), ClassicConeOptimizer),
+#     ((5, 500, :func10, 4, 4, false, false, true, true, true, false),),
+#     ((5, 500, :func10, 4, 4, false, true, false, true, true, false),),
+#     ((5, 500, :func10, 4, 4, false, false, true, false, true, false), ClassicConeOptimizer),
+#     ((5, 500, :func10, 4, 4, false, false, true, false, false, false), ClassicConeOptimizer),
+#     ((5, 500, :func10, 4, 4, false, false, true, true, false, false), ClassicConeOptimizer),
+#     ((5, 500, :func10, 4, 4, false, false, true, true, true, false), ClassicConeOptimizer),
+#     ]
+#
+# # benchmark 1 instances
+# bench1_n_d = [
+#     (1, 3), # compile run
+#     (1, 10),
+#     (1, 20),
+#     (1, 30),
+#     (1, 40),
+#     (1, 50),
+#     (1, 60),
+#     (2, 2), # compile run
+#     (2, 5),
+#     (2, 10),
+#     (2, 15),
+#     (2, 20),
+#     (3, 1), # compile run
+#     (3, 2),
+#     (3, 4),
+#     (3, 6),
+#     (3, 8),
+#     (4, 2),
+#     (4, 3),
+#     (4, 4),
+#     (4, 5),
+#     (6, 2),
+#     (6, 3),
+#     (8, 2),
+#     (10, 2),
+#     (12, 2),
+#     (14, 2),
+#     ]
+# instances[ShapeConRegrJuMP]["bench1"] = (
+#     ((n, ceil(Int, 1.1 * binomial(n + 2d, n)), :func4, 100.0, 2d, use_wsosinterpnonnegative, false, false, true, false),)
+#     for (n, d) in bench1_n_d
+#     for use_wsosinterpnonnegative in (false, true)
+#     )
 
-# benchmark 1 instances
-bench1_n_d = [
-    (1, 3), # compile run
-    (1, 10),
-    (1, 20),
-    (1, 30),
-    (1, 40),
-    (1, 50),
-    (1, 60),
-    (2, 2), # compile run
-    (2, 5),
-    (2, 10),
-    (2, 15),
-    (2, 20),
-    (3, 1), # compile run
-    (3, 2),
-    (3, 4),
-    (3, 6),
-    (3, 8),
-    (4, 2),
-    (4, 3),
-    (4, 4),
-    (4, 5),
-    (6, 2),
-    (6, 3),
-    (8, 2),
-    (10, 2),
-    (12, 2),
-    (14, 2),
-    ]
-instances[ShapeConRegrJuMP]["bench1"] = (
-    ((n, ceil(Int, 1.1 * binomial(n + 2d, n)), :func4, 100.0, 2d, use_wsosinterpnonnegative, false, false, true, false),)
-    for (n, d) in bench1_n_d
-    for use_wsosinterpnonnegative in (false, true)
-    )
+return ShapeConRegrJuMP

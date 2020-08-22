@@ -15,8 +15,9 @@ struct RandomPolyMatJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
     halfdeg::Int
     R::Int
-    use_wsosinterppossemideftri::Bool
-    use_wsosinterpnonnegative::Bool
+    # use_wsosinterppossemideftri::Bool
+    # use_wsosinterpnonnegative::Bool
+    formulation::Symbol
 end
 
 # minimum norm coeffs version
@@ -40,9 +41,9 @@ function build(inst::RandomPolyMatJuMP{T}) where {T <: Float64} # TODO generic r
     end
     full_coeffs = full_mat + [q_poly[Cones.block_idxs(U, Cones.svec_idx(i, j))] for j in 1:R, i in 1:R]
 
-    if inst.use_wsosinterppossemideftri
+    if inst.formulation == :nat_wsos_mat
         JuMP.@constraint(model, vcat([full_coeffs[i, j] * (i == j ? 1 : sqrt(2)) for j in 1:R for i in 1:j]...) in Hypatia.WSOSInterpPosSemidefTriCone{Float64}(R, U, Ps))
-    elseif inst.use_wsosinterpnonnegative
+    elseif inst.formulation == :nat_wsos
         ypts = zeros(svec_dim, R)
         idx = 1
         for j in 1:R
@@ -60,35 +61,37 @@ function build(inst::RandomPolyMatJuMP{T}) where {T <: Float64} # TODO generic r
             push!(new_Ps, kron(ypts, P))
         end
         JuMP.@constraint(model, vcat([full_coeffs[i, j] for j in 1:R for i in 1:j]...) in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U * svec_dim, new_Ps))
-    else
+    elseif inst.formulation == :ext
         JuMP.@variable(model, psd_var[1:(L * R), 1:(L * R)], PSD)
         for x2 in 1:R, x1 in 1:x2
             coeffs_lhs = JuMP.@expression(model, [u in 1:U], sum(Ps[1][u, k] * Ps[1][u, l] * psd_var[(x1 - 1) * L + k, (x2 - 1) * L + l] for k in 1:L for l in 1:L))
             JuMP.@constraint(model, coeffs_lhs .== full_coeffs[x1, x2])
         end
+    else
+        error()
     end
     JuMP.@objective(model, Min, t)
 
     return model
 end
 
-instances[RandomPolyMatJuMP]["minimal"] = [
-    ((1, 1, 2, true, false),),
-    ((1, 1, 2, false, true),),
-    ((1, 1, 2, false, false),),
-    ]
-instances[RandomPolyMatJuMP]["fast"] = [
-    ((3, 2, 4, true, false),),
-    ((3, 2, 4, false, true),),
-    ((3, 2, 4, false, false),),
-    ]
-instances[RandomPolyMatJuMP]["slow"] = [
-    ((4, 2, 10, true, false),),
-    ((4, 2, 10, false, true),),
-    ((4, 2, 10, false, false),),
-    ((2, 2, 15, true, false),),
-    ((2, 2, 15, false, true),),
-    ((2, 2, 15, false, false),),
-    ]
+# instances[RandomPolyMatJuMP]["minimal"] = [
+#     ((1, 1, 2, true, false),),
+#     ((1, 1, 2, false, true),),
+#     ((1, 1, 2, false, false),),
+#     ]
+# instances[RandomPolyMatJuMP]["fast"] = [
+#     ((3, 2, 4, true, false),),
+#     ((3, 2, 4, false, true),),
+#     ((3, 2, 4, false, false),),
+#     ]
+# instances[RandomPolyMatJuMP]["slow"] = [
+#     ((4, 2, 10, true, false),),
+#     ((4, 2, 10, false, true),),
+#     ((4, 2, 10, false, false),),
+#     ((2, 2, 15, true, false),),
+#     ((2, 2, 15, false, true),),
+#     ((2, 2, 15, false, false),),
+#     ]
 
 return RandomPolyMatJuMP
