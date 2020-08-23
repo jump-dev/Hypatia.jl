@@ -139,7 +139,7 @@ all_tests_time = time()
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - all_tests_time)
     show(perf, allrows = true, allcols = true)
     println("\n")
-    show(timer)
+    # show(timer)
     println("\n")
 end
 

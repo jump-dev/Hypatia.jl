@@ -151,6 +151,7 @@ function update_feas(cone::WSOSInterpPosSemidefTri)
 end
 
 function update_grad(cone::WSOSInterpPosSemidefTri)
+    @timeit cone.timer "grad" begin
     @assert is_feas(cone)
     U = cone.U
     R = cone.R
@@ -212,6 +213,8 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
             block_q_i = block_q + i
             @inbounds cone.grad[idx + i] = scal * sum(PlambdaPk[block_q_i, block_p_i] for PlambdaPk in cone.PlambdaP)
         end
+    end
+
     end
 
     cone.grad_updated = true
