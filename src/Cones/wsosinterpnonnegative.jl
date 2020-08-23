@@ -38,6 +38,8 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tmpLL::Vector{Matrix{R}}
     tmpUL::Vector{Matrix{R}}
     tmpLU::Vector{Matrix{R}}
+    tmpLU2::Vector{Matrix{R}}
+    tmpLU3::Vector{Matrix{R}}
     tmpUU::Vector{Matrix{R}} # TODO for corrector, this can stay as a single matrix if we only use LU
     ΛF::Vector
 
@@ -79,6 +81,8 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     cone.tmpLL = [Matrix{R}(undef, size(Pk, 2), size(Pk, 2)) for Pk in Ps]
     cone.tmpUL = [Matrix{R}(undef, dim, size(Pk, 2)) for Pk in Ps]
     cone.tmpLU = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
+    cone.tmpLU2 = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
+    cone.tmpLU3 = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
     cone.tmpUU = [Matrix{R}(undef, dim, dim) for Pk in Ps]
     cone.ΛF = Vector{Any}(undef, length(Ps))
     return
@@ -158,8 +162,8 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
     corr = cone.correction
     corr .= 0
     @inbounds for k in eachindex(cone.Ps)
-        # NOTE don't overwrite tmpLU or tmpUU
-        LpdU = (cone.tmpLU[k] * Diagonal(primal_dir)) * cone.tmpUU[k] # TODO allocs
+        mul!(cone.tmpLU2[k], cone.tmpLU[k],  Diagonal(primal_dir))
+        LpdU = mul!(cone.tmpLU3[k], cone.tmpLU2[k], cone.tmpUU[k])
         @inbounds @views for j in 1:cone.dim
             corr[j] += sum(abs2, LpdU[:, j])
         end

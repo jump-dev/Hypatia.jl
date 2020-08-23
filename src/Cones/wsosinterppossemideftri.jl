@@ -270,7 +270,7 @@ end
 function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where {T}
     @assert cone.grad_updated
     if !cone.blocks_R_updated
-        update_blocks_R(cone)
+        @timeit cone.timer "update_blocks" update_blocks_R(cone)
     end
     corr = cone.correction
     corr .= 0
@@ -295,14 +295,14 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
             @views primal_dir_mat_p = Symmetric(svec_to_smat!(matRR, primal_dir[p:U:dim], cone.rt2))
             @inbounds for q in 1:U
                 pq_q = PlambdaP_dirs[p][q] # PlambdaPk_slice_pq * primal_dir_mat_q
-                @inbounds for r in 1:q
+                @timeit cone.timer "loop5" @inbounds for r in 1:q
                     PlambdaPk_slice_qr = PlambdaPk[q, r]
                     r_rp = PlambdaP_dirs[p][r]'
 
                     # O(R^3) done O(U^3) times
-                    mul!(matRR2, PlambdaPk_slice_qr, r_rp)
-                    mul!(matRR3, pq_q, matRR2)
-                    axpy!(true, matRR3, matRR3')
+                    @timeit cone.timer "mul2" mul!(matRR2, PlambdaPk_slice_qr, r_rp)
+                    @timeit cone.timer "mul3" mul!(matRR3, pq_q, matRR2)
+                    @timeit cone.timer "axpy" axpy!(true, matRR3, matRR3')
                     if q != r
                         matRR3 .*= 2
                     end
