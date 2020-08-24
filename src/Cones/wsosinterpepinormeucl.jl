@@ -120,6 +120,8 @@ end
 
 get_nu(cone::WSOSInterpEpiNormEucl) = 2 * sum(size(Psk, 2) for Psk in cone.Ps)
 
+use_correction(::WSOSInterpEpiNormEucl) = false
+
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormEucl)
     arr[1:cone.U] .= 1
     arr[(cone.U + 1):end] .= 0
