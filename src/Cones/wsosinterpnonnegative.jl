@@ -77,14 +77,14 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    Ps = cone.Ps
-    cone.tmpLL = [Matrix{R}(undef, size(Pk, 2), size(Pk, 2)) for Pk in Ps]
-    cone.tmpUL = [Matrix{R}(undef, dim, size(Pk, 2)) for Pk in Ps]
-    cone.tmpLU = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
-    cone.tmpLU2 = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
-    cone.tmpLU3 = [Matrix{R}(undef, size(Pk, 2), dim) for Pk in Ps]
-    cone.tmpUU = [Matrix{R}(undef, dim, dim) for Pk in Ps]
-    cone.ΛF = Vector{Any}(undef, length(Ps))
+    Ls = [size(Pk, 2) for Pk in cone.Ps]
+    cone.tmpLL = [Matrix{R}(undef, L, L) for L in Ls]
+    cone.tmpUL = [Matrix{R}(undef, dim, L) for L in Ls]
+    cone.tmpLU = [Matrix{R}(undef, L, dim) for L in Ls]
+    cone.tmpLU2 = [Matrix{R}(undef, L, dim) for L in Ls]
+    cone.tmpLU3 = [Matrix{R}(undef, L, dim) for L in Ls]
+    cone.tmpUU = [Matrix{R}(undef, dim, dim) for L in Ls]
+    cone.ΛF = Vector{Any}(undef, length(Ls))
     return
 end
 
