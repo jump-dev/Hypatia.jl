@@ -51,6 +51,19 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     PlambdaP_blocks_R::Vector{Matrix{Matrix{T}}}
     blocks_R_updated::Bool
 
+    UU1::Matrix{T}
+    UU2::Matrix{T}
+    UU3::Matrix{T}
+    UU4::Matrix{T}
+    UU5::Matrix{T}
+    UU6::Matrix{T}
+    UU7::Matrix{T}
+    UU8::Matrix{T}
+    UU9::Matrix{T}
+    UU10::Matrix{T}
+    UU11::Matrix{T}
+    UU12::Matrix{T}
+
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
         U::Int,
@@ -111,6 +124,18 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     @inbounds for k in eachindex(Ps), r in 1:U, s in 1:U
         cone.PlambdaP_blocks_R[k][r, s] = zeros(T, R, R)
     end
+    cone.UU1 = zeros(T, U, U)
+    cone.UU2 = zeros(T, U, U)
+    cone.UU3 = zeros(T, U, U)
+    cone.UU4 = zeros(T, U, U)
+    cone.UU5 = zeros(T, U, U)
+    cone.UU6 = zeros(T, U, U)
+    cone.UU7 = zeros(T, U, U)
+    cone.UU8 = zeros(T, U, U)
+    cone.UU9 = zeros(T, U, U)
+    cone.UU10 = zeros(T, U, U)
+    cone.UU11 = zeros(T, U, U)
+    cone.UU12 = zeros(T, U, U)
     return
 end
 
@@ -268,6 +293,14 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
 end
 
 function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where {T}
+    if cone.U < 30
+        correction1(cone, primal_dir)
+    else
+        correction2(cone, primal_dir)
+    end
+end
+
+function correction1(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where {T}
     @assert cone.grad_updated
     if !cone.blocks_R_updated
         @timeit cone.timer "update_blocks" update_blocks_R(cone)
@@ -311,6 +344,91 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
             end
         end
     end
+    corr ./= 2
+
+    return corr
+end
+
+function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
+    @assert cone.grad_updated
+    corr = cone.correction
+    U = cone.U
+    R = cone.R
+    corr .= 0
+    rt2 = cone.rt2
+
+    @inbounds for p in eachindex(cone.Ps)
+        PlambdaPk = cone.PlambdaP_blocks_U[p]
+        idx_kl = 1
+        for l in 1:R, k in 1:l
+            scal_kl = (k == l ? 1 : rt2)
+            idx_mn = 1
+            for n in 1:R, m in 1:n
+                scal_mn = (m == n ? 1 : rt2)
+                @views primal_dir_kl = Diagonal(primal_dir[block_idxs(U, idx_kl)])
+                @views primal_dir_mn = Diagonal(primal_dir[block_idxs(U, idx_mn)])
+                PlambdaPk_slice_km = PlambdaPk[k, m]
+                PlambdaPk_slice_kn = PlambdaPk[k, n]
+                PlambdaPk_slice_lm = PlambdaPk[l, m]
+                PlambdaPk_slice_ln = PlambdaPk[l, n]
+
+                @timeit cone.timer "muls_1" begin
+                    mul!(cone.UU5, PlambdaPk_slice_kn, primal_dir_mn)
+                    mid1 = mul!(cone.UU1, primal_dir_kl, cone.UU5)
+                    mul!(cone.UU5, PlambdaPk_slice_ln, primal_dir_mn)
+                    mid2 = mul!(cone.UU2, primal_dir_kl, cone.UU5)
+                    mul!(cone.UU5, PlambdaPk_slice_km, primal_dir_mn)
+                    mid3 = mul!(cone.UU3, primal_dir_kl, cone.UU5)
+                    mul!(cone.UU5, PlambdaPk_slice_lm, primal_dir_mn)
+                    mid4 = mul!(cone.UU4, primal_dir_kl, cone.UU5)
+                end
+
+                idx_ij = 1
+                for j in 1:R, i in 1:j
+                    scal_ij = (i == j ? 1 : rt2)
+                    corr_ij = view(corr, block_idxs(U, idx_ij))
+
+                    PlambdaPk_slice_ik = PlambdaPk[i, k]
+                    PlambdaPk_slice_il = PlambdaPk[i, l]
+                    PlambdaPk_slice_im = PlambdaPk[i, m]
+                    PlambdaPk_slice_in = PlambdaPk[i, n]
+                    PlambdaPk_slice_jk = PlambdaPk[j, k]
+                    PlambdaPk_slice_jl = PlambdaPk[j, l]
+                    PlambdaPk_slice_jm = PlambdaPk[j, m]
+                    PlambdaPk_slice_jn = PlambdaPk[j, n]
+
+                    @timeit cone.timer "muls_2" begin
+                        right1 = mul!(cone.UU5, mid1, PlambdaPk_slice_jm')
+                        right2 = mul!(cone.UU6, mid1, PlambdaPk_slice_im')
+                        right3 = mul!(cone.UU7, mid2, PlambdaPk_slice_jm')
+                        right4 = mul!(cone.UU8, mid2, PlambdaPk_slice_im')
+                        right5 = mul!(cone.UU9, mid3, PlambdaPk_slice_jn')
+                        right6 = mul!(cone.UU10, mid3, PlambdaPk_slice_in')
+                        right7 = mul!(cone.UU11, mid4, PlambdaPk_slice_jn')
+                        right8 = mul!(cone.UU12, mid4, PlambdaPk_slice_in')
+                    end
+
+                    scal = scal_ij * scal_kl * scal_mn / 4
+                    for u in 1:U
+                        @timeit cone.timer "dot" @views corr_ij[u] += scal * (
+                            dot(PlambdaPk_slice_il[u, :], right1[:, u]) +
+                            dot(PlambdaPk_slice_jl[u, :], right2[:, u]) +
+                            dot(PlambdaPk_slice_ik[u, :], right3[:, u]) +
+                            dot(PlambdaPk_slice_jk[u, :], right4[:, u]) +
+                            dot(PlambdaPk_slice_il[u, :], right5[:, u]) +
+                            dot(PlambdaPk_slice_jl[u, :], right6[:, u]) +
+                            dot(PlambdaPk_slice_ik[u, :], right7[:, u]) +
+                            dot(PlambdaPk_slice_jk[u, :], right8[:, u])
+                            )
+                    end
+                    idx_ij += 1
+                end
+                idx_mn += 1
+            end
+            idx_kl += 1
+        end
+    end
+
     corr ./= 2
 
     return corr
