@@ -59,121 +59,114 @@ function test_extra(inst::ExampleInstanceJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
-# run a JuMP instance with a given solver and return solve info
-function test(
-    E::Type{<:ExampleInstanceJuMP{Float64}}, # an instance of a JuMP example # TODO support generic reals
+function setup_model(
+    E::Type{<:ExampleInstanceJuMP{Float64}}, # an instance of a JuMP example
     inst_data::Tuple,
     extender = nothing, # MOI.Utilities.@model-defined optimizer with subset of cones if using extended formulation
     solver_options = (), # additional non-default solver options specific to the example
     solver_type = Hypatia.Optimizer;
     default_solver_options = (), # default solver options
-    test::Bool = true,
     rseed::Int = 1,
     )
-    # setup instance and model
+    # setup example instance and JuMP model
     Random.seed!(rseed)
     inst = E(inst_data...)
-    build_time = @elapsed model = build(inst)
-    flush(stdout)
-    flush(stderr)
+    model = build(inst)
 
-    # solve and process result
-    solver = solver_type(; default_solver_options..., solver_options...)
-    result = solve_process(inst, model, solver, extender, test)
-    flush(stdout)
-    flush(stderr)
-
-    return (extender, build_time, result)
-end
-
-function solve_process(
-    inst,
-    model,
-    solver::Hypatia.Optimizer,
-    extender,
-    test::Bool,
-    )
-    # setup Hypatia model
-    opt = hyp_opt = solver
+    opt = hyp_opt = (solver_type == Hypatia.Optimizer) ? Hypatia.Optimizer(; default_solver_options..., solver_options...) : Hypatia.Optimizer()
     if !isnothing(extender)
         # use MOI automated extended formulation
-        opt = MOI.Utilities.CachingOptimizer(extender{Float64}(), hyp_opt)
-    end
-    JuMP.set_optimizer(model, () -> opt)
-    JuMP.optimize!(model)
-    flush(stdout)
-    flush(stderr)
-
-    if test
-        # run tests for the example
-        test_extra(inst, model)
-    end
-
-    # use process result
-    return process_result(hyp_opt.model, hyp_opt.solver)
-end
-
-function solve_process(
-    inst,
-    model,
-    solver,
-    extender,
-    test::Bool,
-    )
-    # setup Hypatia model
-    opt = hyp_opt = Hypatia.Optimizer()
-    if !isnothing(extender)
-        # use MOI automated extended formulation
-        opt = MOI.Bridges.full_bridge_optimizer(MOI.Utilities.CachingOptimizer(extender{Float64}(), hyp_opt), Float64)
+        opt = MOI.Bridges.full_bridge_optimizer(MOI.Utilities.CachingOptimizer(extender{Float64}(), opt), Float64)
     end
     backend = JuMP.backend(model)
     MOI.Utilities.reset_optimizer(backend, opt)
     MOI.Utilities.attach_optimizer(backend)
-    MOI.Utilities.attach_optimizer(backend.optimizer.model)
+    isnothing(extender) || MOI.Utilities.attach_optimizer(backend.optimizer.model)
+    flush(stdout); flush(stderr)
 
     hyp_model = hyp_opt.model
-    (A, b, c, G, h) = (hyp_model.A, hyp_model.b, hyp_model.c, hyp_model.G, hyp_model.h)
-    (cones, cone_idxs) = (hyp_model.cones, hyp_model.cone_idxs)
+    if solver_type != Hypatia.Optimizer
+        # not using Hypatia to solve, so setup new JuMP model corresponding to Hypatia data
+        (A, b, c, G, h) = (hyp_model.A, hyp_model.b, hyp_model.c, hyp_model.G, hyp_model.h)
+        (cones, cone_idxs) = (hyp_model.cones, hyp_model.cone_idxs)
 
-    jump_model = JuMP.Model()
-    JuMP.@variable(jump_model, x_var[1:length(hyp_model.c)])
-    JuMP.@objective(jump_model, Min, dot(c, x_var))
-    eq_refs = JuMP.@constraint(jump_model, hyp_model.A * x_var .== hyp_model.b)
-    cone_refs = Vector{JuMP.ConstraintRef}(undef, length(hyp_model.cones))
-    for (k, cone_k) in enumerate(hyp_model.cones)
-        idxs = hyp_model.cone_idxs[k]
-        h_k = h[idxs]
-        G_k = G[idxs, :]
-        moi_set = cone_from_hyp(cone_k)
-        if Hypatia.needs_untransform(moi_set)
-            Hypatia.untransform_affine(moi_set, h_k)
-            for j in 1:size(G_k, 2)
-                @views Hypatia.untransform_affine(moi_set, G_k[:, j])
+        new_model = JuMP.Model()
+        new_model.ext[:hyp_data] = hyp_model
+        JuMP.@variable(new_model, x_var[1:length(c)])
+        JuMP.@objective(new_model, Min, dot(c, x_var))
+        eq_refs = JuMP.@constraint(new_model, A * x_var .== b)
+        cone_refs = Vector{JuMP.ConstraintRef}(undef, length(cones))
+        for (k, cone_k) in enumerate(cones)
+            idxs = cone_idxs[k]
+            h_k = h[idxs]
+            G_k = G[idxs, :]
+            moi_set = cone_from_hyp(cone_k)
+            if Hypatia.needs_untransform(moi_set)
+                Hypatia.untransform_affine(moi_set, h_k)
+                for j in 1:size(G_k, 2)
+                    @views Hypatia.untransform_affine(moi_set, G_k[:, j])
+                end
             end
+            cone_refs[k] = JuMP.@constraint(new_model, h_k - G_k * x_var in moi_set)
         end
-        cone_refs[k] = JuMP.@constraint(jump_model, h_k - G_k * x_var in moi_set)
+        new_model.ext[:x_var] = x_var
+        new_model.ext[:eq_refs] = eq_refs
+        new_model.ext[:cone_refs] = cone_refs
+
+        opt = solver_type(; default_solver_options..., solver_options...)
+        JuMP.set_optimizer(new_model, () -> opt)
+        model = new_model
+        flush(stdout); flush(stderr)
+    else
+        model.ext[:inst] = inst
     end
 
-    opt = solver
-    JuMP.set_optimizer(jump_model, () -> opt)
-    JuMP.optimize!(jump_model)
-    flush(stdout)
-    flush(stderr)
+    string_cones = [string(nameof(c)) for c in unique(typeof.(hyp_model.cones))]
+    model_stats = (hyp_model.n, hyp_model.p, hyp_model.q, string_cones)
+    return (model, model_stats)
+end
 
-    solve_time = JuMP.solve_time(jump_model)
-    num_iters = MOI.get(jump_model, MOI.BarrierIterations())
-    primal_obj = JuMP.objective_value(jump_model)
-    dual_obj = JuMP.dual_objective_value(jump_model)
-    moi_status = MOI.get(jump_model, MOI.TerminationStatus())
+function solve_check(
+    model::JuMP.Model;
+    test::Bool = true,
+    )
+    JuMP.optimize!(model) # TODO make sure it doesn't copy again - just the optimize call - maybe use MOI.optimize instead
+    # MOI.optimize!(opt)
+    flush(stdout); flush(stderr)
+
+    opt = JuMP.backend(model).optimizer
+    if !isa(opt, Hypatia.Optimizer)
+        backend_model = JuMP.backend(model).optimizer.model
+        if backend_model isa MOI.Utilities.CachingOptimizer
+            opt = backend_model.optimizer
+        end
+    end
+
+    if opt isa Hypatia.Optimizer
+        test && test_extra(model.ext[inst], model)
+        flush(stdout); flush(stderr)
+        return process_result(opt.model, opt.solver)
+    end
+
+    test && @info("cannot run example tests if solver is not Hypatia")
+
+    solve_time = JuMP.solve_time(model)
+    num_iters = MOI.get(model, MOI.BarrierIterations())
+    primal_obj = JuMP.objective_value(model)
+    dual_obj = JuMP.dual_objective_value(model)
+    moi_status = MOI.get(model, MOI.TerminationStatus())
     hyp_status = haskey(moi_hyp_status_map, moi_status) ? moi_hyp_status_map[moi_status] : :OtherStatus
 
-    x = JuMP.value.(x_var)
-    y = (isempty(A) ? Float64[] : -JuMP.dual.(eq_refs))
+    hyp_data = model.ext[:hyp_data]
+    eq_refs = model.ext[:eq_refs]
+    cone_refs = model.ext[:cone_refs]
+    x = JuMP.value.(model.ext[:x_var])
+    y = (isempty(eq_refs) ? Float64[] : -JuMP.dual.(eq_refs))
     s_cones = Vector{Vector{Float64}}(undef, length(cone_refs))
     z_cones = Vector{Vector{Float64}}(undef, length(cone_refs))
     for (k, cr) in enumerate(cone_refs)
         moi_set = MOI.get(cr.model, MOI.ConstraintSet(), cr)
-        idxs = Hypatia.permute_affine(moi_set, 1:length(hyp_model.cone_idxs[k]))
+        idxs = Hypatia.permute_affine(moi_set, 1:length(hyp_data.cone_idxs[k]))
         s_k = Hypatia.rescale_affine(moi_set, JuMP.value.(cr))
         z_k = Hypatia.rescale_affine(moi_set, JuMP.dual.(cr))
         s_cones[k] = s_k[idxs]
@@ -184,16 +177,11 @@ function solve_process(
 
     obj_diff = primal_obj - dual_obj
     compl = dot(s, z)
-    (x_viol, y_viol, z_viol) = certificate_violations(hyp_status, hyp_model, x, y, z, s)
-    string_cones = [string(nameof(c)) for c in unique(typeof.(hyp_model.cones))]
+    (x_viol, y_viol, z_viol) = certificate_violations(hyp_status, hyp_data, x, y, z, s)
+    flush(stdout); flush(stderr)
 
-    return (status = hyp_status,
-        solve_time = solve_time, num_iters = num_iters,
-        primal_obj = primal_obj, dual_obj = dual_obj,
-        n = hyp_model.n, p = hyp_model.p, q = hyp_model.q,
-        cones = string_cones,
-        obj_diff = obj_diff, compl = compl,
-        x_viol = x_viol, y_viol = y_viol, z_viol = z_viol)
+    solve_stats = (hyp_status, solve_time, num_iters, primal_obj, dual_obj, obj_diff, compl, x_viol, y_viol, z_viol)
+    return solve_stats
 end
 
 # run a CBF instance with a given solver and return solve info
@@ -212,8 +200,7 @@ function test(
     opt = solver_type(; solver_options...)
     JuMP.set_optimizer(model, () -> opt)
     JuMP.optimize!(model)
-    flush(stdout)
-    flush(stderr)
+    flush(stdout); flush(stderr)
 
     @test JuMP.termination_status(model) == MOI.OPTIMAL # TODO some may be infeasible
 

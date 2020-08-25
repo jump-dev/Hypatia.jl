@@ -26,12 +26,15 @@ function test(
     solver = Solvers.Solver{T}(; default_solver_options..., solver_options...)
     Solvers.load(solver, model)
     Solvers.solve(solver)
+    flush(stdout); flush(stderr)
 
     # process the solve info and solution
     result = process_result(model, solver)
+    flush(stdout); flush(stderr)
 
     # run tests for the example
     test_extra(inst, result)
+    flush(stdout); flush(stderr)
 
     return (nothing, build_time, result)
 end
