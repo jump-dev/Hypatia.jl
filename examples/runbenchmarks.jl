@@ -11,6 +11,7 @@ import CSV
 using Printf
 import TimerOutputs
 import LinearAlgebra
+using Distributed
 using Hypatia
 using MosekTools
 
@@ -21,8 +22,8 @@ include(joinpath(examples_dir, "common_JuMP.jl"))
 results_path = joinpath(homedir(), "bench", "bench.csv")
 # results_path = nothing
 
-# spawn_runs = true
-spawn_runs = false
+spawn_runs = true
+# spawn_runs = false
 
 free_memory_limit = 16 * 2^30 # keep at least X GB of RAM available
 optimizer_time_limit = 1800
@@ -65,7 +66,7 @@ instance_sets = [
 
 # models to run
 JuMP_example_names = [
-    # "densityest",
+    "densityest",
     # "expdesign",
     # "matrixcompletion",
     # "matrixquadratic",

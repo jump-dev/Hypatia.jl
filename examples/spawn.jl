@@ -4,8 +4,6 @@ Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 utilities for spawning benchmark runs
 =#
 
-using Distributed
-
 # reduce printing for worker
 Base.eval(Distributed, :(function redirect_worker_output(ident, stream)
     @async while !eof(stream)
@@ -36,8 +34,8 @@ end
 function spawn_setup()
     kill_workers()
     get_worker()
-    @spawnat worker @eval using MosekTools
-    @spawnat worker include(joinpath(examples_dir, "common_JuMP.jl"))
+    @fetchfrom worker @eval using MosekTools
+    @fetchfrom worker include(joinpath(examples_dir, "common_JuMP.jl"))
 end
 
 function spawn_step(fun)
@@ -81,7 +79,7 @@ function spawn_step(fun)
 
     if nprocs() < 2
         get_worker()
-        @spawnat worker begin
+        @fetchfrom worker begin
             Base.@eval using MosekTools
             include(joinpath(examples_dir, "common_JuMP.jl"))
             include(joinpath(examples_dir, ex_name, "JuMP.jl"))
