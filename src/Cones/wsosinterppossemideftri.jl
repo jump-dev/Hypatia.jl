@@ -296,7 +296,8 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
     if cone.U < 30
         correction1(cone, primal_dir)
     else
-        correction2(cone, primal_dir)
+        cone.correction .= 0
+        # correction2(cone, primal_dir)
     end
 end
 
@@ -359,6 +360,7 @@ function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
 
     @inbounds for p in eachindex(cone.Ps)
         PlambdaPk = cone.PlambdaP_blocks_U[p]
+
         idx_kl = 1
         for l in 1:R, k in 1:l
             scal_kl = (k == l ? 1 : rt2)
@@ -433,3 +435,79 @@ function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
 
     return corr
 end
+
+# function correction2(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
+#     @assert cone.grad_updated
+#     corr = cone.correction
+#     U = cone.U
+#     R = cone.R
+#     corr .= 0
+#     rt2 = cone.rt2
+#
+#     @inbounds for p in eachindex(cone.Ps)
+#         PlambdaPk = cone.PlambdaP_blocks_U[p]
+#
+#         idx_kl = 1
+#         for l in 1:R, k in 1:l
+#             scal_kl = (k == l ? 1 : rt2)
+#             idx_mn = 1
+#             for n in 1:R, m in 1:n
+#                 scal_mn = (m == n ? 1 : rt2)
+#                 @views primal_dir_kl = Diagonal(primal_dir[block_idxs(U, idx_kl)])
+#                 @views primal_dir_mn = Diagonal(primal_dir[block_idxs(U, idx_mn)])
+#                 PlambdaPk_slice_km = PlambdaPk[k, m]
+#                 PlambdaPk_slice_kn = PlambdaPk[k, n]
+#                 PlambdaPk_slice_lm = PlambdaPk[l, m]
+#                 PlambdaPk_slice_ln = PlambdaPk[l, n]
+#
+#                 idx_ij = 1
+#                 for j in 1:R, i in 1:j
+#                     scal_ij = (i == j ? 1 : rt2)
+#                     corr_ij = view(corr, block_idxs(U, idx_ij))
+#
+#                     PlambdaPk_slice_ik = PlambdaPk[i, k]
+#                     PlambdaPk_slice_il = PlambdaPk[i, l]
+#                     PlambdaPk_slice_im = PlambdaPk[i, m]
+#                     PlambdaPk_slice_in = PlambdaPk[i, n]
+#                     PlambdaPk_slice_jk = PlambdaPk[j, k]
+#                     PlambdaPk_slice_jl = PlambdaPk[j, l]
+#                     PlambdaPk_slice_jm = PlambdaPk[j, m]
+#                     PlambdaPk_slice_jn = PlambdaPk[j, n]
+#
+#                     @timeit cone.timer "muls_1" begin
+#                         left1 = mul!(cone.UU1, PlambdaPk_slice_il, primal_dir_kl)
+#                         left2 = mul!(cone.UU2, PlambdaPk_slice_jl, primal_dir_kl)
+#                         left3 = mul!(cone.UU3, PlambdaPk_slice_ik, primal_dir_kl)
+#                         left4 = mul!(cone.UU4, PlambdaPk_slice_jk, primal_dir_kl)
+#
+#                         right1 = mul!(cone.UU5, primal_dir_mn, PlambdaPk_slice_jm')
+#                         right2 = mul!(cone.UU6, primal_dir_mn, PlambdaPk_slice_im')
+#                         right3 = mul!(cone.UU7, primal_dir_mn, PlambdaPk_slice_jn')
+#                         right4 = mul!(cone.UU8, primal_dir_mn, PlambdaPk_slice_in')
+#                     end
+#
+#                     scal = scal_ij * scal_kl * scal_mn / 4
+#                     for u in 1:U
+#                         @timeit cone.timer "dot" @views corr_ij[u] += scal * (
+#                             dot(left1[u, :], PlambdaPk_slice_kn, right1[:, u]) +
+#                             dot(left2[u, :], PlambdaPk_slice_kn, right2[:, u]) +
+#                             dot(left3[u, :], PlambdaPk_slice_ln, right1[:, u]) +
+#                             dot(left4[u, :], PlambdaPk_slice_ln, right2[:, u]) +
+#                             dot(left1[u, :], PlambdaPk_slice_km, right3[:, u]) +
+#                             dot(left2[u, :], PlambdaPk_slice_km, right4[:, u]) +
+#                             dot(left3[u, :], PlambdaPk_slice_lm, right3[:, u]) +
+#                             dot(left4[u, :], PlambdaPk_slice_lm, right4[:, u])
+#                             )
+#                     end
+#                     idx_ij += 1
+#                 end
+#                 idx_mn += 1
+#             end
+#             idx_kl += 1
+#         end
+#     end
+#
+#     corr ./= 2
+#
+#     return corr
+# end
