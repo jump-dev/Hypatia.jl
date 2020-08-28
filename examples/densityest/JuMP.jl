@@ -58,11 +58,16 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
     else
         # PSD formulation
         psd_vars = []
-        for (r, Pr) in enumerate(Ps)
+        for Pr in Ps
             Lr = size(Pr, 2)
             psd_r = JuMP.@variable(model, [1:Lr, 1:Lr], Symmetric)
+            if Lr == 1
+                # Mosek cannot handle 1x1 PSD constraints
+                JuMP.@constraint(model, psd_r[1, 1] >= 0)
+            else
+                JuMP.@SDconstraint(model, psd_r >= 0)
+            end
             push!(psd_vars, psd_r)
-            JuMP.@SDconstraint(model, psd_r >= 0)
         end
         coeffs_lhs = JuMP.@expression(model, [u in 1:U], sum(sum(Pr[u, k] * Pr[u, l] * psd_r[k, l] * (k == l ? 1 : 2) for k in 1:size(Pr, 2) for l in 1:k) for (Pr, psd_r) in zip(Ps, psd_vars)))
         JuMP.@constraint(model, coeffs_lhs .== f_pts)
@@ -70,77 +75,3 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic real
 
     return model
 end
-
-instances[DensityEstJuMP]["minimal"] = [
-    ((5, 1, 2, true),),
-    ((:iris, 2, true),),
-    ]
-instances[DensityEstJuMP]["fast"] = [
-    ((10, 1, 5, true),),
-    ((10, 1, 10, true),),
-    ((100, 1, 20, true),),
-    ((100, 1, 50, true),),
-    ((100, 1, 100, true),),
-    ((200, 1, 200, true),),
-    ((500, 1, 500, true),),
-    ((100, 2, 5, true),),
-    ((100, 2, 10, true),),
-    ((200, 2, 20, true),),
-    ((50, 3, 2, true),),
-    ((50, 3, 4, true),),
-    ((500, 3, 14, true),),
-    ((50, 4, 2, true),),
-    ((100, 8, 2, true),),
-    ((100, 8, 2, false),),
-    ((250, 4, 4, true),),
-    ((250, 4, 4, false),),
-    ((200, 32, 2, false),),
-    ((:iris, 4, true),),
-    ((:iris, 5, true),),
-    ((:iris, 6, true),),
-    ((:iris, 4, false),),
-    ((:cancer, 4, true),),
-    ]
-instances[DensityEstJuMP]["slow"] = [
-    ((500, 2, 60, true),),
-    ((1000, 3, 20, true),),
-    ((200, 4, 4, false),),
-    ((500, 4, 6, true),),
-    ((500, 4, 6, false),),
-    ]
-
-# benchmark 1 instances
-bench1_n_d = [
-    (1, 4), # compile run
-    (1, 75),
-    (1, 150),
-    (1, 300),
-    (1, 600),
-    (1, 900),
-    (1, 1200),
-    (1, 1500),
-    (2, 3), # compile run
-    (2, 10),
-    (2, 20),
-    (2, 30),
-    (2, 40),
-    (3, 2), # compile run
-    (3, 3),
-    (3, 6),
-    (3, 9),
-    (3, 12),
-    (4, 2),
-    (4, 4),
-    (4, 6),
-    (8, 2),
-    (8, 3),
-    (16, 1),
-    (16, 2), # (16, 3) too large for quadrature weights
-    (32, 1), # (32, 2) too large for quadrature weights
-    (64, 1),
-    ]
-instances[DensityEstJuMP]["bench1"] = (
-    ((ceil(Int, 1.1 * binomial(n + 2d, n)), n, 2d, use_nat), ext)
-    for (n, d) in bench1_n_d
-    for (use_nat, ext) in ((false, ExpPSDConeOptimizer), (true, nothing))
-    )

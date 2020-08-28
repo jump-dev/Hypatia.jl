@@ -30,19 +30,3 @@ function build(inst::EnvelopeJuMP{T}) where {T <: Float64} # TODO generic reals
 
     return model
 end
-
-instances[EnvelopeJuMP]["minimal"] = [
-    ((1, 2, 2, 2),),
-    ]
-instances[EnvelopeJuMP]["fast"] = [
-    ((2, 2, 3, 2),),
-    ((3, 3, 3, 3),),
-    ((3, 3, 5, 4),),
-    ((5, 2, 5, 3),),
-    ((1, 30, 2, 30),),
-    ((10, 1, 3, 1),),
-    ]
-instances[EnvelopeJuMP]["slow"] = [
-    ((4, 5, 4, 6),),
-    ((2, 30, 4, 30),),
-    ]

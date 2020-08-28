@@ -82,24 +82,18 @@ function process_result(
     status = Solvers.get_status(solver)
     solve_time = Solvers.get_solve_time(solver)
     num_iters = Solvers.get_num_iters(solver)
-
     primal_obj = Solvers.get_primal_obj(solver)
     dual_obj = Solvers.get_dual_obj(solver)
+    obj_diff = primal_obj - dual_obj
 
-    x = Solvers.get_x(solver)
-    y = Solvers.get_y(solver)
     z = Solvers.get_z(solver)
     s = Solvers.get_s(solver)
-
-    obj_diff = primal_obj - dual_obj
+    x = Solvers.get_x(solver)
+    y = Solvers.get_y(solver)
     compl = dot(s, z)
     (x_viol, y_viol, z_viol) = certificate_violations(status, model, x, y, z, s)
 
-    return (status = status,
-        solve_time = solve_time, num_iters = num_iters,
-        primal_obj = primal_obj, dual_obj = dual_obj,
-        n = model.n, p = model.p, q = model.q,
-        x = x, y = y, z = z, s = s,
-        obj_diff = obj_diff, compl = compl,
-        x_viol = x_viol, y_viol = y_viol, z_viol = z_viol)
+    solve_stats = (status, solve_time, num_iters, primal_obj, dual_obj, obj_diff, compl, x_viol, y_viol, z_viol, x, y, z, s)
+    flush(stdout); flush(stderr)
+    return solve_stats
 end

@@ -65,16 +65,3 @@ function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64} # TODO generic re
 
     return model
 end
-
-instances[RegionOfAttrJuMP]["minimal"] = [
-    ((4, true),),
-    ((4, false),),
-    ]
-instances[RegionOfAttrJuMP]["fast"] = [
-    ((6, true),),
-    ((6, false),),
-    ((8, true),),
-    ]
-instances[RegionOfAttrJuMP]["slow"] = [
-    ((8, false),),
-    ]

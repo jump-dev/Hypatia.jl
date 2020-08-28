@@ -47,19 +47,29 @@ function build(inst::PolyMinJuMP{T}) where {T <: Float64} # TODO generic reals
     else
         if use_primal
             psd_vars = []
-            for (k, P) in enumerate(Ps)
-                Lk = size(P, 2)
-                psd_k = JuMP.@variable(model, [1:Lk, 1:Lk], Symmetric)
-                push!(psd_vars, psd_k)
-                JuMP.@SDconstraint(model, psd_k >= 0)
+            for Pr in Ps
+                Lr = size(Pr, 2)
+                psd_r = JuMP.@variable(model, [1:Lr, 1:Lr], Symmetric)
+                if Lr == 1
+                    # Mosek cannot handle 1x1 PSD constraints
+                    JuMP.@constraint(model, psd_r[1, 1] >= 0)
+                else
+                    JuMP.@SDconstraint(model, psd_r >= 0)
+                end
+                push!(psd_vars, psd_r)
             end
-            coeffs_lhs = JuMP.@expression(model, [u in 1:U], sum(sum(P[u, k] * P[u, l] * psd_k[k, l] * (k == l ? 1 : 2) for k in 1:size(Pr, 2) for l in 1:k) for (P, psd_k) in zip(Ps, psd_vars)))
+            coeffs_lhs = JuMP.@expression(model, [u in 1:U], sum(sum(Pr[u, k] * Pr[u, l] * psd_r[k, l] * (k == l ? 1 : 2) for k in 1:size(Pr, 2) for l in 1:k) for (Pr, psd_r) in zip(Ps, psd_vars)))
             JuMP.@constraint(model, coeffs_lhs .== interp_vals .- a)
         else
-            for P in Ps
-                L = size(P, 2)
-                psd_vec = [JuMP.@expression(model, sum(P[u, i] * P[u, j] * μ[u] for u in 1:U)) for i in 1:L for j in 1:i]
-                JuMP.@constraint(model, psd_vec in MOI.PositiveSemidefiniteConeTriangle(L))
+            for Pr in Ps
+                Lr = size(Pr, 2)
+                psd_r = [JuMP.@expression(model, sum(Pr[u, i] * Pr[u, j] * μ[u] for u in 1:U)) for i in 1:Lr for j in 1:i]
+                if Lr == 1
+                    # Mosek cannot handle 1x1 PSD constraints
+                    JuMP.@constraint(model, psd_r[1] >= 0)
+                else
+                    JuMP.@constraint(model, psd_r in MOI.PositiveSemidefiniteConeTriangle(Lr))
+                end
             end
         end
     end
@@ -75,95 +85,3 @@ function test_extra(inst::PolyMinJuMP{T}, model::JuMP.Model) where T
         @test JuMP.objective_value(model) ≈ inst.true_min atol = tol rtol = tol
     end
 end
-
-instances[PolyMinJuMP]["minimal"] = [
-    ((1, 2, true, true),),
-    ((1, 2, false, true),),
-    ((1, 2, false, false),),
-    ((:motzkin, 3, true, true),),
-    ]
-instances[PolyMinJuMP]["fast"] = [
-    ((1, 3, true, true),),
-    ((1, 30, true, true),),
-    ((1, 30, false, true),),
-    ((1, 30, false, false),),
-    ((2, 8, true, true),),
-    ((3, 6, true, true),),
-    ((5, 3, true, true),),
-    ((10, 1, true, true),),
-    ((10, 1, false, true),),
-    ((10, 1, false, false),),
-    ((4, 4, true, true),),
-    ((4, 4, false, true),),
-    ((4, 4, false, false),),
-    ((:butcher, 2, true, true),),
-    ((:caprasse, 4, true, true),),
-    ((:goldsteinprice, 7, true, true),),
-    ((:goldsteinprice_ball, 6, true, true),),
-    ((:goldsteinprice_ellipsoid, 7, true, true),),
-    ((:heart, 2, true, true),),
-    ((:lotkavolterra, 3, true, true),),
-    ((:magnetism7, 2, true, true),),
-    ((:magnetism7_ball, 2, true, true),),
-    ((:motzkin, 3, true, true),),
-    ((:motzkin_ball, 3, true, true),),
-    ((:motzkin_ellipsoid, 3, true, true),),
-    ((:reactiondiffusion, 4, true, true),),
-    ((:robinson, 8, true, true),),
-    ((:robinson_ball, 8, true, true),),
-    ((:rosenbrock, 5, true, true),),
-    ((:rosenbrock_ball, 5, true, true),),
-    ((:schwefel, 2, true, true),),
-    ((:schwefel_ball, 2, true, true),),
-    ((:lotkavolterra, 3, false, true),),
-    ((:motzkin, 3, false, true),),
-    ((:motzkin_ball, 3, false, true),),
-    ((:schwefel, 2, false, true),),
-    ((:lotkavolterra, 3, false, false),),
-    ((:motzkin, 3, false, false),),
-    ((:motzkin_ball, 3, false, false),),
-    ]
-instances[PolyMinJuMP]["slow"] = [
-    ((4, 5, true, true),),
-    ((4, 5, false, true),),
-    ((4, 5, false, false),),
-    ((2, 30, true, true),),
-    ((2, 30, false, true),),
-    ((2, 30, false, false),),
-    ]
-
-# benchmark 1 instances
-bench1_n_d = [
-    (1, 4), # compile run
-    (1, 100),
-    (1, 200),
-    (1, 500),
-    (1, 1000),
-    (1, 1500),
-    (1, 2500),
-    (1, 3500),
-    (2, 3), # compile run
-    (2, 15),
-    (2, 30),
-    (2, 45),
-    (2, 60),
-    (3, 2), # compile run
-    (3, 6),
-    (3, 9),
-    (3, 12),
-    (3, 15),
-    (4, 4),
-    (4, 6),
-    (4, 8),
-    (8, 2),
-    (8, 3),
-    (16, 1),
-    (16, 2),
-    (32, 1),
-    (64, 1),
-    ]
-instances[PolyMinJuMP]["bench1"] = (
-    ((n, d, false, use_wsos),)
-    for (n, d) in bench1_n_d
-    for use_wsos in (false, true)
-    )

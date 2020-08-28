@@ -115,39 +115,11 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
     return model
 end
 
-function test_extra(inst::SparsePCANative, result::NamedTuple)
+function test_extra(inst::SparsePCANative{T}, result::NamedTuple) where T
     @test result.status == :Optimal
     if result.status == :Optimal && iszero(inst.noise_ratio)
         # check objective value is correct
-        tol = eps(eltype(result.x))^0.25
+        tol = eps(T)^0.25
         @test result.primal_obj ≈ -1 atol = tol rtol = tol
     end
 end
-
-instances[SparsePCANative]["minimal"] = [
-    ((3, 2, true, 0, false),),
-    ((3, 2, false, 0, false),),
-    ((3, 2, true, 10, false),),
-    ((3, 2, false, 10, false),),
-    ]
-instances[SparsePCANative]["fast"] = [
-    ((5, 3, true, 0, false),),
-    ((5, 3, false, 0, false),),
-    ((5, 3, true, 10, false),),
-    ((5, 3, false, 10, false),),
-    ((30, 10, true, 0, false),),
-    ((30, 10, false, 0, false),),
-    ((30, 10, true, 10, false),),
-    ((30, 10, false, 10, false),),
-    ]
-instances[SparsePCANative]["slow"] = Tuple[]
-instances[SparsePCANative]["linops"] = [
-    ((5, 3, true, 0, true),),
-    ((5, 3, false, 0, true),),
-    ((5, 3, true, 10, true),),
-    ((5, 3, false, 10, true),),
-    ((30, 10, true, 0, true),),
-    ((30, 10, false, 0, true),),
-    ((30, 10, true, 10, true),),
-    ((30, 10, false, 10, true),),
-    ]

@@ -13,7 +13,6 @@ TODO
 
 mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     max_neighborhood::T
     dim::Int
     side::Int
@@ -57,14 +56,12 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         dim::Int;
         use_dual::Bool = false,
         sc_const::Real = 25 / T(9),
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 2
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
@@ -83,6 +80,8 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         return cone
     end
 end
+
+use_heuristic_neighborhood(cone::HypoRootdetTri) = false
 
 reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
 

@@ -425,13 +425,19 @@ get_primal_obj(solver::Solver) = solver.primal_obj
 get_dual_obj(solver::Solver) = solver.dual_obj
 
 function get_s(solver::Solver)
-    solver.rescale || return copy(solver.point.s)
-    return solver.point.s .* solver.h_scale
+    s = copy(solver.point.s)
+    if solver.rescale
+        s .*= solver.h_scale
+    end
+    return s
 end
 
 function get_z(solver::Solver)
-    solver.rescale || return copy(solver.point.z)
-    return solver.point.z ./ solver.h_scale
+    z = copy(solver.point.z)
+    if solver.rescale
+        z ./= solver.h_scale
+    end
+    return z
 end
 
 function get_x(solver::Solver{T}) where {T <: Real}

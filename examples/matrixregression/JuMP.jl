@@ -102,43 +102,7 @@ function test_extra(inst::MatrixRegressionJuMP{T}, model::JuMP.Model) where T
             inst.lam_las * norm(vec(A_opt), 1) +
             inst.lam_glr * sum(norm, eachrow(A_opt)) +
             inst.lam_glc * sum(norm, eachcol(A_opt))
-        tol = eps(T)^0.25
+        tol = eps(T)^0.20
         @test JuMP.objective_value(model) ≈ obj_result atol = tol rtol = tol
     end
 end
-
-instances[MatrixRegressionJuMP]["minimal"] = [
-    ((2, 3, 4, 0, 0, 0, 0, 0),),
-    ((2, 3, 4, 0, 0, 0, 0, 0), ClassicConeOptimizer),
-    ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
-    ]
-instances[MatrixRegressionJuMP]["fast"] = [
-    ((5, 3, 4, 0, 0, 0, 0, 0),),
-    ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
-    ((5, 3, 4, 0, 0.1, 0.1, 0, 0),),
-    ((3, 4, 5, 0, 0, 0, 0, 0),),
-    ((3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((3, 4, 5, 0, 0.1, 0.1, 0, 0),),
-    ((10, 20, 20, 0, 0, 0, 0, 0),),
-    ((10, 20, 20, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((10, 20, 20, 0, 0.1, 0.1, 0, 0),),
-    ((50, 8, 12, 0, 0, 0, 0, 0),),
-    ((50, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((50, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
-    ((50, 8, 12, 0, 0.1, 0.1, 0, 0),),
-    ]
-instances[MatrixRegressionJuMP]["slow"] = [
-    ((15, 20, 50, 0, 0, 0, 0, 0),),
-    ((15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2), ClassicConeOptimizer),
-    ((15, 20, 50, 0, 0.1, 0.1, 0, 0),),
-    ]
-
-# benchmark 1 instances
-instances[MatrixRegressionJuMP]["bench1"] = (
-    ((ceil(Int, 6m), m, 5m, 0, 0.2, 0, 0, 0), ext)
-    for m in vcat(3, 5:5:55) # includes compile run
-    for ext in (nothing, ClassicConeOptimizer)
-    )
