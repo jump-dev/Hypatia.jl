@@ -311,6 +311,28 @@ WSOSInterpEpiNormEuclCone{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: 
 MOI.dimension(cone::WSOSInterpEpiNormEuclCone) = cone.U * cone.R
 cone_from_moi(::Type{T}, cone::WSOSInterpEpiNormEuclCone{T}) where {T <: Real} = Cones.WSOSInterpEpiNormEucl{T}(cone.R, cone.U, cone.Ps, use_dual = cone.use_dual)
 
+export WSOSInterpEpiNormInfCone
+struct WSOSInterpEpiNormInfCone{T <: Real} <: MOI.AbstractVectorSet
+    R::Int
+    U::Int
+    Ps::Vector{Matrix{T}}
+    use_dual::Bool
+end
+WSOSInterpEpiNormInfCone{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSInterpEpiNormInfCone{T}(R, U, Ps, false)
+MOI.dimension(cone::WSOSInterpEpiNormInfCone) = cone.U * cone.R
+cone_from_moi(::Type{T}, cone::WSOSInterpEpiNormInfCone{T}) where {T <: Real} = Cones.WSOSInterpEpiNormInf{T}(cone.R, cone.U, cone.Ps, use_dual = cone.use_dual)
+
+export WSOSInterpHypoGeoMeanCone
+struct WSOSInterpHypoGeoMeanCone{T <: Real} <: MOI.AbstractVectorSet
+    R::Int
+    U::Int
+    Ps::Vector{Matrix{T}}
+    use_dual::Bool
+end
+WSOSInterpHypoGeoMeanCone{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSInterpHypoGeoMeanCone{T}(R, U, Ps, false)
+MOI.dimension(cone::WSOSInterpHypoGeoMeanCone) = cone.U * cone.R
+cone_from_moi(::Type{T}, cone::WSOSInterpHypoGeoMeanCone{T}) where {T <: Real} = Cones.WSOSInterpHypoGeoMean{T}(cone.R, cone.U, cone.Ps, use_dual = cone.use_dual)
+
 # all cones
 # TODO avoid repeating the tuple and union below
 
@@ -358,6 +380,8 @@ const MOIOtherConesList(::Type{T}) where {T <: Real} = (
     WSOSInterpNonnegativeCone{T, Complex{T}},
     WSOSInterpPosSemidefTriCone{T},
     WSOSInterpEpiNormEuclCone{T},
+    WSOSInterpEpiNormInfCone{T},
+    WSOSInterpHypoGeoMeanCone{T},
     )
 
 const MOIOtherCones{T <: Real} = Union{
@@ -404,4 +428,6 @@ const MOIOtherCones{T <: Real} = Union{
     WSOSInterpNonnegativeCone{T, Complex{T}},
     WSOSInterpPosSemidefTriCone{T},
     WSOSInterpEpiNormEuclCone{T},
+    WSOSInterpEpiNormInfCone{T},
+    WSOSInterpHypoGeoMeanCone{T},
     }
