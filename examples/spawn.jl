@@ -38,7 +38,7 @@ function spawn_setup()
     @fetchfrom worker include(joinpath(examples_dir, "common_JuMP.jl"))
 end
 
-function spawn_step(fun)
+function spawn_step(fun::Function, fun_name::Symbol)
     @assert nprocs() == 2
     status = :ok
     output = nothing
@@ -49,17 +49,15 @@ function spawn_step(fun)
         try
             remotecall_fetch(fun, worker)
         catch e
-            println("caught error: ", e)
+            println(fun_name, ": caught error: ", e)
         end
     end)
 
     while !isready(fut)
         if Sys.free_memory() < free_memory_limit
-            status = :KilledMemory
-            println("killed memory")
+            killstatus = :KilledMemory
         elseif time() - time_start > setup_time_limit
-            status = :KilledTime
-            println("killed time")
+            killstatus = :KilledTime
         else
             sleep(1)
             continue
@@ -68,12 +66,14 @@ function spawn_step(fun)
         sleep(1)
         isready(fut) || kill_workers()
         sleep(1)
+        status = Symbol(fun_name, killstatus)
+        println("status: ", status)
         break
     end
 
     output = isready(fut) ? fetch(fut) : nothing
     if isnothing(output) && status == :ok
-        status = :CaughtError
+        status = Symbol(fun_name, :CaughtError)
     end
     flush(stdout); flush(stderr)
 
@@ -90,21 +90,21 @@ function spawn_step(fun)
     return (status, output)
 end
 
-function run_instance(
-    ex_type::Type{<:ExampleInstanceJuMP},
-    inst::Tuple,
+function spawn_instance_check(
+    ex_type::Type{<:ExampleInstanceJuMP{Float64}},
+    inst_data::Tuple,
     extender,
     solver::Tuple,
     )
     println("setup model")
-    fun = () -> setup_model(ex_type{Float64}, inst, extender, solver[3], solver[2])
-    setup_time = @elapsed (status, output) = spawn_step(fun)
+    fun = () -> setup_model(ex_type, inst_data, extender, solver[3], solver[2])
+    setup_time = @elapsed (status, output) = spawn_step(fun, :SetupModel)
 
     check_time = @elapsed if status == :ok
         (model, model_stats) = output
         println("solve and check")
         fun = () -> solve_check(model, test = false)
-        (status, solve_stats) = spawn_step(fun)
+        (status, solve_stats) = spawn_step(fun, :SolveCheck)
     else
         model_stats = (-1, -1, -1, String[])
     end

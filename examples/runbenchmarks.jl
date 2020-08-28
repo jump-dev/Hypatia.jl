@@ -26,7 +26,7 @@ spawn_runs = true
 # spawn_runs = false
 
 free_memory_limit = 16 * 2^30 # keep at least X GB of RAM available
-optimizer_time_limit = 1800
+optimizer_time_limit = 30
 solve_time_limit = 1.2 * optimizer_time_limit
 setup_time_limit = optimizer_time_limit / 2
 
@@ -57,11 +57,9 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
 
 # instance sets and solvers to run
 instance_sets = [
-    ("nat", [hyp_solver,]),
-    ("ext", [
-        hyp_solver,
-        mosek_solver,
-        ]),
+    ("nat", hyp_solver),
+    ("ext", hyp_solver),
+    ("ext", mosek_solver),
     ]
 
 # models to run
@@ -77,26 +75,22 @@ JuMP_example_names = [
     # "shapeconregr",
     ]
 
-function run_instance(
-    ex_type::Type{<:ExampleInstanceJuMP},
-    inst::Tuple,
+function run_instance_check(
+    ex_type::Type{<:ExampleInstanceJuMP{Float64}},
+    inst_data::Tuple,
     extender,
     solver::Tuple,
     )
-    println("setup optimizer")
-    setup_time = @elapsed (model, model_stats) = setup_model(ex_type{Float64}, inst, extender, solver[3], solver[2])
-
-    println("solve and check")
-    check_time = @elapsed solve_stats = solve_check(model, test = false)
-
-    return (false, (model_stats..., solve_stats..., setup_time, check_time))
+    return (false, run_instance(ex_type, inst_data, extender, NamedTuple(), solver[2], default_options = solver[3], test = false))
 end
 
-spawn_runs && include(joinpath(examples_dir, "spawn.jl"))
-
-@info("starting script")
-
-spawn_runs && spawn_setup()
+if spawn_runs
+    include(joinpath(examples_dir, "spawn.jl"))
+    spawn_setup()
+    instance_check_fun = spawn_instance_check
+else
+    instance_check_fun = run_instance_check
+end
 
 perf = DataFrames.DataFrame(
     example = Type{<:ExampleInstance}[],
@@ -130,9 +124,9 @@ time_all = time()
 @info("starting benchmark runs")
 for ex_name in JuMP_example_names
     @everywhere include(joinpath($examples_dir, $ex_name, "JuMP.jl"))
-    @everywhere (ex_type, ex_insts) = include(joinpath($examples_dir, $ex_name, "benchmark.jl"))
+    @everywhere (ex_type, ex_insts) = include(joinpath($examples_dir, $ex_name, "JuMP_benchmark.jl"))
 
-    for (inst_set, solvers) in instance_sets, solver in solvers
+    for (inst_set, solver) in instance_sets
         haskey(ex_insts, inst_set) || continue
         (extender, inst_subsets) = ex_insts[inst_set]
         isempty(inst_subsets) && continue
@@ -141,7 +135,7 @@ for ex_name in JuMP_example_names
         for inst_subset in inst_subsets
             for (inst_num, inst) in enumerate(inst_subset)
                 println("\n$ex_type $inst_set $(solver[1]) $inst_num: $inst ...")
-                time_inst = @elapsed (is_killed, p) = run_instance(ex_type, inst, extender, solver)
+                time_inst = @elapsed (is_killed, p) = instance_check_fun(ex_type{Float64}, inst, extender, solver)
 
                 push!(perf, (ex_type, inst_set, inst_num, inst, extender, solver[1], p..., time_inst))
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
@@ -155,7 +149,7 @@ end
 
 spawn_runs && kill_workers()
 
-@printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)
+@printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)
 DataFrames.show(perf, allrows = true, allcols = true)
 println()
 flush(stdout); flush(stderr)
