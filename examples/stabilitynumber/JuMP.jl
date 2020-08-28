@@ -37,18 +37,3 @@ function build(inst::StabilityNumber{T}) where {T <: Float64} # TODO generic rea
 
     return model
 end
-
-instances[StabilityNumber]["minimal"] = [
-    ((2, true),),
-    ((2, false),),
-    ]
-instances[StabilityNumber]["fast"] = [
-    ((20, true),),
-    ((20, false),),
-    ((50, true),),
-    ((50, false),),
-    ]
-instances[StabilityNumber]["slow"] = [
-    ((500, true),),
-    ((500, false),),
-    ]

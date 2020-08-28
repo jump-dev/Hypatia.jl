@@ -31,28 +31,3 @@ function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64} # TODO generi
 
     return model
 end
-
-instances[MatrixCompletionJuMP]["minimal"] = [
-    ((2, 3),),
-    ((2, 3), ClassicConeOptimizer),
-    ]
-instances[MatrixCompletionJuMP]["fast"] = [
-    ((5, 8),),
-    ((5, 8), ClassicConeOptimizer),
-    ((12, 20),),
-    ]
-instances[MatrixCompletionJuMP]["slow"] = [
-    ((12, 24), ClassicConeOptimizer),
-    ((14, 140),),
-    ((14, 140), ClassicConeOptimizer),
-    ((40, 70),),
-    ((18, 180),),
-    ]
-
-# benchmark 1 instances
-instances[MatrixCompletionJuMP]["bench1"] = (
-    ((d1, d2), ext)
-    for d1 in vcat(3, 10:5:50) # includes compile run
-    for d2 in (5d1, 10d1)
-    for ext in (nothing, ClassicConeOptimizer)
-    )

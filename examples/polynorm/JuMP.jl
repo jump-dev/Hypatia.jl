@@ -34,12 +34,3 @@ function build(inst::PolyNormJuMP{T}) where {T <: Float64} # TODO generic reals
 
     return model
 end
-
-instances[PolyNormJuMP]["minimal"] = [
-    ((1, 2, 2),),
-    ]
-instances[PolyNormJuMP]["fast"] = [
-    ((2, 2, 2),),
-    ((2, 1, 3),),
-    ]
-instances[PolyNormJuMP]["slow"] = Tuple[]

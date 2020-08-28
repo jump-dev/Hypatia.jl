@@ -38,4 +38,4 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SumOfSquares = "4b9e565b-77fc-50a5-a571-1244f986bda1"
 
 [targets]
-test = ["CSV", "DataFrames", "DataStructures", "ForwardDiff", "GenericLinearAlgebra", "JuMP", "PolyJuMP", "Random", "SumOfSquares", "TimerOutputs"]
+test = ["CSV", "DataFrames", "DataStructures", "ForwardDiff", "JuMP", "PolyJuMP", "Random", "SumOfSquares"]

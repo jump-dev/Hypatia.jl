@@ -38,18 +38,3 @@ secondorderpoly_data = Dict(
     :polys8 => (x -> [x + 2, x]),
     :polys9 => (x -> [x - 1, x, x]),
     )
-
-instances[SecondOrderPolyJuMP]["minimal"] = [
-    ((:polys1, 2, true),),
-    ]
-instances[SecondOrderPolyJuMP]["fast"] = [
-    ((:polys2, 2, true),),
-    ((:polys3, 2, true),),
-    ((:polys4, 4, true),),
-    ((:polys5, 2, false),),
-    ((:polys6, 2, false),),
-    ((:polys7, 2, false),),
-    ((:polys8, 2, false),),
-    ((:polys9, 2, false),),
-    ]
-instances[SecondOrderPolyJuMP]["slow"] = Tuple[]

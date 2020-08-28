@@ -30,18 +30,3 @@ function build(inst::LinearOptNative{T}) where {T <: Real}
     model = Models.Model{T}(c, A, b, G, h, cones)
     return model
 end
-
-instances[LinearOptNative]["minimal"] = [
-    ((2, 4, 1.0),),
-    ((2, 4, 0.5),),
-    ]
-instances[LinearOptNative]["fast"] = [
-    ((15, 20, 1.0),),
-    ((15, 20, 0.25),),
-    ((50, 100, 1.0),),
-    ((50, 100, 0.15),),
-    ]
-instances[LinearOptNative]["slow"] = [
-    ((500, 1000, 0.05),),
-    ((500, 1000, 1.0),),
-    ]
