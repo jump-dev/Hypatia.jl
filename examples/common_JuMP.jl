@@ -164,7 +164,7 @@ function solve_check(
     if opt isa Hypatia.Optimizer
         test && test_extra(model.ext[:inst], model)
         flush(stdout); flush(stderr)
-        return process_result(opt.model, opt.solver)
+        return process_result(opt.model, opt.solver)[1:(end - 4)]
     end
 
     test && @info("cannot run example tests if solver is not Hypatia")
@@ -204,26 +204,35 @@ function solve_check(
 end
 
 # run a CBF instance with a given solver and return solve info
-function test(
+function run_cbf(
     inst::String, # a CBF file name
-    solver_options = (), # additional non-default solver options specific to the example
-    solver_type = Hypatia.Optimizer,
+    solver_options::NamedTuple,
+    solver_type = Hypatia.Optimizer; # TODO generalize for other solvers
+    test::Bool = true,
     )
-    cbf_file = joinpath(cblib_dir, inst * ".cbf.gz")
-    model = JuMP.read_from_file(cbf_file)
+    println("setup model")
+    setup_time = @elapsed begin
+        model = JuMP.read_from_file(joinpath(cblib_dir, inst * ".cbf.gz"))
 
-    # delete integer constraints
-    int_cons = JuMP.all_constraints(model, JuMP.VariableRef, MOI.Integer)
-    JuMP.delete.(model, int_cons)
+        # delete integer constraints
+        JuMP.delete.(model, JuMP.all_constraints(model, JuMP.VariableRef, MOI.Integer))
 
-    opt = solver_type(; solver_options...)
-    JuMP.set_optimizer(model, () -> opt)
-    JuMP.optimize!(model)
-    flush(stdout); flush(stderr)
+        # TODO refactor code in run_instance, so can use other solvers easily
+        opt = solver_type(; solver_options...)
+        backend = JuMP.backend(model)
+        MOI.Utilities.reset_optimizer(backend, opt)
+        MOI.Utilities.attach_optimizer(backend)
 
-    @test JuMP.termination_status(model) == MOI.OPTIMAL # TODO some may be infeasible
+        hyp_model = opt.model
+        string_cones = [string(nameof(c)) for c in unique(typeof.(hyp_model.cones))]
+        model_stats = (hyp_model.n, hyp_model.p, hyp_model.q, string_cones)
+        flush(stdout); flush(stderr)
+    end
 
-    return process_result(model)
+    println("solve and check")
+    check_time = @elapsed solve_stats = solve_check(model, test = false)
+
+    return (model_stats..., solve_stats..., setup_time, check_time)
 end
 
 moi_hyp_status_map = Dict(

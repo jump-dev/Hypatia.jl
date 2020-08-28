@@ -8,7 +8,6 @@ import DataFrames
 import CSV
 using Printf
 import TimerOutputs
-import DataStructures
 
 examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "common_JuMP.jl"))
@@ -20,15 +19,15 @@ results_path = nothing
 
 # options to solvers
 timer = TimerOutputs.TimerOutput()
-# tol = 1e-7
+tol = 1e-7
 default_options = (
-    # verbose = false,
-    verbose = true,
+    verbose = false,
+    # verbose = true,
     iter_limit = 250,
     timer = timer,
-    # tol_abs_opt = tol,
-    # tol_rel_opt = tol,
-    # tol_feas = tol,
+    tol_abs_opt = tol,
+    tol_rel_opt = tol,
+    tol_feas = tol,
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
@@ -43,49 +42,49 @@ instance_sets = [
 # types of models to run and corresponding options and example names
 model_types = [
     "native",
-    # "JuMP",
+    "JuMP",
     ]
 
 # list of names of native examples to run
 native_example_names = [
     "densityest",
-    # "envelope",
-    # "expdesign",
-    # "linearopt",
-    # "matrixcompletion",
-    # "matrixregression",
-    # "maxvolume",
-    # "polymin",
-    # "portfolio",
-    # "sparsepca",
+    "envelope",
+    "expdesign",
+    "linearopt",
+    "matrixcompletion",
+    "matrixregression",
+    "maxvolume",
+    "polymin",
+    "portfolio",
+    "sparsepca",
     ]
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    # "centralpolymat",
-    # "conditionnum",
-    # "contraction",
+    "centralpolymat",
+    "conditionnum",
+    # "contraction", # TODO PolyJuMP error
     "densityest",
-    # "envelope",
-    # "expdesign",
-    # # "lotkavolterra", # TODO PolyJuMP error
-    # "lyapunovstability",
-    # "matrixcompletion",
-    # "matrixquadratic",
-    # "matrixregression",
-    # "maxvolume",
-    # "muconvexity",
-    # "nearestpsd",
-    # "polymin",
-    # "polynorm",
-    # "portfolio",
-    # # "regionofattr", # TODO PolyJuMP error
-    # "robustgeomprog",
-    # "secondorderpoly",
-    # "semidefinitepoly",
-    # "shapeconregr",
-    # "signomialmin",
-    # "stabilitynumber",
+    "envelope",
+    "expdesign",
+    # "lotkavolterra", # TODO PolyJuMP error
+    "lyapunovstability",
+    "matrixcompletion",
+    "matrixquadratic",
+    "matrixregression",
+    "maxvolume",
+    # "muconvexity", # TODO PolyJuMP error
+    "nearestpsd",
+    "polymin",
+    "polynorm",
+    "portfolio",
+    # "regionofattr", # TODO PolyJuMP error
+    "robustgeomprog",
+    "secondorderpoly",
+    # "semidefinitepoly", # TODO PolyJuMP error
+    "shapeconregr",
+    "signomialmin",
+    "stabilitynumber",
     ]
 
 perf = DataFrames.DataFrame(
@@ -130,7 +129,7 @@ time_all = time()
             isempty(inst_subset) && continue
             ex_type_T = ex_type{real_T}
             new_default_options = (; default_options..., time_limit = time_limit)
-            println("\nstarting instances for $ex_type_T $inst_set\n")
+            println("\nstarting $(length(inst_subset)) instances for $ex_type_T $inst_set\n")
 
             for (inst_num, inst) in enumerate(inst_subset)
                 test_info = "$ex_type_T $inst_set $inst_num: $inst"
@@ -147,6 +146,7 @@ time_all = time()
             end
         end
     end
+
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)
     DataFrames.show(perf, allrows = true, allcols = true)
     println("\n")
