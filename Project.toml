@@ -14,8 +14,6 @@ GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
-Mosek = "6405355b-0ac2-5fba-af84-adbd65488c0e"
-MosekTools = "1ec41992-ff65-5c91-ac43-2df89e9693a4"
 PolynomialRoots = "3a141323-8675-5d76-9d11-e1df1406c778"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
@@ -40,4 +38,4 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SumOfSquares = "4b9e565b-77fc-50a5-a571-1244f986bda1"
 
 [targets]
-test = ["CSV", "DataFrames", "DataStructures", "ForwardDiff", "GenericLinearAlgebra", "JuMP", "PolyJuMP", "Random", "SumOfSquares", "TimerOutputs"]
+test = ["CSV", "DataFrames", "DataStructures", "ForwardDiff", "JuMP", "PolyJuMP", "Random", "SumOfSquares"]
