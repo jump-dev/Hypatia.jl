@@ -93,7 +93,7 @@ function process_result(
     compl = dot(s, z)
     (x_viol, y_viol, z_viol) = certificate_violations(status, model, x, y, z, s)
 
-    solve_stats = (status, solve_time, num_iters, primal_obj, dual_obj, obj_diff, compl, x_viol, y_viol, z_viol)
+    solve_stats = (status, solve_time, num_iters, primal_obj, dual_obj, obj_diff, compl, x_viol, y_viol, z_viol, x, y, z, s)
     flush(stdout); flush(stderr)
     return solve_stats
 end

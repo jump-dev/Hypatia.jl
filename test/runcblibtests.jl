@@ -1,20 +1,26 @@
 #=
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
+
+run CBLIB instances
 =#
 
+import DataFrames
+import CSV
+using Printf
+import TimerOutputs
+
+include(joinpath(@__DIR__, "cblibsets.jl"))
 examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "common_JuMP.jl"))
-using Test
-using DataFrames
-using Printf
-using TimerOutputs
-import Hypatia
-import Hypatia.Solvers
+
+# path to write results DataFrame to CSV, if any
+results_path = joinpath(homedir(), "bench", "bench.csv")
+# results_path = nothing
 
 # options to solvers
-timer = TimerOutput()
+timer = TimerOutputs.TimerOutput()
 tol = 1e-7
-default_solver_options = (
+default_options = (
     # verbose = false,
     verbose = true,
     iter_limit = 150,
@@ -28,29 +34,25 @@ default_solver_options = (
     timer = timer,
     )
 
-# instance sets to run and corresponding extenders and time limits (seconds)
-include(joinpath(@__DIR__, "cblibsets.jl"))
+# instance sets to run and corresponding time limits (seconds)
 instance_sets = [
-    ("diverse_few", nothing, 15),
-    ("power_small", nothing, 60),
-    ("exp_small", nothing, 15),
-    # ("exp_most", nothing, 60),
+    ("diverse_few", 15),
+    ("power_small", 60),
+    ("exp_small", 15),
+    # ("exp_most", 60),
     ]
 
 # CBLIB file folder location (use default)
 cblib_dir = joinpath(ENV["HOME"], "cblib/cblib.zib.de/download/all")
 
-# start the tests
-@info("starting CBLIB tests")
-for (inst_set, extender, time_limit) in instance_sets
-    @info("each $inst_set instance with extender $extender should take <$time_limit seconds")
-end
-
-perf = DataFrame(
+perf = DataFrames.DataFrame(
     inst_set = String[],
     count = Int[],
     inst = String[],
-    test_time = Float64[],
+    n = Int[],
+    p = Int[],
+    q = Int[],
+    cone_types = Vector{String}[],
     status = Symbol[],
     solve_time = Float64[],
     iters = Int[],
@@ -61,41 +63,43 @@ perf = DataFrame(
     x_viol = Float64[],
     y_viol = Float64[],
     z_viol = Float64[],
-    ext_n = Int[],
-    ext_p = Int[],
-    ext_q = Int[],
+    setup_time = Float64[],
+    check_time = Float64[],
+    total_time = Float64[],
     )
 
-all_tests_time = time()
+isnothing(results_path) || CSV.write(results_path, perf)
+time_all = time()
+
+@info("starting CBLIB tests")
 
 @testset "CBLIB tests" begin
-    for (inst_set, extender, time_limit) in instance_sets
-        insts = eval(Symbol(inst_set))
-        isempty(insts) && continue
-        println("\nstarting $(length(insts)) instances for $inst_set with extender $extender\n")
-        solver_options = (default_solver_options..., time_limit = time_limit)
-        for (inst_num, inst) in enumerate(insts)
-            test_info = "$inst_set $extender $inst_num: $inst"
+    for (inst_set, time_limit) in instance_sets
+        inst_subset = eval(Symbol(inst_set))
+        isempty(inst_subset) && continue
+        solver_options = (; default_options..., time_limit = time_limit)
+        println("\nstarting $(length(inst_subset)) instances for $inst_set\n")
+
+        for (inst_num, inst) in enumerate(inst_subset)
+            test_info = "$inst_set $inst_num: $inst"
             @testset "$test_info" begin
                 println(test_info, "...")
-                test_time = @elapsed r = test(inst, extender, solver_options)
-                push!(perf, (
-                    inst_set, inst_num, inst, test_time,
-                    r.status, r.solve_time, r.num_iters, r.primal_obj, r.dual_obj,
-                    r.obj_diff, r.compl, r.x_viol, r.y_viol, r.z_viol,
-                    r.n, r.p, r.q,
-                    ))
-                @printf("... %8.2e seconds\n", test_time)
+                time_inst = @elapsed p = run_cbf(inst, solver_options)
+
+                push!(perf, (inst_set, inst_num, inst, p..., time_inst))
+                isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
+                @printf("... %8.2e seconds\n\n", time_inst)
+                flush(stdout); flush(stderr)
             end
         end
     end
 
-    @printf("\ncblib tests total time: %8.2e seconds\n\n", time() - all_tests_time)
-    show(perf, allrows = true, allcols = true)
+    @printf("\nCBLIB tests total time: %8.2e seconds\n\n", time() - time_all)
+    DataFrames.show(perf, allrows = true, allcols = true)
     println("\n")
-    @show sum(perf[:iters])
+    # @show sum(perf[:iters])
     # show(timer)
-    # println("\n")
+    println("\n")
+    flush(stdout); flush(stderr)
 end
-
 ;
