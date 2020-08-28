@@ -55,25 +55,44 @@ MOI.Utilities.@model(ExpPSDConeOptimizer,
 abstract type ExampleInstanceJuMP{T <: Real} <: ExampleInstance{T} end
 
 # fallback: just check optimal status
-function test_extra(inst::ExampleInstanceJuMP{T}, model::JuMP.Model) where T
+function test_extra(inst::ExampleInstanceJuMP{Float64}, model::JuMP.Model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
-function setup_model(
-    E::Type{<:ExampleInstanceJuMP{Float64}}, # an instance of a JuMP example
+function run_instance(
+    ex_type::Type{<:ExampleInstanceJuMP{Float64}}, # an instance of a JuMP example
     inst_data::Tuple,
     extender = nothing, # MOI.Utilities.@model-defined optimizer with subset of cones if using extended formulation
-    solver_options = (), # additional non-default solver options specific to the example
+    inst_options::NamedTuple = NamedTuple(),
     solver_type = Hypatia.Optimizer;
-    default_solver_options = (), # default solver options
+    default_options::NamedTuple = NamedTuple(),
+    test::Bool = true,
+    )
+    new_options = merge(default_options, inst_options)
+
+    println("setup model")
+    setup_time = @elapsed (model, model_stats) = setup_model(ex_type, inst_data, extender, new_options, solver_type)
+
+    println("solve and check")
+    check_time = @elapsed solve_stats = solve_check(model, test = test)
+
+    return (model_stats..., solve_stats..., setup_time, check_time)
+end
+
+function setup_model(
+    ex_type::Type{<:ExampleInstanceJuMP{Float64}},
+    inst_data::Tuple,
+    extender,
+    solver_options::NamedTuple,
+    solver_type;
     rseed::Int = 1,
     )
     # setup example instance and JuMP model
     Random.seed!(rseed)
-    inst = E(inst_data...)
+    inst = ex_type(inst_data...)
     model = build(inst)
 
-    opt = hyp_opt = (solver_type == Hypatia.Optimizer) ? Hypatia.Optimizer(; default_solver_options..., solver_options...) : Hypatia.Optimizer()
+    opt = hyp_opt = (solver_type == Hypatia.Optimizer) ? Hypatia.Optimizer(; solver_options...) : Hypatia.Optimizer()
     if !isnothing(extender)
         # use MOI automated extended formulation
         opt = MOI.Bridges.full_bridge_optimizer(MOI.Utilities.CachingOptimizer(extender{Float64}(), opt), Float64)
@@ -113,7 +132,7 @@ function setup_model(
         new_model.ext[:eq_refs] = eq_refs
         new_model.ext[:cone_refs] = cone_refs
 
-        opt = solver_type(; default_solver_options..., solver_options...)
+        opt = solver_type(; solver_options...)
         JuMP.set_optimizer(new_model, () -> opt)
         model = new_model
         flush(stdout); flush(stderr)
@@ -143,7 +162,7 @@ function solve_check(
     end
 
     if opt isa Hypatia.Optimizer
-        test && test_extra(model.ext[inst], model)
+        test && test_extra(model.ext[:inst], model)
         flush(stdout); flush(stderr)
         return process_result(opt.model, opt.solver)
     end
