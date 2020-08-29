@@ -292,12 +292,19 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     return cone.hess
 end
 
+function use_correction(cone::WSOSInterpPosSemidefTri)
+    if cone.U < 30
+        return true
+    else
+        return false
+    end
+end
+
 function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where {T}
     if cone.U < 30
         correction1(cone, primal_dir)
     else
-        cone.correction .= 0
-        # correction2(cone, primal_dir)
+        correction2(cone, primal_dir)
     end
 end
 

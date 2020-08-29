@@ -78,12 +78,13 @@ mutable struct WSOSInterpEpiNormInf{T <: Real} <: Cone{T}
                  lambda_1 = Hermitian(P' * Diagonal(point[1:U]) * P)
                  for i in 2:R
                      lambda_i = Hermitian(P' * Diagonal(point[block_idxs(U, i)]) * P)
-                     bar -= logdet((lambda_1 - lambda_i) * (lambda_1 + lambda_i))
+                     bar -= logdet(lambda_1 - lambda_i) + logdet(lambda_1 + lambda_i)
                  end
                  bar += logdet(cholesky(lambda_1)) * (R - 2)
              end
              return bar
         end
+
         cone.barrier = barrier
 
         return cone
