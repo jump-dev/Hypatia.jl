@@ -1,56 +1,13 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
+TODO describe cone
 
 derivatives for quantum relative entropy function adapted from
 "Long-Step Path-Following Algorithm in Quantum Information Theory: Some Numerical Aspects and Applications"
 by L. Faybusovich and C. Zhou
 
-
 TODO
 initial point
 =#
-
-function grad_logm(V_vecs, diff_mat, sdim, side)
-    ret = zeros(sdim, sdim)
-    row_idx = 1
-    for j in 1:side, i in 1:j
-        col_idx = 1
-        for l in 1:side, k in 1:l
-            ret[row_idx, col_idx] += sum(diff_mat[m, n] * (
-                V_vecs[i, m] * V_vecs[k, m] * V_vecs[l, n] * V_vecs[j, n] +
-                V_vecs[j, m] * V_vecs[k, m] * V_vecs[l, n] * V_vecs[i, n] +
-                V_vecs[i, m] * V_vecs[l, m] * V_vecs[k, n] * V_vecs[j, n] +
-                V_vecs[j, m] * V_vecs[l, m] * V_vecs[k, n] * V_vecs[i, n]
-                ) * (m == n ? 1 : 2) * (i == j ? 1 : sqrt(2)) * (k == l ? 1 : sqrt(2)) / 4
-                for m in 1:side for n in 1:m)
-            col_idx += 1
-        end
-        row_idx += 1
-    end
-    return ret
-end
-
-function hess_tr_logm(V_vecs, W_similar, diff_tensor_V, sdim, side)
-    ret = zeros(sdim, sdim)
-    row_idx = 1
-    for j in 1:side, i in 1:j
-        col_idx = 1
-        for l in 1:side, k in 1:l
-            ret[row_idx, col_idx] += sum(
-                (
-                V_vecs[i, m] * V_vecs[j, n] * (V_vecs[k, m] * dot(V_vecs[l, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[l, n] * dot(V_vecs[k, :], W_similar[:, m] .* diff_tensor_V[m, n, :])) +
-                V_vecs[j, m] * V_vecs[i, n] * (V_vecs[k, m] * dot(V_vecs[l, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[l, n] * dot(V_vecs[k, :], W_similar[:, m] .* diff_tensor_V[m, n, :])) +
-                V_vecs[i, m] * V_vecs[j, n] * (V_vecs[l, m] * dot(V_vecs[k, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[k, n] * dot(V_vecs[l, :], W_similar[:, m] .* diff_tensor_V[m, n, :])) +
-                V_vecs[j, m] * V_vecs[i, n] * (V_vecs[l, m] * dot(V_vecs[k, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[k, n] * dot(V_vecs[l, :], W_similar[:, m] .* diff_tensor_V[m, n, :]))
-                ) *
-                (m == n ? 1 : 2) * (i == j ? 1 : sqrt(2)) * (k == l ? 1 : sqrt(2)) / 4
-                for m in 1:side for n in 1:m)
-            col_idx += 1
-        end
-        row_idx += 1
-    end
-    return ret
-end
 
 mutable struct MatrixEpiPerEntropy{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
@@ -326,4 +283,46 @@ function update_hess(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
 
     cone.hess_updated = true
     return cone.hess
+end
+
+function grad_logm(V_vecs, diff_mat, sdim, side)
+    ret = zeros(sdim, sdim)
+    row_idx = 1
+    for j in 1:side, i in 1:j
+        col_idx = 1
+        for l in 1:side, k in 1:l
+            ret[row_idx, col_idx] += sum(diff_mat[m, n] * (
+                V_vecs[i, m] * V_vecs[k, m] * V_vecs[l, n] * V_vecs[j, n] +
+                V_vecs[j, m] * V_vecs[k, m] * V_vecs[l, n] * V_vecs[i, n] +
+                V_vecs[i, m] * V_vecs[l, m] * V_vecs[k, n] * V_vecs[j, n] +
+                V_vecs[j, m] * V_vecs[l, m] * V_vecs[k, n] * V_vecs[i, n]
+                ) * (m == n ? 1 : 2) * (i == j ? 1 : sqrt(2)) * (k == l ? 1 : sqrt(2)) / 4
+                for m in 1:side for n in 1:m)
+            col_idx += 1
+        end
+        row_idx += 1
+    end
+    return ret
+end
+
+function hess_tr_logm(V_vecs, W_similar, diff_tensor_V, sdim, side)
+    ret = zeros(sdim, sdim)
+    row_idx = 1
+    for j in 1:side, i in 1:j
+        col_idx = 1
+        for l in 1:side, k in 1:l
+            ret[row_idx, col_idx] += sum(
+                (
+                V_vecs[i, m] * V_vecs[j, n] * (V_vecs[k, m] * dot(V_vecs[l, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[l, n] * dot(V_vecs[k, :], W_similar[:, m] .* diff_tensor_V[m, n, :])) +
+                V_vecs[j, m] * V_vecs[i, n] * (V_vecs[k, m] * dot(V_vecs[l, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[l, n] * dot(V_vecs[k, :], W_similar[:, m] .* diff_tensor_V[m, n, :])) +
+                V_vecs[i, m] * V_vecs[j, n] * (V_vecs[l, m] * dot(V_vecs[k, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[k, n] * dot(V_vecs[l, :], W_similar[:, m] .* diff_tensor_V[m, n, :])) +
+                V_vecs[j, m] * V_vecs[i, n] * (V_vecs[l, m] * dot(V_vecs[k, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[k, n] * dot(V_vecs[l, :], W_similar[:, m] .* diff_tensor_V[m, n, :]))
+                ) *
+                (m == n ? 1 : 2) * (i == j ? 1 : sqrt(2)) * (k == l ? 1 : sqrt(2)) / 4
+                for m in 1:side for n in 1:m)
+            col_idx += 1
+        end
+        row_idx += 1
+    end
+    return ret
 end
