@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey and contributors
-
 helpers for dense factorizations and linear solves
 =#
 

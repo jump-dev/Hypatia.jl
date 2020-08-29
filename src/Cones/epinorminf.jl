@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 epigraph of L-infinity norm
 (u in R, w in R^n) : u >= norm_inf(w)
 

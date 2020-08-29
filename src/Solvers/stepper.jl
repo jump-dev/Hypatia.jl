@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey and contributors
-
 interior point stepping routines for algorithms based on homogeneous self dual embedding
 =#
 

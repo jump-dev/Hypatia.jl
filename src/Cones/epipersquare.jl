@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 epigraph of perspective of (half) square function (AKA rotated second-order cone)
 (u in R, v in R_+, w in R^n) : u >= v*1/2*norm_2(w/v)^2
 note v*1/2*norm_2(w/v)^2 = 1/2*sum_i(w_i^2)/v

@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 (closure of) hypograph of perspective of sum of logarithms
 (u in R, v in R_+, w in R_+^d) : u <= v*sum(log.(w/v))
 

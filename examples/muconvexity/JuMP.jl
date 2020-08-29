@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 find parameter of convexity mu for a given polynomial p(x)
 ie the largest mu such that p(x) - mu/2*||x||^2 is convex everywhere on given domain
 see https://en.wikipedia.org/wiki/Convex_function#Strongly_convex_functions

@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 regularized matrix regression problems
 
 min 1/(2n) * ||Y - X * A||_fro^2 + lam_fro * ||A||_fro + lam_nuc * ||A||_nuc + lam_lass * ||A||_las + lam_glr * ||A||_glr + lamb_glc * ||A||_glc

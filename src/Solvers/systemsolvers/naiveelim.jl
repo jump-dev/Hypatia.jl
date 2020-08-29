@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 naive+elimination linear system solver
 solves linear system in naive.jl via the following procedure
 

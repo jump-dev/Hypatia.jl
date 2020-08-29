@@ -1,6 +1,5 @@
 name = "Hypatia"
 uuid = "b99e6be6-89ff-11e8-14f8-45c827f4f8f2"
-authors = ["Chris Coey <coey.chris@gmail.com>"]
 repo = "https://github.com/chriscoey/Hypatia.jl.git"
 version = "0.0.0"
 

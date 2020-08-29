@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey and contributors
+see README.md and LICENSE
 =#
 
 module Hypatia

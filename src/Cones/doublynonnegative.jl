@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 smat(w) in S_+^d intersected with w in R_+^(sdim(d))
 
 barrier -logdet(W) - sum(log(W_ij) for i in 1:n, j in 1:(i-1))

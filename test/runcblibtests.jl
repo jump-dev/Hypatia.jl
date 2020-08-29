@@ -1,7 +1,5 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
-run CBLIB instances
+run CBLIB tests
 =#
 
 import DataFrames

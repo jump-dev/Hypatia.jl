@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 list of predefined polynomials and domains from various applications
 see https://people.sc.fsu.edu/~jburkardt/py_src/polynomials/polynomials.html
 =#

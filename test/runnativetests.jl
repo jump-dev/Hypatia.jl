@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey and contributors
-
 run native instance tests from test/nativeinstances.jl and display basic benchmarks
 =#
 

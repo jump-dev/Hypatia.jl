@@ -1,5 +1,5 @@
 #=
-Copyright 2019, Chris Coey and contributors
+run model utilities tests
 =#
 
 include(joinpath(@__DIR__, "modelutilities.jl"))

@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 D-optimal experimental design
 adapted from Boyd and Vandenberghe, "Convex Optimization", section 7.5
   maximize    F(V*diagm(np)*V')

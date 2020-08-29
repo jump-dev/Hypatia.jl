@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 problem 1 (linear_dynamics = true)
 eigenvalue problem related to Lyapunov stability example from sections 2.2.2 / 6.3.2
 "Linear Matrix Inequalities in System and Control Theory" by

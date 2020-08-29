@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 definitions of conic sets not already defined by MathOptInterface
 and functions for converting between Hypatia and MOI cone definitions
 =#
