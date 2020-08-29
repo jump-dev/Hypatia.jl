@@ -18,7 +18,6 @@ function get_worker()
         sleep(1)
     end
     global worker = workers()[end]
-    return nothing
 end
 
 function kill_workers()
@@ -36,6 +35,19 @@ function spawn_setup()
     get_worker()
     @fetchfrom worker @eval using MosekTools
     @fetchfrom worker include(joinpath(examples_dir, "common_JuMP.jl"))
+end
+
+function spawn_reload(ex_name::String)
+    if nprocs() < 2
+        get_worker()
+        @fetchfrom worker begin
+            Base.@eval using MosekTools
+            include(joinpath(examples_dir, "common_JuMP.jl"))
+            include(joinpath(examples_dir, ex_name, "JuMP.jl"))
+            include(joinpath(examples_dir, ex_name, "benchmark.jl"))
+            flush(stdout); flush(stderr)
+        end
+    end
 end
 
 function spawn_step(fun::Function, fun_name::Symbol)
@@ -77,16 +89,6 @@ function spawn_step(fun::Function, fun_name::Symbol)
     end
     flush(stdout); flush(stderr)
 
-    if nprocs() < 2
-        get_worker()
-        @fetchfrom worker begin
-            Base.@eval using MosekTools
-            include(joinpath(examples_dir, "common_JuMP.jl"))
-            include(joinpath(examples_dir, ex_name, "JuMP.jl"))
-            include(joinpath(examples_dir, ex_name, "benchmark.jl"))
-            flush(stdout); flush(stderr)
-        end
-    end
     return (status, output)
 end
 

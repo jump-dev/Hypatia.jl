@@ -19,15 +19,15 @@ results_path = nothing
 
 # options to solvers
 timer = TimerOutputs.TimerOutput()
-tol = 1e-7
+# tol = 1e-7
 default_options = (
     verbose = false,
     # verbose = true,
     iter_limit = 250,
     timer = timer,
-    tol_abs_opt = tol,
-    tol_rel_opt = tol,
-    tol_feas = tol,
+    # tol_abs_opt = tol,
+    # tol_rel_opt = tol,
+    # tol_feas = tol,
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
@@ -35,7 +35,7 @@ instance_sets = [
     ("minimal", Float64, 15),
     # ("minimal", Float32, 15),
     # ("minimal", BigFloat, 15),
-    ("fast", Float64, 15),
+    # ("fast", Float64, 15),
     # ("slow", Float64, 120),
     ]
 
@@ -63,25 +63,25 @@ native_example_names = [
 JuMP_example_names = [
     "centralpolymat",
     "conditionnum",
-    # "contraction", # TODO PolyJuMP error
+    "contraction",
     "densityest",
     "envelope",
     "expdesign",
-    # "lotkavolterra", # TODO PolyJuMP error
+    "lotkavolterra",
     "lyapunovstability",
     "matrixcompletion",
     "matrixquadratic",
     "matrixregression",
     "maxvolume",
-    # "muconvexity", # TODO PolyJuMP error
+    "muconvexity",
     "nearestpsd",
     "polymin",
     "polynorm",
     "portfolio",
-    # "regionofattr", # TODO PolyJuMP error
+    "regionofattr",
     "robustgeomprog",
     "secondorderpoly",
-    # "semidefinitepoly", # TODO PolyJuMP error
+    "semidefinitepoly",
     "shapeconregr",
     "signomialmin",
     "stabilitynumber",
@@ -150,7 +150,7 @@ time_all = time()
     @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)
     DataFrames.show(perf, allrows = true, allcols = true)
     println("\n")
-    # @show sum(perf[:iters])
+    @show sum(perf[:iters])
     show(timer)
     println("\n")
     flush(stdout); flush(stderr)
