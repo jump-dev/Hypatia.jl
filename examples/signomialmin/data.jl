@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 list of predefined signomials and domains from various applications
 
 prefixes:

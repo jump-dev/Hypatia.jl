@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 TODO write proper description of the model
 
 references minimizing the nuclear norm:

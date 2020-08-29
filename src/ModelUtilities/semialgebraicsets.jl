@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 utilities for Hypatia domains and SemialgebraicSets.jl
 =#
 

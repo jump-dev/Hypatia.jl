@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 see description in examples/envelope/native.jl
 =#
 

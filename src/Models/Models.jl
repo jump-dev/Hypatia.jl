@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 functions and types for linear objective conic problems of the form:
 
 primal (over x,s):

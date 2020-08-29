@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 given a sequence of observations X₁,...,Xᵢ with each Xᵢ in Rᵈ,
 find a density function f maximizing the log likelihood of the observations
 (equivalent to maximizing geomean of f.(X))

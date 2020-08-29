@@ -1,7 +1,5 @@
 #=
-Copyright 2019, Chris Coey and contributors
-
-run examples tests from the examples folder and display basic benchmarks
+run examples tests from the examples folder
 =#
 
 import DataFrames

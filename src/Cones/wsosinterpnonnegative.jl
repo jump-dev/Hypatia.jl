@@ -1,7 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-Copyright 2018, David Papp, Sercan Yildiz
-
 interpolation-based weighted-sum-of-squares (multivariate) polynomial cone parametrized by interpolation matrices Ps
 
 definition and dual barrier from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792

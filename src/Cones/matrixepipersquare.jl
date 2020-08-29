@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 matrix epigraph of matrix square
 
 (U, v, W) in (S_+^d1, R_+, R^(d1, d2)) such that 2 * U * v - W * W' in S_+^d1

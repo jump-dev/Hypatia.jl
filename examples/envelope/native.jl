@@ -1,8 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-Copyright 2018, David Papp, Sercan Yildiz
-
-modified from https://github.com/dpapp-github/alfonso/blob/master/polyEnv.m
 formulates and solves the (dual of the) polynomial envelope problem described in the paper:
 D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programming
 available at https://arxiv.org/abs/1712.01792

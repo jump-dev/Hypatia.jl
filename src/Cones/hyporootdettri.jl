@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 hypograph of the root determinant of a (row-wise lower triangle) symmetric positive definite matrix
 (u in R, W in S_n+) : u <= det(W)^(1/n)
 

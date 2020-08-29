@@ -1,5 +1,5 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
+run subset of tests
 =#
 
 using Test

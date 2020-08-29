@@ -1,5 +1,5 @@
 #=
-Copyright 2019, Chris Coey and contributors
+run MOI tests
 =#
 
 # MOI wrapper Hypatia cone tests

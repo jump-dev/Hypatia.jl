@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 epigraph of Euclidean (2-)norm (AKA second-order cone)
 (u in R, w in R^n) : u >= norm_2(w)
 
