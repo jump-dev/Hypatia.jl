@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 QR+Cholesky linear system solver
 requires precomputed QR factorization of A'
 

@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 strengthening of the theta function towards the stability number of a graph
 
 TODO add sparse PSD formulation

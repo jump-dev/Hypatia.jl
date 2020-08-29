@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 check a sufficient condition for pointwise membership of vector valued polynomials in the second order cone
 =#
 

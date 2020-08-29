@@ -1,16 +1,5 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-Copyright 2018, David Papp, Sercan Yildiz
-
-utilities for interpolation on canonical domains
-
-modified/inspired from files in https://github.com/dpapp-github/alfonso/
-- https://github.com/dpapp-github/alfonso/blob/master/ChebInterval.m
-- https://github.com/dpapp-github/alfonso/blob/master/PaduaSquare.m
-- https://github.com/dpapp-github/alfonso/blob/master/FeketeCube.m
-and Matlab files in the packages
-- Chebfun http://www.chebfun.org/
-- Padua2DM by M. Caliari, S. De Marchi, A. Sommariva, and M. Vianello http://profs.sci.univr.it/~caliari/software.htm
+utilities for polynomial interpolation on canonical domains
 =#
 
 sampling_region(dom::SemiFreeDomain) = dom.restricted_halfregion

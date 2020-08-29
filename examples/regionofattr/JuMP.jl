@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 univariate cubic dynamical system
 example taken from "Convex computation of the region of attraction of polynomial control systems" by D. Henrion and M. Korda
 =#

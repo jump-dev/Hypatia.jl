@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 utilities for constructing Hypatia native models and PolyJuMP.jl models
 =#
 

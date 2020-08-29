@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 MOI.Test linear and conic tests
 =#
 

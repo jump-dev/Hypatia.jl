@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 for variables X in R^{n, m} and Y in S^n:
     max tr(C*X) :
     Y - X*X' in S^n_+

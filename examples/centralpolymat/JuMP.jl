@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 compute a gram matrix of a polynomial, minimizing its log-determinant or root-determinant (equivalent optimal solutions with different optimal objective values)
 =#
 

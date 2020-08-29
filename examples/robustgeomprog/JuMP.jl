@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 robust geometric programming problem
 given a convex set C in R_+^k (described by conic constraints) and a matrix B in R^{k, n}, calculate
     f(C, B) = sup_{c in C} (inf_{x in R^n, z in R_+^k} c'*z : B_i*x <= log(z_i), i = 1..k)

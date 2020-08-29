@@ -1,5 +1,5 @@
 #=
-Copyright 2019, Chris Coey and contributors
+run barrier tests
 =#
 
 include(joinpath(@__DIR__, "barrier.jl"))

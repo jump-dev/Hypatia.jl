@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 let E be a symmetric matrix sparsity pattern:
 (1) find sparse PSD matrix with given sparsity pattern, "nearest" to A
     max_X tr(A, X) :

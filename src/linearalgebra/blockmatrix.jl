@@ -1,5 +1,5 @@
 #=
-Copyright 2019, Chris Coey and contributors
+TODO possibly use LinearMaps.jl instead
 =#
 
 import LinearAlgebra.mul!

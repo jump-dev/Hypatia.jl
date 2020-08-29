@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 functions and caches for cones
 =#
 

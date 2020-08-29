@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 epigraph of matrix spectral norm (operator norm associated with standard Euclidean norm; i.e. maximum singular value)
 (u in R, W in R^{n,m}) : u >= opnorm(W)
 note n <= m is enforced WLOG since opnorm(W) = opnorm(W')

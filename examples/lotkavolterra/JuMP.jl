@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 TODO
 - reference paper for model
 - add options to use standard PSD cone formulation vs interpolation-based WSOS cone formulation

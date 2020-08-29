@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 interpolation-based weighted-sum-of-squares (multivariate) polynomial epinormeucl (AKA second-order cone) parametrized by interpolation matrices Ps
 certifies that u(x)^2 <= sum(w_i(x)^2) for all x in the domain described by input Ps
 u(x), w_1(x), ...,  w_R(x) are polynomials with U coefficients

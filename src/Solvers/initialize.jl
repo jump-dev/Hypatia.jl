@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey and contributors
-
 preprocessing and initial point finding functions for interior point algorithms
 =#
 

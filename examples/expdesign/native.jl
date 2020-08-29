@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 see description in examples/expdesign/JuMP.jl
 
 TODO describe options

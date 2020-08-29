@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 MathOptInterface wrapper of Hypatia solver
 
 TODO generalize all code for T <: Real

@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 (closure of) hypograph of perspective of (natural) log of determinant of a (row-wise lower triangle) symmetric positive define matrix
 (u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
 (see equivalent MathOptInterface LogDetConeTriangle definition)

@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 polymin real: formulates and solves the real polynomial optimization problem for a given polynomial; see:
 D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programming.
 

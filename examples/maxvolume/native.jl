@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 find maximum volume hypercube with edges parallel to the axes inside a polyhedron
 =#
 

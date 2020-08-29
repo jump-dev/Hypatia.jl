@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 symmetric-indefinite linear system solver
 solves linear system in naive.jl by first eliminating s and kap via the method in naiveelim.jl and then eliminating tau via a procedure similar to that described by S7.4 of
 http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf
