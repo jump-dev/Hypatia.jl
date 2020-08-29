@@ -1,8 +1,8 @@
 #=
 for variables X in R^{n, m} and Y in S^n:
-    max tr(C*X) :
-    Y - X*X' in S^n_+
-    Y_ij = P_ij for (i, j) in Omega
+maximize    tr(C*X) :
+subject to  Y - X*X' in S^n_+
+            Y_ij = P_ij for (i, j) in Omega
 where Omega is a set of fixed indices and P is a random PSD matrix
 
 the nonlinear constraint Y - X*X' in S^n_+ is equivalent to
