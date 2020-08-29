@@ -7,7 +7,7 @@ Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import PolyJuMP
-import MultivariateBases: FixedPolynomialBasis
+const MB = PolyJuMP.MultivariateBases
 import SumOfSquares
 
 struct ContractionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -34,7 +34,7 @@ function build(inst::ContractionJuMP{T}) where {T <: Float64} # TODO generic rea
     dynamics = [dx1dt; dx2dt]
 
     model = JuMP.Model()
-    JuMP.@variable(model, polys[1:3], PolyJuMP.Poly(FixedPolynomialBasis(lagrange_polys)))
+    JuMP.@variable(model, polys[1:3], PolyJuMP.Poly(MB.FixedPolynomialBasis(lagrange_polys)))
 
     M = [polys[1] polys[2]; polys[2] polys[3]]
     dMdt = [JuMP.dot(DP.differentiate(M[i, j], x), dynamics) for i in 1:n, j in 1:n]
