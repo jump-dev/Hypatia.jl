@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 contraction analysis example adapted from
 "Stability and robustness analysis of nonlinear systems via contraction metrics and SOS programming"
 Aylward, E.M., Parrilo, P.A. and Slotine, J.J.E

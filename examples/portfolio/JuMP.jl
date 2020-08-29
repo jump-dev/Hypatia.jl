@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 see description in native.jl
 =#
 

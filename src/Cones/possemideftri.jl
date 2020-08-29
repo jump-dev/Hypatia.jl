@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 row-wise lower triangle of positive semidefinite matrix cone (scaled "svec" form)
 W \in S^n : 0 >= eigmin(W)
 

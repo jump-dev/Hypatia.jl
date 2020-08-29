@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 interpolation-based weighted-sum-of-squares (multivariate) polynomial positive semidefinite cone parametrized by interpolation matrices Ps
 certifies that a polynomial valued R x R matrix is in the positive semidefinite cone for all x in the domain defined by Ps
 

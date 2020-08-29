@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 svec-scaled sparse positive semidefinite matrix cone
 mat(w) PSD
 

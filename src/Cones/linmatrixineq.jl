@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 TODO
 - write description
 - assumes first A matrix is PSD (eg identity)

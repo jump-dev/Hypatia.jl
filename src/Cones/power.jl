@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 generalized power cone parametrized by alpha in R_++^n in unit simplex interior
 (u in R_++^m, w in R^n) : prod_i(u_i^alpha_i) => norm_2(w)
 where sum_i(alpha_i) = 1, alpha_i > 0

@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 test whether a given matrix has a SOS decomposition,
 and use this procedure to check whether a polynomial is globally convex
 =#

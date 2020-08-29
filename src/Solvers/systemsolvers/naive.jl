@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 naive linear system solver
 
 6x6 nonsymmetric system in (x, y, z, tau, s, kap):

@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 given data (xᵢ, yᵢ), find a polynomial p to solve
     min ∑ᵢℓ(p(xᵢ), yᵢ)
     ρⱼ × dᵏp/dtⱼᵏ ≥ 0 ∀ t ∈ D
