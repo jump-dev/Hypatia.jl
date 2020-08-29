@@ -208,7 +208,10 @@ is_dual_feas(cone::MatrixEpiPerEntropy) = true
 #         W_vals = eigvals(W)
 #         # return isposdef(u * (I + log(V / u)) + W)
 #         # return isposdef(u * (I + log(V) - I * log(u)) + W)
-#         return all(u * (1 + log(vi / u)) + wi > eps(T) for (vi, wi) in zip(V_vals, W_vals))
+#         # return all(u * (1 + log(vi / u)) + wi > eps(T) for (vi, wi) in zip(V_vals, W_vals))
+#         return u * cone.side * (1 - log(u)) + u * logdet(V) > -minimum(W_vals)
+#         # return u * sum(1 + log(vi / u) for vi in V_vals) + sum(W_vals) > eps(T)
+#         # return all(u * (1 + log(vi / u)) + sum(W_vals) > eps(T) for vi in V_vals)
 #     end
 #     return false
 # end
