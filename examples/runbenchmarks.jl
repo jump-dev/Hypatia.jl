@@ -26,9 +26,9 @@ spawn_runs = true
 # spawn_runs = false
 
 free_memory_limit = 16 * 2^30 # keep at least X GB of RAM available
-optimizer_time_limit = 30
+optimizer_time_limit = 1800
 solve_time_limit = 1.2 * optimizer_time_limit
-setup_time_limit = optimizer_time_limit / 2
+setup_time_limit = optimizer_time_limit
 
 num_threads = Threads.nthreads()
 blas_num_threads = LinearAlgebra.BLAS.get_num_threads()
@@ -141,7 +141,11 @@ for ex_name in JuMP_example_names
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
                 @printf("... %8.2e seconds\n\n", time_inst)
                 flush(stdout); flush(stderr)
-                is_killed && break
+
+                if is_killed
+                    spawn_runs && spawn_reload(ex_name)
+                    break
+                end
             end
         end
     end
