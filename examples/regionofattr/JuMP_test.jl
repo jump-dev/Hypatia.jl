@@ -1,16 +1,16 @@
 
-relaxed_tols = (tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-6)
+# NOTE an extender is needed if use_wsos = false
 insts = Dict()
 insts["minimal"] = [
     ((4, true),),
-    ((4, false), nothing, relaxed_tols),
+    ((4, false), StandardConeOptimizer),
     ]
 insts["fast"] = [
     ((6, true),),
-    ((6, false),),
+    ((6, false), StandardConeOptimizer),
     ((8, true),),
     ]
 insts["slow"] = [
-    ((8, false),),
+    ((8, false), StandardConeOptimizer),
     ]
 return (RegionOfAttrJuMP, insts)

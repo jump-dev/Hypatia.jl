@@ -94,6 +94,10 @@ function setup_model(
     if !isnothing(extender)
         # use MOI automated extended formulation
         opt = MOI.Bridges.full_bridge_optimizer(MOI.Utilities.CachingOptimizer(extender{Float64}(), opt), Float64)
+        # for PolyJuMP/SumOfSquares models
+        for B in model.bridge_types
+            MOI.Bridges.add_bridge(opt, B{Float64})
+        end
     end
     backend = JuMP.backend(model)
     MOI.Utilities.reset_optimizer(backend, opt)
