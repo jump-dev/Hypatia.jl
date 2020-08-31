@@ -59,10 +59,6 @@ function test_recover_lagrange_polys(T::Type{<:Real})
 
     for n in 1:3, sample in [true, false]
         halfdeg = 2
-        if T == BigFloat
-            @test_broken MU.interpolate(MU.FreeDomain{T}(n), halfdeg, sample = sample, calc_w = true)
-            continue
-        end
 
         (U, pts, Ps, V, w) = MU.interpolate(MU.FreeDomain{T}(n), halfdeg, sample = sample, calc_V = true, calc_w = true)
         DynamicPolynomials.@polyvar x[1:n]
