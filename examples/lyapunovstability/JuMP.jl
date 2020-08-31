@@ -3,18 +3,18 @@ problem 1 (linear_dynamics = true)
 eigenvalue problem related to Lyapunov stability example from sections 2.2.2 / 6.3.2
 "Linear Matrix Inequalities in System and Control Theory" by
 S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan:
-min t
-P in S_+
-[-A'*P - P*A - C'C, P*B;
-B'*P, tI] in S_+
+minimize    t
+subject to  P in S_+
+            [-A'*P - P*A - C'C, P*B;
+            B'*P, tI] in S_+
 for the system with linear dynamics x_dot = A*x
 
 problem 2 (linear_dynamics = false)
 Lyapunov stability example from https://stanford.edu/class/ee363/sessions/s4notes.pdf:
-min t
-P - I in S_+
-[-A'*P - P*A - alpha*P - t*gamma^2*I, -P;
--P, tI] in S_+
+minimize    t
+subject to  P - I in S_+
+            [-A'*P - P*A - alpha*P - t*gamma^2*I, -P;
+            -P, tI] in S_+
 originally a feasibility problem, a feasible P and t prove the existence of a Lyapunov function
 for the system x_dot = A*x+g(x), norm(g(x)) <= gamma*norm(x)
 =#

@@ -1,12 +1,12 @@
 
 insts = Dict()
 insts["minimal"] = [
-    ((2,),),
+    ((3,), StandardConeOptimizer),
     ]
 insts["fast"] = [
-    ((4,),),
+    ((4,), StandardConeOptimizer),
     ]
 insts["slow"] = [
-    ((6,),),
+    ((6,), StandardConeOptimizer),
     ]
 return (LotkaVolterraJuMP, insts)

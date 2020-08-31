@@ -2,9 +2,9 @@
 given a sequence of observations X₁,...,Xᵢ with each Xᵢ in Rᵈ,
 find a density function f maximizing the log likelihood of the observations
 (equivalent to maximizing geomean of f.(X))
-    max (prod_i f(Xᵢ))^(1/n)
-    ∫f = 1
-    f ≥ 0
+maximize    (prod_i f(Xᵢ))^(1/n)
+subject to  ∫f = 1
+            f ≥ 0
 =#
 
 import DelimitedFiles

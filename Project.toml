@@ -31,10 +31,11 @@ CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+GSL = "92c85e6c-cbff-5e0c-80f7-495c94daaecd"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 PolyJuMP = "ddf597a6-d67e-5340-b84c-e37d84115374"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SumOfSquares = "4b9e565b-77fc-50a5-a571-1244f986bda1"
 
 [targets]
-test = ["CSV", "DataFrames", "DataStructures", "ForwardDiff", "JuMP", "PolyJuMP", "Random", "SumOfSquares"]
+test = ["CSV", "DataFrames", "DataStructures", "ForwardDiff", "GSL", "JuMP", "PolyJuMP", "Random", "SumOfSquares"]

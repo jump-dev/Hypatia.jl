@@ -1,7 +1,5 @@
 #=
 see description in examples/expdesign/JuMP.jl
-
-TODO describe options
 =#
 
 struct ExpDesignNative{T <: Real} <: ExampleInstanceNative{T}
@@ -12,9 +10,9 @@ struct ExpDesignNative{T <: Real} <: ExampleInstanceNative{T}
     logdet_obj::Bool
     rootdet_obj::Bool
     geomean_obj::Bool
-    use_logdet::Bool
-    use_rootdet::Bool
-    use_epinorminf::Bool
+    use_logdet::Bool # use logdet cone, else use extended formulation
+    use_rootdet::Bool # use rootdet cone, else use extended formulation
+    use_epinorminf::Bool # use infinity norm cone, else use extended formulation
 end
 
 function build(inst::ExpDesignNative{T}) where {T <: Real}

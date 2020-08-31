@@ -59,10 +59,6 @@ function test_recover_lagrange_polys(T::Type{<:Real})
 
     for n in 1:3, sample in [true, false]
         halfdeg = 2
-        if T == BigFloat
-            @test_broken MU.interpolate(MU.FreeDomain{T}(n), halfdeg, sample = sample, calc_w = true)
-            continue
-        end
 
         (U, pts, Ps, V, w) = MU.interpolate(MU.FreeDomain{T}(n), halfdeg, sample = sample, calc_V = true, calc_w = true)
         DynamicPolynomials.@polyvar x[1:n]
@@ -73,6 +69,13 @@ function test_recover_lagrange_polys(T::Type{<:Real})
         @test sum(lagrange_polys) ≈ 1
         @test sum(w[i] * lagrange_polys[j](pts[i, :]) for j in 1:U, i in 1:U) ≈ sum(w) atol=tol rtol=tol
         @test sum(w) ≈ 2^n
+    end
+end
+
+function test_cheb2_w(T::Type{<:Real})
+    for halfdeg in 1:4
+        (U, pts, Ps, V, w) = MU.interpolate(MU.FreeDomain{T}(1), halfdeg, sample = false, calc_w = true)
+        @test dot(w, [sum(pts[i, 1] ^ d for d in 0:(2halfdeg)) for i in 1:U]) ≈ sum(2 / (i + 1) for i in 0:2:(2halfdeg))
     end
 end
 
