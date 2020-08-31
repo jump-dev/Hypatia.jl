@@ -13,8 +13,8 @@ problem 2 (linear_dynamics = false)
 Lyapunov stability example from https://stanford.edu/class/ee363/sessions/s4notes.pdf:
 minimize    t
 subject to  P - I in S_+
-           [-A'*P - P*A - alpha*P - t*gamma^2*I, -P;
-           -P, tI] in S_+
+            [-A'*P - P*A - alpha*P - t*gamma^2*I, -P;
+            -P, tI] in S_+
 originally a feasibility problem, a feasible P and t prove the existence of a Lyapunov function
 for the system x_dot = A*x+g(x), norm(g(x)) <= gamma*norm(x)
 =#
