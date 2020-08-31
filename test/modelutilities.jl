@@ -79,7 +79,6 @@ function test_cheb2_w(T::Type{<:Real})
     end
 end
 
-
 function test_recover_cheb_polys(T::Type{<:Real})
     DynamicPolynomials.@polyvar x[1:2]
     halfdeg = 2
