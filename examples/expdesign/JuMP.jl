@@ -1,9 +1,9 @@
 #=
 D-optimal experimental design
 adapted from Boyd and Vandenberghe, "Convex Optimization", section 7.5
-  maximize    F(V*diagm(np)*V')
-  subject to  sum(np) == n
-              0 .<= np .<= n_max
+maximize    F(V*diagm(np)*V')
+subject to  sum(np) == n
+            0 .<= np .<= n_max
 where np is a vector of variables representing the number of experiment p to run (fractional),
 and the columns of V are the vectors representing each experiment
 

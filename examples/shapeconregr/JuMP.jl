@@ -1,7 +1,7 @@
 #=
 given data (xᵢ, yᵢ), find a polynomial p to solve
-    min ∑ᵢℓ(p(xᵢ), yᵢ)
-    ρⱼ × dᵏp/dtⱼᵏ ≥ 0 ∀ t ∈ D
+minimize    ∑ᵢℓ(p(xᵢ), yᵢ)
+subject to  ρⱼ × dᵏp/dtⱼᵏ ≥ 0 ∀ t ∈ D
 where
     - dᵏp/dtⱼᵏ is the kᵗʰ derivative of p in direction j,
     - ρⱼ determines the desired sign of the derivative,

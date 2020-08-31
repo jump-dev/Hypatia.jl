@@ -116,7 +116,7 @@ function interpolate(
                 end
             end
         end
-        return wsos_sample_params(dom, d, calc_V, calc_w, sample_factor)
+        return wsos_sample_params(dom, d, calc_w, sample_factor)
     else
         return wsos_box_params(sampling_region(dom), n, d, calc_V, calc_w)
     end
@@ -165,7 +165,7 @@ function wsos_box_params(T::Type{<:Real}, n::Int, d::Int, calc_V::Bool, calc_w::
     elseif n == 2
         return padua_data(T, d, calc_V, calc_w) # or approxfekete_data(n, d)
     elseif n > 2
-        return approxfekete_data(T, n, d, calc_V, calc_w)
+        return approxfekete_data(T, n, d, calc_w)
     end
 end
 
@@ -226,9 +226,10 @@ function cheb2_data(
 
     # Chebyshev points for degree 2d
     pts = reshape(cheb2_pts(T, U), :, 1)
+    is_blas_real = (T <: LinearAlgebra.BlasReal)
 
     # evaluations
-    if calc_V
+    if calc_V || (calc_w && !is_blas_real)
         V = make_chebyshev_vandermonde(pts, 2d)
         P0 = V[:, 1:L]
     else
@@ -239,11 +240,20 @@ function cheb2_data(
 
     # weights for Clenshaw-Curtis quadrature at pts
     if calc_w
-        wa = T[2 / T(1 - j^2) for j in 0:2:(U - 1)]
-        append!(wa, wa[div(U, 2):-1:2])
-        w = real.(FFTW.ifft(wa))
-        w[1] /= 2
-        push!(w, w[1])
+        if is_blas_real
+            wa = T[2 / T(1 - j^2) for j in 0:2:(U - 1)]
+            append!(wa, wa[div(U, 2):-1:2])
+            w = real.(FFTW.ifft(wa))
+            w[1] /= 2
+            push!(w, w[1])
+        else
+            m = zeros(T, U)
+            for j in 0:2:(U - 1)
+                m[j + 1] = 2 / T(1 - j^2)
+            end
+            F = qr!(Array(V'), Val(true))
+            w = F \ m
+        end
     else
         w = T[]
     end
@@ -325,7 +335,6 @@ function approxfekete_data(
     T::Type{<:Real},
     n::Int,
     d::Int,
-    calc_V::Bool,
     calc_w::Bool,
     )
     @assert d > 0
@@ -354,7 +363,7 @@ function approxfekete_data(
     end
 
     dom = Box{T}(-ones(T, n), ones(T, n))
-    (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, candidate_pts, d, calc_V, calc_w)
+    (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, candidate_pts, d, calc_w)
 
     return (size(pts, 1), pts, P0, P0sub, V, w)
 end
@@ -364,11 +373,10 @@ function make_wsos_arrays(
     dom::Domain{T},
     candidate_pts::Matrix{T},
     d::Int,
-    calc_V::Bool,
     calc_w::Bool,
     ) where {T <: Real}
     n = size(candidate_pts, 2)
-    (V, keep_pts, w) = choose_interp_pts(candidate_pts, d, calc_V, calc_w)
+    (V, keep_pts, w) = choose_interp_pts(candidate_pts, d, calc_w)
     pts = candidate_pts[keep_pts, :]
     P0 = V[:, 1:get_L(n, d)] # subset of polynomial evaluations up to total degree d
     Lsub = get_L(n, div(2d - get_degree(dom), 2))
@@ -380,13 +388,12 @@ end
 function wsos_sample_params(
     dom::Domain,
     d::Int,
-    calc_V::Bool,
     calc_w::Bool,
     sample_factor::Int,
     )
     U = get_U(get_dimension(dom), d)
     candidate_pts = interp_sample(dom, U * sample_factor)
-    (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, candidate_pts, d, calc_V, calc_w)
+    (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, candidate_pts, d, calc_w)
     g = get_weights(dom, pts)
     PWts = [sqrt.(gi) .* P0sub for gi in g]
     return (U = U, pts = pts, Ps = [P0, PWts...], V = V, w = w)
@@ -398,7 +405,6 @@ n_deg_exponents(n::Int, deg::Int) = [xp for t in 0:deg for xp in Combinatorics.m
 function choose_interp_pts(
     candidate_pts::Matrix{T},
     d::Int,
-    calc_V::Bool,
     calc_w::Bool,
     ) where {T <: Real}
     n = size(candidate_pts, 2)
