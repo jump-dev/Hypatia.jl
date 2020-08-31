@@ -226,7 +226,7 @@ function cheb2_data(
 
     # Chebyshev points for degree 2d
     pts = reshape(cheb2_pts(T, U), :, 1)
-    is_blas_real = T isa LinearAlgebra.BlasReal
+    is_blas_real = (T <: LinearAlgebra.BlasReal)
 
     # evaluations
     if calc_V || (calc_w && !is_blas_real)
@@ -249,12 +249,10 @@ function cheb2_data(
         else
             m = zeros(T, U)
             for j in 0:2:(U - 1)
-                # m[j + 1] = 2 / T(1 - j^2)
-                m[j + 1] = 2 / T(1 + j)
+                m[j + 1] = 2 / T(1 - j^2)
             end
             F = qr!(Array(V'), Val(true))
-            Qtm = F.Q' * m
-            w = UpperTriangular(F.R[:, 1:U]) \ Qtm
+            w = F \ m
         end
     else
         w = T[]

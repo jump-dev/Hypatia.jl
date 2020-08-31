@@ -72,6 +72,14 @@ function test_recover_lagrange_polys(T::Type{<:Real})
     end
 end
 
+function test_cheb2_w(T::Type{<:Real})
+    for halfdeg in 1:4
+        (U, pts, Ps, V, w) = MU.interpolate(MU.FreeDomain{T}(1), halfdeg, sample = false, calc_w = true)
+        @test dot(w, [sum(pts[i, 1] ^ d for d in 0:(2halfdeg)) for i in 1:U]) ≈ sum(2 / (i + 1) for i in 0:2:(2halfdeg))
+    end
+end
+
+
 function test_recover_cheb_polys(T::Type{<:Real})
     DynamicPolynomials.@polyvar x[1:2]
     halfdeg = 2
