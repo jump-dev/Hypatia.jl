@@ -127,6 +127,7 @@ is_dual_feas(cone::WSOSInterpNonnegative) = true
 # TODO can be done in parallel
 # TODO may be faster (but less numerically stable) with explicit inverse here
 function update_grad(cone::WSOSInterpNonnegative)
+    @timeit cone.timer "grad" begin
     @assert cone.is_feas
 
     cone.grad .= 0
@@ -139,10 +140,12 @@ function update_grad(cone::WSOSInterpNonnegative)
     end
 
     cone.grad_updated = true
+    end #time
     return cone.grad
 end
 
 function update_hess(cone::WSOSInterpNonnegative)
+    @timeit cone.timer "hess" begin
     @assert cone.grad_updated
 
     cone.hess .= 0
@@ -155,6 +158,7 @@ function update_hess(cone::WSOSInterpNonnegative)
     end
 
     cone.hess_updated = true
+    end #time
     return cone.hess
 end
 

@@ -86,7 +86,7 @@ function solve_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solver{T}
 
         if !isempty(system_solver.Q2div)
             mul!(system_solver.GQ1x, system_solver.GQ1, y)
-            block_hess_prod.(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k)
+            @timeit solver.timer "bhp" block_hess_prod.(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k)
             mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
         end
     end
@@ -254,8 +254,8 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
         for k in inv_hess_cones
             arr_k = system_solver.GQ2_k[k]
             prod_k = system_solver.HGQ2_k[k]
-            Cones.inv_hess_prod!(prod_k, arr_k, model.cones[k])
-            mul!(lhs, arr_k', prod_k, true, true)
+            @timeit solver.timer "inv_hess_prod" Cones.inv_hess_prod!(prod_k, arr_k, model.cones[k])
+            @timeit solver.timer "mul" mul!(lhs, arr_k', prod_k, true, true)
         end
 
         # do hess and hess_sqrt cones
@@ -306,7 +306,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
     const_sol[system_solver.y_rows] = model.b
     @views const_sol_z = const_sol[system_solver.z_rows]
     for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
-        @views block_hess_prod(cone_k, const_sol_z[idxs_k], model.h[idxs_k])
+        @timeit solver.timer "bhp" @views block_hess_prod(cone_k, const_sol_z[idxs_k], model.h[idxs_k])
     end
     solve_subsystem(system_solver, solver, const_sol)
 

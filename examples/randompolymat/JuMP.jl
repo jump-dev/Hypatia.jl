@@ -34,6 +34,8 @@ function build(inst::RandomPolyMatJuMP{T}) where {T <: Float64} # TODO generic r
     JuMP.@variable(model, q_poly[1:(U * svec_dim)])
     JuMP.@variable(model, t)
     JuMP.@constraint(model, vcat(t, q_poly) in JuMP.SecondOrderCone())
+    # JuMP.@constraint(model, vcat(t, q_poly) in JuMP.MOI.NormOneCone(U + 1))
+    # JuMP.@constraint(model, vcat(t, q_poly) in JuMP.MOI.NormInfinityCone(U + 1))
 
     full_mat = [randn(U) for _ in 1:R, _ in 1:R]
     for j in 1:R, i in 1:j

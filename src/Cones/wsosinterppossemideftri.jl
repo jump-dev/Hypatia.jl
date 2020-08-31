@@ -186,6 +186,7 @@ end
 is_dual_feas(cone::WSOSInterpPosSemidefTri) = true
 
 function update_grad(cone::WSOSInterpPosSemidefTri)
+    @timeit cone.timer "grad" begin
     @assert is_feas(cone)
     U = cone.U
     R = cone.R
@@ -242,6 +243,7 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
     end
 
     cone.grad_updated = true
+    end #time
     return cone.grad
 end
 
@@ -258,6 +260,7 @@ function update_blocks_R(cone::WSOSInterpPosSemidefTri)
 end
 
 function update_hess(cone::WSOSInterpPosSemidefTri)
+    @timeit cone.timer "hess" begin
     @assert cone.grad_updated
     R = cone.R
     U = cone.U
@@ -289,6 +292,7 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     end
 
     cone.hess_updated = true
+    end #time
     return cone.hess
 end
 
