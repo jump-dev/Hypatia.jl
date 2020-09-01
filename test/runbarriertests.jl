@@ -15,7 +15,7 @@ barrier_testfuns = [
     test_hypogeomean_barrier,
     test_hypopowermean_barrier,
     test_epinormspectral_barrier,
-    test_linmatrixineq_barrier, # TODO experiencing ForwardDiff failures?
+    test_linmatrixineq_barrier,
     test_possemideftri_barrier,
     test_possemideftrisparse_barrier,
     test_doublynonnegative_barrier,
