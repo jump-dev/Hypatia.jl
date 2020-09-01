@@ -286,8 +286,7 @@ function test_linmatrixineq_barrier(T::Type{<:Real})
             Ai = rand(Rs[i], side, side)
             As[i] = Hermitian(Ai + Ai', :U)
         end
-        # to use cholesky (not in place) need to extend Base.ldexp(x::T, e::Integer) where {T <: ForwardDiff.Dual}
-        barrier(s) = -(logdet(cholesky!(Hermitian(copy(sum(s_i * A_i for (s_i, A_i) in zip(s, As))), :U))))
+        barrier(s) = -logdet(cholesky!(Hermitian(sum(s_i * A_i for (s_i, A_i) in zip(s, As)), :U)))
         test_barrier_oracles(CO.LinMatrixIneq{T}(As), barrier, init_tol = Inf)
     end
     return
