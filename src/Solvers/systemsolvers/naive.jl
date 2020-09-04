@@ -206,7 +206,7 @@ function update_lhs(system_solver::NaiveSparseSystemSolver, solver::Solver)
             @views copyto!(system_solver.lhs6.nzval[system_solver.hess_idxs[k][j]], H_k[nz_rows, j])
         end
     end
-    system_solver.lhs6.nzval[system_solver.mtt_idx] = solver.mu / solver.tau / solver.tau # NOTE: mismatch when using NT for kaptau
+    system_solver.lhs6.nzval[system_solver.mtt_idx] = solver.mu / solver.point.tau / solver.point.tau # NOTE: mismatch when using NT for kaptau
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs6)
 
@@ -272,7 +272,7 @@ function update_lhs(system_solver::NaiveDenseSystemSolver, solver::Solver)
     for (cone_k, lhs6_H_k) in zip(solver.model.cones, system_solver.lhs6_H_k)
         copyto!(lhs6_H_k, Cones.hess(cone_k))
     end
-    system_solver.lhs6[end, system_solver.tau_row] = solver.mu / solver.tau / solver.tau # NOTE: mismatch when using NT for kaptau
+    system_solver.lhs6[end, system_solver.tau_row] = solver.mu / solver.point.tau[1] / solver.point.tau[1] # NOTE: mismatch when using NT for kaptau
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs6)
 
@@ -282,11 +282,11 @@ end
 function solve_system(
     system_solver::NaiveDenseSystemSolver,
     solver::Solver,
-    sol::Vector{T},
-    rhs::Vector{T},
+    sol::Point{T},
+    rhs::Point{T},
     ::T,
     ) where {T <: Real}
-    copyto!(sol, rhs)
-    inv_prod(system_solver.fact_cache, sol)
+    copyto!(sol.vec, rhs.vec)
+    inv_prod(system_solver.fact_cache, sol.vec)
     return sol
 end

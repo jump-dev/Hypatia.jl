@@ -26,6 +26,8 @@ import Hypatia.DensePosDefCache
 import Hypatia.load_matrix
 import Hypatia.invert
 
+include("point.jl")
+
 default_tol(::Type{T}) where {T <: Real} = sqrt(eps(T))
 default_tol(::Type{BigFloat}) = eps(BigFloat) ^ 0.4
 
@@ -74,9 +76,7 @@ mutable struct Solver{T <: Real}
     reduce_row_piv_inv
 
     # current iterate
-    point::Models.Point{T}
-    tau::T
-    kap::T
+    point::Point{T}
     mu::T
 
     # residuals
@@ -133,7 +133,8 @@ mutable struct Solver{T <: Real}
         init_tol_qr::Real = 1000 * eps(T),
         init_use_fallback::Bool = true,
         max_nbhd::Real = Cones.default_max_neighborhood(), # TODO cleanup - only for taukap, maybe use full name
-        stepper::Stepper{T} = CombinedStepper{T}(),
+        stepper::Stepper{T} = HeurCombStepper{T}(),
+        # stepper::Stepper{T} = PredOrCorrStepper{T}(),
         system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         timer::TimerOutput = TimerOutput(),
         ) where {T <: Real}
@@ -199,27 +200,33 @@ function solve(solver::Solver{T}) where {T <: Real}
         orig_model = solver.orig_model
         model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
 
-        @timeit solver.timer "init_cone" point = solver.point = initialize_cone_point(solver.orig_model.cones, solver.orig_model.cone_idxs, solver.timer)
+        @timeit solver.timer "init_cone" (init_z, init_s) = initialize_cone_point(solver.orig_model, solver.timer)
 
         solver.rescale && rescale_data(solver)
 
         if solver.reduce
             # TODO don't find point / unnecessary stuff before reduce
-            @timeit solver.timer "remove_prim_eq" point.y = find_initial_y(solver, true)
-            @timeit solver.timer "preproc_init_x" point.x = find_initial_x(solver)
+            @timeit solver.timer "remove_prim_eq" init_y = find_initial_y(solver, init_s, true)
+            @timeit solver.timer "preproc_init_x" init_x = find_initial_x(solver, init_z)
         else
-            @timeit solver.timer "preproc_init_x" point.x = find_initial_x(solver)
-            @timeit solver.timer "preproc_init_y" point.y = find_initial_y(solver, false)
+            @timeit solver.timer "preproc_init_x" init_x = find_initial_x(solver, init_z)
+            @timeit solver.timer "preproc_init_y" init_y = find_initial_y(solver, init_s, false)
         end
 
-        if solver.status != :SolveCalled
-            point.x = fill(NaN, orig_model.n)
-            point.y = fill(NaN, orig_model.p)
-            return solver
-        end
+        point = solver.point = Point(model)
+        point.x .= init_x
+        point.y .= init_y
+        point.z .= init_z
+        point.s .= init_s
 
-        solver.tau = one(T)
-        solver.kap = one(T)
+        # if solver.status != :SolveCalled
+        #     point.x = fill(NaN, orig_model.n)
+        #     point.y = fill(NaN, orig_model.p)
+        #     return solver
+        # end
+
+        point.tau[1] = one(T)
+        point.kap[1] = one(T)
         calc_mu(solver)
         if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
             @warn("initial mu is $(solver.mu) but should be 1 (this could indicate a problem with cone barrier oracles)")
@@ -270,14 +277,22 @@ function solve(solver::Solver{T}) where {T <: Real}
         end
 
         @timeit solver.timer "step" step(stepper, solver) || break
+
+        if point.tau[1] <= zero(T) || point.kap[1] <= zero(T) || solver.mu <= zero(T)
+            @warn("numerical failure: tau is $(point.tau[1]), kappa is $(point.kap[1]), mu is $(solver.mu); terminating")
+            solver.status = :NumericalFailure
+            break
+        end
+
         solver.num_iters += 1
     end
 
     # calculate result and iteration statistics and finish
-    point.x ./= solver.tau
-    point.y ./= solver.tau
-    point.z ./= solver.tau
-    point.s ./= solver.tau
+    tau = point.tau[1]
+    point.x ./= tau
+    point.y ./= tau
+    point.z ./= tau
+    point.s ./= tau
     Cones.load_point.(model.cones, point.primal_views)
     Cones.load_dual_point.(model.cones, point.dual_views)
 
@@ -292,37 +307,38 @@ function solve(solver::Solver{T}) where {T <: Real}
 end
 
 function calc_mu(solver::Solver{T}) where {T <: Real}
-    solver.mu = (dot(solver.point.z, solver.point.s) + solver.tau * solver.kap) / (1 + solver.model.nu)
+    solver.mu = (dot(solver.point.z, solver.point.s) + dot(solver.point.tau, solver.point.kap)) / (1 + solver.model.nu)
     return solver.mu
 end
 
 function calc_residual(solver::Solver{T}) where {T <: Real}
     model = solver.model
     point = solver.point
+    tau = solver.point.tau[1]
 
     # x_residual = -A'*y - G'*z - c*tau
     x_residual = solver.x_residual
     mul!(x_residual, model.G', point.z)
     mul!(x_residual, model.A', point.y, true, true)
     solver.x_norm_res_t = norm(x_residual, Inf)
-    @. x_residual += model.c * solver.tau
-    solver.x_norm_res = norm(x_residual, Inf) / solver.tau
+    @. x_residual += model.c * tau
+    solver.x_norm_res = norm(x_residual, Inf) / tau
     @. x_residual *= -1
 
     # y_residual = A*x - b*tau
     y_residual = solver.y_residual
     mul!(y_residual, model.A, point.x)
     solver.y_norm_res_t = norm(y_residual, Inf)
-    @. y_residual -= model.b * solver.tau
-    solver.y_norm_res = norm(y_residual, Inf) / solver.tau
+    @. y_residual -= model.b * tau
+    solver.y_norm_res = norm(y_residual, Inf) / tau
 
     # z_residual = s + G*x - h*tau
     z_residual = solver.z_residual
     mul!(z_residual, model.G, point.x)
     @. z_residual += point.s
     solver.z_norm_res_t = norm(z_residual, Inf)
-    @. z_residual -= model.h * solver.tau
-    solver.z_norm_res = norm(z_residual, Inf) / solver.tau
+    @. z_residual -= model.h * tau
+    solver.z_norm_res = norm(z_residual, Inf) / tau
 
     return
 end
@@ -339,8 +355,8 @@ function calc_convergence_params(solver::Solver{T}) where {T <: Real}
 
     solver.primal_obj_t = dot(model.c, point.x)
     solver.dual_obj_t = -dot(model.b, point.y) - dot(model.h, point.z)
-    solver.primal_obj = solver.primal_obj_t / solver.tau + model.obj_offset
-    solver.dual_obj = solver.dual_obj_t / solver.tau + model.obj_offset
+    solver.primal_obj = solver.primal_obj_t / solver.point.tau[1] + model.obj_offset
+    solver.dual_obj = solver.dual_obj_t / solver.point.tau[1] + model.obj_offset
     solver.gap = dot(point.z, point.s)
     if solver.primal_obj < -eps(T)
         solver.rel_gap = solver.gap / -solver.primal_obj
@@ -382,7 +398,7 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
             return true
         end
     end
-    if solver.mu <= solver.tol_feas * T(1e-2) && solver.tau <= solver.tol_feas * T(1e-2) * min(one(T), solver.kap)
+    if solver.mu <= solver.tol_feas * T(1e-2) && solver.point.tau[1] <= solver.tol_feas * T(1e-2) * min(one(T), solver.point.kap[1])
         solver.verbose && println("ill-posedness detected; terminating")
         solver.status = :IllPosed
         return true
@@ -489,8 +505,8 @@ function get_y(solver::Solver{T}) where {T <: Real}
     return y
 end
 
-get_tau(solver::Solver) = solver.tau
-get_kappa(solver::Solver) = solver.kap
+get_tau(solver::Solver) = solver.point.tau[1]
+get_kappa(solver::Solver) = solver.point.kap[1]
 get_mu(solver::Solver) = solver.mu
 
 function load(solver::Solver{T}, model::Models.Model{T}) where {T <: Real}
@@ -501,7 +517,13 @@ function load(solver::Solver{T}, model::Models.Model{T}) where {T <: Real}
 end
 
 include("initialize.jl")
-include("stepper.jl")
+
+include("steppers/common.jl")
+include("steppers/heurcomb.jl")
+include("steppers/predorcorr.jl")
+include("linesearch.jl")
+
+include("systemsolvers/common.jl")
 include("systemsolvers/naive.jl")
 include("systemsolvers/naiveelim.jl")
 include("systemsolvers/symindef.jl")
