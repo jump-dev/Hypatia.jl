@@ -190,7 +190,7 @@ function update_lhs(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
             @views copyto!(system_solver.lhs4.nzval[system_solver.hess_idxs[k][j]], H_k[nz_rows, j])
         end
     end
-    system_solver.lhs4.nzval[end] = solver.mu / solver.tau / solver.tau # NOTE: mismatch when using NT for kaptau
+    system_solver.lhs4.nzval[end] = solver.mu / solver.point.tau / solver.point.tau # NOTE: mismatch when using NT for kaptau
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs4)
 
@@ -261,7 +261,7 @@ function update_lhs(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver
             @views Cones.hess_prod!(lhs4[z_rows_k, end], model.h[idxs_k], cone_k)
         end
     end
-    lhs4[end, end] = solver.mu / solver.tau / solver.tau # NOTE: mismatch when using NT for kaptau
+    lhs4[end, end] = solver.mu / solver.point.tau / solver.point.tau # NOTE: mismatch when using NT for kaptau
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs4)
 

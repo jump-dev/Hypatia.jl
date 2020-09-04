@@ -3,25 +3,25 @@ preprocessing and initial point finding functions for interior point algorithms
 =#
 
 # TODO rewrite using a new function in Cones.jl - for most cones we want to just set the dual point same as primal point rather than taking gradient
-function initialize_cone_point(cones::Vector{Cones.Cone{T}}, cone_idxs::Vector{UnitRange{Int}}, timer::TimerOutput) where {T <: Real}
-    q = isempty(cones) ? 0 : sum(Cones.dimension, cones)
-    point = Models.Point(T[], T[], zeros(T, q), zeros(T, q), cones, cone_idxs)
+function initialize_cone_point(model::Models.Model{T}, timer::TimerOutput) where {T <: Real}
+    init_z = zeros(T, model.q)
+    init_s = zeros(T, model.q)
 
-    for (k, cone_k) in enumerate(cones)
-        Cones.setup_data(cone_k)
-        Cones.set_timer(cone_k, timer)
-        primal_k = point.primal_views[k]
-        Cones.set_initial_point(primal_k, cone_k)
-        Cones.load_point(cone_k, primal_k)
-        dual_k = point.dual_views[k]
-        @assert Cones.is_feas(cone_k)
-        g = Cones.grad(cone_k)
+    for (cone, idxs) in zip(model.cones, model.cone_idxs)
+        Cones.setup_data(cone)
+        Cones.set_timer(cone, timer)
+        primal_k = view(Cones.use_dual_barrier(cone) ? init_z : init_s, idxs)
+        dual_k = view(Cones.use_dual_barrier(cone) ? init_s : init_z, idxs)
+        Cones.set_initial_point(primal_k, cone)
+        Cones.load_point(cone, primal_k)
+        @assert Cones.is_feas(cone)
+        g = Cones.grad(cone)
         @. dual_k = -g
-        Cones.load_dual_point(cone_k, dual_k)
-        hasfield(typeof(cone_k), :hess_fact_cache) && @assert Cones.update_hess_fact(cone_k)
+        Cones.load_dual_point(cone, dual_k)
+        hasfield(typeof(cone), :hess_fact_cache) && @assert Cones.update_hess_fact(cone)
     end
 
-    return point
+    return (init_z, init_s)
 end
 
 # rescale the rows and columns of the conic data to get an equivalent conic problem
@@ -40,9 +40,9 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
     @inbounds solver.b_scale = b_scale = T[sqrt(max(abs(model.b[i]), maxabsminrow(model.A, i))) for i in 1:model.p]
 
     h_scale = solver.h_scale = ones(T, model.q)
-    for (k, cone_k) in enumerate(model.cones)
+    for (k, cone) in enumerate(model.cones)
         idxs = model.cone_idxs[k]
-        if cone_k isa Cones.Nonnegative
+        if cone isa Cones.Nonnegative
             for i in idxs
                 @inbounds h_scale[i] = sqrt(max(abs(model.h[i]), maxabsminrow(model.G, i)))
             end
@@ -71,7 +71,10 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
 end
 
 # optionally preprocess dual equalities and solve for x as least squares solution to Ax = b, Gx = h - s
-function find_initial_x(solver::Solver{T}) where {T <: Real}
+function find_initial_x(
+    solver::Solver{T},
+    init_s::Vector{T},
+    ) where {T <: Real}
     model = solver.model
     n = model.n
     if iszero(n) # x is empty (no primal variables)
@@ -84,7 +87,7 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
     G = model.G
     solver.x_keep_idxs = 1:n
 
-    rhs = vcat(model.b, model.h - solver.point.s)
+    rhs = vcat(model.b, model.h - init_s)
 
     # indirect method
     if solver.init_use_indirect
@@ -168,7 +171,7 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
 
     @timeit solver.timer "qr_solve" begin
         # init_x = AG_R \ ((AG_fact.Q' * vcat(b, h - point.s))[1:AG_rank])
-        tmp = vcat(model.b, model.h - solver.point.s)
+        tmp = vcat(model.b, model.h - init_s)
         lmul!(AG_fact.Q', tmp)
         init_x = tmp[1:model.n]
         ldiv!(AG_R, init_x)
@@ -178,7 +181,11 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
 end
 
 # optionally preprocess primal equalities and solve for y as least squares solution to A'y = -c - G'z
-function find_initial_y(solver::Solver{T}, reduce::Bool) where {T <: Real}
+function find_initial_y(
+    solver::Solver{T},
+    init_s::Vector{T},
+    reduce::Bool,
+    ) where {T <: Real}
     model = solver.model
     p = model.p
     if iszero(p) # y is empty (no primal variables)
@@ -195,7 +202,7 @@ function find_initial_y(solver::Solver{T}, reduce::Bool) where {T <: Real}
     if !reduce
         # rhs = -c - G' * point.z
         rhs = copy(model.c)
-        mul!(rhs, model.G', solver.point.z, -1, -1)
+        mul!(rhs, model.G', init_z, -1, -1)
 
         # indirect method
         if solver.init_use_indirect
@@ -325,7 +332,7 @@ function find_initial_y(solver::Solver{T}, reduce::Bool) where {T <: Real}
     @timeit solver.timer "qr_solve" begin
         # init_y = Ap_R \ ((Ap_fact.Q' * (-c - G' * point.z))[1:Ap_rank])
         tmp = copy(model.c)
-        mul!(tmp, model.G', solver.point.z, true, true)
+        mul!(tmp, model.G', init_z, true, true)
         lmul!(Ap_fact.Q', tmp)
         init_y = tmp[1:Ap_rank]
         init_y .*= -1

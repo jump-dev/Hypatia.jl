@@ -25,18 +25,18 @@ default_reals = [
 system_solvers_instance_names = vcat(
     # inst_preproc,
     # inst_infeas,
-    # inst_cones_few, # NOTE subset of inst_cones_many
-    inst_cones_many,
+    inst_cones_few, # NOTE subset of inst_cones_many
+    # inst_cones_many,
     )
 system_solvers = Dict(
-    # "NaiveDense" => all_reals,
+    "NaiveDense" => all_reals,
     # "NaiveSparse" => default_reals,
     # # "NaiveIndirect" => all_reals, # TODO fix
     # "NaiveElimDense" => all_reals,
     # "NaiveElimSparse" => default_reals,
     # "SymIndefDense" => all_reals,
     # "SymIndefSparse" => default_reals,
-    "QRCholDense" => all_reals,
+    # "QRCholDense" => all_reals,
     )
 
 # preprocessing test options
