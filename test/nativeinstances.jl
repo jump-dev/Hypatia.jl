@@ -72,7 +72,7 @@ function build_solve_check(
 
     solve_time = Solvers.get_solve_time(solver)
     num_iters = Solvers.get_num_iters(solver)
-    global ITERS += num_iters
+    (@isdefined ITERS) && (global ITERS += num_iters)
 
     return (solver = solver, model = model, status = status,
         solve_time = solve_time, num_iters = num_iters,

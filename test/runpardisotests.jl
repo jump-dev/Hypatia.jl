@@ -6,7 +6,7 @@ requires that Pardiso.jl be installed and built successfully; Requires.jl handle
 import Pardiso
 
 include(joinpath(@__DIR__, "nativeinstances.jl"))
-include(joinpath(@__DIR__, "nativesets.jl"))
+include(joinpath(@__DIR__, "common_nativetests.jl"))
 
 const SO = Hypatia.Solvers
 
@@ -22,13 +22,13 @@ options = (verbose = false,)
     end
 
     T = Float64
-    @testset "NaiveSparse tests: $t" for t in testfuns_many
+    @testset "NaiveSparse tests: $t" for t in inst_cones_many
         t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache()); options...))
     end
-    @testset "NaiveElimSparse tests: $t" for t in testfuns_many
+    @testset "NaiveElimSparse tests: $t" for t in inst_cones_many
         t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache()); options...))
     end
-    @testset "SymIndefSparse tests: $t" for t in testfuns_many
+    @testset "SymIndefSparse tests: $t" for t in inst_cones_many
         t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(fact_cache = Hypatia.PardisoSymCache()); options...))
     end
 end

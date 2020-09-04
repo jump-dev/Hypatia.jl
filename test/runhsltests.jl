@@ -4,13 +4,13 @@ requires that HSL.jl be installed and built successfully; Requires.jl handles th
 =#
 
 import HSL
+import Hypatia
+import Hypatia.Solvers
 
 include(joinpath(@__DIR__, "nativeinstances.jl"))
-include(joinpath(@__DIR__, "nativesets.jl"))
+include(joinpath(@__DIR__, "common_nativetests.jl"))
 
-const SO = Hypatia.Solvers
-
-options = (verbose = false,)
+hsl_sys_name = "SymIndefSparse"
 
 blas_reals = [
     Float64,
@@ -27,7 +27,7 @@ blas_reals = [
         @test_throws Exception cache_type{BigFloat}() # TODO make error more specific
     end
 
-    @testset "SymIndefSparse tests: $t, $T" for t in testfuns_many, T in blas_reals
-        t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(fact_cache = Hypatia.HSLSymCache{T}()); options...))
+    @testset "SymIndefSparse tests: $inst_name, $T" for inst_name in inst_cones_many, T in blas_reals
+        run_instance_options(T, inst_name, hsl_sys_name, "$inst_name system_solver = SymIndefSparse $T", system_solver_options = (fact_cache = Hypatia.HSLSymCache{T}(),))
     end
 end
