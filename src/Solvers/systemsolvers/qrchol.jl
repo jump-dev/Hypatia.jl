@@ -93,13 +93,13 @@ function solve_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solver{T}
 
     if !isempty(system_solver.Q2div)
         @views x_sub2 = copyto!(rhs3[(p + 1):n], system_solver.Q2div)
-        inv_prod(system_solver.fact_cache, x_sub2)
+        @timeit solver.timer "inv_prod" inv_prod(system_solver.fact_cache, x_sub2)
     end
 
     lmul!(solver.Ap_Q, x)
 
     mul!(system_solver.Gx, model.G, x)
-    block_hess_prod.(model.cones, system_solver.HGx_k, system_solver.Gx_k)
+    @timeit solver.timer "bhp" block_hess_prod.(model.cones, system_solver.HGx_k, system_solver.Gx_k)
 
     @. z = system_solver.HGx - z
 
@@ -244,7 +244,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
                 arr_k = system_solver.GQ2_k[k]
                 q_k = size(arr_k, 1)
                 @views prod_k = system_solver.HGQ2[idx:(idx + q_k - 1), :]
-                Cones.inv_hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
+                @timeit solver.timer "inv_hess_sqrt_prod" Cones.inv_hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
                 idx += q_k
             end
             @views HGQ2_sub = system_solver.HGQ2[1:(idx - 1), :]
@@ -265,7 +265,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
                 arr_k = system_solver.GQ2_k[k]
                 q_k = size(arr_k, 1)
                 @views prod_k = system_solver.HGQ2[idx:(idx + q_k - 1), :]
-                Cones.hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
+                @timeit solver.timer "hess_sqrt_prod" Cones.hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
                 idx += q_k
             end
             @views HGQ2_sub = system_solver.HGQ2[1:(idx - 1), :]
