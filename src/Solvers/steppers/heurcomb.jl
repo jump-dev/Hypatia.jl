@@ -77,22 +77,22 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     # calculate centering direction and keep in dir_cent
     @timeit timer "rhs_cent" update_rhs_cent(solver, stepper.rhs)
     @timeit timer "dir_cent" get_directions(stepper, solver, false, iter_ref_steps = 3)
-    dir_cent = copy(stepper.dir) # TODO
+    dir_cent = copy(stepper.dir.vec) # TODO
     @timeit timer "rhs_centcorr" update_rhs_centcorr(solver, stepper.rhs, stepper.dir)
     @timeit timer "dir_centcorr" get_directions(stepper, solver, false, iter_ref_steps = 3)
-    dir_centcorr = copy(stepper.dir) # TODO
+    dir_centcorr = copy(stepper.dir.vec) # TODO
     # copyto!(stepper.dir_cent, stepper.dir)
 
     # calculate affine/prediction direction and keep in dir
     @timeit timer "rhs_pred" update_rhs_pred(solver, stepper.rhs)
     @timeit timer "dir_pred" get_directions(stepper, solver, true, iter_ref_steps = 3)
-    dir_pred = copy(stepper.dir) # TODO
+    dir_pred = copy(stepper.dir.vec) # TODO
     @timeit timer "rhs_predcorr" update_rhs_predcorr(solver, stepper.rhs, stepper.dir)
     @timeit timer "dir_predcorr" get_directions(stepper, solver, true, iter_ref_steps = 3)
-    dir_predcorr = copy(stepper.dir) # TODO
+    dir_predcorr = copy(stepper.dir.vec) # TODO
 
     # calculate centering factor gamma by finding distance pred_alpha for stepping in pred direction
-    copyto!(stepper.dir, dir_pred)
+    copyto!(stepper.dir.vec, dir_pred)
     @timeit timer "alpha_pred" stepper.prev_pred_alpha = pred_alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T)) # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
 
     # TODO allow different function (heuristic) as option?
@@ -101,7 +101,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
 
     # calculate combined direction and keep in dir
     # axpby!(gamma, stepper.dir_cent, 1 - gamma, stepper.dir)
-    @. stepper.dir = gamma * (dir_cent + pred_alpha * dir_centcorr) + (1 - gamma) * (dir_pred + pred_alpha * dir_predcorr) # TODO
+    @. stepper.dir.vec = gamma * (dir_cent + pred_alpha * dir_centcorr) + (1 - gamma) * (dir_pred + pred_alpha * dir_predcorr) # TODO
 
     # find distance alpha for stepping in combined direction
     @timeit timer "alpha_comb" alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
@@ -110,13 +110,13 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
         # could not step far in combined direction, so attempt a pure centering step
         solver.verbose && println("performing centering step")
         # copyto!(stepper.dir, stepper.dir_cent)
-        @. stepper.dir = dir_cent + dir_centcorr
+        @. stepper.dir.vec = dir_cent + dir_centcorr
 
         # find distance alpha for stepping in centering direction
         @timeit timer "alpha_cent" alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-6))
 
         if iszero(alpha)
-            copyto!(stepper.dir, dir_cent)
+            copyto!(stepper.dir.vec, dir_cent)
             @timeit timer "alpha_cent2" alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-6))
 
             if iszero(alpha)
@@ -128,13 +128,8 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     end
     stepper.prev_alpha = alpha
 
-    # step distance alpha in combined direction
-    @. point.x += alpha * stepper.dir.x
-    @. point.y += alpha * stepper.dir.y
-    @. point.z += alpha * stepper.dir.z
-    @. point.s += alpha * stepper.dir.s
-    solver.point.tau += alpha * stepper.dir[stepper.tau_row]
-    solver.point.kap += alpha * stepper.dir[stepper.kap_row]
+    # step
+    @. solver.point.vec += alpha * stepper.dir.vec
     calc_mu(solver)
 
     return true
