@@ -6,7 +6,7 @@ requires that Pardiso.jl be installed and built successfully; Requires.jl handle
 import Pardiso
 
 include(joinpath(@__DIR__, "nativeinstances.jl"))
-include(joinpath(@__DIR__, "common_nativetests.jl"))
+include(joinpath(@__DIR__, "nativesets.jl"))
 
 const SO = Hypatia.Solvers
 

@@ -8,9 +8,11 @@ import Hypatia
 import Hypatia.Solvers
 
 include(joinpath(@__DIR__, "nativeinstances.jl"))
-include(joinpath(@__DIR__, "common_nativetests.jl"))
+include(joinpath(@__DIR__, "nativesets.jl"))
 
 hsl_sys_name = "SymIndefSparse"
+
+options = (verbose = false,)
 
 blas_reals = [
     Float64,
@@ -28,6 +30,7 @@ blas_reals = [
     end
 
     @testset "SymIndefSparse tests: $inst_name, $T" for inst_name in inst_cones_many, T in blas_reals
-        run_instance_options(T, inst_name, hsl_sys_name, "$inst_name system_solver = SymIndefSparse $T", system_solver_options = (fact_cache = Hypatia.HSLSymCache{T}(),))
+        inst_function = eval(Symbol(inst_name))
+        inst_function(T, solver = Solvers.Solver{T}(system_solver = Solvers.SymIndefSparseSystemSolver{T}(fact_cache = Hypatia.HSLSymCache{T}()); options...))
     end
 end

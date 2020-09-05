@@ -2,47 +2,6 @@
 sets of native test instances and helper functions
 =#
 
-# other solver options
-timer = TimerOutput()
-# tol = 1e-10
-# tol = 1e-7
-other_options = (
-    verbose = true,
-    # verbose = false,
-    iter_limit = 100,
-    time_limit = 6e1,
-    timer = timer,
-    # tol_feas = tol,
-    # tol_rel_opt = tol,
-    # tol_abs_opt = tol,
-    # rescale = false,
-    # preprocess = false,
-    # reduce = false,
-    )
-
-perf = DataFrame(
-    inst_name = String[],
-    sys_solver = String[],
-    real_T = String[],
-    preprocess = Bool[],
-    init_use_indirect = Bool[],
-    reduce = Bool[],
-    test_time = Float64[],
-    )
-
-function run_instance_options(T::Type{<:Real}, inst_name::String, sys_name::String, test_info::String; system_solver_options = NamedTuple(), kwargs...)
-    @testset "$test_info" begin
-        println(test_info, "...")
-        inst_function = eval(Symbol(inst_name))
-        sys_solver = Solvers.eval(Symbol(sys_name, "SystemSolver"))
-        solver = Solvers.Solver{T}(; system_solver = sys_solver{T}(; system_solver_options...), kwargs..., other_options...)
-        test_time = @elapsed inst_function(T, solver = solver)
-        push!(perf, (inst_name, sys_name, string(T), solver.preprocess, solver.init_use_indirect, solver.reduce, test_time))
-        @printf("... %8.2e seconds\n", test_time)
-    end
-    return nothing
-end
-
 inst_preproc = [ # TODO add more preprocessing test instances
     "dimension1",
     "consistent1",
