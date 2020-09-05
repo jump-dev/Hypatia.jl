@@ -10,8 +10,6 @@ import Hypatia.Solvers
 include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
 
-hsl_sys_name = "SymIndefSparse"
-
 options = (verbose = false,)
 
 blas_reals = [

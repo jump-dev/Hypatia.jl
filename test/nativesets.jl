@@ -1,5 +1,5 @@
 #=
-sets of native test instances and helper functions
+sets of native test instances
 =#
 
 inst_preproc = [ # TODO add more preprocessing test instances
