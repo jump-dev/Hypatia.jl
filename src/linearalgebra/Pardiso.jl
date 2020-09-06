@@ -4,11 +4,13 @@ utilities for Pardiso
 
 mutable struct PardisoNonSymCache{T <: Real} <: SparseNonSymCache{T}
     analyzed::Bool
-    pardiso::Pardiso.PardisoSolver
+    # pardiso::Pardiso.PardisoSolver
+    pardiso::Pardiso.MKLPardisoSolver
     function PardisoNonSymCache{Float64}()
         cache = new{Float64}()
         cache.analyzed = false
-        cache.pardiso = Pardiso.PardisoSolver()
+        # cache.pardiso = Pardiso.PardisoSolver()
+        cache.pardiso = Pardiso.MKLPardisoSolver()
         Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_NONSYM) # tell Pardiso the matrix is nonsymmetric
         return cache
     end
@@ -18,12 +20,14 @@ PardisoNonSymCache() = PardisoNonSymCache{Float64}()
 
 mutable struct PardisoSymCache{T <: Real} <: SparseSymCache{T}
     analyzed::Bool
-    pardiso::Pardiso.PardisoSolver
+    # pardiso::Pardiso.PardisoSolver
+    pardiso::Pardiso.MKLPardisoSolver
     diag_pert::Float64
     function PardisoSymCache{Float64}(; diag_pert::Float64 = 0.0)
         cache = new{Float64}()
         cache.analyzed = false
-        cache.pardiso = Pardiso.PardisoSolver()
+        # cache.pardiso = Pardiso.PardisoSolver()
+        cache.pardiso = Pardiso.MKLPardisoSolver()
         Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_SYM_INDEF) # tell Pardiso the matrix is symmetric indefinite
         cache.diag_pert = diag_pert
         return cache
@@ -35,21 +39,40 @@ PardisoSymCache(; diag_pert = 0.0) = PardisoSymCache{Float64}(diag_pert = diag_p
 PardisoSparseCache = Union{PardisoSymCache{Float64}, PardisoNonSymCache{Float64}}
 int_type(::PardisoSparseCache) = Int32
 
+# function update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int32})
+#     pardiso = cache.pardiso
+#
+#     if !cache.analyzed
+#         Pardiso.pardisoinit(pardiso)
+#         # don't ignore other iparms
+#         Pardiso.set_iparm!(pardiso, 1, 1)
+#         # solve transposed problem (Pardiso accepts CSR matrices)
+#         Pardiso.set_iparm!(pardiso, 12, 1)
+#         # perturbation for small pivots (default 8 for symmetric, 13 for nonsymmetric)
+#         if Pardiso.get_matrixtype(pardiso) == Pardiso.REAL_SYM_INDEF
+#             Pardiso.set_iparm!(pardiso, 10, 8)
+#         end
+#         # maximum number of iterative refinement steps (default = 2)
+#         Pardiso.set_iparm!(pardiso, 8, 2)
+#         Pardiso.set_phase!(pardiso, Pardiso.ANALYSIS)
+#         Pardiso.pardiso(pardiso, A, Float64[])
+#         cache.analyzed = true
+#     end
+#
+#     Pardiso.set_phase!(pardiso, Pardiso.NUM_FACT)
+#     Pardiso.pardiso(pardiso, A, Float64[])
+#
+#     return
+# end
+
+# setters/getters not wrapped for MKL Pardiso
 function update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int32})
     pardiso = cache.pardiso
 
     if !cache.analyzed
         Pardiso.pardisoinit(pardiso)
-        # don't ignore other iparms
-        Pardiso.set_iparm!(pardiso, 1, 1)
         # solve transposed problem (Pardiso accepts CSR matrices)
-        Pardiso.set_iparm!(pardiso, 12, 1)
-        # perturbation for small pivots (default 8 for symmetric, 13 for nonsymmetric)
-        if Pardiso.get_matrixtype(pardiso) == Pardiso.REAL_SYM_INDEF
-            Pardiso.set_iparm!(pardiso, 10, 8)
-        end
-        # maximum number of iterative refinement steps (default = 2)
-        Pardiso.set_iparm!(pardiso, 8, 2)
+        Pardiso.fix_iparm!(pardiso, :N)
         Pardiso.set_phase!(pardiso, Pardiso.ANALYSIS)
         Pardiso.pardiso(pardiso, A, Float64[])
         cache.analyzed = true
