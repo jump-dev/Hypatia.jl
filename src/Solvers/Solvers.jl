@@ -519,15 +519,9 @@ end
 include("initialize.jl")
 
 include("steppers/common.jl")
-include("steppers/heurcomb.jl")
-include("steppers/predorcorr.jl")
 include("linesearch.jl")
 
 include("systemsolvers/common.jl")
-include("systemsolvers/naive.jl")
-include("systemsolvers/naiveelim.jl")
-include("systemsolvers/symindef.jl")
-include("systemsolvers/qrchol.jl")
 
 # release memory used by sparse system solvers
 free_memory(::SystemSolver) = nothing

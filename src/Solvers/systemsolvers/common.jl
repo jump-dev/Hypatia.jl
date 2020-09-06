@@ -107,3 +107,90 @@ function apply_lhs(
 
     return stepper.res
 end
+
+include("naive.jl")
+include("naiveelim.jl")
+include("symindef.jl")
+include("qrchol.jl")
+
+function solve_inner_system(
+    system_solver::Union{NaiveElimSparseSystemSolver, SymIndefSparseSystemSolver},
+    sol::Vector,
+    rhs::Vector,
+    )
+    inv_prod(system_solver.fact_cache, sol, system_solver.lhs_sub, rhs)
+    return sol
+end
+
+function solve_inner_system(
+    system_solver::Union{NaiveElimDenseSystemSolver, SymIndefDenseSystemSolver},
+    sol::Vector,
+    rhs::Vector,
+    )
+    copyto!(sol, rhs)
+    inv_prod(system_solver.fact_cache, sol)
+    return sol
+end
+
+# reduce to 4x4 subsystem
+function solve_system(
+    system_solver::Union{NaiveElimSystemSolver{T}, SymIndefSystemSolver{T}, QRCholSystemSolver{T}},
+    solver::Solver{T},
+    sol::Point{T},
+    rhs::Point{T},
+    tau_scal::T,
+    ) where {T <: Real}
+    model = solver.model
+
+    solve_subsystem4(system_solver, solver, sol, rhs, tau_scal)
+    tau = sol.tau[1]
+
+    # lift to get s and kap
+    # s = -G*x + h*tau - zrhs
+    @. sol.s = model.h * tau - rhs.z
+    mul!(sol.s, model.G, sol.x, -1, true)
+
+    # kap = -kapbar/taubar*tau + kaprhs
+    sol.kap[1] = -tau_scal * tau + rhs.kap[1]
+
+    return sol
+end
+
+# reduce to 3x3 subsystem
+function solve_subsystem4(
+    system_solver::Union{SymIndefSystemSolver{T}, QRCholSystemSolver{T}},
+    solver::Solver{T},
+    sol::Point{T},
+    rhs::Point{T},
+    tau_scal::T,
+    ) where {T <: Real}
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+
+    rhs_sub = system_solver.rhs_sub
+    sol_sub = system_solver.sol_sub
+    dim3 = length(rhs_sub)
+    x_rows = 1:n
+    y_rows = n .+ (1:p)
+    z_rows = (n + p) .+ (1:q)
+
+    @. @views rhs_sub[x_rows] = rhs.x
+    @. @views rhs_sub[y_rows] = -rhs.y
+
+    setup_rhs3(system_solver, model, rhs, sol, rhs_sub)
+
+    solve_subsystem3(system_solver, solver, sol_sub, rhs_sub)
+
+    # TODO maybe use higher precision here
+    const_sol = system_solver.const_sol
+
+    # lift to get tau
+    @views tau_num = rhs.tau[1] + rhs.kap[1] + dot(model.c, sol_sub[x_rows]) + dot(model.b, sol_sub[y_rows]) + dot(model.h, sol_sub[z_rows])
+    @views tau_denom = tau_scal - dot(model.c, const_sol[x_rows]) - dot(model.b, const_sol[y_rows]) - dot(model.h, const_sol[z_rows])
+    sol_tau = tau_num / tau_denom
+
+    @. sol.vec[1:dim3] = sol_sub + sol_tau * const_sol
+    sol.tau[1] = sol_tau
+
+    return sol
+end
