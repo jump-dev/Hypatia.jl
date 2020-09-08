@@ -84,6 +84,7 @@ function build(inst::RandomPolyMatJuMP{T}) where {T <: Float64} # TODO generic r
     svec_dim = div(R * (R + 1), 2)
 
     domain = ModelUtilities.FreeDomain{Float64}(n)
+    # domain = ModelUtilities.Box{Float64}(-ones(n), ones(n))
     (U, points, Ps, _, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
 
     model = JuMP.Model()
@@ -92,9 +93,11 @@ function build(inst::RandomPolyMatJuMP{T}) where {T <: Float64} # TODO generic r
     full_mat = [randn(U) for _ in 1:R, _ in 1:R]
     # full_mat = [Ps[1] * rand(-9:9, L) for _ in 1:R, _ in 1:R]
     for j in 1:R, i in 1:j
-        full_mat[i, j] += full_mat[j, i]
+        full_mat[i, j] .+= full_mat[j, i]
+        full_mat[j, i] .= full_mat[i, j]
     end
-    full_coeffs = full_mat - [q_poly[Cones.block_idxs(U, Cones.svec_idx(i, j))] for j in 1:R, i in 1:R]
+    svec_idx(row::Int, col::Int) = (row >= col ? Cones.svec_idx(row, col) : Cones.svec_idx(col, row))
+    full_coeffs = full_mat - [q_poly[Cones.block_idxs(U, svec_idx(i, j))] for j in 1:R, i in 1:R]
 
     # full_mat_2 = [randn(U) for _ in 1:R, _ in 1:R]
     # for j in 1:R, i in 1:j
