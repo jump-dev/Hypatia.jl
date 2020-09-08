@@ -25,25 +25,23 @@ A*x = [-yrhs, b]
 abstract type SymIndefSystemSolver{T <: Real} <: SystemSolver{T} end
 
 function setup_rhs3(
-    ::SymIndefSystemSolver,
-    model,
-    rhs,
-    sol,
-    rhs_sub,
-    )
-    @inbounds for k in eachindex(model.cones)
-        cone_k = model.cones[k]
+    ::SymIndefSystemSolver{T},
+    model::Models.Model{T},
+    rhs::Point{T},
+    sol::Point{T},
+    rhs_sub::Point{T},
+    ) where {T <: Real}
+    @inbounds for (k, cone_k) in enumerate(model.cones)
         rhs_z_k = rhs.z_views[k]
         rhs_s_k = rhs.s_views[k]
-        z_rows_k = (model.n + model.p) .+ model.cone_idxs[k]
-        @views z3_k = rhs_sub[z_rows_k]
+        rhs_sub_z_k = rhs_sub.z_views[k]
         if Cones.use_dual_barrier(cone_k)
             # G_k*x - mu*H_k*z_k = [-zrhs_k - srhs_k, h_k]
-            @. z3_k = -rhs_z_k - rhs_s_k
+            @. rhs_sub_z_k = -rhs_z_k - rhs_s_k
         else
             # G_k*x - (mu*H_k)\z_k = [-zrhs_k - (mu*H_k)\srhs_k, h_k]
-            Cones.inv_hess_prod!(z3_k, rhs_s_k, cone_k)
-            axpby!(-1, rhs_z_k, -1, z3_k)
+            Cones.inv_hess_prod!(rhs_sub_z_k, rhs_s_k, cone_k)
+            axpby!(-1, rhs_z_k, -1, rhs_sub_z_k)
         end
     end
     return nothing
@@ -55,12 +53,12 @@ direct sparse
 
 mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     lhs_sub::SparseMatrixCSC # TODO type will depend on Int type
-    rhs_sub::Vector{T}
-    sol_sub::Vector{T}
-    hess_idxs::Vector
     fact_cache::SparseSymCache{T}
-    const_sol::Vector{T}
-    const_rhs::Vector{T}
+    hess_idxs::Vector
+    rhs_sub::Point{T}
+    sol_sub::Point{T}
+    sol_const::Point{T}
+    rhs_const::Point{T}
     function SymIndefSparseSystemSolver{T}(;
         fact_cache::SparseSymCache{T} = SparseSymCache{T}(),
         ) where {T <: Real}
@@ -76,10 +74,6 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     (n, p, q) = (model.n, model.p, model.q)
     cones = model.cones
     cone_idxs = model.cone_idxs
-    dim = n + p + q
-
-    system_solver.sol_sub = zeros(dim)
-    system_solver.rhs_sub = similar(system_solver.sol_sub)
 
     # form sparse LHS without Hessians and inverse Hessians in z/z block
     lhs_sub = T[
@@ -128,6 +122,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     # prefer conversions of integer types to happen here than inside external wrappers
     Is = convert(Vector{Ti}, Is)
     Js = convert(Vector{Ti}, Js)
+    dim = size(lhs_sub, 1)
     lhs_sub = system_solver.lhs_sub = sparse(Is, Js, Vs, dim, dim)
 
     # cache indices of nonzeros of Hessians and inverse Hessians in sparse LHS nonzeros vector
@@ -149,8 +144,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
         end
     end
 
-    system_solver.const_rhs = vcat(-model.c, model.b, model.h)
-    system_solver.const_sol = similar(system_solver.const_rhs)
+    setup_point_sub(system_solver, model)
 
     return system_solver
 end
@@ -165,7 +159,7 @@ function update_lhs(system_solver::SymIndefSparseSystemSolver, solver::Solver)
     end
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs_sub)
-    @timeit solver.timer "solve_subsystem3" solve_subsystem3(system_solver, solver, system_solver.const_sol, system_solver.const_rhs)
+    @timeit solver.timer "solve_subsystem3" solve_subsystem3(system_solver, solver, system_solver.sol_const, system_solver.rhs_const)
 
     return system_solver
 end
@@ -173,10 +167,10 @@ end
 function solve_subsystem3(
     system_solver::SymIndefSparseSystemSolver,
     ::Solver,
-    sol_sub::Vector,
-    rhs_sub::Vector,
+    sol_sub::Point,
+    rhs_sub::Point,
     )
-    inv_prod(system_solver.fact_cache, sol_sub, system_solver.lhs_sub, rhs_sub)
+    inv_prod(system_solver.fact_cache, sol_sub.vec, system_solver.lhs_sub, rhs_sub.vec)
     return sol_sub
 end
 
@@ -186,11 +180,11 @@ direct dense
 
 mutable struct SymIndefDenseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     lhs_sub::Symmetric{T, Matrix{T}}
-    rhs_sub::Vector{T}
-    sol_sub::Vector{T}
     fact_cache::DenseSymCache{T}
-    const_sol::Vector{T}
-    const_rhs::Vector{T}
+    rhs_sub::Point{T}
+    sol_sub::Point{T}
+    sol_const::Point{T}
+    rhs_const::Point{T}
     function SymIndefDenseSystemSolver{T}(;
         fact_cache::DenseSymCache{T} = DenseSymCache{T}(),
         ) where {T <: Real}
@@ -204,9 +198,6 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
 
-    system_solver.sol_sub = zeros(T, n + p + q)
-    system_solver.rhs_sub = similar(system_solver.sol_sub)
-
     # fill symmetric lower triangle
     system_solver.lhs_sub = Symmetric(T[
         zeros(T, n, n)  zeros(T, n, p)  zeros(T, n, q);
@@ -216,8 +207,7 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
 
     load_matrix(system_solver.fact_cache, system_solver.lhs_sub)
 
-    system_solver.const_rhs = vcat(-model.c, model.b, model.h)
-    system_solver.const_sol = similar(system_solver.const_rhs)
+    setup_point_sub(system_solver, model)
 
     return system_solver
 end
@@ -241,7 +231,7 @@ function update_lhs(system_solver::SymIndefDenseSystemSolver, solver::Solver)
     end
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs_sub)
-    @timeit solver.timer "solve_subsystem3" solve_subsystem3(system_solver, solver, system_solver.const_sol, system_solver.const_rhs)
+    @timeit solver.timer "solve_subsystem3" solve_subsystem3(system_solver, solver, system_solver.sol_const, system_solver.rhs_const)
 
     return system_solver
 end
@@ -249,10 +239,10 @@ end
 function solve_subsystem3(
     system_solver::SymIndefDenseSystemSolver,
     ::Solver,
-    sol_sub::Vector,
-    rhs_sub::Vector,
+    sol_sub::Point,
+    rhs_sub::Point,
     )
-    copyto!(sol_sub, rhs_sub)
-    inv_prod(system_solver.fact_cache, sol_sub)
+    copyto!(sol_sub.vec, rhs_sub.vec)
+    inv_prod(system_solver.fact_cache, sol_sub.vec)
     return sol_sub
 end

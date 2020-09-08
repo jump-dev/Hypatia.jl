@@ -1,5 +1,14 @@
 #=
 helpers for linear system solving
+
+6x6 nonsymmetric system in (x, y, z, tau, s, kap):
+A'*y + G'*z + c*tau = xrhs
+-A*x + b*tau = yrhs
+-G*x + h*tau - s = zrhs
+-c'*x - b'*y - h'*z - kap = taurhs
+(pr bar) z_k + mu*H_k*s_k = srhs_k
+(du bar) mu*H_k*z_k + s_k = srhs_k
+mu/(taubar^2)*tau + kap = kaprhs
 =#
 
 # calculate direction given rhs, and apply iterative refinement
@@ -16,7 +25,8 @@ function get_directions(
     system_solver = solver.system_solver
     timer = solver.timer
 
-    tau_scal = (use_nt ? solver.point.kap[1] : solver.mu / solver.point.tau[1]) / solver.point.tau[1]
+    tau = solver.point.tau[1]
+    tau_scal = (use_nt ? solver.point.kap[1] : solver.mu / tau) / tau
 
     solve_system(system_solver, solver, dir, rhs, tau_scal)
 
@@ -26,7 +36,6 @@ function get_directions(
     res.vec .-= rhs.vec
     norm_inf = norm(res.vec, Inf)
     norm_2 = norm(res.vec, 2)
-    # @show res
 
     for i in 1:iter_ref_steps
         # @show norm_inf
@@ -115,20 +124,20 @@ include("qrchol.jl")
 
 function solve_inner_system(
     system_solver::Union{NaiveElimSparseSystemSolver, SymIndefSparseSystemSolver},
-    sol::Vector,
-    rhs::Vector,
+    sol::Point,
+    rhs::Point,
     )
-    inv_prod(system_solver.fact_cache, sol, system_solver.lhs_sub, rhs)
+    inv_prod(system_solver.fact_cache, sol.vec, system_solver.lhs_sub, rhs.vec)
     return sol
 end
 
 function solve_inner_system(
     system_solver::Union{NaiveElimDenseSystemSolver, SymIndefDenseSystemSolver},
-    sol::Vector,
-    rhs::Vector,
+    sol::Point,
+    rhs::Point,
     )
-    copyto!(sol, rhs)
-    inv_prod(system_solver.fact_cache, sol)
+    copyto!(sol.vec, rhs.vec)
+    inv_prod(system_solver.fact_cache, sol.vec)
     return sol
 end
 
@@ -165,32 +174,47 @@ function solve_subsystem4(
     tau_scal::T,
     ) where {T <: Real}
     model = solver.model
-    (n, p, q) = (model.n, model.p, model.q)
-
     rhs_sub = system_solver.rhs_sub
     sol_sub = system_solver.sol_sub
-    dim3 = length(rhs_sub)
-    x_rows = 1:n
-    y_rows = n .+ (1:p)
-    z_rows = (n + p) .+ (1:q)
 
-    @. @views rhs_sub[x_rows] = rhs.x
-    @. @views rhs_sub[y_rows] = -rhs.y
-
+    @. rhs_sub.x = rhs.x
+    @. rhs_sub.y = -rhs.y
     setup_rhs3(system_solver, model, rhs, sol, rhs_sub)
 
     solve_subsystem3(system_solver, solver, sol_sub, rhs_sub)
 
-    # TODO maybe use higher precision here
-    const_sol = system_solver.const_sol
-
     # lift to get tau
-    @views tau_num = rhs.tau[1] + rhs.kap[1] + dot(model.c, sol_sub[x_rows]) + dot(model.b, sol_sub[y_rows]) + dot(model.h, sol_sub[z_rows])
-    @views tau_denom = tau_scal - dot(model.c, const_sol[x_rows]) - dot(model.b, const_sol[y_rows]) - dot(model.h, const_sol[z_rows])
+    sol_const = system_solver.sol_const
+    tau_num = rhs.tau[1] + rhs.kap[1] + dot_obj(model, sol_sub)
+    tau_denom = tau_scal - dot_obj(model, sol_const)
     sol_tau = tau_num / tau_denom
 
-    @. sol.vec[1:dim3] = sol_sub + sol_tau * const_sol
+    dim3 = length(sol_sub.vec)
+    @. sol.vec[1:dim3] = sol_sub.vec + sol_tau * sol_const.vec
     sol.tau[1] = sol_tau
 
     return sol
 end
+
+function setup_point_sub(system_solver::Union{QRCholSystemSolver{T}, SymIndefSystemSolver{T}}, model::Models.Model{T}) where {T <: Real}
+    (n, p, q) = (model.n, model.p, model.q)
+    dim_sub = n + p + q
+    z_start = model.n + model.p
+    sol_sub = system_solver.sol_sub = Point{T}()
+    rhs_sub = system_solver.rhs_sub = Point{T}()
+    rhs_const = system_solver.rhs_const = Point{T}()
+    sol_const = system_solver.sol_const = Point{T}()
+    for point_sub in (sol_sub, rhs_sub, rhs_const, sol_const)
+        point_sub.vec = zeros(T, dim_sub)
+        @views point_sub.x = point_sub.vec[1:n]
+        @views point_sub.y = point_sub.vec[n .+ (1:p)]
+        @views point_sub.z = point_sub.vec[n + p .+ (1:q)]
+        point_sub.z_views = [view(point_sub.z, idxs) for idxs in model.cone_idxs]
+    end
+    @. rhs_const.x = -model.c
+    @. rhs_const.y = model.b
+    @. rhs_const.z = model.h
+    return nothing
+end
+
+dot_obj(model::Models.Model, point::Point) = dot(model.c, point.x) + dot(model.b, point.y) + dot(model.h, point.z)

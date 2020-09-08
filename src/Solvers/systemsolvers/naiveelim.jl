@@ -39,40 +39,47 @@ function solve_subsystem4(
     rhs::Point{T},
     tau_scal::T,
     ) where {T <: Real}
-    model = solver.model
-    (n, p, q) = (model.n, model.p, model.q)
-
-    sol_sub = system_solver.sol_sub
     rhs_sub = system_solver.rhs_sub
-    dim4 = size(sol_sub, 1)
-    @views rhs_sub .= rhs.vec[1:dim4]
+    dim4 = length(rhs_sub.vec)
+    @inbounds @views rhs_sub.vec .= rhs.vec[1:dim4]
 
-    for k in eachindex(model.cones)
-        cone_k = model.cones[k]
-        z_rows_k = (n + p) .+ model.cone_idxs[k]
-        s_rows_k = (q + 1) .+ z_rows_k
+    @inbounds for (k, cone_k) in enumerate(solver.model.cones)
         rhs_z_k = rhs.z_views[k]
         rhs_s_k = rhs.s_views[k]
+        rhs_sub_z_k = rhs_sub.z_views[k]
         if Cones.use_dual_barrier(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
-            @. @views rhs_sub[z_rows_k] += rhs_s_k
+            rhs_sub_z_k .+= rhs_s_k
         elseif system_solver.use_inv_hess
             # -G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k
-            @views Cones.inv_hess_prod!(rhs_sub[z_rows_k], rhs_s_k, cone_k)
-            @. @views rhs_sub[z_rows_k] += rhs_z_k
+            Cones.inv_hess_prod!(rhs_sub_z_k, rhs_s_k, cone_k)
+            rhs_sub_z_k .+= rhs_z_k
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-            @views Cones.hess_prod!(rhs_sub[z_rows_k], rhs_z_k, cone_k)
-            @. @views rhs_sub[z_rows_k] += rhs_s_k
+            Cones.hess_prod!(rhs_sub_z_k, rhs_z_k, cone_k)
+            rhs_sub_z_k .+= rhs_s_k
         end
     end
     # -c'x - b'y - h'z + kapbar/taubar*tau = taurhs + kaprhs
-    rhs_sub[end] += rhs.kap[1]
+    rhs_sub.vec[end] += rhs.kap[1]
 
+    sol_sub = system_solver.sol_sub
     solve_inner_system(system_solver, sol_sub, rhs_sub)
-    sol.vec[1:dim4] .= sol_sub
+    @inbounds sol.vec[1:dim4] .= sol_sub.vec
 
     return sol
+end
+
+function setup_point_sub(system_solver::NaiveElimSystemSolver{T}, model::Models.Model{T}) where {T <: Real}
+    system_solver.sol_sub = Point{T}()
+    system_solver.rhs_sub = Point{T}()
+    z_start = model.n + model.p
+    dim_sub = size(system_solver.lhs_sub, 1)
+    for point_sub in (system_solver.sol_sub, system_solver.rhs_sub)
+        point_sub.vec = zeros(T, dim_sub)
+        point_sub.z_views = [view(point_sub.vec, z_start .+ idxs) for idxs in model.cone_idxs]
+    end
+    return nothing
 end
 
 #=
@@ -82,10 +89,10 @@ direct sparse
 mutable struct NaiveElimSparseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
     use_inv_hess::Bool
     lhs_sub::SparseMatrixCSC # TODO type params will depend on factor cache Int type
-    rhs_sub::Vector{T}
-    sol_sub::Vector{T}
-    hess_idxs::Vector
     fact_cache::SparseNonSymCache{T}
+    rhs_sub::Point{T}
+    sol_sub::Point{T}
+    hess_idxs::Vector
     function NaiveElimSparseSystemSolver{T}(;
         use_inv_hess::Bool = true,
         fact_cache::SparseNonSymCache{Float64} = SparseNonSymCache{Float64}(),
@@ -106,9 +113,6 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     (n, p, q) = (model.n, model.p, model.q)
     cones = model.cones
     cone_idxs = model.cone_idxs
-
-    system_solver.sol_sub = zeros(T, n + p + q + 1)
-    system_solver.rhs_sub = similar(system_solver.sol_sub)
 
     # form sparse LHS without Hessians and inverse Hessians in z/z block
     lhs_sub = T[
@@ -147,11 +151,11 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     append!(Vs, ones(T, hess_nz_total))
 
     # prefer conversions of integer types to happen here than inside external wrappers
-    dim = size(lhs_sub, 1)
     # integer type supported by the sparse system solver library to be used
     Ti = int_type(system_solver.fact_cache)
     Is = convert(Vector{Ti}, Is)
     Js = convert(Vector{Ti}, Js)
+    dim = size(lhs_sub, 1)
     lhs_sub = system_solver.lhs_sub = sparse(Is, Js, Vs, dim, dim)
 
     # cache indices of nonzeros of Hessians and inverse Hessians in sparse LHS nonzeros vector
@@ -171,6 +175,8 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
             system_solver.hess_idxs[k][j] = (col_idx_start + first_H - 2) .+ (1:length(nz_hess_indices))
         end
     end
+
+    setup_point_sub(system_solver, model)
 
     return system_solver
 end
@@ -198,9 +204,9 @@ direct dense
 mutable struct NaiveElimDenseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
     use_inv_hess::Bool
     lhs_sub::Matrix{T}
-    rhs_sub::Vector{T}
-    sol_sub::Vector{T}
     fact_cache::DenseNonSymCache{T}
+    rhs_sub::Point{T}
+    sol_sub::Point{T}
     function NaiveElimDenseSystemSolver{T}(;
         use_inv_hess::Bool = true,
         fact_cache::DenseNonSymCache{T} = DenseNonSymCache{T}(),
@@ -215,8 +221,6 @@ end
 function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
-    system_solver.sol_sub = zeros(T, n + p + q + 1)
-    system_solver.rhs_sub = similar(system_solver.sol_sub)
 
     system_solver.lhs_sub = T[
         zeros(T, n, n)  model.A'        model.G'                  model.c;
@@ -227,6 +231,8 @@ function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) w
 
     load_matrix(system_solver.fact_cache, system_solver.lhs_sub)
 
+    setup_point_sub(system_solver, model)
+
     return system_solver
 end
 
@@ -235,7 +241,7 @@ function update_lhs(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver
     (n, p) = (model.n, model.p)
     lhs_sub = system_solver.lhs_sub
 
-    for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
+    @inbounds for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
         z_rows_k = (n + p) .+ idxs_k
         if Cones.use_dual_barrier(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k

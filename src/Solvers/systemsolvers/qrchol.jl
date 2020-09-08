@@ -11,88 +11,47 @@ TODO iterative refinement for 3x3 solution
 abstract type QRCholSystemSolver{T <: Real} <: SystemSolver{T} end
 
 function setup_rhs3(
-    ::QRCholSystemSolver,
-    model,
-    rhs,
-    sol,
-    rhs_sub,
-    )
-    @inbounds for k in eachindex(model.cones)
-        cone_k = model.cones[k]
+    ::QRCholSystemSolver{T},
+    model::Models.Model{T},
+    rhs::Point{T},
+    sol::Point{T},
+    rhs_sub::Point{T},
+    ) where {T <: Real}
+    @inbounds for (k, cone_k) in enumerate(model.cones)
         rhs_z_k = rhs.z_views[k]
         rhs_s_k = rhs.s_views[k]
-        z_rows_k = (model.n + model.p) .+ model.cone_idxs[k]
-        @views z3_k = rhs_sub[z_rows_k]
+        rhs_sub_z_k = rhs_sub.z_views[k]
         if Cones.use_dual_barrier(cone_k)
             z_temp_k = sol.z_views[k]
             @. z_temp_k = -rhs_z_k - rhs_s_k
-            Cones.inv_hess_prod!(z3_k, z_temp_k, cone_k)
+            Cones.inv_hess_prod!(rhs_sub_z_k, z_temp_k, cone_k)
         else
-            Cones.hess_prod!(z3_k, rhs_z_k, cone_k)
-            axpby!(-1, rhs_s_k, -1, z3_k)
+            Cones.hess_prod!(rhs_sub_z_k, rhs_z_k, cone_k)
+            axpby!(-1, rhs_s_k, -1, rhs_sub_z_k)
         end
     end
     return nothing
 end
 
-# function solve_subsystem4(
-#     system_solver::QRCholSystemSolver{T},
-#     solver::Solver{T},
-#     sol::Point{T},
-#     rhs::Point{T},
-#     tau_scal::T,
-#     ) where {T <: Real}
-#     model = solver.model
-#     x_rows = system_solver.x_rows
-#     y_rows = system_solver.y_rows
-#     z_rows = system_solver.z_rows
-#
-#     rhs_sub = system_solver.rhs_sub
-#     dim3 = length(rhs_sub)
-#
-#     @. @views rhs_sub[x_rows] = rhs.x
-#     @. @views rhs_sub[y_rows] = -rhs.y
-#
-#     setup_rhs3(system_solver, model, rhs, sol, rhs_sub)
-#
-#     sol_sub = solve_subsystem3(system_solver, solver, rhs_sub) # NOTE modifies and returns rhs_sub
-#
-#     # TODO refactor all below
-#     # TODO maybe use higher precision here
-#     const_sol = system_solver.const_sol
-#
-#     # lift to get tau
-#     @views tau_num = rhs.tau[1] + rhs.kap[1] + dot(model.c, sol_sub[x_rows]) + dot(model.b, sol_sub[y_rows]) + dot(model.h, sol_sub[z_rows])
-#     @views tau_denom = tau_scal - dot(model.c, const_sol[x_rows]) - dot(model.b, const_sol[y_rows]) - dot(model.h, const_sol[z_rows])
-#     sol_tau = tau_num / tau_denom
-#
-#     @. sol.vec[1:dim3] = sol_sub + sol_tau * const_sol
-#     sol.tau[1] = sol_tau
-#
-#     return sol
-# end
-
 function solve_subsystem3(
     system_solver::QRCholSystemSolver,
     solver::Solver,
-    sol_sub::Vector,
-    rhs_sub::Vector,
+    sol_sub::Point,
+    rhs_sub::Point,
     ) where {T <: Real}
     model = solver.model
-    (n, p) = (model.n, model.p)
+    copyto!(sol_sub.vec, rhs_sub.vec)
+    x = sol_sub.x
+    y = sol_sub.y
+    z = sol_sub.z
 
-    copyto!(sol_sub, rhs_sub)
-    @views x = sol_sub[system_solver.x_rows]
-    @views y = sol_sub[system_solver.y_rows]
-    @views z = sol_sub[system_solver.z_rows]
-
-    copyto!(system_solver.QpbxGHbz, x) 
+    copyto!(system_solver.QpbxGHbz, x)
     mul!(system_solver.QpbxGHbz, model.G', z, true, true)
     lmul!(solver.Ap_Q', system_solver.QpbxGHbz)
 
-    if !iszero(p)
+    if !iszero(model.p)
         ldiv!(solver.Ap_R', y)
-        sol_sub[1:p] = y
+        sol_sub[1:model.p] = y
 
         if !isempty(system_solver.Q2div)
             mul!(system_solver.GQ1x, system_solver.GQ1, y)
@@ -102,7 +61,7 @@ function solve_subsystem3(
     end
 
     if !isempty(system_solver.Q2div)
-        @views x_sub2 = copyto!(sol_sub[(p + 1):n], system_solver.Q2div)
+        @views x_sub2 = copyto!(sol_sub.vec[(model.p + 1):model.n], system_solver.Q2div)
         inv_prod(system_solver.fact_cache, x_sub2)
     end
 
@@ -113,7 +72,7 @@ function solve_subsystem3(
 
     @. z = system_solver.HGx - z
 
-    if !iszero(p)
+    if !iszero(model.p)
         copyto!(y, system_solver.Q1pbxGHbz)
         mul!(y, system_solver.GQ1', system_solver.HGx, -1, true)
         ldiv!(solver.Ap_R, y)
@@ -136,17 +95,15 @@ direct dense
 =#
 
 mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
-    x_rows::UnitRange{Int}
-    y_rows::UnitRange{Int}
-    z_rows::UnitRange{Int}
-    rhs_sub::Vector{T}
-    sol_sub::Vector{T}
-    const_sol::Vector{T}
     lhs1::Symmetric{T, Matrix{T}}
     inv_hess_cones::Vector{Int}
     inv_hess_sqrt_cones::Vector{Int}
     hess_cones::Vector{Int}
     hess_sqrt_cones::Vector{Int}
+    rhs_sub::Point{T}
+    sol_sub::Point{T}
+    sol_const::Point{T}
+    rhs_const::Point{T}
     GQ1
     GQ2
     QpbxGHbz
@@ -179,13 +136,6 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     nmp = n - p
     cone_idxs = model.cone_idxs
 
-    system_solver.x_rows = 1:n
-    system_solver.y_rows = n .+ (1:p)
-    system_solver.z_rows = (n + p) .+ (1:q)
-
-    dim3 = n + p + q
-    system_solver.rhs_sub = zeros(T, dim3)
-    system_solver.sol_sub = zeros(T, dim3)
     system_solver.lhs1 = Symmetric(zeros(T, nmp, nmp), :U)
 
     num_cones = length(cone_idxs)
@@ -219,7 +169,7 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
 
     load_matrix(system_solver.fact_cache, system_solver.lhs1)
 
-    system_solver.const_sol = zeros(T, length(system_solver.rhs_sub))
+    setup_point_sub(system_solver, model)
 
     return system_solver
 end
@@ -314,14 +264,11 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
     end
 
     # update solution for fixed c,b,h part
-    rhs_sub = system_solver.rhs_sub
-    @. rhs_sub[system_solver.x_rows] = -model.c
-    rhs_sub[system_solver.y_rows] = model.b
-    @views rhs_sub_z = rhs_sub[system_solver.z_rows]
-    for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
-        @views block_hess_prod(cone_k, rhs_sub_z[idxs_k], model.h[idxs_k])
+    rhs_const = system_solver.rhs_const
+    for (k, cone_k) in enumerate(model.cones)
+        block_hess_prod(cone_k, rhs_const.z_views[k], model.h[model.cone_idxs[k]])
     end
-    solve_subsystem3(system_solver, solver, system_solver.const_sol, rhs_sub)
+    @timeit solver.timer "solve_subsystem3" solve_subsystem3(system_solver, solver, system_solver.sol_const, rhs_const)
 
     return system_solver
 end
