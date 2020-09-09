@@ -11,17 +11,8 @@ mutable struct HeurCombStepper{T <: Real} <: Stepper{T}
     dir::Point{T}
     res::Point{T}
     dir_temp::Vector{T}
-    dir_cent::Vector{T}
-    tau_row::Int
-    kap_row::Int
 
-    # TODO make a line search cache
-    z_ls::Vector{T}
-    s_ls::Vector{T}
-    primal_views_ls::Vector
-    dual_views_ls::Vector
-    cone_times::Vector{Float64}
-    cone_order::Vector{Int}
+    line_searcher::LineSearcher{T}
 
     HeurCombStepper{T}() where {T <: Real} = new{T}()
 end
@@ -36,19 +27,9 @@ function load(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.rhs = Point(model)
     stepper.dir = Point(model)
     stepper.res = Point(model)
-    q = model.q
-    stepper.tau_row = model.n + model.p + q + 1
-    stepper.kap_row = stepper.tau_row + q + 1
-    stepper.dir_temp = zeros(T, stepper.kap_row)
-    stepper.dir_cent = zeros(T, stepper.kap_row)
+    stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
 
-    cones = model.cones
-    stepper.z_ls = zeros(T, q)
-    stepper.s_ls = zeros(T, q)
-    stepper.primal_views_ls = [view(Cones.use_dual_barrier(cone) ? stepper.z_ls : stepper.s_ls, idxs) for (cone, idxs) in zip(cones, model.cone_idxs)]
-    stepper.dual_views_ls = [view(Cones.use_dual_barrier(cone) ? stepper.s_ls : stepper.z_ls, idxs) for (cone, idxs) in zip(cones, model.cone_idxs)]
-    stepper.cone_times = zeros(length(cones))
-    stepper.cone_order = collect(1:length(cones))
+    stepper.line_searcher = LineSearcher{T}(model)
 
     return stepper
 end
@@ -56,10 +37,11 @@ end
 # original combined stepper
 function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
+    model = solver.model
     timer = solver.timer
 
     # # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)
-    # cones = solver.model.cones
+    # cones = model.cones
     # rtmu = sqrt(solver.mu)
     # irtmu = inv(rtmu)
     # Cones.load_point.(cones, point.primal_views, irtmu)
@@ -71,7 +53,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     # # @assert all(Cones.in_neighborhood.(cones, rtmu, T(0.7)))
 
     # update linear system solver factorization and helpers
-    Cones.grad.(solver.model.cones)
+    Cones.grad.(model.cones)
     @timeit timer "update_lhs" update_lhs(solver.system_solver, solver)
 
     # calculate centering direction and keep in dir_cent
@@ -93,7 +75,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
 
     # calculate centering factor gamma by finding distance pred_alpha for stepping in pred direction
     copyto!(stepper.dir.vec, dir_pred)
-    @timeit timer "alpha_pred" stepper.prev_pred_alpha = pred_alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T)) # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
+    @timeit timer "alpha_pred" stepper.prev_pred_alpha = pred_alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T)) # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
 
     # TODO allow different function (heuristic) as option?
     # stepper.prev_gamma = gamma = abs2(1 - pred_alpha)
@@ -104,7 +86,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     @. stepper.dir.vec = gamma * (dir_cent + pred_alpha * dir_centcorr) + (1 - gamma) * (dir_pred + pred_alpha * dir_predcorr) # TODO
 
     # find distance alpha for stepping in combined direction
-    @timeit timer "alpha_comb" alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
+    @timeit timer "alpha_comb" alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
 
     if iszero(alpha)
         # could not step far in combined direction, so attempt a pure centering step
@@ -113,11 +95,11 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
         @. stepper.dir.vec = dir_cent + dir_centcorr
 
         # find distance alpha for stepping in centering direction
-        @timeit timer "alpha_cent" alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-6))
+        @timeit timer "alpha_cent" alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
 
         if iszero(alpha)
             copyto!(stepper.dir.vec, dir_cent)
-            @timeit timer "alpha_cent2" alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-6))
+            @timeit timer "alpha_cent2" alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
 
             if iszero(alpha)
                 @warn("numerical failure: could not step in centering direction; terminating")

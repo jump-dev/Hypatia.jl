@@ -11,17 +11,8 @@ mutable struct PredOrCorrStepper{T <: Real} <: Stepper{T}
     dir::Point{T}
     res::Point{T}
     dir_temp::Vector{T}
-    dir_cent::Vector{T}
-    tau_row::Int
-    kap_row::Int
 
-    # TODO make a line search cache
-    z_ls::Vector{T}
-    s_ls::Vector{T}
-    primal_views_ls::Vector
-    dual_views_ls::Vector
-    cone_times::Vector{Float64}
-    cone_order::Vector{Int}
+    line_searcher::LineSearcher{T}
 
     PredOrCorrStepper{T}() where {T <: Real} = new{T}()
 end
@@ -36,29 +27,19 @@ function load(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real
     stepper.rhs = Point(model)
     stepper.dir = Point(model)
     stepper.res = Point(model)
-    q = model.q
-    stepper.tau_row = model.n + model.p + q + 1
-    stepper.kap_row = stepper.tau_row + q + 1
-    stepper.dir_temp = zeros(T, stepper.kap_row)
-    stepper.dir_cent = zeros(T, stepper.kap_row)
+    stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
 
-    # TODO make a line search cache
-    cones = model.cones
-    stepper.z_ls = zeros(T, q)
-    stepper.s_ls = zeros(T, q)
-    stepper.primal_views_ls = [view(Cones.use_dual_barrier(cone) ? stepper.z_ls : stepper.s_ls, idxs) for (cone, idxs) in zip(cones, model.cone_idxs)]
-    stepper.dual_views_ls = [view(Cones.use_dual_barrier(cone) ? stepper.s_ls : stepper.z_ls, idxs) for (cone, idxs) in zip(cones, model.cone_idxs)]
-    stepper.cone_times = zeros(length(cones))
-    stepper.cone_order = collect(1:length(cones))
+    stepper.line_searcher = LineSearcher{T}(model)
 
     return stepper
 end
 
 function step(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real}
     timer = solver.timer
+    model = solver.model
 
     # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)
-    # cones = solver.model.cones
+    # cones = model.cones
     # point = solver.point
     # rtmu = sqrt(solver.mu)
     # irtmu = inv(rtmu)
@@ -75,7 +56,7 @@ function step(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real
     use_corr = true
     # use_corr = false
 
-    if all(Cones.in_neighborhood.(solver.model.cones, sqrt(solver.mu), T(0.05)))
+    if all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))
         # predict
         update_rhs_pred(solver, stepper.rhs)
         get_directions(stepper, solver, true, iter_ref_steps = 3)
@@ -99,7 +80,8 @@ function step(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real
 
     # alpha step length
     # alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3), max_nbhd = T(0.99))
-    alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
+    # alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
+    alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
     # @show alpha
 
     !pred && alpha < 0.98 && println(alpha)

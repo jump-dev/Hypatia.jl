@@ -26,10 +26,10 @@ import Hypatia.DensePosDefCache
 import Hypatia.load_matrix
 import Hypatia.invert
 
-include("point.jl")
-
 default_tol(::Type{T}) where {T <: Real} = sqrt(eps(T))
 default_tol(::Type{BigFloat}) = eps(BigFloat) ^ 0.4
+
+include("point.jl")
 
 abstract type Stepper{T <: Real} end
 
@@ -518,8 +518,9 @@ end
 
 include("initialize.jl")
 
-include("steppers/common.jl")
 include("linesearch.jl")
+
+include("steppers/common.jl")
 
 include("systemsolvers/common.jl")
 

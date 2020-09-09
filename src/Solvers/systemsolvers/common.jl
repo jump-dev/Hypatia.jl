@@ -1,5 +1,5 @@
 #=
-helpers for linear system solving
+linear system solver subroutines
 
 6x6 nonsymmetric system in (x, y, z, tau, s, kap):
 A'*y + G'*z + c*tau = xrhs

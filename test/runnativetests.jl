@@ -30,13 +30,13 @@ system_solvers_instance_names = vcat(
     )
 system_solvers = Dict(
     "NaiveDense" => all_reals,
-    "NaiveSparse" => default_reals,
-    # "NaiveIndirect" => all_reals, # TODO fix
-    "NaiveElimDense" => all_reals,
-    "NaiveElimSparse" => default_reals,
-    "SymIndefDense" => all_reals,
-    "SymIndefSparse" => default_reals,
-    "QRCholDense" => all_reals,
+    # "NaiveSparse" => default_reals,
+    # # "NaiveIndirect" => all_reals, # TODO fix
+    # "NaiveElimDense" => all_reals,
+    # "NaiveElimSparse" => default_reals,
+    # "SymIndefDense" => all_reals,
+    # "SymIndefSparse" => default_reals,
+    # "QRCholDense" => all_reals,
     )
 
 # preprocessing test options
@@ -119,7 +119,8 @@ function run_instance_options(T::Type{<:Real}, inst_name::String, sys_name::Stri
         println(test_info, "...")
         inst_function = eval(Symbol(inst_name))
         sys_solver = Solvers.eval(Symbol(sys_name, "SystemSolver"))
-        solver = Solvers.Solver{T}(; system_solver = sys_solver{T}(), kwargs..., other_options...)
+        solver = Solvers.Solver{T}(; system_solver = sys_solver{T}(), kwargs..., other_options...,
+        stepper = Solvers.HeurCombStepper{T}()) # TODO
         test_time = @elapsed inst_function(T, solver = solver)
         push!(perf, (inst_name, sys_name, string(T), solver.preprocess, solver.init_use_indirect, solver.reduce, test_time))
         @printf("... %8.2e seconds\n", test_time)
