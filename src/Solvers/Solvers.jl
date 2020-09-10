@@ -196,44 +196,41 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.z_feas = NaN
 
     # preprocess and find initial point
-    @timeit solver.timer "initialize" begin
-        orig_model = solver.orig_model
-        model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
+    # TODO refac initialization to a function
+    orig_model = solver.orig_model
+    model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
 
-        @timeit solver.timer "init_cone" (init_z, init_s) = initialize_cone_point(solver.orig_model, solver.timer)
+    (init_z, init_s) = initialize_cone_point(solver.orig_model, solver.timer)
 
-        solver.rescale && rescale_data(solver)
+    solver.rescale && rescale_data(solver)
 
-        if solver.reduce
-            # TODO don't find point / unnecessary stuff before reduce
-            @timeit solver.timer "remove_prim_eq" init_y = find_initial_y(solver, init_s, true)
-            @timeit solver.timer "preproc_init_x" init_x = find_initial_x(solver, init_z)
-        else
-            @timeit solver.timer "preproc_init_x" init_x = find_initial_x(solver, init_z)
-            @timeit solver.timer "preproc_init_y" init_y = find_initial_y(solver, init_s, false)
-        end
-
-        point = solver.point = Point(model)
-        point.x .= init_x
-        point.y .= init_y
-        point.z .= init_z
-        point.s .= init_s
-
-        # if solver.status != :SolveCalled
-        #     point.x = fill(NaN, orig_model.n)
-        #     point.y = fill(NaN, orig_model.p)
-        #     return solver
-        # end
-
-        point.tau[1] = one(T)
-        point.kap[1] = one(T)
-        calc_mu(solver)
-        if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
-            @warn("initial mu is $(solver.mu) but should be 1 (this could indicate a problem with cone barrier oracles)")
-        end
-        Cones.load_point.(model.cones, point.primal_views)
-        Cones.load_dual_point.(model.cones, point.dual_views)
+    if solver.reduce
+        # TODO don't find point / unnecessary stuff before reduce
+        init_y = find_initial_y(solver, init_s, true)
+        init_x = find_initial_x(solver, init_z)
+    else
+        init_x = find_initial_x(solver, init_z)
+        init_y = find_initial_y(solver, init_s, false)
     end
+
+    point = solver.point = Point(model)
+    if solver.status != :SolveCalled
+        point.x .= NaN
+        point.y .= NaN
+        return solver
+    end
+    point.x .= init_x
+    point.y .= init_y
+    point.z .= init_z
+    point.s .= init_s
+    point.tau[1] = one(T)
+    point.kap[1] = one(T)
+    calc_mu(solver)
+    if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
+        @warn("initial mu is $(solver.mu) but should be 1 (this could indicate a problem with cone barrier oracles)")
+    end
+    Cones.load_point.(model.cones, point.primal_views)
+    Cones.load_dual_point.(model.cones, point.dual_views)
 
     # setup iteration helpers
     solver.x_residual = similar(model.c)
