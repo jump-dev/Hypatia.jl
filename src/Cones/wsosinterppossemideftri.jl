@@ -297,11 +297,11 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
 end
 
 function use_correction(cone::WSOSInterpPosSemidefTri)
-    if cone.U < 30
-        return true
-    else
+    # if cone.U < 30
+    #     return true
+    # else
         return false
-    end
+    # end
 end
 
 function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where {T}

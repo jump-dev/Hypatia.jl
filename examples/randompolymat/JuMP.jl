@@ -39,9 +39,11 @@ end
 #
 #     full_mat = [randn(U) for _ in 1:R, _ in 1:R]
 #     for j in 1:R, i in 1:j
-#         full_mat[i, j] += full_mat[j, i]
+#         full_mat[i, j] .+= full_mat[j, i]
+#         full_mat[j, i] .= full_mat[i, j]
 #     end
-#     full_coeffs = full_mat + [q_poly[Cones.block_idxs(U, Cones.svec_idx(i, j))] for j in 1:R, i in 1:R]
+#     svec_idx(row::Int, col::Int) = (row >= col ? Cones.svec_idx(row, col) : Cones.svec_idx(col, row))
+#     full_coeffs = full_mat + [q_poly[Cones.block_idxs(U, svec_idx(i, j))] for j in 1:R, i in 1:R]
 #
 #     if inst.formulation == :nat_wsos_mat
 #         JuMP.@constraint(model, vcat([full_coeffs[i, j] * (i == j ? 1 : sqrt(2)) for j in 1:R for i in 1:j]...) in Hypatia.WSOSInterpPosSemidefTriCone{Float64}(R, U, Ps))

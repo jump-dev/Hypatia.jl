@@ -88,6 +88,8 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     return
 end
 
+use_correction(::WSOSInterpNonnegative) = false
+
 get_nu(cone::WSOSInterpNonnegative) = sum(size(Pk, 2) for Pk in cone.Ps)
 
 # TODO find "central" initial point, like for other cones
