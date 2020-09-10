@@ -35,9 +35,24 @@ function build(inst::EnvelopeJuMP{T}) where {T <: Float64} # TODO generic reals
     model = JuMP.Model()
     JuMP.@variable(model, fpv[1:U]) # values at Fekete points
     JuMP.@objective(model, Min, dot(fpv, w)) # integral over domain (via quadrature)
+    #
+    # p_plus = []
+    # p_minus = []
+    # for i in 1:inst.num_polys
+    #     p_plus_i = JuMP.@variable(model, [1:U])
+    #     p_minus_i = JuMP.@variable(model, [1:U])
+    #     push!(p_plus, p_plus_i)
+    #     push!(p_minus, p_minus_i)
+    #     JuMP.@constraint(model, polys[:, i] .== p_plus_i - p_minus_i)
+    #     JuMP.@constraint(model, p_plus_i in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
+    #     JuMP.@constraint(model, p_minus_i in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
+    # end
+    # JuMP.@constraint(model, fpv - sum(p_plus) - sum(p_minus) in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
+
     # JuMP.@constraint(model, [i in 1:inst.num_polys], polys[:, i] .- fpv in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
     R = num_polys + 1
     if inst.formulation == :nat_wsos_soc
+        # JuMP.@constraint(model, vcat(fpv, [polys[:, i] for i in 1:inst.num_polys]...) in Hypatia.WSOSInterpEpiNormInfCone{Float64}(R, U, Ps))
         JuMP.@constraint(model, vcat(fpv, [polys[:, i] for i in 1:inst.num_polys]...) in Hypatia.WSOSInterpEpiNormEuclCone{Float64}(R, U, Ps))
     elseif inst.formulation == :nat_wsos # broken
         # keep in mind this is not equivalent
