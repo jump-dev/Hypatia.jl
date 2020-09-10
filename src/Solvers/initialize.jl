@@ -75,6 +75,9 @@ function find_initial_x(
     solver::Solver{T},
     init_s::Vector{T},
     ) where {T <: Real}
+    if solver.status != :SolveCalled
+        return zeros(T, 0)
+    end
     model = solver.model
     n = model.n
     if iszero(n) # x is empty (no primal variables)
@@ -96,7 +99,7 @@ function find_initial_x(
             AG = G
         else
             # TODO use LinearMaps.jl
-            AG = BlockMatrix{T}(p + q, n, [A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
+            AG = BlockMatrix{T}(p + q, n, [A, G], [1:p, p .+ (1:q)], [1:n, 1:n])
         end
         @timeit solver.timer "lsqr_solve" init_x = IterativeSolvers.lsqr(AG, rhs)
         return init_x
@@ -183,9 +186,12 @@ end
 # optionally preprocess primal equalities and solve for y as least squares solution to A'y = -c - G'z
 function find_initial_y(
     solver::Solver{T},
-    init_s::Vector{T},
+    init_z::Vector{T},
     reduce::Bool,
     ) where {T <: Real}
+    if solver.status != :SolveCalled
+        return zeros(T, 0)
+    end
     model = solver.model
     p = model.p
     if iszero(p) # y is empty (no primal variables)

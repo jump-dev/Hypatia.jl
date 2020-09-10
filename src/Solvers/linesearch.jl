@@ -32,7 +32,7 @@ function find_max_alpha(
     point::Point{T},
     dir::Point{T},
     line_searcher::LineSearcher{T},
-    model::Models.Model{T}; # TODO remove if not using
+    model::Models.Model{T};
     prev_alpha::T,
     min_alpha::T,
     min_nbhd::T = T(0.01),
@@ -89,8 +89,6 @@ function find_max_alpha(
         min_nbhd_mu = min_nbhd * mu_ls
         (taukap_ls < min_nbhd_mu) && continue
         any(skzk[k] < min_nbhd_mu * Cones.get_nu(cones[k]) for k in cone_order) && continue
-
-        # TODO experiment with SY nbhd for tau-kappa
         isfinite(max_nbhd) && (abs(taukap_ls - mu_ls) > max_nbhd * mu_ls) && continue
 
         rtmu = sqrt(mu_ls)
@@ -103,11 +101,7 @@ function find_max_alpha(
             Cones.load_point(cone_k, line_searcher.primal_views[k], irtmu)
             Cones.load_dual_point(cone_k, line_searcher.dual_views[k])
             Cones.reset_data(cone_k)
-
-            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, rtmu, max_nbhd))
-            # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
-            # TODO is_dual_feas function should fall back to a nbhd-like check (for ray maybe) if not using nbhd check
-            # in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k))
+            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
 
             line_searcher.cone_times[k] = time_ns() - time_k
             if !in_nbhd_k
