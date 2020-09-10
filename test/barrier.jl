@@ -48,8 +48,7 @@ function test_barrier_oracles(
     init_only && return
 
     # perturb and scale the initial point and check feasible
-    noise = 0.0
-    perturb_scale(point, dual_point, noise / 100, one(T))
+    perturb_scale(point, dual_point, noise, one(T))
     load_reset_check(cone, point, dual_point)
 
     # test gradient and Hessian oracles

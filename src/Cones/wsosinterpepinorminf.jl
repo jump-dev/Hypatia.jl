@@ -348,9 +348,6 @@ function update_hess(cone::WSOSInterpEpiNormInf)
             # safe to ovewrite UUk now
             @. UUk = UU + UU'
             @. hess[1:U, 1:U] += UUk
-            # blocks (1,r)
-            @. hess[1:U, idxs] += PΛiPs1[r] * PΛiPs2[r]'
-            # block (1,1)
             @. hess[1:U, 1:U] += abs2(PΛiPs1[r])
             # blocks (1,r)
             @. hess[1:U, idxs] += PΛiPs2[r] * PΛiPs1[r] + PΛiPs1[r] * PΛiPs2[r]
@@ -363,7 +360,7 @@ function update_hess(cone::WSOSInterpEpiNormInf)
         end
     end
     @. hess[:, (U + 1):cone.dim] *= 2
-    # # @show cone.hess ./ fd_hess
+    # @show cone.hess ./ fd_hess
 
     cone.hess_updated = true
     return cone.hess
