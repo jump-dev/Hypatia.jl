@@ -36,6 +36,7 @@ mutable struct WSOSInterpEpiNormInf{T <: Real} <: Cone{T}
     matfact::Vector{Vector}
     Λi_Λ::Vector{Vector{Matrix{T}}}
     Λ11::Vector{Matrix{T}}
+    tmpΛ11::Vector{Matrix{T}}
     tmpLL::Vector{Matrix{T}}
     tmpLU::Vector{Matrix{T}}
     tmpLU2::Vector{Matrix{T}}
@@ -128,6 +129,7 @@ function setup_data(cone::WSOSInterpEpiNormInf{T}) where {T <: Real}
         cone.Λi_Λ[k][r] = similar(cone.grad, size(Ps[k], 2), size(Ps[k], 2))
     end
     cone.Λ11 = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
+    cone.tmpΛ11 = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
     cone.tmpLL = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
     cone.tmpLU = [similar(cone.grad, size(Psk, 2), U) for Psk in Ps]
     cone.tmpLU2 = [similar(cone.grad, size(Psk, 2), U) for Psk in Ps]
@@ -211,6 +213,7 @@ function update_feas(cone::WSOSInterpEpiNormInf)
     @inbounds for k in eachindex(cone.Ps)
         Psk = cone.Ps[k]
         Λ11j = cone.Λ11[k]
+        tmpΛ11j = cone.tmpΛ11[k]
         LLk = cone.tmpLL[k]
         LUk = cone.tmpLU[k]
         Λi_Λ = cone.Λi_Λ[k]
@@ -219,9 +222,9 @@ function update_feas(cone::WSOSInterpEpiNormInf)
 
         # first lambda
         @. LUk = Psk' * point_views[1]'
-        mul!(matsk[1], LUk, Psk)
-        copyto!(Λ11j, matsk[1])
-        lambdafact[k] = cholesky!(Symmetric(matsk[1], :U), check = false)
+        mul!(tmpΛ11j, LUk, Psk)
+        copyto!(Λ11j, tmpΛ11j)
+        lambdafact[k] = cholesky!(Symmetric(tmpΛ11j, :U), check = false)
         if !isposdef(lambdafact[k])
             cone.is_feas = false
             break
@@ -237,11 +240,12 @@ function update_feas(cone::WSOSInterpEpiNormInf)
 
             # not using lambdafact.L \ lambda with an syrk because storing lambdafact \ lambda is useful later
             ldiv!(Λi_Λ[r1], lambdafact[k], LLk)
-            matr = Symmetric(Λ11j, :U) - LLk * Λi_Λ[r1]
+            copyto!(matr, Λ11j)
+            mul!(matr, LLk, Λi_Λ[r1], -1, 1)
 
             # ldiv!(lambdafact[k].L, LLk)
             # mat = Λ11j - LLk' * LLk
-            factk[r1] = cholesky(Symmetric(matr), check = false)
+            factk[r1] = cholesky!(Symmetric(matr, :U), check = false)
             if !isposdef(factk[r1])
                 cone.is_feas = false
                 cone.feas_updated = true
@@ -315,6 +319,7 @@ function update_grad(cone::WSOSInterpEpiNormInf)
 end
 
 function update_hess(cone::WSOSInterpEpiNormInf)
+    @timeit cone.timer "hess" begin
     # cone.hess.data .= ForwardDiff.hessian(cone.barrier, cone.point)
     # fd_hess = ForwardDiff.hessian(cone.barrier, cone.point)
 
@@ -328,42 +333,85 @@ function update_hess(cone::WSOSInterpEpiNormInf)
 
     hess .= 0
     @inbounds for k in eachindex(cone.Ps)
-        Psk = cone.Ps[k]
         PΛiPs1 = cone.PΛiPs1[k]
         PΛiPs2 = cone.PΛiPs2[k]
-        Λi_Λ = cone.Λi_Λ[k]
         UUk = cone.tmpUU_vec[k]
-        LUk = cone.tmpLU[k]
-        LUk2 = cone.tmpLU2[k]
 
-        @inbounds for i in 1:U, k in 1:i
-            hess[k, i] -= abs2(UUk[k, i]) * R2
-        end
-
+        @. hess[1:U, 1:U] -= abs2(UUk) * R2
         @inbounds for r in 1:(R - 1)
-            @. hess[1:U, 1:U] += abs2(PΛiPs1[r])
+            # @. UU = abs2(PΛiPs2[r])
+            @. UU = PΛiPs2[r] * PΛiPs2[r]' # TODO be more careful with numeric for PΛiPs2[r]
+            @. UU += abs2(PΛiPs1[r])
+            @. hess[1:U, 1:U] += UU
+            @. hess[1:U, 1:U] += UU
+            # blocks (r, r)
             idxs = block_idxs(U, r + 1)
-            # block (1,1)
-            @. UU = abs2(PΛiPs2[r])
-            # safe to ovewrite UUk now
-            @. UUk = UU + UU'
-            @. hess[1:U, 1:U] += UUk
-            @. hess[1:U, 1:U] += abs2(PΛiPs1[r])
+            @. hess[idxs, idxs] += UU
             # blocks (1,r)
-            @. hess[1:U, idxs] += PΛiPs2[r] * PΛiPs1[r] + PΛiPs1[r] * PΛiPs2[r]
-
-            # blocks (r, r2)
-            # NOTE for hess[idxs, idxs], UU and UUk are symmetric
-            @. UU = PΛiPs2[r] * PΛiPs2[r]'
-            @. UUk = abs2(PΛiPs1[r])
-            @. hess[idxs, idxs] += UU + UUk
+            @. UU = PΛiPs2[r] * PΛiPs1[r]
+            @. UU += UU'
+            @. hess[1:U, idxs] += UU
         end
     end
+
     @. hess[:, (U + 1):cone.dim] *= 2
-    # @show cone.hess ./ fd_hess
+    # # @show cone.hess ./ fd_hess
 
     cone.hess_updated = true
+    end # timer
     return cone.hess
 end
+
+# function update_hess(cone::WSOSInterpEpiNormInf)
+#     # cone.hess.data .= ForwardDiff.hessian(cone.barrier, cone.point)
+#     # fd_hess = ForwardDiff.hessian(cone.barrier, cone.point)
+#
+#     @assert cone.grad_updated
+#     U = cone.U
+#     R = cone.R
+#     R2 = R - 2
+#     hess = cone.hess.data
+#     UU = cone.tmpUU
+#     matfact = cone.matfact
+#
+#     hess .= 0
+#     @inbounds for k in eachindex(cone.Ps)
+#         Psk = cone.Ps[k]
+#         PΛiPs1 = cone.PΛiPs1[k]
+#         PΛiPs2 = cone.PΛiPs2[k]
+#         Λi_Λ = cone.Λi_Λ[k]
+#         UUk = cone.tmpUU_vec[k]
+#         LUk = cone.tmpLU[k]
+#         LUk2 = cone.tmpLU2[k]
+#
+#         @inbounds for i in 1:U, k in 1:i
+#             hess[k, i] -= abs2(UUk[k, i]) * R2
+#         end
+#
+#         @inbounds for r in 1:(R - 1)
+#             @. hess[1:U, 1:U] += abs2(PΛiPs1[r])
+#             idxs = block_idxs(U, r + 1)
+#             # block (1,1)
+#             @. UU = abs2(PΛiPs2[r])
+#             # safe to ovewrite UUk now
+#             @. UUk = UU + UU'
+#             @. hess[1:U, 1:U] += UUk
+#             @. hess[1:U, 1:U] += abs2(PΛiPs1[r])
+#             # blocks (1,r)
+#             @. hess[1:U, idxs] += PΛiPs2[r] * PΛiPs1[r] + PΛiPs1[r] * PΛiPs2[r]
+#
+#             # blocks (r, r2)
+#             # NOTE for hess[idxs, idxs], UU and UUk are symmetric
+#             @. UU = PΛiPs2[r] * PΛiPs2[r]'
+#             @. UUk = abs2(PΛiPs1[r])
+#             @. hess[idxs, idxs] += UU + UUk
+#         end
+#     end
+#     @. hess[:, (U + 1):cone.dim] *= 2
+#     # @show cone.hess ./ fd_hess
+#
+#     cone.hess_updated = true
+#     return cone.hess
+# end
 
 use_correction(::WSOSInterpEpiNormInf) = false
