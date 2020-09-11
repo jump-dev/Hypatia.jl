@@ -74,7 +74,7 @@ global ITERS = 0
 @testset "native tests" begin
 
 @testset "default options tests" begin
-for inst_name in inst_all
+for inst_name in inst_cones_few#inst_all
     test_instance_solver(inst_name, Float64, common_options, "defaults")
 end
 end

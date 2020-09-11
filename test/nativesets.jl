@@ -140,4 +140,4 @@ inst_cones_many = [
     "wsosinterpepinormeucl3",
     ]
 
-inst_all = vcat(inst_preproc)#, inst_infeas, inst_cones_many)
+inst_all = vcat(inst_preproc, inst_infeas, inst_cones_many)
