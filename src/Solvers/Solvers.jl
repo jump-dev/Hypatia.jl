@@ -79,6 +79,9 @@ mutable struct Solver{T <: Real}
     point::Point{T}
     mu::T
 
+    # result (solution) point
+    result::Point{T}
+
     # residuals
     x_residual::Vector{T}
     y_residual::Vector{T}
@@ -213,85 +216,134 @@ function solve(solver::Solver{T}) where {T <: Real}
         init_y = find_initial_y(solver, init_s, false)
     end
 
-    point = solver.point = Point(model)
-    if solver.status != :SolveCalled
-        point.x .= NaN
-        point.y .= NaN
-        return solver
-    end
-    point.x .= init_x
-    point.y .= init_y
-    point.z .= init_z
-    point.s .= init_s
-    point.tau[1] = one(T)
-    point.kap[1] = one(T)
-    calc_mu(solver)
-    if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
-        @warn("initial mu is $(solver.mu) but should be 1 (this could indicate a problem with cone barrier oracles)")
-    end
-    Cones.load_point.(model.cones, point.primal_views)
-    Cones.load_dual_point.(model.cones, point.dual_views)
-
-    # setup iteration helpers
-    solver.x_residual = similar(model.c)
-    solver.y_residual = similar(model.b)
-    solver.z_residual = similar(model.h)
-
-    solver.x_conv_tol = inv(max(one(T), norm(model.c)))
-    solver.y_conv_tol = inv(max(one(T), norm(model.b)))
-    solver.z_conv_tol = inv(max(one(T), norm(model.h)))
-    solver.prev_is_slow = false
-    solver.prev2_is_slow = false
-    solver.prev_gap = NaN
-    solver.prev_rel_gap = NaN
-    solver.prev_x_feas = NaN
-    solver.prev_y_feas = NaN
-    solver.prev_z_feas = NaN
-
-    stepper = solver.stepper
-    @timeit solver.timer "setup_stepper" load(stepper, solver)
-    @timeit solver.timer "setup_system" load(solver.system_solver, solver)
-
-    # iterate from initial point
-    while true
-        @timeit solver.timer "calc_res" calc_residual(solver)
-
-        @timeit solver.timer "calc_conv" calc_convergence_params(solver)
-
-        @timeit solver.timer "print_iter" solver.verbose && print_iteration_stats(stepper, solver)
-
-        @timeit solver.timer "check_conv" check_convergence(solver) && break
-
-        if solver.num_iters == solver.iter_limit
-            solver.verbose && println("iteration limit reached; terminating")
-            solver.status = :IterationLimit
-            break
+    if solver.status == :SolveCalled
+        point = solver.point = Point(model)
+        point.x .= init_x
+        point.y .= init_y
+        point.z .= init_z
+        point.s .= init_s
+        point.tau[1] = one(T)
+        point.kap[1] = one(T)
+        calc_mu(solver)
+        if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
+            @warn("initial mu is $(solver.mu) but should be 1 (this could indicate a problem with cone barrier oracles)")
         end
-        if time() - start_time >= solver.time_limit
-            solver.verbose && println("time limit reached; terminating")
-            solver.status = :TimeLimit
-            break
+        Cones.load_point.(model.cones, point.primal_views)
+        Cones.load_dual_point.(model.cones, point.dual_views)
+
+        # setup iteration helpers
+        solver.x_residual = similar(model.c)
+        solver.y_residual = similar(model.b)
+        solver.z_residual = similar(model.h)
+
+        solver.x_conv_tol = inv(max(one(T), norm(model.c)))
+        solver.y_conv_tol = inv(max(one(T), norm(model.b)))
+        solver.z_conv_tol = inv(max(one(T), norm(model.h)))
+        solver.prev_is_slow = false
+        solver.prev2_is_slow = false
+        solver.prev_gap = NaN
+        solver.prev_rel_gap = NaN
+        solver.prev_x_feas = NaN
+        solver.prev_y_feas = NaN
+        solver.prev_z_feas = NaN
+
+        stepper = solver.stepper
+        @timeit solver.timer "setup_stepper" load(stepper, solver)
+        @timeit solver.timer "setup_system" load(solver.system_solver, solver)
+
+        # iterate from initial point
+        while true
+            @timeit solver.timer "calc_res" calc_residual(solver)
+
+            @timeit solver.timer "calc_conv" calc_convergence_params(solver)
+
+            @timeit solver.timer "print_iter" solver.verbose && print_iteration_stats(stepper, solver)
+
+            @timeit solver.timer "check_conv" check_convergence(solver) && break
+
+            if solver.num_iters == solver.iter_limit
+                solver.verbose && println("iteration limit reached; terminating")
+                solver.status = :IterationLimit
+                break
+            end
+            if time() - start_time >= solver.time_limit
+                solver.verbose && println("time limit reached; terminating")
+                solver.status = :TimeLimit
+                break
+            end
+
+            @timeit solver.timer "step" step(stepper, solver) || break
+
+            if point.tau[1] <= zero(T) || point.kap[1] <= zero(T) || solver.mu <= zero(T)
+                @warn("numerical failure: tau is $(point.tau[1]), kappa is $(point.kap[1]), mu is $(solver.mu); terminating")
+                solver.status = :NumericalFailure
+                break
+            end
+
+            solver.num_iters += 1
         end
 
-        @timeit solver.timer "step" step(stepper, solver) || break
-
-        if point.tau[1] <= zero(T) || point.kap[1] <= zero(T) || solver.mu <= zero(T)
-            @warn("numerical failure: tau is $(point.tau[1]), kappa is $(point.kap[1]), mu is $(solver.mu); terminating")
-            solver.status = :NumericalFailure
-            break
+        # calculate result and iteration statistics and finish
+        point.vec ./= point.tau[1]
+        # Cones.load_point.(model.cones, point.primal_views)
+        # Cones.load_dual_point.(model.cones, point.dual_views)
+        result = solver.result = Point{T}(orig_model)
+        # get x
+        if solver.preprocess && !iszero(solver.orig_model.n) && !any(isnan, solver.point.x)
+            # unpreprocess solver's solution
+            if solver.reduce && !iszero(solver.orig_model.p)
+                # unreduce solver's solution
+                # x0 = Q * [(R' \ b0), x]
+                x = zeros(T, solver.orig_model.n - length(solver.reduce_Rpib0))
+                x[solver.x_keep_idxs] = solver.point.x
+                x = vcat(solver.reduce_Rpib0, x)
+                lmul!(solver.reduce_Ap_Q, x)
+                if !isempty(solver.reduce_row_piv_inv)
+                    x = x[solver.reduce_row_piv_inv]
+                end
+            else
+                x = zeros(T, solver.orig_model.n)
+                x[solver.x_keep_idxs] = solver.point.x
+            end
+        else
+            x = copy(solver.point.x)
+        end
+        # get y
+        if solver.preprocess && !iszero(solver.orig_model.p) && !any(isnan, solver.point.y)
+            # unpreprocess solver's solution
+            y = zeros(T, solver.orig_model.p)
+            if solver.reduce
+                # unreduce solver's solution
+                # y0 = R \ (-cQ1' - GQ1' * z0)
+                y0 = solver.reduce_GQ1' * solver.point.z
+                y0 .+= solver.reduce_cQ1
+                @views ldiv!(solver.reduce_Ap_R, y0[1:length(solver.reduce_y_keep_idxs)])
+                @. y[solver.reduce_y_keep_idxs] = -y0
+            else
+                y[solver.y_keep_idxs] = solver.point.y
+            end
+        else
+            y = copy(solver.point.y)
+        end
+        # get s,z
+        if solver.rescale
+            @. result.s = point.s * solver.h_scale
+            @. result.z = point.z / solver.h_scale
+            @. result.x /= solver.c_scale
+            @. result.y /= solver.b_scale
+        else
+            @. result.s = point.s
+            @. result.z = point.z
         end
 
-        solver.num_iters += 1
+
+
+
+    else
+        point = solver.point = Point(orig_model)
+
+
     end
-
-    # calculate result and iteration statistics and finish
-    tau = point.tau[1]
-    point.x ./= tau
-    point.y ./= tau
-    point.z ./= tau
-    point.s ./= tau
-    Cones.load_point.(model.cones, point.primal_views)
-    Cones.load_dual_point.(model.cones, point.dual_views)
 
     solver.solve_time = time() - start_time
 

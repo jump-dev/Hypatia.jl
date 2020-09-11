@@ -51,7 +51,7 @@ function solve_subsystem3(
 
     if !iszero(model.p)
         ldiv!(solver.Ap_R', y)
-        sol_sub[1:model.p] = y
+        sol_sub.vec[1:model.p] = y
 
         if !isempty(system_solver.Q2div)
             mul!(system_solver.GQ1x, system_solver.GQ1, y)
