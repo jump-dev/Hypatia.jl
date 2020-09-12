@@ -2,7 +2,6 @@
 Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 
 =#
-using ForwardDiff
 
 mutable struct WSOSInterpEpiNormInf{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
@@ -42,6 +41,9 @@ mutable struct WSOSInterpEpiNormInf{T <: Real} <: Cone{T}
     tmpLU2::Vector{Matrix{T}}
     tmpUU_vec::Vector{Matrix{T}} # reused in update_hess
     tmpUU::Matrix{T}
+    tmpUU2::Matrix{T}
+    tmpURU::Matrix{T}
+    tmpURU2::Matrix{T}
     PΛiPs1::Vector{Vector{Matrix{T}}} # for each (2, 2)-block pertaining to (lambda_1, lambda_i), P * inv(Λ)[1, 1] * Ps = P * inv(Λ)i[2, 2] * Ps
     PΛiPs2::Vector{Vector{Matrix{T}}} # for each (2, 2)-block pertaining to (lambda_1, lambda_i), P * inv(Λ)[2, 1] * Ps = P * inv(Λ)[1, 2]' * Ps
     lambdafact::Vector
@@ -87,20 +89,20 @@ mutable struct WSOSInterpEpiNormInf{T <: Real} <: Cone{T}
         # end
 
         # orthant-based
-        function barrier(point)
-             bar = zero(eltype(point))
-             for P in cone.Ps
-                 lambda_1 = Hermitian(P' * Diagonal(point[1:U]) * P)
-                 for i in 2:R
-                     lambda_i = Hermitian(P' * Diagonal(point[block_idxs(U, i)]) * P)
-                     bar -= logdet(lambda_1 - lambda_i) + logdet(lambda_1 + lambda_i)
-                 end
-                 bar += logdet(cholesky(lambda_1)) * (R - 2)
-             end
-             return bar
-        end
-
-        cone.barrier = barrier
+        # function barrier(point)
+        #      bar = zero(eltype(point))
+        #      for P in cone.Ps
+        #          lambda_1 = Hermitian(P' * Diagonal(point[1:U]) * P)
+        #          for i in 2:R
+        #              lambda_i = Hermitian(P' * Diagonal(point[block_idxs(U, i)]) * P)
+        #              bar -= logdet(lambda_1 - lambda_i) + logdet(lambda_1 + lambda_i)
+        #          end
+        #          bar += logdet(cholesky(lambda_1)) * (R - 2)
+        #      end
+        #      return bar
+        # end
+        #
+        # cone.barrier = barrier
 
         return cone
     end
@@ -134,7 +136,10 @@ function setup_data(cone::WSOSInterpEpiNormInf{T}) where {T <: Real}
     cone.tmpLU = [similar(cone.grad, size(Psk, 2), U) for Psk in Ps]
     cone.tmpLU2 = [similar(cone.grad, size(Psk, 2), U) for Psk in Ps]
     cone.tmpUU_vec = [similar(cone.grad, U, U) for _ in eachindex(Ps)]
-    cone.tmpUU = similar(cone.grad, U, U)
+    cone.tmpUU = zeros(T, U, U)
+    cone.tmpUU2 = zeros(T, U, U)
+    cone.tmpURU = zeros(T, U, U * (R - 1))
+    cone.tmpURU2 = zeros(T, U * (R - 1), U)
     cone.PΛiPs1 = [Vector{Matrix{T}}(undef, R) for Psk in Ps]
     cone.PΛiPs2 = [Vector{Matrix{T}}(undef, R) for Psk in Ps]
     @inbounds for k in eachindex(Ps), r in 1:(R - 1)
@@ -413,5 +418,42 @@ end
 #     cone.hess_updated = true
 #     return cone.hess
 # end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpEpiNormInf)
+    @assert cone.hess_updated
+    U = cone.U
+    R = cone.R
+    H = cone.hess.data
+    UU = cone.tmpUU
+
+    schur = cone.tmpUU2
+    @views copyto!(schur, H[1:U, 1:U])
+    edge = cone.tmpURU
+    @views copyto!(edge, H[1:U, (U + 1):end])
+    Diz = cone.tmpURU2
+
+    @inbounds for r in 2:R
+        idxs = block_idxs(U, r)
+        idxs2 = block_idxs(U, r - 1)
+        @views z = H[1:U, idxs]
+        @views copyto!(UU, H[idxs, idxs])
+        fact = cholesky!(Symmetric(UU, :U))
+        @views ldiv!(Diz[idxs2, :], fact, z)
+        @views mul!(schur, z', Diz[idxs2, :], -1, true)
+        @views ldiv!(prod[idxs, :], fact, arr[idxs, :])
+    end
+    # prod += u * inv(schur) * u' * arr
+    s_fact = cholesky!(Symmetric(schur, :U))
+    ldiv!(s_fact, edge)
+    @inbounds for j in 1:size(arr, 2)
+        @views Dix = prod[(U + 1):end, j]
+        @views a1j = arr[1:U, j]
+        @views ldiv!(prod[1:U, j], s_fact, a1j)
+        @views mul!(prod[1:U, j], edge, Dix, -1, true)
+        @views mul!(prod[(U + 1):end, j], Diz, prod[1:U, j], -1, true)
+    end
+
+    return prod
+end
 
 use_correction(::WSOSInterpEpiNormInf) = false
