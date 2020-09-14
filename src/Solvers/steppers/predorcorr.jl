@@ -87,7 +87,7 @@ function step(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real
     !pred && alpha < 0.98 && println(alpha)
     if iszero(alpha)
         @warn("very small alpha")
-        solver.status = :NumericalFailure
+        solver.status = NumericalFailure
         return false
     end
     stepper.prev_alpha = alpha
@@ -337,7 +337,7 @@ end
 #         alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-3))
 #         if iszero(alpha)
 #             @warn("numerical failure: could not step in centering direction; terminating")
-#             solver.status = :NumericalFailure
+#             solver.status = NumericalFailure
 #             return false
 #         end
 #         stepper.prev_alpha = alpha

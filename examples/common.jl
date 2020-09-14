@@ -36,7 +36,7 @@ function certificate_violations(
     ) where {T <: Real}
     (c, A, b, G, h, obj_offset) = (model.c, model.A, model.b, model.G, model.h, model.obj_offset)
 
-    if status == :Optimal
+    if status == Solvers.Optimal
         x_res = G' * z + A' * y + c
         y_res = A * x - b
         z_res = G * x + s - h
@@ -46,14 +46,14 @@ function certificate_violations(
         x_viol = norm(x_res_rel, Inf)
         y_viol = norm(y_res_rel, Inf)
         z_viol = norm(z_res_rel, Inf)
-    elseif status == :PrimalInfeasible
+    elseif status == Solvers.PrimalInfeasible
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         x_res = G' * z + A' * y
         x_res_rel = relative_residual(x_res, c)
         x_viol = norm(x_res_rel, Inf)
         y_viol = NaN
         z_viol = NaN
-    elseif status == :DualInfeasible
+    elseif status == Solvers.DualInfeasible
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         y_res = A * x
         z_res = G * x + s
@@ -62,7 +62,7 @@ function certificate_violations(
         x_viol = NaN
         y_viol = norm(y_res_rel, Inf)
         z_viol = norm(z_res_rel, Inf)
-    # TODO elseif status == :IllPosed # primal vs dual ill-posed statuses and conditions
+    # TODO elseif status == Solvers.IllPosed # primal vs dual ill-posed statuses and conditions
     else # failure
         x_viol = NaN
         y_viol = NaN

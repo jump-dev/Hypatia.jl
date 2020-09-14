@@ -103,7 +103,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
 
             if iszero(alpha)
                 @warn("numerical failure: could not step in centering direction; terminating")
-                solver.status = :NumericalFailure
+                solver.status = NumericalFailure
                 return false
             end
         end

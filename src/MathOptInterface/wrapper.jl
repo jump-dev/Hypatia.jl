@@ -45,10 +45,10 @@ Optimizer(; options...) = Optimizer{Float64}(; options...) # default to Float64
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 MOI.get(opt::Optimizer, ::MOI.RawSolver) = opt.solver
 
-MOI.is_empty(opt::Optimizer) = (opt.solver.status == :NotLoaded)
+MOI.is_empty(opt::Optimizer) = (opt.solver.status == Solvers.NotLoaded)
 
 function MOI.empty!(opt::Optimizer)
-    opt.solver.status = :NotLoaded
+    opt.solver.status = Hypatia.Solvers.NotLoaded
     return
 end
 
@@ -510,19 +510,19 @@ MOI.get(opt::Optimizer, ::MOI.BarrierIterations) = opt.solver.num_iters
 
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     status = opt.solver.status
-    if status in (:NotLoaded, :Loaded)
+    if status in (Solvers.NotLoaded, Solvers.Loaded)
         return MOI.OPTIMIZE_NOT_CALLED
-    elseif status == :Optimal
+    elseif status == Solvers.Optimal
         return MOI.OPTIMAL
-    elseif status == :PrimalInfeasible
+    elseif status == Solvers.PrimalInfeasible
         return MOI.INFEASIBLE
-    elseif status == :DualInfeasible
+    elseif status == Solvers.DualInfeasible
         return MOI.DUAL_INFEASIBLE
-    elseif status == :SlowProgress
+    elseif status == Solvers.SlowProgress
         return MOI.SLOW_PROGRESS
-    elseif status == :IterationLimit
+    elseif status == Solvers.IterationLimit
         return MOI.ITERATION_LIMIT
-    elseif status == :TimeLimit
+    elseif status == Solvers.TimeLimit
         return MOI.TIME_LIMIT
     else
         @warn("Hypatia status $(opt.solver.status) not handled")
@@ -532,13 +532,13 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
     status = opt.solver.status
-    if status == :Optimal
+    if status == Solvers.Optimal
         return MOI.FEASIBLE_POINT
-    elseif status == :PrimalInfeasible
+    elseif status == Solvers.PrimalInfeasible
         return MOI.INFEASIBLE_POINT
-    elseif status == :DualInfeasible
+    elseif status == Solvers.DualInfeasible
         return MOI.INFEASIBILITY_CERTIFICATE
-    elseif status == :IllPosed
+    elseif status == Solvers.IllPosed
         return MOI.OTHER_RESULT_STATUS
     else
         return MOI.UNKNOWN_RESULT_STATUS
@@ -547,13 +547,13 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.DualStatus)
     status = opt.solver.status
-    if status == :Optimal
+    if status == Solvers.Optimal
         return MOI.FEASIBLE_POINT
-    elseif status == :PrimalInfeasible
+    elseif status == Solvers.PrimalInfeasible
         return MOI.INFEASIBILITY_CERTIFICATE
-    elseif status == :DualInfeasible
+    elseif status == Solvers.DualInfeasible
         return MOI.INFEASIBLE_POINT
-    elseif status == :IllPosed
+    elseif status == Solvers.IllPosed
         return MOI.OTHER_RESULT_STATUS
     else
         return MOI.UNKNOWN_RESULT_STATUS

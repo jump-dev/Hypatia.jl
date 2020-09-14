@@ -140,7 +140,7 @@ function find_initial_x(
     @views residual = norm(A' * yz_sub[1:p] + G' * yz_sub[(p + 1):end] - model.c, Inf)
     if residual > solver.init_tol_qr
         solver.verbose && println("some dual equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
-        solver.status = :DualInconsistent
+        solver.status = DualInconsistent
         return zeros(T, 0)
     end
     solver.verbose && println("$(n - AG_rank) out of $n dual equality constraints are dependent")
@@ -245,7 +245,7 @@ function find_initial_y(
         residual = norm(A * x_sub - model.b, Inf)
         if residual > solver.init_tol_qr
             solver.verbose && println("some primal equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
-            solver.status = :PrimalInconsistent
+            solver.status = PrimalInconsistent
             return zeros(T, 0)
         end
         solver.verbose && println("$(p - Ap_rank) out of $p primal equality constraints are dependent")
