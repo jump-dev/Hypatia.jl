@@ -14,21 +14,21 @@ options = (verbose = false,)
 
 @info("starting Pardiso cache tests")
 @testset "Pardiso cache tests" begin
-    @testset "cache setup tests: $cache_type" for cache_type in [Hypatia.PardisoSymCache, Hypatia.PardisoNonSymCache]
-        cache = cache_type()
-        @test isa(cache, cache_type{Float64})
-        @test cache.analyzed == false
-        @test_throws Exception cache_type{Float32}() # TODO make error more specific
-    end
+@testset "cache setup tests: $cache_type" for cache_type in [Hypatia.PardisoSymCache, Hypatia.PardisoNonSymCache]
+    cache = cache_type()
+    @test isa(cache, cache_type{Float64})
+    @test cache.analyzed == false
+    @test_throws Exception cache_type{Float32}() # TODO make error more specific
+end
 
-    T = Float64
-    @testset "NaiveSparse tests: $t" for t in testfuns_many
-        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache()); options...))
-    end
-    @testset "NaiveElimSparse tests: $t" for t in testfuns_many
-        t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache()); options...))
-    end
-    @testset "SymIndefSparse tests: $t" for t in testfuns_many
-        t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(fact_cache = Hypatia.PardisoSymCache()); options...))
-    end
+T = Float64
+@testset "NaiveSparse tests: $t" for t in testfuns_many
+    t(T, solver = SO.Solver{T}(system_solver = SO.NaiveSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache()); options...))
+end
+@testset "NaiveElimSparse tests: $t" for t in testfuns_many
+    t(T, solver = SO.Solver{T}(system_solver = SO.NaiveElimSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache()); options...))
+end
+@testset "SymIndefSparse tests: $t" for t in testfuns_many
+    t(T, solver = SO.Solver{T}(system_solver = SO.SymIndefSparseSystemSolver{T}(fact_cache = Hypatia.PardisoSymCache()); options...))
+end
 end

@@ -1,5 +1,7 @@
 #=
 functions and caches for cones
+
+TODO maybe write a fallback dual feas check that checks if ray of dual point intersects dikin ellipsoid at primal point
 =#
 
 module Cones
@@ -60,7 +62,6 @@ load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
 load_dual_point(cone::Cone, point::AbstractVector) = copyto!(cone.dual_point, point)
 
 is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))
-# is_dual_feas(cone::Cone) = # TODO maybe write a fallback dual feas check that checks if ray of dual point intersects dikin ellipsoid at primal point
 grad(cone::Cone) = (cone.grad_updated ? cone.grad : update_grad(cone))
 hess(cone::Cone) = (cone.hess_updated ? cone.hess : update_hess(cone))
 inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(cone))
@@ -170,7 +171,6 @@ inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 use_heuristic_neighborhood(cone::Cone) = cone.use_heuristic_neighborhood
 
 function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
-    # norm(H^(-1/2) * (z + mu * grad))
     nbhd_tmp = cone.nbhd_tmp
     nbhd_tmp2 = cone.nbhd_tmp2
     g = grad(cone)
@@ -195,63 +195,6 @@ function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
     return (nbhd < rtmu * max_nbhd)
 end
 
-# TODO cleanup / remove if not using
-# function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector{T}, rtmu::T, max_nbhd::T) where {T <: Real}
-#     # norm(H^(-1/2) * (z + mu * grad))
-#     nbhd_tmp = cone.nbhd_tmp
-#     g = rtmu * grad(cone)
-#     dp = copy(dual_point)
-#
-#     # TODO trying to see if ray intersects dikin ellipsoid
-#     # TODO find point on ray closest to g in the hessian norm
-#     gdp = dot(dp, g)
-#     # gdp = dot(dp, hess_prod!(similar(g), g, cone)) / mu
-#     # gdp = -dot(dp, cone.point)
-#     if gdp > 0
-#         return false
-#     end
-#
-#     # TODO this can be used to check feasibility rather than nbhd
-#     # scal = -gdp / sum(abs2, dp)
-#     # dp .*= scal
-#     # @show scal
-#
-#     @. nbhd_tmp = dp + g
-#
-#     # if use_heuristic_neighborhood(cone)
-#     #     error("shouldn't be using heuristic nbhd")
-#     #     nbhd = norm(nbhd_tmp, Inf) / norm(g, Inf)
-#     #     # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(nbhd_tmp, g)) # TODO try this neighborhood
-#     # else
-#         has_hess_fact_cache = hasfield(typeof(cone), :hess_fact_cache)
-#         if has_hess_fact_cache && !update_hess_fact(cone)
-#             return false
-#         end
-#         nbhd_tmp2 = cone.nbhd_tmp2
-#         if has_hess_fact_cache && cone.hess_fact_cache isa DenseSymCache{T}
-#             inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
-#             nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
-#             if nbhd_sqr < -eps(T) # TODO possibly loosen
-#                 # @warn("numerical failure: cone neighborhood is $nbhd_sqr")
-#                 return false
-#             end
-#             nbhd = sqrt(abs(nbhd_sqr))
-#         else
-#             inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
-#             nbhd = norm(nbhd_tmp2)
-#         end
-#     # end
-#
-#     # @show nbhd, typeof(cone)
-#     # return (nbhd < mu * cone.max_neighborhood)
-#     # return (nbhd < 0.5 * mu)
-#     # @show nbhd
-#     return (nbhd < rtmu * max_nbhd)
-#     # return (nbhd < max_nbhd)
-#     # return (nbhd < T(0.5))
-# end
-
-
 # utilities for arrays
 
 svec_length(side::Int) = div(side * (side + 1), 2)
@@ -260,7 +203,7 @@ svec_idx(row::Int, col::Int) = (div((row - 1) * row, 2) + col)
 
 block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
 
-# TODO fix later, rt2::T doesn't work with tests using ForwardDiff
+# TODO rt2::T doesn't work with tests using ForwardDiff
 function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where {T}
     k = 1
     m = size(mat, 1)

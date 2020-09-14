@@ -30,7 +30,7 @@ function build_solve_check(
     cones::Vector{Cone{T}};
     obj_offset::T = zero(T),
     solver::Solvers.Solver{T} = Solvers.Solver{T}(),
-    tol::Real = sqrt(eps(T)),
+    tol::Real = 10sqrt(eps(T)),
     ) where {T <: Real}
     model = Hypatia.Models.Model{T}(c, A, b, G, h, cones, obj_offset = obj_offset)
 
@@ -45,24 +45,23 @@ function build_solve_check(
     z = Solvers.get_z(solver)
     s = Solvers.get_s(solver)
 
-    tol_sq = abs2(tol)
     tol_rt = sqrt(tol)
     if status == :Optimal
         @test primal_obj ≈ dual_obj atol=tol rtol=tol
-        @test dot(c, x) + obj_offset ≈ primal_obj atol=tol_sq rtol=tol_sq
-        @test -dot(b, y) - dot(h, z) + obj_offset ≈ dual_obj atol=tol_sq rtol=tol_sq
+        @test dot(c, x) + obj_offset ≈ primal_obj atol=tol rtol=tol
+        @test -dot(b, y) - dot(h, z) + obj_offset ≈ dual_obj atol=tol rtol=tol
         @test A * x ≈ b atol=tol rtol=tol
         @test G * x + s ≈ h atol=tol rtol=tol
         @test G' * z + A' * y ≈ -c atol=tol rtol=tol
         @test dot(s, z) ≈ zero(T) atol=tol_rt rtol=tol_rt
     elseif status == :PrimalInfeasible
         @test dual_obj > obj_offset
-        @test -dot(b, y) - dot(h, z) + obj_offset ≈ dual_obj atol=tol_sq rtol=tol_sq
+        @test -dot(b, y) - dot(h, z) + obj_offset ≈ dual_obj atol=tol rtol=tol
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         @test G' * z ≈ -A' * y atol=tol_rt rtol=tol_rt
     elseif status == :DualInfeasible
         @test primal_obj < obj_offset
-        @test dot(c, x) + obj_offset ≈ primal_obj atol=tol_sq rtol=tol_sq
+        @test dot(c, x) + obj_offset ≈ primal_obj atol=tol rtol=tol
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         @test G * x ≈ -s atol=tol_rt rtol=tol_rt
         @test A * x ≈ zeros(T, length(y)) atol=tol_rt rtol=tol_rt
@@ -99,8 +98,6 @@ function dimension1(T; options...)
         @test r.primal_obj ≈ -1 atol=tol rtol=tol
         @test r.x ≈ [1, 0] atol=tol rtol=tol
         @test isempty(r.y)
-
-        @test_throws ErrorException options.linear_model{T}(T[-1, -1], A, b, G, h, cones)
     end
 end
 
@@ -138,8 +135,10 @@ function inconsistent1(T; options...)
     A[11:15, :] = rnd1 * A[1:5, :] - rnd2 * A[6:10, :]
     b[11:15] = 2 * (rnd1 * b[1:5] - rnd2 * b[6:10])
     h = zeros(T, q)
+    cones = Cone{T}[Cones.Nonnegative{T}(q)]
 
-    @test_throws ErrorException options.linear_model{T}(c, A, b, G, h, Cone{T}[Cones.Nonnegative{T}(q)])
+    r = build_solve_check(c, A, b, G, h, cones; options...)
+    @test r.status == :PrimalInconsistent
 end
 
 function inconsistent2(T; options...)
@@ -155,8 +154,10 @@ function inconsistent2(T; options...)
     G[:,11:15] = rnd1 * G[:,1:5] - rnd2 * G[:,6:10]
     c[11:15] = 2 * (rnd1 * c[1:5] - rnd2 * c[6:10])
     h = zeros(T, q)
+    cones = Cone{T}[Cones.Nonnegative{T}(q)]
 
-    @test_throws ErrorException options.linear_model{T}(c, A, b, G, h, Cone{T}[Cones.Nonnegative{T}(q)])
+    r = build_solve_check(c, A, b, G, h, cones; options...)
+    @test r.status == :DualInconsistent
 end
 
 function nonnegative1(T; options...)

@@ -1,103 +1,9 @@
 #=
 naive linear system solver
-
-6x6 nonsymmetric system in (x, y, z, tau, s, kap):
-A'*y + G'*z + c*tau = xrhs
--A*x + b*tau = yrhs
--G*x + h*tau - s = zrhs
--c'*x - b'*y - h'*z - kap = taurhs
-(pr bar) z_k + mu*H_k*s_k = srhs_k
-(du bar) mu*H_k*z_k + s_k = srhs_k
-mu/(taubar^2)*tau + kap = kaprhs
+solves 6x6 system without reductions
 =#
 
 abstract type NaiveSystemSolver{T <: Real} <: SystemSolver{T} end
-
-#=
-indirect
-TODO
-- precondition
-- optimize operations
-- tune number of restarts and tolerances etc, ensure initial point in sol helps
-- fix IterativeSolvers so that methods can take matrix RHS
-=#
-
-# mutable struct NaiveIndirectSystemSolver{T <: Real} <: NaiveSystemSolver{T}
-#     lhs6::BlockMatrix{T}
-#     NaiveIndirectSystemSolver{T}() where {T <: Real} = new{T}()
-# end
-#
-# function load(system_solver::NaiveIndirectSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-#     model = solver.model
-#     (n, p, q) = (model.n, model.p, model.q)
-#     cones = model.cones
-#     cone_idxs = model.cone_idxs
-#     tau_row = n + p + q + 1
-#     dim = tau_row + q + 1
-#
-#     # setup block LHS
-#     x_idxs = 1:n
-#     y_idxs = n .+ (1:p)
-#     z_idxs = (n + p) .+ (1:q)
-#     tau_idxs = tau_row:tau_row
-#     s_idxs = tau_row .+ (1:q)
-#     kap_idxs = dim:dim
-#
-#     k_len = 2 * length(cones)
-#     cone_rows = Vector{UnitRange{Int}}(undef, k_len)
-#     cone_cols = Vector{UnitRange{Int}}(undef, k_len)
-#     cone_blocks = Vector{Any}(undef, k_len)
-#     for (k, cone_k) in enumerate(cones)
-#         idxs_k = model.cone_idxs[k]
-#         rows = tau_row .+ idxs_k
-#         k1 = 2k - 1
-#         k2 = 2k
-#         cone_rows[k1] = cone_rows[k2] = rows
-#         cone_cols[k1] = (n + p) .+ idxs_k
-#         cone_cols[k2] = rows
-#         if Cones.use_dual_barrier(cone_k)
-#             cone_blocks[k1] = cone_k
-#             cone_blocks[k2] = I
-#         else
-#             cone_blocks[k1] = I
-#             cone_blocks[k2] = cone_k
-#         end
-#     end
-#
-#     system_solver.lhs6 = BlockMatrix{T}(dim, dim,
-#         [cone_blocks...,
-#             model.A', model.G', reshape(model.c, :, 1),
-#             -model.A, reshape(model.b, :, 1),
-#             -model.G, reshape(model.h, :, 1), -I,
-#             -model.c', -model.b', -model.h', -ones(T, 1, 1),
-#             solver, ones(T, 1, 1)],
-#         [cone_rows...,
-#             x_idxs, x_idxs, x_idxs,
-#             y_idxs, y_idxs,
-#             z_idxs, z_idxs, z_idxs,
-#             tau_idxs, tau_idxs, tau_idxs, tau_idxs,
-#             kap_idxs, kap_idxs],
-#         [cone_cols...,
-#             y_idxs, z_idxs, tau_idxs,
-#             x_idxs, tau_idxs,
-#             x_idxs, tau_idxs, s_idxs,
-#             x_idxs, y_idxs, z_idxs, kap_idxs,
-#             tau_idxs, kap_idxs],
-#         )
-#
-#     return system_solver
-# end
-#
-# update_lhs(system_solver::NaiveIndirectSystemSolver, solver::Solver) = system_solver
-#
-# function solve_system(system_solver::NaiveIndirectSystemSolver, solver::Solver, sol6::Matrix, rhs6::Matrix)
-#     for j in 1:size(rhs6, 2)
-#         rhs_j = view(rhs6, :, j)
-#         sol_j = view(sol6, :, j)
-#         IterativeSolvers.gmres!(sol_j, system_solver.lhs6, rhs_j, restart = size(rhs6, 1))
-#     end
-#     return sol6
-# end
 
 #=
 direct sparse
@@ -105,9 +11,9 @@ direct sparse
 
 mutable struct NaiveSparseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     lhs6::SparseMatrixCSC
+    fact_cache::SparseNonSymCache{T}
     hess_idxs::Vector
     mtt_idx::Int
-    fact_cache::SparseNonSymCache{T}
     function NaiveSparseSystemSolver{Float64}(; fact_cache::SparseNonSymCache{Float64} = SparseNonSymCache{Float64}())
         s = new{Float64}()
         s.fact_cache = fact_cache
@@ -206,7 +112,8 @@ function update_lhs(system_solver::NaiveSparseSystemSolver, solver::Solver)
             @views copyto!(system_solver.lhs6.nzval[system_solver.hess_idxs[k][j]], H_k[nz_rows, j])
         end
     end
-    system_solver.lhs6.nzval[system_solver.mtt_idx] = solver.mu / solver.tau / solver.tau # NOTE: mismatch when using NT for kaptau
+    tau = solver.point.tau[1]
+    system_solver.lhs6.nzval[system_solver.mtt_idx] = solver.mu / tau / tau # NOTE: mismatch when using NT for kaptau
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs6)
 
@@ -216,11 +123,11 @@ end
 function solve_system(
     system_solver::NaiveSparseSystemSolver,
     solver::Solver{T},
-    sol::Vector{T},
-    rhs::Vector{T},
+    sol::Point{T},
+    rhs::Point{T},
     ::T,
     ) where {T <: Real}
-    inv_prod(system_solver.fact_cache, sol, system_solver.lhs6, rhs)
+    inv_prod(system_solver.fact_cache, sol.vec, system_solver.lhs6, rhs.vec)
     return sol
 end
 
@@ -231,8 +138,8 @@ direct dense
 mutable struct NaiveDenseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     tau_row::Int
     lhs6::Matrix{T}
-    lhs6_H_k::Vector
     fact_cache::DenseNonSymCache{T}
+    lhs6_H_k::Vector
     function NaiveDenseSystemSolver{T}(; fact_cache::DenseNonSymCache{T} = DenseNonSymCache{T}()) where {T <: Real}
         system_solver = new{T}()
         system_solver.fact_cache = fact_cache
@@ -272,7 +179,8 @@ function update_lhs(system_solver::NaiveDenseSystemSolver, solver::Solver)
     for (cone_k, lhs6_H_k) in zip(solver.model.cones, system_solver.lhs6_H_k)
         copyto!(lhs6_H_k, Cones.hess(cone_k))
     end
-    system_solver.lhs6[end, system_solver.tau_row] = solver.mu / solver.tau / solver.tau # NOTE: mismatch when using NT for kaptau
+    tau = solver.point.tau[1]
+    system_solver.lhs6[end, system_solver.tau_row] = solver.mu / tau / tau # NOTE: mismatch when using NT for kaptau
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs6)
 
@@ -282,11 +190,97 @@ end
 function solve_system(
     system_solver::NaiveDenseSystemSolver,
     solver::Solver,
-    sol::Vector{T},
-    rhs::Vector{T},
+    sol::Point{T},
+    rhs::Point{T},
     ::T,
     ) where {T <: Real}
-    copyto!(sol, rhs)
-    inv_prod(system_solver.fact_cache, sol)
+    copyto!(sol.vec, rhs.vec)
+    inv_prod(system_solver.fact_cache, sol.vec)
     return sol
 end
+
+#=
+indirect
+TODO
+- precondition
+- optimize operations
+- tune number of restarts and tolerances etc, ensure initial point in sol helps
+- fix IterativeSolvers so that methods can take matrix RHS
+=#
+
+# mutable struct NaiveIndirectSystemSolver{T <: Real} <: NaiveSystemSolver{T}
+#     lhs6::BlockMatrix{T}
+#     NaiveIndirectSystemSolver{T}() where {T <: Real} = new{T}()
+# end
+#
+# function load(system_solver::NaiveIndirectSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+#     model = solver.model
+#     (n, p, q) = (model.n, model.p, model.q)
+#     cones = model.cones
+#     cone_idxs = model.cone_idxs
+#     tau_row = n + p + q + 1
+#     dim = tau_row + q + 1
+#
+#     # setup block LHS
+#     x_idxs = 1:n
+#     y_idxs = n .+ (1:p)
+#     z_idxs = (n + p) .+ (1:q)
+#     tau_idxs = tau_row:tau_row
+#     s_idxs = tau_row .+ (1:q)
+#     kap_idxs = dim:dim
+#
+#     k_len = 2 * length(cones)
+#     cone_rows = Vector{UnitRange{Int}}(undef, k_len)
+#     cone_cols = Vector{UnitRange{Int}}(undef, k_len)
+#     cone_blocks = Vector{Any}(undef, k_len)
+#     for (k, cone_k) in enumerate(cones)
+#         idxs_k = model.cone_idxs[k]
+#         rows = tau_row .+ idxs_k
+#         k1 = 2k - 1
+#         k2 = 2k
+#         cone_rows[k1] = cone_rows[k2] = rows
+#         cone_cols[k1] = (n + p) .+ idxs_k
+#         cone_cols[k2] = rows
+#         if Cones.use_dual_barrier(cone_k)
+#             cone_blocks[k1] = cone_k
+#             cone_blocks[k2] = I
+#         else
+#             cone_blocks[k1] = I
+#             cone_blocks[k2] = cone_k
+#         end
+#     end
+#
+#     system_solver.lhs6 = BlockMatrix{T}(dim, dim,
+#         [cone_blocks...,
+#             model.A', model.G', reshape(model.c, :, 1),
+#             -model.A, reshape(model.b, :, 1),
+#             -model.G, reshape(model.h, :, 1), -I,
+#             -model.c', -model.b', -model.h', -ones(T, 1, 1),
+#             solver, ones(T, 1, 1)],
+#         [cone_rows...,
+#             x_idxs, x_idxs, x_idxs,
+#             y_idxs, y_idxs,
+#             z_idxs, z_idxs, z_idxs,
+#             tau_idxs, tau_idxs, tau_idxs, tau_idxs,
+#             kap_idxs, kap_idxs],
+#         [cone_cols...,
+#             y_idxs, z_idxs, tau_idxs,
+#             x_idxs, tau_idxs,
+#             x_idxs, tau_idxs, s_idxs,
+#             x_idxs, y_idxs, z_idxs, kap_idxs,
+#             tau_idxs, kap_idxs],
+#         )
+#
+#     return system_solver
+# end
+#
+# update_lhs(system_solver::NaiveIndirectSystemSolver, solver::Solver) = system_solver
+#
+# function solve_system(system_solver::NaiveIndirectSystemSolver, solver::Solver, sol6::Matrix, rhs6::Matrix)
+#     for j in 1:size(rhs6, 2)
+#         rhs_j = view(rhs6, :, j)
+#         sol_j = view(sol6, :, j)
+#         IterativeSolvers.gmres!(sol_j, system_solver.lhs6, rhs_j, restart = size(rhs6, 1))
+#     end
+#     return sol6
+# end
