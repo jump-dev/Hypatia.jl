@@ -199,15 +199,11 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.z_feas = NaN
 
     # preprocess and find initial point
-    # TODO refac initialization to a function
     orig_model = solver.orig_model
     result = solver.result = Point(orig_model)
     model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
-
     (init_z, init_s) = initialize_cone_point(solver.orig_model, solver.timer)
-
     solver.rescale && rescale_data(solver)
-
     if solver.reduce
         # TODO don't find point / unnecessary stuff before reduce
         init_y = find_initial_y(solver, init_s, true)
@@ -284,58 +280,8 @@ function solve(solver::Solver{T}) where {T <: Real}
             solver.num_iters += 1
         end
 
-        # calculate result and iteration statistics and finish
-        point.vec ./= point.tau[1]
-        # Cones.load_point.(model.cones, point.primal_views)
-        # Cones.load_dual_point.(model.cones, point.dual_views)
-        # get x
-        if solver.preprocess && !iszero(solver.orig_model.n) && !any(isnan, point.x)
-            # unpreprocess solver's solution
-            if solver.reduce && !iszero(solver.orig_model.p)
-                # unreduce solver's solution
-                # x0 = Q * [(R' \ b0), x]
-                x = zeros(T, solver.orig_model.n - length(solver.reduce_Rpib0))
-                x[solver.x_keep_idxs] = point.x
-                x = vcat(solver.reduce_Rpib0, x)
-                lmul!(solver.reduce_Ap_Q, x)
-                if !isempty(solver.reduce_row_piv_inv)
-                    x = x[solver.reduce_row_piv_inv]
-                end
-                result.x .= x
-            else
-                x = result.x
-                x[solver.x_keep_idxs] = point.x
-            end
-        else
-            result.x = copy(point.x)
-        end
-        # get y
-        if solver.preprocess && !iszero(solver.orig_model.p) && !any(isnan, point.y)
-            # unpreprocess solver's solution
-            y = result.y
-            if solver.reduce
-                # unreduce solver's solution
-                # y0 = R \ (-cQ1' - GQ1' * z0)
-                y0 = solver.reduce_GQ1' * point.z
-                y0 .+= solver.reduce_cQ1
-                @views ldiv!(solver.reduce_Ap_R, y0[1:length(solver.reduce_y_keep_idxs)])
-                @. y[solver.reduce_y_keep_idxs] = -y0
-            else
-                y[solver.y_keep_idxs] = point.y
-            end
-        else
-            result.y .= point.y
-        end
-        # get s,z
-        if solver.rescale
-            @. result.s = point.s * solver.h_scale
-            @. result.z = point.z / solver.h_scale
-            @. result.x /= solver.c_scale
-            @. result.y /= solver.b_scale
-        else
-            @. result.s = point.s
-            @. result.z = point.z
-        end
+        # finalize result point
+        postprocess(solver)
     end
 
     solver.solve_time = time() - start_time
@@ -471,6 +417,27 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
     return false
 end
 
+function initialize_cone_point(model::Models.Model{T}, timer::TimerOutput) where {T <: Real}
+    init_z = zeros(T, model.q)
+    init_s = zeros(T, model.q)
+
+    for (cone, idxs) in zip(model.cones, model.cone_idxs)
+        Cones.setup_data(cone)
+        Cones.set_timer(cone, timer)
+        primal_k = view(Cones.use_dual_barrier(cone) ? init_z : init_s, idxs)
+        dual_k = view(Cones.use_dual_barrier(cone) ? init_s : init_z, idxs)
+        Cones.set_initial_point(primal_k, cone)
+        Cones.load_point(cone, primal_k)
+        @assert Cones.is_feas(cone)
+        g = Cones.grad(cone)
+        @. dual_k = -g
+        Cones.load_dual_point(cone, dual_k)
+        hasfield(typeof(cone), :hess_fact_cache) && @assert Cones.update_hess_fact(cone)
+    end
+
+    return (init_z, init_s)
+end
+
 get_timer(solver::Solver) = solver.timer
 
 get_status(solver::Solver) = solver.status
@@ -480,75 +447,9 @@ get_num_iters(solver::Solver) = solver.num_iters
 get_primal_obj(solver::Solver) = solver.primal_obj
 get_dual_obj(solver::Solver) = solver.dual_obj
 
-# function get_s(solver::Solver)
-#     s = copy(solver.point.s)
-#     if solver.rescale
-#         s .*= solver.h_scale
-#     end
-#     return s
-# end
 get_s(solver::Solver) = copy(solver.result.s)
-
-# function get_z(solver::Solver)
-#     z = copy(solver.point.z)
-#     if solver.rescale
-#         z ./= solver.h_scale
-#     end
-#     return z
-# end
 get_z(solver::Solver) = copy(solver.result.z)
-
-# function get_x(solver::Solver{T}) where {T <: Real}
-#     if solver.preprocess && !iszero(solver.orig_model.n) && !any(isnan, solver.point.x)
-#         # unpreprocess solver's solution
-#         if solver.reduce && !iszero(solver.orig_model.p)
-#             # unreduce solver's solution
-#             # x0 = Q * [(R' \ b0), x]
-#             x = zeros(T, solver.orig_model.n - length(solver.reduce_Rpib0))
-#             x[solver.x_keep_idxs] = solver.point.x
-#             x = vcat(solver.reduce_Rpib0, x)
-#             lmul!(solver.reduce_Ap_Q, x)
-#             if !isempty(solver.reduce_row_piv_inv)
-#                 x = x[solver.reduce_row_piv_inv]
-#             end
-#         else
-#             x = zeros(T, solver.orig_model.n)
-#             x[solver.x_keep_idxs] = solver.point.x
-#         end
-#     else
-#         x = copy(solver.point.x)
-#     end
-#     if solver.rescale
-#         x ./= solver.c_scale
-#     end
-#
-#     return x
-# end
 get_x(solver::Solver) = copy(solver.result.x)
-
-# function get_y(solver::Solver{T}) where {T <: Real}
-#     if solver.preprocess && !iszero(solver.orig_model.p) && !any(isnan, solver.point.y)
-#         # unpreprocess solver's solution
-#         y = zeros(T, solver.orig_model.p)
-#         if solver.reduce
-#             # unreduce solver's solution
-#             # y0 = R \ (-cQ1' - GQ1' * z0)
-#             y0 = solver.reduce_GQ1' * solver.point.z
-#             y0 .+= solver.reduce_cQ1
-#             @views ldiv!(solver.reduce_Ap_R, y0[1:length(solver.reduce_y_keep_idxs)])
-#             @. y[solver.reduce_y_keep_idxs] = -y0
-#         else
-#             y[solver.y_keep_idxs] = solver.point.y
-#         end
-#     else
-#         y = copy(solver.point.y)
-#     end
-#     if solver.rescale
-#         y ./= solver.b_scale
-#     end
-#
-#     return y
-# end
 get_y(solver::Solver) = copy(solver.result.y)
 
 get_tau(solver::Solver) = solver.point.tau[1]
@@ -562,7 +463,7 @@ function load(solver::Solver{T}, model::Models.Model{T}) where {T <: Real}
     return solver
 end
 
-include("initialize.jl")
+include("process.jl")
 
 include("linesearch.jl")
 
