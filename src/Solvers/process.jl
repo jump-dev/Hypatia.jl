@@ -3,26 +3,6 @@ preprocessing and initial point finding functions for interior point algorithms
 =#
 
 # TODO rewrite using a new function in Cones.jl - for most cones we want to just set the dual point same as primal point rather than taking gradient
-function initialize_cone_point(model::Models.Model{T}, timer::TimerOutput) where {T <: Real}
-    init_z = zeros(T, model.q)
-    init_s = zeros(T, model.q)
-
-    for (cone, idxs) in zip(model.cones, model.cone_idxs)
-        Cones.setup_data(cone)
-        Cones.set_timer(cone, timer)
-        primal_k = view(Cones.use_dual_barrier(cone) ? init_z : init_s, idxs)
-        dual_k = view(Cones.use_dual_barrier(cone) ? init_s : init_z, idxs)
-        Cones.set_initial_point(primal_k, cone)
-        Cones.load_point(cone, primal_k)
-        @assert Cones.is_feas(cone)
-        g = Cones.grad(cone)
-        @. dual_k = -g
-        Cones.load_dual_point(cone, dual_k)
-        hasfield(typeof(cone), :hess_fact_cache) && @assert Cones.update_hess_fact(cone)
-    end
-
-    return (init_z, init_s)
-end
 
 # rescale the rows and columns of the conic data to get an equivalent conic problem
 function rescale_data(solver::Solver{T}) where {T <: Real}
@@ -375,4 +355,68 @@ function get_rank_est(qr_fact, init_tol_qr::Real)
         end
     end
     return rank_est
+end
+
+# postprocess the interior point and save in result point
+function postprocess(solver::Solver{T}) where {T <: Real}
+    point = solver.point
+    result = solver.result
+    tau = point.tau[1]
+    if tau <= 0
+        result.vec .= NaN
+        return nothing
+    end
+
+    # finalize s,z
+    @. result.s = point.s / tau
+    @. result.z = point.z / tau
+
+    # finalize x
+    if solver.preprocess && !iszero(solver.orig_model.n) && !any(isnan, point.x)
+        # unpreprocess solver's solution
+        if solver.reduce && !iszero(solver.orig_model.p)
+            # unreduce solver's solution
+            # x = Q * [(R' \ b0), x]
+            xa = zeros(T, solver.orig_model.n - length(solver.reduce_Rpib0))
+            @. xa[solver.x_keep_idxs] = point.x / tau
+            xb = vcat(solver.reduce_Rpib0, xa)
+            lmul!(solver.reduce_Ap_Q, xb)
+            if isempty(solver.reduce_row_piv_inv)
+                result.x .= xb
+            else
+                @. result.x = xb[solver.reduce_row_piv_inv]
+            end
+        else
+            @. result.x[solver.x_keep_idxs] = point.x / tau
+        end
+    else
+        @. result.x = point.x / tau
+    end
+
+    # finalize y
+    if solver.preprocess && !iszero(solver.orig_model.p) && !any(isnan, point.y)
+        # unpreprocess solver's solution
+        if solver.reduce
+            # unreduce solver's solution
+            # y = R \ (-cQ1' - GQ1' * z)
+            ya = solver.reduce_GQ1' * result.z
+            ya .+= solver.reduce_cQ1
+            @views ldiv!(solver.reduce_Ap_R, ya[1:length(solver.reduce_y_keep_idxs)])
+            @. result.y[solver.reduce_y_keep_idxs] = -ya
+        else
+            @. result.y[solver.y_keep_idxs] = point.y / tau
+        end
+    else
+        @. result.y = point.y / tau
+    end
+
+    if solver.rescale
+        # unscale result
+        result.s .*= solver.h_scale
+        result.z ./= solver.h_scale
+        result.y ./= solver.b_scale
+        result.x ./= solver.c_scale
+    end
+
+    return nothing
 end

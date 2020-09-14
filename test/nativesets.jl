@@ -1,8 +1,10 @@
 #=
 sets of native test instances
+
+TODO add more preprocessing test instances
 =#
 
-inst_preproc = [ # TODO add more preprocessing test instances
+inst_preproc = [
     "dimension1",
     "consistent1",
     "inconsistent1",
