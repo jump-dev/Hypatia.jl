@@ -97,7 +97,7 @@ function setup_data(cone::WSOSInterpEpiNormInf{T}) where {T <: Real}
     cone.mats = [[Matrix{Any}(undef, size(Pk, 2), size(Pk, 2)) for _ in 1:(R - 1)] for Pk in cone.Ps]
     cone.matfact = [[cholesky(hcat([one(T)])) for _ in 1:R] for _ in cone.Ps] # TODO preallocate better
     cone.hess_diag_facts = [cholesky(hcat([one(T)])) for _ in 1:(R - 1)] # TODO preallocate better
-    cone.hess_diags = fill(zeros(T, U, U), R - 1)
+    cone.hess_diags = [zeros(T, U, U) for _ in 1:R - 1]
     cone.Λi_Λ = [Vector{Matrix{T}}(undef, R - 1) for Psk in Ps]
     @inbounds for k in eachindex(Ps), r in 1:(R - 1)
         cone.Λi_Λ[k][r] = similar(cone.grad, size(Ps[k], 2), size(Ps[k], 2))
@@ -257,9 +257,6 @@ end
 
 function update_hess(cone::WSOSInterpEpiNormInf)
     @timeit cone.timer "hess" begin
-    # cone.hess.data .= ForwardDiff.hessian(cone.barrier, cone.point)
-    # fd_hess = ForwardDiff.hessian(cone.barrier, cone.point)
-
     @assert cone.grad_updated
     U = cone.U
     R = cone.R
@@ -292,7 +289,6 @@ function update_hess(cone::WSOSInterpEpiNormInf)
     end
 
     @. hess[:, (U + 1):cone.dim] *= 2
-    # # @show cone.hess ./ fd_hess
 
     cone.hess_updated = true
     end # timer
@@ -314,22 +310,14 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormInf)
 
     @inbounds for r in 2:R
         r1 = r - 1
-        # diag_r = cone.hess_diags[r - 1]
+        diag_r = cone.hess_diags[r - 1]
         idxs = block_idxs(U, r)
         idxs2 = block_idxs(U, r - 1)
         @views z = H[1:U, idxs]
-        # if r > 2
-        #     @show "2", r, cone.hess_diag_facts[r1 - 1].L
-        # end
-        @views copyto!(cone.hess_diags[r1], H[idxs, idxs])
-        # if r > 2
-        #     @show "3", r, cone.hess_diag_facts[r1 - 1].L
-        # end
-        cone.hess_diag_facts[r1] = cholesky(Symmetric(cone.hess_diags[r1], :U), check = false) # TODO allocations
-        # @show "1", r, cone.hess_diag_facts[r1].L
+        @views copyto!(diag_r, H[idxs, idxs])
+        cone.hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U), check = false)
         if !isposdef(cone.hess_diag_facts[r1])
-            cone.hess_diag_facts[r1] = cholesky(Symmetric(cone.hess_diags[r1] + I, :U))
-            # cone.hess_diag_facts[r1] = bunchkaufman!(Symmetric(cone.hess_diags[r1], :U))
+            cone.hess_diag_facts[r1] = cholesky!(Symmetric(diag_r + I, :U)) # TODO save graciously
         end
         @views ldiv!(Diz[idxs2, :], cone.hess_diag_facts[r - 1], z)
         @views mul!(schur, z', Diz[idxs2, :], -1, true)
@@ -342,6 +330,7 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormInf)
     end
 
     cone.inv_hess_prod_updated = true
+    return
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpEpiNormInf)
@@ -349,47 +338,19 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSO
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
     end
-    # if !cone.hess_updated
-    #     update_hess(cone)
-    # end
     U = cone.U
     R = cone.R
-    H = cone.hess.data
-    UU = cone.tmpUU
 
-    # schur = cone.tmpUU2
-    # @views copyto!(schur, H[1:U, 1:U])
     edge = cone.tmpURU
-    @views copyto!(edge, H[1:U, (U + 1):end])
+    @views copyto!(edge, cone.hess[1:U, (U + 1):end])
     Diz = cone.tmpURU2
 
     @inbounds for r in 2:R
         idxs = block_idxs(U, r)
-        # idxs2 = block_idxs(U, r - 1)
-        # @views z = H[1:U, idxs]
-        # @views copyto!(UU, H[idxs, idxs])
-        # TODO refactor
-        # fact = cone.hess_diag_facts[r - 1]
-        # if !cone.inv_hess_prod_updated
-        #     fact = cone.hess_diag_facts[r] = cholesky!(Symmetric(UU, :U), check = false)
-        #     if !isposdef(fact)
-        #         fact = bunchkaufman!(Symmetric(UU, :U))
-        #     end
-        # end
-        # @views ldiv!(Diz[idxs2, :], fact, z)
-        # @views mul!(schur, z', Diz[idxs2, :], -1, true)
         @views ldiv!(prod[idxs, :], cone.hess_diag_facts[r - 1], arr[idxs, :])
     end
     # prod += u * inv(schur) * u' * arr
-    # TODO refactor
     s_fact = cone.hess_schur_fact
-    # if !cone.inv_hess_prod_updated
-    #     s_fact = cone.hess_schur_fact = cholesky!(Symmetric(schur, :U), check = false)
-    #     if !isposdef(s_fact)
-    #         s_fact = cholesky!(Symmetric(schur + I, :U))
-    #         # s_fact = bunchkaufman!(Symmetric(schur, :U))
-    #     end
-    # end
     ldiv!(s_fact, edge)
     @inbounds for j in 1:size(arr, 2)
         @views Dix = prod[(U + 1):end, j]
