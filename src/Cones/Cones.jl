@@ -187,7 +187,7 @@ function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
     #     inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
     #     nbhd = norm(nbhd_tmp2)
     else
-        inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
+        @timeit cone.timer "inv_hess_prod" inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
         nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
         if nbhd_sqr < -100eps(T) # TODO possibly loosen
             # @warn("numerical failure: cone neighborhood is $nbhd_sqr")

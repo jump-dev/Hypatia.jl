@@ -85,7 +85,7 @@ function solve_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solver{T}
         rhs3[1:p] = y
 
         if !isempty(system_solver.Q2div)
-            mul!(system_solver.GQ1x, system_solver.GQ1, y)
+            @timeit solver.timer "mul" mul!(system_solver.GQ1x, system_solver.GQ1, y)
             @timeit solver.timer "bhp" block_hess_prod.(model.cones, system_solver.HGQ1x_k, system_solver.GQ1x_k)
             mul!(system_solver.Q2div, system_solver.GQ2', system_solver.HGQ1x, -1, true)
         end
@@ -98,14 +98,14 @@ function solve_subsystem(system_solver::QRCholSystemSolver{T}, solver::Solver{T}
 
     lmul!(solver.Ap_Q, x)
 
-    mul!(system_solver.Gx, model.G, x)
+    @timeit solver.timer "mul" mul!(system_solver.Gx, model.G, x)
     @timeit solver.timer "bhp" block_hess_prod.(model.cones, system_solver.HGx_k, system_solver.Gx_k)
 
     @. z = system_solver.HGx - z
 
     if !iszero(p)
         copyto!(y, system_solver.Q1pbxGHbz)
-        mul!(y, system_solver.GQ1', system_solver.HGx, -1, true)
+        @timeit solver.timer "mul" mul!(y, system_solver.GQ1', system_solver.HGx, -1, true)
         ldiv!(solver.Ap_R, y)
     end
 
@@ -248,7 +248,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
                 idx += q_k
             end
             @views HGQ2_sub = system_solver.HGQ2[1:(idx - 1), :]
-            outer_prod(HGQ2_sub, lhs, true, false)
+            @timeit solver.timer "outer_prod" outer_prod(HGQ2_sub, lhs, true, false)
         end
 
         for k in inv_hess_cones
@@ -269,7 +269,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
                 idx += q_k
             end
             @views HGQ2_sub = system_solver.HGQ2[1:(idx - 1), :]
-            outer_prod(HGQ2_sub, lhs, true, true)
+            @timeit solver.timer "outer_prod" outer_prod(HGQ2_sub, lhs, true, true)
         end
 
         for k in hess_cones
@@ -308,7 +308,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
     for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
         @timeit solver.timer "bhp" @views block_hess_prod(cone_k, const_sol_z[idxs_k], model.h[idxs_k])
     end
-    solve_subsystem(system_solver, solver, const_sol)
+    @timeit solver.timer "solve_subsystem" solve_subsystem(system_solver, solver, const_sol)
 
     return system_solver
 end
