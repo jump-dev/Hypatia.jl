@@ -3,26 +3,6 @@ preprocessing and initial point finding functions for interior point algorithms
 =#
 
 # TODO rewrite using a new function in Cones.jl - for most cones we want to just set the dual point same as primal point rather than taking gradient
-function initialize_cone_point(cones::Vector{Cones.Cone{T}}, cone_idxs::Vector{UnitRange{Int}}, timer::TimerOutput) where {T <: Real}
-    q = isempty(cones) ? 0 : sum(Cones.dimension, cones)
-    point = Models.Point(T[], T[], zeros(T, q), zeros(T, q), cones, cone_idxs)
-
-    for (k, cone_k) in enumerate(cones)
-        Cones.setup_data(cone_k)
-        Cones.set_timer(cone_k, timer)
-        primal_k = point.primal_views[k]
-        Cones.set_initial_point(primal_k, cone_k)
-        Cones.load_point(cone_k, primal_k)
-        dual_k = point.dual_views[k]
-        @assert Cones.is_feas(cone_k)
-        g = Cones.grad(cone_k)
-        @. dual_k = -g
-        Cones.load_dual_point(cone_k, dual_k)
-        hasfield(typeof(cone_k), :hess_fact_cache) && @assert Cones.update_hess_fact(cone_k)
-    end
-
-    return point
-end
 
 # rescale the rows and columns of the conic data to get an equivalent conic problem
 function rescale_data(solver::Solver{T}) where {T <: Real}
@@ -40,9 +20,9 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
     @inbounds solver.b_scale = b_scale = T[sqrt(max(abs(model.b[i]), maxabsminrow(model.A, i))) for i in 1:model.p]
 
     h_scale = solver.h_scale = ones(T, model.q)
-    for (k, cone_k) in enumerate(model.cones)
+    for (k, cone) in enumerate(model.cones)
         idxs = model.cone_idxs[k]
-        if cone_k isa Cones.Nonnegative
+        if cone isa Cones.Nonnegative
             for i in idxs
                 @inbounds h_scale[i] = sqrt(max(abs(model.h[i]), maxabsminrow(model.G, i)))
             end
@@ -71,7 +51,13 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
 end
 
 # optionally preprocess dual equalities and solve for x as least squares solution to Ax = b, Gx = h - s
-function find_initial_x(solver::Solver{T}) where {T <: Real}
+function find_initial_x(
+    solver::Solver{T},
+    init_s::Vector{T},
+    ) where {T <: Real}
+    if solver.status != :SolveCalled
+        return zeros(T, 0)
+    end
     model = solver.model
     n = model.n
     if iszero(n) # x is empty (no primal variables)
@@ -84,7 +70,7 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
     G = model.G
     solver.x_keep_idxs = 1:n
 
-    rhs = vcat(model.b, model.h - solver.point.s)
+    rhs = vcat(model.b, model.h - init_s)
 
     # indirect method
     if solver.init_use_indirect
@@ -93,7 +79,7 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
             AG = G
         else
             # TODO use LinearMaps.jl
-            AG = BlockMatrix{T}(p + q, n, [A, G], [1:p, (p + 1):(p + q)], [1:n, 1:n])
+            AG = BlockMatrix{T}(p + q, n, [A, G], [1:p, p .+ (1:q)], [1:n, 1:n])
         end
         @timeit solver.timer "lsqr_solve" init_x = IterativeSolvers.lsqr(AG, rhs)
         return init_x
@@ -168,7 +154,7 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
 
     @timeit solver.timer "qr_solve" begin
         # init_x = AG_R \ ((AG_fact.Q' * vcat(b, h - point.s))[1:AG_rank])
-        tmp = vcat(model.b, model.h - solver.point.s)
+        tmp = vcat(model.b, model.h - init_s)
         lmul!(AG_fact.Q', tmp)
         init_x = tmp[1:model.n]
         ldiv!(AG_R, init_x)
@@ -178,7 +164,14 @@ function find_initial_x(solver::Solver{T}) where {T <: Real}
 end
 
 # optionally preprocess primal equalities and solve for y as least squares solution to A'y = -c - G'z
-function find_initial_y(solver::Solver{T}, reduce::Bool) where {T <: Real}
+function find_initial_y(
+    solver::Solver{T},
+    init_z::Vector{T},
+    reduce::Bool,
+    ) where {T <: Real}
+    if solver.status != :SolveCalled
+        return zeros(T, 0)
+    end
     model = solver.model
     p = model.p
     if iszero(p) # y is empty (no primal variables)
@@ -195,7 +188,7 @@ function find_initial_y(solver::Solver{T}, reduce::Bool) where {T <: Real}
     if !reduce
         # rhs = -c - G' * point.z
         rhs = copy(model.c)
-        mul!(rhs, model.G', solver.point.z, -1, -1)
+        mul!(rhs, model.G', init_z, -1, -1)
 
         # indirect method
         if solver.init_use_indirect
@@ -325,7 +318,7 @@ function find_initial_y(solver::Solver{T}, reduce::Bool) where {T <: Real}
     @timeit solver.timer "qr_solve" begin
         # init_y = Ap_R \ ((Ap_fact.Q' * (-c - G' * point.z))[1:Ap_rank])
         tmp = copy(model.c)
-        mul!(tmp, model.G', solver.point.z, true, true)
+        mul!(tmp, model.G', init_z, true, true)
         lmul!(Ap_fact.Q', tmp)
         init_y = tmp[1:Ap_rank]
         init_y .*= -1
@@ -362,4 +355,68 @@ function get_rank_est(qr_fact, init_tol_qr::Real)
         end
     end
     return rank_est
+end
+
+# postprocess the interior point and save in result point
+function postprocess(solver::Solver{T}) where {T <: Real}
+    point = solver.point
+    result = solver.result
+    tau = point.tau[1]
+    if tau <= 0
+        result.vec .= NaN
+        return nothing
+    end
+
+    # finalize s,z
+    @. result.s = point.s / tau
+    @. result.z = point.z / tau
+
+    # finalize x
+    if solver.preprocess && !iszero(solver.orig_model.n) && !any(isnan, point.x)
+        # unpreprocess solver's solution
+        if solver.reduce && !iszero(solver.orig_model.p)
+            # unreduce solver's solution
+            # x = Q * [(R' \ b0), x]
+            xa = zeros(T, solver.orig_model.n - length(solver.reduce_Rpib0))
+            @. xa[solver.x_keep_idxs] = point.x / tau
+            xb = vcat(solver.reduce_Rpib0, xa)
+            lmul!(solver.reduce_Ap_Q, xb)
+            if isempty(solver.reduce_row_piv_inv)
+                result.x .= xb
+            else
+                @. result.x = xb[solver.reduce_row_piv_inv]
+            end
+        else
+            @. result.x[solver.x_keep_idxs] = point.x / tau
+        end
+    else
+        @. result.x = point.x / tau
+    end
+
+    # finalize y
+    if solver.preprocess && !iszero(solver.orig_model.p) && !any(isnan, point.y)
+        # unpreprocess solver's solution
+        if solver.reduce
+            # unreduce solver's solution
+            # y = R \ (-cQ1' - GQ1' * z)
+            ya = solver.reduce_GQ1' * result.z
+            ya .+= solver.reduce_cQ1
+            @views ldiv!(solver.reduce_Ap_R, ya[1:length(solver.reduce_y_keep_idxs)])
+            @. result.y[solver.reduce_y_keep_idxs] = -ya
+        else
+            @. result.y[solver.y_keep_idxs] = point.y / tau
+        end
+    else
+        @. result.y = point.y / tau
+    end
+
+    if solver.rescale
+        # unscale result
+        result.s .*= solver.h_scale
+        result.z ./= solver.h_scale
+        result.y ./= solver.b_scale
+        result.x ./= solver.c_scale
+    end
+
+    return nothing
 end
