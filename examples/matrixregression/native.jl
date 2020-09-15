@@ -255,8 +255,8 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
 end
 
 function test_extra(inst::MatrixRegressionNative{T}, result::NamedTuple) where T
-    @test result.status == :Optimal
-    if result.status == :Optimal
+    @test result.status == Solvers.Optimal
+    if result.status == Solvers.Optimal
         # check objective value is correct
         (Y, X) = (inst.Y, inst.X)
         A_opt = similar(Y, size(X, 2), size(Y, 2))

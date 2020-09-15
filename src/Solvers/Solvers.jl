@@ -31,6 +31,23 @@ default_tol(::Type{BigFloat}) = eps(BigFloat) ^ 0.4
 
 include("point.jl")
 
+# solver termination status codes
+@enum Status begin
+    NotLoaded
+    Loaded
+    SolveCalled
+    Optimal
+    PrimalInfeasible
+    DualInfeasible
+    IllPosed
+    PrimalInconsistent
+    DualInconsistent
+    SlowProgress
+    IterationLimit
+    TimeLimit
+    NumericalFailure
+end
+
 abstract type Stepper{T <: Real} end
 
 abstract type SystemSolver{T <: Real} end
@@ -56,7 +73,7 @@ mutable struct Solver{T <: Real}
     timer::TimerOutput
 
     # current status of the solver object and info
-    status::Symbol
+    status::Status
     solve_time::Float64
     num_iters::Int
 
@@ -168,15 +185,15 @@ mutable struct Solver{T <: Real}
         solver.stepper = stepper
         solver.system_solver = system_solver
         solver.timer = timer
-        solver.status = :NotLoaded
+        solver.status = NotLoaded
 
         return solver
     end
 end
 
 function solve(solver::Solver{T}) where {T <: Real}
-    @assert solver.status == :Loaded
-    solver.status = :SolveCalled
+    @assert solver.status == Loaded
+    solver.status = SolveCalled
     start_time = time()
     solver.num_iters = 0
     solver.solve_time = NaN
@@ -213,7 +230,7 @@ function solve(solver::Solver{T}) where {T <: Real}
         init_y = find_initial_y(solver, init_s, false)
     end
 
-    if solver.status == :SolveCalled
+    if solver.status == SolveCalled
         point = solver.point = Point(model)
         point.x .= init_x
         point.y .= init_y
@@ -260,12 +277,12 @@ function solve(solver::Solver{T}) where {T <: Real}
 
             if solver.num_iters == solver.iter_limit
                 solver.verbose && println("iteration limit reached; terminating")
-                solver.status = :IterationLimit
+                solver.status = IterationLimit
                 break
             end
             if time() - start_time >= solver.time_limit
                 solver.verbose && println("time limit reached; terminating")
-                solver.status = :TimeLimit
+                solver.status = TimeLimit
                 break
             end
 
@@ -273,7 +290,7 @@ function solve(solver::Solver{T}) where {T <: Real}
 
             if point.tau[1] <= zero(T) || point.kap[1] <= zero(T) || solver.mu <= zero(T)
                 @warn("numerical failure: tau is $(point.tau[1]), kappa is $(point.kap[1]), mu is $(solver.mu); terminating")
-                solver.status = :NumericalFailure
+                solver.status = NumericalFailure
                 break
             end
 
@@ -367,14 +384,14 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
     if max(solver.x_feas, solver.y_feas, solver.z_feas) <= solver.tol_feas &&
         (solver.gap <= solver.tol_abs_opt || (!isnan(solver.rel_gap) && solver.rel_gap <= solver.tol_rel_opt))
         solver.verbose && println("optimal solution found; terminating")
-        solver.status = :Optimal
+        solver.status = Optimal
         return true
     end
     if solver.dual_obj_t > eps(T)
         infres_pr = solver.x_norm_res_t * solver.x_conv_tol / solver.dual_obj_t
         if infres_pr <= solver.tol_feas
             solver.verbose && println("primal infeasibility detected; terminating")
-            solver.status = :PrimalInfeasible
+            solver.status = PrimalInfeasible
             return true
         end
     end
@@ -382,13 +399,13 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         infres_du = -max(solver.y_norm_res_t * solver.y_conv_tol, solver.z_norm_res_t * solver.z_conv_tol) / solver.primal_obj_t
         if infres_du <= solver.tol_feas
             solver.verbose && println("dual infeasibility detected; terminating")
-            solver.status = :DualInfeasible
+            solver.status = DualInfeasible
             return true
         end
     end
     if solver.mu <= solver.tol_feas * T(1e-2) && solver.point.tau[1] <= solver.tol_feas * T(1e-2) * min(one(T), solver.point.kap[1])
         solver.verbose && println("ill-posedness detected; terminating")
-        solver.status = :IllPosed
+        solver.status = IllPosed
         return true
     end
 
@@ -403,7 +420,7 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
     if max_improve < solver.tol_slow
         if solver.prev_is_slow && solver.prev2_is_slow
             solver.verbose && println("slow progress in consecutive iterations; terminating")
-            solver.status = :SlowProgress
+            solver.status = SlowProgress
             return true
         else
             solver.prev2_is_slow = solver.prev_is_slow
@@ -457,9 +474,9 @@ get_kappa(solver::Solver) = solver.point.kap[1]
 get_mu(solver::Solver) = solver.mu
 
 function load(solver::Solver{T}, model::Models.Model{T}) where {T <: Real}
-    # @assert solver.status == :NotLoaded # TODO maybe want a reset function that just keeps options
+    # @assert solver.status == NotLoaded # TODO maybe want a reset function that just keeps options
     solver.orig_model = model
-    solver.status = :Loaded
+    solver.status = Loaded
     return solver
 end
 

@@ -114,8 +114,8 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
 end
 
 function test_extra(inst::SparsePCANative{T}, result::NamedTuple) where T
-    @test result.status == :Optimal
-    if result.status == :Optimal && iszero(inst.noise_ratio)
+    @test result.status == Solvers.Optimal
+    if result.status == Solvers.Optimal && iszero(inst.noise_ratio)
         # check objective value is correct
         tol = eps(T)^0.25
         @test result.primal_obj ≈ -1 atol = tol rtol = tol

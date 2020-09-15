@@ -153,8 +153,8 @@ function build_complex(inst::PolyMinNative{T}) where {T <: Real}
 end
 
 function test_extra(inst::PolyMinNative{T}, result::NamedTuple) where T
-    @test result.status == :Optimal
-    if result.status == :Optimal && !isnan(inst.true_min)
+    @test result.status == Solvers.Optimal
+    if result.status == Solvers.Optimal && !isnan(inst.true_min)
         # check objective value is correct
         tol = eps(T)^0.1
         true_min = (inst.use_primal ? -1 : 1) * inst.true_min
