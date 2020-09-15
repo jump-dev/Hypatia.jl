@@ -50,5 +50,5 @@ function run_instance(
     end
     flush(stdout); flush(stderr)
 
-    return (model_stats..., solve_stats[1:(end - 4)]..., setup_time, check_time)
+    return (model_stats..., string(solve_stats[1]), solve_stats[2:(end - 4)]..., setup_time, check_time)
 end

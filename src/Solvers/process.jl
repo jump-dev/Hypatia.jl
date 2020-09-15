@@ -55,7 +55,7 @@ function find_initial_x(
     solver::Solver{T},
     init_s::Vector{T},
     ) where {T <: Real}
-    if solver.status != :SolveCalled
+    if solver.status != SolveCalled
         return zeros(T, 0)
     end
     model = solver.model
@@ -169,7 +169,7 @@ function find_initial_y(
     init_z::Vector{T},
     reduce::Bool,
     ) where {T <: Real}
-    if solver.status != :SolveCalled
+    if solver.status != SolveCalled
         return zeros(T, 0)
     end
     model = solver.model

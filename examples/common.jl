@@ -27,7 +27,7 @@ end
 
 # calculate violations for Hypatia certificate equalities
 function certificate_violations(
-    status::Symbol,
+    status::Solvers.Status,
     model::Models.Model{T},
     x::Vector{T},
     y::Vector{T},
