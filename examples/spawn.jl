@@ -113,5 +113,5 @@ function spawn_instance_check(
         solve_stats = (status, NaN, -1, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
     end
 
-    return (status != :ok, (model_stats..., solve_stats..., setup_time, check_time))
+    return (status != :ok, (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time))
 end

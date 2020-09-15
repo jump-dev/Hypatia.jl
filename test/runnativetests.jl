@@ -49,7 +49,7 @@ function test_instance_solver(
     @testset "$test_info" begin
         solver = Solvers.Solver{T}(; options...)
         test_time = @elapsed eval(Symbol(inst_name))(T, solver = solver)
-        push!(perf, (inst_name, string(T), type_name(solver.stepper), type_name(solver.system_solver), solver.init_use_indirect, solver.preprocess, solver.reduce, test_time))
+        push!(perf, (inst_name, string(T), type_name(solver.stepper), type_name(solver.system_solver), solver.init_use_indirect, solver.preprocess, solver.reduce, test_time, string(Solvers.get_status(solver))))
         @printf("... %8.2e seconds\n", test_time)
     end
     return nothing
@@ -64,6 +64,7 @@ perf = DataFrame(
     preprocess = Bool[],
     reduce = Bool[],
     test_time = Float64[],
+    status = String[],
     )
 
 @info("starting native tests")
