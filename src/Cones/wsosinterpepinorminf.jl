@@ -19,6 +19,7 @@ mutable struct WSOSInterpEpiNormInf{T <: Real} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    hess_prod_updated::Bool
     inv_hess_prod_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
@@ -48,6 +49,8 @@ mutable struct WSOSInterpEpiNormInf{T <: Real} <: Cone{T}
     PΛiPs1::Vector{Vector{Matrix{T}}} # for each (2, 2)-block pertaining to (lambda_1, lambda_i), P * inv(Λ)[1, 1] * Ps = P * inv(Λ)i[2, 2] * Ps
     PΛiPs2::Vector{Vector{Matrix{T}}} # for each (2, 2)-block pertaining to (lambda_1, lambda_i), P * inv(Λ)[2, 1] * Ps = P * inv(Λ)[1, 2]' * Ps
     lambdafact::Vector
+    hess_edge_blocks::Vector{Matrix{T}}
+    hess_diag_blocks::Vector{Matrix{T}}
     hess_diag_facts::Vector
     hess_diags::Vector{Matrix{T}}
     hess_schur_fact
@@ -96,7 +99,9 @@ function setup_data(cone::WSOSInterpEpiNormInf{T}) where {T <: Real}
 
     cone.mats = [[Matrix{Any}(undef, size(Pk, 2), size(Pk, 2)) for _ in 1:(R - 1)] for Pk in cone.Ps]
     cone.matfact = [[cholesky(hcat([one(T)])) for _ in 1:R] for _ in cone.Ps] # TODO preallocate better
-    cone.hess_diag_facts = [cholesky(hcat([one(T)])) for _ in 1:(R - 1)] # TODO preallocate better
+    cone.hess_edge_blocks = [zeros(T, U, U) for _ in 1:(R - 1)]
+    cone.hess_diag_blocks = [zeros(T, U, U) for _ in 1:R]
+    cone.hess_diag_facts = Any[cholesky(hcat([one(T)])) for _ in 1:(R - 1)] # TODO preallocate better
     cone.hess_diags = [zeros(T, U, U) for _ in 1:R - 1]
     cone.Λi_Λ = [Vector{Matrix{T}}(undef, R - 1) for Psk in Ps]
     @inbounds for k in eachindex(Ps), r in 1:(R - 1)
@@ -123,9 +128,12 @@ function setup_data(cone::WSOSInterpEpiNormInf{T}) where {T <: Real}
     return
 end
 
-reset_data(cone::WSOSInterpEpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.inv_hess_prod_updated = false)
+reset_data(cone::WSOSInterpEpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated =
+    cone.inv_hess_updated = cone.hess_fact_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
 
 get_nu(cone::WSOSInterpEpiNormInf) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
+
+use_sqrt_oracles(::WSOSInterpEpiNormInf) = false
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormInf)
     arr[1:cone.U] .= 1
@@ -197,8 +205,6 @@ is_dual_feas(cone::WSOSInterpEpiNormInf) = true
 
 # TODO common code could be refactored with epinormeucl version
 function update_grad(cone::WSOSInterpEpiNormInf)
-    # cone.grad = ForwardDiff.gradient(cone.barrier, cone.point)
-
     @assert cone.is_feas
     U = cone.U
     R = cone.R
@@ -249,7 +255,6 @@ function update_grad(cone::WSOSInterpEpiNormInf)
             idx += 1
         end
     end # j
-    # # @show cone.grad ./ fd_grad
 
     cone.grad_updated = true
     return cone.grad
@@ -257,42 +262,87 @@ end
 
 function update_hess(cone::WSOSInterpEpiNormInf)
     @timeit cone.timer "hess" begin
+    if !cone.hess_prod_updated
+        update_hess_prod(cone)
+    end
+    U = cone.U
+    H = cone.hess.data
+    H .= 0
+
+    @. @views H[1:U, 1:U] = cone.hess_diag_blocks[1]
+    @inbounds for r in 1:(cone.R - 1)
+        idxs = block_idxs(U, r + 1)
+        LinearAlgebra.copytri!(cone.hess_edge_blocks[r], 'U')
+        @. @views H[1:U, idxs] = cone.hess_edge_blocks[r]
+        @. @views H[idxs, idxs] = cone.hess_diag_blocks[r + 1]
+    end
+
+    cone.hess_updated = true
+    end # timer
+    return cone.hess
+end
+
+function update_hess_prod(cone::WSOSInterpEpiNormInf)
+    @timeit cone.timer "updatehessprod" begin
     @assert cone.grad_updated
+
     U = cone.U
     R = cone.R
     R2 = R - 2
-    hess = cone.hess.data
-    UU = cone.tmpUU
-    matfact = cone.matfact
 
-    hess .= 0
+    @inbounds for r in 1:(R - 1)
+        cone.hess_diag_blocks[r] .= 0
+        cone.hess_edge_blocks[r] .= 0
+    end
+    cone.hess_diag_blocks[R] .= 0
+
     @inbounds for k in eachindex(cone.Ps)
         PΛiPs1 = cone.PΛiPs1[k]
         PΛiPs2 = cone.PΛiPs2[k]
         UUk = cone.tmpUU_vec[k]
 
-        @. hess[1:U, 1:U] -= abs2(UUk) * R2
-        @inbounds for r in 1:(R - 1)
-            @. UU = abs2(PΛiPs2[r])
-            # @. UU = PΛiPs2[r] * PΛiPs2[r]' # TODO be more careful with numeric for PΛiPs2[r]
-            @. UU += abs2(PΛiPs1[r])
-            @. hess[1:U, 1:U] += UU
-            @. hess[1:U, 1:U] += UU
-            # blocks (r, r)
-            idxs = block_idxs(U, r + 1)
-            @. hess[idxs, idxs] += UU
-            # blocks (1,r)
-            @. UU = PΛiPs2[r] * PΛiPs1[r]
-            @. UU += UU'
-            @. hess[1:U, idxs] += UU
+        for j in 1:U, i in 1:j
+            cone.hess_diag_blocks[1][i, j] -= abs2(UUk[i, j]) * R2
+        end
+
+        for r in 1:(R - 1)
+            for j in 1:U, i in 1:j
+                ij1 = PΛiPs1[r][i, j]
+                ij2 = (PΛiPs2[r][i, j] + PΛiPs2[r][j, i]) / 2
+                uu = abs2(ij1) + abs2(ij2)
+                cone.hess_diag_blocks[1][i, j] += 2 * uu
+                cone.hess_diag_blocks[r + 1][i, j] += 2 * uu
+                cone.hess_edge_blocks[r][i, j] += 4 * (ij1 * ij2)
+            end
         end
     end
 
-    @. hess[:, (U + 1):cone.dim] *= 2
-
-    cone.hess_updated = true
     end # timer
-    return cone.hess
+    cone.hess_prod_updated = true
+    return prod
+end
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpEpiNormInf)
+    @timeit cone.timer "hessprod" begin
+    if !cone.hess_prod_updated
+        update_hess_prod(cone)
+    end
+    U = cone.U
+    R = cone.R
+    prod .= 0
+
+    @views mul!(prod[1:U, :], Symmetric(cone.hess_diag_blocks[1], :U), arr[1:U, :])
+    @inbounds for r in 1:(R - 1)
+        idxs = block_idxs(U, r + 1)
+        edge_r = Symmetric(cone.hess_edge_blocks[r], :U)
+        @views arr_r = arr[idxs, :]
+        @views mul!(prod[1:U, :], edge_r, arr_r, true, true)
+        @views mul!(prod[idxs, :], edge_r, arr[1:U, :])
+        @views mul!(prod[idxs, :], Symmetric(cone.hess_diag_blocks[r + 1], :U), arr_r, true, true)
+    end
+
+    end # timer
+    return prod
 end
 
 function update_inv_hess_prod(cone::WSOSInterpEpiNormInf)
@@ -317,7 +367,8 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormInf)
         @views copyto!(diag_r, H[idxs, idxs])
         cone.hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U), check = false)
         if !isposdef(cone.hess_diag_facts[r1])
-            cone.hess_diag_facts[r1] = cholesky!(Symmetric(diag_r + I, :U)) # TODO save graciously
+            # cone.hess_diag_facts[r1] = cholesky!(Symmetric(diag_r + I, :U)) # TODO save graciously
+            cone.hess_diag_facts[r1] = bunchkaufman!(Symmetric(diag_r, :U)) # TODO save graciously
         end
         @views ldiv!(Diz[idxs2, :], cone.hess_diag_facts[r - 1], z)
         @views mul!(schur, z', Diz[idxs2, :], -1, true)

@@ -93,7 +93,7 @@ function test_grad_hess(cone::CO.Cone{T}, point::Vector{T}, dual_point::Vector{T
     inv_hess = Matrix(CO.inv_hess(cone))
 
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
-    # @test hess * inv_hess ≈ I atol=tol rtol=tol
+    @test hess * inv_hess ≈ I atol=tol rtol=tol
 
     prod_mat = similar(point, dim, dim)
     @test CO.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
