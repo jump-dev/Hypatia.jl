@@ -48,7 +48,7 @@ MOI.get(opt::Optimizer, ::MOI.RawSolver) = opt.solver
 MOI.is_empty(opt::Optimizer) = (opt.solver.status == Solvers.NotLoaded)
 
 function MOI.empty!(opt::Optimizer)
-    opt.solver.status = Hypatia.Solvers.NotLoaded
+    opt.solver.status = Solvers.NotLoaded
     return
 end
 

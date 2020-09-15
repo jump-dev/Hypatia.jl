@@ -40,6 +40,8 @@ include("point.jl")
     PrimalInfeasible
     DualInfeasible
     IllPosed
+    PrimalInconsistent
+    DualInconsistent
     SlowProgress
     IterationLimit
     TimeLimit
