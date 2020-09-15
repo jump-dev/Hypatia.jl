@@ -301,19 +301,17 @@ function update_hess_prod(cone::WSOSInterpEpiNormInf)
         PΛiPs2 = cone.PΛiPs2[k]
         UUk = cone.tmpUU_vec[k]
 
-        for j in 1:U, i in 1:j
-            cone.hess_diag_blocks[1][i, j] -= abs2(UUk[i, j]) * R2
+        for r in 1:(R - 1), j in 1:U, i in 1:j
+            ij1 = PΛiPs1[r][i, j]
+            ij2 = (PΛiPs2[r][i, j] + PΛiPs2[r][j, i]) / 2 # NOTE PΛiPs2[r] should be symmetric
+            uu = 2 * (abs2(ij1) + abs2(ij2))
+            cone.hess_diag_blocks[1][i, j] += uu
+            cone.hess_diag_blocks[r + 1][i, j] += uu
+            cone.hess_edge_blocks[r][i, j] += 4 * (ij1 * ij2)
         end
 
-        for r in 1:(R - 1)
-            for j in 1:U, i in 1:j
-                ij1 = PΛiPs1[r][i, j]
-                ij2 = (PΛiPs2[r][i, j] + PΛiPs2[r][j, i]) / 2
-                uu = abs2(ij1) + abs2(ij2)
-                cone.hess_diag_blocks[1][i, j] += 2 * uu
-                cone.hess_diag_blocks[r + 1][i, j] += 2 * uu
-                cone.hess_edge_blocks[r][i, j] += 4 * (ij1 * ij2)
-            end
+        for j in 1:U, i in 1:j
+            cone.hess_diag_blocks[1][i, j] -= abs2(UUk[i, j]) * R2
         end
     end
 
