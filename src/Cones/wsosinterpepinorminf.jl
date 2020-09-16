@@ -349,11 +349,14 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormInf)
     end
     U = cone.U
     R = cone.R
-    H = cone.hess.data
     schur = cone.tmpUU2
-    @views copyto!(schur, H[1:U, 1:U])
+    @views copyto!(schur, Symmetric(cone.hess_diag_blocks[1], :U))
     edge = cone.tmpURU
-    @views copyto!(edge, H[1:U, (U + 1):end])
+    @inbounds for r in 1:(R - 1)
+        idxs = block_idxs(U, r)
+        LinearAlgebra.copytri!(cone.hess_edge_blocks[r], 'U')
+        @views copyto!(edge[idxs, :], cone.hess_edge_blocks[r])
+    end
     Diz = cone.tmpURU2
 
     @inbounds for r in 2:R
@@ -361,8 +364,8 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormInf)
         diag_r = cone.hess_diags[r - 1]
         idxs = block_idxs(U, r)
         idxs2 = block_idxs(U, r - 1)
-        @views z = H[1:U, idxs]
-        @views copyto!(diag_r, H[idxs, idxs])
+        z = cone.hess_edge_blocks[r - 1]
+        @views copyto!(diag_r, cone.hess_diag_blocks[r])
         cone.hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U), check = false)
         if !isposdef(cone.hess_diag_facts[r1])
             # cone.hess_diag_facts[r1] = cholesky!(Symmetric(diag_r + I, :U)) # TODO save graciously
