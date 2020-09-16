@@ -8,12 +8,12 @@ using Printf
 using LinearAlgebra
 using SparseArrays
 import SuiteSparse
+import LinearMaps
 import IterativeSolvers
 using Test
 using TimerOutputs
 import Hypatia.Cones
 import Hypatia.Models
-import Hypatia.BlockMatrix
 import Hypatia.SparseNonSymCache
 import Hypatia.SparseSymCache
 import Hypatia.update_fact

@@ -8,7 +8,6 @@ const RealOrComplex{T <: Real} = Union{T, Complex{T}}
 
 # linear algebra helpers
 using LinearAlgebra
-include("linearalgebra/blockmatrix.jl")
 include("linearalgebra/dense.jl")
 include("linearalgebra/sparse.jl")
 

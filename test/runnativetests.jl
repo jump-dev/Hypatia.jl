@@ -18,7 +18,7 @@ timer = TimerOutput()
 common_options = (
     verbose = true,
     # verbose = false,
-    iter_limit = 100,
+    iter_limit = 20,
     time_limit = 6e1,
     timer = timer,
     # tol_feas = tol,
@@ -74,34 +74,34 @@ global ITERS = 0
 
 @testset "native tests" begin
 
-@testset "default options tests" begin
-for inst_name in inst_all
-    test_instance_solver(inst_name, Float64, common_options, "defaults")
-end
-end
-
-@testset "steppers tests" begin
-steppers = [
-    # (Solvers.HeurCombStepper, all_reals), # default
-    (Solvers.PredOrCorrStepper, all_reals),
-    ]
-for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in real_types
-    test_info = "stepper = $(string_nameof(stepper))"
-    options = (; common_options..., stepper = stepper{T}())
-    test_instance_solver(inst_name, T, options, test_info)
-end
-end
+# @testset "default options tests" begin
+# for inst_name in inst_all
+#     test_instance_solver(inst_name, Float64, common_options, "defaults")
+# end
+# end
+#
+# @testset "steppers tests" begin
+# steppers = [
+#     # (Solvers.HeurCombStepper, all_reals), # default
+#     (Solvers.PredOrCorrStepper, all_reals),
+#     ]
+# for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in real_types
+#     test_info = "stepper = $(string_nameof(stepper))"
+#     options = (; common_options..., stepper = stepper{T}())
+#     test_instance_solver(inst_name, T, options, test_info)
+# end
+# end
 
 @testset "system solvers tests" begin
 system_solvers = [
-    (Solvers.NaiveDenseSystemSolver, all_reals),
-    (Solvers.NaiveSparseSystemSolver, default_reals),
-    # (Solvers.NaiveIndirectSystemSolver, all_reals), # TODO fix
-    (Solvers.NaiveElimDenseSystemSolver, all_reals),
-    (Solvers.NaiveElimSparseSystemSolver, default_reals),
-    (Solvers.SymIndefDenseSystemSolver, all_reals),
-    (Solvers.SymIndefSparseSystemSolver, default_reals),
-    (Solvers.QRCholDenseSystemSolver, all_reals),
+    # (Solvers.NaiveDenseSystemSolver, all_reals),
+    # (Solvers.NaiveSparseSystemSolver, default_reals),
+    # (Solvers.NaiveElimDenseSystemSolver, all_reals),
+    # (Solvers.NaiveElimSparseSystemSolver, default_reals),
+    # (Solvers.SymIndefDenseSystemSolver, all_reals),
+    # (Solvers.SymIndefSparseSystemSolver, default_reals),
+    (Solvers.SymIndefIndirectSystemSolver, all_reals), # TODO fix
+    # (Solvers.QRCholDenseSystemSolver, all_reals),
     ]
 for inst_name in inst_cones_few, (system_solver, real_types) in system_solvers, T in real_types
     test_info = "system_solver = $(string_nameof(system_solver))"
@@ -110,21 +110,21 @@ for inst_name in inst_cones_few, (system_solver, real_types) in system_solvers, 
 end
 end
 
-@testset "indirect initialize tests" begin
-for inst_name in inst_cones_few, T in all_reals
-    test_info = "init_use_indirect = true"
-    options = (; common_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.NaiveElimDenseSystemSolver{T}())
-    test_instance_solver(inst_name, T, options, test_info)
-end
-end
-
-@testset "no preprocess tests" begin
-for inst_name in inst_cones_few, T in all_reals
-    test_info = "preprocess = false"
-    options = (; common_options..., preprocess = false, reduce = false, system_solver = Solvers.SymIndefDenseSystemSolver{T}())
-    test_instance_solver(inst_name, T, options, test_info)
-end
-end
+# @testset "indirect initialize tests" begin
+# for inst_name in inst_cones_few, T in all_reals
+#     test_info = "init_use_indirect = true"
+#     options = (; common_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.NaiveElimDenseSystemSolver{T}())
+#     test_instance_solver(inst_name, T, options, test_info)
+# end
+# end
+#
+# @testset "no preprocess tests" begin
+# for inst_name in inst_cones_few, T in all_reals
+#     test_info = "preprocess = false"
+#     options = (; common_options..., preprocess = false, reduce = false, system_solver = Solvers.SymIndefDenseSystemSolver{T}())
+#     test_instance_solver(inst_name, T, options, test_info)
+# end
+# end
 
 @printf("\nnative tests total time: %8.2e seconds\n\n", time() - all_tests_time)
 show(perf, allrows = true, allcols = true)
