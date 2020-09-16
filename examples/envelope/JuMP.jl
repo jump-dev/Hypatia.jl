@@ -29,9 +29,9 @@ function build(inst::EnvelopeJuMP{T}) where {T <: Float64} # TODO generic reals
 
     # generate random polynomials
     L = binomial(n + inst.rand_halfdeg, n)
-    polys = Ps[1][:, 1:L] * rand(-9:9, L, inst.num_polys)
+    # polys = Ps[1][:, 1:L] * rand(-9:9, L, inst.num_polys)
     # polys = V[:, 1:U] * rand(-9:9, U, inst.num_polys)
-    # polys = randn(U, inst.num_polys)
+    polys = randn(U, inst.num_polys)
 
     model = JuMP.Model()
     JuMP.@variable(model, fpv[1:U]) # values at Fekete points

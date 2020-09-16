@@ -344,8 +344,8 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInt
 end
 
 function update_inv_hess_prod(cone::WSOSInterpEpiNormInf)
-    if !cone.hess_updated
-        update_hess(cone)
+    if !cone.hess_prod_updated
+        update_hess_prod(cone)
     end
     U = cone.U
     R = cone.R
