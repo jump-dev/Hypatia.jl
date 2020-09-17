@@ -351,20 +351,15 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormInf)
     R = cone.R
     schur = cone.tmpUU2
     @views copyto!(schur, Symmetric(cone.hess_diag_blocks[1], :U))
-    edge = cone.tmpURU
-    @inbounds for r in 1:(R - 1)
-        idxs = block_idxs(U, r)
-        LinearAlgebra.copytri!(cone.hess_edge_blocks[r], 'U')
-        @views copyto!(edge[idxs, :], cone.hess_edge_blocks[r])
-    end
     Diz = cone.tmpURU2
 
     @inbounds for r in 2:R
         r1 = r - 1
-        diag_r = cone.hess_diags[r - 1]
+        diag_r = cone.hess_diags[r1]
         idxs = block_idxs(U, r)
-        idxs2 = block_idxs(U, r - 1)
-        z = cone.hess_edge_blocks[r - 1]
+        idxs2 = block_idxs(U, r1)
+        LinearAlgebra.copytri!(cone.hess_edge_blocks[r1], 'U')
+        z = cone.hess_edge_blocks[r1]
         @views copyto!(diag_r, cone.hess_diag_blocks[r])
         cone.hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U), check = false)
         if !isposdef(cone.hess_diag_facts[r1])
@@ -394,7 +389,11 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSO
     R = cone.R
 
     edge = cone.tmpURU
-    @views copyto!(edge, cone.hess[1:U, (U + 1):end])
+    # maybe don't copy into contiguous block, or do in update function and store separately
+    @inbounds for r in 1:(R - 1)
+        idxs = block_idxs(U, r)
+        @views copyto!(edge[:, idxs], cone.hess_edge_blocks[r])
+    end
     Diz = cone.tmpURU2
 
     @inbounds for r in 2:R
