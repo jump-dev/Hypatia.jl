@@ -245,8 +245,8 @@ indirect (using LinearMaps and IterativeSolvers)
 TODO
 - precondition
 - optimize operations
-- tune number of restarts and tolerances etc, ensure initial point in sol helps
-- fix IterativeSolvers so that methods can take matrix RHS
+- tune tolerances etc
+- try to make initial point in sol_sub a good guess (currently zeros)
 =#
 
 mutable struct SymIndefIndirectSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
@@ -301,6 +301,6 @@ function solve_subsystem3(
     rhs_sub::Point,
     )
     sol_sub.vec .= 0 # initially_zero = true
-    IterativeSolvers.minres!(sol_sub.vec, system_solver.lhs, rhs_sub.vec, initially_zero = true)#, restart = size(rhs6, 1)) # TODO tune options, initial guess?
+    IterativeSolvers.minres!(sol_sub.vec, system_solver.lhs, rhs_sub.vec, initially_zero = true)#, maxiter = 2 * size(sol_sub.vec, 1)) # TODO tune options, initial guess?
     return sol_sub
 end
