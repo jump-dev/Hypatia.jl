@@ -134,6 +134,7 @@ mutable struct Solver{T <: Real}
     prev_z_feas::T
 
     # data scaling
+    used_rescaling::Bool
     b_scale::Vector{T}
     c_scale::Vector{T}
     h_scale::Vector{T}
