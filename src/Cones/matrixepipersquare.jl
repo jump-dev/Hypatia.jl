@@ -20,7 +20,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
-    hess_prod_updated::Bool
+    hess_aux_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
@@ -78,7 +78,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-reset_data(cone::MatrixEpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.hess_prod_updated = false)
+reset_data(cone::MatrixEpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.hess_aux_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -177,22 +177,23 @@ function update_grad(cone::MatrixEpiPerSquare)
     return cone.grad
 end
 
-function update_hess_prod(cone::MatrixEpiPerSquare) # TODO here and in other cones these are misleading names since also needed for just hess
+function update_hess_aux(cone::MatrixEpiPerSquare) # TODO here and in other cones these are misleading names since also needed for just hess
     @assert cone.grad_updated
     ZiUZi = cone.ZiUZi
+
     ldiv!(ZiUZi.data, cone.fact_Z, cone.U)
     rdiv!(ZiUZi.data, cone.fact_Z)
     mul!(cone.WtZiW.data, cone.W', cone.ZiW) # TODO not used for hess prod
     v = cone.point[cone.v_idx]
     cone.Hvv = 4 * dot(ZiUZi, cone.U) - (cone.d1 - 1) / v / v
-    cone.hess_prod_updated = true
-    return cone.hess_prod_updated
+    mul!(cone.ZiUZiW, cone.ZiUZi, cone.W)
+
+    cone.hess_aux_updated = true
+    return cone.hess_aux_updated
 end
 
 function update_hess(cone::MatrixEpiPerSquare)
-    if !cone.hess_prod_updated
-        update_hess_prod(cone)
-    end
+    cone.hess_aux_updated || update_hess_aux(cone)
     d1 = cone.d1
     d2 = cone.d2
     U_idxs = cone.U_idxs
@@ -272,7 +273,6 @@ function update_hess(cone::MatrixEpiPerSquare)
     @. @views H[U_idxs, W_idxs] *= -2 * v
 
     # H_v_W part
-    mul!(cone.ZiUZiW, cone.ZiUZi, cone.W)
     @views vec_copy_to!(H[v_idx, W_idxs], cone.ZiUZiW)
     @. @views H[v_idx, W_idxs] *= -4
 
@@ -286,10 +286,7 @@ function update_hess(cone::MatrixEpiPerSquare)
 end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::MatrixEpiPerSquare)
-    if !cone.hess_prod_updated
-        update_hess_prod(cone)
-    end
-
+    cone.hess_aux_updated || update_hess_aux(cone)
     U_idxs = cone.U_idxs
     v_idx = cone.v_idx
     W_idxs = cone.W_idxs
@@ -330,10 +327,11 @@ end
 
 # TODO reduce allocs
 function correction(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
-    @assert cone.hess_updated
+    cone.hess_aux_updated || update_hess_aux(cone)
     d1 = cone.d1
     d2 = cone.d2
     dim = cone.dim
+    fact_Z = cone.fact_Z
 
     U_idxs = cone.U_idxs
     v_idx = cone.v_idx
@@ -354,23 +352,23 @@ function correction(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     vd2 = 2 * v_dir
     Zi = cone.Zi
     ZiW = cone.ZiW # TODO AKA tau
-    ZiU = cone.fact_Z \ U # TODO cache
-    ZiWd = cone.fact_Z \ W_dir
-    ZiUd = cone.fact_Z \ U_dir
+    ZiU = fact_Z \ U # TODO cache
+    ZiWd = fact_Z \ W_dir
+    ZiUd = fact_Z \ U_dir
     ZiUZi = cone.ZiUZi
     ZiUZiUZi = Hermitian(ZiUZi * ZiU', :U)
     ZiUZi2v = Hermitian(ZiUZi - v2 * ZiUZiUZi, :U)
     WdWZi = W_dir * ZiW'
     WdZiW = W_dir' * ZiW
     UdZiW = U_dir * ZiW
-    ZiWdWZi = cone.fact_Z \ WdWZi
+    ZiWdWZi = fact_Z \ WdWZi
     ZiWdWZi2 = Hermitian(ZiWdWZi + ZiWdWZi', :U)
-    ZiUdZiW = cone.fact_Z \ UdZiW
+    ZiUdZiW = fact_Z \ UdZiW
     ZiUZiWdWZi = ZiU * ZiWdWZi
     ZiUZiUdZiW = ZiU * ZiUdZiW + ZiUd * cone.ZiUZiW
     ZiWdWZiUZi = ZiWdWZi * ZiU'
     ZiWdWZiUZi2 = ZiWdWZiUZi + ZiWdWZiUZi' + ZiUZiWdWZi'
-    ZiUdZi = Hermitian(ZiUd / cone.fact_Z, :U)
+    ZiUdZi = Hermitian(ZiUd / fact_Z, :U)
     ZiUZiUdZi = ZiU * ZiUdZi
     ZiUZiUdZi2 = Hermitian(ZiUZiUdZi + ZiUZiUdZi')
     ZiUdZiWdWZi = ZiUd * ZiWdWZi + ZiWdWZi * ZiUd'

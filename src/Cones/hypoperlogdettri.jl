@@ -27,8 +27,8 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
-    hess_prod_updated::Bool
-    inv_hess_prod_updated::Bool
+    hess_aux_updated::Bool
+    inv_hess_aux_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
@@ -83,7 +83,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = cone.hess_fact_updated = false)
+reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
 
 function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
@@ -181,8 +181,8 @@ function update_grad(cone::HypoPerLogdetTri)
 end
 
 function update_hess(cone::HypoPerLogdetTri)
-    if !cone.hess_prod_updated
-        update_hess_prod(cone)
+    if !cone.hess_aux_updated
+        update_hess_aux(cone)
     end
     Wi = cone.Wi
     Wivzi = cone.Wivzi
@@ -199,7 +199,7 @@ function update_hess(cone::HypoPerLogdetTri)
 end
 
 # function update_inv_hess(cone::HypoPerLogdetTri)
-#     if !cone.inv_hess_prod_updated
+#     if !cone.inv_hess_aux_updated
 #         update_inv_hess_prod(cone)
 #     end
 #     H = cone.inv_hess.data
@@ -222,7 +222,7 @@ end
 # end
 
 # update first two rows of the Hessian
-function update_hess_prod(cone::HypoPerLogdetTri)
+function update_hess_aux(cone::HypoPerLogdetTri)
     @assert cone.grad_updated
     u = cone.point[1]
     v = cone.point[2]
@@ -240,14 +240,14 @@ function update_hess_prod(cone::HypoPerLogdetTri)
     smat_to_svec!(h2end, cone.Wi, cone.rt2)
     h2end .*= ((cone.ldWv - cone.side) / cone.ldWvuv - 1) / z
 
-    cone.hess_prod_updated = true
+    cone.hess_aux_updated = true
     return
 end
 
 # function update_inv_hess_prod(cone::HypoPerLogdetTri)
 #     # TODO remove with explicit expression for (1,1) element
-#     if !cone.hess_prod_updated
-#         update_hess_prod(cone)
+#     if !cone.hess_aux_updated
+#         update_hess_aux(cone)
 #     end
 #     H = cone.inv_hess.data
 #     side = cone.side
@@ -265,13 +265,13 @@ end
 #     @views H[2, 3:end] .= v * w * v
 #     H ./= denom
 #
-#     cone.inv_hess_prod_updated = true
+#     cone.inv_hess_aux_updated = true
 #     return
 # end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdetTri)
-    if !cone.hess_prod_updated
-        update_hess_prod(cone)
+    if !cone.hess_aux_updated
+        update_hess_aux(cone)
     end
 
     const_diag = cone.ldWvuv * cone.vzip1 * cone.ldWvuv
@@ -293,7 +293,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
 end
 
 # function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdetTri)
-#     if !cone.inv_hess_prod_updated
+#     if !cone.inv_hess_aux_updated
 #         update_inv_hess_prod(cone)
 #     end
 #     side = cone.side

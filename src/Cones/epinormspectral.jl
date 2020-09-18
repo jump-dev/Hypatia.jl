@@ -25,7 +25,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
-    hess_prod_updated::Bool
+    hess_aux_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
@@ -44,7 +44,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     HuW::Matrix{R}
     Huu::T
     trZi2::T
-    Wtau::Matrix{R}
+    WtauI::Matrix{R}
     Zitau::Matrix{R}
     tmpd1d2::Matrix{R}
     tmpd1d2b::Matrix{R}
@@ -76,7 +76,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
+reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.hess_fact_updated = false)
 
 # TODO only allocate the fields we use
 function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -95,7 +95,7 @@ function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} w
     cone.Z = zeros(R, cone.d1, cone.d1)
     cone.tau = zeros(R, cone.d1, cone.d2)
     cone.HuW = zeros(R, cone.d1, cone.d2)
-    cone.Wtau = zeros(R, cone.d2, cone.d2)
+    cone.WtauI = zeros(R, cone.d2, cone.d2)
     cone.Zitau = zeros(R, cone.d1, cone.d2)
     cone.tmpd1d2 = zeros(R, cone.d1, cone.d2)
     cone.tmpd1d2b = zeros(R, cone.d1, cone.d2)
@@ -159,38 +159,35 @@ function update_grad(cone::EpiNormSpectral)
     return cone.grad
 end
 
-function update_hess_prod(cone::EpiNormSpectral)
+function update_hess_aux(cone::EpiNormSpectral)
     @assert cone.grad_updated
     u = cone.point[1]
+    tau = cone.tau
     Zitau = cone.Zitau
+    WtauI = cone.WtauI
 
-    copyto!(Zitau, cone.tau)
+    copyto!(Zitau, tau)
     ldiv!(cone.fact_Z, Zitau)
     @. cone.HuW = -4 * u * Zitau
     cone.trZi2 = sum(abs2, cone.Zi)
     cone.Huu = 4 * abs2(u) * cone.trZi2 + (cone.grad[1] - 2 * (cone.d1 - 1) / u) / u
+    copyto!(WtauI, I)
+    mul!(WtauI, cone.W', tau, true, true)
 
-    cone.hess_prod_updated = true
+    cone.hess_aux_updated = true
     return
 end
 
 function update_hess(cone::EpiNormSpectral)
-    if !cone.hess_prod_updated
-        update_hess_prod(cone)
-    end
+    cone.hess_aux_updated || update_hess_aux(cone)
     d1 = cone.d1
     d2 = cone.d2
-    u = cone.point[1]
-    W = cone.W
     Zi = cone.Zi
     tau = cone.tau
-    Wtau = cone.Wtau
+    WtauI = cone.WtauI
     H = cone.hess.data
 
     # H_W_W part
-    copyto!(Wtau, I)
-    mul!(Wtau, W', tau, true, true)
-
     # TODO parallelize loops
     idx_incr = (cone.is_complex ? 2 : 1)
     r_idx = 2
@@ -198,10 +195,10 @@ function update_hess(cone::EpiNormSpectral)
         c_idx = r_idx
         @inbounds for k in i:d2
             taujk = tau[j, k]
-            Wtauik = Wtau[i, k]
+            WtauIik = WtauI[i, k]
             lstart = (i == k ? j : 1)
             @inbounds for l in lstart:d1
-                term1 = Zi[l, j] * Wtauik
+                term1 = Zi[l, j] * WtauIik
                 term2 = tau[l, i] * taujk
                 hess_element(H, r_idx, c_idx, term1, term2)
                 c_idx += idx_incr
@@ -220,9 +217,7 @@ function update_hess(cone::EpiNormSpectral)
 end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
-    if !cone.hess_prod_updated
-        update_hess_prod(cone)
-    end
+    cone.hess_aux_updated || update_hess_aux(cone)
     u = cone.point[1]
     W = cone.W
     tmpd1d2 = cone.tmpd1d2
@@ -248,7 +243,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
 end
 
 function correction(cone::EpiNormSpectral, primal_dir::AbstractVector)
-    @assert cone.hess_updated
+    @assert cone.hess_aux_updated
 
     u = cone.point[1]
     W = cone.W
@@ -259,7 +254,7 @@ function correction(cone::EpiNormSpectral, primal_dir::AbstractVector)
     Zi = cone.Zi
     tau = cone.tau
     Zitau = cone.Zitau
-    WtauI = cone.Wtau
+    WtauI = cone.WtauI
     tmpd1d2b = cone.tmpd1d2b
     tmpd1d2c = cone.tmpd1d2c
     tmpd1d2d = cone.tmpd1d2d

@@ -308,13 +308,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumP
     return prod
 end
 
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
-#     cone.inv_hess_sqrt_aux_updated || update_inv_hess_sqrt_aux(cone)
-#     @assert !cone.no_sqrts
-#     ldiv!(cone.inv_hess_sqrt', ldiv!(prod, cone.inv_hess_sqrt, arr))
-#     return prod
-# end
-
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     @views @inbounds begin
@@ -328,14 +321,6 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     end
     return prod
 end
-
-# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
-#     cone.inv_hess_sqrt_aux_updated || update_inv_hess_sqrt_aux(cone)
-#     @assert !cone.no_sqrts
-#     copyto!(prod, arr)
-#     lmul!(cone.inv_hess_sqrt, lmul!(cone.inv_hess_sqrt', prod))
-#     return prod
-# end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
     cone.inv_hess_sqrt_aux_updated || update_inv_hess_sqrt_aux(cone)

@@ -25,7 +25,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
-    hess_prod_updated::Bool
+    hess_aux_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
     grad::Vector{T}
@@ -81,7 +81,7 @@ end
 
 use_heuristic_neighborhood(cone::HypoRootdetTri) = false
 
-reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_prod_updated = cone.hess_fact_updated = false)
+reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.hess_fact_updated = false)
 
 function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     reset_data(cone)
@@ -170,8 +170,8 @@ function update_grad(cone::HypoRootdetTri)
 end
 
 function update_hess(cone::HypoRootdetTri)
-    if !cone.hess_prod_updated
-        update_hess_prod(cone)
+    if !cone.hess_aux_updated
+        update_hess_aux(cone)
     end
     Wi = cone.Wi
     H = cone.hess.data
@@ -212,7 +212,7 @@ function update_inv_hess(cone::HypoRootdetTri)
 end
 
 # update first row of the Hessian
-function update_hess_prod(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function update_hess_aux(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert cone.grad_updated
 
     sigma = cone.sigma # rootdet / rootdetu / side
@@ -224,13 +224,13 @@ function update_hess_prod(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{
     @. hess[1, :] = cone.grad / cone.rootdetu
     @. hess[1, 2:end] *= sigma / cone.kron_const
 
-    cone.hess_prod_updated = true
+    cone.hess_aux_updated = true
     return
 end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
-    if !cone.hess_prod_updated
-        update_hess_prod(cone)
+    if !cone.hess_aux_updated
+        update_hess_aux(cone)
     end
 
     const_diag = cone.dot_const / cone.kron_const
