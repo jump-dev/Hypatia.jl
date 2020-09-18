@@ -50,8 +50,8 @@ function update_rhs_predcorr(
         # end
         if corr_viol < 0.001
             @. rhs.s_views[k] += H_prim_dir_k + corr_k
-        else
-            println("skip pred-corr: $corr_viol")
+        # else
+        #     println("skip pred-corr: $corr_viol")
         end
     end
 

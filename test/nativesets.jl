@@ -142,4 +142,10 @@ inst_cones_many = [
     "wsosinterpepinormeucl3",
     ]
 
-inst_all = vcat(inst_preproc, inst_infeas, inst_cones_many)
+inst_indirect = [
+    "indirect1",
+    "indirect2",
+    "indirect3",
+    "indirect4",
+    "indirect5",
+    ]

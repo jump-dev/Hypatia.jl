@@ -130,12 +130,12 @@ for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
         println("\nstarting $(length(inst_subset)) instances for $ex_type_T $inst_set\n")
 
         for (inst_num, inst) in enumerate(inst_subset)
-            test_info = "$ex_type_T $inst_set $inst_num: $inst"
+            test_info = "$ex_type_T $inst_set $inst_num: $(inst[1])"
             @testset "$test_info" begin
                 println(test_info, "...")
                 time_inst = @elapsed p = run_instance(ex_type_T, inst..., default_options = new_default_options)
 
-                extender = (length(inst) > 1 ? inst[2] : nothing)
+                extender = (length(inst) > 1 && mod_type == "JuMP" ? inst[2] : nothing)
                 push!(perf, (string(ex_type), inst_set, real_T, inst_num, inst[1], string(extender), p..., time_inst))
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
                 @printf("... %8.2e seconds\n\n", time_inst)

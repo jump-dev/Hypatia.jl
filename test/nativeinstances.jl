@@ -10,6 +10,7 @@ using Test
 import Random
 using LinearAlgebra
 using SparseArrays
+using LinearMaps
 import GenericLinearAlgebra.svdvals
 import GenericLinearAlgebra.eigvals
 import DynamicPolynomials
@@ -2167,4 +2168,76 @@ function dualinfeas3(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
     @test r.status == Solvers.DualInfeasible
+end
+
+function indirect1(T; options...)
+    tol = eps(T)^0.1
+    Random.seed!(1)
+    (n, p, q) = (4, 3, 4)
+    c = rand(T(0):T(9), n)
+    A = rand(T(-9):T(9), p, n)
+    b = vec(sum(A, dims = 2))
+    G = LinearMap(SparseMatrixCSC(-one(T) * I, q, n))
+    h = zeros(T, q)
+    cones = Cone{T}[Cones.Nonnegative{T}(q)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, obj_offset = one(T), options...)
+    @test r.status == Solvers.Optimal
+end
+
+function indirect2(T; options...)
+    tol = eps(T)^0.1
+    c = T[0, 0, -1, -1]
+    A = LinearMap(T[1 0 0 0; 0 1 0 0])
+    b = T[0.5, 1]
+    G = LinearMap(-I, 4)
+    h = zeros(T, 4)
+    cones = Cone{T}[Cones.EpiPerSquare{T}(4)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ -sqrt(T(2)) atol=tol rtol=tol
+    @test r.x[3:4] ≈ [1, 1] / sqrt(T(2)) atol=tol rtol=tol
+end
+
+function indirect3(T; options...)
+    tol = eps(T)^0.1
+    Random.seed!(1)
+    c = T[1, 0, 0, 0, 0, 0]
+    A_mat = rand(T(-9):T(9), 6, 6)
+    b = vec(sum(A_mat, dims = 2))
+    A = LinearMap(A_mat)
+    G = rand(T, 6, 6)
+    h = vec(sum(G, dims = 2))
+    cones = Cone{T}[Cones.EpiNormInf{T, T}(6, use_dual = true)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ 1 atol=tol rtol=tol
+end
+
+function indirect4(T; options...)
+    tol = eps(T)^0.1
+    c = zeros(T, 3)
+    A = LinearMap(-I, 3)
+    b = [one(T), one(T), T(3)]
+    G = -one(T) * I
+    h = zeros(T, 3)
+    cones = Cone{T}[Cones.HypoPerLog{T}(3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == Solvers.PrimalInfeasible
+end
+
+function indirect5(T; options...)
+    tol = eps(T)^0.1
+    c = zeros(T, 3)
+    A = LinearMap(-I, 3)
+    b = [one(T), one(T), T(3)]
+    G = LinearMap(-I, 3)
+    h = zeros(T, 3)
+    cones = Cone{T}[Cones.HypoPerLog{T}(3)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == Solvers.PrimalInfeasible
 end
