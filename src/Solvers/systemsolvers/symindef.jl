@@ -214,20 +214,13 @@ end
 
 function update_lhs(system_solver::SymIndefDenseSystemSolver, solver::Solver)
     model = solver.model
-    (n, p) = (model.n, model.p)
+    z_start = model.n + model.p
     lhs_sub = system_solver.lhs_sub.data
 
     for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
-        z_rows_k = (n + p) .+ idxs_k
-        if Cones.use_dual_barrier(cone_k)
-            # G_k*x - mu*H_k*z_k = [-zrhs_k - srhs_k, h_k]
-            H_k = Cones.hess(cone_k)
-            @. lhs_sub[z_rows_k, z_rows_k] = -H_k
-        else
-            # G_k*x - (mu*H_k)\z_k = [-zrhs_k - (mu*H_k)\srhs_k, h_k]
-            Hi_k = Cones.inv_hess(cone_k)
-            @. lhs_sub[z_rows_k, z_rows_k] = -Hi_k
-        end
+        z_rows_k = z_start .+ idxs_k
+        H_k = (Cones.use_dual_barrier(cone_k) ? Cones.hess : Cones.inv_hess)(cone_k)
+        @. lhs_sub[z_rows_k, z_rows_k] = -H_k
     end
 
     @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs_sub)
@@ -244,5 +237,70 @@ function solve_subsystem3(
     )
     copyto!(sol_sub.vec, rhs_sub.vec)
     inv_prod(system_solver.fact_cache, sol_sub.vec)
+    return sol_sub
+end
+
+#=
+indirect (using LinearMaps and IterativeSolvers)
+TODO
+- precondition
+- optimize operations
+- tune tolerances etc
+- try to make initial point in sol_sub a good guess (currently zeros)
+=#
+
+mutable struct SymIndefIndirectSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
+    lhs::LinearMaps.LinearMap{T}
+    rhs_sub::Point{T}
+    sol_sub::Point{T}
+    sol_const::Point{T}
+    rhs_const::Point{T}
+    SymIndefIndirectSystemSolver{T}() where {T <: Real} = new{T}()
+end
+
+function load(system_solver::SymIndefIndirectSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+    x_idxs = 1:n
+    y_idxs = n .+ (1:p)
+    z_start = n + p
+    z_idxs = z_start .+ (1:q)
+
+    function symindef_mul(b::AbstractVector, a::AbstractVector)
+        # x part
+        @views mul!(b[x_idxs], model.A', a[y_idxs])
+        @views mul!(b[x_idxs], model.G', a[z_idxs], true, true)
+        # y part
+        @views mul!(b[y_idxs], model.A, a[x_idxs])
+        # z part
+        for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
+            z_rows_k = z_start .+ idxs_k
+            prod_fun = (Cones.use_dual_barrier(cone_k) ? Cones.hess_prod! : Cones.inv_hess_prod!)
+            @views prod_fun(b[z_rows_k], a[z_rows_k], cone_k)
+        end
+        @views mul!(b[z_idxs], model.G, a[x_idxs], true, -one(T))
+        return b
+    end
+
+    system_solver.lhs = LinearMaps.LinearMap{T}(symindef_mul, z_start + q, ismutating = true, issymmetric = true, isposdef = false)
+
+    setup_point_sub(system_solver, model)
+
+    return system_solver
+end
+
+function update_lhs(system_solver::SymIndefIndirectSystemSolver, solver::Solver)
+    solve_subsystem3(system_solver, solver, system_solver.sol_const, system_solver.rhs_const)
+    return system_solver
+end
+
+function solve_subsystem3(
+    system_solver::SymIndefIndirectSystemSolver,
+    ::Solver,
+    sol_sub::Point,
+    rhs_sub::Point,
+    )
+    sol_sub.vec .= 0 # initially_zero = true
+    IterativeSolvers.minres!(sol_sub.vec, system_solver.lhs, rhs_sub.vec, initially_zero = true)#, maxiter = 2 * size(sol_sub.vec, 1)) # TODO tune options, initial guess?
     return sol_sub
 end

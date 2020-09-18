@@ -77,7 +77,7 @@ end
 
 use_correction(::Cone) = true
 
-update_hess_prod(cone::Cone) = nothing
+update_hess_aux(cone::Cone) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.hess_updated
