@@ -1,8 +1,10 @@
 #=
 sets of native test instances
+
+TODO add more preprocessing test instances
 =#
 
-inst_preproc = [ # TODO add more preprocessing test instances
+inst_preproc = [
     "dimension1",
     "consistent1",
     "inconsistent1",
@@ -44,6 +46,7 @@ inst_cones_few = [
     "wsosinterpepinormeucl1",
     ]
 
+# superset of inst_cones_few
 inst_cones_many = [
     "nonnegative1",
     "nonnegative2",
@@ -137,4 +140,12 @@ inst_cones_many = [
     "wsosinterpepinormeucl1",
     "wsosinterpepinormeucl2",
     "wsosinterpepinormeucl3",
+    ]
+
+inst_indirect = [
+    "indirect1",
+    "indirect2",
+    "indirect3",
+    "indirect4",
+    "indirect5",
     ]

@@ -72,32 +72,32 @@ time_all = time()
 @info("starting CBLIB tests")
 
 @testset "CBLIB tests" begin
-    for (inst_set, time_limit) in instance_sets
-        inst_subset = eval(Symbol(inst_set))
-        isempty(inst_subset) && continue
-        solver_options = (; default_options..., time_limit = time_limit)
-        println("\nstarting $(length(inst_subset)) instances for $inst_set\n")
+for (inst_set, time_limit) in instance_sets
+    inst_subset = eval(Symbol(inst_set))
+    isempty(inst_subset) && continue
+    solver_options = (; default_options..., time_limit = time_limit)
+    println("\nstarting $(length(inst_subset)) instances for $inst_set\n")
 
-        for (inst_num, inst) in enumerate(inst_subset)
-            test_info = "$inst_set $inst_num: $inst"
-            @testset "$test_info" begin
-                println(test_info, "...")
-                time_inst = @elapsed p = run_cbf(inst, solver_options)
+    for (inst_num, inst) in enumerate(inst_subset)
+        test_info = "$inst_set $inst_num: $inst"
+        @testset "$test_info" begin
+            println(test_info, "...")
+            time_inst = @elapsed p = run_cbf(inst, solver_options)
 
-                push!(perf, (inst_set, inst_num, inst, p..., time_inst))
-                isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
-                @printf("... %8.2e seconds\n\n", time_inst)
-                flush(stdout); flush(stderr)
-            end
+            push!(perf, (inst_set, inst_num, inst, p..., time_inst))
+            isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
+            @printf("... %8.2e seconds\n\n", time_inst)
+            flush(stdout); flush(stderr)
         end
     end
+end
 
-    @printf("\nCBLIB tests total time: %8.2e seconds\n\n", time() - time_all)
-    DataFrames.show(perf, allrows = true, allcols = true)
-    println("\n")
-    # @show sum(perf[:iters])
-    # show(timer)
-    println("\n")
-    flush(stdout); flush(stderr)
+@printf("\nCBLIB tests total time: %8.2e seconds\n\n", time() - time_all)
+DataFrames.show(perf, allrows = true, allcols = true)
+println("\n")
+# @show sum(perf[:iters])
+# show(timer)
+println("\n")
+flush(stdout); flush(stderr)
 end
 ;

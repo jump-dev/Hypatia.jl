@@ -74,7 +74,7 @@ function run_instance(
     println("solve and check")
     check_time = @elapsed solve_stats = solve_check(model, test = test)
 
-    return (model_stats..., solve_stats..., setup_time, check_time)
+    return (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time)
 end
 
 function setup_model(
@@ -234,13 +234,13 @@ function run_cbf(
     println("solve and check")
     check_time = @elapsed solve_stats = solve_check(model, test = false)
 
-    return (model_stats..., solve_stats..., setup_time, check_time)
+    return (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time)
 end
 
 moi_hyp_status_map = Dict(
-    MOI.OPTIMAL => :Optimal,
-    MOI.INFEASIBLE => :PrimalInfeasible,
-    MOI.DUAL_INFEASIBLE => :DualInfeasible,
+    MOI.OPTIMAL => Solvers.Optimal,
+    MOI.INFEASIBLE => Solvers.PrimalInfeasible,
+    MOI.DUAL_INFEASIBLE => Solvers.DualInfeasible,
     )
 
 cone_from_hyp(cone::Cones.Cone) = error("cannot transform a Hypatia cone of type $(typeof(cone)) to an MOI cone")

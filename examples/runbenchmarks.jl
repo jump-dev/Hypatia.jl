@@ -91,17 +91,17 @@ else
 end
 
 perf = DataFrames.DataFrame(
-    example = Type{<:ExampleInstance}[],
+    example = String[],
     inst_set = String[],
     count = Int[],
     inst_data = Tuple[],
-    extender = Any[],
+    extender = String[],
     solver = String[],
     n = Int[],
     p = Int[],
     q = Int[],
     cone_types = Vector{String}[],
-    status = Symbol[],
+    status = String[],
     solve_time = Float64[],
     iters = Int[],
     prim_obj = Float64[],
@@ -135,7 +135,7 @@ for ex_name in JuMP_example_names
                 println("\n$ex_type $inst_set $(solver[1]) $inst_num: $inst ...")
                 time_inst = @elapsed (is_killed, p) = instance_check_fun(ex_type{Float64}, inst, extender, solver)
 
-                push!(perf, (ex_type, inst_set, inst_num, inst, extender, solver[1], p..., time_inst))
+                push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], p..., time_inst))
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
                 @printf("... %8.2e seconds\n\n", time_inst)
                 flush(stdout); flush(stderr)

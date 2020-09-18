@@ -336,13 +336,6 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::E
     return prod
 end
 
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-#     cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
-#     copyto!(prod, arr)
-#     lmul!(cone.hess_sqrt, lmul!(cone.hess_sqrt', prod))
-#     return prod
-# end
-
 function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, T}) where {T <: Real}
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     @views @inbounds begin
@@ -373,13 +366,6 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
     return prod
 end
 
-# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-#     cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
-#     @assert !cone.no_sqrts
-#     ldiv!(cone.hess_sqrt', ldiv!(prod, cone.hess_sqrt, arr))
-#     return prod
-# end
-
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
     @assert !cone.no_sqrts
@@ -396,6 +382,7 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
 end
 
 function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T <: Real}
+    @assert cone.grad_updated
     u = cone.point[1]
     udir = primal_dir[1]
     corr = cone.correction

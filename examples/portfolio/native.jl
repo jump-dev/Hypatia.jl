@@ -11,7 +11,6 @@ struct PortfolioNative{T <: Real} <: ExampleInstanceNative{T}
     epinormeucl_constr::Bool # add L2 ball constraints, else don't add
     epinorminf_constrs::Bool # add Linfty ball constraints, else don't add
     use_epinorminf::Bool # use epinorminf cone, else nonnegative cones
-    use_linops::Bool
 end
 
 function build(inst::PortfolioNative{T}) where {T <: Real}
@@ -24,37 +23,20 @@ function build(inst::PortfolioNative{T}) where {T <: Real}
 
     c = -returns
     # investments add to one, nonnegativity
-    if inst.use_linops
-        A_blocks = Any[ones(T, 1, num_stocks)]
-        A_rows = [1:1]
-        A_cols = [1:num_stocks]
-        G_blocks = Any[-I]
-        G_rows = [1:num_stocks]
-        G_cols = [1:num_stocks]
-    else
-        A = ones(T, 1, num_stocks)
-        G = Matrix{T}(-I, num_stocks, num_stocks)
-    end
+    A = ones(T, 1, num_stocks)
+    G = sparse(-one(T) * I, num_stocks, num_stocks)
     b = T[1]
     h = zeros(T, num_stocks)
     cones = Cones.Cone{T}[Cones.Nonnegative{T}(num_stocks)]
     cone_offset = num_stocks
 
     function add_ball_constr(cone, gamma_new)
-        if inst.use_linops
-            push!(G_blocks, -sigma_half)
-            push!(G_rows, (cone_offset + 2):(cone_offset + num_stocks + 1))
-            push!(G_cols, 1:num_stocks)
-        else
-            G = vcat(G, zeros(T, 1, num_stocks), -sigma_half)
-        end
+        G = vcat(G, spzeros(T, 1, num_stocks), -sigma_half)
         h_risk = vcat(gamma_new, zeros(T, num_stocks))
         h = vcat(h, h_risk)
         push!(cones, cone)
         cone_offset += num_stocks + 1
     end
-
-    last_idx(a::Vector{UnitRange{Int}}) = a[end][end]
 
     if inst.epinormeucl_constr
         add_ball_constr(Cones.EpiNormEucl{T}(num_stocks + 1), gamma)
@@ -66,67 +48,23 @@ function build(inst::PortfolioNative{T}) where {T <: Real}
             add_ball_constr(Cones.EpiNormInf{T, T}(num_stocks + 1), gamma)
         else
             c = vcat(c, zeros(T, 2 * num_stocks))
-            if inst.use_linops
-                push!(A_blocks, sigma_half)
-                push!(A_blocks, -I)
-                push!(A_blocks, I)
-
-                A_offset = last_idx(A_rows)
-                append!(A_rows, fill((A_offset + 1):(A_offset + num_stocks), 3))
-
-                push!(A_cols, 1:num_stocks)
-                push!(A_cols, (num_stocks + 1):(2 * num_stocks))
-                push!(A_cols, (2 * num_stocks + 1):(3 * num_stocks))
-
-                push!(G_blocks, -I)
-                push!(G_blocks, ones(T, 1, 2 * num_stocks))
-                push!(G_rows, (last_idx(G_rows) + 1):(last_idx(G_rows) + 2 * num_stocks))
-                push!(G_rows, (last_idx(G_rows) + 1):(last_idx(G_rows) + 1))
-                # must have `num_stocks` primal variables, append columns
-                push!(G_cols, (num_stocks + 1):(3 * num_stocks))
-                push!(G_cols, (num_stocks + 1):(3 * num_stocks))
-            else
-                id = Matrix{T}(I, num_stocks, num_stocks)
-                id2 = Matrix{T}(I, 2 * num_stocks, 2 * num_stocks)
-                A = [
-                    A    zeros(T, 1, 2 * num_stocks);
-                    sigma_half    -id    id;
-                    ]
-                G = [
-                    G    zeros(T, size(G, 1), 2 * num_stocks);
-                    zeros(T, 2 * num_stocks, num_stocks)    -id2;
-                    zeros(T, 1, num_stocks)    ones(T, 1, 2 * num_stocks);
-                    ]
-            end
+            A = [
+                A    spzeros(T, 1, 2 * num_stocks);
+                sigma_half    -I    I;
+                ]
+            padding = spzeros(T, num_stocks, 2 * num_stocks)
+            G = [
+                G    spzeros(T, size(G, 1), 2 * num_stocks);
+                spzeros(T, 2 * num_stocks, num_stocks)    -I;
+                spzeros(T, 1, num_stocks)    ones(T, 1, 2 * num_stocks);
+                sigma_half    padding;
+                -sigma_half    padding;
+                ]
             b = vcat(b, zeros(T, num_stocks))
-            h = vcat(h, zeros(T, 2 * num_stocks), gamma * sqrt(T(num_stocks)))
-            push!(cones, Cones.Nonnegative{T}(2 * num_stocks + 1))
-            cone_offset += 2 * num_stocks + 1
-
-            if inst.use_linops
-                push!(G_blocks, sigma_half)
-                push!(G_blocks, -sigma_half)
-                push!(G_rows, (cone_offset + 1):(cone_offset + num_stocks))
-                push!(G_rows, (cone_offset + num_stocks + 1):(cone_offset + 2 * num_stocks))
-                push!(G_cols, 1:num_stocks)
-                push!(G_cols, 1:num_stocks)
-            else
-                padding = zeros(T, num_stocks, size(G, 2) - num_stocks)
-                G = [
-                    G;
-                    sigma_half    padding;
-                    -sigma_half    padding;
-                    ]
-            end
-            h = vcat(h, gamma * ones(T, 2 * num_stocks))
-            push!(cones, Cones.Nonnegative{T}(2 * num_stocks))
-            cone_offset += 2 * num_stocks
+            h = vcat(h, zeros(T, 2 * num_stocks), gamma * sqrt(T(num_stocks)), gamma * ones(T, 2 * num_stocks))
+            push!(cones, Cones.Nonnegative{T}(4 * num_stocks + 1))
+            cone_offset += 4 * num_stocks + 1
         end
-    end
-
-    if inst.use_linops
-        A = Hypatia.BlockMatrix{T}(last_idx(A_rows), last_idx(A_cols), A_blocks, A_rows, A_cols)
-        G = Hypatia.BlockMatrix{T}(last_idx(G_rows), last_idx(G_cols), G_blocks, G_rows, G_cols)
     end
 
     model = Models.Model{T}(c, A, b, G, h, cones)
