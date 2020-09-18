@@ -204,7 +204,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
 end
 
 function correction(cone::Power, primal_dir::AbstractVector)
-    @assert cone.hess_updated
     m = length(cone.alpha)
     @views u = cone.point[1:m]
     @views w = cone.point[(m + 1):end]

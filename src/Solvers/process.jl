@@ -2,11 +2,17 @@
 preprocessing and initial point finding functions for interior point algorithms
 =#
 
-# TODO rewrite using a new function in Cones.jl - for most cones we want to just set the dual point same as primal point rather than taking gradient
+MatrixyAG = Union{AbstractMatrix, UniformScaling}
 
 # rescale the rows and columns of the conic data to get an equivalent conic problem
 function rescale_data(solver::Solver{T}) where {T <: Real}
     model = solver.model
+    (c, A, b, G, h) = (model.c, model.A, model.b, model.G, model.h)
+    if !isa(A, MatrixyAG) || !isa(G, MatrixyAG)
+        solver.used_rescaling = false
+        return solver.model
+    end
+
     rteps = sqrt(eps(T))
     maxabsmin(v::AbstractVecOrMat) = maximum(abs, v, init = rteps)
     maxabsmincol(v::UniformScaling, ::Int) = max(abs(v.λ), rteps)
@@ -16,36 +22,33 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
     maxabsminrows(v::UniformScaling, ::UnitRange{Int}) = max(abs(v.λ), rteps)
     maxabsminrows(v::AbstractMatrix, rows::UnitRange{Int}) = maxabsmin(view(v, rows, :))
 
-    @inbounds solver.c_scale = c_scale = T[sqrt(max(abs(model.c[j]), maxabsmincol(model.A, j), maxabsmincol(model.G, j))) for j in 1:model.n]
-    @inbounds solver.b_scale = b_scale = T[sqrt(max(abs(model.b[i]), maxabsminrow(model.A, i))) for i in 1:model.p]
+    @inbounds solver.c_scale = c_scale = T[sqrt(max(abs(c[j]), maxabsmincol(A, j), maxabsmincol(G, j))) for j in eachindex(c)]
+    @inbounds solver.b_scale = b_scale = T[sqrt(max(abs(b[i]), maxabsminrow(A, i))) for i in eachindex(b)]
 
     h_scale = solver.h_scale = ones(T, model.q)
     for (k, cone) in enumerate(model.cones)
         idxs = model.cone_idxs[k]
         if cone isa Cones.Nonnegative
             for i in idxs
-                @inbounds h_scale[i] = sqrt(max(abs(model.h[i]), maxabsminrow(model.G, i)))
+                @inbounds h_scale[i] = sqrt(max(abs(h[i]), maxabsminrow(G, i)))
             end
         else
             # TODO store single scale value only?
-            @inbounds h_scale[idxs] .= sqrt(max(maxabsmin(view(model.h, idxs)), maxabsminrows(model.G, idxs)))
+            @inbounds h_scale[idxs] .= sqrt(max(maxabsmin(view(h, idxs)), maxabsminrows(G, idxs)))
         end
     end
 
-    if !isempty(model.c)
-        cdiag = Diagonal(c_scale)
-        model.c = cdiag \ model.c
-        model.A = model.A / cdiag
-        model.G = model.G / cdiag
-    end
-    if !isempty(model.b)
-        model.b = Diagonal(b_scale) \ model.b
-        model.A ./= b_scale
-    end
-    if !isempty(model.h)
-        model.h = Diagonal(h_scale) \ model.h
-        model.G ./= h_scale
-    end
+    c_diag = Diagonal(c_scale)
+    model.c = c_diag \ c
+    model.A = A / c_diag
+    model.G = G / c_diag
+    b_diag = Diagonal(b_scale)
+    model.b = b_diag \ b
+    ldiv!(b_diag, model.A)
+    h_diag = Diagonal(h_scale)
+    model.h = h_diag \ h
+    ldiv!(h_diag, model.G)
+    solver.used_rescaling = true
 
     return solver.model
 end
@@ -73,13 +76,14 @@ function find_initial_x(
     rhs = vcat(model.b, model.h - init_s)
 
     # indirect method
-    if solver.init_use_indirect
+    if solver.init_use_indirect || !isa(A, MatrixyAG) || !isa(G, MatrixyAG)
         # TODO pick lsqr or lsmr
         if iszero(p)
             AG = G
         else
-            # TODO use LinearMaps.jl
-            AG = BlockMatrix{T}(p + q, n, [A, G], [1:p, p .+ (1:q)], [1:n, 1:n])
+            linmap(M::UniformScaling) = LinearMaps.LinearMap(M, n)
+            linmap(M) = LinearMaps.LinearMap(M)
+            AG = vcat(linmap(A), linmap(G))
         end
         @timeit solver.timer "lsqr_solve" init_x = IterativeSolvers.lsqr(AG, rhs)
         return init_x
@@ -185,7 +189,7 @@ function find_initial_y(
     A = model.A
     solver.y_keep_idxs = 1:p
 
-    if !reduce
+    if !reduce || !isa(A, MatrixyAG)
         # rhs = -c - G' * point.z
         rhs = copy(model.c)
         mul!(rhs, model.G', init_z, -1, -1)
@@ -251,7 +255,7 @@ function find_initial_y(
         solver.verbose && println("$(p - Ap_rank) out of $p primal equality constraints are dependent")
     end
 
-    if reduce
+    if reduce && isa(model.G, MatrixyAG)
         @timeit solver.timer "reduce" begin
             # remove all primal equalities by making A and b empty with n = n0 - p0 and p = 0
             # TODO improve efficiency
@@ -410,7 +414,7 @@ function postprocess(solver::Solver{T}) where {T <: Real}
         @. result.y = point.y / tau
     end
 
-    if solver.rescale
+    if solver.used_rescaling
         # unscale result
         result.s .*= solver.h_scale
         result.z ./= solver.h_scale

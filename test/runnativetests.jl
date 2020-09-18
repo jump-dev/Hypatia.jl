@@ -16,9 +16,9 @@ include(joinpath(@__DIR__, "nativesets.jl"))
 timer = TimerOutput()
 # tol = 1e-10
 common_options = (
-    verbose = true,
-    # verbose = false,
-    iter_limit = 100,
+    # verbose = true,
+    verbose = false,
+    iter_limit = 20,
     time_limit = 6e1,
     timer = timer,
     # tol_feas = tol,
@@ -75,7 +75,7 @@ global ITERS = 0
 @testset "native tests" begin
 
 @testset "default options tests" begin
-for inst_name in inst_all
+for inst_name in vcat(inst_preproc, inst_infeas, inst_cones_many)
     test_instance_solver(inst_name, Float64, common_options, "defaults")
 end
 end
@@ -96,7 +96,6 @@ end
 system_solvers = [
     (Solvers.NaiveDenseSystemSolver, all_reals),
     (Solvers.NaiveSparseSystemSolver, default_reals),
-    # (Solvers.NaiveIndirectSystemSolver, all_reals), # TODO fix
     (Solvers.NaiveElimDenseSystemSolver, all_reals),
     (Solvers.NaiveElimSparseSystemSolver, default_reals),
     (Solvers.SymIndefDenseSystemSolver, all_reals),
@@ -110,10 +109,10 @@ for inst_name in inst_cones_few, (system_solver, real_types) in system_solvers, 
 end
 end
 
-@testset "indirect initialize tests" begin
-for inst_name in inst_cones_few, T in all_reals
-    test_info = "init_use_indirect = true"
-    options = (; common_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.NaiveElimDenseSystemSolver{T}())
+@testset "indirect solvers tests" begin
+for inst_name in inst_indirect, T in all_reals
+    test_info = "indirect solvers"
+    options = (; common_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.SymIndefIndirectSystemSolver{T}(), tol_feas = 1e-3, tol_rel_opt = 1e-3, tol_abs_opt = 1e-3)
     test_instance_solver(inst_name, T, options, test_info)
 end
 end

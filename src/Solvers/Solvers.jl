@@ -8,12 +8,12 @@ using Printf
 using LinearAlgebra
 using SparseArrays
 import SuiteSparse
+import LinearMaps
 import IterativeSolvers
 using Test
 using TimerOutputs
 import Hypatia.Cones
 import Hypatia.Models
-import Hypatia.BlockMatrix
 import Hypatia.SparseNonSymCache
 import Hypatia.SparseSymCache
 import Hypatia.update_fact
@@ -134,6 +134,7 @@ mutable struct Solver{T <: Real}
     prev_z_feas::T
 
     # data scaling
+    used_rescaling::Bool
     b_scale::Vector{T}
     c_scale::Vector{T}
     h_scale::Vector{T}
