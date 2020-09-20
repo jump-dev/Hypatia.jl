@@ -19,7 +19,7 @@ struct MatrixQuadraticJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_matrixepipersquare::Bool # use matrixepipersquare cone, else PSD formulation
 end
 
-function build(inst::MatrixQuadraticJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::MatrixQuadraticJuMP{T}) where {T <: Float64}
     (num_rows, num_cols) = (inst.num_rows, inst.num_cols)
     C = randn(num_cols, num_rows)
     P = randn(num_rows, num_rows)

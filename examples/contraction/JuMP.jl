@@ -18,7 +18,7 @@ struct ContractionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     is_feas::Bool
 end
 
-function build(inst::ContractionJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::ContractionJuMP{T}) where {T <: Float64}
     delta = inst.delta
     n = 2
     dom = ModelUtilities.FreeDomain{Float64}(n)

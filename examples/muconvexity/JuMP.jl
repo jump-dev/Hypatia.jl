@@ -16,7 +16,7 @@ struct MuConvexityJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     true_mu::Real # optional true value of parameter for testing only
 end
 
-function build(inst::MuConvexityJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::MuConvexityJuMP{T}) where {T <: Float64}
     dom = muconvexity_data[inst.dom]
     n = ModelUtilities.get_dimension(dom)
     DP.@polyvar x[1:n]

@@ -5,7 +5,6 @@ run native instance tests from test/nativeinstances.jl and display basic benchma
 using Test
 using DataFrames
 using Printf
-using TimerOutputs
 import Hypatia
 import Hypatia.Solvers
 
@@ -13,14 +12,12 @@ include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
 
 # common solver options
-timer = TimerOutput()
 # tol = 1e-10
 common_options = (
     # verbose = true,
     verbose = false,
     iter_limit = 20,
     time_limit = 6e1,
-    timer = timer,
     # tol_feas = tol,
     # tol_rel_opt = tol,
     # tol_abs_opt = tol,
@@ -74,23 +71,23 @@ global ITERS = 0
 
 @testset "native tests" begin
 
-@testset "default options tests" begin
-for inst_name in vcat(inst_preproc, inst_infeas, inst_cones_many)
-    test_instance_solver(inst_name, Float64, common_options, "defaults")
-end
-end
+# @testset "default options tests" begin
+# for inst_name in vcat(inst_preproc, inst_infeas, inst_cones_many)
+#     test_instance_solver(inst_name, Float64, common_options, "defaults")
+# end
+# end
 
-@testset "steppers tests" begin
-steppers = [
-    # (Solvers.HeurCombStepper, all_reals), # default
-    (Solvers.PredOrCorrStepper, all_reals),
-    ]
-for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in real_types
-    test_info = "stepper = $(string_nameof(stepper))"
-    options = (; common_options..., stepper = stepper{T}())
-    test_instance_solver(inst_name, T, options, test_info)
-end
-end
+# @testset "steppers tests" begin
+# steppers = [
+#     # (Solvers.HeurCombStepper, all_reals), # default
+#     (Solvers.PredOrCorrStepper, all_reals),
+#     ]
+# for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in real_types
+#     test_info = "stepper = $(string_nameof(stepper))"
+#     options = (; common_options..., stepper = stepper{T}())
+#     test_instance_solver(inst_name, T, options, test_info)
+# end
+# end
 
 @testset "system solvers tests" begin
 system_solvers = [
@@ -109,26 +106,24 @@ for inst_name in inst_cones_few, (system_solver, real_types) in system_solvers, 
 end
 end
 
-@testset "indirect solvers tests" begin
-for inst_name in inst_indirect, T in all_reals
-    test_info = "indirect solvers"
-    options = (; common_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.SymIndefIndirectSystemSolver{T}(), tol_feas = 1e-3, tol_rel_opt = 1e-3, tol_abs_opt = 1e-3)
-    test_instance_solver(inst_name, T, options, test_info)
-end
-end
-
-@testset "no preprocess tests" begin
-for inst_name in inst_cones_few, T in all_reals
-    test_info = "preprocess = false"
-    options = (; common_options..., preprocess = false, reduce = false, system_solver = Solvers.SymIndefDenseSystemSolver{T}())
-    test_instance_solver(inst_name, T, options, test_info)
-end
-end
+# @testset "indirect solvers tests" begin
+# for inst_name in inst_indirect, T in all_reals
+#     test_info = "indirect solvers"
+#     options = (; common_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.SymIndefIndirectSystemSolver{T}(), tol_feas = 1e-3, tol_rel_opt = 1e-3, tol_abs_opt = 1e-3)
+#     test_instance_solver(inst_name, T, options, test_info)
+# end
+# end
+#
+# @testset "no preprocess tests" begin
+# for inst_name in inst_cones_few, T in all_reals
+#     test_info = "preprocess = false"
+#     options = (; common_options..., preprocess = false, reduce = false, system_solver = Solvers.SymIndefDenseSystemSolver{T}())
+#     test_instance_solver(inst_name, T, options, test_info)
+# end
+# end
 
 @printf("\nnative tests total time: %8.2e seconds\n\n", time() - all_tests_time)
 show(perf, allrows = true, allcols = true)
-println("\n")
-show(timer)
 println("\n")
 @show ITERS
 end

@@ -19,7 +19,6 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     dual_point::Vector{T}
     rt2::T
     sc_const::T
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -99,7 +98,6 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     cone.W = zeros(R, side, side)
     cone.tmpW = zeros(R, side, side)
     cone.Wi_vec = zeros(T, dim - 1)
-    # cone.Wi = zeros(R, side, side)
     cone.work_mat = zeros(R, side, side)
     cone.work_mat2 = zeros(R, side, side)
     cone.tmpw = zeros(T, dim - 1)
@@ -144,11 +142,13 @@ end
 
 function is_dual_feas(cone::HypoRootdetTri{T}) where {T}
     u = cone.dual_point[1]
+
     if u < -eps(T)
         @views svec_to_smat!(cone.work_mat, cone.dual_point[2:end], cone.rt2)
         dual_fact_W = cholesky!(Hermitian(cone.work_mat, :U), check = false)
         return isposdef(dual_fact_W) && (logdet(dual_fact_W) - cone.side * log(-u / cone.side) > eps(T))
     end
+
     return false
 end
 
@@ -158,6 +158,7 @@ function update_grad(cone::HypoRootdetTri)
     u = cone.point[1]
 
     cone.grad[1] = cone.sc_const / cone.rootdetu
+    # TODO in-place
     # copyto!(cone.Wi, cone.fact_W.factors)
     # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0)) # TODO inplace for bigfloat
     cone.Wi = inv(cone.fact_W)
@@ -261,7 +262,6 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hyp
     const1 = rootdet / side
 
     denom = side * (side * rootdetu + rootdet) # TODO could write using cone.u, check if this is better because rootdetu is derived from u
-
     @inbounds for i in 1:size(arr, 2)
         @views arr_w = arr[2:end, i]
         @views prod_w = prod[2:end, i]
@@ -278,8 +278,8 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hyp
     @. @views prod[1, :] = H11 * arr[1, :]
     @views mul!(prod[1, :]', w', arr[2:end, :], const1, true)
     @views mul!(prod[2:cone.dim, :], w, arr[1, :]', const1, true)
-
     prod ./= cone.sc_const
+
     return prod
 end
 
@@ -319,7 +319,7 @@ function correction(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}) wher
 
     @. w_corr += scal6 * vec_skron2
     corr[1] = (sigma * (dot(vec_skron2, w_dir) - (scal2 + 4 * udz) * dot_wdwi) + 2 * abs2(udz)) / z
-    corr *= cone.sc_const / -2
+    corr .*= cone.sc_const / -2
 
     return corr
 end
