@@ -10,7 +10,7 @@ struct PolyNormJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     num_polys::Int
 end
 
-function build(inst::PolyNormJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::PolyNormJuMP{T}) where {T <: Float64}
     (n, num_polys) = (inst.n, inst.num_polys)
 
     dom = ModelUtilities.FreeDomain{Float64}(n)

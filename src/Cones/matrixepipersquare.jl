@@ -15,7 +15,6 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     rt2::T
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -146,6 +145,7 @@ end
 
 function is_dual_feas(cone::MatrixEpiPerSquare{T}) where {T}
     v = cone.dual_point[cone.v_idx]
+
     if v > eps(T)
         @views svec_to_smat!(cone.tmpd1d1b, cone.dual_point[cone.U_idxs], cone.rt2)
         F = cholesky!(Hermitian(cone.tmpd1d1b, :U), check = false)
@@ -155,6 +155,7 @@ function is_dual_feas(cone::MatrixEpiPerSquare{T}) where {T}
         trLW = sum(abs2, LW)
         return (2 * v - trLW > eps(T))
     end
+
     return false
 end
 

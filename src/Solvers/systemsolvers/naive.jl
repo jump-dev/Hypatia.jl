@@ -38,7 +38,6 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
         spzeros(T, q, n)  spzeros(T, q, p)  sparse(one(T) * I, q, q)  spzeros(T, q)  sparse(one(T) * I, q, q)   spzeros(T, q);
         spzeros(T, 1, n)  spzeros(T, 1, p)  spzeros(T, 1, q)          one(T)         spzeros(T, 1, q)           one(T);
         ]
-    @assert issparse(lhs)
     dropzeros!(lhs)
     (Is, Js, Vs) = findnz(lhs)
 
@@ -64,7 +63,6 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
             @. H_Js[IJV_idxs] = H_start_k + j
         end
     end
-    @assert offset == hess_nz_total + 1
     append!(Is, H_Is)
     append!(Js, H_Js)
     append!(Vs, ones(T, hess_nz_total))
@@ -115,7 +113,7 @@ function update_lhs(system_solver::NaiveSparseSystemSolver, solver::Solver)
     tau = solver.point.tau[1]
     system_solver.lhs.nzval[system_solver.mtt_idx] = solver.mu / tau / tau # NOTE: mismatch when using NT for kaptau
 
-    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs)
+    update_fact(system_solver.fact_cache, system_solver.lhs)
 
     return system_solver
 end
@@ -182,7 +180,7 @@ function update_lhs(system_solver::NaiveDenseSystemSolver, solver::Solver)
     tau = solver.point.tau[1]
     system_solver.lhs[end, system_solver.tau_row] = solver.mu / tau / tau # NOTE: mismatch when using NT for kaptau
 
-    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs)
+    update_fact(system_solver.fact_cache, system_solver.lhs)
 
     return system_solver
 end

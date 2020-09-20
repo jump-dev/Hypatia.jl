@@ -48,7 +48,7 @@ function ShapeConRegrJuMP{Float64}(
     return ShapeConRegrJuMP{Float64}(X, y, args...)
 end
 
-function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64}
     (X, y, deg) = (inst.X, inst.y, inst.deg)
     n = size(X, 2)
     num_points = size(X, 1)

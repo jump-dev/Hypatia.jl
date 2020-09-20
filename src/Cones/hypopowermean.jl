@@ -15,7 +15,6 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     alpha::Vector{T}
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -111,10 +110,11 @@ function is_dual_feas(cone::HypoPowerMean{T}) where {T}
     u = cone.dual_point[1]
     @views w = cone.dual_point[2:end]
     alpha = cone.alpha
-    if u < -eps(T) && all(>(eps(T)), w)
-        @inbounds dual_wprodu = exp(sum(alpha[i] * log(w[i] / alpha[i]) for i in eachindex(alpha))) + u
-        return (dual_wprodu > eps(T))
+
+    @inbounds if u < -eps(T) && all(>(eps(T)), w)
+        return (exp(sum(alpha[i] * log(w[i] / alpha[i]) for i in eachindex(alpha))) + u > eps(T))
     end
+
     return false
 end
 

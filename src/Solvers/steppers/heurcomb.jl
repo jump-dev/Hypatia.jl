@@ -38,7 +38,6 @@ end
 function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
     model = solver.model
-    timer = solver.timer
 
     # # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)
     # cones = model.cones
@@ -54,28 +53,28 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
 
     # update linear system solver factorization and helpers
     Cones.grad.(model.cones)
-    @timeit timer "update_lhs" update_lhs(solver.system_solver, solver)
+    update_lhs(solver.system_solver, solver)
 
     # calculate centering direction and keep in dir_cent
-    @timeit timer "rhs_cent" update_rhs_cent(solver, stepper.rhs)
-    @timeit timer "dir_cent" get_directions(stepper, solver, false, iter_ref_steps = 3)
+    update_rhs_cent(solver, stepper.rhs)
+    get_directions(stepper, solver, false, iter_ref_steps = 3)
     dir_cent = copy(stepper.dir.vec) # TODO
-    @timeit timer "rhs_centcorr" update_rhs_centcorr(solver, stepper.rhs, stepper.dir)
-    @timeit timer "dir_centcorr" get_directions(stepper, solver, false, iter_ref_steps = 3)
+    update_rhs_centcorr(solver, stepper.rhs, stepper.dir)
+    get_directions(stepper, solver, false, iter_ref_steps = 3)
     dir_centcorr = copy(stepper.dir.vec) # TODO
     # copyto!(stepper.dir_cent, stepper.dir)
 
     # calculate affine/prediction direction and keep in dir
-    @timeit timer "rhs_pred" update_rhs_pred(solver, stepper.rhs)
-    @timeit timer "dir_pred" get_directions(stepper, solver, true, iter_ref_steps = 3)
+    update_rhs_pred(solver, stepper.rhs)
+    get_directions(stepper, solver, true, iter_ref_steps = 3)
     dir_pred = copy(stepper.dir.vec) # TODO
-    @timeit timer "rhs_predcorr" update_rhs_predcorr(solver, stepper.rhs, stepper.dir)
-    @timeit timer "dir_predcorr" get_directions(stepper, solver, true, iter_ref_steps = 3)
+    update_rhs_predcorr(solver, stepper.rhs, stepper.dir)
+    get_directions(stepper, solver, true, iter_ref_steps = 3)
     dir_predcorr = copy(stepper.dir.vec) # TODO
 
     # calculate centering factor gamma by finding distance pred_alpha for stepping in pred direction
     copyto!(stepper.dir.vec, dir_pred)
-    @timeit timer "alpha_pred" stepper.prev_pred_alpha = pred_alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T)) # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
+    stepper.prev_pred_alpha = pred_alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T)) # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
 
     # TODO allow different function (heuristic) as option?
     # stepper.prev_gamma = gamma = abs2(1 - pred_alpha)
@@ -86,7 +85,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     @. stepper.dir.vec = gamma * (dir_cent + pred_alpha * dir_centcorr) + (1 - gamma) * (dir_pred + pred_alpha * dir_predcorr) # TODO
 
     # find distance alpha for stepping in combined direction
-    @timeit timer "alpha_comb" alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
+    alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
 
     if iszero(alpha)
         # could not step far in combined direction, so attempt a pure centering step
@@ -95,11 +94,11 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
         @. stepper.dir.vec = dir_cent + dir_centcorr
 
         # find distance alpha for stepping in centering direction
-        @timeit timer "alpha_cent" alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
+        alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
 
         if iszero(alpha)
             copyto!(stepper.dir.vec, dir_cent)
-            @timeit timer "alpha_cent2" alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
+            alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
 
             if iszero(alpha)
                 @warn("numerical failure: could not step in centering direction; terminating")

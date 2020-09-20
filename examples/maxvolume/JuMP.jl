@@ -9,7 +9,7 @@ struct MaxVolumeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     epinorminf_constrs::Bool # add L1 and Linfty ball constraints, else don't add
 end
 
-function build(inst::MaxVolumeJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::MaxVolumeJuMP{T}) where {T <: Float64}
     n = inst.n
     A = randn(n, n)
     # ensure there will be a feasible solution

@@ -121,7 +121,6 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
         -model.G          spzeros(T, q, p)  sparse(one(T) * I, q, q)  model.h;
         -model.c'         -model.b'         -model.h'                 one(T);
         ]
-    @assert issparse(lhs_sub)
     dropzeros!(lhs_sub)
     (Is, Js, Vs) = findnz(lhs_sub)
 
@@ -145,7 +144,6 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
             @. H_Js[IJV_idxs] = z_start_k + j
         end
     end
-    @assert offset == hess_nz_total + 1
     append!(Is, H_Is)
     append!(Js, H_Js)
     append!(Vs, ones(T, hess_nz_total))
@@ -192,7 +190,7 @@ function update_lhs(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
     tau = solver.point.tau[1]
     system_solver.lhs_sub.nzval[end] = solver.mu / tau / tau # NOTE: mismatch when using NT for kaptau
 
-    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs_sub)
+    update_fact(system_solver.fact_cache, system_solver.lhs_sub)
 
     return system_solver
 end
@@ -259,7 +257,7 @@ function update_lhs(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver
     tau = solver.point.tau[1]
     lhs_sub[end, end] = solver.mu / tau / tau # NOTE: mismatch when using NT for kaptau
 
-    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs_sub)
+    update_fact(system_solver.fact_cache, system_solver.lhs_sub)
 
     return system_solver
 end

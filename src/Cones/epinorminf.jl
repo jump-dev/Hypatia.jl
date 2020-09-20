@@ -15,7 +15,6 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     is_complex::Bool
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -125,6 +124,7 @@ end
 function is_dual_feas(cone::EpiNormInf{T}) where {T}
     dp = cone.dual_point
     u = dp[1]
+
     if u > eps(T)
         if cone.is_complex
             norm1 = sum(hypot(dp[2i], dp[2i + 1]) for i in 1:cone.n)
@@ -133,6 +133,7 @@ function is_dual_feas(cone::EpiNormInf{T}) where {T}
         end
         return (u - norm1 > eps(T))
     end
+
     return false
 end
 
@@ -313,17 +314,20 @@ end
 
 function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, T}) where {T <: Real}
     cone.hess_aux_updated || update_hess_aux(cone)
+
     @views @inbounds begin
         copyto!(prod[1, :], arr[1, :])
         mul!(prod[1, :], arr[2:end, :]', cone.Hure, true, cone.Huu)
         mul!(prod[2:end, :], cone.Hure, arr[1, :]')
         @. prod[2:end, :] += cone.Hrere * arr[2:end, :]
     end
+
     return prod
 end
 
 function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, Complex{T}}) where {T <: Real}
     cone.hess_aux_updated || update_hess_aux(cone)
+
     @views @inbounds begin
         @. prod[1, :] = cone.Huu * arr[1, :]
         mul!(prod[1, :], arr[2:2:end, :]', cone.Hure, true, true)
@@ -333,11 +337,13 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::E
         @. prod[2:2:end, :] += cone.Hrere * arr[2:2:end, :] + cone.Hreim * arr[3:2:end, :]
         @. prod[3:2:end, :] += cone.Himim * arr[3:2:end, :] + cone.Hreim * arr[2:2:end, :]
     end
+
     return prod
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, T}) where {T <: Real}
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
+
     @views @inbounds begin
         copyto!(prod[1, :], arr[1, :])
         mul!(prod[1, :], arr[2:end, :]', cone.Hiure, true, true)
@@ -345,11 +351,13 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
         prod ./= cone.schur
         @. prod[2:end, :] += arr[2:end, :] / cone.Hrere
     end
+
     return prod
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, Complex{T}}) where {T <: Real}
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
+
     @views @inbounds begin
         copyto!(prod[1, :], arr[1, :])
         mul!(prod[1, :], arr[2:2:end, :]', cone.Hiure, true, true)
@@ -363,6 +371,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
         @. prod[j2, :] += (cone.Himim[j] * arr[j2, :] - cone.Hreim[j] * arr[j2 + 1, :]) / cone.idet[j]
         @. prod[j2 + 1, :] += (cone.Hrere[j] * arr[j2 + 1, :] - cone.Hreim[j] * arr[j2, :]) / cone.idet[j]
     end
+
     return prod
 end
 

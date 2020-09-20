@@ -13,7 +13,6 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     dim::Int
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -100,10 +99,11 @@ end
 function is_dual_feas(cone::HypoGeoMean{T}) where {T}
     u = cone.dual_point[1]
     @views w = cone.dual_point[2:end]
+
     if u < -eps(T) && all(>(eps(T)), w)
-        dual_wgeou = (cone.dim - 1) * exp(cone.iwdim * sum(log, w)) + u
-        return (dual_wgeou > eps(T))
+        return ((cone.dim - 1) * exp(cone.iwdim * sum(log, w)) + u > eps(T))
     end
+
     return false
 end
 

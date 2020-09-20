@@ -16,7 +16,6 @@ mutable struct Power{T <: Real} <: Cone{T}
     n::Int
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -116,11 +115,13 @@ function is_dual_feas(cone::Power{T}) where {T <: Real}
     alpha = cone.alpha
     m = length(cone.alpha)
     @views u = cone.dual_point[1:m]
+
     if all(>(eps(T)), u)
         @inbounds p = exp(2 * sum(alpha[i] * log(u[i] / alpha[i]) for i in eachindex(alpha)))
         @views w = cone.dual_point[(m + 1):end]
         return (p - sum(abs2, w) > eps(T))
     end
+
     return false
 end
 

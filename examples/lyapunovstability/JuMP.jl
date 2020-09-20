@@ -26,7 +26,7 @@ struct LyapunovStabilityJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_matrixepipersquare::Bool # use matrixepipersquare cone, else PSD formulation
 end
 
-function build(inst::LyapunovStabilityJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::LyapunovStabilityJuMP{T}) where {T <: Float64}
     (num_rows, num_cols) = (inst.num_rows, inst.num_cols)
 
     model = JuMP.Model()

@@ -21,7 +21,7 @@ struct NearestPSDJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_sparsepsd::Bool # use sparse PSD cone formulation, else dense PSD formulation
 end
 
-function build(inst::NearestPSDJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::NearestPSDJuMP{T}) where {T <: Float64}
     side = inst.side
     sparsity = min(3.0 / side, 1.0) # sparsity factor (before computing optional chordal extension) TODO make option
 

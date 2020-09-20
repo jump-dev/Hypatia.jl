@@ -11,7 +11,7 @@ struct StabilityNumber{T <: Real} <: ExampleInstanceJuMP{T}
     use_doublynonnegative::Bool
 end
 
-function build(inst::StabilityNumber{T}) where {T <: Float64} # TODO generic reals
+function build(inst::StabilityNumber{T}) where {T <: Float64}
     side = inst.side
     sparsity = 1 - inv(side)
     inv_graph = tril!(sprand(Bool, side, side, sparsity) + I)

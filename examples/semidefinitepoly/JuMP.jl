@@ -26,7 +26,7 @@ function SemidefinitePolyJuMP{Float64}(
     return SemidefinitePolyJuMP{Float64}(get_semidefinitepoly_data(matpoly)..., args...)
 end
 
-function build(inst::SemidefinitePolyJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::SemidefinitePolyJuMP{T}) where {T <: Float64}
     (x, H) = (inst.x, inst.H)
 
     model = JuMP.Model()

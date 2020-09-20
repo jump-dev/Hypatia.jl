@@ -145,7 +145,7 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     system_solver.hess_sqrt_cones = sizehint!(Int[], num_cones)
 
     # NOTE very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
-    @timeit solver.timer "mul_G_Q" GQ = model.G * solver.Ap_Q
+    GQ = model.G * solver.Ap_Q
 
     system_solver.GQ2 = GQ[:, (p + 1):end]
     system_solver.HGQ2 = zeros(T, q, nmp)
@@ -268,7 +268,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
     for (k, cone_k) in enumerate(model.cones)
         block_hess_prod(cone_k, rhs_const.z_views[k], model.h[model.cone_idxs[k]])
     end
-    @timeit solver.timer "solve_subsystem3" solve_subsystem3(system_solver, solver, system_solver.sol_const, rhs_const)
+    solve_subsystem3(system_solver, solver, system_solver.sol_const, rhs_const)
 
     return system_solver
 end

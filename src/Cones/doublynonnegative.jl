@@ -6,7 +6,6 @@ where W = smat(w)
 
 TODO
 - improve description
-- complex generalization?
 =#
 
 mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
@@ -18,7 +17,6 @@ mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     rt2::T
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -57,9 +55,8 @@ mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
         cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
-        side = round(Int, sqrt(0.25 + 2 * dim) - 0.5)
+        cone.side = side = round(Int, sqrt(0.25 + 2 * dim) - 0.5)
         @assert side * (side + 1) == 2 * dim
-        cone.side = side
         cone.offdiag_idxs = vcat([div(i * (i - 1), 2) .+ (1:(i - 1)) for i in 2:side]...)
         cone.hess_fact_cache = hess_fact_cache
         return cone
@@ -94,6 +91,7 @@ get_nu(cone::DoublyNonnegative) = cone.dim
 
 function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegative{T}) where {T}
     side = cone.side
+
     # for small side dimension, use closed-form solutions
     if side == 1
         on_diag = off_diag = one(T)
@@ -161,7 +159,7 @@ is_dual_feas(cone::DoublyNonnegative) = true
 function update_grad(cone::DoublyNonnegative)
     @assert cone.is_feas
 
-    cone.inv_mat = inv(cone.fact_mat)
+    cone.inv_mat = inv(cone.fact_mat) # TODO in-place
     smat_to_svec!(cone.grad, cone.inv_mat, cone.rt2)
     cone.grad .*= -1
     @. @views cone.inv_vec = inv(cone.point[cone.offdiag_idxs])
@@ -174,10 +172,12 @@ end
 function update_hess(cone::DoublyNonnegative)
     @assert cone.grad_updated
     H = cone.hess.data
+
     symm_kron(H, cone.inv_mat, cone.rt2)
     for (inv_od, idx) in zip(cone.inv_vec, cone.offdiag_idxs)
         H[idx, idx] += abs2(inv_od)
     end
+
     cone.hess_updated = true
     return cone.hess
 end

@@ -4,9 +4,6 @@ epigraph of Euclidean (2-)norm (AKA second-order cone)
 
 barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
 -log(u^2 - norm_2(w)^2)
-
-TODO
-- try to derive faster neighborhood calculations for this cone specifically
 =#
 
 mutable struct EpiNormEucl{T <: Real} <: Cone{T}
@@ -15,7 +12,6 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     dim::Int
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -93,11 +89,13 @@ end
 
 function is_dual_feas(cone::EpiNormEucl{T}) where {T}
     u = cone.dual_point[1]
+
     if u > eps(T)
         w = view(cone.dual_point, 2:cone.dim)
         @views dual_dist = abs2(u) - sum(abs2, cone.dual_point[2:end])
         return (dual_dist > 2 * eps(T))
     end
+
     return false
 end
 
