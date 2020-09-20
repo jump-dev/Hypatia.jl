@@ -15,7 +15,7 @@ struct RegionOfAttrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_wsos::Bool # use wsosinterpnonnegative cone, else PSD formulation
 end
 
-function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64}
     deg = inst.deg
     DP.@polyvar x
     DP.@polyvar t

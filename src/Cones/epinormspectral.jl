@@ -19,7 +19,6 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     is_complex::Bool
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -91,19 +90,20 @@ function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} w
     cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    cone.W = zeros(R, cone.d1, cone.d2)
-    cone.Z = zeros(R, cone.d1, cone.d1)
-    cone.tau = zeros(R, cone.d1, cone.d2)
-    cone.HuW = zeros(R, cone.d1, cone.d2)
-    cone.WtauI = zeros(R, cone.d2, cone.d2)
-    cone.Zitau = zeros(R, cone.d1, cone.d2)
-    cone.tmpd1d2 = zeros(R, cone.d1, cone.d2)
-    cone.tmpd1d2b = zeros(R, cone.d1, cone.d2)
-    cone.tmpd1d2c = zeros(R, cone.d1, cone.d2)
-    cone.tmpd1d2d = zeros(R, cone.d1, cone.d2)
-    cone.tmpd1d1 = zeros(R, cone.d1, cone.d1)
-    cone.tmpd2d2 = zeros(R, cone.d2, cone.d2)
-    cone.tmpd2d2b = zeros(R, cone.d2, cone.d2)
+    (d1, d2) = (cone.d1, cone.d2)
+    cone.W = zeros(R, d1, d2)
+    cone.Z = zeros(R, d1, d1)
+    cone.tau = zeros(R, d1, d2)
+    cone.HuW = zeros(R, d1, d2)
+    cone.WtauI = zeros(R, d2, d2)
+    cone.Zitau = zeros(R, d1, d2)
+    cone.tmpd1d2 = zeros(R, d1, d2)
+    cone.tmpd1d2b = zeros(R, d1, d2)
+    cone.tmpd1d2c = zeros(R, d1, d2)
+    cone.tmpd1d2d = zeros(R, d1, d2)
+    cone.tmpd1d1 = zeros(R, d1, d1)
+    cone.tmpd2d2 = zeros(R, d2, d2)
+    cone.tmpd2d2b = zeros(R, d2, d2)
     return
 end
 
@@ -136,10 +136,12 @@ end
 # TODO is there a faster way to check u >= nuc_norm, eg thru a cholesky?
 function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: BlasReal}
     u = cone.dual_point[1]
+
     if u > eps(T)
         W = @views vec_copy_to!(similar(cone.W), cone.dual_point[2:end])
         return (u - sum(svdvals(W)) > eps(T))
     end
+
     return false
 end
 is_dual_feas(cone::EpiNormSpectral) = true # NOTE svdvals too slow for non-BLAS types

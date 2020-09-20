@@ -21,7 +21,7 @@ struct ExpDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     geomean_obj::Bool # use formulation with geomean objective
 end
 
-function build(inst::ExpDesignJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::ExpDesignJuMP{T}) where {T <: Float64}
     (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)
     @assert (p > q) && (n > q) && (n_max <= n)
     @assert inst.logdet_obj + inst.geomean_obj + inst.rootdet_obj == 1

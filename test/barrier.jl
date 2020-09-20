@@ -7,12 +7,9 @@ import Random
 using LinearAlgebra
 using SparseArrays
 import ForwardDiff
-import TimerOutputs
 import Hypatia
 const CO = Hypatia.Cones
 const MU = Hypatia.ModelUtilities
-
-timer = TimerOutputs.TimerOutput()
 
 function test_barrier_oracles(
     cone::CO.Cone{T},
@@ -26,7 +23,6 @@ function test_barrier_oracles(
     Random.seed!(1)
 
     CO.setup_data(cone)
-    CO.set_timer(cone, timer)
     dim = CO.dimension(cone)
     point = Vector{T}(undef, dim)
     dual_point = copy(point)

@@ -12,7 +12,6 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     dim::Int
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -98,9 +97,11 @@ function is_dual_feas(cone::HypoPerLog{T}) where {T}
     u = cone.dual_point[1]
     v = cone.dual_point[2]
     @views w = cone.dual_point[3:cone.dim]
+
     if all(>(eps(T)), w) && u < -eps(T)
         return (v - u * (length(w) + sum(log(-wi / u) for wi in w)) > eps(T))
     end
+
     return false
 end
 
@@ -261,89 +262,3 @@ const central_rays_hypoperlog = [
     -0.287837744  0.600745284  1.083013
     -0.264242734  0.596019009  1.075868782
     ]
-
-# TODO add hess prod, inv hess etc functions
-# NOTE old EpiPerExp code below may be useful (cone vector is reversed)
-
-# function update_feas(cone::EpiPerExp)
-#     @assert !cone.feas_updated
-#     (u, v, w) = (cone.point[1], cone.point[2], cone.point[3])
-#
-#     if u > 0 && v > 0
-#         cone.luv = log(u / v)
-#         cone.vluvw = v * cone.luv - w
-#         cone.is_feas = (cone.vluvw > 0)
-#     else
-#         cone.is_feas = false
-#     end
-#
-#     cone.feas_updated = true
-#     return cone.is_feas
-# end
-#
-# function update_grad(cone::EpiPerExp)
-#     @assert cone.is_feas
-#     (u, v, w) = (cone.point[1], cone.point[2], cone.point[3])
-#     vluvw = cone.vluvw
-#
-#     cone.g1a = -v / u / vluvw
-#     cone.grad[1] = cone.g1a - inv(u)
-#     cone.g2a = (1 - cone.luv) / vluvw
-#     cone.grad[2] = cone.g2a - inv(v)
-#     cone.grad[3] = inv(vluvw)
-#
-#     cone.grad_updated = true
-#     return cone.grad
-# end
-#
-# function update_hess(cone::EpiPerExp)
-#     @assert cone.grad_updated
-#     (u, v, w) = (cone.point[1], cone.point[2], cone.point[3])
-#     H = cone.hess.data
-#     vluvw = cone.vluvw
-#     g1a = cone.g1a
-#     g2a = cone.g2a
-#
-#     H[1, 3] = g1a / vluvw
-#     H[2, 3] = g2a / vluvw
-#     H[3, 3] = abs2(cone.grad[3])
-#     H[1, 1] = abs2(g1a) - cone.grad[1] / u
-#     H[1, 2] = -(v * cone.g2a + 1) / cone.vluvw / u
-#     H[2, 2] = abs2(g2a) + (inv(vluvw) + inv(v)) / v
-#
-#     cone.hess_updated = true
-#     return cone.hess
-# end
-
-# function update_inv_hess(cone::EpiPerExp)
-#     @assert cone.is_feas
-#     (u, v, w) = (cone.point[1], cone.point[2], cone.point[3])
-#     Hi = cone.inv_hess.data
-#     vluvw = cone.vluvw
-#     vluv = vluvw + w
-#     denom = vluvw + 2 * v
-#     uvdenom = u * v / denom
-#
-#     Hi[1, 1] = u * (vluvw + v) / denom * u
-#     Hi[2, 2] = v * (vluvw + v) / denom * v
-#     Hi[3, 3] = 2 * (abs2(vluv - v) + vluv * (v - w)) + abs2(w) - v / denom * abs2(vluv - 2 * v)
-#     Hi[1, 2] = uvdenom * v
-#     Hi[1, 3] = uvdenom * (2 * vluv - w)
-#     Hi[2, 3] = (abs2(vluv) + w * (v - vluv)) / denom * v
-#
-#     cone.inv_hess_updated = true
-#     return cone.inv_hess
-# end
-#
-# function update_inv_hess_prod(cone::EpiPerExp)
-#     if !cone.inv_hess_updated
-#         update_inv_hess(cone)
-#     end
-#     return
-# end
-#
-# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerExp)
-#     update_inv_hess_prod(cone)
-#     mul!(prod, cone.inv_hess, arr)
-#     return prod
-# end

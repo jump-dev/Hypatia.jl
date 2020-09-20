@@ -23,7 +23,6 @@ function get_directions(
     dir_temp = stepper.dir_temp
     res = stepper.res
     system_solver = solver.system_solver
-    timer = solver.timer
 
     tau = solver.point.tau[1]
     tau_scal = (use_nt ? solver.point.kap[1] : solver.mu / tau) / tau
@@ -64,10 +63,7 @@ function get_directions(
         norm_2 = norm_2_new
     end
 
-    @assert !isnan(norm_inf)
-    if norm_inf > 1e-4
-        println("residual on direction too large: $norm_inf")
-    end
+    @assert !isnan(norm_inf) # TODO error
 
     return dir
 end

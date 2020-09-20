@@ -16,7 +16,6 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     Ps::Vector{Matrix{R}}
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -157,6 +156,7 @@ end
 
 function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
     corr = cone.correction
+
     corr .= 0
     @inbounds for k in eachindex(cone.Ps)
         mul!(cone.tmpLU2[k], cone.tmpLU[k],  Diagonal(primal_dir))
@@ -165,5 +165,6 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
             corr[j] += sum(abs2, LpdU[:, j])
         end
     end
+
     return corr
 end

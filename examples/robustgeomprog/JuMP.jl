@@ -15,7 +15,7 @@ struct RobustGeomProgJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     k::Int
 end
 
-function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64}
     (n, k) = (inst.n, inst.k)
     @assert n < k # want some degrees of freedom for v
     B = randn(T, k, n) # GP powers matrix

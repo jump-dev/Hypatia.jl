@@ -42,16 +42,9 @@ function update_rhs_predcorr(
         prim_k_scal = irtrtmu * prim_dir_k
         corr_k = Cones.correction(cone_k, prim_k_scal)
         corr_point = dot(corr_k, cone_k.point)
-        @assert !isnan(corr_point)
         corr_viol = abs(corr_point - irtrtmu * dot(prim_k_scal, H_prim_dir_k)) / abs(corr_point + 10eps(T))
-        @assert !isnan(corr_viol)
-        # if corr_point < eps(T)
-        #     @show "pred ", corr_point
-        # end
         if corr_viol < 0.001
             @. rhs.s_views[k] += H_prim_dir_k + corr_k
-        # else
-        #     println("skip pred-corr: $corr_viol")
         end
     end
 
@@ -108,16 +101,9 @@ function update_rhs_centcorr(
         H_prim_dir_k_scal = Cones.hess_prod!(similar(prim_dir_k), prim_k_scal, cone_k)
         corr_k = Cones.correction(cone_k, prim_k_scal)
         corr_point = dot(corr_k, cone_k.point)
-        @assert !isnan(corr_point)
         corr_viol = abs(corr_point - dot(prim_k_scal, H_prim_dir_k_scal)) / abs(corr_point + 10eps(T))
-        @assert !isnan(corr_viol)
-        # if corr_point < eps(T)
-        #     @show "cent ", corr_point
-        # end
         if corr_viol < 0.001
             rhs.s_views[k] .+= corr_k
-        # else
-        #     println("skip cent-corr: $corr_viol")
         end
     end
 

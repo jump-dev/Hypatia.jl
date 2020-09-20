@@ -35,7 +35,6 @@ function load(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real
 end
 
 function step(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real}
-    timer = solver.timer
     model = solver.model
 
     # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)
@@ -144,14 +143,9 @@ function print_iteration_stats(stepper::PredOrCorrStepper{T}, solver::Solver{T})
     return
 end
 
-
-
-
-
 # # stepper using line search between cent and pred points
 # function step(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real}
 #     point = solver.point
-#     timer = solver.timer
 #
 #     # # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)
 #     # rtmu = sqrt(solver.mu)
@@ -167,22 +161,22 @@ end
 #
 #     # update linear system solver factorization and helpers
 #     Cones.grad.(solver.model.cones)
-#     @timeit timer "update_lhs" update_lhs(solver.system_solver, solver)
+#     update_lhs(solver.system_solver, solver)
 #
 #     z_dir = stepper.dir.z
 #     s_dir = stepper.dir.s
 #
 #     # calculate centering direction and keep in dir_cent
-#     @timeit timer "rhs_cent" update_rhs_cent(stepper, solver)
-#     @timeit timer "dir_cent" get_directions(stepper, solver, false, iter_ref_steps = 3)
+#     update_rhs_cent(stepper, solver)
+#     get_directions(stepper, solver, false, iter_ref_steps = 3)
 #     dir_cent = copy(stepper.dir) # TODO
 #     tau_cent = stepper.dir[stepper.tau_row]
 #     kap_cent = stepper.dir[stepper.kap_row]
 #     z_cent = copy(z_dir)
 #     s_cent = copy(s_dir)
 #
-#     @timeit timer "rhs_centcorr" update_rhs_centcorr(stepper, solver)
-#     @timeit timer "dir_centcorr" get_directions(stepper, solver, false, iter_ref_steps = 3)
+#     update_rhs_centcorr(stepper, solver)
+#     get_directions(stepper, solver, false, iter_ref_steps = 3)
 #     dir_centcorr = copy(stepper.dir) # TODO
 #     tau_centcorr = stepper.dir[stepper.tau_row]
 #     kap_centcorr = stepper.dir[stepper.kap_row]
@@ -190,16 +184,16 @@ end
 #     s_centcorr = copy(s_dir)
 #
 #     # calculate affine/prediction direction and keep in dir
-#     @timeit timer "rhs_pred" update_rhs_pred(stepper, solver)
-#     @timeit timer "dir_pred" get_directions(stepper, solver, true, iter_ref_steps = 3)
+#     update_rhs_pred(stepper, solver)
+#     get_directions(stepper, solver, true, iter_ref_steps = 3)
 #     dir_pred = copy(stepper.dir) # TODO
 #     tau_pred = stepper.dir[stepper.tau_row]
 #     kap_pred = stepper.dir[stepper.kap_row]
 #     z_pred = copy(z_dir)
 #     s_pred = copy(s_dir)
 #
-#     @timeit timer "rhs_predcorr" update_rhs_predcorr(stepper, solver)
-#     @timeit timer "dir_predcorr" get_directions(stepper, solver, true, iter_ref_steps = 3)
+#     update_rhs_predcorr(stepper, solver)
+#     get_directions(stepper, solver, true, iter_ref_steps = 3)
 #     dir_predcorr = copy(stepper.dir) # TODO
 #     tau_predcorr = stepper.dir[stepper.tau_row]
 #     kap_predcorr = stepper.dir[stepper.kap_row]

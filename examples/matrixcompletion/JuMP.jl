@@ -9,7 +9,7 @@ struct MatrixCompletionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     num_cols::Int
 end
 
-function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64}
     (num_rows, num_cols) = (inst.num_rows, inst.num_cols)
     @assert num_rows <= num_cols
     (rows, cols, Avals) = findnz(sprand(num_rows, num_cols, 0.1))

@@ -14,7 +14,6 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     is_complex::Bool
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -52,7 +51,6 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
                     @assert size(A_i, 1) == side
                 end
             end
-            # @assert eltype(A_i) <: RealOrComplex{T}
             @assert ishermitian(A_i)
         end
         @assert side > 0

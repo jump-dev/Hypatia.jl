@@ -16,7 +16,6 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     Ps::Vector{Matrix{T}}
     point::AbstractVector{T}
     dual_point::AbstractVector{T}
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -44,7 +43,6 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     ΛFLP::Vector{Matrix{T}}
     tmpLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
-
     PlambdaP_blocks_U::Vector{Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}}
     PlambdaP_blocks_R::Vector{Matrix{Matrix{T}}}
     blocks_R_updated::Bool
@@ -217,7 +215,6 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
     cone.grad_updated = true
     return cone.grad
 end
-
 
 function update_blocks_R(cone::WSOSInterpPosSemidefTri)
     @assert cone.grad_updated
