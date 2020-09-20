@@ -17,7 +17,7 @@ struct LotkaVolterraJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     deg::Int # polynomial degrees
 end
 
-function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64}
     # parameters
     n = 4 # number of species
     m = 2 * n # number of control inputs (u)

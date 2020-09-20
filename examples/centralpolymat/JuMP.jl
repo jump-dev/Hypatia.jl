@@ -10,7 +10,7 @@ struct CentralPolyMatJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     logdet_obj::Bool # use logdet, else rootdet
 end
 
-function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64}
     (n, halfdeg) = (inst.n, inst.halfdeg)
 
     DynamicPolynomials.@polyvar x[1:n]

@@ -19,7 +19,7 @@ function DensityEstJuMP{Float64}(num_obs::Int, n::Int, args...)
     return DensityEstJuMP{Float64}(:Random, X, args...)
 end
 
-function build(inst::DensityEstJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::DensityEstJuMP{T}) where {T <: Float64}
     X = inst.X
     (num_obs, n) = size(X)
     domain = ModelUtilities.Box{Float64}(-ones(n), ones(n)) # domain is unit box [-1,1]^n

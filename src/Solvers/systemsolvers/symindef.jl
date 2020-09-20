@@ -81,7 +81,6 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
         model.A           spzeros(T, p, p)  spzeros(T, p, q);
         model.G           spzeros(T, q, p)  sparse(-one(T) * I, q, q);
         ]
-    @assert issparse(lhs_sub)
     dropzeros!(lhs_sub)
     (Is, Js, Vs) = findnz(lhs_sub)
 
@@ -106,7 +105,6 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
             @. H_Js[IJV_idxs] = z_start_k + j
         end
     end
-    @assert offset == hess_nz_total + 1
     append!(Is, H_Is)
     append!(Js, H_Js)
     append!(Vs, ones(T, hess_nz_total))
@@ -158,8 +156,8 @@ function update_lhs(system_solver::SymIndefSparseSystemSolver, solver::Solver)
         end
     end
 
-    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs_sub)
-    @timeit solver.timer "solve_subsystem3" solve_subsystem3(system_solver, solver, system_solver.sol_const, system_solver.rhs_const)
+    update_fact(system_solver.fact_cache, system_solver.lhs_sub)
+    solve_subsystem3(system_solver, solver, system_solver.sol_const, system_solver.rhs_const)
 
     return system_solver
 end
@@ -223,8 +221,8 @@ function update_lhs(system_solver::SymIndefDenseSystemSolver, solver::Solver)
         @. lhs_sub[z_rows_k, z_rows_k] = -H_k
     end
 
-    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs_sub)
-    @timeit solver.timer "solve_subsystem3" solve_subsystem3(system_solver, solver, system_solver.sol_const, system_solver.rhs_const)
+    update_fact(system_solver.fact_cache, system_solver.lhs_sub)
+    solve_subsystem3(system_solver, solver, system_solver.sol_const, system_solver.rhs_const)
 
     return system_solver
 end

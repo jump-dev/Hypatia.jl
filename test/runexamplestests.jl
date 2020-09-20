@@ -5,7 +5,6 @@ run examples tests from the examples folder
 import DataFrames
 import CSV
 using Printf
-import TimerOutputs
 
 examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "common_JuMP.jl"))
@@ -16,13 +15,11 @@ include(joinpath(examples_dir, "common_native.jl"))
 results_path = nothing
 
 # options to solvers
-timer = TimerOutputs.TimerOutput()
 # tol = 1e-7
 default_options = (
     verbose = false,
     # verbose = true,
     iter_limit = 250,
-    timer = timer,
     # tol_abs_opt = tol,
     # tol_rel_opt = tol,
     # tol_feas = tol,
@@ -149,8 +146,6 @@ end
 DataFrames.show(perf, allrows = true, allcols = true)
 println("\n")
 @show sum(perf[:iters])
-show(timer)
-println("\n")
 flush(stdout); flush(stderr)
 end
 ;

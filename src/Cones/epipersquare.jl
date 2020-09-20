@@ -16,7 +16,6 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     dim::Int
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -108,6 +107,7 @@ function is_dual_feas(cone::EpiPerSquare{T}) where {T}
         @views w = cone.dual_point[3:end]
         return (u * v - sum(abs2, w) / 2 > eps(T))
     end
+
     return false
 end
 

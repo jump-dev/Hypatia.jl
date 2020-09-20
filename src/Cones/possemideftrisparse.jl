@@ -33,7 +33,6 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     point::Vector{T}
     dual_point::Vector{T}
     rt2::T
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -45,6 +44,7 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    correction::Vector{T}
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -68,8 +68,6 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     map_blocks
     temp_blocks
     rel_idxs
-
-    correction
 
     function PosSemidefTriSparse{T, R}(
         side::Int,
@@ -273,6 +271,7 @@ function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse{T, T})
             arr[i] = 0
         end
     end
+
     return arr
 end
 
@@ -289,6 +288,7 @@ function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse{T, Com
             idx += 1
         end
     end
+
     return arr
 end
 
@@ -470,6 +470,7 @@ end
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTriSparse)
     @assert cone.grad_updated
     temp_blocks = cone.temp_blocks
+
     @inbounds for i in 1:size(arr, 2)
         @views svec_to_smat_sparse!(temp_blocks, arr[:, i], cone)
         _hess_step1(cone, temp_blocks, eachindex(cone.num_cols))
@@ -477,6 +478,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemi
         _hess_step3(cone, temp_blocks)
         @views smat_to_svec_sparse!(prod[:, i], temp_blocks, cone)
     end
+
     return prod
 end
 
@@ -597,6 +599,7 @@ function outer_L_prod!(cone, k)
     mul!(F_aa.data, L_a, F_an', -1, true)
     mul!(F_an, L_a, F_nn, -1, true)
     mul!(F_aa.data, F_an, L_a', -1, true)
+
     return F_block
 end
 
@@ -663,6 +666,7 @@ function correction(cone::PosSemidefTriSparse, primal_dir::AbstractVector)
     _hess_step3(cone, temp_blocks)
     smat_to_svec_sparse!(cone.correction, cone.temp_blocks, cone)
     cone.correction ./= 2
+
     return cone.correction
 end
 
@@ -677,6 +681,7 @@ function svec_to_smat_sparse!(blocks::Vector{Matrix{T}}, vec::AbstractVector{T},
         end
         blocks[super][row_idx, col_idx] = vec_i
     end
+
     return blocks
 end
 
@@ -688,6 +693,7 @@ function smat_to_svec_sparse!(vec::AbstractVector{T}, blocks::Vector{Matrix{T}},
         end
         vec[i] = vec_i
     end
+
     return vec
 end
 
@@ -705,6 +711,7 @@ function svec_to_smat_sparse!(blocks::Vector{Matrix{Complex{T}}}, vec::AbstractV
             idx += 1
         end
     end
+
     return blocks
 end
 
@@ -722,5 +729,6 @@ function smat_to_svec_sparse!(vec::AbstractVector{T}, blocks::Vector{Matrix{Comp
             idx += 1
         end
     end
+
     return vec
 end

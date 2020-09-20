@@ -21,7 +21,6 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     rt2::T
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -149,6 +148,7 @@ end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
+
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
         copytri!(cone.mat4, 'U', cone.is_complex)
@@ -156,22 +156,26 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemi
         ldiv!(cone.fact_mat, cone.mat4)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
     end
+
     return prod
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
+
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
         mul!(cone.mat3, Hermitian(cone.mat4, :U), cone.mat)
         mul!(cone.mat4, Hermitian(cone.mat, :U), cone.mat3)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
     end
+
     return prod
 end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
+
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
         copytri!(cone.mat4, 'U', cone.is_complex)
@@ -179,11 +183,13 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Po
         ldiv!(cone.fact_mat.U', cone.mat4)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
     end
+
     return prod
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
+
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
         copytri!(cone.mat4, 'U', cone.is_complex)
@@ -191,6 +197,7 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
         lmul!(cone.fact_mat.U, cone.mat4)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
     end
+
     return prod
 end
 

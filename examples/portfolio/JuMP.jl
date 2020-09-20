@@ -8,7 +8,7 @@ struct PortfolioJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     epinorminf_constrs::Bool # add L1 and Linfty ball constraints, else don't add
 end
 
-function build(inst::PortfolioJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::PortfolioJuMP{T}) where {T <: Float64}
     num_stocks = inst.num_stocks
     returns = rand(num_stocks)
     sigma_half = randn(num_stocks, num_stocks)

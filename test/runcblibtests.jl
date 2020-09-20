@@ -5,7 +5,6 @@ run CBLIB tests
 import DataFrames
 import CSV
 using Printf
-import TimerOutputs
 
 include(joinpath(@__DIR__, "cblibsets.jl"))
 examples_dir = joinpath(@__DIR__, "../examples")
@@ -16,7 +15,6 @@ results_path = joinpath(homedir(), "bench", "bench.csv")
 # results_path = nothing
 
 # options to solvers
-timer = TimerOutputs.TimerOutput()
 tol = 1e-7
 default_options = (
     # verbose = false,
@@ -29,7 +27,6 @@ default_options = (
     # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
     # system_solver = Solvers.SymIndefDenseSystemSolver{Float64}(),
     system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
-    timer = timer,
     )
 
 # instance sets to run and corresponding time limits (seconds)
@@ -94,9 +91,6 @@ end
 
 @printf("\nCBLIB tests total time: %8.2e seconds\n\n", time() - time_all)
 DataFrames.show(perf, allrows = true, allcols = true)
-println("\n")
-# @show sum(perf[:iters])
-# show(timer)
 println("\n")
 flush(stdout); flush(stderr)
 end
