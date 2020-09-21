@@ -342,7 +342,7 @@ function calc_residual(solver::Solver{T}) where {T <: Real}
     @. z_residual -= model.h * tau
     solver.z_norm_res = norm(z_residual, Inf) / tau
 
-    return
+    return nothing
 end
 
 function calc_convergence_params(solver::Solver{T}) where {T <: Real}
