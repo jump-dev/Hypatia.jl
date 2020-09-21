@@ -7,7 +7,7 @@ import DataFrames
 import CSV
 import DelimitedFiles
 
-# naics5811 dataset
+# naics5811 dataset (save as naics5811.csv)
 # see https://arxiv.org/pdf/1509.08165v1.pdf (example 3)
 # data obtained from http://www.nber.org/data/nbprod2005.html
 function get_naics5811_data()
