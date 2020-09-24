@@ -110,7 +110,7 @@ function interpolate(
         end
         return wsos_sample_params(dom, d, calc_w, sample_factor)
     else
-        return wsos_box_params(sampling_region(dom), n, d, calc_V, calc_w)
+        return wsos_box_params(dom, n, d, calc_V, calc_w)
     end
 end
 
