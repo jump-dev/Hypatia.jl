@@ -8,8 +8,8 @@ using Printf
 test_files = [
     # "modelutilities",
     # "barrier",
-    "native",
-    # "moi",
+    # "native",
+    "moi",
     # "cblib",
     # "examples",
     # NOTE require optional dependencies:
