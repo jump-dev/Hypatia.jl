@@ -356,7 +356,7 @@ function test_possemideftrisparse_barrier(T::Type{<:Real})
     return
 end
 
-function test_doublynonnegative_barrier(T::Type{<:Real})
+function test_doublynonnegativetri_barrier(T::Type{<:Real})
     for side in [1, 2, 3, 6, 20, 50]
         function barrier(s)
             S = similar(s, side, side)
@@ -365,7 +365,7 @@ function test_doublynonnegative_barrier(T::Type{<:Real})
             return -logdet(cholesky!(Hermitian(S, :U))) - mapreduce(log, +, s[offdiags]; init = zero(eltype(s)))
         end
         dim = CO.svec_length(side)
-        test_barrier_oracles(CO.DoublyNonnegative{T}(dim), barrier, init_tol = sqrt(eps(T)), init_only = (side > 6))
+        test_barrier_oracles(CO.DoublyNonnegativeTri{T}(dim), barrier, init_tol = sqrt(eps(T)), init_only = (side > 6))
     end
     return
 end

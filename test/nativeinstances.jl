@@ -1636,7 +1636,7 @@ function possemideftrisparse5(T; options...)
     @test r.z ≈ [1, inv2, inv2, inv2, inv2, inv2, -inv2, -inv2, 0, -invrt6, invrt6, -invrt6] atol=tol rtol=tol
 end
 
-function doublynonnegative1(T; options...)
+function doublynonnegativetri1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     n = q = 3
     c = T[0, 1, 0]
@@ -1646,7 +1646,7 @@ function doublynonnegative1(T; options...)
     for use_dual in [false, true]
         use_dual = false
         h = (use_dual ? T[1, 0, 1] : zeros(T, q))
-        cones = Cone{T}[Cones.DoublyNonnegative{T}(q, use_dual = use_dual)]
+        cones = Cone{T}[Cones.DoublyNonnegativeTri{T}(q, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
         @test r.status == Solvers.Optimal
@@ -1656,14 +1656,14 @@ function doublynonnegative1(T; options...)
     end
 end
 
-function doublynonnegative2(T; options...)
+function doublynonnegativetri2(T; options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[0, -1, 0]
     A = T[1 0 0; 0 0 1]
     b = T[1.0, 1.5]
     G = -one(T) * I
     h = [-inv(T(2)), zero(T), -inv(T(2))]
-    cones = Cone{T}[Cones.DoublyNonnegative{T}(3)]
+    cones = Cone{T}[Cones.DoublyNonnegativeTri{T}(3)]
 
     r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
     @test r.status == Solvers.Optimal
@@ -1671,7 +1671,7 @@ function doublynonnegative2(T; options...)
     @test r.x[2] ≈ one(T) atol=tol rtol=tol
 end
 
-function doublynonnegative3(T; options...)
+function doublynonnegativetri3(T; options...)
     tol = sqrt(sqrt(eps(T)))
     c = ones(T, 3)
     A = T[1 0 1]

@@ -302,10 +302,10 @@ function test_moi_cones(T::Type{<:Real})
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 10
     end
 
-    @testset "DoublyNonnegative" begin
+    @testset "DoublyNonnegativeTri" begin
         moi_cone = HYP.DoublyNonnegativeTriCone{T}(3)
         hyp_cone = HYP.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa CO.DoublyNonnegative{T}
+        @test hyp_cone isa CO.DoublyNonnegativeTri{T}
         @test MOI.dimension(moi_cone) == CO.dimension(hyp_cone) == 3
     end
 

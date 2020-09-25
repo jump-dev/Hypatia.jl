@@ -275,7 +275,7 @@ struct DoublyNonnegativeTriCone{T <: Real} <: MOI.AbstractVectorSet
 end
 DoublyNonnegativeTriCone{T}(dim::Int) where {T <: Real} = DoublyNonnegativeTriCone{T}(dim, false)
 MOI.dimension(cone::DoublyNonnegativeTriCone where {T <: Real}) = cone.dim
-cone_from_moi(::Type{T}, cone::DoublyNonnegativeTriCone{T}) where {T <: Real} = Cones.DoublyNonnegative{T}(cone.dim, use_dual = cone.use_dual)
+cone_from_moi(::Type{T}, cone::DoublyNonnegativeTriCone{T}) where {T <: Real} = Cones.DoublyNonnegativeTri{T}(cone.dim, use_dual = cone.use_dual)
 
 export WSOSInterpNonnegativeCone
 struct WSOSInterpNonnegativeCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet

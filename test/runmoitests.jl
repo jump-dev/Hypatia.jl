@@ -27,7 +27,7 @@ end
     println("\nstarting MOI.Test tests")
     system_solvers = [
         Solvers.SymIndefSparseSystemSolver,
-        Solvers.QRCholDenseSystemSolver,
+        # Solvers.QRCholDenseSystemSolver,
         ]
     real_types = [
         Float64,
@@ -37,7 +37,7 @@ end
         ]
     dense_flags = [
         false,
-        true,
+        # true,
         ]
     for s in system_solvers, T in real_types, d in dense_flags
         test_info = "$s, $T, $d"

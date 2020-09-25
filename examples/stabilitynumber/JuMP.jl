@@ -8,7 +8,7 @@ using SparseArrays
 
 struct StabilityNumber{T <: Real} <: ExampleInstanceJuMP{T}
     side::Int
-    use_doublynonnegative::Bool
+    use_doublynonnegativetri::Bool
 end
 
 function build(inst::StabilityNumber{T}) where {T <: Float64}
@@ -25,7 +25,7 @@ function build(inst::StabilityNumber{T}) where {T <: Float64}
     JuMP.@constraint(model, sum(X_diag) == 1)
     X_lifted = sparse(row_idxs, col_idxs, X, side, side)
     X_vec = JuMP.AffExpr[X_lifted[i, j] for i in 1:side for j in 1:i]
-    if inst.use_doublynonnegative
+    if inst.use_doublynonnegativetri
         cone_dim = length(X_vec)
         JuMP.@constraint(model, X_vec .* ModelUtilities.vec_to_svec!(ones(cone_dim)) in Hypatia.DoublyNonnegativeTriCone{T}(cone_dim))
     else

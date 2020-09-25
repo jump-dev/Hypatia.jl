@@ -20,7 +20,7 @@ barrier_test_names = [
     "linmatrixineq", # NOTE failing on Julia v1.5.1
     "possemideftri",
     "possemideftrisparse",
-    "doublynonnegative",
+    "doublynonnegativetri",
     "matrixepipersquare",
     "hypoperlogdettri",
     "hyporootdettri",

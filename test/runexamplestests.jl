@@ -140,10 +140,8 @@ for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
     end
 end
 
-@printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)
-DataFrames.show(perf, allrows = true, allcols = true)
-println("\n")
-@show sum(perf[:iters])
-flush(stdout); flush(stderr)
+# @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)
+# DataFrames.show(perf, allrows = true, allcols = true)
+# println("\n")
 end
 ;
