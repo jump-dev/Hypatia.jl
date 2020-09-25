@@ -389,6 +389,8 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         if infres_pr <= solver.tol_feas
             solver.verbose && println("primal infeasibility detected; terminating")
             solver.status = PrimalInfeasible
+            solver.primal_obj = solver.primal_obj_t
+            solver.dual_obj = solver.dual_obj_t
             return true
         end
     end
@@ -397,6 +399,8 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         if infres_du <= solver.tol_feas
             solver.verbose && println("dual infeasibility detected; terminating")
             solver.status = DualInfeasible
+            solver.primal_obj = solver.primal_obj_t
+            solver.dual_obj = solver.dual_obj_t
             return true
         end
     end

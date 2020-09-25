@@ -22,7 +22,7 @@ real_types = [
         test_recover_lagrange_polys(T)
         test_recover_cheb_polys(T)
     end
-    @printf("%4.2f seconds\n", test_time)
+    @printf("%8.2e seconds\n", test_time)
 end
 end
 ;

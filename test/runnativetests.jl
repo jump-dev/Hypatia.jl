@@ -38,15 +38,15 @@ function test_instance_solver(
     inst_name::String,
     T::Type{<:Real},
     options::NamedTuple,
-    test_info::String,
+    test_info::String = "",
     )
     test_info = "$inst_name $T $test_info"
-    println("\n", test_info, " ...")
     @testset "$test_info" begin
+        println(test_info, " ...")
         solver = Solvers.Solver{T}(; options...)
         test_time = @elapsed eval(Symbol(inst_name))(T, solver = solver)
         push!(perf, (inst_name, string(T), type_name(solver.stepper), type_name(solver.system_solver), solver.init_use_indirect, solver.preprocess, solver.reduce, test_time, string(Solvers.get_status(solver))))
-        @printf("... %8.2e seconds\n", test_time)
+        @printf("%8.2e seconds\n", test_time)
     end
     return nothing
 end
@@ -66,9 +66,11 @@ perf = DataFrame(
 @testset "native tests" begin
 
 @testset "default options tests" begin
-for inst_name in vcat(inst_preproc, inst_infeas, inst_cones_many)
-    test_instance_solver(inst_name, Float64, common_options, "defaults")
-end
+    println("starting default options tests")
+    test_time = @elapsed for inst_name in vcat(inst_preproc, inst_infeas, inst_cones_many)
+        test_instance_solver(inst_name, Float64, common_options)
+    end
+    @printf("%8.2e seconds\n", test_time)
 end
 
 # @testset "steppers tests" begin

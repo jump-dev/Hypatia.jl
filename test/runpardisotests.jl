@@ -1,6 +1,6 @@
 #=
 run tests using Pardiso sparse linear system solver caches
-requires that PardiSolvers.jl be installed and built successfully; Requires.jl handles this optional dependency
+requires that Pardiso.jl be installed and built successfully; Requires.jl handles this optional dependency
 =#
 
 using Test

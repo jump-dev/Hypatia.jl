@@ -19,7 +19,6 @@ import Hypatia.ModelUtilities
 import Hypatia.Cones
 import Hypatia.Cones.Cone
 import Hypatia.Solvers
-const MU = Hypatia.ModelUtilities
 
 # build model, solve, test conic certificates, and return solve information
 function build_solve_check(
@@ -56,13 +55,11 @@ function build_solve_check(
         @test G' * z + A' * y ≈ -c atol=tol rtol=tol
         @test dot(s, z) ≈ zero(T) atol=tol_rt rtol=tol_rt
     elseif status == Solvers.PrimalInfeasible
-        @test dual_obj > obj_offset
-        @test -dot(b, y) - dot(h, z) + obj_offset ≈ dual_obj atol=tol rtol=tol
+        @test -dot(b, y) - dot(h, z) ≈ dual_obj atol=tol rtol=tol
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         @test G' * z ≈ -A' * y atol=tol_rt rtol=tol_rt
     elseif status == Solvers.DualInfeasible
-        @test primal_obj < obj_offset
-        @test dot(c, x) + obj_offset ≈ primal_obj atol=tol rtol=tol
+        @test dot(c, x) ≈ primal_obj atol=tol rtol=tol
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         @test G * x ≈ -s atol=tol_rt rtol=tol_rt
         @test A * x ≈ zeros(T, length(y)) atol=tol_rt rtol=tol_rt

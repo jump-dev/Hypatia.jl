@@ -40,7 +40,7 @@ real_types = [
 @testset "$T" for T in real_types
     println("$name: $T ...")
     test_time = @elapsed eval(Symbol("test_", name, "_barrier"))(T)
-    @printf("%4.2f seconds\n", test_time)
+    @printf("%8.2e seconds\n", test_time)
 end
 end
 end
