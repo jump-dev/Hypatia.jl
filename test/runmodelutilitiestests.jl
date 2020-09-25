@@ -2,6 +2,7 @@
 run model utilities tests
 =#
 
+using Test
 using Printf
 include(joinpath(@__DIR__, "modelutilities.jl"))
 
@@ -11,7 +12,6 @@ real_types = [
     BigFloat,
     ]
 
-@info("starting model utilities tests")
 @testset "model utilities tests" begin
 @testset "$T" for T in real_types
     println("$T ...")

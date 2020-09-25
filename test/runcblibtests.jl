@@ -2,10 +2,10 @@
 run CBLIB tests
 =#
 
+using Test
+using Printf
 import DataFrames
 import CSV
-using Printf
-
 include(joinpath(@__DIR__, "cblibsets.jl"))
 examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "common_JuMP.jl"))
@@ -65,8 +65,6 @@ perf = DataFrames.DataFrame(
 
 isnothing(results_path) || CSV.write(results_path, perf)
 time_all = time()
-
-@info("starting CBLIB tests")
 
 @testset "CBLIB tests" begin
 for (inst_set, time_limit) in instance_sets

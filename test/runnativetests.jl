@@ -7,7 +7,6 @@ using DataFrames
 using Printf
 import Hypatia
 import Hypatia.Solvers
-
 include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
 
@@ -63,8 +62,6 @@ perf = DataFrame(
     test_time = Float64[],
     status = String[],
     )
-
-@info("starting native tests")
 
 all_tests_time = time()
 global ITERS = 0

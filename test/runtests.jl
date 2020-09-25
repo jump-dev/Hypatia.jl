@@ -3,6 +3,7 @@ run subset of tests
 =#
 
 using Test
+using Printf
 
 test_files = [
     "modelutilities",
@@ -19,9 +20,9 @@ test_files = [
 @info("starting all tests")
 @testset "all tests" begin
 @testset "$t" for t in test_files
+    @info("starting $t tests")
     test_time = @elapsed include("run$(t)tests.jl")
-    println("finished $t tests")
-    @printf("%4.2f seconds\n\n", test_time)
+    @info("finished $t tests in $(@sprintf("%4.2f seconds", test_time))")
 end
 end
 ;

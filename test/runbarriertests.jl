@@ -2,6 +2,7 @@
 run barrier tests
 =#
 
+using Test
 using Printf
 include(joinpath(@__DIR__, "barrier.jl"))
 
@@ -34,7 +35,6 @@ real_types = [
     # BigFloat,
     ]
 
-@info("starting barrier tests")
 @testset "barrier tests" begin
 @testset "$name" for name in barrier_test_names
 @testset "$T" for T in real_types

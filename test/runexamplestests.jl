@@ -2,10 +2,10 @@
 run examples tests from the examples folder
 =#
 
+using Test
+using Printf
 import DataFrames
 import CSV
-using Printf
-
 examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "common_JuMP.jl"))
 include(joinpath(examples_dir, "common_native.jl"))
@@ -110,8 +110,6 @@ perf = DataFrames.DataFrame(
 
 isnothing(results_path) || CSV.write(results_path, perf)
 time_all = time()
-
-@info("starting examples tests")
 
 @testset "examples tests" begin
 for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))

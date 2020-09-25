@@ -7,7 +7,7 @@ they may be redundant if already doing a QR of the U*U Vandermonde
 =#
 
 function recover_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
-    @warn("recover_lagrange_polys is not numerically stable for large degree")
+    deg > 8 && @warn("recover_lagrange_polys is not numerically stable for large degree")
     (U, n) = size(pts)
     DP.@polyvar x[1:n]
     basis = get_chebyshev_polys(x, deg)
@@ -19,7 +19,7 @@ end
 
 # returns the multivariate Chebyshev polynomials in x up to degree deg
 function get_chebyshev_polys(x::Vector{DynamicPolynomials.PolyVar{true}}, deg::Int)
-    @warn("get_chebyshev_polys for polyvar input is not numerically stable for large degree")
+    deg > 8 && @warn("get_chebyshev_polys is not numerically stable for large degree")
     n = length(x)
     u = calc_chebyshev_univariate(x, deg)
     V = Vector{DP.Polynomial{true, Int}}(undef, get_L(n, deg))
@@ -36,7 +36,7 @@ function get_chebyshev_polys(x::Vector{DynamicPolynomials.PolyVar{true}}, deg::I
 end
 
 function calc_chebyshev_univariate(monovec::Vector{DynamicPolynomials.PolyVar{true}}, deg::Int)
-    @warn("calc_u for polyvar input is not numerically stable for large degree")
+    deg > 8 && @warn("calc_chebyshev_univariate is not numerically stable for large degree")
     n = length(monovec)
     u = Vector{Vector}(undef, n)
     for j in 1:n
