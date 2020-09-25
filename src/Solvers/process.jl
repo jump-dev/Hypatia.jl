@@ -14,7 +14,7 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
     end
 
     rteps = sqrt(eps(T))
-    maxabsmin(v::AbstractVecOrMat) = maximum(abs, v, init = rteps)
+    maxabsmin(v::AbstractVecOrMat) = mapreduce(abs, max, v; init = rteps)
     maxabsmincol(v::UniformScaling, ::Int) = max(abs(v.λ), rteps)
     maxabsmincol(v::AbstractMatrix, j::Int) = maxabsmin(view(v, :, j))
     maxabsminrow(v::UniformScaling, ::Int) = max(abs(v.λ), rteps)

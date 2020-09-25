@@ -3,8 +3,8 @@ run native instance tests from test/nativeinstances.jl and display basic benchma
 =#
 
 using Test
-using DataFrames
 using Printf
+using DataFrames
 import Hypatia
 import Hypatia.Solvers
 include(joinpath(@__DIR__, "nativeinstances.jl"))
@@ -63,9 +63,6 @@ perf = DataFrame(
     status = String[],
     )
 
-all_tests_time = time()
-global ITERS = 0
-
 @testset "native tests" begin
 
 @testset "default options tests" begin
@@ -119,7 +116,6 @@ end
 # end
 # end
 #
-# @printf("\nnative tests total time: %8.2e seconds\n\n", time() - all_tests_time)
 # show(perf, allrows = true, allcols = true)
 # println("\n")
 end

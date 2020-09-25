@@ -17,7 +17,7 @@ barrier_test_names = [
     "hypogeomean",
     "hypopowermean",
     "epinormspectral",
-    # "linmatrixineq", TODO failing
+    "linmatrixineq", # NOTE failing on Julia v1.5.1
     "possemideftri",
     "possemideftrisparse",
     "doublynonnegative",
@@ -44,3 +44,4 @@ real_types = [
 end
 end
 end
+;
