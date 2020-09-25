@@ -18,8 +18,9 @@ test_files = [
     ]
 
 @info("starting all tests")
+println()
 @testset "all tests" begin
-all_test_time = @elapsed @testset "$t" for t in test_files
+all_test_time = @elapsed for t in test_files
     @info("starting $t tests")
     test_time = @elapsed include("run$(t)tests.jl")
     @info("finished $t tests in $(@sprintf("%8.2e seconds", test_time))")

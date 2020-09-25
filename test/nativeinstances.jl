@@ -1899,7 +1899,7 @@ end
 
 function wsosinterpnonnegative1(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(-ones(T, 2), ones(T, 2)), 2)
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(-zeros(T, 2), ones(T, 2)), 2)
     DynamicPolynomials.@polyvar x y
     fn = x ^ 4 + x ^ 2 * y ^ 2 + 4 * y ^ 2 + 4
 
