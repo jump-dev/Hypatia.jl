@@ -26,8 +26,8 @@ end
 @testset "MOI.Test tests" begin
     println("\nstarting MOI.Test tests")
     system_solvers = [
-        SO.SymIndefSparseSystemSolver,
-        SO.QRCholDenseSystemSolver,
+        Solvers.SymIndefSparseSystemSolver,
+        Solvers.QRCholDenseSystemSolver,
         ]
     real_types = [
         Float64,

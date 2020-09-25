@@ -10,7 +10,7 @@ test_files = [
     # "barrier",
     # "native",
     "moi",
-    # "cblib",
+    "cblib",
     # "examples",
     # NOTE require optional dependencies:
     # "pardiso",
