@@ -421,8 +421,8 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
     if max_improve < solver.tol_slow
         if solver.prev_is_slow && solver.prev2_is_slow
             solver.verbose && println("slow progress in consecutive iterations; terminating")
-            # solver.status = SlowProgress
-            # return true
+            solver.status = SlowProgress
+            return true
         else
             solver.prev2_is_slow = solver.prev_is_slow
             solver.prev_is_slow = true
