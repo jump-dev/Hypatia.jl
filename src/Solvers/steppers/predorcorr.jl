@@ -1,11 +1,12 @@
 #=
-predict or correct stepper
+predict or center stepper
 =#
 
-mutable struct PredOrCorrStepper{T <: Real} <: Stepper{T}
+mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     prev_pred_alpha::T
     prev_alpha::T
-    prev_gamma::T
+    prev_is_pred::Bool
+    cent_count::Int
 
     rhs::Point{T}
     dir::Point{T}
@@ -14,14 +15,15 @@ mutable struct PredOrCorrStepper{T <: Real} <: Stepper{T}
 
     line_searcher::LineSearcher{T}
 
-    PredOrCorrStepper{T}() where {T <: Real} = new{T}()
+    PredOrCentStepper{T}() where {T <: Real} = new{T}()
 end
 
 # create the stepper cache
-function load(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real}
+function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.prev_pred_alpha = one(T)
-    stepper.prev_gamma = one(T)
+    stepper.prev_is_pred = false
     stepper.prev_alpha = one(T)
+    stepper.cent_count = 0
 
     model = solver.model
     stepper.rhs = Point(model)
@@ -34,47 +36,46 @@ function load(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real
     return stepper
 end
 
-function step(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real}
+function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
 
     # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)
-    # cones = model.cones
-    # point = solver.point
-    # rtmu = sqrt(solver.mu)
-    # irtmu = inv(rtmu)
-    # Cones.load_point.(cones, point.primal_views, irtmu)
-    # Cones.load_dual_point.(cones, point.dual_views)
-    # Cones.reset_data.(cones)
-    # @assert all(Cones.is_feas.(cones))
-    # Cones.grad.(cones)
-    # Cones.hess.(cones)
+    cones = model.cones
+    point = solver.point
+    rtmu = sqrt(solver.mu)
+    irtmu = inv(rtmu)
+    Cones.load_point.(cones, point.primal_views, irtmu)
+    Cones.load_dual_point.(cones, point.dual_views)
+    Cones.reset_data.(cones)
+    @assert all(Cones.is_feas.(cones))
+    Cones.grad.(cones)
+    Cones.hess.(cones)
 
     update_lhs(solver.system_solver, solver)
 
     # TODO option
-    use_corr = true
-    # use_corr = false
+    # use_corr = true
+    use_corr = false
+    stepper.prev_is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))
 
-    if all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))
+    if stepper.prev_is_pred
         # predict
+        stepper.cent_count = 0
         update_rhs_pred(solver, stepper.rhs)
         get_directions(stepper, solver, true, iter_ref_steps = 3)
         if use_corr
             update_rhs_predcorr(solver, stepper.rhs, stepper.dir)
             get_directions(stepper, solver, true, iter_ref_steps = 3)
         end
-        pred = true
-        stepper.prev_gamma = zero(T) # TODO print like "pred" in column, or "cent" otherwise
     else
         # center
+        stepper.cent_count += 1
         update_rhs_cent(solver, stepper.rhs)
         get_directions(stepper, solver, false, iter_ref_steps = 3)
         if use_corr
             update_rhs_centcorr(solver, stepper.rhs, stepper.dir)
             get_directions(stepper, solver, false, iter_ref_steps = 3)
         end
-        pred = false
-        stepper.prev_gamma = one(T)
     end
 
     # alpha step length
@@ -83,14 +84,14 @@ function step(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real
     alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
     # @show alpha
 
-    !pred && alpha < 0.98 && println(alpha)
+    !stepper.prev_is_pred && alpha < 0.98 && println(alpha)
     if iszero(alpha)
         @warn("very small alpha")
         solver.status = NumericalFailure
         return false
     end
     stepper.prev_alpha = alpha
-    if pred
+    if stepper.prev_is_pred
         stepper.prev_pred_alpha = alpha
     end
 
@@ -101,23 +102,23 @@ function step(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real
     return true
 end
 
-function print_iteration_stats(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real}
+function print_iteration_stats(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
     if iszero(solver.num_iters)
         if iszero(solver.model.p)
-            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
+            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %5s %9s\n",
                 "iter", "p_obj", "d_obj", "rel_gap", "abs_gap",
                 "x_feas", "z_feas", "tau", "kap", "mu",
-                "gamma", "alpha",
+                "step", "alpha",
                 )
             @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
                 solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
                 solver.x_feas, solver.z_feas, solver.point.tau[1], solver.point.kap[1], solver.mu
                 )
         else
-            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
+            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %5s %9s\n",
                 "iter", "p_obj", "d_obj", "rel_gap", "abs_gap",
                 "x_feas", "y_feas", "z_feas", "tau", "kap", "mu",
-                "gamma", "alpha",
+                "step", "alpha",
                 )
             @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
                 solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
@@ -125,17 +126,18 @@ function print_iteration_stats(stepper::PredOrCorrStepper{T}, solver::Solver{T})
                 )
         end
     else
+        step = (stepper.prev_is_pred ? "pred" : "cent")
         if iszero(solver.model.p)
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %5s %9.2e\n",
                 solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
                 solver.x_feas, solver.z_feas, solver.point.tau[1], solver.point.kap[1], solver.mu,
-                stepper.prev_gamma, stepper.prev_alpha,
+                step, stepper.prev_alpha,
                 )
         else
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %5s %9.2e %9.2e\n",
                 solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
                 solver.x_feas, solver.y_feas, solver.z_feas, solver.point.tau[1], solver.point.kap[1], solver.mu,
-                stepper.prev_gamma, stepper.prev_alpha,
+                step, stepper.prev_alpha,
                 )
         end
     end
@@ -144,7 +146,7 @@ function print_iteration_stats(stepper::PredOrCorrStepper{T}, solver::Solver{T})
 end
 
 # # stepper using line search between cent and pred points
-# function step(stepper::PredOrCorrStepper{T}, solver::Solver{T}) where {T <: Real}
+# function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
 #     point = solver.point
 #
 #     # # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)

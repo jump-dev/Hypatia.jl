@@ -153,7 +153,7 @@ mutable struct Solver{T <: Real}
         init_use_fallback::Bool = true,
         max_nbhd::Real = Cones.default_max_neighborhood(), # TODO cleanup - only for taukap, maybe use full name
         stepper::Stepper{T} = HeurCombStepper{T}(),
-        # stepper::Stepper{T} = PredOrCorrStepper{T}(),
+        # stepper::Stepper{T} = PredOrCentStepper{T}(),
         system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
@@ -421,8 +421,8 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
     if max_improve < solver.tol_slow
         if solver.prev_is_slow && solver.prev2_is_slow
             solver.verbose && println("slow progress in consecutive iterations; terminating")
-            solver.status = SlowProgress
-            return true
+            # solver.status = SlowProgress
+            # return true
         else
             solver.prev2_is_slow = solver.prev_is_slow
             solver.prev_is_slow = true
