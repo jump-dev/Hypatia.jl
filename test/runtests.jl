@@ -8,10 +8,10 @@ using Printf
 test_files = [
     "modelutilities",
     "barrier",
-    "native",
+    # "native",
     "moi",
     "cblib",
-    "examples",
+    # "examples",
     # NOTE require optional dependencies:
     # "pardiso",
     # "hsl",
