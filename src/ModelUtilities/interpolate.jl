@@ -1,10 +1,16 @@
 #=
 utilities for polynomial interpolation on canonical domains
+
+TODO put unused domains into polymin example (note ball and ellipse require GSL dependency)
 =#
 
-sampling_region(dom::SemiFreeDomain) = dom.restricted_halfregion
-sampling_region(dom::Domain) = dom
+interp_sample(dom::FreeDomain{T}, npts::Int) where {T <: Real} = interp_sample(Box{T}(-ones(T, dom.n), ones(T, dom.n)), npts)
 
+get_weights(::FreeDomain{T}, ::AbstractMatrix{T}) where {T <: Real} = T[]
+
+# interp_sample(dom::SemiFreeDomain, npts::Int) = hcat(interp_sample(dom.restricted_halfregion, npts), interp_sample(dom.restricted_halfregion, npts))
+#
+# get_weights(dom::SemiFreeDomain, pts::Matrix{<:Real}) = get_weights(dom.restricted_halfregion, view(pts, :, 1:div(size(pts, 2), 2)))
 
 function interp_sample(dom::Box{T}, npts::Int) where {T <: Real}
     dim = get_dimension(dom)
@@ -22,65 +28,51 @@ function get_weights(dom::Box{T}, pts::AbstractMatrix{T}) where {T <: Real}
     return g
 end
 
-
-function interp_sample(dom::Ball{T}, npts::Int) where {T <: Real}
-    dim = get_dimension(dom)
-    pts = randn(T, npts, dim)
-    norms = sum(abs2, pts, dims = 2)
-    pts .*= dom.r ./ sqrt.(norms) # scale
-    norms ./= 2
-    pts .*= sf_gamma_inc_Q.(norms, dim / 2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
-    for i in 1:dim
-        pts[:, i] .+= dom.c[i] # shift
-    end
-    return pts
-end
-
-function get_weights(dom::Ball{T}, pts::AbstractMatrix{T}) where {T <: Real}
-    g = [abs2(dom.r) - sum((pts[j, :] - dom.c) .^ 2) for j in 1:size(pts, 1)]
-    @assert all(g .>= 0)
-    return [g]
-end
-
-
-function interp_sample(dom::Ellipsoid{T}, npts::Int) where {T <: Real}
-    dim = get_dimension(dom)
-    pts = randn(T, npts, dim)
-    norms = sum(abs2, pts, dims = 2)
-    for i in 1:npts
-        pts[i, :] ./= sqrt(norms[i]) # scale
-    end
-    norms ./= 2
-    pts .*= sf_gamma_inc_Q.(norms, dim / 2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
-
-    F_rotate_scale = cholesky(dom.Q).U
-    for i in 1:npts
-        pts[i, :] = F_rotate_scale \ pts[i, :] # rotate/scale
-    end
-    for i in 1:dim
-        pts[:, i] .+= dom.c[i] # shift
-    end
-
-    return pts
-end
-
-function get_weights(dom::Ellipsoid{T}, pts::AbstractMatrix{T}) where {T <: Real}
-    g = [1 - (pts[j, :] - dom.c)' * dom.Q * (pts[j, :] - dom.c) for j in 1:size(pts, 1)]
-    @assert all(g .>= 0)
-    return [g]
-end
-
-interp_sample(dom::SemiFreeDomain, npts::Int) =
-    hcat(interp_sample(dom.restricted_halfregion, npts), interp_sample(dom.restricted_halfregion, npts))
-
-get_weights(dom::SemiFreeDomain, pts::Matrix{<:Real}) =
-    get_weights(dom.restricted_halfregion, view(pts, :, 1:div(size(pts, 2), 2)))
-
-
-interp_sample(dom::FreeDomain{T}, npts::Int) where {T <: Real} = interp_sample(Box{T}(-ones(T, dom.n), ones(T, dom.n)), npts)
-
-get_weights(::FreeDomain{T}, ::AbstractMatrix{T}) where {T <: Real} = T[]
-
+# function interp_sample(dom::Ball{T}, npts::Int) where {T <: Real}
+#     dim = get_dimension(dom)
+#     pts = randn(T, npts, dim)
+#     norms = sum(abs2, pts, dims = 2)
+#     pts .*= dom.r ./ sqrt.(norms) # scale
+#     norms ./= 2
+#     pts .*= sf_gamma_inc_Q.(norms, dim / 2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
+#     for i in 1:dim
+#         pts[:, i] .+= dom.c[i] # shift
+#     end
+#     return pts
+# end
+#
+# function get_weights(dom::Ball{T}, pts::AbstractMatrix{T}) where {T <: Real}
+#     g = [abs2(dom.r) - sum((pts[j, :] - dom.c) .^ 2) for j in 1:size(pts, 1)]
+#     @assert all(g .>= 0)
+#     return [g]
+# end
+#
+# function interp_sample(dom::Ellipsoid{T}, npts::Int) where {T <: Real}
+#     dim = get_dimension(dom)
+#     pts = randn(T, npts, dim)
+#     norms = sum(abs2, pts, dims = 2)
+#     for i in 1:npts
+#         pts[i, :] ./= sqrt(norms[i]) # scale
+#     end
+#     norms ./= 2
+#     pts .*= sf_gamma_inc_Q.(norms, dim / 2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
+#
+#     F_rotate_scale = cholesky(dom.Q).U
+#     for i in 1:npts
+#         pts[i, :] = F_rotate_scale \ pts[i, :] # rotate/scale
+#     end
+#     for i in 1:dim
+#         pts[:, i] .+= dom.c[i] # shift
+#     end
+#
+#     return pts
+# end
+#
+# function get_weights(dom::Ellipsoid{T}, pts::AbstractMatrix{T}) where {T <: Real}
+#     g = [1 - (pts[j, :] - dom.c)' * dom.Q * (pts[j, :] - dom.c) for j in 1:size(pts, 1)]
+#     @assert all(g .>= 0)
+#     return [g]
+# end
 
 get_L(n::Int, d::Int) = binomial(n + d, n)
 get_U(n::Int, d::Int) = binomial(n + 2d, n)
@@ -118,7 +110,7 @@ function interpolate(
         end
         return wsos_sample_params(dom, d, calc_w, sample_factor)
     else
-        return wsos_box_params(sampling_region(dom), n, d, calc_V, calc_w)
+        return wsos_box_params(dom, n, d, calc_V, calc_w)
     end
 end
 
@@ -226,10 +218,9 @@ function cheb2_data(
 
     # Chebyshev points for degree 2d
     pts = reshape(cheb2_pts(T, U), :, 1)
-    is_blas_real = (T <: LinearAlgebra.BlasReal)
 
     # evaluations
-    if calc_V || (calc_w && !is_blas_real)
+    if calc_V
         V = make_chebyshev_vandermonde(pts, 2d)
         P0 = V[:, 1:L]
     else
@@ -240,20 +231,12 @@ function cheb2_data(
 
     # weights for Clenshaw-Curtis quadrature at pts
     if calc_w
-        if is_blas_real
-            wa = T[2 / T(1 - j^2) for j in 0:2:(U - 1)]
-            append!(wa, wa[div(U, 2):-1:2])
-            w = real.(FFTW.ifft(wa))
-            w[1] /= 2
-            push!(w, w[1])
-        else
-            m = zeros(T, U)
-            for j in 0:2:(U - 1)
-                m[j + 1] = 2 / T(1 - j^2)
-            end
-            F = qr!(Array(V'), Val(true))
-            w = F \ m
-        end
+        wa = T[2 / T(1 - j^2) for j in 0:2:(U - 1)]
+        append!(wa, wa[div(U, 2):-1:2])
+        tmpconst = pi / T(length(wa)) * 2 * im
+        w = [abs(sum(wa[j] * exp(tmpconst * (i - 1) * j) for j in eachindex(wa)) / length(wa)) for i in eachindex(wa)] # inverse fft
+        w[1] /= 2
+        push!(w, w[1])
     else
         w = T[]
     end
@@ -458,52 +441,5 @@ function make_product_vandermonde(u::Vector{Matrix{T}}, expos::Vector) where {T 
         end
     end
 
-    return V
-end
-
-
-# these functions are not numerically stable for high degree (since they essentially calculate 2^degree); consider removing entirely
-# TODO this is redundant if already do a QR of the U*U Vandermonde - just use that QR
-function recover_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
-    @warn("recover_lagrange_polys is not numerically stable for large degree")
-    (U, n) = size(pts)
-    DP.@polyvar x[1:n]
-    basis = get_chebyshev_polys(x, deg)
-    @assert length(basis) == U
-    vandermonde_inv = inv([basis[j](x => view(pts, i, :)) for i in 1:U, j in 1:U])
-    lagrange_polys = [DP.polynomial(view(vandermonde_inv, :, i), basis) for i in 1:U]
-    return lagrange_polys
-end
-
-function calc_chebyshev_univariate(monovec::Vector{DynamicPolynomials.PolyVar{true}}, deg::Int)
-    @warn("calc_u for polyvar input is not numerically stable for large degree")
-    n = length(monovec)
-    u = Vector{Vector}(undef, n)
-    for j in 1:n
-        uj = u[j] = Vector{DP.Polynomial{true, Int}}(undef, deg + 1)
-        uj[1] = DP.Monomial(1)
-        uj[2] = monovec[j]
-        for t in 3:(deg + 1)
-            uj[t] = 2 * uj[2] * uj[t - 1] - uj[t - 2]
-        end
-    end
-    return u
-end
-
-# returns the multivariate Chebyshev polynomials in x up to degree deg
-function get_chebyshev_polys(x::Vector{DynamicPolynomials.PolyVar{true}}, deg::Int)
-    @warn("get_chebyshev_polys for polyvar input is not numerically stable for large degree")
-    n = length(x)
-    u = calc_chebyshev_univariate(x, deg)
-    V = Vector{DP.Polynomial{true, Int}}(undef, get_L(n, deg))
-    V[1] = DP.Monomial(1)
-    col = 1
-    for t in 1:deg, xp in Combinatorics.multiexponents(n, t)
-        col += 1
-        V[col] = u[1][xp[1] + 1]
-        for j in 2:n
-            V[col] *= u[j][xp[j] + 1]
-        end
-    end
     return V
 end

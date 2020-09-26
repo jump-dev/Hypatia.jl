@@ -14,7 +14,7 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
     end
 
     rteps = sqrt(eps(T))
-    maxabsmin(v::AbstractVecOrMat) = maximum(abs, v, init = rteps)
+    maxabsmin(v::AbstractVecOrMat) = mapreduce(abs, max, v; init = rteps)
     maxabsmincol(v::UniformScaling, ::Int) = max(abs(v.λ), rteps)
     maxabsmincol(v::AbstractMatrix, j::Int) = maxabsmin(view(v, :, j))
     maxabsminrow(v::UniformScaling, ::Int) = max(abs(v.λ), rteps)
@@ -291,8 +291,7 @@ function find_initial_y(
         GQ1 = solver.reduce_GQ1 = GQ[:, Q1_idxs]
         GQ2 = GQ[:, Q2_idxs]
         # h = h0 - GQ1 * (R' \ b0)
-        model.h -= GQ1 * Rpib0 # TODO replace with below when working
-        # mul!(model.h, GQ1, Rpib0, -1, true)
+        mul!(model.h, GQ1, Rpib0, -1, true)
 
         # G = GQ2
         model.G = GQ2
@@ -355,10 +354,14 @@ end
 function postprocess(solver::Solver{T}) where {T <: Real}
     point = solver.point
     result = solver.result
-    tau = point.tau[1]
-    if tau <= 0
-        result.vec .= NaN
-        return nothing
+    if in(solver.status, (PrimalInfeasible, DualInfeasible))
+        tau = true
+    else
+        tau = point.tau[1]
+        if tau <= 0
+            result.vec .= NaN
+            return nothing
+        end
     end
 
     # finalize s,z
@@ -373,7 +376,12 @@ function postprocess(solver::Solver{T}) where {T <: Real}
             # x = Q * [(R' \ b0), x]
             xa = zeros(T, solver.orig_model.n - length(solver.reduce_Rpib0))
             @. xa[solver.x_keep_idxs] = point.x / tau
-            xb = vcat(solver.reduce_Rpib0, xa)
+            if in(solver.status, (PrimalInfeasible, DualInfeasible))
+                Rpib0 = zeros(T, length(solver.reduce_Rpib0))
+            else
+                Rpib0 = solver.reduce_Rpib0
+            end
+            xb = vcat(Rpib0, xa)
             lmul!(solver.reduce_Ap_Q, xb)
             if isempty(solver.reduce_row_piv_inv)
                 result.x .= xb
@@ -394,7 +402,9 @@ function postprocess(solver::Solver{T}) where {T <: Real}
             # unreduce solver's solution
             # y = R \ (-cQ1' - GQ1' * z)
             ya = solver.reduce_GQ1' * result.z
-            ya .+= solver.reduce_cQ1
+            if !in(solver.status, (PrimalInfeasible, DualInfeasible))
+                ya .+= solver.reduce_cQ1
+            end
             @views ldiv!(solver.reduce_Ap_R, ya[1:length(solver.reduce_y_keep_idxs)])
             @. result.y[solver.reduce_y_keep_idxs] = -ya
         else

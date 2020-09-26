@@ -1,7 +1,7 @@
 #=
 sets of native test instances
 
-TODO add more preprocessing test instances
+TODO add more preprocessing tests and primal or dual infeasible tests
 =#
 
 inst_preproc = [
@@ -38,7 +38,7 @@ inst_cones_few = [
     "possemideftri5",
     "possemideftrisparse2",
     "possemideftrisparse5",
-    "doublynonnegative1",
+    "doublynonnegativetri1",
     "hypoperlogdettri1",
     "hyporootdettri1",
     "wsosinterpnonnegative1",
@@ -117,9 +117,9 @@ inst_cones_many = [
     "possemideftrisparse3",
     "possemideftrisparse4",
     "possemideftrisparse5",
-    "doublynonnegative1",
-    "doublynonnegative2",
-    "doublynonnegative3",
+    "doublynonnegativetri1",
+    "doublynonnegativetri2",
+    "doublynonnegativetri3",
     "matrixepipersquare1",
     "matrixepipersquare2",
     "matrixepipersquare3",

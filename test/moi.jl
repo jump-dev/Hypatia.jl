@@ -6,10 +6,8 @@ using Test
 import MathOptInterface
 const MOI = MathOptInterface
 const MOIT = MOI.Test
-const MOIB = MOI.Bridges
 const MOIU = MOI.Utilities
 import Hypatia
-const SO = Hypatia.Solvers
 
 config = MOIT.TestConfig(
     atol = 2e-4,
@@ -56,8 +54,8 @@ conic_exclude = String[
     "rootdets",
     ]
 
-function test_moi(T::Type{<:Real}, use_dense_model::Bool; solver_options...)
-    optimizer = MOIU.CachingOptimizer(MOIU.UniversalFallback(MOIU.Model{T}()), Hypatia.Optimizer{T}(use_dense_model = use_dense_model; solver_options...))
+function test_moi(T::Type{<:Real}; solver_options...)
+    optimizer = MOIU.CachingOptimizer(MOIU.UniversalFallback(MOIU.Model{T}()), Hypatia.Optimizer{T}(; solver_options...))
 
     @testset "unit tests" begin
         MOIT.unittest(optimizer, config, unit_exclude)
@@ -68,7 +66,7 @@ function test_moi(T::Type{<:Real}, use_dense_model::Bool; solver_options...)
     end
 
     @testset "conic tests" begin
-        MOIT.contconictest(MOIB.Constraint.Square{T}(optimizer), config, conic_exclude)
+        MOIT.contconictest(MOI.Bridges.Constraint.Square{T}(optimizer), config, conic_exclude)
     end
 
     return

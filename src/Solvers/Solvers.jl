@@ -153,7 +153,7 @@ mutable struct Solver{T <: Real}
         init_use_fallback::Bool = true,
         max_nbhd::Real = Cones.default_max_neighborhood(), # TODO cleanup - only for taukap, maybe use full name
         stepper::Stepper{T} = HeurCombStepper{T}(),
-        # stepper::Stepper{T} = PredOrCorrStepper{T}(),
+        # stepper::Stepper{T} = PredOrCentStepper{T}(),
         system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
@@ -389,6 +389,8 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         if infres_pr <= solver.tol_feas
             solver.verbose && println("primal infeasibility detected; terminating")
             solver.status = PrimalInfeasible
+            solver.primal_obj = solver.primal_obj_t
+            solver.dual_obj = solver.dual_obj_t
             return true
         end
     end
@@ -397,6 +399,8 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         if infres_du <= solver.tol_feas
             solver.verbose && println("dual infeasibility detected; terminating")
             solver.status = DualInfeasible
+            solver.primal_obj = solver.primal_obj_t
+            solver.dual_obj = solver.dual_obj_t
             return true
         end
     end
