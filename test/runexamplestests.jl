@@ -17,8 +17,8 @@ results_path = nothing
 # options to solvers
 # tol = 1e-7
 default_options = (
-    verbose = false,
-    # verbose = true,
+    # verbose = false,
+    verbose = true,
     iter_limit = 250,
     # tol_abs_opt = tol,
     # tol_rel_opt = tol,
@@ -30,13 +30,13 @@ instance_sets = [
     ("minimal", Float64, 30),
     # ("minimal", Float32, 30),
     # ("minimal", BigFloat, 30),
-    # ("fast", Float64, 30),
+    ("fast", Float64, 30),
     # ("slow", Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
@@ -56,30 +56,30 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
-    "conditionnum",
-    "contraction",
+    # "centralpolymat",
+    # "conditionnum",
+    # "contraction",
     "densityest",
-    "envelope",
-    "expdesign",
-    "lotkavolterra",
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
+    # "envelope",
+    # "expdesign",
+    # "lotkavolterra",
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
     "maxvolume",
-    "muconvexity",
-    "nearestpsd",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    "regionofattr",
-    "robustgeomprog",
-    "secondorderpoly",
-    "semidefinitepoly",
+    # "muconvexity",
+    # "nearestpsd",
+    # "polymin",
+    # "polynorm",
+    # "portfolio",
+    # "regionofattr",
+    # "robustgeomprog",
+    # "secondorderpoly",
+    # "semidefinitepoly",
     "shapeconregr",
-    "signomialmin",
-    "stabilitynumber",
+    # "signomialmin",
+    # "stabilitynumber",
     ]
 
 perf = DataFrames.DataFrame(
