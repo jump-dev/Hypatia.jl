@@ -2043,7 +2043,7 @@ function wsosinterpepinormeucl1(T; options...)
 end
 
 function wsosinterpepinormeucl2(T; options...)
-    # min t(x) : t(x) ^ 2 >= x ^ 4 + (x - 1) ^ 2 on [-1, 1]^2 where t(x) a constant
+    # min t(x) : t(x) ^ 2 >= x ^ 4 + (x - 1) ^ 2 on [-1, 1] where t(x) a constant
     tol = sqrt(sqrt(eps(T)))
     (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
@@ -2067,7 +2067,7 @@ function wsosinterpepinormeucl3(T; options...)
     if !(T <: LinearAlgebra.BlasReal)
         return # calc_w only works with BlasReal
     end
-    # max: w'f: 25x^4 >= f(x)^4 + 9x^4 on [-1, 1], soln is +/- 4x^2
+    # max: w'f: 25x^4 >= f(x)^2 + 9x^4 on [-1, 1], soln is +/- 4x^2
     tol = sqrt(sqrt(eps(T)))
     (U, pts, Ps, _, w) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1, calc_w = true)
     DynamicPolynomials.@polyvar x
@@ -2086,6 +2086,73 @@ function wsosinterpepinormeucl3(T; options...)
     @test r.primal_obj ≈ -8 / 3 atol=tol rtol=tol
     fn_sol = 4x^2
     @test abs2.(r.x) ≈ abs2.([fn_sol(pts[u, :]...) for u in 1:U]) atol=tol rtol=tol
+end
+
+function wsosinterpepinormone1(T; options...)
+    # min t(x) : t(x) >= abs(x ^ 2) on [-1, 1] where t(x) a constant
+    tol = sqrt(sqrt(eps(T)))
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1)
+    @assert U == 3
+    DynamicPolynomials.@polyvar x
+    fn = x ^ 2
+
+    c = ones(T, U)
+    A = T[1 -1 0; 1 0 -1]
+    b = zeros(T, 2)
+    G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U))
+    h = vcat(zeros(T, U), T[fn(pts[u, :]...) for u in 1:U])
+    cones = Cone{T}[Cones.WSOSInterpEpiNormOne{T}(2, U, Ps)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ T(U) atol=tol rtol=tol
+    @test r.x ≈ ones(T, U) atol=tol rtol=tol
+end
+
+function wsosinterpepinormone2(T; options...)
+    # min t(x) : t(x) >= abs(x ^ 2) + abs(x - 1) on [-1, 1] where t(x) a constant
+    tol = sqrt(sqrt(eps(T)))
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1)
+    DynamicPolynomials.@polyvar x
+    fn1 = x ^ 2
+    fn2 = (x - 1)
+
+    c = ones(T, U)
+    A = T[1 -1 0; 1 0 -1]
+    b = zeros(T, 2)
+    G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U), zeros(T, U, U))
+    h = vcat(zeros(T, U), T[fn1(pts[u, :]...) for u in 1:U], T[fn2(pts[u, :]...) for u in 1:U])
+    cones = Cone{T}[Cones.WSOSInterpEpiNormOne{T}(3, U, Ps)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ T(3) * U atol=tol rtol=tol
+    @test r.x ≈ fill(T(3), U) atol=tol rtol=tol
+end
+
+function wsosinterpepinormone3(T; options...)
+    if !(T <: LinearAlgebra.BlasReal)
+        return # calc_w only works with BlasReal
+    end
+    # max: w'f: 5x^2 >= abs(f(x)) + abs(3x^2) on [-1, 1], soln is +/- 2x^2
+    tol = sqrt(sqrt(eps(T)))
+    (U, pts, Ps, _, w) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1, calc_w = true)
+    DynamicPolynomials.@polyvar x
+    fn1 = 5x^2
+    fn2 = 3x^2
+
+    c = -T.(w)
+    A = zeros(T, 0, U)
+    b = T[]
+    G = vcat(spzeros(T, U, U), Diagonal(-one(T) * I, U), spzeros(T, U, U))
+    h = vcat(T[fn1(pts[u, :]...) for u in 1:U], zeros(T, U), T[fn2(pts[u, :]...) for u in 1:U])
+    cones = Cone{T}[Cones.WSOSInterpEpiNormOne{T}(3, U, Ps)]
+
+    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ -4 / 3 atol=tol rtol=tol
+    fn_sol = 2x^2
+    @test abs.(r.x) ≈ abs.([fn_sol(pts[u, :]...) for u in 1:U]) atol=tol rtol=tol
 end
 
 function primalinfeas1(T; options...)

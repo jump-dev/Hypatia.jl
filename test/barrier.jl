@@ -528,3 +528,26 @@ function test_wsosinterpepinormeucl_barrier(T::Type{<:Real})
     end
     return
 end
+
+function test_wsosinterpepinormone_barrier(T::Type{<:Real})
+    Random.seed!(1)
+    for n in 1:3, halfdeg in 1:2, R in 2:3
+        (U, _, Ps, _) = ModelUtilities.interpolate(ModelUtilities.Box{T}(-ones(T, n), ones(T, n)), halfdeg, sample = false)
+        cone = Cones.WSOSInterpEpiNormOne{T}(R, U, Ps)
+        function barrier(point)
+            bar = zero(eltype(point))
+            for P in cone.Ps
+                lambda_1 = Symmetric(P' * Diagonal(point[1:U]) * P, :U)
+                fact_1 = cholesky(lambda_1)
+                for i in 2:R
+                    lambda_i = Symmetric(P' * Diagonal(point[Cones.block_idxs(U, i)]) * P)
+                    bar -= logdet(lambda_1 - lambda_i * (fact_1 \ lambda_i))
+                end
+                bar -= logdet(fact_1)
+            end
+            return bar
+        end
+        test_barrier_oracles(cone, barrier, init_tol = Inf)
+    end
+    return
+end

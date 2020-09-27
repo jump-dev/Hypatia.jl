@@ -44,6 +44,7 @@ inst_cones_few = [
     "wsosinterpnonnegative1",
     "wsosinterppossemideftri1",
     "wsosinterpepinormeucl1",
+    "wsosinterpepinormone1",
     ]
 
 # superset of inst_cones_few
@@ -140,6 +141,9 @@ inst_cones_many = [
     "wsosinterpepinormeucl1",
     "wsosinterpepinormeucl2",
     "wsosinterpepinormeucl3",
+    "wsosinterpepinormone1",
+    "wsosinterpepinormone2",
+    "wsosinterpepinormone3",
     ]
 
 inst_indirect = [
