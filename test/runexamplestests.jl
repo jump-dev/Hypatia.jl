@@ -58,7 +58,7 @@ native_example_names = [
 JuMP_example_names = [
     # "centralpolymat",
     # "conditionnum",
-    # "contraction",
+    "contraction",
     # "densityest",
     # "envelope",
     # "expdesign",
@@ -76,7 +76,7 @@ JuMP_example_names = [
     # "regionofattr",
     # "robustgeomprog",
     # "secondorderpoly",
-    "semidefinitepoly",
+    # "semidefinitepoly",
     # "shapeconregr",
     # "signomialmin",
     # "stabilitynumber",
