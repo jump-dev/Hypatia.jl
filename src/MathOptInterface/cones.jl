@@ -3,7 +3,7 @@ definitions of conic sets not already defined by MathOptInterface
 and functions for converting between Hypatia and MOI cone definitions
 =#
 
-cone_from_moi(::Type{<:Real}, cone::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
+cone_from_moi(::Type{<:Real}, cone::MOI.AbstractVectorSet) = error("MOI set $cone is not recognized")
 
 # MOI predefined cones
 
@@ -44,22 +44,12 @@ end
 
 function permute_affine(cone::MOI.RelativeEntropyCone, idxs::AbstractVector)
     dim = MOI.dimension(cone)
-    first_idx = 1 # TODO
     w_dim = div(dim - 1, 2)
     new_idxs = collect(idxs)
-    for (i, idx) in enumerate(idxs)
-        if idx != first_idx
-            # if idx <= (w_dim + first_idx)
-            #     new_offset = 2 * (idx - first_idx)
-            # else
-            #     new_offset = 2 * (idx - w_dim) - first_idx
-            # end
-            new_idx = 2 * idx - first_idx - (idx <= (w_dim + first_idx) ? first_idx : 2 * w_dim)
-            new_idxs[i] = new_idx
-        end
+    for i in 2:length(idxs)
+        idx = idxs[i]
+        new_idxs[i] = 2 * idx - 1 - (idx <= 1 + w_dim ? 1 : 2 * w_dim)
     end
-    # @show new_idxs
-
     return new_idxs
 end
 
@@ -310,70 +300,8 @@ MOI.dimension(cone::WSOSInterpEpiNormEuclCone) = cone.U * cone.R
 cone_from_moi(::Type{T}, cone::WSOSInterpEpiNormEuclCone{T}) where {T <: Real} = Cones.WSOSInterpEpiNormEucl{T}(cone.R, cone.U, cone.Ps, use_dual = cone.use_dual)
 
 # all cones
-# TODO avoid repeating the tuple and union below
 
-const MOIOtherConesList(::Type{T}) where {T <: Real} = (
-    MOI.NormInfinityCone,
-    MOI.NormOneCone,
-    MOI.SecondOrderCone,
-    MOI.RotatedSecondOrderCone,
-    MOI.ExponentialCone,
-    MOI.DualExponentialCone,
-    MOI.PowerCone{T},
-    MOI.DualPowerCone{T},
-    MOI.GeometricMeanCone,
-    MOI.RelativeEntropyCone,
-    MOI.NormSpectralCone,
-    MOI.NormNuclearCone,
-    MOI.PositiveSemidefiniteConeTriangle,
-    MOI.LogDetConeTriangle,
-    MOI.RootDetConeTriangle,
-    NonnegativeCone{T},
-    EpiNormInfinityCone{T, T},
-    EpiNormInfinityCone{T, Complex{T}},
-    EpiNormEuclCone{T},
-    EpiPerSquareCone{T},
-    PowerCone{T},
-    HypoPerLogCone{T},
-    EpiSumPerEntropyCone{T},
-    HypoGeoMeanCone{T},
-    HypoPowerMeanCone{T},
-    EpiNormSpectralCone{T, T},
-    EpiNormSpectralCone{T, Complex{T}},
-    MatrixEpiPerSquareCone{T, T},
-    MatrixEpiPerSquareCone{T, Complex{T}},
-    LinMatrixIneqCone{T},
-    PosSemidefTriCone{T, T},
-    PosSemidefTriCone{T, Complex{T}},
-    PosSemidefTriSparseCone{T, T},
-    PosSemidefTriSparseCone{T, Complex{T}},
-    HypoPerLogdetTriCone{T, T},
-    HypoPerLogdetTriCone{T, Complex{T}},
-    HypoRootdetTriCone{T, T},
-    HypoRootdetTriCone{T, Complex{T}},
-    DoublyNonnegativeTriCone{T},
-    WSOSInterpNonnegativeCone{T, T},
-    WSOSInterpNonnegativeCone{T, Complex{T}},
-    WSOSInterpPosSemidefTriCone{T},
-    WSOSInterpEpiNormEuclCone{T},
-    )
-
-const MOIOtherCones{T <: Real} = Union{
-    MOI.NormInfinityCone,
-    MOI.NormOneCone,
-    MOI.SecondOrderCone,
-    MOI.RotatedSecondOrderCone,
-    MOI.ExponentialCone,
-    MOI.DualExponentialCone,
-    MOI.PowerCone{T},
-    MOI.DualPowerCone{T},
-    MOI.GeometricMeanCone,
-    MOI.RelativeEntropyCone,
-    MOI.NormSpectralCone,
-    MOI.NormNuclearCone,
-    MOI.PositiveSemidefiniteConeTriangle,
-    MOI.LogDetConeTriangle,
-    MOI.RootDetConeTriangle,
+const HypatiaCones{T <: Real} = Union{
     NonnegativeCone{T},
     EpiNormInfinityCone{T, T},
     EpiNormInfinityCone{T, Complex{T}},
@@ -403,3 +331,27 @@ const MOIOtherCones{T <: Real} = Union{
     WSOSInterpPosSemidefTriCone{T},
     WSOSInterpEpiNormEuclCone{T},
     }
+
+const SupportedCones{T <: Real} = Union{
+    HypatiaCones{T},
+    MOI.Zeros,
+    MOI.Nonnegatives,
+    MOI.Nonpositives,
+    MOI.NormInfinityCone,
+    MOI.NormOneCone,
+    MOI.SecondOrderCone,
+    MOI.RotatedSecondOrderCone,
+    MOI.ExponentialCone,
+    MOI.DualExponentialCone,
+    MOI.PowerCone{T},
+    MOI.DualPowerCone{T},
+    MOI.GeometricMeanCone,
+    MOI.RelativeEntropyCone,
+    MOI.NormSpectralCone,
+    MOI.NormNuclearCone,
+    MOI.PositiveSemidefiniteConeTriangle,
+    MOI.LogDetConeTriangle,
+    MOI.RootDetConeTriangle,
+    }
+
+Base.copy(cone::HypatiaCones) = cone # NOTE maybe should deep copy the cone struct, but this is expensive

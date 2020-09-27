@@ -36,7 +36,7 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
@@ -56,30 +56,30 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "centralpolymat",
-    "conditionnum",
-    "contraction",
-    "densityest",
-    "envelope",
-    "expdesign",
-    "lotkavolterra",
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "muconvexity",
-    "nearestpsd",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    "regionofattr",
-    "robustgeomprog",
-    "secondorderpoly",
+    # "centralpolymat",
+    # "conditionnum",
+    # "contraction",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # "lotkavolterra",
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # "maxvolume",
+    # "muconvexity",
+    # "nearestpsd",
+    # "polymin",
+    # "polynorm",
+    # "portfolio",
+    # "regionofattr",
+    # "robustgeomprog",
+    # "secondorderpoly",
     "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
-    "stabilitynumber",
+    # "shapeconregr",
+    # "signomialmin",
+    # "stabilitynumber",
     ]
 
 perf = DataFrames.DataFrame(
@@ -112,32 +112,32 @@ isnothing(results_path) || CSV.write(results_path, perf)
 time_all = time()
 
 @testset "examples tests" begin
-for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
-    include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
-    (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, mod_type * "_test.jl"))
+@testset "$ex_name" for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
+include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
+(ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, mod_type * "_test.jl"))
 
-    for (inst_set, real_T, time_limit) in instance_sets
-        haskey(ex_insts, inst_set) || continue
-        inst_subset = ex_insts[inst_set]
-        isempty(inst_subset) && continue
-        ex_type_T = ex_type{real_T}
-        new_default_options = (; default_options..., time_limit = time_limit)
-        println("\nstarting $(length(inst_subset)) instances for $ex_type_T $inst_set\n")
+for (inst_set, real_T, time_limit) in instance_sets
+    haskey(ex_insts, inst_set) || continue
+    inst_subset = ex_insts[inst_set]
+    isempty(inst_subset) && continue
+    ex_type_T = ex_type{real_T}
+    new_default_options = (; default_options..., time_limit = time_limit)
 
-        for (inst_num, inst) in enumerate(inst_subset)
-            test_info = "$ex_type_T $inst_set $inst_num: $(inst[1])"
-            @testset "$test_info" begin
-                println(test_info, "...")
-                time_inst = @elapsed p = run_instance(ex_type_T, inst..., default_options = new_default_options)
-
-                extender = (length(inst) > 1 && mod_type == "JuMP" ? inst[2] : nothing)
-                push!(perf, (string(ex_type), inst_set, real_T, inst_num, inst[1], string(extender), p..., time_inst))
-                isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
-                @printf("... %8.2e seconds\n\n", time_inst)
-                flush(stdout); flush(stderr)
-            end
+    println("\nstarting $ex_type_T $inst_set tests")
+    @testset "$ex_type_T $inst_set" begin
+    for (inst_num, inst) in enumerate(inst_subset)
+        test_info = "inst $inst_num: $(inst[1])"
+        @testset "$test_info" begin
+            println(test_info, " ...")
+            test_time = @elapsed p = run_instance(ex_type_T, inst..., default_options = new_default_options, verbose = false)
+            extender = (length(inst) > 1 && mod_type == "JuMP") ? inst[2] : nothing
+            push!(perf, (string(ex_type), inst_set, real_T, inst_num, inst[1], string(extender), p..., test_time))
+            isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
+            @printf("%8.2e seconds\n", test_time)
         end
     end
+    end
+end
 end
 
 # @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)

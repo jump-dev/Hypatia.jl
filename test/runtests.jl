@@ -6,12 +6,12 @@ using Test
 using Printf
 
 test_files = [
-    "modelutilities",
-    "barrier",
+    # "modelutilities",
+    # "barrier",
     # "native",
-    "moi",
+    # "moi",
     # "cblib",
-    # "examples",
+    "examples",
     # NOTE require optional dependencies:
     # "pardiso",
     # "hsl",
