@@ -1,18 +1,12 @@
 
-relaxed_tols = (tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-6)
 insts = Dict()
 insts["minimal"] = [
     ((:naics5811, 3, true, false, true, true, false),),
     ((:naics5811, 3, true, false, true, false, false),),
-    ((:naics5811, 3, true, false, false, true, false),),
-    ((1, 5, :func1, 2, 5, true, false, true, true, false),),
     ((2, 5, :func2, 2, 4, true, false, true, false, false),),
-    ((3, 5, :func3, 2, 3, true, false, false, true, false), nothing, relaxed_tols),
     ((1, 5, :func4, 2, 4, true, false, false, false, true),),
-    ((1, 5, :func5, 2, 4, true, true, true, true, false),),
     ((1, 5, :func6, 2, 4, false, false, true, true, false),),
     ((1, 5, :func7, 2, 4, false, true, true, true, false), StandardConeOptimizer),
-    ((1, 5, :func8, 2, 4, false, true, true, true, false),),
     ((1, 5, :func1, 2, 4, false, true, false, false, true), StandardConeOptimizer),
     ]
 insts["fast"] = [

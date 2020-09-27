@@ -27,10 +27,10 @@ default_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    ("minimal", Float64, 15),
-    # ("minimal", Float32, 15),
-    # ("minimal", BigFloat, 15),
-    # ("fast", Float64, 15),
+    ("minimal", Float64, 30),
+    # ("minimal", Float32, 30),
+    # ("minimal", BigFloat, 30),
+    ("fast", Float64, 30),
     # ("slow", Float64, 120),
     ]
 
