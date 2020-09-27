@@ -30,7 +30,7 @@ instance_sets = [
     ("minimal", Float64, 30),
     # ("minimal", Float32, 30),
     # ("minimal", BigFloat, 30),
-    ("fast", Float64, 30),
+    # ("fast", Float64, 30),
     # ("slow", Float64, 120),
     ]
 
@@ -59,7 +59,7 @@ JuMP_example_names = [
     # "centralpolymat",
     # "conditionnum",
     # "contraction",
-    "densityest",
+    # "densityest",
     # "envelope",
     # "expdesign",
     # "lotkavolterra",
@@ -77,7 +77,7 @@ JuMP_example_names = [
     # "robustgeomprog",
     # "secondorderpoly",
     # "semidefinitepoly",
-    "shapeconregr",
+    # "shapeconregr",
     # "signomialmin",
     # "stabilitynumber",
     ]
