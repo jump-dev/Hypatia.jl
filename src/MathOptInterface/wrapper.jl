@@ -75,7 +75,7 @@ function MOI.copy_to(
     warn_attributes::Bool = true,
     ) where {T <: Real}
     @assert !copy_names
-    idx_map = Dict{MOI.Index, MOI.Index}()
+    idx_map = MOI.Utilities.IndexMap()
 
     # variables
     n = MOI.get(src, MOI.NumberOfVariables()) # columns of A

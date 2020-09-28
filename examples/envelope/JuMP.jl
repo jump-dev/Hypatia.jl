@@ -9,7 +9,7 @@ struct EnvelopeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     env_halfdeg::Int
 end
 
-function build(inst::EnvelopeJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::EnvelopeJuMP{T}) where {T <: Float64}
     n = inst.n
     @assert inst.rand_halfdeg <= inst.env_halfdeg
     domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))

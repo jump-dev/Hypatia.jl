@@ -33,7 +33,7 @@ function MatrixRegressionJuMP{Float64}(
     return MatrixRegressionJuMP{Float64}(Y, X, args...)
 end
 
-function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64}
     (Y, X) = (inst.Y, inst.X)
     @assert min(inst.lam_fro, inst.lam_nuc, inst.lam_las, inst.lam_glr, inst.lam_glc) >= 0
     (data_n, data_m) = size(Y)

@@ -21,7 +21,6 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     rt2::T
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -103,7 +102,6 @@ function setup_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} 
     cone.mat2 = zeros(R, side, side)
     cone.mat3 = zeros(R, side, side)
     cone.mat4 = zeros(R, side, side)
-    # cone.Wi = zeros(R, side, side)
     cone.Wivzi = zeros(R, side, side)
     cone.tmpw = zeros(T, dim - 2)
     return
@@ -164,6 +162,7 @@ function update_grad(cone::HypoPerLogdetTri)
     u = cone.point[1]
     v = cone.point[2]
 
+    # TODO in-place
     # copyto!(cone.Wi, cone.fact_mat.factors)
     # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0))
     cone.Wi = inv(cone.fact_mat)
@@ -348,7 +347,7 @@ function correction(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}) wh
     const6 = 1 + v * nLz
     uuw_scal = -2 * udz * vz / z
     vvw_scal = -vdz * (2 * const6 * nLz + side / z)
-    uvw_scal =-2 * (2 * vz * nLz + inv(z)) / z
+    uvw_scal = -2 * (2 * vz * nLz + inv(z)) / z
     const8 = -2 * (1 + vz)
     const10 = 2 * (vz * udz + vdz * const6)
     const9 = -2 * abs2(vz) * dot_Wi_S + const10
@@ -372,7 +371,7 @@ function correction(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}) wh
     corr[1] = 2 * abs2(udz) / z + (2 * const2 + const3) * v_dir + (uuw_scal + const7) * dot_Wi_S + vz * t4awd
     corr[2] = const4 * abs2(v_dir) + (2 * vvw_scal + uvw_scal * u_dir) * dot_Wi_S + u_dir * (const2 + 2 * const3) + const6 * t4awd
 
-    corr /= -2
+    corr ./= -2
 
     return corr
 end

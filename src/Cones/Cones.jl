@@ -6,7 +6,6 @@ TODO maybe write a fallback dual feas check that checks if ray of dual point int
 
 module Cones
 
-using TimerOutputs
 using LinearAlgebra
 import LinearAlgebra.copytri!
 import LinearAlgebra.HermOrSym
@@ -46,7 +45,7 @@ include("matrixepipersquare.jl")
 include("linmatrixineq.jl")
 include("possemideftri.jl")
 include("possemideftrisparse.jl")
-include("doublynonnegative.jl")
+include("doublynonnegativetri.jl")
 include("hypoperlogdettri.jl")
 include("hyporootdettri.jl")
 include("wsosinterpnonnegative.jl")
@@ -55,7 +54,6 @@ include("wsosinterpepinormeucl.jl")
 
 use_dual_barrier(cone::Cone) = cone.use_dual_barrier
 dimension(cone::Cone) = cone.dim
-set_timer(cone::Cone, timer::TimerOutput) = (cone.timer = timer)
 
 load_point(cone::Cone{T}, point::AbstractVector{T}, scal::T) where {T <: Real} = (@. cone.point = scal * point)
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
@@ -121,7 +119,6 @@ function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
 end
 
 function update_inv_hess(cone::Cone)
-    @assert !cone.inv_hess_updated
     if !cone.hess_fact_updated
         update_hess_fact(cone)
     end

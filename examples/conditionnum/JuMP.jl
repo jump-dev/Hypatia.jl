@@ -26,7 +26,7 @@ struct ConditionNumJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_linmatrixineq::Bool # use linmatrixineq cone, else PSD formulation
 end
 
-function build(inst::ConditionNumJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::ConditionNumJuMP{T}) where {T <: Float64}
     (side, len_y) = (inst.side, inst.len_y)
 
     rand_pd() = (Mh = randn(side, side); Symmetric(Mh * Mh'))

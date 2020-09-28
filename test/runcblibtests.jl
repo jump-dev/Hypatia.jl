@@ -2,46 +2,43 @@
 run CBLIB tests
 =#
 
+using Test
+using Printf
 import DataFrames
 import CSV
-using Printf
-import TimerOutputs
-
 include(joinpath(@__DIR__, "cblibsets.jl"))
 examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "common_JuMP.jl"))
 
+# CBLIB file folder location (use default)
+cblib_dir = joinpath(ENV["HOME"], "cblib/cblib.zib.de/download/all")
+
 # path to write results DataFrame to CSV, if any
-results_path = joinpath(homedir(), "bench", "bench.csv")
-# results_path = nothing
+# results_path = joinpath(homedir(), "bench", "bench.csv")
+results_path = nothing
+
+# instance sets to run and corresponding time limits (seconds)
+instance_sets = [
+    ("diverse_few", 15),
+    # ("power_small", 60),
+    # ("exp_small", 15),
+    # ("exp_most", 60),
+    ]
 
 # options to solvers
-timer = TimerOutputs.TimerOutput()
 tol = 1e-7
 default_options = (
-    # verbose = false,
-    verbose = true,
+    verbose = false,
+    # verbose = true,
     iter_limit = 150,
     time_limit = 120,
     tol_rel_opt = tol,
     tol_abs_opt = tol,
     tol_feas = tol,
     # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
-    # system_solver = Solvers.SymIndefDenseSystemSolver{Float64}(),
-    system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
-    timer = timer,
+    system_solver = Solvers.SymIndefSparseSystemSolver{Float64}(),
+    # system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),
     )
-
-# instance sets to run and corresponding time limits (seconds)
-instance_sets = [
-    ("diverse_few", 15),
-    ("power_small", 60),
-    ("exp_small", 15),
-    # ("exp_most", 60),
-    ]
-
-# CBLIB file folder location (use default)
-cblib_dir = joinpath(ENV["HOME"], "cblib/cblib.zib.de/download/all")
 
 perf = DataFrames.DataFrame(
     inst_set = String[],
@@ -51,7 +48,7 @@ perf = DataFrames.DataFrame(
     p = Int[],
     q = Int[],
     cone_types = Vector{String}[],
-    status = Symbol[],
+    status = String[],
     solve_time = Float64[],
     iters = Int[],
     prim_obj = Float64[],
@@ -67,9 +64,6 @@ perf = DataFrames.DataFrame(
     )
 
 isnothing(results_path) || CSV.write(results_path, perf)
-time_all = time()
-
-@info("starting CBLIB tests")
 
 @testset "CBLIB tests" begin
 for (inst_set, time_limit) in instance_sets
@@ -83,21 +77,14 @@ for (inst_set, time_limit) in instance_sets
         @testset "$test_info" begin
             println(test_info, "...")
             time_inst = @elapsed p = run_cbf(inst, solver_options)
-
             push!(perf, (inst_set, inst_num, inst, p..., time_inst))
             isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
             @printf("... %8.2e seconds\n\n", time_inst)
-            flush(stdout); flush(stderr)
         end
     end
 end
 
-@printf("\nCBLIB tests total time: %8.2e seconds\n\n", time() - time_all)
 DataFrames.show(perf, allrows = true, allcols = true)
 println("\n")
-# @show sum(perf[:iters])
-# show(timer)
-println("\n")
-flush(stdout); flush(stderr)
 end
 ;

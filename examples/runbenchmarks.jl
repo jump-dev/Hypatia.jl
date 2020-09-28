@@ -7,7 +7,6 @@ to use the bench instance set and run on cmd line:
 import DataFrames
 import CSV
 using Printf
-import TimerOutputs
 import LinearAlgebra
 using Distributed
 using Hypatia

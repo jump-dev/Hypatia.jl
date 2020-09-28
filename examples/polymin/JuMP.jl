@@ -24,7 +24,7 @@ function PolyMinJuMP{Float64}(
     return PolyMinJuMP{Float64}(random_interp_data(Float64, n, halfdeg)..., args...)
 end
 
-function build(inst::PolyMinJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::PolyMinJuMP{T}) where {T <: Float64}
     (interp_vals, Ps, use_primal) = (inst.interp_vals, inst.Ps, inst.use_primal)
     U = length(interp_vals)
 

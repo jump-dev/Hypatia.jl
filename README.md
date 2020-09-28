@@ -1,5 +1,8 @@
 # Hypatia.jl
 
+[![Build Status](https://travis-ci.com/chriscoey/Hypatia.jl.svg?branch=master)](https://travis-ci.com/chriscoey/Hypatia.jl) 
+[![codecov](https://codecov.io/gh/chriscoey/Hypatia.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/chriscoey/Hypatia.jl)
+
 Under construction. Only works on Julia master.
 
 An interior point solver for general convex conic optimization problems. 

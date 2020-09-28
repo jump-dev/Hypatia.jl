@@ -39,7 +39,7 @@ end
 SignomialMinJuMP{Float64}(sig_name::Symbol) = SignomialMinJuMP{Float64}(signomialmin_data[sig_name]...)
 SignomialMinJuMP{Float64}(m::Int, n::Int) = SignomialMinJuMP{Float64}(signomialmin_random(m, n)...)
 
-function build(inst::SignomialMinJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::SignomialMinJuMP{T}) where {T <: Float64}
     (fc, fA, gc, gA) = (inst.fc, inst.fA, inst.gc, inst.gA)
     (fm, n) = size(fA)
     @assert length(fc) == fm

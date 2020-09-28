@@ -19,7 +19,6 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     w_idxs
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -115,6 +114,7 @@ function update_feas(cone::EpiSumPerEntropy{T}) where {T}
     u = cone.point[1]
     @views v = cone.point[cone.v_idxs]
     @views w = cone.point[cone.w_idxs]
+
     if all(vi -> vi > eps(T), v) && all(wi -> wi > eps(T), w)
         @. cone.lwv = log(w / v)
         cone.z = u - dot(w, cone.lwv)
@@ -122,6 +122,7 @@ function update_feas(cone::EpiSumPerEntropy{T}) where {T}
     else
         cone.is_feas = false
     end
+
     cone.feas_updated = true
     return cone.is_feas
 end
@@ -130,9 +131,11 @@ function is_dual_feas(cone::EpiSumPerEntropy{T}) where {T}
     u = cone.dual_point[1]
     @views v = cone.dual_point[cone.v_idxs]
     @views w = cone.dual_point[cone.w_idxs]
+
     if all(vi -> vi > eps(T), v) && (u > eps(T))
         return all(u * (1 + log(vi / u)) + wi > eps(T) for (vi, wi) in zip(v, w))
     end
+
     return false
 end
 
@@ -270,7 +273,6 @@ function update_inv_hess_sqrt_aux(cone::EpiSumPerEntropy{T}) where {T}
 
     # modify nonzeros of upper triangular factor of inverse Hessian
     cone.no_sqrts = !factor_upper_arrow_block2(cone.Hiuu, cone.Hiuv, cone.Hiuw, cone.Hivv, cone.Hivw, cone.Hiww, cone.inv_hess_sqrt.data.nzval)
-
     cone.no_sqrts && println("no sqrt")
 
     cone.inv_hess_sqrt_aux_updated = true
@@ -310,6 +312,7 @@ end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
+
     @views @inbounds begin
         @. prod[1, :] = cone.Hiuu * arr[1, :]
         mul!(prod[1, :], arr[2:2:end, :]', cone.Hiuv, true, true)
@@ -319,6 +322,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
         @. prod[2:2:end, :] += cone.Hivv * arr[2:2:end, :] + cone.Hivw * arr[3:2:end, :]
         @. prod[3:2:end, :] += cone.Hiww * arr[3:2:end, :] + cone.Hivw * arr[2:2:end, :]
     end
+
     return prod
 end
 

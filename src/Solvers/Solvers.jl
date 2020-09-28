@@ -11,7 +11,6 @@ import SuiteSparse
 import LinearMaps
 import IterativeSolvers
 using Test
-using TimerOutputs
 import Hypatia.Cones
 import Hypatia.Models
 import Hypatia.SparseNonSymCache
@@ -70,7 +69,6 @@ mutable struct Solver{T <: Real}
     max_nbhd::T
     stepper::Stepper{T}
     system_solver::SystemSolver{T}
-    timer::TimerOutput
 
     # current status of the solver object and info
     status::Status
@@ -155,9 +153,8 @@ mutable struct Solver{T <: Real}
         init_use_fallback::Bool = true,
         max_nbhd::Real = Cones.default_max_neighborhood(), # TODO cleanup - only for taukap, maybe use full name
         stepper::Stepper{T} = HeurCombStepper{T}(),
-        # stepper::Stepper{T} = PredOrCorrStepper{T}(),
+        # stepper::Stepper{T} = PredOrCentStepper{T}(),
         system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
-        timer::TimerOutput = TimerOutput(),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
             @assert preprocess # require preprocessing for QRCholSystemSolver # TODO only need primal eq preprocessing or reduction
@@ -185,7 +182,6 @@ mutable struct Solver{T <: Real}
         solver.max_nbhd = max_nbhd
         solver.stepper = stepper
         solver.system_solver = system_solver
-        solver.timer = timer
         solver.status = NotLoaded
 
         return solver
@@ -220,7 +216,7 @@ function solve(solver::Solver{T}) where {T <: Real}
     orig_model = solver.orig_model
     result = solver.result = Point(orig_model)
     model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
-    (init_z, init_s) = initialize_cone_point(solver.orig_model, solver.timer)
+    (init_z, init_s) = initialize_cone_point(solver.orig_model)
     solver.rescale && rescale_data(solver)
     if solver.reduce
         # TODO don't find point / unnecessary stuff before reduce
@@ -263,18 +259,18 @@ function solve(solver::Solver{T}) where {T <: Real}
         solver.prev_z_feas = NaN
 
         stepper = solver.stepper
-        @timeit solver.timer "setup_stepper" load(stepper, solver)
-        @timeit solver.timer "setup_system" load(solver.system_solver, solver)
+        load(stepper, solver)
+        load(solver.system_solver, solver)
 
         # iterate from initial point
         while true
-            @timeit solver.timer "calc_res" calc_residual(solver)
+            calc_residual(solver)
 
-            @timeit solver.timer "calc_conv" calc_convergence_params(solver)
+            calc_convergence_params(solver)
 
-            @timeit solver.timer "print_iter" solver.verbose && print_iteration_stats(stepper, solver)
+            solver.verbose && print_iteration_stats(stepper, solver)
 
-            @timeit solver.timer "check_conv" check_convergence(solver) && break
+            check_convergence(solver) && break
 
             if solver.num_iters == solver.iter_limit
                 solver.verbose && println("iteration limit reached; terminating")
@@ -287,7 +283,7 @@ function solve(solver::Solver{T}) where {T <: Real}
                 break
             end
 
-            @timeit solver.timer "step" step(stepper, solver) || break
+            step(stepper, solver) || break
 
             if point.tau[1] <= zero(T) || point.kap[1] <= zero(T) || solver.mu <= zero(T)
                 @warn("numerical failure: tau is $(point.tau[1]), kappa is $(point.kap[1]), mu is $(solver.mu); terminating")
@@ -346,7 +342,7 @@ function calc_residual(solver::Solver{T}) where {T <: Real}
     @. z_residual -= model.h * tau
     solver.z_norm_res = norm(z_residual, Inf) / tau
 
-    return
+    return nothing
 end
 
 function calc_convergence_params(solver::Solver{T}) where {T <: Real}
@@ -393,6 +389,8 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         if infres_pr <= solver.tol_feas
             solver.verbose && println("primal infeasibility detected; terminating")
             solver.status = PrimalInfeasible
+            solver.primal_obj = solver.primal_obj_t
+            solver.dual_obj = solver.dual_obj_t
             return true
         end
     end
@@ -401,6 +399,8 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         if infres_du <= solver.tol_feas
             solver.verbose && println("dual infeasibility detected; terminating")
             solver.status = DualInfeasible
+            solver.primal_obj = solver.primal_obj_t
+            solver.dual_obj = solver.dual_obj_t
             return true
         end
     end
@@ -435,28 +435,25 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
     return false
 end
 
-function initialize_cone_point(model::Models.Model{T}, timer::TimerOutput) where {T <: Real}
+function initialize_cone_point(model::Models.Model{T}) where {T <: Real}
     init_z = zeros(T, model.q)
     init_s = zeros(T, model.q)
 
     for (cone, idxs) in zip(model.cones, model.cone_idxs)
         Cones.setup_data(cone)
-        Cones.set_timer(cone, timer)
         primal_k = view(Cones.use_dual_barrier(cone) ? init_z : init_s, idxs)
         dual_k = view(Cones.use_dual_barrier(cone) ? init_s : init_z, idxs)
         Cones.set_initial_point(primal_k, cone)
         Cones.load_point(cone, primal_k)
-        @assert Cones.is_feas(cone)
+        @assert Cones.is_feas(cone) # TODO error?
         g = Cones.grad(cone)
         @. dual_k = -g
         Cones.load_dual_point(cone, dual_k)
-        hasfield(typeof(cone), :hess_fact_cache) && @assert Cones.update_hess_fact(cone)
+        hasfield(typeof(cone), :hess_fact_cache) && @assert Cones.update_hess_fact(cone) # TODO error?
     end
 
     return (init_z, init_s)
 end
-
-get_timer(solver::Solver) = solver.timer
 
 get_status(solver::Solver) = solver.status
 get_solve_time(solver::Solver) = solver.solve_time

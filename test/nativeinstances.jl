@@ -19,7 +19,6 @@ import Hypatia.ModelUtilities
 import Hypatia.Cones
 import Hypatia.Cones.Cone
 import Hypatia.Solvers
-const MU = Hypatia.ModelUtilities
 
 # build model, solve, test conic certificates, and return solve information
 function build_solve_check(
@@ -56,13 +55,11 @@ function build_solve_check(
         @test G' * z + A' * y ≈ -c atol=tol rtol=tol
         @test dot(s, z) ≈ zero(T) atol=tol_rt rtol=tol_rt
     elseif status == Solvers.PrimalInfeasible
-        @test dual_obj > obj_offset
-        @test -dot(b, y) - dot(h, z) + obj_offset ≈ dual_obj atol=tol rtol=tol
+        @test -dot(b, y) - dot(h, z) ≈ dual_obj atol=tol rtol=tol
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         @test G' * z ≈ -A' * y atol=tol_rt rtol=tol_rt
     elseif status == Solvers.DualInfeasible
-        @test primal_obj < obj_offset
-        @test dot(c, x) + obj_offset ≈ primal_obj atol=tol rtol=tol
+        @test dot(c, x) ≈ primal_obj atol=tol rtol=tol
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         @test G * x ≈ -s atol=tol_rt rtol=tol_rt
         @test A * x ≈ zeros(T, length(y)) atol=tol_rt rtol=tol_rt
@@ -72,7 +69,6 @@ function build_solve_check(
 
     solve_time = Solvers.get_solve_time(solver)
     num_iters = Solvers.get_num_iters(solver)
-    (@isdefined ITERS) && (global ITERS += num_iters)
 
     return (solver = solver, model = model, status = status,
         solve_time = solve_time, num_iters = num_iters,
@@ -1640,7 +1636,7 @@ function possemideftrisparse5(T; options...)
     @test r.z ≈ [1, inv2, inv2, inv2, inv2, inv2, -inv2, -inv2, 0, -invrt6, invrt6, -invrt6] atol=tol rtol=tol
 end
 
-function doublynonnegative1(T; options...)
+function doublynonnegativetri1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     n = q = 3
     c = T[0, 1, 0]
@@ -1650,7 +1646,7 @@ function doublynonnegative1(T; options...)
     for use_dual in [false, true]
         use_dual = false
         h = (use_dual ? T[1, 0, 1] : zeros(T, q))
-        cones = Cone{T}[Cones.DoublyNonnegative{T}(q, use_dual = use_dual)]
+        cones = Cone{T}[Cones.DoublyNonnegativeTri{T}(q, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
         @test r.status == Solvers.Optimal
@@ -1660,14 +1656,14 @@ function doublynonnegative1(T; options...)
     end
 end
 
-function doublynonnegative2(T; options...)
+function doublynonnegativetri2(T; options...)
     tol = sqrt(sqrt(eps(T)))
     c = T[0, -1, 0]
     A = T[1 0 0; 0 0 1]
     b = T[1.0, 1.5]
     G = -one(T) * I
     h = [-inv(T(2)), zero(T), -inv(T(2))]
-    cones = Cone{T}[Cones.DoublyNonnegative{T}(3)]
+    cones = Cone{T}[Cones.DoublyNonnegativeTri{T}(3)]
 
     r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
     @test r.status == Solvers.Optimal
@@ -1675,7 +1671,7 @@ function doublynonnegative2(T; options...)
     @test r.x[2] ≈ one(T) atol=tol rtol=tol
 end
 
-function doublynonnegative3(T; options...)
+function doublynonnegativetri3(T; options...)
     tol = sqrt(sqrt(eps(T)))
     c = ones(T, 3)
     A = T[1 0 1]
@@ -1903,7 +1899,7 @@ end
 
 function wsosinterpnonnegative1(T; options...)
     tol = sqrt(sqrt(eps(T)))
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(-ones(T, 2), ones(T, 2)), 2)
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(-zeros(T, 2), ones(T, 2)), 2)
     DynamicPolynomials.@polyvar x y
     fn = x ^ 4 + x ^ 2 * y ^ 2 + 4 * y ^ 2 + 4
 

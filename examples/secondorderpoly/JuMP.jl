@@ -8,7 +8,7 @@ struct SecondOrderPolyJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     is_feas::Bool # whether model should be primal-dual feasible; only for testing
 end
 
-function build(inst::SecondOrderPolyJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::SecondOrderPolyJuMP{T}) where {T <: Float64}
     halfdeg = div(inst.deg + 1, 2)
     (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{Float64}(1), halfdeg)
     vals = secondorderpoly_data[inst.polys_name].(pts)

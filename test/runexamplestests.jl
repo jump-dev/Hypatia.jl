@@ -2,11 +2,10 @@
 run examples tests from the examples folder
 =#
 
+using Test
+using Printf
 import DataFrames
 import CSV
-using Printf
-import TimerOutputs
-
 examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "common_JuMP.jl"))
 include(joinpath(examples_dir, "common_native.jl"))
@@ -16,13 +15,11 @@ include(joinpath(examples_dir, "common_native.jl"))
 results_path = nothing
 
 # options to solvers
-timer = TimerOutputs.TimerOutput()
 # tol = 1e-7
 default_options = (
     verbose = false,
     # verbose = true,
     iter_limit = 250,
-    timer = timer,
     # tol_abs_opt = tol,
     # tol_rel_opt = tol,
     # tol_feas = tol,
@@ -114,8 +111,6 @@ perf = DataFrames.DataFrame(
 isnothing(results_path) || CSV.write(results_path, perf)
 time_all = time()
 
-@info("starting examples tests")
-
 @testset "examples tests" begin
 for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
     include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
@@ -145,12 +140,8 @@ for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
     end
 end
 
-@printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)
-DataFrames.show(perf, allrows = true, allcols = true)
-println("\n")
-@show sum(perf[:iters])
-show(timer)
-println("\n")
-flush(stdout); flush(stderr)
+# @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)
+# DataFrames.show(perf, allrows = true, allcols = true)
+# println("\n")
 end
 ;
