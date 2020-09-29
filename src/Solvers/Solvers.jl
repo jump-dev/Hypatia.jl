@@ -410,26 +410,28 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         return true
     end
 
-    max_improve = zero(T)
-    for (curr, prev) in ((solver.gap, solver.prev_gap), (solver.rel_gap, solver.prev_rel_gap),
-        (solver.x_feas, solver.prev_x_feas), (solver.y_feas, solver.prev_y_feas), (solver.z_feas, solver.prev_z_feas))
-        if isnan(prev) || isnan(curr)
-            continue
+    if expect_improvement(solver.stepper)
+        max_improve = zero(T)
+        for (curr, prev) in ((solver.gap, solver.prev_gap), (solver.rel_gap, solver.prev_rel_gap),
+            (solver.x_feas, solver.prev_x_feas), (solver.y_feas, solver.prev_y_feas), (solver.z_feas, solver.prev_z_feas))
+            if isnan(prev) || isnan(curr)
+                continue
+            end
+            max_improve = max(max_improve, (prev - curr) / (abs(prev) + eps(T)))
         end
-        max_improve = max(max_improve, (prev - curr) / (abs(prev) + eps(T)))
-    end
-    if max_improve < solver.tol_slow
-        if solver.prev_is_slow && solver.prev2_is_slow
-            solver.verbose && println("slow progress in consecutive iterations; terminating")
-            solver.status = SlowProgress
-            return true
+        if max_improve < solver.tol_slow
+            if solver.prev_is_slow && solver.prev2_is_slow
+                solver.verbose && println("slow progress in consecutive iterations; terminating")
+                solver.status = SlowProgress
+                return true
+            else
+                solver.prev2_is_slow = solver.prev_is_slow
+                solver.prev_is_slow = true
+            end
         else
             solver.prev2_is_slow = solver.prev_is_slow
-            solver.prev_is_slow = true
+            solver.prev_is_slow = false
         end
-    else
-        solver.prev2_is_slow = solver.prev_is_slow
-        solver.prev_is_slow = false
     end
 
     return false

@@ -42,8 +42,8 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     update_lhs(solver.system_solver, solver)
 
     # TODO option
-    # use_corr = true
-    use_corr = false
+    use_corr = true
+    # use_corr = false
     stepper.prev_is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))
 
     if stepper.prev_is_pred
@@ -69,7 +69,6 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     # alpha step length
     alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
 
-    !stepper.prev_is_pred && alpha < 0.98 && println(alpha) # TODO remove
     if iszero(alpha)
         @warn("very small alpha")
         solver.status = NumericalFailure
@@ -86,6 +85,8 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
 
     return true
 end
+
+expect_improvement(stepper::PredOrCentStepper) = stepper.prev_is_pred
 
 function print_iteration_stats(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
     if iszero(solver.num_iters)

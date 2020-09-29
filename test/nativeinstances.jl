@@ -1174,7 +1174,7 @@ function matrixepipersquare1(T; options...)
 end
 
 function matrixepipersquare2(T; options...)
-    tol = sqrt(sqrt(eps(T)))
+    tol = 3 * sqrt(sqrt(eps(T)))
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
     for is_complex in (false, true)

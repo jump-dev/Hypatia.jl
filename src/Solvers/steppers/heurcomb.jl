@@ -104,6 +104,8 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     return true
 end
 
+expect_improvement(::HeurCombStepper) = true
+
 function print_iteration_stats(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     if iszero(solver.num_iters)
         if iszero(solver.model.p)

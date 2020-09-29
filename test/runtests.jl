@@ -4,6 +4,7 @@ run subset of tests
 
 using Test
 using Printf
+using Hypatia
 
 test_files = [
     # "modelutilities",

@@ -15,14 +15,13 @@ include(joinpath(examples_dir, "common_native.jl"))
 results_path = nothing
 
 # options to solvers
-tol = 1e-11
+# tol = 1e-10
 default_options = (
-    # verbose = false,
-    verbose = true,
-    iter_limit = 250,
-    tol_abs_opt = tol,
-    tol_rel_opt = tol,
-    tol_feas = tol,
+    verbose = false,
+    # verbose = true,
+    # tol_abs_opt = tol,
+    # tol_rel_opt = tol,
+    # tol_feas = tol,
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
@@ -36,7 +35,7 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
+    "native",
     "JuMP",
     ]
 
@@ -56,30 +55,30 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    # "centralpolymat",
-    # "conditionnum",
-    # "contraction",
-    # "densityest",
-    # "envelope",
-    # "expdesign",
-    # "lotkavolterra",
-    # "lyapunovstability",
-    # "matrixcompletion",
-    # "matrixquadratic",
-    # "matrixregression",
+    "centralpolymat",
+    "conditionnum",
+    "contraction",
+    "densityest",
+    "envelope",
+    "expdesign",
+    "lotkavolterra",
+    "lyapunovstability",
+    "matrixcompletion",
+    "matrixquadratic",
+    "matrixregression",
     "maxvolume",
-    # "muconvexity",
-    # "nearestpsd",
-    # "polymin",
-    # "polynorm",
-    # "portfolio",
-    # "regionofattr",
-    # "robustgeomprog",
-    # "secondorderpoly",
-    # "semidefinitepoly",
-    # "shapeconregr",
-    # "signomialmin",
-    # "stabilitynumber",
+    "muconvexity",
+    "nearestpsd",
+    "polymin",
+    "polynorm",
+    "portfolio",
+    "regionofattr",
+    "robustgeomprog",
+    "secondorderpoly",
+    "semidefinitepoly",
+    "shapeconregr",
+    "signomialmin",
+    "stabilitynumber",
     ]
 
 perf = DataFrames.DataFrame(
@@ -140,8 +139,8 @@ for (inst_set, real_T, time_limit) in instance_sets
 end
 end
 
-# @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)
-# DataFrames.show(perf, allrows = true, allcols = true)
-# println("\n")
+@printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)
+DataFrames.show(perf, allrows = true, allcols = true)
+println("\n")
 end
 ;

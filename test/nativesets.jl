@@ -22,17 +22,17 @@ inst_infeas = [
 
 inst_cones_few = [
     "nonnegative1",
-    "epinorminf1",
+    "epinorminf4",
     "epinorminf6",
     "epinormeucl1",
     "epipersquare1",
-    "episumperentropy1",
+    "episumperentropy4",
     "hypoperlog1",
     "power1",
     "hypogeomean1",
     "hypopowermean1",
     "epinormspectral1",
-    "matrixepipersquare1",
+    "matrixepipersquare2",
     "linmatrixineq1",
     "possemideftri1",
     "possemideftri5",
@@ -43,7 +43,7 @@ inst_cones_few = [
     "hyporootdettri1",
     "wsosinterpnonnegative1",
     "wsosinterppossemideftri1",
-    "wsosinterpepinormeucl1",
+    "wsosinterpepinormeucl2",
     ]
 
 # superset of inst_cones_few
