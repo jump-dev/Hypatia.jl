@@ -9,7 +9,7 @@ mutable struct PardisoNonSymCache{T <: Real} <: SparseNonSymCache{T}
         cache = new{Float64}()
         cache.analyzed = false
         cache.pardiso = Pardiso.MKLPardisoSolver()
-        Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_NONSYM) # tell Pardiso the matrix is nonsymmetric
+        Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_NONSYM)
         return cache
     end
 end
@@ -24,7 +24,7 @@ mutable struct PardisoSymCache{T <: Real} <: SparseSymCache{T}
         cache = new{Float64}()
         cache.analyzed = false
         cache.pardiso = Pardiso.MKLPardisoSolver()
-        Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_SYM_INDEF) # tell Pardiso the matrix is symmetric indefinite
+        Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_SYM_INDEF)
         cache.diag_pert = diag_pert
         return cache
     end
@@ -35,7 +35,6 @@ PardisoSymCache(; diag_pert = 0.0) = PardisoSymCache{Float64}(diag_pert = diag_p
 PardisoSparseCache = Union{PardisoSymCache{Float64}, PardisoNonSymCache{Float64}}
 int_type(::PardisoSparseCache) = Int32
 
-# setters/getters not wrapped for MKL Pardiso
 function update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int32})
     pardiso = cache.pardiso
 

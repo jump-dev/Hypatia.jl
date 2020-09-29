@@ -7,6 +7,10 @@ using Test
 import HSL
 import Hypatia
 import Hypatia.Solvers
+blas_reals = [
+    Float64,
+    Float32,
+    ]
 include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
 
