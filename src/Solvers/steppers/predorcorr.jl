@@ -42,8 +42,8 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     update_lhs(solver.system_solver, solver)
 
     # TODO option
-    use_corr = true
-    # use_corr = false
+    # use_corr = true
+    use_corr = false
     stepper.prev_is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))
 
     if stepper.prev_is_pred

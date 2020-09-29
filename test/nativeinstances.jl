@@ -1238,7 +1238,7 @@ end
 function linmatrixineq1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
-    for side in [2, 3, 5], R in [T, Complex{T}]
+    for side in [2, 4], R in [T, Complex{T}]
         c = T[1]
         A = zeros(T, 0, 1)
         b = T[]
@@ -2167,13 +2167,13 @@ function dualinfeas3(T; options...)
 end
 
 function indirect1(T; options...)
-    tol = eps(T)^0.1
+    tol = 1e-3
     Random.seed!(1)
     (n, p, q) = (4, 3, 4)
     c = rand(T(0):T(9), n)
     A = rand(T(-9):T(9), p, n)
     b = vec(sum(A, dims = 2))
-    G = LinearMap(SparseMatrixCSC(-one(T) * I, q, n))
+    G = LinearMap(SparseMatrixCSC(-one(T) * I, q, n), isposdef = false)
     h = zeros(T, q)
     cones = Cone{T}[Cones.Nonnegative{T}(q)]
 
@@ -2182,7 +2182,7 @@ function indirect1(T; options...)
 end
 
 function indirect2(T; options...)
-    tol = eps(T)^0.1
+    tol = 1e-3
     c = T[0, 0, -1, -1]
     A = LinearMap(T[1 0 0 0; 0 1 0 0])
     b = T[0.5, 1]
@@ -2197,7 +2197,7 @@ function indirect2(T; options...)
 end
 
 function indirect3(T; options...)
-    tol = eps(T)^0.1
+    tol = 1e-3
     Random.seed!(1)
     c = T[1, 0, 0, 0, 0, 0]
     A_mat = rand(T(-9):T(9), 6, 6)
@@ -2213,7 +2213,7 @@ function indirect3(T; options...)
 end
 
 function indirect4(T; options...)
-    tol = eps(T)^0.1
+    tol = 1e-3
     c = zeros(T, 3)
     A = LinearMap(-I, 3)
     b = [one(T), one(T), T(3)]
@@ -2226,7 +2226,7 @@ function indirect4(T; options...)
 end
 
 function indirect5(T; options...)
-    tol = eps(T)^0.1
+    tol = 1e-3
     c = zeros(T, 3)
     A = LinearMap(-I, 3)
     b = [one(T), one(T), T(3)]

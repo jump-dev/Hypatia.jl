@@ -31,8 +31,8 @@ barrier_test_names = [
 
 real_types = [
     Float64,
-    # Float32,
-    # BigFloat,
+    Float32,
+    BigFloat,
     ]
 
 @testset "barrier tests" begin
