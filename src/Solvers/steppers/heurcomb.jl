@@ -39,18 +39,6 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
     model = solver.model
 
-    # # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)
-    # cones = model.cones
-    # rtmu = sqrt(solver.mu)
-    # irtmu = inv(rtmu)
-    # Cones.load_point.(cones, point.primal_views, irtmu)
-    # Cones.load_dual_point.(cones, point.dual_views)
-    # Cones.reset_data.(cones)
-    # @assert all(Cones.is_feas.(cones))
-    # Cones.grad.(cones)
-    # Cones.hess.(cones)
-    # # @assert all(Cones.in_neighborhood.(cones, rtmu, T(0.7)))
-
     # update linear system solver factorization and helpers
     Cones.grad.(model.cones)
     update_lhs(solver.system_solver, solver)
@@ -74,7 +62,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
 
     # calculate centering factor gamma by finding distance pred_alpha for stepping in pred direction
     copyto!(stepper.dir.vec, dir_pred)
-    stepper.prev_pred_alpha = pred_alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T)) # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
+    stepper.prev_pred_alpha = pred_alpha = find_max_alpha(point, stepper.dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T)) # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
 
     # TODO allow different function (heuristic) as option?
     # stepper.prev_gamma = gamma = abs2(1 - pred_alpha)
@@ -85,7 +73,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     @. stepper.dir.vec = gamma * (dir_cent + pred_alpha * dir_centcorr) + (1 - gamma) * (dir_pred + pred_alpha * dir_predcorr) # TODO
 
     # find distance alpha for stepping in combined direction
-    alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
+    alpha = find_max_alpha(point, stepper.dir, stepper.line_searcher, model, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
 
     if iszero(alpha)
         # could not step far in combined direction, so attempt a pure centering step
@@ -94,11 +82,11 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
         @. stepper.dir.vec = dir_cent + dir_centcorr
 
         # find distance alpha for stepping in centering direction
-        alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
+        alpha = find_max_alpha(point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
 
         if iszero(alpha)
             copyto!(stepper.dir.vec, dir_cent)
-            alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
+            alpha = find_max_alpha(point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
 
             if iszero(alpha)
                 @warn("numerical failure: could not step in centering direction; terminating")
@@ -110,7 +98,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.prev_alpha = alpha
 
     # step
-    @. solver.point.vec += alpha * stepper.dir.vec
+    @. point.vec += alpha * stepper.dir.vec
     calc_mu(solver)
 
     return true

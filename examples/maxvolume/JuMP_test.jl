@@ -5,8 +5,6 @@ insts["minimal"] = [
     ((2, true, true),),
     ((2, false, true),),
     ((2, false, true), StandardConeOptimizer),
-    ((2, false, true), SOPSDConeOptimizer),
-    # ((2, false, true), ExpConeOptimizer), # TODO waiting for MOI bridges geomean to exp
     ]
 insts["fast"] = [
     ((10, true, false),),

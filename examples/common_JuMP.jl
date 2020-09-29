@@ -7,42 +7,13 @@ include(joinpath(@__DIR__, "common.jl"))
 import JuMP
 const MOI = JuMP.MOI
 
-# SOCone, PSDCone, ExpCone, PowerCone only
+# nonnegative, second-order, PSD, exponential, 3-dim power cones only
 MOI.Utilities.@model(StandardConeOptimizer,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
     MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle, MOI.ExponentialCone,),
     (MOI.PowerCone, MOI.DualPowerCone,),
-    (),
-    (MOI.ScalarAffineFunction,),
-    (MOI.VectorOfVariables,),
-    (MOI.VectorAffineFunction,),
-    true,
-    )
-
-# SOCone and PSDCone only
-MOI.Utilities.@model(SOPSDConeOptimizer,
-    (),
-    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
-    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
-    MOI.PositiveSemidefiniteConeTriangle,),
-    (),
-    (),
-    (MOI.ScalarAffineFunction,),
-    (MOI.VectorOfVariables,),
-    (MOI.VectorAffineFunction,),
-    true,
-    )
-
-# ExpCone and PSDCone only
-MOI.Utilities.@model(ExpPSDConeOptimizer,
-    (),
-    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
-    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-    MOI.ExponentialCone, MOI.PositiveSemidefiniteConeTriangle,),
-    (),
     (),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),

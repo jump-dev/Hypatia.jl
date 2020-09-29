@@ -96,14 +96,12 @@ function find_max_alpha(
         in_nbhd = true
         for k in cone_order
             cone_k = cones[k]
-            time_k = time_ns()
-
-            Cones.load_point(cone_k, line_searcher.primal_views[k], irtmu)
-            Cones.load_dual_point(cone_k, line_searcher.dual_views[k])
-            Cones.reset_data(cone_k)
-            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
-
-            line_searcher.cone_times[k] = time_ns() - time_k
+            line_searcher.cone_times[k] = @elapsed begin
+                Cones.load_point(cone_k, line_searcher.primal_views[k], irtmu)
+                Cones.load_dual_point(cone_k, line_searcher.dual_views[k])
+                Cones.reset_data(cone_k)
+                in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
+            end
             if !in_nbhd_k
                 in_nbhd = false
                 break

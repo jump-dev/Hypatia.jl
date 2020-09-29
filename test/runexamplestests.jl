@@ -15,14 +15,14 @@ include(joinpath(examples_dir, "common_native.jl"))
 results_path = nothing
 
 # options to solvers
-# tol = 1e-7
+tol = 1e-11
 default_options = (
     # verbose = false,
     verbose = true,
     iter_limit = 250,
-    # tol_abs_opt = tol,
-    # tol_rel_opt = tol,
-    # tol_feas = tol,
+    tol_abs_opt = tol,
+    tol_rel_opt = tol,
+    tol_feas = tol,
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
