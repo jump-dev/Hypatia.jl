@@ -72,7 +72,6 @@ inst_cones_many = [
     "episumperentropy3",
     "episumperentropy4",
     "episumperentropy5",
-    "episumperentropy6",
     "hypoperlog1",
     "hypoperlog2",
     "hypoperlog3",

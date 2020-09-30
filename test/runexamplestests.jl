@@ -14,7 +14,7 @@ include(joinpath(examples_dir, "common_native.jl"))
 # results_path = joinpath(homedir(), "bench", "bench.csv")
 results_path = nothing
 
-# options to solvers
+# default options to solvers
 default_options = (
     verbose = false,
     # verbose = true,

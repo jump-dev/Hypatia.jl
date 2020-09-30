@@ -578,28 +578,6 @@ function episumperentropy5(T; options...)
     @test r.z ≈ inv(T(3)) * [1, 1, -1, 1, -1, 1, -1, 3] atol=tol rtol=tol
 end
 
-function episumperentropy6(T; options...)
-    tol = test_tol(T)
-    c = T[-1, 0, 0, 0, 0]
-    A = zeros(T, 0, 5)
-    b = zeros(T, 0)
-    G = sparse(
-        [3, 5, 7, 2, 9, 4, 9, 6, 9, 3, 5, 7, 8],
-        [1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 5],
-        T[-1, -1, -1, -1, 1, -1, 1, -1, 1, -1, -1, -1, -1],
-        9, 5)
-    h = vcat(zeros(T, 8), T(3))
-    h = zeros(T, 9)
-    h[9] = 3
-    cones = Cone{T}[Cones.EpiSumPerEntropy{T}(7), Cones.Nonnegative{T}(2)]
-
-    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
-    @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -1 atol=tol rtol=tol
-    @test r.s ≈ [0, 1, 1, 1, 1, 1, 1, 0, 0] atol=tol rtol=tol
-    @test r.z ≈ inv(T(3)) * [1, 1, -1, 1, -1, 1, -1, 3, 1] atol=tol rtol=tol
-end
-
 function hypoperlog1(T; options...)
     tol = test_tol(T)
     Texph = exp(T(0.5))

@@ -10,8 +10,8 @@ import Hypatia.Solvers
 include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
 
-# common solver options
-common_options = (
+# default options to solvers
+default_options = (
     # verbose = true,
     verbose = false,
     default_tol_relax = 10,
@@ -69,14 +69,14 @@ perf = DataFrames.DataFrame(
         inst_cones_many,
         )
     for inst_name in inst_defaults
-        test_instance_solver(inst_name, Float64, common_options)
+        test_instance_solver(inst_name, Float64, default_options)
     end
 end
 
 @testset "no preprocess tests" begin
     println("\nstarting no preprocess tests")
     for inst_name in inst_cones_few, T in diff_reals
-        options = (; common_options..., preprocess = false, reduce = false, system_solver = Solvers.SymIndefDenseSystemSolver{T}())
+        options = (; default_options..., preprocess = false, reduce = false, system_solver = Solvers.SymIndefDenseSystemSolver{T}())
         test_instance_solver(inst_name, T, options)
     end
 end
@@ -84,7 +84,7 @@ end
 @testset "indirect solvers tests" begin
     println("\nstarting indirect solvers tests")
     for inst_name in inst_indirect, T in diff_reals
-        options = (; common_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.SymIndefIndirectSystemSolver{T}(), tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+        options = (; default_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.SymIndefIndirectSystemSolver{T}(), tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
         test_instance_solver(inst_name, T, options)
     end
 end
@@ -101,7 +101,7 @@ end
         (Solvers.QRCholDenseSystemSolver, all_reals),
         ]
     for inst_name in inst_cones_few, (system_solver, real_types) in system_solvers, T in real_types
-        options = (; common_options..., system_solver = system_solver{T}(), reduce = false)
+        options = (; default_options..., system_solver = system_solver{T}(), reduce = false)
         test_instance_solver(inst_name, T, options, string_nameof(system_solver))
     end
 end
@@ -113,7 +113,7 @@ end
         (Solvers.PredOrCentStepper, diff_reals),
         ]
     for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in diff_reals
-        options = (; common_options..., stepper = stepper{T}())
+        options = (; default_options..., stepper = stepper{T}())
         test_instance_solver(inst_name, T, options, string_nameof(stepper))
     end
 end
