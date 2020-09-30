@@ -22,9 +22,6 @@ all_reals = [
     Float64,
     BigFloat,
     ]
-default_reals = [
-    Float64,
-    ]
 diff_reals = [
     Float64,
     BigFloat,
@@ -96,11 +93,11 @@ end
     println("\nstarting system solvers tests")
     system_solvers = [
         (Solvers.NaiveDenseSystemSolver, diff_reals),
-        (Solvers.NaiveSparseSystemSolver, default_reals),
+        (Solvers.NaiveSparseSystemSolver, [Float64,]),
         (Solvers.NaiveElimDenseSystemSolver, diff_reals),
-        (Solvers.NaiveElimSparseSystemSolver, default_reals),
+        (Solvers.NaiveElimSparseSystemSolver, [Float64,]),
         (Solvers.SymIndefDenseSystemSolver, all_reals),
-        (Solvers.SymIndefSparseSystemSolver, default_reals),
+        (Solvers.SymIndefSparseSystemSolver, [Float64,]),
         (Solvers.QRCholDenseSystemSolver, all_reals),
         ]
     for inst_name in inst_cones_few, (system_solver, real_types) in system_solvers, T in real_types
@@ -112,8 +109,8 @@ end
 @testset "steppers tests" begin
     println("\nstarting steppers tests")
     steppers = [
-        (Solvers.HeurCombStepper, all_reals),
-        (Solvers.PredOrCentStepper, all_reals),
+        (Solvers.HeurCombStepper, diff_reals),
+        (Solvers.PredOrCentStepper, diff_reals),
         ]
     for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in diff_reals
         options = (; common_options..., stepper = stepper{T}())
@@ -121,7 +118,8 @@ end
     end
 end
 
-DataFrames.show(perf, allrows = true, allcols = true)
-println("\n")
+# println("\n")
+# DataFrames.show(perf, allrows = true, allcols = true)
+# println("\n")
 end
 ;
