@@ -139,8 +139,8 @@ for (inst_set, real_T, time_limit) in instance_sets
 end
 end
 
-@printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)
-DataFrames.show(perf, allrows = true, allcols = true)
-println("\n")
+# @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)
+# DataFrames.show(perf, allrows = true, allcols = true)
+# println("\n")
 end
 ;

@@ -10,7 +10,7 @@ test_files = [
     # "modelutilities",
     # "barrier",
     # "native",
-    "moi",
+    # "moi",
     # "cblib",
     "examples",
     # NOTE require optional dependencies:
