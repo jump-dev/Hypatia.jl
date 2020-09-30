@@ -14,8 +14,8 @@ mutable struct NaiveSparseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     fact_cache::SparseNonSymCache{T}
     hess_idxs::Vector
     mtt_idx::Int
-    function NaiveSparseSystemSolver{Float64}(; fact_cache::SparseNonSymCache{Float64} = SparseNonSymCache{Float64}())
-        s = new{Float64}()
+    function NaiveSparseSystemSolver{T}(; fact_cache::SparseNonSymCache{T} = SparseNonSymCache{T}()) where {T <: Real}
+        s = new{T}()
         s.fact_cache = fact_cache
         return s
     end

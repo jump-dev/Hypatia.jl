@@ -24,7 +24,7 @@ import Hypatia.inv_sqrt_prod
 import Hypatia.invert
 
 default_max_neighborhood() = 0.7
-default_use_heuristic_neighborhood() = true
+default_use_heuristic_neighborhood() = false
 
 # hessian_cache(T::Type{<:BlasReal}) = DenseSymCache{T}() # use Bunch Kaufman for BlasReals from start
 hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}()
@@ -95,7 +95,6 @@ function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
 
     if !fact_success
         recover || return false
-        # TODO if Chol, try adding sqrt(eps(T)) to diag and re-factorize
         if T <: BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
             # @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
             cone.hess_fact_cache = DenseSymCache{T}()
@@ -103,9 +102,9 @@ function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
         else
             # attempt recovery
             # TODO probably safer to only change the copy of the hessian that is getting factorized, not the hessian itself
-            rteps = sqrt(eps(T))
+            diag_pert = 1 + T(1e-5)
             @inbounds for i in 1:size(cone.hess, 1)
-                cone.hess[i, i] += rteps
+                cone.hess[i, i] *= diag_pert
             end
         end
         if !update_fact(cone.hess_fact_cache, cone.hess)

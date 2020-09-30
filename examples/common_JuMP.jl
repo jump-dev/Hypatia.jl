@@ -7,42 +7,13 @@ include(joinpath(@__DIR__, "common.jl"))
 import JuMP
 const MOI = JuMP.MOI
 
-# SOCone, PSDCone, ExpCone, PowerCone only
+# nonnegative, second-order, PSD, exponential, 3-dim power cones only
 MOI.Utilities.@model(StandardConeOptimizer,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
     MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle, MOI.ExponentialCone,),
     (MOI.PowerCone, MOI.DualPowerCone,),
-    (),
-    (MOI.ScalarAffineFunction,),
-    (MOI.VectorOfVariables,),
-    (MOI.VectorAffineFunction,),
-    true,
-    )
-
-# SOCone and PSDCone only
-MOI.Utilities.@model(SOPSDConeOptimizer,
-    (),
-    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
-    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
-    MOI.PositiveSemidefiniteConeTriangle,),
-    (),
-    (),
-    (MOI.ScalarAffineFunction,),
-    (MOI.VectorOfVariables,),
-    (MOI.VectorAffineFunction,),
-    true,
-    )
-
-# ExpCone and PSDCone only
-MOI.Utilities.@model(ExpPSDConeOptimizer,
-    (),
-    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
-    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-    MOI.ExponentialCone, MOI.PositiveSemidefiniteConeTriangle,),
-    (),
     (),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),
@@ -65,13 +36,14 @@ function run_instance(
     solver_type = Hypatia.Optimizer;
     default_options::NamedTuple = NamedTuple(),
     test::Bool = true,
+    verbose::Bool = true,
     )
     new_options = merge(default_options, inst_options)
 
-    println("setup model")
+    verbose && println("setup model")
     setup_time = @elapsed (model, model_stats) = setup_model(ex_type, inst_data, extender, new_options, solver_type)
 
-    println("solve and check")
+    verbose && println("solve and check")
     check_time = @elapsed solve_stats = solve_check(model, test = test)
 
     return (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time)
@@ -211,8 +183,9 @@ function run_cbf(
     solver_options::NamedTuple,
     solver_type = Hypatia.Optimizer; # TODO generalize for other solvers
     test::Bool = true,
+    verbose::Bool = true,
     )
-    println("setup model")
+    verbose && println("setup model")
     setup_time = @elapsed begin
         model = JuMP.read_from_file(joinpath(cblib_dir, inst * ".cbf.gz"))
 
@@ -231,7 +204,7 @@ function run_cbf(
         flush(stdout); flush(stderr)
     end
 
-    println("solve and check")
+    verbose && println("solve and check")
     check_time = @elapsed solve_stats = solve_check(model, test = false)
 
     return (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time)

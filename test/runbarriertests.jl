@@ -17,7 +17,7 @@ barrier_test_names = [
     "hypogeomean",
     "hypopowermean",
     "epinormspectral",
-    "linmatrixineq", # NOTE failing on Julia v1.5.1
+    "linmatrixineq", # NOTE failing on Julia v1.5.1 with ForwardDiff or BigFloat
     "possemideftri",
     "possemideftrisparse",
     "doublynonnegativetri",
@@ -31,8 +31,8 @@ barrier_test_names = [
 
 real_types = [
     Float64,
-    # Float32,
-    # BigFloat,
+    Float32,
+    BigFloat,
     ]
 
 @testset "barrier tests" begin

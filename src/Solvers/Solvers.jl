@@ -25,8 +25,7 @@ import Hypatia.DensePosDefCache
 import Hypatia.load_matrix
 import Hypatia.invert
 
-default_tol(::Type{T}) where {T <: Real} = sqrt(eps(T))
-default_tol(::Type{BigFloat}) = eps(BigFloat) ^ 0.4
+RealOrNothing = Union{Real, Nothing}
 
 include("point.jl")
 
@@ -141,9 +140,10 @@ mutable struct Solver{T <: Real}
         verbose::Bool = true,
         iter_limit::Int = 1000,
         time_limit::Real = Inf,
-        tol_rel_opt::Real = default_tol(T),
-        tol_abs_opt::Real = default_tol(T),
-        tol_feas::Real = default_tol(T),
+        tol_rel_opt::RealOrNothing = nothing,
+        tol_abs_opt::RealOrNothing = nothing,
+        tol_feas::RealOrNothing = nothing,
+        default_tol_relax::RealOrNothing = nothing,
         tol_slow::Real = 1e-3,
         preprocess::Bool = true,
         reduce::Bool = true,
@@ -163,6 +163,20 @@ mutable struct Solver{T <: Real}
             @assert preprocess # cannot use reduction without preprocessing # TODO only need primal eq preprocessing
         end
         @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
+
+        default_tol = (T <: LinearAlgebra.BlasReal ? sqrt(eps(T)) : eps(T) ^ 0.4)
+        if !isnothing(default_tol_relax)
+            default_tol *= default_tol_relax
+        end
+        if isnothing(tol_rel_opt)
+            tol_rel_opt = default_tol
+        end
+        if isnothing(tol_abs_opt)
+            tol_abs_opt = default_tol
+        end
+        if isnothing(tol_feas)
+            tol_feas = default_tol
+        end
 
         solver = new{T}()
 
@@ -410,26 +424,28 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         return true
     end
 
-    max_improve = zero(T)
-    for (curr, prev) in ((solver.gap, solver.prev_gap), (solver.rel_gap, solver.prev_rel_gap),
-        (solver.x_feas, solver.prev_x_feas), (solver.y_feas, solver.prev_y_feas), (solver.z_feas, solver.prev_z_feas))
-        if isnan(prev) || isnan(curr)
-            continue
+    if expect_improvement(solver.stepper)
+        max_improve = zero(T)
+        for (curr, prev) in ((solver.gap, solver.prev_gap), (solver.rel_gap, solver.prev_rel_gap),
+            (solver.x_feas, solver.prev_x_feas), (solver.y_feas, solver.prev_y_feas), (solver.z_feas, solver.prev_z_feas))
+            if isnan(prev) || isnan(curr)
+                continue
+            end
+            max_improve = max(max_improve, (prev - curr) / (abs(prev) + eps(T)))
         end
-        max_improve = max(max_improve, (prev - curr) / (abs(prev) + eps(T)))
-    end
-    if max_improve < solver.tol_slow
-        if solver.prev_is_slow && solver.prev2_is_slow
-            solver.verbose && println("slow progress in consecutive iterations; terminating")
-            solver.status = SlowProgress
-            return true
+        if max_improve < solver.tol_slow
+            if solver.prev_is_slow && solver.prev2_is_slow
+                solver.verbose && println("slow progress in consecutive iterations; terminating")
+                solver.status = SlowProgress
+                return true
+            else
+                solver.prev2_is_slow = solver.prev_is_slow
+                solver.prev_is_slow = true
+            end
         else
             solver.prev2_is_slow = solver.prev_is_slow
-            solver.prev_is_slow = true
+            solver.prev_is_slow = false
         end
-    else
-        solver.prev2_is_slow = solver.prev_is_slow
-        solver.prev_is_slow = false
     end
 
     return false

@@ -60,11 +60,11 @@ MOI.supports(::Optimizer{T}, ::Union{
 
 MOI.supports_constraint(::Optimizer{T},
     ::Type{<:Union{MOI.SingleVariable, MOI.ScalarAffineFunction{T}}},
-    ::Type{<:Union{MOI.EqualTo{T}, MOI.GreaterThan{T}, MOI.LessThan{T}, MOI.Interval{T}}}
+    ::Type{<:Union{MOI.EqualTo{T}, MOI.GreaterThan{T}, MOI.LessThan{T}, MOI.Interval{T}}},
     ) where {T <: Real} = true
 MOI.supports_constraint(::Optimizer{T},
     ::Type{<:Union{MOI.VectorOfVariables, MOI.VectorAffineFunction{T}}},
-    ::Type{<:Union{MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOIOtherCones{T}}}
+    ::Type{<:SupportedCones{T}},
     ) where {T <: Real} = true
 
 # build representation as min c'x s.t. A*x = b, h - G*x in K
@@ -402,34 +402,41 @@ function MOI.copy_to(
     # non-LP conic constraints
     moi_other_cones_start = i + 1
     moi_other_cones = MOI.AbstractVectorSet[]
-    for S in MOIOtherConesList(T), F in (MOI.VectorOfVariables, MOI.VectorAffineFunction{T}), ci in get_src_cons(F, S)
-        i += 1
-        idx_map[ci] = MOI.ConstraintIndex{F, S}(i)
-        push!(constr_offset_cone, q)
-        fi = get_con_fun(ci)
-        si = get_con_set(ci)
-        push!(moi_other_cones, si)
-        dim = MOI.output_dimension(fi)
-        if F == MOI.VectorOfVariables
-            JGi = (idx_map[vj].value for vj in fi.variables)
-            IGi = permute_affine(si, 1:dim)
-            VGi = rescale_affine(si, fill(-1.0, dim))
-        else
-            JGi = (idx_map[vt.scalar_term.variable_index].value for vt in fi.terms)
-            IGi = permute_affine(si, [vt.output_index for vt in fi.terms])
-            VGi = rescale_affine(si, [-vt.scalar_term.coefficient for vt in fi.terms], IGi)
-            Ihi = permute_affine(si, 1:dim)
-            Vhi = rescale_affine(si, fi.constants)
-            Ihi = q .+ Ihi
-            append!(Ih, Ihi)
-            append!(Vh, Vhi)
+
+    for (F, S) in MOI.get(src, MOI.ListOfConstraints())
+        if S <: Union{MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives}
+            continue # already copied these constraints
         end
-        IGi = q .+ IGi
-        append!(IG, IGi)
-        append!(JG, JGi)
-        append!(VG, VGi)
-        push!(cones, cone_from_moi(T, si))
-        q += dim
+        @assert S <: SupportedCones{T}
+        for ci in get_src_cons(F, S)
+            i += 1
+            idx_map[ci] = MOI.ConstraintIndex{F, S}(i)
+            push!(constr_offset_cone, q)
+            fi = get_con_fun(ci)
+            si = get_con_set(ci)
+            push!(moi_other_cones, si)
+            dim = MOI.output_dimension(fi)
+            if F == MOI.VectorOfVariables
+                JGi = (idx_map[vj].value for vj in fi.variables)
+                IGi = permute_affine(si, 1:dim)
+                VGi = rescale_affine(si, fill(-1.0, dim))
+            else
+                JGi = (idx_map[vt.scalar_term.variable_index].value for vt in fi.terms)
+                IGi = permute_affine(si, [vt.output_index for vt in fi.terms])
+                VGi = rescale_affine(si, [-vt.scalar_term.coefficient for vt in fi.terms], IGi)
+                Ihi = permute_affine(si, 1:dim)
+                Vhi = rescale_affine(si, fi.constants)
+                Ihi = q .+ Ihi
+                append!(Ih, Ihi)
+                append!(Vh, Vhi)
+            end
+            IGi = q .+ IGi
+            append!(IG, IGi)
+            append!(JG, JGi)
+            append!(VG, VGi)
+            push!(cones, cone_from_moi(T, si))
+            q += dim
+        end
     end
 
     push!(constr_offset_cone, q)

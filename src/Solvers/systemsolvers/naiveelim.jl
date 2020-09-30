@@ -95,7 +95,7 @@ mutable struct NaiveElimSparseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T
     hess_idxs::Vector
     function NaiveElimSparseSystemSolver{T}(;
         use_inv_hess::Bool = true,
-        fact_cache::SparseNonSymCache{Float64} = SparseNonSymCache{Float64}(),
+        fact_cache::SparseNonSymCache{T} = SparseNonSymCache{T}(),
         ) where {T <: Real}
         system_solver = new{T}()
         if !use_inv_hess
