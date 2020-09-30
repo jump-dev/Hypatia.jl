@@ -25,8 +25,7 @@ import Hypatia.DensePosDefCache
 import Hypatia.load_matrix
 import Hypatia.invert
 
-default_tol(::Type{T}) where {T <: Real} = sqrt(eps(T))
-default_tol(::Type{BigFloat}) = eps(BigFloat) ^ 0.4
+RealOrNothing = Union{Real, Nothing}
 
 include("point.jl")
 
@@ -141,9 +140,10 @@ mutable struct Solver{T <: Real}
         verbose::Bool = true,
         iter_limit::Int = 1000,
         time_limit::Real = Inf,
-        tol_rel_opt::Real = default_tol(T),
-        tol_abs_opt::Real = default_tol(T),
-        tol_feas::Real = default_tol(T),
+        tol_rel_opt::RealOrNothing = nothing,
+        tol_abs_opt::RealOrNothing = nothing,
+        tol_feas::RealOrNothing = nothing,
+        default_tol_relax::RealOrNothing = nothing,
         tol_slow::Real = 1e-3,
         preprocess::Bool = true,
         reduce::Bool = true,
@@ -163,6 +163,20 @@ mutable struct Solver{T <: Real}
             @assert preprocess # cannot use reduction without preprocessing # TODO only need primal eq preprocessing
         end
         @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
+
+        default_tol = (T <: LinearAlgebra.BlasReal ? sqrt(eps(T)) : eps(T) ^ 0.4)
+        if !isnothing(default_tol_relax)
+            default_tol *= default_tol_relax
+        end
+        if isnothing(tol_rel_opt)
+            tol_rel_opt = default_tol
+        end
+        if isnothing(tol_abs_opt)
+            tol_abs_opt = default_tol
+        end
+        if isnothing(tol_feas)
+            tol_feas = default_tol
+        end
 
         solver = new{T}()
 

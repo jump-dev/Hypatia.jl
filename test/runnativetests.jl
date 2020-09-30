@@ -4,7 +4,7 @@ run native instance tests from test/nativeinstances.jl and display basic benchma
 
 using Test
 using Printf
-using DataFrames
+import DataFrames
 import Hypatia
 import Hypatia.Solvers
 include(joinpath(@__DIR__, "nativeinstances.jl"))
@@ -14,6 +14,7 @@ include(joinpath(@__DIR__, "nativesets.jl"))
 common_options = (
     # verbose = true,
     verbose = false,
+    default_tol_relax = 10,
     )
 
 all_reals = [
@@ -49,7 +50,7 @@ function test_instance_solver(
     return nothing
 end
 
-perf = DataFrame(
+perf = DataFrames.DataFrame(
     inst_name = String[],
     real_T = String[],
     stepper = String[],
@@ -120,8 +121,7 @@ end
     end
 end
 
-
-# show(perf, allrows = true, allcols = true)
-# println("\n")
+DataFrames.show(perf, allrows = true, allcols = true)
+println("\n")
 end
 ;

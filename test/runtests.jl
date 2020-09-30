@@ -9,7 +9,7 @@ using Hypatia
 test_files = [
     # "modelutilities",
     # "barrier",
-    # "native",
+    "native",
     # "moi",
     # "cblib",
     "examples",

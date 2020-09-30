@@ -15,21 +15,18 @@ include(joinpath(examples_dir, "common_native.jl"))
 results_path = nothing
 
 # options to solvers
-# tol = 1e-10
 default_options = (
     verbose = false,
     # verbose = true,
-    # tol_abs_opt = tol,
-    # tol_rel_opt = tol,
-    # tol_feas = tol,
+    default_tol_relax = 10,
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    ("minimal", Float64, 30),
-    # ("minimal", Float32, 30),
-    # ("minimal", BigFloat, 30),
-    # ("fast", Float64, 30),
+    ("minimal", Float64, 60),
+    # ("minimal", Float32, 60),
+    # ("minimal", BigFloat, 60),
+    # ("fast", Float64, 60),
     # ("slow", Float64, 120),
     ]
 
@@ -108,7 +105,6 @@ perf = DataFrames.DataFrame(
     )
 
 isnothing(results_path) || CSV.write(results_path, perf)
-time_all = time()
 
 @testset "examples tests" begin
 @testset "$ex_name" for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
@@ -139,7 +135,6 @@ for (inst_set, real_T, time_limit) in instance_sets
 end
 end
 
-# @printf("\nexamples tests total time: %8.2e seconds\n\n", time() - time_all)
 # DataFrames.show(perf, allrows = true, allcols = true)
 # println("\n")
 end
