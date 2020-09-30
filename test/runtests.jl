@@ -4,19 +4,21 @@ run subset of tests
 
 using Test
 using Printf
+using Hypatia
 
 test_files = [
     "modelutilities",
     "barrier",
-    # "native",
+    "native",
     "moi",
     # "cblib",
-    # "examples",
+    "examples",
     # NOTE require optional dependencies:
     # "pardiso",
     # "hsl",
     ]
 
+println()
 @info("starting all tests")
 println()
 @testset "all tests" begin
@@ -28,6 +30,6 @@ all_test_time = @elapsed for t in test_files
     flush(stdout); flush(stderr)
 end
 @info("finished all tests in $(@sprintf("%8.2e seconds", all_test_time))")
-println()
 end
+println()
 ;

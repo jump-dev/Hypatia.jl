@@ -4,12 +4,12 @@ utilities for Pardiso
 
 mutable struct PardisoNonSymCache{T <: Real} <: SparseNonSymCache{T}
     analyzed::Bool
-    pardiso::Pardiso.PardisoSolver
+    pardiso::Pardiso.MKLPardisoSolver
     function PardisoNonSymCache{Float64}()
         cache = new{Float64}()
         cache.analyzed = false
-        cache.pardiso = Pardiso.PardisoSolver()
-        Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_NONSYM) # tell Pardiso the matrix is nonsymmetric
+        cache.pardiso = Pardiso.MKLPardisoSolver()
+        Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_NONSYM)
         return cache
     end
 end
@@ -18,13 +18,13 @@ PardisoNonSymCache() = PardisoNonSymCache{Float64}()
 
 mutable struct PardisoSymCache{T <: Real} <: SparseSymCache{T}
     analyzed::Bool
-    pardiso::Pardiso.PardisoSolver
+    pardiso::Pardiso.MKLPardisoSolver
     diag_pert::Float64
     function PardisoSymCache{Float64}(; diag_pert::Float64 = 0.0)
         cache = new{Float64}()
         cache.analyzed = false
-        cache.pardiso = Pardiso.PardisoSolver()
-        Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_SYM_INDEF) # tell Pardiso the matrix is symmetric indefinite
+        cache.pardiso = Pardiso.MKLPardisoSolver()
+        Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_SYM_INDEF)
         cache.diag_pert = diag_pert
         return cache
     end
@@ -40,16 +40,8 @@ function update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int3
 
     if !cache.analyzed
         Pardiso.pardisoinit(pardiso)
-        # don't ignore other iparms
-        Pardiso.set_iparm!(pardiso, 1, 1)
         # solve transposed problem (Pardiso accepts CSR matrices)
-        Pardiso.set_iparm!(pardiso, 12, 1)
-        # perturbation for small pivots (default 8 for symmetric, 13 for nonsymmetric)
-        if Pardiso.get_matrixtype(pardiso) == Pardiso.REAL_SYM_INDEF
-            Pardiso.set_iparm!(pardiso, 10, 8)
-        end
-        # maximum number of iterative refinement steps (default = 2)
-        Pardiso.set_iparm!(pardiso, 8, 2)
+        Pardiso.fix_iparm!(pardiso, :N)
         Pardiso.set_phase!(pardiso, Pardiso.ANALYSIS)
         Pardiso.pardiso(pardiso, A, Float64[])
         cache.analyzed = true

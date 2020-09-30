@@ -19,10 +19,11 @@ function run_instance(
     default_options::NamedTuple = NamedTuple(),
     test::Bool = true,
     rseed::Int = 1,
+    verbose::Bool = true,
     ) where {T <: Real}
     new_options = merge(default_options, inst_options)
 
-    println("setup model")
+    verbose && println("setup model")
     setup_time = @elapsed begin
         Random.seed!(rseed)
         inst = ex_type(inst_data...)
@@ -35,7 +36,7 @@ function run_instance(
     end
     flush(stdout); flush(stderr)
 
-    println("solve and check")
+    verbose && println("solve and check")
     check_time = @elapsed begin
         Solvers.load(solver, model)
         Solvers.solve(solver)

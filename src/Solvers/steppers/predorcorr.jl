@@ -39,23 +39,11 @@ end
 function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
 
-    # TODO remove the need for this updating here - should be done in line search (some instances failing without it though)
-    cones = model.cones
-    point = solver.point
-    rtmu = sqrt(solver.mu)
-    irtmu = inv(rtmu)
-    Cones.load_point.(cones, point.primal_views, irtmu)
-    Cones.load_dual_point.(cones, point.dual_views)
-    Cones.reset_data.(cones)
-    @assert all(Cones.is_feas.(cones))
-    Cones.grad.(cones)
-    Cones.hess.(cones)
-
     update_lhs(solver.system_solver, solver)
 
     # TODO option
-    # use_corr = true
-    use_corr = false
+    use_corr = true
+    # use_corr = false
     stepper.prev_is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))
 
     if stepper.prev_is_pred
@@ -79,12 +67,8 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     end
 
     # alpha step length
-    # alpha = find_max_alpha(stepper, solver, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3), max_nbhd = T(0.99))
-    # alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
     alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
-    # @show alpha
 
-    !stepper.prev_is_pred && alpha < 0.98 && println(alpha)
     if iszero(alpha)
         @warn("very small alpha")
         solver.status = NumericalFailure
@@ -101,6 +85,8 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
 
     return true
 end
+
+expect_improvement(stepper::PredOrCentStepper) = stepper.prev_is_pred
 
 function print_iteration_stats(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
     if iszero(solver.num_iters)

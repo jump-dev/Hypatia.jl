@@ -102,8 +102,6 @@ function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
     # NOTE not in-place because typeof(A) is AbstractMatrix eg sparse
     # TODO if sumA is dense, can do in-place
     cone.sumA = sum(w_i * A_i for (w_i, A_i) in zip(cone.point, cone.As))
-    @assert ishermitian(cone.sumA) # TODO delete
-    @assert eltype(cone.sumA) <: RealOrComplex{T}
     cone.fact = lmi_fact(cone.sumA)
     cone.is_feas = isposdef(cone.fact)
 
