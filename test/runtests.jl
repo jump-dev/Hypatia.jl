@@ -12,7 +12,7 @@ test_files = [
     "native",
     # "moi",
     # "cblib",
-    "examples",
+    # "examples",
     # NOTE require optional dependencies:
     # "pardiso",
     # "hsl",
