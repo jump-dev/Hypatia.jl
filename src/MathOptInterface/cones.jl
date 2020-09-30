@@ -299,6 +299,17 @@ WSOSInterpEpiNormEuclCone{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: 
 MOI.dimension(cone::WSOSInterpEpiNormEuclCone) = cone.U * cone.R
 cone_from_moi(::Type{T}, cone::WSOSInterpEpiNormEuclCone{T}) where {T <: Real} = Cones.WSOSInterpEpiNormEucl{T}(cone.R, cone.U, cone.Ps, use_dual = cone.use_dual)
 
+export WSOSInterpEpiNormOneCone
+struct WSOSInterpEpiNormOneCone{T <: Real} <: MOI.AbstractVectorSet
+    R::Int
+    U::Int
+    Ps::Vector{Matrix{T}}
+    use_dual::Bool
+end
+WSOSInterpEpiNormOneCone{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSInterpEpiNormOneCone{T}(R, U, Ps, false)
+MOI.dimension(cone::WSOSInterpEpiNormOneCone) = cone.U * cone.R
+cone_from_moi(::Type{T}, cone::WSOSInterpEpiNormOneCone{T}) where {T <: Real} = Cones.WSOSInterpEpiNormOne{T}(cone.R, cone.U, cone.Ps, use_dual = cone.use_dual)
+
 # all cones
 
 const HypatiaCones{T <: Real} = Union{
@@ -330,6 +341,7 @@ const HypatiaCones{T <: Real} = Union{
     WSOSInterpNonnegativeCone{T, Complex{T}},
     WSOSInterpPosSemidefTriCone{T},
     WSOSInterpEpiNormEuclCone{T},
+    WSOSInterpEpiNormOneCone{T},
     }
 
 const SupportedCones{T <: Real} = Union{

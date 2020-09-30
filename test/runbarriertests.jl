@@ -27,6 +27,7 @@ barrier_test_names = [
     "wsosinterpnonnegative",
     "wsosinterppossemideftri",
     "wsosinterpepinormeucl",
+    "wsosinterpepinormone",
     ]
 
 real_types = [

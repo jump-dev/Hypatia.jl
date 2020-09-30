@@ -51,6 +51,7 @@ include("hyporootdettri.jl")
 include("wsosinterpnonnegative.jl")
 include("wsosinterppossemideftri.jl")
 include("wsosinterpepinormeucl.jl")
+include("wsosinterpepinormone.jl")
 
 use_dual_barrier(cone::Cone) = cone.use_dual_barrier
 dimension(cone::Cone) = cone.dim
