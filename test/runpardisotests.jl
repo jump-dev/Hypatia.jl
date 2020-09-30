@@ -5,12 +5,12 @@ requires that Pardiso.jl be installed and built successfully; Requires.jl handle
 
 using Test
 import Pardiso
-import Hypatia
 import Hypatia.Solvers
+
 include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
 
-options = (verbose = false,)
+options = (verbose = true,)
 
 @testset "Pardiso cache tests" begin
 
@@ -21,14 +21,17 @@ options = (verbose = false,)
 end
 
 T = Float64
-@testset "NaiveSparse: $t" for t in testfuns_many
-    t(T, solver = Solvers.Solver{T}(system_solver = Solvers.NaiveSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache()); options...))
+@testset "NaiveSparse tests: $inst_name" for inst_name in inst_cones_many
+    inst_function = eval(Symbol(inst_name))
+    inst_function(T, solver = Solvers.Solver{T}(system_solver = Solvers.NaiveSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache{T}()); options...))
 end
-@testset "NaiveElimSparse: $t" for t in testfuns_many
-    t(T, solver = Solvers.Solver{T}(system_solver = Solvers.NaiveElimSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache()); options...))
+@testset "NaiveElimSparse tests: $inst_name" for inst_name in inst_cones_many
+    inst_function = eval(Symbol(inst_name))
+    inst_function(T, solver = Solvers.Solver{T}(system_solver = Solvers.NaiveElimSparseSystemSolver{T}(fact_cache = Hypatia.PardisoNonSymCache{T}()); options...))
 end
-@testset "SymIndefSparse: $t" for t in testfuns_many
-    t(T, solver = Solvers.Solver{T}(system_solver = Solvers.SymIndefSparseSystemSolver{T}(fact_cache = Hypatia.PardisoSymCache()); options...))
+@testset "SymIndefSparse tests: $inst_name" for inst_name in inst_cones_many
+    inst_function = eval(Symbol(inst_name))
+    inst_function(T, solver = Solvers.Solver{T}(system_solver = Solvers.SymIndefSparseSystemSolver{T}(fact_cache = Hypatia.PardisoSymCache{T}()); options...))
 end
 
 end
