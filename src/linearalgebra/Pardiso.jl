@@ -1,5 +1,19 @@
 #=
 utilities for Pardiso
+
+TODO add to docs following example:
+```julia
+import Hypatia
+
+ENV["OMP_NUM_THREADS"] = length(Sys.cpu_info())
+import Pardiso
+
+system_solver = Hypatia.Solvers.NaiveElimSparseSystemSolver{Float64}(fact_cache = Hypatia.PardisoNonSymCache())
+solver = Hypatia.Solvers.Solver{Float64}(system_solver)
+
+include("test/native.jl")
+nonnegative1(Float64, solver = solver)
+```
 =#
 
 mutable struct PardisoNonSymCache{T <: Real} <: SparseNonSymCache{T}

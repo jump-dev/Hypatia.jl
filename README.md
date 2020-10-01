@@ -1,49 +1,38 @@
 # Hypatia.jl
 
-[![Build Status](https://travis-ci.com/chriscoey/Hypatia.jl.svg?branch=master)](https://travis-ci.com/chriscoey/Hypatia.jl) 
+[![Build Status](https://travis-ci.com/chriscoey/Hypatia.jl.svg?branch=master)](https://travis-ci.com/chriscoey/Hypatia.jl)
 [![codecov](https://codecov.io/gh/chriscoey/Hypatia.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/chriscoey/Hypatia.jl)
 
-Under construction. Only works on Julia master.
+Hypatia is a highly-customizable open source interior point solver for generic conic optimization problems, written in Julia.
+For more information, please see our [working paper](https://arxiv.org/abs/2005.01136).
+We plan to set up proper documentation in this repo soon.
 
-An interior point solver for general convex conic optimization problems. 
+Hypatia is an experimental solver and a work in progress, and may not run with older releases of Julia.
+If you have trouble using Hypatia or wish to make improvements, please submit an issue or contribute a PR.
+Default options/parameters are not well-tuned, so we encourage you to experiment with these.
 
-Solves a pair of primal and dual cone programs:
-
-primal (over x,s):
+To learn how to model using exotic cones in Hypatia, look through the examples folder.
+Our examples are set up using either [JuMP](https://github.com/jump-dev/JuMP.jl) or Hypatia's native interface.
+Modeling with JuMP is generally more user-friendly, though it may make sense to try the more-expressive native interface for large dense or structured models.
+Here is a simple example (from D-optimal experiment design) that sets up a JuMP model and calls Hypatia:
 ```
-  min  c'x :          duals
-    b - Ax == 0       (y)
-    h - Gx == s in K  (z)
-```
-dual (over z,y):
-```
-  max  -b'y - h'z :      duals
-    c + A'y + G'z == 0   (x)
-                z in K*  (s)
-```
-where K is a convex cone defined as a Cartesian product of recognized primitive cones, and K* is its dual cone.
+using LinearAlgebra
+using JuMP
+using Hypatia
 
-The primal-dual optimality conditions are:
-```
-         b - Ax == 0
-         h - Gx == s
-  c + A'y + G'z == 0
-            s'z == 0
-              s in K
-              z in K*
-```
+# setup model
+V = rand(2, 3)
+model = Model(Hypatia.Optimizer)
+@variable(model, x[1:3] >= 0)
+@constraint(model, sum(x) == 5)
+@variable(model, hypo)
+@objective(model, Max, hypo)
+Q = V * diagm(x) * V'
+@constraint(model, vcat(hypo, [Q[i, j] for i in 1:2 for j in 1:i]...) in MOI.RootDetConeTriangle(2))
 
-### Example with Pardiso
-
-```julia
-import Hypatia
-
-ENV["OMP_NUM_THREADS"] = length(Sys.cpu_info())
-import Pardiso
-
-system_solver = Hypatia.Solvers.NaiveElimSparseSystemSolver{Float64}(fact_cache = Hypatia.PardisoNonSymCache())
-solver = Hypatia.Solvers.Solver{Float64}(system_solver)
-
-include("test/native.jl")
-nonnegative1(Float64, solver = solver)
+# solve
+optimize!(model)
+termination_status(model)
+objective_value(model)
+value.(x)
 ```
