@@ -14,8 +14,9 @@ Default options/parameters are not well-tuned, so we encourage you to experiment
 To learn how to model using exotic cones in Hypatia, look through the examples folder.
 Our examples are set up using either [JuMP](https://github.com/jump-dev/JuMP.jl) or Hypatia's native interface.
 Modeling with JuMP is generally more user-friendly, though it may make sense to try the more-expressive native interface for large dense or structured models.
+
 Here is a simple example (from D-optimal experiment design) that sets up a JuMP model and calls Hypatia:
-```
+```julia
 using LinearAlgebra
 using JuMP
 using Hypatia
