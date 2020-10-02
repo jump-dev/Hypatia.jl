@@ -18,7 +18,7 @@ function recover_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
 end
 
 # returns the multivariate Chebyshev polynomials in x up to degree deg
-function get_chebyshev_polys(x::Vector{DynamicPolynomials.PolyVar{true}}, deg::Int)
+function get_chebyshev_polys(x::Vector{DP.PolyVar{true}}, deg::Int)
     deg > 8 && @warn("get_chebyshev_polys is not numerically stable for large degree")
     n = length(x)
     u = calc_chebyshev_univariate(x, deg)
@@ -35,7 +35,7 @@ function get_chebyshev_polys(x::Vector{DynamicPolynomials.PolyVar{true}}, deg::I
     return V
 end
 
-function calc_chebyshev_univariate(monovec::Vector{DynamicPolynomials.PolyVar{true}}, deg::Int)
+function calc_chebyshev_univariate(monovec::Vector{DP.PolyVar{true}}, deg::Int)
     deg > 8 && @warn("calc_chebyshev_univariate is not numerically stable for large degree")
     n = length(monovec)
     u = Vector{Vector}(undef, n)

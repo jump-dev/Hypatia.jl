@@ -14,7 +14,7 @@ include("interpolate.jl")
 
 import DynamicPolynomials
 const DP = DynamicPolynomials
-include("polynomials.jl") # TODO possibly remove these functions, then remove dependence on DP
+include("polynomials.jl") # TODO possibly remove these functions, then remove dependence on DP (from Project.toml also)
 
 # utilities for in-place vector and matrix rescalings for svec form
 function vec_to_svec!(arr::AbstractVecOrMat{T}; rt2 = sqrt(T(2)), incr::Int = 1) where {T}
