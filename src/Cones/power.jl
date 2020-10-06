@@ -162,7 +162,7 @@ function update_hess(cone::Power)
     end
 
     offset = 2 / cone.produw
-    for j in m .+ (1:cone.n)
+    @inbounds for j in m .+ (1:cone.n)
         gj = g[j]
         @inbounds for i in 1:m
             H[i, j] = auiproduuw[i] * gj
