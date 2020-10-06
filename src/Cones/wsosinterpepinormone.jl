@@ -97,7 +97,7 @@ function setup_data(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
 
-    cone.mats = [[Matrix{Any}(undef, size(Pk, 2), size(Pk, 2)) for _ in 1:(R - 1)] for Pk in cone.Ps]
+    cone.mats = [[zeros(T, size(Pk, 2), size(Pk, 2)) for _ in 1:(R - 1)] for Pk in cone.Ps]
     cone.matfact = [[cholesky(hcat([one(T)])) for _ in 1:R] for _ in cone.Ps] # TODO preallocate better
     cone.hess_edge_blocks = [zeros(T, U, U) for _ in 1:(R - 1)]
     cone.hess_diag_blocks = [zeros(T, U, U) for _ in 1:R]
