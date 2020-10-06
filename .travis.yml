@@ -23,9 +23,9 @@ os:
 #       arch: arm64
 julia:
  - 1
-  # - nightly
-# jobs:
-#   allow_failures:
-#   - julia: nightly
+  - nightly
+jobs:
+  allow_failures:
+  - julia: nightly
 notifications:
   email: false
