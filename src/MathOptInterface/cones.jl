@@ -277,6 +277,25 @@ WSOSInterpNonnegativeCone{T, R}(U::Int, Ps::Vector{Matrix{R}}) where {R <: RealO
 MOI.dimension(cone::WSOSInterpNonnegativeCone) = cone.U
 cone_from_moi(::Type{T}, cone::WSOSInterpNonnegativeCone{T, R}) where {R <: RealOrComplex{T}} where {T <: Real} = Cones.WSOSInterpNonnegative{T, R}(cone.U, cone.Ps, use_dual = cone.use_dual)
 
+export WSOSInterpNonnegativeCone2
+struct WSOSInterpNonnegativeCone2{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
+    initial_point
+    P::Matrix{R}
+    Ls
+    gs
+    use_dual::Bool
+end
+WSOSInterpNonnegativeCone2{T, R}(
+    initial_point,
+    P::Matrix{R},
+    Ls,
+    gs,
+    ) where {R <: RealOrComplex{T}} where {T <: Real} =
+    WSOSInterpNonnegativeCone2{T, R}(initial_point, P, Ls, gs, false)
+MOI.dimension(cone::WSOSInterpNonnegativeCone2) = length(cone.initial_point)
+cone_from_moi(::Type{T}, cone::WSOSInterpNonnegativeCone2{T, R}) where {R <: RealOrComplex{T}} where {T <: Real} =
+    Cones.WSOSInterpNonnegative2{T, R}(cone.initial_point, cone.P, cone.Ls, cone.gs, use_dual = cone.use_dual)
+
 export WSOSInterpPosSemidefTriCone
 struct WSOSInterpPosSemidefTriCone{T <: Real} <: MOI.AbstractVectorSet
     R::Int
@@ -339,6 +358,8 @@ const HypatiaCones{T <: Real} = Union{
     DoublyNonnegativeTriCone{T},
     WSOSInterpNonnegativeCone{T, T},
     WSOSInterpNonnegativeCone{T, Complex{T}},
+    WSOSInterpNonnegativeCone2{T, T},
+    WSOSInterpNonnegativeCone2{T, Complex{T}},
     WSOSInterpPosSemidefTriCone{T},
     WSOSInterpEpiNormEuclCone{T},
     WSOSInterpEpiNormOneCone{T},

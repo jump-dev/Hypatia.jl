@@ -1934,6 +1934,90 @@ function wsosinterpnonnegative3(T; options...)
     @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
 end
 
+function wsosinterpnonnegative1a(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    (lb, ub) = (-ones(T, 2), ones(T, 2))
+    halfdeg = 2
+    (U, pts, Ps, V, _) = ModelUtilities.interpolate(ModelUtilities.Box{T}(lb, ub), halfdeg, sample = false, calc_V = true)
+    F = qr!(Array(V'), Val(true))
+    DynamicPolynomials.@polyvar x y
+    fn = x ^ 4 + x ^ 2 * y ^ 2 + 4 * y ^ 2 + 4
+
+    c = T[-1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    G = ones(T, U, 1)
+    h = T[fn(pts[j, :]...) for j in 1:U]
+    init_support_pts = (rand(U, 2) .- 0.5) .* 2
+    Ls = [size(P, 2) for P in Ps[2:end]]
+    gs = [(1 .- pts[:, i]) .* (1 .+ pts[:, i]) for i in 1:2]
+    push!(Ls, size(Ps[1], 2))
+    push!(gs, ones(U))
+
+    init_pt = ModelUtilities.initial_wsos_point(F, init_support_pts, lb, ub, halfdeg, true)
+    cones = Cone{T}[Cones.WSOSInterpNonnegative2{T, T}(init_pt, Ps[1], Ls, gs)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ -T(4) atol=tol rtol=tol
+    @test r.x[1] ≈ T(4) atol=tol rtol=tol
+end
+
+function wsosinterpnonnegative2a(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    (lb, ub) = (zeros(T, 2), fill(T(3), 2))
+    halfdeg = 2
+    (U, pts, Ps, V, _) = ModelUtilities.interpolate(ModelUtilities.Box{T}(lb, ub), halfdeg, sample = false, calc_V = true)
+    F = qr!(Array(V'), Val(true))
+    DynamicPolynomials.@polyvar x y
+    fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
+
+    c = T[-1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    G = ones(T, U, 1)
+    h = T[fn(pts[j, :]...) for j in 1:U]
+    init_support_pts = rand(U, 2) .* 3
+    Ls = [size(P, 2) for P in Ps[2:end]]
+    gs = [(3 .- pts[:, i]) .* pts[:, i] for i in 1:2]
+    push!(Ls, size(Ps[1], 2))
+    push!(gs, ones(U))
+    init_pt = ModelUtilities.initial_wsos_point(F, init_support_pts, lb, ub, halfdeg, true)
+    cones = Cone{T}[Cones.WSOSInterpNonnegative2{T, T}(init_pt, Ps[1], Ls, gs)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
+    @test r.x[1] ≈ zero(T) atol=tol rtol=tol
+end
+
+function wsosinterpnonnegative3a(T; options...)
+    tol = sqrt(sqrt(eps(T)))
+    (lb, ub) = (zeros(T, 2), fill(T(3), 2))
+    halfdeg = 2
+    (U, pts, Ps, V, _) = ModelUtilities.interpolate(ModelUtilities.Box{T}(lb, ub), halfdeg, sample = false, calc_V = true)
+    F = qr!(Array(V'), Val(true))
+    DynamicPolynomials.@polyvar x y
+    fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
+
+    c = T[fn(pts[j, :]...) for j in 1:U]
+    A = ones(T, 1, U)
+    b = T[1]
+    G = Diagonal(-one(T) * I, U)
+    h = zeros(T, U)
+    init_support_pts = rand(U, 2) .* 3
+    Ls = [size(P, 2) for P in Ps[2:end]]
+    gs = [(3 .- pts[:, i]) .* pts[:, i] for i in 1:2]
+    push!(Ls, size(Ps[1], 2))
+    push!(gs, ones(U))
+    init_pt = ModelUtilities.initial_wsos_point(F, init_support_pts, lb, ub, halfdeg, true)
+    cones = Cone{T}[Cones.WSOSInterpNonnegative2{T, T}(init_pt, Ps[1], Ls, gs, use_dual = true)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
+end
+
 function wsosinterppossemideftri1(T; options...)
     # convexity parameter for (x + 1) ^ 2 * (x - 1) ^ 2
     tol = test_tol(T)

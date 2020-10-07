@@ -481,6 +481,30 @@ function test_wsosinterpnonnegative_barrier(T::Type{<:Real})
     return
 end
 
+function test_wsosinterpnonnegative2_barrier(T::Type{<:Real})
+    MU = Hypatia.ModelUtilities
+    Random.seed!(1)
+    for (n, halfdeg) in [(1, 1), (1, 2), (1, 3), (2, 1), (2, 2), (3, 1)]
+        dom = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))
+        sample = false
+        (U, pts, Ps, V) = ModelUtilities.interpolate(dom, halfdeg, sample = sample, calc_V = true) # use a unit box domain
+        F = qr!(Array(V'), Val(true))
+        P = Ps[1]
+        Ls = [size(P, 2) for P in Ps[2:end]]
+        gs = [(1 .- pts[:, i]) .* (1 .+ pts[:, i]) for i in 1:n]
+        barrier(s) = -sum(logdet(cholesky!(Symmetric(P' * Diagonal(s) * P))) for P in Ps)
+        push!(Ls, size(P, 2))
+        push!(gs, ones(U))
+        # guess U points should be enough for strict interior. seems like not enough for perturbed point to be feasible too.
+        init_support_points = ModelUtilities.interp_sample(dom, 2 * U)
+        initial_point = ModelUtilities.initial_wsos_point(F, init_support_points, -ones(T, n), ones(T, n), halfdeg, !sample)
+        cone = Cones.WSOSInterpNonnegative2{T, T}(initial_point, P, Ls, gs)
+        test_barrier_oracles(cone, barrier, init_tol = Inf) # TODO center and test initial points
+    end
+    # TODO also test complex case Cones.WSOSInterpNonnegative{T, Complex{T}} - need complex MU interp functions first
+    return
+end
+
 function test_wsosinterppossemideftri_barrier(T::Type{<:Real})
     Random.seed!(1)
     rt2i = inv(sqrt(T(2)))

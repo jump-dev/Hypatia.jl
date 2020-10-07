@@ -47,4 +47,21 @@ function svec_to_vec!(arr::AbstractVecOrMat{T}; rt2 = sqrt(T(2)), incr::Int = 1)
     return arr
 end
 
+function eval_lagrange_polys(F, points, state_lb::Vector{T}, state_ub::Vector{T}, order, shift) where {T}
+    points_shift = similar(points)
+    if shift
+        for i in 1:size(points, 1)
+            points_shift[i, :] = (points[i, :] .- (state_lb .+ state_ub) ./ 2) ./ (state_ub .- state_lb) .* 2
+        end
+    end
+    X = hcat(points_shift) # 1 by 1 matrix
+    V = make_chebyshev_vandermonde(X, 2order)
+    return F \ V'
+end
+
+function initial_wsos_point(F, points, state_lb::Vector{T}, state_ub::Vector{T}, order, shift) where {T}
+    point_evals = eval_lagrange_polys(F, points, state_lb, state_ub, order, shift)
+    return vec(sum(point_evals, dims = 2))
+end
+
 end
