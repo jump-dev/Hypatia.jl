@@ -16,19 +16,12 @@ function build(inst::PolyNormJuMP{T}) where {T <: Float64}
     dom = ModelUtilities.FreeDomain{Float64}(n)
     halfdeg = div(inst.deg + 1, 2)
     (U, pts, Ps, _, w) = ModelUtilities.interpolate(dom, halfdeg, calc_w = true)
-    lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
+    polys = Ps[1] * rand(-9:9, size(Ps[1], 2), num_polys)
 
     model = JuMP.Model()
     JuMP.@variable(model, f[1:U])
     JuMP.@objective(model, Min, dot(w, f))
-
-    L = size(Ps[1], 2)
-    polys = Ps[1] * rand(-9:9, L, num_polys)
-
-    fpoly = dot(f, lagrange_polys)
-    rand_polys = [dot(polys[:, i], lagrange_polys) for i in 1:num_polys]
-    cone = Hypatia.WSOSInterpEpiNormEuclCone{Float64}(num_polys + 1, U, Ps)
-    JuMP.@constraint(model, vcat(f, [polys[:, i] for i in 1:num_polys]...) in cone)
+    JuMP.@constraint(model, vcat(f, vec(polys)) in Hypatia.WSOSInterpEpiNormEuclCone{Float64}(num_polys + 1, U, Ps))
 
     return model
 end

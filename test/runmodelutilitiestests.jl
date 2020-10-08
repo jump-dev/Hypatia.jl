@@ -19,8 +19,8 @@ real_types = [
         test_svec_conversion(T)
         test_fekete_sample(T)
         test_cheb2_w(T)
-        test_recover_lagrange_polys(T)
-        test_recover_cheb_polys(T)
+        # test_recover_lagrange_polys(T)
+        # test_recover_cheb_polys(T)
     end
     @printf("%8.2e seconds\n", test_time)
 end
