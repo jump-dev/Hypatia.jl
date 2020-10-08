@@ -92,6 +92,8 @@ function MOI.copy_to(
         obj = MOI.ScalarAffineFunction{T}(MOI.get(src, MOI.ObjectiveFunction{F}()))
     elseif F == MOI.ScalarAffineFunction{T}
         obj = MOI.get(src, MOI.ObjectiveFunction{F}())
+    else
+        error("function type $F not supported")
     end
     (Jc, Vc) = (Int[], T[])
     for t in obj.terms
@@ -158,7 +160,7 @@ function MOI.copy_to(
         dim = MOI.output_dimension(fi)
         append!(IA, (p + 1):(p + dim))
         append!(JA, idx_map[vi].value for vi in fi.variables)
-        append!(VA, -ones(dim))
+        append!(VA, -ones(T, dim))
         p += dim
     end
 
@@ -351,8 +353,8 @@ function MOI.copy_to(
         lower = get_con_set(ci).lower
         @assert isfinite(upper) && isfinite(lower)
         @assert upper > lower
-        mid = (upper + lower) / 2
-        scal = 2 * inv(upper - lower)
+        mid = (upper + lower) / T(2)
+        scal = 2 / (upper - lower)
 
         push!(IG, q)
         push!(JG, idx_map[get_con_fun(ci).variable].value)
@@ -375,7 +377,7 @@ function MOI.copy_to(
         lower = get_con_set(ci).lower
         @assert isfinite(upper) && isfinite(lower)
         @assert upper > lower
-        mid = (upper + lower) / 2
+        mid = (upper + lower) / T(2)
         scal = 2 / (upper - lower)
 
         fi = get_con_fun(ci)
@@ -419,7 +421,7 @@ function MOI.copy_to(
             if F == MOI.VectorOfVariables
                 JGi = (idx_map[vj].value for vj in fi.variables)
                 IGi = permute_affine(si, 1:dim)
-                VGi = rescale_affine(si, fill(-1.0, dim))
+                VGi = rescale_affine(si, fill(-one(T), dim))
             else
                 JGi = (idx_map[vt.scalar_term.variable_index].value for vt in fi.terms)
                 IGi = permute_affine(si, [vt.output_index for vt in fi.terms])

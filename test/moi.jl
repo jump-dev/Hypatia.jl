@@ -9,16 +9,6 @@ const MOIT = MOI.Test
 const MOIU = MOI.Utilities
 import Hypatia
 
-config = MOIT.TestConfig(
-    atol = 2e-4,
-    rtol = 2e-4,
-    solve = true,
-    query = true,
-    modify_lhs = true,
-    duals = true,
-    infeas_certificates = true,
-    )
-
 unit_exclude = [
     "solve_qcp_edge_cases",
     "solve_qp_edge_cases",
@@ -57,16 +47,29 @@ conic_exclude = String[
 function test_moi(T::Type{<:Real}; solver_options...)
     optimizer = MOIU.CachingOptimizer(MOIU.UniversalFallback(MOIU.Model{T}()), Hypatia.Optimizer{T}(; solver_options...))
 
-    @testset "unit tests" begin
-        MOIT.unittest(optimizer, config, unit_exclude)
-    end
+    tol = sqrt(sqrt(Float64(eps(T)))) # TODO remove Float64, waiting for https://github.com/jump-dev/MathOptInterface.jl/pull/1176
+    config = MOIT.TestConfig{T}(
+        atol = tol,
+        rtol = tol,
+        solve = true,
+        query = true,
+        modify_lhs = true,
+        duals = true,
+        infeas_certificates = true,
+        )
 
     @testset "linear tests" begin
         MOIT.contlineartest(optimizer, config)
     end
 
-    @testset "conic tests" begin
-        MOIT.contconictest(MOI.Bridges.Constraint.Square{T}(optimizer), config, conic_exclude)
+    if T == Float64
+        # NOTE test other real types, waiting for https://github.com/jump-dev/MathOptInterface.jl/issues/841
+        @testset "unit tests" begin
+            MOIT.unittest(optimizer, config, unit_exclude)
+        end
+        @testset "conic tests" begin
+            MOIT.contconictest(MOI.Bridges.Constraint.Square{T}(optimizer), config, conic_exclude)
+        end
     end
 
     return
