@@ -3,6 +3,7 @@ run MOI tests
 =#
 
 using Test
+using Printf
 import Hypatia
 import Hypatia.Solvers
 include(joinpath(@__DIR__, "moicones.jl"))
@@ -25,25 +26,17 @@ end
 
 @testset "MOI.Test tests" begin
     println("\nstarting MOI.Test tests")
-    system_solvers = [
-        Solvers.SymIndefSparseSystemSolver,
-        # Solvers.QRCholDenseSystemSolver,
+    options = [
+        (Float64, Solvers.SymIndefSparseSystemSolver, false),
+        # (Float64, Solvers.QRCholDenseSystemSolver, true), # TODO fails a few
+        # (Float32, Solvers.QRCholDenseSystemSolver, false), # TODO fails a few
+        (BigFloat, Solvers.QRCholDenseSystemSolver, true), # TODO uncomment when https://github.com/jump-dev/MathOptInterface.jl/pull/1175 merged
         ]
-    real_types = [
-        Float64,
-        # TODO test when wrapper allows
-        # Float32,
-        # BigFloat,
-        ]
-    dense_flags = [
-        false,
-        # true,
-        ]
-    for s in system_solvers, T in real_types, d in dense_flags
-        test_info = "$s, $T, $d"
+    for (T, system_solver, use_dense_model) in options
+        test_info = "$system_solver, $T, $use_dense_model"
         @testset "$test_info" begin
             println(test_info, " ...")
-            test_time = @elapsed test_moi(T, use_dense_model = d, verbose = false, system_solver = s{T}())
+            test_time = @elapsed test_moi(T, use_dense_model = use_dense_model, verbose = false, system_solver = system_solver{T}())
             @printf("%8.2e seconds\n", test_time)
         end
     end

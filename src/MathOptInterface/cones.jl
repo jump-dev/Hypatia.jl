@@ -78,8 +78,7 @@ function permute_affine(cone::NonSquareMatrixCone, idxs::AbstractVector)
 end
 
 # transformations (svec rescaling) for MOI symmetric matrix cones not in svec (scaled lower triangle) form
-const rt2 = sqrt(2)
-SvecCone = Union{MOI.PositiveSemidefiniteConeTriangle, MOI.LogDetConeTriangle, MOI.RootDetConeTriangle}
+const SvecCone = Union{MOI.PositiveSemidefiniteConeTriangle, MOI.LogDetConeTriangle, MOI.RootDetConeTriangle}
 
 svec_offset(::MOI.PositiveSemidefiniteConeTriangle) = 1
 svec_offset(::MOI.RootDetConeTriangle) = 2
@@ -89,19 +88,20 @@ needs_untransform(::SvecCone) = true
 
 function untransform_affine(cone::SvecCone, vals::AbstractVector)
     @views svec_vals = vals[svec_offset(cone):end]
-    ModelUtilities.svec_to_vec!(svec_vals, rt2 = rt2)
+    ModelUtilities.svec_to_vec!(svec_vals)
     return vals
 end
 
 function rescale_affine(cone::SvecCone, vals::AbstractVector)
     vals = collect(vals)
     @views svec_vals = vals[svec_offset(cone):end]
-    ModelUtilities.vec_to_svec!(svec_vals, rt2 = rt2)
+    ModelUtilities.vec_to_svec!(svec_vals)
     return vals
 end
 
 function rescale_affine(cone::SvecCone, vals::AbstractVector, idxs::AbstractVector)
     scal_start = svec_offset(cone) - 1
+    rt2 = sqrt(eltype(vals)(2))
     for i in eachindex(vals)
         shifted_idx = idxs[i] - scal_start
         if shifted_idx > 0 && !MOI.Utilities.is_diagonal_vectorized_index(shifted_idx)
