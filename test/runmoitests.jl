@@ -30,7 +30,7 @@ end
         (Float64, Solvers.SymIndefSparseSystemSolver, false),
         # (Float64, Solvers.QRCholDenseSystemSolver, true), # TODO fails a few
         # (Float32, Solvers.QRCholDenseSystemSolver, false), # TODO fails a few
-        (BigFloat, Solvers.QRCholDenseSystemSolver, true), # TODO uncomment when https://github.com/jump-dev/MathOptInterface.jl/pull/1175 merged
+        # (BigFloat, Solvers.QRCholDenseSystemSolver, true), # TODO uncomment when https://github.com/jump-dev/MathOptInterface.jl/pull/1175 merged
         ]
     for (T, system_solver, use_dense_model) in options
         test_info = "$system_solver, $T, $use_dense_model"
