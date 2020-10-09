@@ -134,9 +134,9 @@ function setup_symbfact(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrCompl
     dim_R = length(cone.row_idxs)
 
     cm = CHOLMOD.defaults(CHOLMOD.common_struct[Base.Threads.threadid()])
-    unsafe_store!(CHOLMOD.common_print[], 0)
-    unsafe_store!(CHOLMOD.common_postorder[], 1)
-    unsafe_store!(CHOLMOD.common_supernodal[], 2)
+    unsafe_store!(CHOLMOD.common_print[Base.Threads.threadid()], 0)
+    unsafe_store!(CHOLMOD.common_postorder[Base.Threads.threadid()], 1)
+    unsafe_store!(CHOLMOD.common_supernodal[Base.Threads.threadid()], 2)
 
     fake_point = [R(l) for l in 1:dim_R]
     sparse_point = cone.sparse_point = CHOLMOD.Sparse(Hermitian(sparse(cone.row_idxs, cone.col_idxs, fake_point, side, side), :L))
