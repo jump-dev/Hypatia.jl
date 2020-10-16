@@ -135,7 +135,7 @@ for (inst_set, real_T, time_limit) in instance_sets
 end
 end
 
-println("\n")
+# println("\n")
 # DataFrames.show(perf, allrows = true, allcols = true)
 # println("\n")
 # @show sum(perf[:iters])

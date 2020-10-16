@@ -43,27 +43,19 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     Cones.grad.(model.cones)
     update_lhs(solver.system_solver, solver)
 
-
-
-    # TODO
-    addcorr = false
-    # addcorr = true
-    # @show addcorr
-
     # calculate centering direction and keep in dir_cent
     update_rhs_cent(solver, stepper.rhs)
     get_directions(stepper, solver, false, iter_ref_steps = 3)
     dir_cent = copy(stepper.dir.vec) # TODO
-    update_rhs_centcorr(solver, stepper.rhs, stepper.dir, add = addcorr)
+    update_rhs_centcorr(solver, stepper.rhs, stepper.dir, add = false)
     get_directions(stepper, solver, false, iter_ref_steps = 3)
     dir_centcorr = copy(stepper.dir.vec) # TODO
-    # copyto!(stepper.dir_cent, stepper.dir)
 
     # calculate affine/prediction direction and keep in dir
     update_rhs_pred(solver, stepper.rhs)
     get_directions(stepper, solver, true, iter_ref_steps = 3)
     dir_pred = copy(stepper.dir.vec) # TODO
-    update_rhs_predcorr(solver, stepper.rhs, stepper.dir, add = addcorr)
+    update_rhs_predcorr(solver, stepper.rhs, stepper.dir, add = false)
     get_directions(stepper, solver, true, iter_ref_steps = 3)
     dir_predcorr = copy(stepper.dir.vec) # TODO
 
@@ -76,7 +68,6 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.prev_gamma = gamma = 1 - pred_alpha
 
     # calculate combined direction and keep in dir
-    # axpby!(gamma, stepper.dir_cent, 1 - gamma, stepper.dir)
     @. stepper.dir.vec = gamma * (dir_cent + pred_alpha * dir_centcorr) + (1 - gamma) * (dir_pred + pred_alpha * dir_predcorr) # TODO
 
     # find distance alpha for stepping in combined direction
@@ -85,7 +76,6 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     if iszero(alpha)
         # could not step far in combined direction, so attempt a pure centering step
         solver.verbose && println("performing centering step")
-        # copyto!(stepper.dir, stepper.dir_cent)
         @. stepper.dir.vec = dir_cent + dir_centcorr
 
         # find distance alpha for stepping in centering direction

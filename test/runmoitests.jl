@@ -28,7 +28,7 @@ end
     println("\nstarting MOI.Test tests")
     options = [
         (Float64, Solvers.SymIndefSparseSystemSolver, false),
-        # (Float64, Solvers.QRCholDenseSystemSolver, true), # TODO fails a few
+        (Float64, Solvers.QRCholDenseSystemSolver, true),
         # (Float32, Solvers.QRCholDenseSystemSolver, false), # TODO fails a few
         # (BigFloat, Solvers.QRCholDenseSystemSolver, true), # TODO uncomment when https://github.com/jump-dev/MathOptInterface.jl/pull/1175 merged
         ]
