@@ -4,7 +4,7 @@
 [![codecov](https://codecov.io/gh/chriscoey/Hypatia.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/chriscoey/Hypatia.jl)
 
 Hypatia is a highly-customizable open source interior point solver for generic conic optimization problems, written in Julia.
-For more information, please see our [working paper](https://arxiv.org/abs/2005.01136).
+For more information, please see our [working paper](https://arxiv.org/abs/2005.01136) and our [cones reference](https://github.com/chriscoey/Hypatia.jl/wiki/files/coneref.pdf).
 We plan to set up proper documentation in this repo soon.
 
 Hypatia is an experimental solver and a work in progress, and may not run with older releases of Julia.
