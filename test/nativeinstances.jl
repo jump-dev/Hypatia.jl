@@ -1680,7 +1680,7 @@ function hypoperlogdettri1(T; options...)
         b = T[1]
         G = Matrix{T}(-I, dim, 2)
         mat_half = rand(R, side, side)
-        mat = mat_half * mat_half'
+        mat = mat_half * mat_half' + I
         h = zeros(T, dim)
         Cones.smat_to_svec!(view(h, 3:dim), mat, rt2)
         cones = Cone{T}[Cones.HypoPerLogdetTri{T, R}(dim)]
