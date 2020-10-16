@@ -43,11 +43,18 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     Cones.grad.(model.cones)
     update_lhs(solver.system_solver, solver)
 
+
+
+    # TODO
+    addcorr = false
+    # addcorr = true
+    # @show addcorr
+
     # calculate centering direction and keep in dir_cent
     update_rhs_cent(solver, stepper.rhs)
     get_directions(stepper, solver, false, iter_ref_steps = 3)
     dir_cent = copy(stepper.dir.vec) # TODO
-    update_rhs_centcorr(solver, stepper.rhs, stepper.dir)
+    update_rhs_centcorr(solver, stepper.rhs, stepper.dir, add = addcorr)
     get_directions(stepper, solver, false, iter_ref_steps = 3)
     dir_centcorr = copy(stepper.dir.vec) # TODO
     # copyto!(stepper.dir_cent, stepper.dir)
@@ -56,7 +63,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     update_rhs_pred(solver, stepper.rhs)
     get_directions(stepper, solver, true, iter_ref_steps = 3)
     dir_pred = copy(stepper.dir.vec) # TODO
-    update_rhs_predcorr(solver, stepper.rhs, stepper.dir)
+    update_rhs_predcorr(solver, stepper.rhs, stepper.dir, add = addcorr)
     get_directions(stepper, solver, true, iter_ref_steps = 3)
     dir_predcorr = copy(stepper.dir.vec) # TODO
 
@@ -87,7 +94,6 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
         if iszero(alpha)
             copyto!(stepper.dir.vec, dir_cent)
             alpha = find_max_alpha(point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
-
             if iszero(alpha)
                 @warn("numerical failure: could not step in centering direction; terminating")
                 solver.status = NumericalFailure
