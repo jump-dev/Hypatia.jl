@@ -14,22 +14,22 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     max_neighborhood::T
     dim::Int
     Ps::Vector{Matrix{R}}
+
     point::Vector{T}
     dual_point::Vector{T}
-
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     tmpLL::Vector{Matrix{R}}
     tmpUL::Vector{Matrix{R}}
@@ -61,18 +61,11 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     end
 end
 
-function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
     Ls = [size(Pk, 2) for Pk in cone.Ps]
     cone.tmpLL = [Matrix{R}(undef, L, L) for L in Ls]
     cone.tmpUL = [Matrix{R}(undef, dim, L) for L in Ls]
@@ -81,7 +74,7 @@ function setup_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex
     cone.tmpLU3 = [Matrix{R}(undef, L, dim) for L in Ls]
     cone.tmpUU = [Matrix{R}(undef, dim, dim) for L in Ls]
     cone.ΛF = Vector{Any}(undef, length(Ls))
-    return
+    return cone
 end
 
 get_nu(cone::WSOSInterpNonnegative) = sum(size(Pk, 2) for Pk in cone.Ps)

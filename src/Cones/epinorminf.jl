@@ -13,9 +13,13 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     dim::Int
     n::Int
     is_complex::Bool
+
     point::Vector{T}
     dual_point::Vector{T}
-
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
@@ -24,14 +28,10 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_sqrt_aux_updated::Bool
     inv_hess_aux_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, SparseMatrixCSC{T, Int}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_sqrt::UpperTriangular{T, SparseMatrixCSC{T, Int}}
     no_sqrts::Bool
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     w::AbstractVector{R}
     den::AbstractVector{T}
@@ -75,15 +75,7 @@ function use_sqrt_oracles(cone::EpiNormInf)
 end
 
 # TODO only allocate the fields we use
-function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
-    reset_data(cone)
-    dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
+function setup_extra_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     n = cone.n
     cone.w = zeros(R, n)
     cone.wden = zeros(R, n)
@@ -99,7 +91,7 @@ function setup_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where 
         cone.Hiuim = zeros(T, n)
         cone.idet = zeros(T, n)
     end
-    return
+    return cone
 end
 
 get_nu(cone::EpiNormInf) = cone.n + 1

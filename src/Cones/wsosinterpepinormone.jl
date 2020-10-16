@@ -12,9 +12,12 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     R::Int
     U::Int
     Ps::Vector{Matrix{T}}
-    point::AbstractVector{T}
-    dual_point::AbstractVector{T}
 
+    point::Vector{T}
+    dual_point::Vector{T}
+    grad::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
@@ -23,15 +26,9 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     inv_hess_prod_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
-
-    barrier::Function
 
     mats::Vector{Vector{Matrix{T}}}
     matfact::Vector{Vector}
@@ -81,22 +78,14 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     end
 end
 
-function setup_data(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     dim = cone.dim
     U = cone.U
     R = cone.R
     Ps = cone.Ps
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = similar(cone.point)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
-
     cone.mats = [[zeros(T, size(Pk, 2), size(Pk, 2)) for _ in 1:(R - 1)] for Pk in cone.Ps]
     cone.matfact = [[cholesky(hcat([one(T)])) for _ in 1:R] for _ in cone.Ps] # TODO preallocate better
     cone.hess_edge_blocks = [zeros(T, U, U) for _ in 1:(R - 1)]
@@ -125,7 +114,7 @@ function setup_data(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     end
     cone.lambdafact = Vector{Any}(undef, length(Ps))
     cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
-    return
+    return cone
 end
 
 reset_data(cone::WSOSInterpEpiNormOne) = (cone.feas_updated = cone.grad_updated = cone.hess_updated =

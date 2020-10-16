@@ -14,8 +14,8 @@ barrier_test_names = [
     "episumperentropy",
     "hypoperlog",
     "power",
-    "hypogeomean",
     "hypopowermean",
+    "hypogeomean",
     "epinormspectral",
     "linmatrixineq", # NOTE failing on Julia v1.5.1 with ForwardDiff or BigFloat
     "possemideftri",
@@ -25,9 +25,9 @@ barrier_test_names = [
     "hypoperlogdettri",
     "hyporootdettri",
     "wsosinterpnonnegative",
-    "wsosinterppossemideftri",
-    "wsosinterpepinormeucl",
     "wsosinterpepinormone",
+    "wsosinterpepinormeucl",
+    "wsosinterppossemideftri",
     ]
 
 real_types = [

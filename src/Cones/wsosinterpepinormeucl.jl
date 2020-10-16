@@ -19,21 +19,22 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     R::Int
     U::Int
     Ps::Vector{Matrix{T}}
+
     point::Vector{T}
     dual_point::Vector{T}
-
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     mat::Vector{Matrix{T}}
     matfact::Vector
@@ -75,20 +76,14 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     end
 end
 
-function setup_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     dim = cone.dim
     U = cone.U
     R = cone.R
     Ps = cone.Ps
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
     cone.mat = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
     cone.matfact = Vector{Any}(undef, length(Ps))
     cone.Λi_Λ = [Vector{Matrix{T}}(undef, R - 1) for Psk in Ps]
@@ -112,7 +107,7 @@ function setup_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.PΛ11iP = [zeros(T, U, U) for _ in eachindex(Ps)]
     cone.lambdafact = Vector{Any}(undef, length(Ps))
     cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
-    return
+    return cone
 end
 
 get_nu(cone::WSOSInterpEpiNormEucl) = 2 * sum(size(Psk, 2) for Psk in cone.Ps)
