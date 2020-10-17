@@ -341,7 +341,7 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where {T}
             end
             cone.hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U))
         end
-        @views ldiv!(Diz[idxs2, :], cone.hess_diag_facts[r - 1], z)
+        @views ldiv!(Diz[idxs2, :], cone.hess_diag_facts[r1], z)
         @views mul!(schur, z', Diz[idxs2, :], -1, true)
     end
 
