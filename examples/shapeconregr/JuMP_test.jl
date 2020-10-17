@@ -37,7 +37,6 @@ insts["fast"] = [
     ((2, 50, :func6, 5, 4, true, true, true, true, false),),
     ((2, 50, :func7, 5, 4, false, false, true, true, false),),
     ((2, 50, :func8, 5, 4, false, true, true, true, false),),
-    ((4, 150, :func6, 0, 4, true, false, true, true, true),),
     ((4, 150, :func7, 0, 4, true, false, true, true, true),),
     ((4, 150, :func7, 0, 4, true, true, true, true, true),),
     ((4, 150, :func7, 0, 4, false, false, true, true, true),),

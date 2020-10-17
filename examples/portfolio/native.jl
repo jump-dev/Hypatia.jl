@@ -6,6 +6,8 @@ TODO
 - describe formulation and options
 =#
 
+using SparseArrays
+
 struct PortfolioNative{T <: Real} <: ExampleInstanceNative{T}
     num_stocks::Int
     epinormeucl_constr::Bool # add L2 ball constraints, else don't add

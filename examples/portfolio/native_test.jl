@@ -15,10 +15,10 @@ insts["fast"] = [
     ((50, false, true, true),),
     ((50, false, true, false),),
     ((50, true, true, true),),
-    ((400, true, false, true),),
-    ((400, false, true, true),),
-    ((400, false, true, false),),
-    ((400, true, true, true),),
+    ((200, true, false, true),),
+    ((200, false, true, true),),
+    ((200, false, true, false),),
+    ((200, true, true, true),),
     ]
 insts["slow"] = [
     ((3000, true, false, true),),

@@ -40,7 +40,7 @@ function load_matrix(cache::LAPACKNonSymCache{T}, A::Matrix{T}; copy_A::Bool = t
     LinearAlgebra.chkstride1(A)
     n = LinearAlgebra.checksquare(A)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
+    cache.AF = (copy_A ? zero(A) : A) # copy over A to new matrix or use A directly
     cache.ipiv = Vector{BlasInt}(undef, n)
     cache.info = Ref{BlasInt}()
     return cache
@@ -104,7 +104,7 @@ end
 function load_matrix(cache::LUNonSymCache{T}, A::AbstractMatrix{T}; copy_A::Bool = true) where {T <: Real}
     n = LinearAlgebra.checksquare(A)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
+    cache.AF = (copy_A ? zero(A) : A) # copy over A to new matrix or use A directly
     return cache
 end
 
@@ -143,9 +143,9 @@ function load_matrix(cache::LAPACKSymCache{T}, A::Symmetric{T, <:AbstractMatrix{
     LinearAlgebra.chkstride1(A.data)
     n = LinearAlgebra.checksquare(A.data)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
+    cache.AF = (copy_A ? zero(A) : A) # copy over A to new matrix or use A directly
     cache.ipiv = Vector{BlasInt}(undef, n)
-    cache.work = Vector{T}(undef, n) # NOTE this will be resized according to query
+    cache.work = zeros(T, n) # NOTE this will be resized according to query
     cache.lwork = BlasInt(-1) # NOTE -1 initiates a query for optimal size of work
     cache.info = Ref{BlasInt}()
     return cache
@@ -234,7 +234,7 @@ end
 function load_matrix(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: Real}
     n = size(A, 1)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? similar(A) : A) # copy over A (symmetric) to new matrix or use A directly
+    cache.AF = (copy_A ? zero(A) : A) # copy over A (symmetric) to new matrix or use A directly
     return cache
 end
 
@@ -274,7 +274,7 @@ function load_matrix(cache::LAPACKPosDefCache{T}, A::Symmetric{T, <:AbstractMatr
     LinearAlgebra.chkstride1(A.data)
     n = LinearAlgebra.checksquare(A.data)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
+    cache.AF = (copy_A ? zero(A) : A) # copy over A to new matrix or use A directly
     cache.info = Ref{BlasInt}()
     return cache
 end
@@ -355,7 +355,7 @@ end
 function load_matrix(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: Real}
     n = LinearAlgebra.checksquare(A)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? similar(A) : A) # copy over A (symmetric) to new matrix or use A directly
+    cache.AF = (copy_A ? zero(A) : A) # copy over A (symmetric) to new matrix or use A directly
     return cache
 end
 

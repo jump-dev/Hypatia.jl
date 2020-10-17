@@ -14,22 +14,22 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     R::Int
     U::Int
     Ps::Vector{Matrix{T}}
-    point::AbstractVector{T}
-    dual_point::AbstractVector{T}
 
+    point::Vector{T}
+    dual_point::Vector{T}
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     rt2::T
     rt2i::T
@@ -72,32 +72,25 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     end
 end
 
-function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     dim = cone.dim
     U = cone.U
     R = cone.R
     Ps = cone.Ps
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = similar(cone.point)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
     cone.rt2 = sqrt(T(2))
     cone.rt2i = inv(cone.rt2)
-    cone.tmpU = Vector{T}(undef, U)
+    cone.tmpU = zeros(T, U)
     cone.tmpLRLR = [Symmetric(zeros(T, size(Pk, 2) * R, size(Pk, 2) * R), :L) for Pk in Ps]
-    cone.tmpLU = [Matrix{T}(undef, size(Pk, 2), U) for Pk in Ps]
+    cone.tmpLU = [zeros(T, size(Pk, 2), U) for Pk in Ps]
     cone.tmpRR = zeros(T, R, R)
     cone.tmpRR2 = zeros(T, R, R)
     cone.tmpRR3 = zeros(T, R, R)
     cone.tmpRRUU = [[zeros(T, R, R) for _ in 1:U] for _ in 1:U]
     cone.ΛFL = Vector{Any}(undef, length(Ps))
-    cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
+    cone.ΛFLP = [zeros(T, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
     cone.PlambdaP_blocks_U = [Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}(undef, R, R) for _ in eachindex(Ps)]
     @inbounds for k in eachindex(Ps), r in 1:R, s in 1:R
@@ -107,7 +100,7 @@ function setup_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     @inbounds for k in eachindex(Ps), r in 1:U, s in 1:U
         cone.PlambdaP_blocks_R[k][r, s] = zeros(T, R, R)
     end
-    return
+    return cone
 end
 
 reset_data(cone::WSOSInterpPosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.blocks_R_updated = false)

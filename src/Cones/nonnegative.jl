@@ -10,18 +10,20 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     max_neighborhood::T
     dim::Int
+
     point::Vector{T}
     dual_point::Vector{T}
-
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Diagonal{T, Vector{T}}
     inv_hess::Diagonal{T, Vector{T}}
-    correction::Vector{T}
 
     function Nonnegative{T}(
         dim::Int;
@@ -44,16 +46,11 @@ reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.he
 use_sqrt_oracles(cone::Nonnegative) = true
 
 # TODO only allocate the fields we use
-function setup_data(cone::Nonnegative{T}) where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::Nonnegative{T}) where {T <: Real}
     dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Diagonal(zeros(T, dim))
     cone.inv_hess = Diagonal(zeros(T, dim))
-    cone.correction = zeros(T, dim)
-    return
+    return cone
 end
 
 get_nu(cone::Nonnegative) = cone.dim

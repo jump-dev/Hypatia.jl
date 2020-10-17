@@ -171,7 +171,7 @@ function calc_univariate_chebyshev(
     calc_hessian::Bool = false,
     ) where {T <: Real}
     @assert d > 0
-    u = Matrix{T}(undef, length(pts_i), d + 1)
+    u = zeros(T, length(pts_i), d + 1)
     @. u[:, 1] = 1
     @. u[:, 2] = pts_i
     for t in 3:(d + 1)
@@ -184,7 +184,7 @@ function calc_univariate_chebyshev(
     @assert calc_gradient
 
     # calculate gradient
-    ug = similar(u)
+    ug = zero(u)
     @. ug[:, 1] = 0
     @. ug[:, 2] = 1
     for t in 3:(d + 1)
@@ -197,7 +197,7 @@ function calc_univariate_chebyshev(
     @assert d > 1
 
     # calculate hessian
-    uh = similar(u)
+    uh = zero(u)
     @. uh[:, 1:2] = 0
     for t in 3:(d + 1)
         @. @views uh[:, t] = 2 * (2 * ug[:, t - 1] + pts_i * uh[:, t - 1]) - uh[:, t - 2]
@@ -257,7 +257,7 @@ function padua_data(
     # Padua points for degree 2d
     cheba = cheb2_pts(T, 2d + 1)
     chebb = cheb2_pts(T, 2d + 2)
-    pts = Matrix{T}(undef, U, 2)
+    pts = zeros(T, U, 2)
     j = 1
     for a in 0:2d, b in 0:(2d + 1)
         if iseven(a + b)
@@ -298,7 +298,7 @@ function padua_data(
         end
         Mmom[1, d + 1] /= 2
         # cubature weights as matrices on the subgrids
-        W = Matrix{T}(undef, d + 1, 2d + 1)
+        W = zeros(T, d + 1, 2d + 1)
         W[:, 1:2:(2d + 1)] .= to2' * Mmom * te1
         W[:, 2:2:(2d + 1)] .= te2' * Mmom * to1
         W[:, [1, (2d + 1)]] ./= 2
@@ -325,7 +325,7 @@ function approxfekete_data(
 
     # points in the initial interpolation grid
     npts = prod_consec(n, d)
-    candidate_pts = Matrix{T}(undef, npts, n)
+    candidate_pts = zeros(T, npts, n)
 
     for j in 1:n
         ig = prod_consec(n, d, j)
@@ -432,7 +432,7 @@ end
 function make_product_vandermonde(u::Vector{Matrix{T}}, expos::Vector) where {T <: Real}
     npts = size(u[1], 1)
     n = length(u)
-    V = Matrix{T}(undef, npts, length(expos))
+    V = zeros(T, npts, length(expos))
 
     for (col, xp) in enumerate(expos)
         @inbounds @. @views V[:, col] = u[1][:, xp[1] + 1]
