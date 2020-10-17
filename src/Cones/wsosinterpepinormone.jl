@@ -284,6 +284,7 @@ function update_hess_prod(cone::WSOSInterpEpiNormOne)
     @inbounds for k in eachindex(cone.Ps)
         PΛiPs1 = cone.PΛiPs1[k]
         PΛiPs2 = cone.PΛiPs2[k]
+
         UUk = cone.tmpUU_vec[k]
         for r in 1:(R - 1), j in 1:U, i in 1:j
             ij1 = PΛiPs1[r][i, j]
@@ -353,15 +354,9 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where {T}
         end
         @views ldiv!(Diz[idxs2, :], cone.hess_diag_facts[r - 1], z)
         @views mul!(schur, z', Diz[idxs2, :], -1, true)
-        # V = cone.hess_diag_facts[r - 1].L \ z
-        # schur .-= V' * V
     end
 
     copyto!(schur_backup, schur)
-    # @show eigvals(Symmetric(schur_backup, :U))
-    # @show norm(Symmetric(schur_backup, :U))
-    # @show maximum(abs, Symmetric(schur_backup, :U))
-    # @show minimum(abs, Symmetric(schur_backup, :U))
     s_fact = cone.hess_schur_fact = cholesky!(Symmetric(schur, :U), check = false)
     if !isposdef(s_fact)
         for i in 1:U
