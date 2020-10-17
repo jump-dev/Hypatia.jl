@@ -323,13 +323,14 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInt
     return prod
 end
 
-function update_inv_hess_prod(cone::WSOSInterpEpiNormOne)
+function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where {T}
     if !cone.hess_prod_updated
         update_hess_prod(cone)
     end
     U = cone.U
     R = cone.R
     schur = cone.tmpUU2
+    schur_backup = cone.tmpUU
     @views copyto!(schur, Symmetric(cone.hess_diag_blocks[1], :U))
     Diz = cone.tmpURU2
 
@@ -340,18 +341,33 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne)
         idxs2 = block_idxs(U, r1)
         LinearAlgebra.copytri!(cone.hess_edge_blocks[r1], 'U')
         z = cone.hess_edge_blocks[r1]
-        @views copyto!(diag_r, cone.hess_diag_blocks[r])
+        copyto!(diag_r, cone.hess_diag_blocks[r])
         cone.hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U), check = false)
         if !isposdef(cone.hess_diag_facts[r1])
-            cone.hess_diag_facts[r1] = bunchkaufman!(Symmetric(diag_r, :U)) # TODO better approach?
+            copyto!(diag_r, cone.hess_diag_blocks[r])
+            diag_pert = 1 + T(1e-5)
+            for i in 1:U
+                diag_r[i, i] *= diag_pert
+            end
+            cone.hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U))
         end
         @views ldiv!(Diz[idxs2, :], cone.hess_diag_facts[r - 1], z)
         @views mul!(schur, z', Diz[idxs2, :], -1, true)
+        # V = cone.hess_diag_facts[r - 1].L \ z
+        # schur .-= V' * V
     end
 
+    copyto!(schur_backup, schur)
+    # @show eigvals(Symmetric(schur_backup, :U))
+    # @show norm(Symmetric(schur_backup, :U))
+    # @show maximum(abs, Symmetric(schur_backup, :U))
+    # @show minimum(abs, Symmetric(schur_backup, :U))
     s_fact = cone.hess_schur_fact = cholesky!(Symmetric(schur, :U), check = false)
     if !isposdef(s_fact)
-        s_fact = cone.hess_schur_fact = bunchkaufman!(Symmetric(schur, :U)) # TODO better approach?
+        for i in 1:U
+            schur_backup[i, i] += 1
+        end
+        s_fact = cone.hess_schur_fact = cholesky!(Symmetric(schur_backup, :U))
     end
 
     cone.inv_hess_prod_updated = true
