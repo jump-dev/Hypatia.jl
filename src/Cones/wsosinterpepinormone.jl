@@ -94,14 +94,14 @@ function setup_extra_data(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     cone.hess_diags = [zeros(T, U, U) for _ in 1:R - 1]
     cone.Λi_Λ = [Vector{Matrix{T}}(undef, R - 1) for Psk in Ps]
     @inbounds for k in eachindex(Ps), r in 1:(R - 1)
-        cone.Λi_Λ[k][r] = similar(cone.grad, size(Ps[k], 2), size(Ps[k], 2))
+        cone.Λi_Λ[k][r] = zero(cone.grad, size(Ps[k], 2), size(Ps[k], 2))
     end
-    cone.Λ11 = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
-    cone.tmpΛ11 = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
-    cone.tmpLL = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
-    cone.tmpLU = [similar(cone.grad, size(Psk, 2), U) for Psk in Ps]
-    cone.tmpLU2 = [similar(cone.grad, size(Psk, 2), U) for Psk in Ps]
-    cone.tmpUU_vec = [similar(cone.grad, U, U) for _ in eachindex(Ps)]
+    cone.Λ11 = [zero(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
+    cone.tmpΛ11 = [zero(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
+    cone.tmpLL = [zero(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
+    cone.tmpLU = [zero(cone.grad, size(Psk, 2), U) for Psk in Ps]
+    cone.tmpLU2 = [zero(cone.grad, size(Psk, 2), U) for Psk in Ps]
+    cone.tmpUU_vec = [zero(cone.grad, U, U) for _ in eachindex(Ps)]
     cone.tmpUU = zeros(T, U, U)
     cone.tmpUU2 = zeros(T, U, U)
     cone.tmpURU = zeros(T, U, U * (R - 1))
@@ -109,8 +109,8 @@ function setup_extra_data(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     cone.PΛiPs1 = [Vector{Matrix{T}}(undef, R) for Psk in Ps]
     cone.PΛiPs2 = [Vector{Matrix{T}}(undef, R) for Psk in Ps]
     @inbounds for k in eachindex(Ps), r in 1:(R - 1)
-        cone.PΛiPs1[k][r] = similar(cone.grad, U, U)
-        cone.PΛiPs2[k][r] = similar(cone.grad, U, U)
+        cone.PΛiPs1[k][r] = zero(cone.grad, U, U)
+        cone.PΛiPs2[k][r] = zero(cone.grad, U, U)
     end
     cone.lambdafact = Vector{Any}(undef, length(Ps))
     cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
@@ -233,7 +233,7 @@ function update_grad(cone::WSOSInterpEpiNormOne)
             cone.grad[idx] -= 2 * PΛiPs2[r][i, i]
             idx += 1
         end
-    end # j
+    end
 
     cone.grad_updated = true
     return cone.grad

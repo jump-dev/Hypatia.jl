@@ -46,9 +46,13 @@ function permute_affine(cone::MOI.RelativeEntropyCone, idxs::AbstractVector)
     dim = MOI.dimension(cone)
     w_dim = div(dim - 1, 2)
     new_idxs = collect(idxs)
-    for i in 2:length(idxs)
-        idx = idxs[i]
-        new_idxs[i] = 2 * idx - 1 - (idx <= 1 + w_dim ? 1 : 2 * w_dim)
+    for (i, idx) in enumerate(idxs)
+        idx <= 1 && continue
+        if idx <= 1 + w_dim
+            new_idxs[i] = 2 * (idx - 1)
+        else
+            new_idxs[i] = 2 * (idx - w_dim) - 1
+        end
     end
     return new_idxs
 end

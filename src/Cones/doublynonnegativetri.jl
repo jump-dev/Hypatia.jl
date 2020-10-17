@@ -73,9 +73,9 @@ function setup_extra_data(cone::DoublyNonnegativeTri{T}) where {T <: Real}
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.mat = zeros(T, cone.side, cone.side)
-    cone.mat2 = similar(cone.mat)
-    cone.mat3 = similar(cone.mat)
-    cone.mat4 = similar(cone.mat)
+    cone.mat2 = zero(cone.mat)
+    cone.mat3 = zero(cone.mat)
+    cone.mat4 = zero(cone.mat)
     cone.inv_vec = zeros(T, length(cone.offdiag_idxs))
     return cone
 end

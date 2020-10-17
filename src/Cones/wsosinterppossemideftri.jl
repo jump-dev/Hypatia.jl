@@ -82,15 +82,15 @@ function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.rt2 = sqrt(T(2))
     cone.rt2i = inv(cone.rt2)
-    cone.tmpU = Vector{T}(undef, U)
+    cone.tmpU = zeros(T, U)
     cone.tmpLRLR = [Symmetric(zeros(T, size(Pk, 2) * R, size(Pk, 2) * R), :L) for Pk in Ps]
-    cone.tmpLU = [Matrix{T}(undef, size(Pk, 2), U) for Pk in Ps]
+    cone.tmpLU = [zeros(T, size(Pk, 2), U) for Pk in Ps]
     cone.tmpRR = zeros(T, R, R)
     cone.tmpRR2 = zeros(T, R, R)
     cone.tmpRR3 = zeros(T, R, R)
     cone.tmpRRUU = [[zeros(T, R, R) for _ in 1:U] for _ in 1:U]
     cone.ΛFL = Vector{Any}(undef, length(Ps))
-    cone.ΛFLP = [Matrix{T}(undef, R * size(Pk, 2), R * U) for Pk in Ps]
+    cone.ΛFLP = [zeros(T, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
     cone.PlambdaP_blocks_U = [Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}(undef, R, R) for _ in eachindex(Ps)]
     @inbounds for k in eachindex(Ps), r in 1:R, s in 1:R

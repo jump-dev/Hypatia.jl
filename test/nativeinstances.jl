@@ -1017,7 +1017,7 @@ function epinormspectral1(T; options...)
             S = zeros(R, Xn, Xm)
             @views Cones.vec_copy_to!(S, r.s[2:end])
             prim_svdvals = svdvals(S)
-            Z = similar(S)
+            Z = zero(S)
             @views Cones.vec_copy_to!(Z, r.z[2:end])
             dual_svdvals = svdvals(Z)
             if use_dual

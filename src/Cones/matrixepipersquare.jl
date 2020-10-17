@@ -89,16 +89,16 @@ function setup_extra_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComp
     cone.U = Hermitian(zeros(R, d1, d1), :U)
     cone.W = zeros(R, d1, d2)
     cone.Z = Hermitian(zeros(R, d1, d1), :U)
-    cone.ZiW = Matrix{R}(undef, d1, d2)
+    cone.ZiW = zeros(R, d1, d2)
     cone.ZiUZi = Hermitian(zeros(R, d1, d1), :U)
     cone.WtZiW = Hermitian(zeros(R, d2, d2), :U)
-    cone.tmpd2d2 = Matrix{R}(undef, d2, d2)
-    cone.tmpd1d1 = Matrix{R}(undef, d1, d1)
-    cone.tmpd1d1b = Matrix{R}(undef, d1, d1)
-    cone.tmpd1d1c = Matrix{R}(undef, d1, d1)
-    cone.tmpd1d1d = Matrix{R}(undef, d1, d1)
-    cone.tmpd1d2 = Matrix{R}(undef, d1, d2)
-    cone.ZiUZiW = Matrix{R}(undef, d1, d2)
+    cone.tmpd2d2 = zeros(R, d2, d2)
+    cone.tmpd1d1 = zeros(R, d1, d1)
+    cone.tmpd1d1b = zeros(R, d1, d1)
+    cone.tmpd1d1c = zeros(R, d1, d1)
+    cone.tmpd1d1d = zeros(R, d1, d1)
+    cone.tmpd1d2 = zeros(R, d1, d2)
+    cone.ZiUZiW = zeros(R, d1, d2)
     return cone
 end
 
@@ -333,9 +333,9 @@ function correction(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     v = cone.point[cone.v_idx]
     W = cone.W
 
-    @views U_dir = Hermitian(svec_to_smat!(similar(U.data), primal_dir[U_idxs], cone.rt2))
+    @views U_dir = Hermitian(svec_to_smat!(zero(U.data), primal_dir[U_idxs], cone.rt2))
     v_dir = primal_dir[v_idx]
-    @views W_dir = vec_copy_to!(similar(W), primal_dir[W_idxs])
+    @views W_dir = vec_copy_to!(zero(W), primal_dir[W_idxs])
 
     corr = cone.correction
     U_corr = view(corr, U_idxs)

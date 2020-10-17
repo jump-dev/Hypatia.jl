@@ -67,12 +67,12 @@ function setup_extra_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrC
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     Ls = [size(Pk, 2) for Pk in cone.Ps]
-    cone.tmpLL = [Matrix{R}(undef, L, L) for L in Ls]
-    cone.tmpUL = [Matrix{R}(undef, dim, L) for L in Ls]
-    cone.tmpLU = [Matrix{R}(undef, L, dim) for L in Ls]
-    cone.tmpLU2 = [Matrix{R}(undef, L, dim) for L in Ls]
-    cone.tmpLU3 = [Matrix{R}(undef, L, dim) for L in Ls]
-    cone.tmpUU = [Matrix{R}(undef, dim, dim) for L in Ls]
+    cone.tmpLL = [zeros(R, L, L) for L in Ls]
+    cone.tmpUL = [zeros(R, dim, L) for L in Ls]
+    cone.tmpLU = [zeros(R, L, dim) for L in Ls]
+    cone.tmpLU2 = [zeros(R, L, dim) for L in Ls]
+    cone.tmpLU3 = [zeros(R, L, dim) for L in Ls]
+    cone.tmpUU = [zeros(R, dim, dim) for L in Ls]
     cone.ΛF = Vector{Any}(undef, length(Ls))
     return cone
 end

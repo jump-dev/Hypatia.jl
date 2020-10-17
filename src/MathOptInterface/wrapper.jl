@@ -331,7 +331,7 @@ function MOI.copy_to(
     SV_interval_cons = get_src_cons(MOI.SingleVariable, MOI.Interval{T})
     SAF_interval_cons = get_src_cons(MOI.ScalarAffineFunction{T}, MOI.Interval{T})
     num_intervals = length(SV_interval_cons) + length(SAF_interval_cons)
-    interval_scales = Vector{T}(undef, num_intervals)
+    interval_scales = zeros(T, num_intervals)
 
     if num_intervals > 0
         i += 1

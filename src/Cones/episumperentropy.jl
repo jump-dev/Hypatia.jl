@@ -265,7 +265,7 @@ function update_inv_hess_sqrt_aux(cone::EpiSumPerEntropy{T}) where {T}
 
     # modify nonzeros of upper triangular factor of inverse Hessian
     cone.no_sqrts = !factor_upper_arrow_block2(cone.Hiuu, cone.Hiuv, cone.Hiuw, cone.Hivv, cone.Hivw, cone.Hiww, cone.inv_hess_sqrt.data.nzval)
-    cone.no_sqrts && println("no sqrt")
+    # cone.no_sqrts && println("no sqrt")
 
     cone.inv_hess_sqrt_aux_updated = true
     return

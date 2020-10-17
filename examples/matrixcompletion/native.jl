@@ -165,7 +165,7 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
             cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(num_rows)]
             c = vcat(one(T), zeros(T, num_unknown))
         end
-    end # objective natural true/false
+    end
 
     if inst.geomean_constr
         if inst.use_hypogeomean
@@ -237,11 +237,11 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
                 ]
 
             c = vcat(c, zeros(T, num_unknown - 2))
-        end # constraints natural true/false
+        end
     else
         G = G_norm
         h = h_norm
-    end # add geomean constraint
+    end
 
     A = zeros(T, 0, size(G, 2))
     b = T[]

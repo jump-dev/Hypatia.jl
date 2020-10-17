@@ -131,7 +131,7 @@ function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: BlasReal}
     u = cone.dual_point[1]
 
     if u > eps(T)
-        W = @views vec_copy_to!(similar(cone.W), cone.dual_point[2:end])
+        W = @views vec_copy_to!(zero(cone.W), cone.dual_point[2:end])
         return (u - sum(svdvals(W)) > eps(T))
     end
 

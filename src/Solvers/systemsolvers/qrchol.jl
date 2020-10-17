@@ -149,7 +149,7 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
 
     system_solver.GQ2 = GQ[:, (p + 1):end]
     system_solver.HGQ2 = zeros(T, q, nmp)
-    system_solver.QpbxGHbz = Vector{T}(undef, n)
+    system_solver.QpbxGHbz = zeros(T, n)
     system_solver.Q2div = view(system_solver.QpbxGHbz, (p + 1):n)
     system_solver.Gx = zeros(T, q)
     system_solver.HGx = zeros(T, q)

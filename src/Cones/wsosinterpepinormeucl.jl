@@ -84,23 +84,23 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.mat = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
+    cone.mat = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
     cone.matfact = Vector{Any}(undef, length(Ps))
     cone.Λi_Λ = [Vector{Matrix{T}}(undef, R - 1) for Psk in Ps]
     @inbounds for k in eachindex(Ps), r in 1:(R - 1)
-        cone.Λi_Λ[k][r] = similar(cone.grad, size(Ps[k], 2), size(Ps[k], 2))
+        cone.Λi_Λ[k][r] = zeros(T, size(Ps[k], 2), size(Ps[k], 2))
     end
-    cone.Λ11 = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
-    cone.tmpLL = [similar(cone.grad, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
-    cone.tmpLU = [similar(cone.grad, size(Psk, 2), U) for Psk in Ps]
-    cone.tmpLU2 = [similar(cone.grad, size(Psk, 2), U) for Psk in Ps]
-    cone.tmpUU_vec = [similar(cone.grad, U, U) for _ in eachindex(Ps)]
-    cone.tmpUU = similar(cone.grad, U, U)
+    cone.Λ11 = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
+    cone.tmpLL = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
+    cone.tmpLU = [zeros(T, size(Psk, 2), U) for Psk in Ps]
+    cone.tmpLU2 = [zeros(T, size(Psk, 2), U) for Psk in Ps]
+    cone.tmpUU_vec = [zeros(T, U, U) for _ in eachindex(Ps)]
+    cone.tmpUU = zeros(T, U, U)
     cone.PΛiPs = [Vector{Vector{Matrix{T}}}(undef, R) for Psk in Ps]
     @inbounds for k in eachindex(Ps), r1 in 1:R
         cone.PΛiPs[k][r1] = Vector{Matrix{T}}(undef, r1)
         for r2 in 1:r1
-            cone.PΛiPs[k][r1][r2] = similar(cone.grad, U, U)
+            cone.PΛiPs[k][r1][r2] = zeros(T, U, U)
         end
     end
     cone.Λ11iP = [zeros(T, size(P, 2), U) for P in Ps]
@@ -222,7 +222,7 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
             cone.grad[idx] -= 2 * PΛiPs[r][1][i, i]
             idx += 1
         end
-    end # j
+    end
 
     cone.grad_updated = true
     return cone.grad
@@ -298,9 +298,9 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
     return cone.hess
 end
 
-# TODO allocations
+# TODO allocations, inbounds etc
 function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T}) where {T}
-    corr = similar(cone.point)
+    corr = cone.correction
     corr .= 0
     R = cone.R
     U = cone.U
@@ -374,8 +374,8 @@ function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T
                     PΛP_dirs_pqq[1, k] * PΛP_dirs_pqq[1, m] * PΛP(i, 1)'
                 @views corr[block_idxs(U, i)] .+= diag(M)
             end
-        end # loop i
-    end # pk
+        end
+    end
 
     return corr
 end

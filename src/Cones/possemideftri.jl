@@ -77,9 +77,9 @@ function setup_extra_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.mat = zeros(R, cone.side, cone.side)
-    cone.mat2 = similar(cone.mat)
-    cone.mat3 = similar(cone.mat)
-    cone.mat4 = similar(cone.mat)
+    cone.mat2 = zero(cone.mat)
+    cone.mat3 = zero(cone.mat)
+    cone.mat4 = zero(cone.mat)
     return cone
 end
 

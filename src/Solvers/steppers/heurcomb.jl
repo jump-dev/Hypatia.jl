@@ -40,7 +40,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
 
     # update linear system solver factorization and helpers
-    Cones.grad.(model.cones)
+    # Cones.grad.(model.cones)
     update_lhs(solver.system_solver, solver)
 
     # calculate centering direction and keep in dir_cent
@@ -64,8 +64,8 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.prev_pred_alpha = pred_alpha = find_max_alpha(point, stepper.dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T)) # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
 
     # TODO allow different function (heuristic) as option?
-    stepper.prev_gamma = gamma = abs2(1 - pred_alpha)
-    # stepper.prev_gamma = gamma = 1 - pred_alpha
+    # stepper.prev_gamma = gamma = abs2(1 - pred_alpha)
+    stepper.prev_gamma = gamma = 1 - pred_alpha
 
     # calculate combined direction and keep in dir
     @. stepper.dir.vec = gamma * (dir_cent + pred_alpha * dir_centcorr) + (1 - gamma) * (dir_pred + pred_alpha * dir_predcorr) # TODO

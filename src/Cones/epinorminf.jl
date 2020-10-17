@@ -297,8 +297,7 @@ function update_hess_sqrt_aux(cone::EpiNormInf{T}) where {T}
     else
         cone.no_sqrts = !factor_upper_arrow(cone.Huu, cone.Hure, cone.Hrere, cone.hess_sqrt.data.nzval)
     end
-
-    cone.no_sqrts && println("no sqrt") # TODO remove later
+    # cone.no_sqrts && println("no sqrt") # TODO remove later
 
     cone.hess_sqrt_aux_updated = true
     return

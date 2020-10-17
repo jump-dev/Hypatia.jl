@@ -137,7 +137,7 @@ function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
     corr = cone.correction
     dim = cone.dim
 
-    tmp = similar(sumAinvAs[1])
+    tmp = zero(sumAinvAs[1])
     tmp .= 0
     @inbounds for j in 1:dim, k in 1:dim
         mul!(tmp, sumAinvAs[j], sumAinvAs[k], primal_dir[j] * primal_dir[k], true)
