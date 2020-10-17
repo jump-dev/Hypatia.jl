@@ -17,9 +17,13 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     w_dim::Int
     v_idxs
     w_idxs
+
     point::Vector{T}
     dual_point::Vector{T}
-
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
@@ -27,14 +31,10 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     inv_hess_aux_updated::Bool
     inv_hess_sqrt_aux_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, SparseMatrixCSC{T, Int}}
     inv_hess_sqrt::UpperTriangular{T, SparseMatrixCSC{T, Int}}
     no_sqrts::Bool
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     lwv::Vector{T}
     tau::Vector{T}
@@ -77,16 +77,8 @@ function use_sqrt_oracles(cone::EpiSumPerEntropy)
 end
 
 # TODO only allocate the fields we use
-function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
-    reset_data(cone)
-    dim = cone.dim
+function setup_extra_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
     w_dim = cone.w_dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
     cone.lwv = zeros(T, w_dim)
     cone.tau = zeros(T, w_dim)
     cone.Hiuv = zeros(T, w_dim)
@@ -97,7 +89,7 @@ function setup_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
     cone.temp1 = zeros(T, w_dim)
     cone.temp2 = zeros(T, w_dim)
     cone.no_sqrts = false
-    return
+    return cone
 end
 
 get_nu(cone::EpiSumPerEntropy) = cone.dim
@@ -273,7 +265,7 @@ function update_inv_hess_sqrt_aux(cone::EpiSumPerEntropy{T}) where {T}
 
     # modify nonzeros of upper triangular factor of inverse Hessian
     cone.no_sqrts = !factor_upper_arrow_block2(cone.Hiuu, cone.Hiuv, cone.Hiuw, cone.Hivv, cone.Hivw, cone.Hiww, cone.inv_hess_sqrt.data.nzval)
-    cone.no_sqrts && println("no sqrt")
+    # cone.no_sqrts && println("no sqrt")
 
     cone.inv_hess_sqrt_aux_updated = true
     return

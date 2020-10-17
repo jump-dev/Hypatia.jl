@@ -10,20 +10,20 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     max_neighborhood::T
     dim::Int
+
     point::Vector{T}
     dual_point::Vector{T}
-
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     dist::T
 
@@ -48,18 +48,11 @@ reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.he
 use_sqrt_oracles(cone::EpiNormEucl) = true
 
 # TODO only allocate the fields we use
-function setup_data(cone::EpiNormEucl{T}) where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::EpiNormEucl{T}) where {T <: Real}
     dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
-    return
+    return cone
 end
 
 get_nu(cone::EpiNormEucl) = 2

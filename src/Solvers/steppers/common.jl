@@ -35,15 +35,17 @@ function update_rhs_predcorr(
     irtrtmu = inv(sqrt(sqrt(solver.mu))) # TODO or mu^-0.25
     for (k, cone_k) in enumerate(solver.model.cones)
         Cones.use_correction(cone_k) || continue
-
-        # TODO avoid allocs
+        H_prim_dir_k = cone_k.vec1
+        prim_k_scal = cone_k.vec2
         prim_dir_k = dir.primal_views[k]
-        H_prim_dir_k = Cones.hess_prod!(similar(prim_dir_k), prim_dir_k, cone_k)
-        prim_k_scal = irtrtmu * prim_dir_k
+
+        @. prim_k_scal = irtrtmu * prim_dir_k
+        Cones.hess_prod!(H_prim_dir_k, prim_dir_k, cone_k)
         corr_k = Cones.correction(cone_k, prim_k_scal)
+
         corr_point = dot(corr_k, cone_k.point)
         corr_viol = abs(corr_point - irtrtmu * dot(prim_k_scal, H_prim_dir_k)) / abs(corr_point + 10eps(T))
-        if corr_viol < 0.001
+        if corr_viol < T(1e-3)
             @. rhs.s_views[k] += H_prim_dir_k + corr_k
         end
     end
@@ -94,15 +96,17 @@ function update_rhs_centcorr(
     irtrtmu = inv(sqrt(sqrt(solver.mu)))
     for (k, cone_k) in enumerate(solver.model.cones)
         Cones.use_correction(cone_k) || continue
-
-        # TODO avoid allocs
+        H_prim_dir_k_scal = cone_k.vec1
+        prim_k_scal = cone_k.vec2
         prim_dir_k = dir.primal_views[k]
-        prim_k_scal = irtrtmu * prim_dir_k
-        H_prim_dir_k_scal = Cones.hess_prod!(similar(prim_dir_k), prim_k_scal, cone_k)
+
+        @. prim_k_scal = irtrtmu * prim_dir_k
+        Cones.hess_prod!(H_prim_dir_k_scal, prim_k_scal, cone_k)
         corr_k = Cones.correction(cone_k, prim_k_scal)
+
         corr_point = dot(corr_k, cone_k.point)
         corr_viol = abs(corr_point - dot(prim_k_scal, H_prim_dir_k_scal)) / abs(corr_point + 10eps(T))
-        if corr_viol < 0.001
+        if corr_viol < T(1e-3)
             rhs.s_views[k] .+= corr_k
         end
     end

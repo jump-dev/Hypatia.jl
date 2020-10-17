@@ -284,10 +284,13 @@ function find_initial_y(
         # NOTE very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
         if model.G isa UniformScaling
             side = size(Ap_Q, 1)
-            GQ = Matrix{T}(model.G, side, side) * Ap_Q
+            G_mul = Matrix{T}(model.G, side, side)
+        elseif !isa(model.G, Matrix)
+            G_mul = Matrix{T}(model.G)
         else
-            GQ = model.G * Ap_Q
+            G_mul = model.G
         end
+        GQ = G_mul * Ap_Q
         GQ1 = solver.reduce_GQ1 = GQ[:, Q1_idxs]
         GQ2 = GQ[:, Q2_idxs]
         # h = h0 - GQ1 * (R' \ b0)

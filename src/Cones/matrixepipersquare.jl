@@ -12,10 +12,14 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     d1::Int
     d2::Int
     is_complex::Bool
-    point::Vector{T}
-    dual_point::Vector{T}
     rt2::T
 
+    point::Vector{T}
+    dual_point::Vector{T}
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
@@ -23,13 +27,9 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     U_idxs::UnitRange{Int}
     v_idx::Int
@@ -80,34 +80,26 @@ end
 reset_data(cone::MatrixEpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.hess_aux_updated = false)
 
 # TODO only allocate the fields we use
-function setup_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
-    d1 = cone.d1
-    d2 = cone.d2
+    (d1, d2) = (cone.d1, cone.d2)
     cone.U = Hermitian(zeros(R, d1, d1), :U)
     cone.W = zeros(R, d1, d2)
     cone.Z = Hermitian(zeros(R, d1, d1), :U)
-    cone.ZiW = Matrix{R}(undef, d1, d2)
+    cone.ZiW = zeros(R, d1, d2)
     cone.ZiUZi = Hermitian(zeros(R, d1, d1), :U)
     cone.WtZiW = Hermitian(zeros(R, d2, d2), :U)
-    cone.tmpd2d2 = Matrix{R}(undef, d2, d2)
-    cone.tmpd1d1 = Matrix{R}(undef, d1, d1)
-    cone.tmpd1d1b = Matrix{R}(undef, d1, d1)
-    cone.tmpd1d1c = Matrix{R}(undef, d1, d1)
-    cone.tmpd1d1d = Matrix{R}(undef, d1, d1)
-    cone.tmpd1d2 = Matrix{R}(undef, d1, d2)
-    cone.ZiUZiW = Matrix{R}(undef, d1, d2)
-    return
+    cone.tmpd2d2 = zeros(R, d2, d2)
+    cone.tmpd1d1 = zeros(R, d1, d1)
+    cone.tmpd1d1b = zeros(R, d1, d1)
+    cone.tmpd1d1c = zeros(R, d1, d1)
+    cone.tmpd1d1d = zeros(R, d1, d1)
+    cone.tmpd1d2 = zeros(R, d1, d2)
+    cone.ZiUZiW = zeros(R, d1, d2)
+    return cone
 end
 
 get_nu(cone::MatrixEpiPerSquare) = cone.d1 + 1
@@ -341,9 +333,9 @@ function correction(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     v = cone.point[cone.v_idx]
     W = cone.W
 
-    @views U_dir = Hermitian(svec_to_smat!(similar(U.data), primal_dir[U_idxs], cone.rt2))
+    @views U_dir = Hermitian(svec_to_smat!(zero(U.data), primal_dir[U_idxs], cone.rt2))
     v_dir = primal_dir[v_idx]
-    @views W_dir = vec_copy_to!(similar(W), primal_dir[W_idxs])
+    @views W_dir = vec_copy_to!(zero(W), primal_dir[W_idxs])
 
     corr = cone.correction
     U_corr = view(corr, U_idxs)

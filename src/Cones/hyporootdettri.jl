@@ -15,11 +15,15 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     dim::Int
     side::Int
     is_complex::Bool
-    point::Vector{T}
-    dual_point::Vector{T}
     rt2::T
     sc_const::T
 
+    point::Vector{T}
+    dual_point::Vector{T}
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
@@ -27,13 +31,9 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_aux_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     W::Matrix{R}
     tmpW::Matrix{R}
@@ -82,18 +82,11 @@ use_heuristic_neighborhood(cone::HypoRootdetTri) = false
 
 reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.hess_fact_updated = false)
 
-function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
     side = cone.side
     cone.W = zeros(R, side, side)
     cone.tmpW = zeros(R, side, side)
@@ -101,7 +94,7 @@ function setup_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} wh
     cone.work_mat = zeros(R, side, side)
     cone.work_mat2 = zeros(R, side, side)
     cone.tmpw = zeros(T, dim - 1)
-    return
+    return cone
 end
 
 get_nu(cone::HypoRootdetTri) = (cone.side + 1) * cone.sc_const

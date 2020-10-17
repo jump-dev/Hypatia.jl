@@ -40,23 +40,22 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
 
     # update linear system solver factorization and helpers
-    Cones.grad.(model.cones)
+    # Cones.grad.(model.cones)
     update_lhs(solver.system_solver, solver)
 
     # calculate centering direction and keep in dir_cent
     update_rhs_cent(solver, stepper.rhs)
     get_directions(stepper, solver, false, iter_ref_steps = 3)
     dir_cent = copy(stepper.dir.vec) # TODO
-    update_rhs_centcorr(solver, stepper.rhs, stepper.dir)
+    update_rhs_centcorr(solver, stepper.rhs, stepper.dir, add = false)
     get_directions(stepper, solver, false, iter_ref_steps = 3)
     dir_centcorr = copy(stepper.dir.vec) # TODO
-    # copyto!(stepper.dir_cent, stepper.dir)
 
     # calculate affine/prediction direction and keep in dir
     update_rhs_pred(solver, stepper.rhs)
     get_directions(stepper, solver, true, iter_ref_steps = 3)
     dir_pred = copy(stepper.dir.vec) # TODO
-    update_rhs_predcorr(solver, stepper.rhs, stepper.dir)
+    update_rhs_predcorr(solver, stepper.rhs, stepper.dir, add = false)
     get_directions(stepper, solver, true, iter_ref_steps = 3)
     dir_predcorr = copy(stepper.dir.vec) # TODO
 
@@ -69,7 +68,6 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.prev_gamma = gamma = 1 - pred_alpha
 
     # calculate combined direction and keep in dir
-    # axpby!(gamma, stepper.dir_cent, 1 - gamma, stepper.dir)
     @. stepper.dir.vec = gamma * (dir_cent + pred_alpha * dir_centcorr) + (1 - gamma) * (dir_pred + pred_alpha * dir_predcorr) # TODO
 
     # find distance alpha for stepping in combined direction
@@ -78,7 +76,6 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     if iszero(alpha)
         # could not step far in combined direction, so attempt a pure centering step
         solver.verbose && println("performing centering step")
-        # copyto!(stepper.dir, stepper.dir_cent)
         @. stepper.dir.vec = dir_cent + dir_centcorr
 
         # find distance alpha for stepping in centering direction
@@ -87,7 +84,6 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
         if iszero(alpha)
             copyto!(stepper.dir.vec, dir_cent)
             alpha = find_max_alpha(point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
-
             if iszero(alpha)
                 @warn("numerical failure: could not step in centering direction; terminating")
                 solver.status = NumericalFailure

@@ -17,9 +17,13 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     d1::Int
     d2::Int
     is_complex::Bool
+
     point::Vector{T}
     dual_point::Vector{T}
-
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
@@ -27,13 +31,9 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_aux_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     W::Matrix{R}
     Z::Matrix{R}
@@ -78,18 +78,11 @@ end
 reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.hess_fact_updated = false)
 
 # TODO only allocate the fields we use
-function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
     (d1, d2) = (cone.d1, cone.d2)
     cone.W = zeros(R, d1, d2)
     cone.Z = zeros(R, d1, d1)
@@ -104,7 +97,7 @@ function setup_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} w
     cone.tmpd1d1 = zeros(R, d1, d1)
     cone.tmpd2d2 = zeros(R, d2, d2)
     cone.tmpd2d2b = zeros(R, d2, d2)
-    return
+    return cone
 end
 
 get_nu(cone::EpiNormSpectral) = cone.d1 + 1
@@ -138,7 +131,7 @@ function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: BlasReal}
     u = cone.dual_point[1]
 
     if u > eps(T)
-        W = @views vec_copy_to!(similar(cone.W), cone.dual_point[2:end])
+        W = @views vec_copy_to!(zero(cone.W), cone.dual_point[2:end])
         return (u - sum(svdvals(W)) > eps(T))
     end
 

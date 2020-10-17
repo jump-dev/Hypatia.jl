@@ -257,9 +257,9 @@ function solve(solver::Solver{T}) where {T <: Real}
         Cones.load_dual_point.(model.cones, point.dual_views)
 
         # setup iteration helpers
-        solver.x_residual = similar(model.c)
-        solver.y_residual = similar(model.b)
-        solver.z_residual = similar(model.h)
+        solver.x_residual = zero(model.c)
+        solver.y_residual = zero(model.b)
+        solver.z_residual = zero(model.h)
 
         solver.x_conv_tol = inv(max(one(T), norm(model.c)))
         solver.y_conv_tol = inv(max(one(T), norm(model.b)))

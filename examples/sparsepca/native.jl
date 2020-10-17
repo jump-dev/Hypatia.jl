@@ -11,7 +11,7 @@ struct SparsePCANative{T <: Real} <: ExampleInstanceNative{T}
     p::Int
     k::Int
     use_epinorminfdual::Bool # use dual of epinorminf cone, else nonnegative cones
-    noise_ratio::Real
+    noise_ratio::T
 end
 
 function build(inst::SparsePCANative{T}) where {T <: Real}
@@ -27,12 +27,11 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
         sigma ./= tr(sigma)
     else
         # simulate some observations with noise
-        x = randn(p, 100)
+        x = randn(T, p, 100)
         sigma = x * x'
-        y = rand(Distributions.Normal(0, Float64(noise_ratio)), k)
+        y = rand(Distributions.Normal(zero(T), noise_ratio), k)
         sigma[signal_idxs, signal_idxs] .+= y * y'
         sigma ./= 100
-        sigma = T.(sigma)
     end
 
     dimx = Cones.svec_length(p)
@@ -41,8 +40,7 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
     b = T[1]
     A = zeros(T, 1, dimx)
     for i in 1:p
-        s = sum(1:i)
-        A[s] = 1
+        A[sum(1:i)] = 1
     end
     hpsd = zeros(T, dimx)
     cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(dimx)]

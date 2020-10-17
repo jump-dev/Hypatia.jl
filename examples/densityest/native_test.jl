@@ -12,8 +12,7 @@ insts["fast"] = [
     ((50, 1, 4, true, true, true),),
     ((50, 1, 10, true, true, true),),
     ((50, 1, 50, true, true, true),),
-    ((100, 1, 100, true, true, true),),
-    ((500, 1, 500, true, true, true),),
+    ((100, 1, 250, true, true, true),),
     ((50, 2, 2, true, true, true),),
     ((200, 2, 20, true, true, true),),
     ((50, 2, 2, false, true, true),),
@@ -29,7 +28,7 @@ insts["fast"] = [
     ((250, 4, 6, true, true, true),),
     ((250, 4, 6, false, true, true),),
     ((250, 4, 6, true, false, true),),
-    ((250, 4, 6, true, true, false),),
+    # ((250, 4, 6, true, true, false),),
     ((200, 32, 2, true, true, true),),
     ((:iris, 4, true, true, true),),
     ((:iris, 5, true, true, true),),
@@ -40,7 +39,7 @@ insts["fast"] = [
     ((:cancer, 4, true, true, true),),
     ((:cancer, 4, false, true, true),),
     ((:cancer, 4, true, false, true),),
-    ((:cancer, 4, true, true, false),),
+    # ((:cancer, 4, true, true, false),),
     ]
 insts["slow"] = [
     ((:cancer, 6, true, true, true),),
