@@ -259,7 +259,7 @@ function test_extra(inst::MatrixRegressionNative{T}, result::NamedTuple) where T
     if result.status == Solvers.Optimal
         # check objective value is correct
         (Y, X) = (inst.Y, inst.X)
-        A_opt = similar(Y, size(X, 2), size(Y, 2))
+        A_opt = zeros(eltype(Y), size(X, 2), size(Y, 2))
         A_len = length(A_opt) * (inst.is_complex ? 2 : 1)
         @views Cones.vec_copy_to!(A_opt, result.x[1 .+ (1:A_len)])
         loss = (sum(abs2, X * A_opt) / 2 - real(dot(X' * Y, A_opt))) / size(Y, 1)

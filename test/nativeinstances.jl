@@ -1017,7 +1017,7 @@ function epinormspectral1(T; options...)
             S = zeros(R, Xn, Xm)
             @views Cones.vec_copy_to!(S, r.s[2:end])
             prim_svdvals = svdvals(S)
-            Z = similar(S)
+            Z = zero(S)
             @views Cones.vec_copy_to!(Z, r.z[2:end])
             dual_svdvals = svdvals(Z)
             if use_dual
@@ -1680,7 +1680,7 @@ function hypoperlogdettri1(T; options...)
         b = T[1]
         G = Matrix{T}(-I, dim, 2)
         mat_half = rand(R, side, side)
-        mat = mat_half * mat_half'
+        mat = mat_half * mat_half' + I
         h = zeros(T, dim)
         Cones.smat_to_svec!(view(h, 3:dim), mat, rt2)
         cones = Cone{T}[Cones.HypoPerLogdetTri{T, R}(dim)]

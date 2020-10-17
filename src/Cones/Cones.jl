@@ -35,26 +35,41 @@ include("nonnegative.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")
 include("epipersquare.jl")
-include("hypoperlog.jl")
 include("episumperentropy.jl")
-include("hypogeomean.jl")
-include("hypopowermean.jl")
+include("hypoperlog.jl")
 include("power.jl")
+include("hypopowermean.jl")
+include("hypogeomean.jl")
 include("epinormspectral.jl")
-include("matrixepipersquare.jl")
 include("linmatrixineq.jl")
 include("possemideftri.jl")
 include("possemideftrisparse.jl")
 include("doublynonnegativetri.jl")
+include("matrixepipersquare.jl")
 include("hypoperlogdettri.jl")
 include("hyporootdettri.jl")
 include("wsosinterpnonnegative.jl")
-include("wsosinterppossemideftri.jl")
-include("wsosinterpepinormeucl.jl")
 include("wsosinterpepinormone.jl")
+include("wsosinterpepinormeucl.jl")
+include("wsosinterppossemideftri.jl")
 
 use_dual_barrier(cone::Cone) = cone.use_dual_barrier
 dimension(cone::Cone) = cone.dim
+
+function setup_data(cone::Cone{T}) where {T <: Real}
+    reset_data(cone)
+    dim = cone.dim
+    cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
+    cone.grad = zeros(T, dim)
+    if hasfield(typeof(cone), :correction)
+        cone.correction = zeros(T, dim)
+    end
+    cone.vec1 = zeros(T, dim)
+    cone.vec2 = zeros(T, dim)
+    setup_extra_data(cone)
+    return cone
+end
 
 load_point(cone::Cone{T}, point::AbstractVector{T}, scal::T) where {T <: Real} = (@. cone.point = scal * point)
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
@@ -168,20 +183,20 @@ inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 use_heuristic_neighborhood(cone::Cone) = cone.use_heuristic_neighborhood
 
 function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
-    nbhd_tmp = cone.nbhd_tmp
-    nbhd_tmp2 = cone.nbhd_tmp2
+    vec1 = cone.vec1
+    vec2 = cone.vec2
     g = grad(cone)
-    @. nbhd_tmp = cone.dual_point + rtmu * g
+    @. vec1 = cone.dual_point + rtmu * g
 
     if use_heuristic_neighborhood(cone)
-        nbhd = norm(nbhd_tmp, Inf) / norm(g, Inf)
-        # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(nbhd_tmp, g)) # TODO try this neighborhood
+        nbhd = norm(vec1, Inf) / norm(g, Inf)
+        # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(vec1, g)) # TODO try this neighborhood
     # elseif Cones.use_sqrt_oracles(cone) # NOTE can force factorization when we don't need it - better to use inv hess prod
-    #     inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
-    #     nbhd = norm(nbhd_tmp2)
+    #     inv_hess_sqrt_prod!(vec2, vec1, cone)
+    #     nbhd = norm(vec2)
     else
-        inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
-        nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
+        inv_hess_prod!(vec2, vec1, cone)
+        nbhd_sqr = dot(vec2, vec1)
         if nbhd_sqr < -100eps(T) # TODO possibly loosen
             # @warn("numerical failure: cone neighborhood is $nbhd_sqr")
             return false

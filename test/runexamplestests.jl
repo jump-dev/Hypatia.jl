@@ -138,5 +138,7 @@ end
 # println("\n")
 # DataFrames.show(perf, allrows = true, allcols = true)
 # println("\n")
+# @show sum(perf[:iters])
+# @show sum(perf[:solve_time])
 end
 ;

@@ -1,5 +1,5 @@
 
-relaxed_tols = (tol_rel_opt = 1e-6, tol_abs_opt = 1e-6, tol_feas = 1e-6)
+relaxed_tols = (default_tol_relax = 100,)
 insts = Dict()
 insts["minimal"] = [
     ((2, 3, 4, 2, true, false, false), nothing, relaxed_tols),

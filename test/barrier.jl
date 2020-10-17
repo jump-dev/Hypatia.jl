@@ -24,7 +24,7 @@ function test_barrier_oracles(
 
     Cones.setup_data(cone)
     dim = Cones.dimension(cone)
-    point = Vector{T}(undef, dim)
+    point = zeros(T, dim)
     dual_point = copy(point)
     Cones.set_initial_point(point, cone)
     Cones.set_initial_point(dual_point, cone)
@@ -89,11 +89,11 @@ function test_grad_hess(cone::Cones.Cone{T}, point::Vector{T}, dual_point::Vecto
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
     @test hess * inv_hess ≈ I atol=tol rtol=tol
 
-    prod_mat = similar(point, dim, dim)
+    prod_mat = zeros(T, dim, dim)
     @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
     @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
 
-    prod = similar(point)
+    prod = zero(point)
     @test hess * point ≈ -grad atol=tol rtol=tol
     @test Cones.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
     @test Cones.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
@@ -294,7 +294,7 @@ function test_possemideftri_barrier(T::Type{<:Real})
     for side in [1, 2, 3, 5]
         # real PSD cone
         function R_barrier(s)
-            S = similar(s, side, side)
+            S = zeros(eltype(s), side, side)
             Cones.svec_to_smat!(S, s, sqrt(T(2)))
             return -logdet(cholesky!(Symmetric(S, :U)))
         end
@@ -362,7 +362,7 @@ end
 function test_doublynonnegativetri_barrier(T::Type{<:Real})
     for side in [1, 2, 3, 5]
         function barrier(s)
-            S = similar(s, side, side)
+            S = zeros(eltype(s), side, side)
             Cones.svec_to_smat!(S, s, sqrt(T(2)))
             offdiags = vcat([div(i * (i - 1), 2) .+ (1:(i - 1)) for i in 2:side]...)
             return -logdet(cholesky!(Hermitian(S, :U))) - mapreduce(log, +, s[offdiags]; init = zero(eltype(s)))
@@ -378,7 +378,7 @@ function test_matrixepipersquare_barrier(T::Type{<:Real})
         # real matrixepipersquare barrier
         per_idx = Cones.svec_length(n) + 1
         function R_barrier(s)
-            U = Cones.svec_to_smat!(similar(s, n, n), s[1:(per_idx - 1)], sqrt(T(2)))
+            U = Cones.svec_to_smat!(zeros(eltype(s), n, n), s[1:(per_idx - 1)], sqrt(T(2)))
             v = s[per_idx]
             W = reshape(s[(per_idx + 1):end], n, m)
             return -logdet(cholesky!(Symmetric(2 * v * U - W * W', :U))) + (n - 1) * log(v)

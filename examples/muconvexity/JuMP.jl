@@ -14,7 +14,7 @@ import PolyJuMP
 struct MuConvexityJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     poly::Symbol
     dom::Symbol
-    use_matrixwsos::Bool # use wsosinterpposeideftricone, else PSD formulation
+    use_matrixwsos::Bool # use wsosinterpposemideftricone, else PSD formulation
     true_mu::Real # optional true value of parameter for testing only
 end
 
@@ -58,8 +58,8 @@ end
 bss() = SAS.BasicSemialgebraicSet{Float64, DynamicPolynomials.Polynomial{true, Float64}}()
 function get_domain_inequalities(dom::ModelUtilities.Box, x)
     box = bss()
-    for i in 1:get_dimension(dom)
-        SAS.addinequality!(box, (-x[i] + dom.u[i]) * (x[i] - dom.l[i]))
+    for (xi, ui, li) in zip(x, dom.u, dom.l)
+        SAS.addinequality!(box, (-xi + ui) * (xi - li))
     end
     return box
 end
