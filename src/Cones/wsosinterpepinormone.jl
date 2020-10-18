@@ -331,12 +331,16 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where {T}
         diag_r = cone.hess_diags[r1]
 
         copyto!(diag_r, cone.hess_diag_blocks[r])
-        hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U), check = false)
-        if !isposdef(hess_diag_facts[r1])
-            # attempt recovery NOTE can do what hessian factorization fallback does if below is not enough
+        r_fact = hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U), check = false)
+        if !isposdef(r_fact)
+            # attempt recovery NOTE can do what hessian factorization fallback does
             copyto!(diag_r, cone.hess_diag_blocks[r])
             increase_diag!(diag_r)
-            hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U))
+            r_fact = hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U), check = false)
+            if !isposdef(r_fact) && T <: BlasReal
+                copyto!(diag_r, cone.hess_diag_blocks[r])
+                hess_diag_facts[r1] = bunchkaufman!(Symmetric(diag_r, :U), true)
+            end
         end
 
         z = cone.hess_edge_blocks[r1]
@@ -348,11 +352,16 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where {T}
     end
 
     copyto!(schur_backup, schur)
-    s_fact = cone.hess_schur_fact = cholesky!(Symmetric(schur, :U), check = false)
+    s_fact = cone.hess_schur_fact = cholesky!(Symmetric(schur_backup, :U), check = false)
     if !isposdef(s_fact)
-        # attempt recovery NOTE: can do what hessian factorization fallback does if below is not enough
+        # attempt recovery NOTE: can do what hessian factorization fallback
+        copyto!(schur_backup, schur)
         increase_diag!(schur_backup)
-        cone.hess_schur_fact = cholesky!(Symmetric(schur_backup, :U))
+        s_fact = cone.hess_schur_fact = cholesky!(Symmetric(schur_backup, :U), check = false)
+        if !isposdef(s_fact)
+            copyto!(schur_backup, schur)
+            cone.hess_schur_fact = bunchkaufman!(Symmetric(schur_backup, :U), true)
+        end
     end
 
     cone.inv_hess_prod_updated = true
