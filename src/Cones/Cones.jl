@@ -119,7 +119,7 @@ function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
         else
             # attempt recovery
             # TODO safer to only change the copy of the hessian that is getting factorized, not the hessian itself
-            increase_diag!(cone.hess)
+            increase_diag!(cone.hess.data)
         end
         if !update_fact(cone.hess_fact_cache, cone.hess)
             @warn("Hessian Bunch-Kaufman factorization failed after recovery")
