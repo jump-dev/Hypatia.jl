@@ -3,6 +3,7 @@ combined directions stepper
 =#
 
 mutable struct HeurCombStepper{T <: Real} <: Stepper{T}
+    gamma_fun::Function
     prev_pred_alpha::T
     prev_alpha::T
     prev_gamma::T
@@ -11,10 +12,21 @@ mutable struct HeurCombStepper{T <: Real} <: Stepper{T}
     dir::Point{T}
     res::Point{T}
     dir_temp::Vector{T}
+    dir_cent::Vector{T}
+    dir_centcorr::Vector{T}
+    dir_pred::Vector{T}
+    dir_predcorr::Vector{T}
 
     line_searcher::LineSearcher{T}
 
-    HeurCombStepper{T}() where {T <: Real} = new{T}()
+    function HeurCombStepper{T}(;
+        gamma_fun::Function = (a::T -> (1 - a)),
+        # gamma_fun::Function = (a -> abs2(1 - a)),
+        ) where {T <: Real}
+        stepper = new{T}()
+        stepper.gamma_fun = gamma_fun
+        return stepper
+    end
 end
 
 # create the stepper cache
@@ -27,7 +39,12 @@ function load(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.rhs = Point(model)
     stepper.dir = Point(model)
     stepper.res = Point(model)
-    stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
+    dim = length(stepper.rhs.vec)
+    stepper.dir_temp = zeros(T, dim)
+    stepper.dir_cent = zeros(T, dim)
+    stepper.dir_centcorr = zeros(T, dim)
+    stepper.dir_pred = zeros(T, dim)
+    stepper.dir_predcorr = zeros(T, dim)
 
     stepper.line_searcher = LineSearcher{T}(model)
 
@@ -38,52 +55,58 @@ end
 function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
     model = solver.model
+    rhs = stepper.rhs
+    dir = stepper.dir
+    dir_cent = stepper.dir_cent
+    dir_centcorr = stepper.dir_centcorr
+    dir_pred = stepper.dir_pred
+    dir_predcorr = stepper.dir_predcorr
 
-    # update linear system solver factorization and helpers
-    # Cones.grad.(model.cones)
+    # update linear system solver factorization
     update_lhs(solver.system_solver, solver)
 
-    # calculate centering direction and keep in dir_cent
-    update_rhs_cent(solver, stepper.rhs)
+    # calculate centering direction and correction
+    update_rhs_cent(solver, rhs)
     get_directions(stepper, solver, false, iter_ref_steps = 3)
-    dir_cent = copy(stepper.dir.vec) # TODO
-    update_rhs_centcorr(solver, stepper.rhs, stepper.dir, add = false)
+    copyto!(dir_cent, dir.vec)
+    update_rhs_centcorr(solver, rhs, dir, add = false)
     get_directions(stepper, solver, false, iter_ref_steps = 3)
-    dir_centcorr = copy(stepper.dir.vec) # TODO
+    copyto!(dir_centcorr, dir.vec)
 
-    # calculate affine/prediction direction and keep in dir
-    update_rhs_pred(solver, stepper.rhs)
+    # calculate affine/prediction direction and correction
+    update_rhs_pred(solver, rhs)
     get_directions(stepper, solver, true, iter_ref_steps = 3)
-    dir_pred = copy(stepper.dir.vec) # TODO
-    update_rhs_predcorr(solver, stepper.rhs, stepper.dir, add = false)
+    copyto!(dir_pred, dir.vec)
+    update_rhs_predcorr(solver, rhs, dir, add = false)
     get_directions(stepper, solver, true, iter_ref_steps = 3)
-    dir_predcorr = copy(stepper.dir.vec) # TODO
+    copyto!(dir_predcorr, dir.vec)
 
     # calculate centering factor gamma by finding distance pred_alpha for stepping in pred direction
-    copyto!(stepper.dir.vec, dir_pred)
-    stepper.prev_pred_alpha = pred_alpha = find_max_alpha(point, stepper.dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T)) # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
-
-    # TODO allow different function (heuristic) as option?
-    # stepper.prev_gamma = gamma = abs2(1 - pred_alpha)
-    stepper.prev_gamma = gamma = 1 - pred_alpha
+    copyto!(dir.vec, dir_pred)
+    # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
+    stepper.prev_pred_alpha = pred_alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T))
+    stepper.prev_gamma = gamma = stepper.gamma_fun(pred_alpha)
 
     # calculate combined direction and keep in dir
-    @. stepper.dir.vec = gamma * (dir_cent + pred_alpha * dir_centcorr) + (1 - gamma) * (dir_pred + pred_alpha * dir_predcorr) # TODO
+    gamma_alpha = gamma * pred_alpha
+    gamma1 = 1 - gamma
+    gamma1_alpha = gamma1 * pred_alpha
+    @. dir.vec = gamma * dir_cent + gamma_alpha * dir_centcorr + gamma1 * dir_pred + gamma1_alpha * dir_predcorr
 
     # find distance alpha for stepping in combined direction
-    alpha = find_max_alpha(point, stepper.dir, stepper.line_searcher, model, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
+    alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = stepper.prev_alpha, min_alpha = T(1e-3))
 
     if iszero(alpha)
         # could not step far in combined direction, so attempt a pure centering step
         solver.verbose && println("performing centering step")
-        @. stepper.dir.vec = dir_cent + dir_centcorr
+        @. dir.vec = dir_cent + dir_centcorr
 
         # find distance alpha for stepping in centering direction
-        alpha = find_max_alpha(point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
+        alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3))
 
         if iszero(alpha)
-            copyto!(stepper.dir.vec, dir_cent)
-            alpha = find_max_alpha(point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
+            copyto!(dir.vec, dir_cent)
+            alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-6))
             if iszero(alpha)
                 @warn("numerical failure: could not step in centering direction; terminating")
                 solver.status = NumericalFailure
@@ -94,7 +117,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.prev_alpha = alpha
 
     # step
-    @. point.vec += alpha * stepper.dir.vec
+    @. point.vec += alpha * dir.vec
     calc_mu(solver)
 
     return true
