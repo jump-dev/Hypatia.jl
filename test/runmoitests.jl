@@ -24,19 +24,25 @@ include(joinpath(@__DIR__, "moi.jl"))
     end
 end
 
+default_options = (
+    # verbose = true,
+    verbose = false,
+    default_tol_relax = 3,
+    )
+
 @testset "MOI.Test tests" begin
     println("\nstarting MOI.Test tests")
     options = [
         (Float64, Solvers.SymIndefSparseSystemSolver, false),
-        # (Float64, Solvers.QRCholDenseSystemSolver, true), # TODO fails a few
+        (Float64, Solvers.QRCholDenseSystemSolver, true),
         # (Float32, Solvers.QRCholDenseSystemSolver, false), # TODO fails a few
-        # (BigFloat, Solvers.QRCholDenseSystemSolver, true), # TODO uncomment when https://github.com/jump-dev/MathOptInterface.jl/pull/1175 merged
+        # (BigFloat, Solvers.QRCholDenseSystemSolver, true), # TODO uncomment when MOI has been tagged
         ]
     for (T, system_solver, use_dense_model) in options
         test_info = "$system_solver, $T, $use_dense_model"
         @testset "$test_info" begin
             println(test_info, " ...")
-            test_time = @elapsed test_moi(T, use_dense_model = use_dense_model, verbose = false, system_solver = system_solver{T}())
+            test_time = @elapsed test_moi(T, system_solver = system_solver{T}(), use_dense_model = use_dense_model; default_options...)
             @printf("%8.2e seconds\n", test_time)
         end
     end
