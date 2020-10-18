@@ -320,38 +320,39 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where {T}
     U = cone.U
     R = cone.R
     schur = cone.tmpUU2
-    schur_backup = cone.tmpUU
-    @views copyto!(schur, Symmetric(cone.hess_diag_blocks[1], :U))
+    hess_diag_facts = cone.hess_diag_facts
     Diz = cone.tmpURU2
+    schur_backup = cone.tmpUU
+
+    @views copyto!(schur, Symmetric(cone.hess_diag_blocks[1], :U))
 
     @inbounds for r in 2:R
         r1 = r - 1
         diag_r = cone.hess_diags[r1]
-        idxs = block_idxs(U, r)
-        idxs2 = block_idxs(U, r1)
-        LinearAlgebra.copytri!(cone.hess_edge_blocks[r1], 'U')
-        z = cone.hess_edge_blocks[r1]
+
         copyto!(diag_r, cone.hess_diag_blocks[r])
-        cone.hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U), check = false)
-        if !isposdef(cone.hess_diag_facts[r1])
+        hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U), check = false)
+        if !isposdef(hess_diag_facts[r1])
+            # attempt recovery NOTE can do what hessian factorization fallback does if below is not enough
             copyto!(diag_r, cone.hess_diag_blocks[r])
-            diag_pert = 1 + T(1e-5)
-            for i in 1:U
-                diag_r[i, i] *= diag_pert
-            end
-            cone.hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U))
+            increase_diag!(diag_r)
+            hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U))
         end
-        @views ldiv!(Diz[idxs2, :], cone.hess_diag_facts[r1], z)
-        @views mul!(schur, z', Diz[idxs2, :], -1, true)
+
+        z = cone.hess_edge_blocks[r1]
+        LinearAlgebra.copytri!(z, 'U')
+        idxs2 = block_idxs(U, r1)
+        @views Dizi = Diz[idxs2, :]
+        ldiv!(Dizi, hess_diag_facts[r1], z)
+        mul!(schur, z', Dizi, -1, true)
     end
 
     copyto!(schur_backup, schur)
     s_fact = cone.hess_schur_fact = cholesky!(Symmetric(schur, :U), check = false)
     if !isposdef(s_fact)
-        for i in 1:U
-            schur_backup[i, i] += 1
-        end
-        s_fact = cone.hess_schur_fact = cholesky!(Symmetric(schur_backup, :U))
+        # attempt recovery NOTE: can do what hessian factorization fallback does if below is not enough
+        increase_diag!(schur_backup)
+        cone.hess_schur_fact = cholesky!(Symmetric(schur_backup, :U))
     end
 
     cone.inv_hess_prod_updated = true
@@ -365,25 +366,25 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSO
     U = cone.U
     R = cone.R
     edge = cone.tmpURU
+    Diz = cone.tmpURU2
+    s_fact = cone.hess_schur_fact
 
     @inbounds for r in 1:(R - 1)
         idxs = block_idxs(U, r)
         @views copyto!(edge[:, idxs], cone.hess_edge_blocks[r])
     end
-    Diz = cone.tmpURU2
     @inbounds for r in 2:R
         idxs = block_idxs(U, r)
         @views ldiv!(prod[idxs, :], cone.hess_diag_facts[r - 1], arr[idxs, :])
     end
     # prod += u * inv(schur) * u' * arr
-    s_fact = cone.hess_schur_fact
     ldiv!(s_fact, edge)
-    @inbounds for j in 1:size(arr, 2)
-        @views Dix = prod[(U + 1):end, j]
-        @views a1j = arr[1:U, j]
-        @views ldiv!(prod[1:U, j], s_fact, a1j)
-        @views mul!(prod[1:U, j], edge, Dix, -1, true)
-        @views mul!(prod[(U + 1):end, j], Diz, prod[1:U, j], -1, true)
+    @inbounds @views for j in 1:size(arr, 2)
+        Dix = prod[(U + 1):end, j]
+        p1j = prod[1:U, j]
+        ldiv!(p1j, s_fact, arr[1:U, j])
+        mul!(p1j, edge, Dix, -1, true)
+        mul!(Dix, Diz, p1j, -1, true)
     end
 
     return prod

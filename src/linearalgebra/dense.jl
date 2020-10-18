@@ -8,15 +8,11 @@ import LinearAlgebra.BLAS.@blasfunc
 import LinearAlgebra.LAPACK.liblapack
 
 # ensure diagonal terms in symm/herm that should be PSD are not too small
-function set_min_diag!(A::Matrix{<:RealOrComplex{T}}, tol::T) where {T <: Real}
-    if tol <= 0
-        return A
-    end
+function increase_diag!(A::Matrix{<:RealOrComplex{T}}) where {T <: Real}
+    diag_pert = 1 + T(1e-5)
+    diag_min = 10eps(T)
     @inbounds for j in 1:size(A, 1)
-        Ajj = A[j, j]
-        if Ajj < tol
-            A[j, j] = tol
-        end
+        A[j, j] = diag_pert * max(A[j, j], diag_min)
     end
     return A
 end

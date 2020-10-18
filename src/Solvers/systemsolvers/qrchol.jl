@@ -251,13 +251,14 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
             system_solver.fact_cache = DenseSymCache{T}()
             load_matrix(system_solver.fact_cache, system_solver.lhs1)
         else
-            system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
+            # attempt recovery
+            increase_diag!(system_solver.lhs1)
         end
         if !update_fact(system_solver.fact_cache, system_solver.lhs1)
-            system_solver.lhs1 += sqrt(eps(T)) * I # attempt recovery # TODO make more efficient
+            # attempt recovery # TODO make more efficient
+            system_solver.lhs1 += sqrt(eps(T)) * I
             if !update_fact(system_solver.fact_cache, system_solver.lhs1)
                 @warn("QRChol Bunch-Kaufman factorization failed after recovery")
-                @show system_solver.lhs1
                 @assert !any(isnan, system_solver.lhs1)
             end
         end
