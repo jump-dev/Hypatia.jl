@@ -24,6 +24,7 @@ import Hypatia.DenseSymCache
 import Hypatia.DensePosDefCache
 import Hypatia.load_matrix
 import Hypatia.invert
+import Hypatia.increase_diag!
 
 RealOrNothing = Union{Real, Nothing}
 

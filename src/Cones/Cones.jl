@@ -22,6 +22,7 @@ import Hypatia.inv_prod
 import Hypatia.sqrt_prod
 import Hypatia.inv_sqrt_prod
 import Hypatia.invert
+import Hypatia.increase_diag!
 
 default_max_neighborhood() = 0.7
 default_use_heuristic_neighborhood() = false
@@ -117,11 +118,8 @@ function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
             load_matrix(cone.hess_fact_cache, cone.hess)
         else
             # attempt recovery
-            # TODO probably safer to only change the copy of the hessian that is getting factorized, not the hessian itself
-            diag_pert = 1 + T(1e-5)
-            @inbounds for i in 1:size(cone.hess, 1)
-                cone.hess[i, i] *= diag_pert
-            end
+            # TODO safer to only change the copy of the hessian that is getting factorized, not the hessian itself
+            increase_diag!(cone.hess.data)
         end
         if !update_fact(cone.hess_fact_cache, cone.hess)
             @warn("Hessian Bunch-Kaufman factorization failed after recovery")
