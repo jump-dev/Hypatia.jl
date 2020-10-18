@@ -3,6 +3,7 @@ predict or center stepper
 =#
 
 mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
+    use_correction::Bool
     prev_pred_alpha::T
     prev_alpha::T
     prev_is_pred::Bool
@@ -15,7 +16,13 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
 
     line_searcher::LineSearcher{T}
 
-    PredOrCentStepper{T}() where {T <: Real} = new{T}()
+    function PredOrCentStepper{T}(;
+        use_correction::Bool = true,
+        ) where {T <: Real}
+        stepper = new{T}()
+        stepper.use_correction = use_correction
+        return stepper
+    end
 end
 
 # create the stepper cache
@@ -37,50 +44,50 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
 end
 
 function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
+    point = solver.point
     model = solver.model
+    rhs = stepper.rhs
+    dir = stepper.dir
 
+    # update linear system solver factorization
     update_lhs(solver.system_solver, solver)
 
-    # TODO option
-    use_corr = true
-    # use_corr = false
     stepper.prev_is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))
-
     if stepper.prev_is_pred
         # predict
         stepper.cent_count = 0
-        update_rhs_pred(solver, stepper.rhs)
+        update_rhs_pred(solver, rhs)
         get_directions(stepper, solver, true, iter_ref_steps = 3)
-        if use_corr
-            update_rhs_predcorr(solver, stepper.rhs, stepper.dir)
+        if stepper.use_correction
+            update_rhs_predcorr(solver, rhs, dir)
             get_directions(stepper, solver, true, iter_ref_steps = 3)
         end
     else
         # center
         stepper.cent_count += 1
-        update_rhs_cent(solver, stepper.rhs)
+        update_rhs_cent(solver, rhs)
         get_directions(stepper, solver, false, iter_ref_steps = 3)
-        if use_corr
-            update_rhs_centcorr(solver, stepper.rhs, stepper.dir)
+        if stepper.use_correction
+            update_rhs_centcorr(solver, rhs, dir)
             get_directions(stepper, solver, false, iter_ref_steps = 3)
         end
     end
 
     # alpha step length
-    alpha = find_max_alpha(solver.point, stepper.dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
+    stepper.prev_alpha = alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
 
     if iszero(alpha)
+        # TODO attempt recovery
         @warn("very small alpha")
         solver.status = NumericalFailure
         return false
     end
-    stepper.prev_alpha = alpha
     if stepper.prev_is_pred
         stepper.prev_pred_alpha = alpha
     end
 
     # step
-    @. solver.point.vec += alpha * stepper.dir.vec
+    @. point.vec += alpha * dir.vec
     calc_mu(solver)
 
     return true

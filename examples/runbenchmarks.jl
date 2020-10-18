@@ -28,7 +28,7 @@ solve_time_limit = 1.2 * optimizer_time_limit
 setup_time_limit = optimizer_time_limit
 
 num_threads = Threads.nthreads()
-blas_num_threads = LinearAlgebra.BLAS.get_num_threads()
+blas_num_threads = LinearAlgebra.BLAS.get_num_threads() # requires Julia 1.6
 @show num_threads
 @show blas_num_threads
 println()
