@@ -31,15 +31,19 @@ end
 function spawn_setup()
     kill_workers()
     get_worker()
-    @fetchfrom worker @eval using MosekTools
-    @fetchfrom worker include(joinpath(examples_dir, "common_JuMP.jl"))
+    @fetchfrom worker begin
+        LinearAlgebra.BLAS.set_num_threads(num_threads)
+        @eval using MosekTools
+        include(joinpath(examples_dir, "common_JuMP.jl"))
+    end
 end
 
 function spawn_reload(ex_name::String)
     if nprocs() < 2
         get_worker()
         @fetchfrom worker begin
-            Base.@eval using MosekTools
+            LinearAlgebra.BLAS.set_num_threads(num_threads)
+            @eval using MosekTools
             include(joinpath(examples_dir, "common_JuMP.jl"))
             include(joinpath(examples_dir, ex_name, "JuMP.jl"))
             include(joinpath(examples_dir, ex_name, "benchmark.jl"))
