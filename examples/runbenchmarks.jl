@@ -66,8 +66,8 @@ JuMP_example_names = [
     # "matrixregression",
     # "nearestpsd",
     # "polymin",
-    # "portfolio",
-    # "shapeconregr",
+    "portfolio",
+    "shapeconregr",
     ]
 
 function run_instance_check(
