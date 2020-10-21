@@ -13,6 +13,7 @@ insts["fast"] = [
     ((10, true, true),),
     ((50, true, false),),
     ((50, false, true),),
+    ((50, false, true), StandardConeOptimizer),
     ((50, true, true),),
     ((400, true, false),),
     ((400, false, true),),
