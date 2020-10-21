@@ -10,7 +10,6 @@ barrier from "On self-concordant barriers for generalized power cones" by Roy & 
 mutable struct Power{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     use_heuristic_neighborhood::Bool
-    max_neighborhood::T
     dim::Int
     alpha::Vector{T}
     n::Int
@@ -43,7 +42,6 @@ mutable struct Power{T <: Real} <: Cone{T}
         n::Int;
         use_dual::Bool = false,
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
-        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert n >= 1
@@ -55,7 +53,6 @@ mutable struct Power{T <: Real} <: Cone{T}
         cone.n = n
         cone.use_dual_barrier = use_dual
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
-        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.alpha = alpha
         cone.hess_fact_cache = hess_fact_cache
