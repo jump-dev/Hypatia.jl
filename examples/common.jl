@@ -20,7 +20,7 @@ Random.randn(R::Type{BigFloat}, dims::Vararg{Int, N} where N) = R.(randn(dims...
 Random.randn(R::Type{Complex{BigFloat}}, dims::Vararg{Int, N} where N) = R.(randn(ComplexF64, dims...))
 
 # helper for calculating solution violations
-relative_residual(residual::Vector{T}, constant::Vector{T}) where {T <: Real} = T[r / max(one(T), abs(c)) for (r, c) in zip(residual, constant)]
+relative_residual(residual::Vector{T}, constant::Vector{T}) where {T <: Real} = norm(residual, Inf) / (1 + norm(constant, Inf))
 
 # calculate violations for Hypatia certificate equalities
 function certificate_violations(
@@ -37,28 +37,22 @@ function certificate_violations(
         x_res = G' * z + A' * y + c
         y_res = A * x - b
         z_res = G * x + s - h
-        x_res_rel = relative_residual(x_res, c)
-        y_res_rel = relative_residual(y_res, b)
-        z_res_rel = relative_residual(z_res, h)
-        x_viol = norm(x_res_rel, Inf)
-        y_viol = norm(y_res_rel, Inf)
-        z_viol = norm(z_res_rel, Inf)
+        x_viol = relative_residual(x_res, c)
+        y_viol = relative_residual(y_res, b)
+        z_viol = relative_residual(z_res, h)
     elseif status == Solvers.PrimalInfeasible
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         x_res = G' * z + A' * y
-        x_res_rel = relative_residual(x_res, c)
-        x_viol = norm(x_res_rel, Inf)
+        x_viol = relative_residual(x_res, c)
         y_viol = NaN
         z_viol = NaN
     elseif status == Solvers.DualInfeasible
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         y_res = A * x
         z_res = G * x + s
-        y_res_rel = relative_residual(y_res, b)
-        z_res_rel = relative_residual(z_res, h)
+        y_viol = relative_residual(y_res, b)
+        z_viol = relative_residual(z_res, h)
         x_viol = NaN
-        y_viol = norm(y_res_rel, Inf)
-        z_viol = norm(z_res_rel, Inf)
     # TODO elseif status == Solvers.IllPosed # primal vs dual ill-posed statuses and conditions
     else # failure
         x_viol = NaN
@@ -79,7 +73,7 @@ function process_result(
     num_iters = Solvers.get_num_iters(solver)
     primal_obj = Solvers.get_primal_obj(solver)
     dual_obj = Solvers.get_dual_obj(solver)
-    obj_diff = primal_obj - dual_obj
+    rel_obj_diff = (primal_obj - dual_obj) / (1 + abs(dual_obj))
 
     z = Solvers.get_z(solver)
     s = Solvers.get_s(solver)
@@ -88,7 +82,7 @@ function process_result(
     compl = dot(s, z)
     (x_viol, y_viol, z_viol) = certificate_violations(status, model, x, y, z, s)
 
-    solve_stats = (status, solve_time, num_iters, primal_obj, dual_obj, obj_diff, compl, x_viol, y_viol, z_viol, x, y, z, s)
+    solve_stats = (status, solve_time, num_iters, primal_obj, dual_obj, rel_obj_diff, compl, x_viol, y_viol, z_viol, x, y, z, s)
     flush(stdout); flush(stderr)
     return solve_stats
 end

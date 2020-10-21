@@ -45,7 +45,7 @@ function run_instance(
         solve_stats = process_result(model, solver)
 
         if test
-            named_result = NamedTuple{(:status, :solve_time, :num_iters, :primal_obj, :dual_obj, :obj_diff, :compl, :x_viol, :y_viol, :z_viol, :x, :y, :z, :s)}(solve_stats)
+            named_result = NamedTuple{(:status, :solve_time, :num_iters, :primal_obj, :dual_obj, :rel_obj_diff, :compl, :x_viol, :y_viol, :z_viol, :x, :y, :z, :s)}(solve_stats)
             test_extra(inst, named_result)
         end
     end
