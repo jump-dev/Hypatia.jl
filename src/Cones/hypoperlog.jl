@@ -8,7 +8,6 @@ barrier modified from "Primal-Dual Interior-Point Methods for Domain-Driven Form
 
 mutable struct HypoPerLog{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    max_neighborhood::T
     dim::Int
 
     point::Vector{T}
@@ -35,13 +34,11 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     function HypoPerLog{T}(
         dim::Int;
         use_dual::Bool = false,
-        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual_barrier = use_dual
-        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.hess_fact_cache = hess_fact_cache
         return cone

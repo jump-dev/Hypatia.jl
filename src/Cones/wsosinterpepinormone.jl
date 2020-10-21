@@ -7,7 +7,6 @@ u(x), w_1(x), ...,  w_R(x) are polynomials with U coefficients
 mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     use_heuristic_neighborhood::Bool
-    max_neighborhood::T
     dim::Int
     R::Int
     U::Int
@@ -59,7 +58,6 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
         Ps::Vector{Matrix{T}};
         use_dual::Bool = false,
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
-        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         for Pk in Ps
@@ -68,7 +66,6 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
         cone = new{T}()
         cone.use_dual_barrier = !use_dual # using dual barrier
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
-        cone.max_neighborhood = max_neighborhood
         cone.dim = U * R
         cone.R = R
         cone.U = U

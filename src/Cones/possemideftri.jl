@@ -14,7 +14,6 @@ TODO
 
 mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
-    max_neighborhood::T
     dim::Int
     side::Int
     is_complex::Bool
@@ -44,12 +43,10 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     function PosSemidefTri{T, R}(
         dim::Int;
         use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
-        max_neighborhood::Real = default_max_neighborhood(),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 1
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
-        cone.max_neighborhood = max_neighborhood
         cone.dim = dim # real vector dimension
         cone.rt2 = sqrt(T(2))
         if R <: Complex

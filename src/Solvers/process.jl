@@ -6,20 +6,18 @@ MatrixyAG = Union{AbstractMatrix, UniformScaling}
 
 # rescale the rows and columns of the conic data to get an equivalent conic problem
 function rescale_data(solver::Solver{T}) where {T <: Real}
+    solver.rescale || return false
     model = solver.model
     (c, A, b, G, h) = (model.c, model.A, model.b, model.G, model.h)
-    if !isa(A, MatrixyAG) || !isa(G, MatrixyAG)
-        solver.used_rescaling = false
-        return solver.model
-    end
+    (isa(A, MatrixyAG) && isa(G, MatrixyAG)) || return false
 
-    rteps = sqrt(eps(T))
-    maxabsmin(v::AbstractVecOrMat) = mapreduce(abs, max, v; init = rteps)
-    maxabsmincol(v::UniformScaling, ::Int) = max(abs(v.λ), rteps)
+    minval = sqrt(eps(T))
+    maxabsmin(v::AbstractVecOrMat) = mapreduce(abs, max, v; init = minval)
+    maxabsmincol(v::UniformScaling, ::Int) = max(abs(v.λ), minval)
     maxabsmincol(v::AbstractMatrix, j::Int) = maxabsmin(view(v, :, j))
-    maxabsminrow(v::UniformScaling, ::Int) = max(abs(v.λ), rteps)
+    maxabsminrow(v::UniformScaling, ::Int) = max(abs(v.λ), minval)
     maxabsminrow(v::AbstractMatrix, i::Int) = maxabsmin(view(v, i, :))
-    maxabsminrows(v::UniformScaling, ::UnitRange{Int}) = max(abs(v.λ), rteps)
+    maxabsminrows(v::UniformScaling, ::UnitRange{Int}) = max(abs(v.λ), minval)
     maxabsminrows(v::AbstractMatrix, rows::UnitRange{Int}) = maxabsmin(view(v, rows, :))
 
     @inbounds solver.c_scale = c_scale = T[sqrt(max(abs(c[j]), maxabsmincol(A, j), maxabsmincol(G, j))) for j in eachindex(c)]
@@ -48,9 +46,8 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
     h_diag = Diagonal(h_scale)
     model.h = h_diag \ h
     ldiv!(h_diag, model.G)
-    solver.used_rescaling = true
 
-    return solver.model
+    return true
 end
 
 # optionally preprocess dual equalities and solve for x as least squares solution to Ax = b, Gx = h - s

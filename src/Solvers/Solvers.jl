@@ -66,7 +66,6 @@ mutable struct Solver{T <: Real}
     init_use_indirect::Bool
     init_tol_qr::T
     init_use_fallback::Bool
-    max_nbhd::T
     stepper::Stepper{T}
     system_solver::SystemSolver{T}
 
@@ -152,9 +151,7 @@ mutable struct Solver{T <: Real}
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
         init_use_fallback::Bool = true,
-        max_nbhd::Real = Cones.default_max_neighborhood(), # TODO cleanup - only for taukap, maybe use full name
         stepper::Stepper{T} = HeurCombStepper{T}(),
-        # stepper::Stepper{T} = PredOrCentStepper{T}(),
         system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
@@ -194,7 +191,6 @@ mutable struct Solver{T <: Real}
         solver.init_use_indirect = init_use_indirect
         solver.init_tol_qr = init_tol_qr
         solver.init_use_fallback = init_use_fallback
-        solver.max_nbhd = max_nbhd
         solver.stepper = stepper
         solver.system_solver = system_solver
         solver.status = NotLoaded
@@ -232,14 +228,14 @@ function solve(solver::Solver{T}) where {T <: Real}
     result = solver.result = Point(orig_model)
     model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
     (init_z, init_s) = initialize_cone_point(solver.orig_model)
-    solver.rescale && rescale_data(solver)
+    solver.used_rescaling = rescale_data(solver)
     if solver.reduce
         # TODO don't find point / unnecessary stuff before reduce
-        init_y = find_initial_y(solver, init_s, true)
-        init_x = find_initial_x(solver, init_z)
+        init_y = find_initial_y(solver, init_z, true)
+        init_x = find_initial_x(solver, init_s)
     else
-        init_x = find_initial_x(solver, init_z)
-        init_y = find_initial_y(solver, init_s, false)
+        init_x = find_initial_x(solver, init_s)
+        init_y = find_initial_y(solver, init_z, false)
     end
 
     if solver.status == SolveCalled
@@ -262,6 +258,10 @@ function solve(solver::Solver{T}) where {T <: Real}
         solver.y_residual = zero(model.b)
         solver.z_residual = zero(model.h)
 
+        # TODO try other way of computing conv tols
+        # solver.x_conv_tol = inv(1 + norm(model.c, Inf))
+        # solver.y_conv_tol = inv(1 + norm(model.b, Inf))
+        # solver.z_conv_tol = inv(1 + norm(model.h, Inf))
         solver.x_conv_tol = inv(max(one(T), norm(model.c)))
         solver.y_conv_tol = inv(max(one(T), norm(model.b)))
         solver.z_conv_tol = inv(max(one(T), norm(model.h)))
