@@ -9,7 +9,6 @@ barrier from "Barrier Functions in Interior Point Methods" by Osman Guler
 
 mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
-    max_neighborhood::T
     dim::Int
     n::Int
     is_complex::Bool
@@ -51,12 +50,10 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     function EpiNormInf{T, R}(
         dim::Int;
         use_dual::Bool = false,
-        max_neighborhood::Real = default_max_neighborhood(),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 2
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
-        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.is_complex = (R <: Complex)
         cone.n = (cone.is_complex ? div(dim - 1, 2) : dim - 1)

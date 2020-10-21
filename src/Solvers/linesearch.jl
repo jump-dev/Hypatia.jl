@@ -36,7 +36,6 @@ function find_max_alpha(
     prev_alpha::T,
     min_alpha::T,
     min_nbhd::T = T(0.01),
-    # max_nbhd::T = one(T),
     max_nbhd::T = T(0.99),
     ) where {T <: Real}
     cones = model.cones
@@ -48,7 +47,6 @@ function find_max_alpha(
     alpha_reduce = T(0.95) # TODO tune, maybe try smaller for pred_alpha since heuristic
 
     # TODO experiment with starting alpha (<1)
-    # alpha = one(T)
     alpha = max(T(0.1), min(prev_alpha * T(1.4), one(T))) # TODO option for parameter
 
     if tau_dir < zero(T)

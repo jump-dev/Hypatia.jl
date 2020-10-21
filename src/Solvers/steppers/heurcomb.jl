@@ -84,7 +84,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     # calculate centering factor gamma by finding distance pred_alpha for stepping in pred direction
     copyto!(dir.vec, dir_pred)
     # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
-    stepper.prev_pred_alpha = pred_alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T))
+    stepper.prev_pred_alpha = pred_alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2))
     stepper.prev_gamma = gamma = stepper.gamma_fun(pred_alpha)
 
     # calculate combined direction and keep in dir
