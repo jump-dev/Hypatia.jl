@@ -12,8 +12,7 @@ using Distributed
 using Hypatia
 using MosekTools
 
-# num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
-num_threads = 8 # number of threads to use for BLAS and Julia processes that run instances
+num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
 LinearAlgebra.BLAS.set_num_threads(num_threads)
 println()
 
@@ -24,12 +23,11 @@ include(joinpath(examples_dir, "common_JuMP.jl"))
 results_path = joinpath(homedir(), "bench", "bench.csv")
 # results_path = nothing
 
-# spawn_runs = true # needed for running Julia process with multiple threads
-spawn_runs = false
+spawn_runs = true # needed for running Julia process with multiple threads
+# spawn_runs = false
 
 free_memory_limit = 16 * 2^30 # keep at least X GB of RAM available
-# optimizer_time_limit = 1800
-optimizer_time_limit = 60
+optimizer_time_limit = 1800
 solve_time_limit = 1.2 * optimizer_time_limit
 setup_time_limit = optimizer_time_limit
 
