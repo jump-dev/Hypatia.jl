@@ -168,12 +168,12 @@ function solve_check(
     s = vcat(s_cones...)
     z = vcat(z_cones...)
 
-    obj_diff = primal_obj - dual_obj
+    rel_obj_diff = (primal_obj - dual_obj) / (1 + abs(dual_obj))
     compl = dot(s, z)
     (x_viol, y_viol, z_viol) = certificate_violations(hyp_status, hyp_data, x, y, z, s)
     flush(stdout); flush(stderr)
 
-    solve_stats = (hyp_status, solve_time, num_iters, primal_obj, dual_obj, obj_diff, compl, x_viol, y_viol, z_viol)
+    solve_stats = (hyp_status, solve_time, num_iters, primal_obj, dual_obj, rel_obj_diff, compl, x_viol, y_viol, z_viol)
     return solve_stats
 end
 
