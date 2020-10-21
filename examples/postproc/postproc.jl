@@ -1,13 +1,11 @@
 using CSV
 using DataFrames
 
-# TODO account for nbhd?
-# TODO how to ignore compile runs
-
 df_all = DataFrame(CSV.File(joinpath(homedir(), "bench", "bench.csv")))
 
 params_map = Dict(
     "DensityEstJuMP" => (inst_keys = [:m, :twod], positions = [2, 3]), # TODO
+    "ExpDesignJuMP" => (inst_keys = [:k, :logdetobj], positions = [1, 5]),
     "PortfolioJuMP" => (inst_keys = [:d], positions = [1]),
     "MatrixCompletionJuMP" => (inst_keys = [:d1, :d2], positions = [1, 2]),
     )
@@ -66,5 +64,13 @@ for edf in groupby(df_all, :example)
         for v in [:status, :converged, :iters, :solve_time]
         ]
     ex_df_wide = join(unstacked_dims..., unstacked_res..., on = inst_keys)
-    CSV.write("$(ex_name)_wide.csv", ex_df_wide)
+
+    if ex_name == "ExpDesignJuMP"
+        for subdf in groupby(ex_df_wide, :logdetobj)
+            obj_group = subdf.logdetobj[1]
+            CSV.write("$(ex_name)_logdetobj_$(obj_group)_wide.csv", subdf)
+        end
+    else
+        CSV.write("$(ex_name)_wide.csv", ex_df_wide)
+    end
 end
