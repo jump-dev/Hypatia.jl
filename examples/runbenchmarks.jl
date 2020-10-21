@@ -44,6 +44,8 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
 mosek_solver = ("Mosek", Mosek.Optimizer, (
     QUIET = false,
     MSK_IPAR_NUM_THREADS = num_threads,
+    MSK_IPAR_OPTIMIZER = Mosek.MSK_OPTIMIZER_CONIC,
+    MSK_IPAR_INTPNT_BASIS = Mosek.MSK_BI_NEVER, # do not do basis identification for LO problems
     MSK_DPAR_OPTIMIZER_MAX_TIME = solve_time_limit,
     MSK_DPAR_INTPNT_CO_TOL_PFEAS = tol,
     MSK_DPAR_INTPNT_CO_TOL_DFEAS = tol,
@@ -144,6 +146,7 @@ for ex_name in JuMP_example_names
             end
         end
     end
+    sleep(1)
 end
 
 spawn_runs && kill_workers()

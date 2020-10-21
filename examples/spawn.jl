@@ -13,7 +13,7 @@ function get_worker()
     if nprocs() < 2
         println("adding worker")
         addprocs(1, enable_threaded_blas = true, exeflags = `--threads $num_threads`)
-        sleep(1)
+        sleep(5)
     end
     global worker = workers()[end]
 end
@@ -25,30 +25,34 @@ function kill_workers()
         sleep(1)
         run(`kill -SIGKILL $(remotecall_fetch(getpid, w))`)
     end
-    sleep(1)
+    sleep(5)
 end
 
 function spawn_setup()
     kill_workers()
     get_worker()
     @fetchfrom worker begin
+        @eval import LinearAlgebra
         LinearAlgebra.BLAS.set_num_threads(num_threads)
         @eval using MosekTools
         include(joinpath(examples_dir, "common_JuMP.jl"))
     end
+    sleep(5)
 end
 
 function spawn_reload(ex_name::String)
     if nprocs() < 2
         get_worker()
         @fetchfrom worker begin
+            @eval import LinearAlgebra
             LinearAlgebra.BLAS.set_num_threads(num_threads)
             @eval using MosekTools
             include(joinpath(examples_dir, "common_JuMP.jl"))
             include(joinpath(examples_dir, ex_name, "JuMP.jl"))
-            include(joinpath(examples_dir, ex_name, "benchmark.jl"))
+            include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
             flush(stdout); flush(stderr)
         end
+        sleep(5)
     end
 end
 
@@ -77,9 +81,9 @@ function spawn_step(fun::Function, fun_name::Symbol)
             continue
         end
         interrupt()
-        sleep(1)
+        sleep(5)
         isready(fut) || kill_workers()
-        sleep(1)
+        sleep(5)
         status = Symbol(fun_name, killstatus)
         println("status: ", status)
         break
