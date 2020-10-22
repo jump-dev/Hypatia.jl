@@ -20,7 +20,7 @@ Random.randn(R::Type{BigFloat}, dims::Vararg{Int, N} where N) = R.(randn(dims...
 Random.randn(R::Type{Complex{BigFloat}}, dims::Vararg{Int, N} where N) = R.(randn(ComplexF64, dims...))
 
 # helper for calculating solution violations
-relative_residual(residual::Vector{T}, constant::Vector{T}) where {T <: Real} = norm(residual, Inf) / max(one(T), norm(constant, Inf))
+relative_residual(residual::Vector{T}, constant::Vector{T}) where {T <: Real} = norm(residual, Inf) / (1 + norm(constant, Inf))
 
 # calculate violations for Hypatia certificate equalities
 function certificate_violations(
