@@ -397,7 +397,7 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
 
     is_feas = (max(solver.x_feas, solver.y_feas, solver.z_feas) <= solver.tol_feas)
     is_abs_opt = (solver.gap <= solver.tol_abs_opt)
-    is_rel_opt = (min(solver.gap / tau, abs(primal_obj_t + dual_obj_t)) <= solver.tol_rel_opt * max(tau, min(abs(primal_obj_t), abs(dual_obj_t))))
+    is_rel_opt = (min(solver.gap / tau, abs(primal_obj_t - dual_obj_t)) <= solver.tol_rel_opt * max(tau, min(abs(primal_obj_t), abs(dual_obj_t))))
     if is_feas && (is_abs_opt || is_rel_opt)
         solver.verbose && println("optimal solution found; terminating")
         solver.status = Optimal
