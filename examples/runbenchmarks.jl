@@ -40,6 +40,7 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     tol_abs_opt = tol,
     tol_rel_opt = tol,
     tol_feas = tol,
+    tol_infeas = 1e-4 * tol
     ))
 mosek_solver = ("Mosek", Mosek.Optimizer, (
     QUIET = false,

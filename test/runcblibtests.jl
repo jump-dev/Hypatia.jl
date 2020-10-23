@@ -26,15 +26,12 @@ instance_sets = [
     ]
 
 # options to solvers
-tol = 1e-7
 default_options = (
     verbose = false,
     # verbose = true,
     iter_limit = 150,
     time_limit = 120,
-    tol_rel_opt = tol,
-    tol_abs_opt = tol,
-    tol_feas = tol,
+    default_tol_relax = 100,
     # system_solver = Solvers.NaiveDenseSystemSolver{Float64}(),
     system_solver = Solvers.SymIndefSparseSystemSolver{Float64}(),
     # system_solver = Solvers.QRCholDenseSystemSolver{Float64}(),

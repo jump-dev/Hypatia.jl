@@ -7,8 +7,8 @@ using Printf
 using Hypatia
 
 test_files = [
-    # "modelutilities",
-    # "barrier",
+    "modelutilities",
+    "barrier",
     "native",
     "moi",
     # "cblib",
