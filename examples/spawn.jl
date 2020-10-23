@@ -92,22 +92,21 @@ function run_instance_check(
         (model, model_stats) = setup_model($ex_type, $inst_data, $extender, $(solver[3]), $(solver[2]))
         return model_stats
     end
-    setup_time = @elapsed (status, model_stats) = spawn_step(setup_fun, :SetupModel)
+    setup_time = @elapsed (setup_status, model_stats) = spawn_step(setup_fun, :SetupModel)
 
-    check_time = @elapsed if status == :ok
+    if setup_status == :ok
         println("solve and check")
-        solve_fun() = @eval begin
-            solve_stats = solve_check(model, test = false)
-            return solve_stats
-        end
-        (status, solve_stats) = spawn_step(solve_fun, :SolveCheck)
+        solve_fun() = @eval solve_check(model, test = false)
+        check_time = @elapsed (status, solve_stats) = spawn_step(solve_fun, :SolveCheck)
     else
+        check_time = 0.0
         model_stats = (-1, -1, -1, String[])
+        status = setup_status
     end
 
     if status != :ok
         solve_stats = (status, NaN, -1, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
     end
 
-    return (status != :ok, (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time))
+    return (setup_status != :ok, (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time))
 end
