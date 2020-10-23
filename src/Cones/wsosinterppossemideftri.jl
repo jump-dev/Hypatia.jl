@@ -103,6 +103,8 @@ function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     return cone
 end
 
+use_correction(::WSOSInterpPosSemidefTri) = false
+
 reset_data(cone::WSOSInterpPosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.blocks_R_updated = false)
 
 get_nu(cone::WSOSInterpPosSemidefTri) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)

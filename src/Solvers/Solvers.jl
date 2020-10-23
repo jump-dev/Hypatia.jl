@@ -25,6 +25,8 @@ import Hypatia.DensePosDefCache
 import Hypatia.load_matrix
 import Hypatia.invert
 import Hypatia.increase_diag!
+import Hypatia.TimerOutputs
+import Hypatia.timer
 
 RealOrNothing = Union{Real, Nothing}
 
@@ -231,6 +233,7 @@ function solve(solver::Solver{T}) where {T <: Real}
     orig_model = solver.orig_model
     result = solver.result = Point(orig_model)
     model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
+    TimerOutputs.@timeit timer "initialize" begin
     (init_z, init_s) = initialize_cone_point(solver.orig_model)
     solver.rescale && rescale_data(solver)
     if solver.reduce
@@ -240,6 +243,7 @@ function solve(solver::Solver{T}) where {T <: Real}
     else
         init_x = find_initial_x(solver, init_z)
         init_y = find_initial_y(solver, init_s, false)
+    end
     end
 
     if solver.status == SolveCalled

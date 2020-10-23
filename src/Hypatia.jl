@@ -11,6 +11,9 @@ using LinearAlgebra
 include("linearalgebra/dense.jl")
 include("linearalgebra/sparse.jl")
 
+import TimerOutputs
+const timer = TimerOutputs.TimerOutput()
+
 # optional dependencies using Requires.jl
 import Requires
 function __init__()

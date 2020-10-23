@@ -1,6 +1,8 @@
 #=
 combined directions stepper
 =#
+import Hypatia.TimerOutputs
+import Hypatia.Timer
 
 mutable struct HeurCombStepper{T <: Real} <: Stepper{T}
     gamma_fun::Function
@@ -66,25 +68,25 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     update_lhs(solver.system_solver, solver)
 
     # calculate centering direction and correction
-    update_rhs_cent(solver, rhs)
-    get_directions(stepper, solver, false, iter_ref_steps = 3)
+    TimerOutputs.@timeit timer "update_rhs_cent" update_rhs_cent(solver, rhs)
+    TimerOutputs.@timeit timer "cent_dir" get_directions(stepper, solver, false, iter_ref_steps = 3)
     copyto!(dir_cent, dir.vec)
-    update_rhs_centcorr(solver, rhs, dir, add = false)
-    get_directions(stepper, solver, false, iter_ref_steps = 3)
+    TimerOutputs.@timeit timer "update_rhs_centcorr" update_rhs_centcorr(solver, rhs, dir, add = false)
+    TimerOutputs.@timeit timer "cent_corr_dir" get_directions(stepper, solver, false, iter_ref_steps = 3)
     copyto!(dir_centcorr, dir.vec)
 
     # calculate affine/prediction direction and correction
-    update_rhs_pred(solver, rhs)
-    get_directions(stepper, solver, true, iter_ref_steps = 3)
+    TimerOutputs.@timeit timer "update_rhs_pred" update_rhs_pred(solver, rhs)
+    TimerOutputs.@timeit timer "pred_dir" get_directions(stepper, solver, true, iter_ref_steps = 3)
     copyto!(dir_pred, dir.vec)
-    update_rhs_predcorr(solver, rhs, dir, add = false)
-    get_directions(stepper, solver, true, iter_ref_steps = 3)
+    TimerOutputs.@timeit timer "update_rhs_predcorr" update_rhs_predcorr(solver, rhs, dir, add = false)
+    TimerOutputs.@timeit timer "pred_corr_dir" get_directions(stepper, solver, true, iter_ref_steps = 3)
     copyto!(dir_predcorr, dir.vec)
 
     # calculate centering factor gamma by finding distance pred_alpha for stepping in pred direction
     copyto!(dir.vec, dir_pred)
     # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
-    stepper.prev_pred_alpha = pred_alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T))
+    TimerOutputs.@timeit timer "find_max_alpha" stepper.prev_pred_alpha = pred_alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T))
     stepper.prev_gamma = gamma = stepper.gamma_fun(pred_alpha)
 
     # calculate combined direction and keep in dir
