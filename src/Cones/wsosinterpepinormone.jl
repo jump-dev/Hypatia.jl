@@ -334,9 +334,13 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where {T}
             copyto!(diag_r, cone.hess_diag_blocks[r])
             increase_diag!(diag_r)
             r_fact = hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U), check = false)
-            if !isposdef(r_fact) && T <: BlasReal
+            if !isposdef(r_fact)
                 copyto!(diag_r, cone.hess_diag_blocks[r])
-                hess_diag_facts[r1] = bunchkaufman!(Symmetric(diag_r, :U), true)
+                if T <: BlasReal # TODO refac
+                    hess_diag_facts[r1] = bunchkaufman!(Symmetric(diag_r, :U), true)
+                else
+                    hess_diag_facts[r1] = lu!(Symmetric(diag_r, :U))
+                end
             end
         end
 
@@ -357,7 +361,11 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where {T}
         s_fact = cone.hess_schur_fact = cholesky!(Symmetric(schur_backup, :U), check = false)
         if !isposdef(s_fact)
             copyto!(schur_backup, schur)
-            cone.hess_schur_fact = bunchkaufman!(Symmetric(schur_backup, :U), true)
+                if T <: BlasReal # TODO refac
+                cone.hess_schur_fact = bunchkaufman!(Symmetric(schur_backup, :U), true)
+            else
+                cone.hess_schur_fact = lu!(Symmetric(schur_backup, :U))
+            end
         end
     end
 

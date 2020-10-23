@@ -164,13 +164,14 @@ mutable struct Solver{T <: Real}
         @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
 
         if isnothing(default_tol_power)
-            default_tol_power = T(0.5)
+            default_tol_power = (T <: LinearAlgebra.BlasReal ? 0.5 : 0.4)
         end
+        default_tol_power = T(default_tol_power)
         default_tol_loose = eps(T) ^ default_tol_power
         default_tol_tight = eps(T) ^ (T(1.5) * default_tol_power)
         if !isnothing(default_tol_relax)
-            default_tol_loose *= default_tol_relax
-            default_tol_tight *= default_tol_relax
+            default_tol_loose *= T(default_tol_relax)
+            default_tol_tight *= T(default_tol_relax)
         end
         if isnothing(tol_rel_opt)
             tol_rel_opt = default_tol_loose
