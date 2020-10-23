@@ -27,7 +27,7 @@ include(joinpath(@__DIR__, "moi.jl"))
 default_options = (
     # verbose = true,
     verbose = false,
-    default_tol_relax = 5,
+    default_tol_relax = 10,
     )
 
 @testset "MOI.Test tests" begin
