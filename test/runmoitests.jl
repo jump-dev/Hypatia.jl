@@ -11,18 +11,18 @@ include(joinpath(@__DIR__, "moi.jl"))
 
 @testset "MOI tests" begin
 
-# @testset "MOI wrapper cone tests" begin
-#     println("starting MOI wrapper cone tests")
-#     real_types = [
-#         Float64,
-#         Float32,
-#         BigFloat,
-#         ]
-#     for T in real_types
-#         println(T, " ...")
-#         test_moi_cones(T)
-#     end
-# end
+@testset "MOI wrapper cone tests" begin
+    println("starting MOI wrapper cone tests")
+    real_types = [
+        Float64,
+        Float32,
+        BigFloat,
+        ]
+    for T in real_types
+        println(T, " ...")
+        test_moi_cones(T)
+    end
+end
 
 default_options = (
     # verbose = true,
