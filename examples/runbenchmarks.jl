@@ -37,10 +37,10 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     verbose = true,
     iter_limit = 250,
     time_limit = solve_time_limit,
-    tol_abs_opt = tol,
+    tol_abs_opt = 1e-3 * tol,
     tol_rel_opt = tol,
     tol_feas = tol,
-    tol_infeas = 1e-4 * tol
+    tol_infeas = 1e-3 * tol
     ))
 mosek_solver = ("Mosek", Mosek.Optimizer, (
     QUIET = false,
