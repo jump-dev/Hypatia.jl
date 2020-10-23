@@ -258,13 +258,13 @@ function solve(solver::Solver{T}) where {T <: Real}
         solver.y_residual = zero(model.b)
         solver.z_residual = zero(model.h)
 
-        # TODO try other way of computing conv tols
-        # solver.x_conv_tol = inv(1 + norm(model.c, Inf))
-        # solver.y_conv_tol = inv(1 + norm(model.b, Inf))
-        # solver.z_conv_tol = inv(1 + norm(model.h, Inf))
-        solver.x_conv_tol = inv(max(one(T), norm(model.c)))
-        solver.y_conv_tol = inv(max(one(T), norm(model.b)))
-        solver.z_conv_tol = inv(max(one(T), norm(model.h)))
+        # TODO
+        solver.x_conv_tol = inv(1 + norm(model.c, Inf))
+        solver.y_conv_tol = inv(1 + norm(model.b, Inf))
+        solver.z_conv_tol = inv(1 + norm(model.h, Inf))
+        # solver.x_conv_tol = inv(max(one(T), norm(model.c)))
+        # solver.y_conv_tol = inv(max(one(T), norm(model.b)))
+        # solver.z_conv_tol = inv(max(one(T), norm(model.h)))
         solver.prev_is_slow = false
         solver.prev2_is_slow = false
         solver.prev_gap = NaN
@@ -324,14 +324,15 @@ function solve(solver::Solver{T}) where {T <: Real}
 end
 
 function calc_mu(solver::Solver{T}) where {T <: Real}
-    solver.mu = (dot(solver.point.z, solver.point.s) + dot(solver.point.tau, solver.point.kap)) / (1 + solver.model.nu)
+    point = solver.point
+    solver.mu = (dot(point.z, point.s) + point.tau[1] * point.kap[1]) / (solver.model.nu + 1)
     return solver.mu
 end
 
 function calc_residual(solver::Solver{T}) where {T <: Real}
     model = solver.model
     point = solver.point
-    tau = solver.point.tau[1]
+    tau = point.tau[1]
 
     # x_residual = -A'*y - G'*z - c*tau
     x_residual = solver.x_residual
@@ -391,17 +392,22 @@ function calc_convergence_params(solver::Solver{T}) where {T <: Real}
 end
 
 function check_convergence(solver::Solver{T}) where {T <: Real}
+
+    tol_infeas = solver.tol_feas / 1000 # TODO
+
     # check convergence criteria
     # TODO nearly primal or dual infeasible or nearly optimal cases?
+    tau = solver.point.tau[1]
     if max(solver.x_feas, solver.y_feas, solver.z_feas) <= solver.tol_feas &&
-        (solver.gap <= solver.tol_abs_opt || (!isnan(solver.rel_gap) && solver.rel_gap <= solver.tol_rel_opt))
+        # (solver.gap <= solver.tol_abs_opt || (!isnan(solver.rel_gap) && solver.rel_gap <= solver.tol_rel_opt))
+        min(solver.gap / tau, abs(solver.primal_obj_t + solver.dual_obj_t)) <= solver.tol_rel_opt * max(tau, min(abs(solver.primal_obj_t), abs(solver.dual_obj_t)))
         solver.verbose && println("optimal solution found; terminating")
         solver.status = Optimal
         return true
     end
     if solver.dual_obj_t > eps(T)
-        infres_pr = solver.x_norm_res_t * solver.x_conv_tol / solver.dual_obj_t
-        if infres_pr <= solver.tol_feas
+        if solver.x_norm_res_t <= tol_infeas * solver.dual_obj_t
+        # if solver.x_norm_res_t * solver.x_conv_tol / solver.dual_obj_t <= solver.tol_feas
             solver.verbose && println("primal infeasibility detected; terminating")
             solver.status = PrimalInfeasible
             solver.primal_obj = solver.primal_obj_t
@@ -410,8 +416,8 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         end
     end
     if solver.primal_obj_t < -eps(T)
-        infres_du = -max(solver.y_norm_res_t * solver.y_conv_tol, solver.z_norm_res_t * solver.z_conv_tol) / solver.primal_obj_t
-        if infres_du <= solver.tol_feas
+        if max(solver.y_norm_res_t, solver.z_norm_res_t) <= tol_infeas * -solver.primal_obj_t
+        # if -max(solver.y_norm_res_t * solver.y_conv_tol, solver.z_norm_res_t * solver.z_conv_tol) / solver.primal_obj_t <= solver.tol_feas
             solver.verbose && println("dual infeasibility detected; terminating")
             solver.status = DualInfeasible
             solver.primal_obj = solver.primal_obj_t
@@ -419,11 +425,11 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
             return true
         end
     end
-    if solver.mu <= solver.tol_feas * T(1e-2) && solver.point.tau[1] <= solver.tol_feas * T(1e-2) * min(one(T), solver.point.kap[1])
-        solver.verbose && println("ill-posedness detected; terminating")
-        solver.status = IllPosed
-        return true
-    end
+    # if solver.mu <= solver.tol_feas * T(1e-2) && solver.point.tau[1] <= solver.tol_feas * T(1e-2) * min(one(T), solver.point.kap[1])
+    #     solver.verbose && println("ill-posedness detected; terminating")
+    #     solver.status = IllPosed
+    #     return true
+    # end
 
     if expect_improvement(solver.stepper)
         max_improve = zero(T)
