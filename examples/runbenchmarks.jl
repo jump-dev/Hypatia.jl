@@ -37,9 +37,10 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     verbose = true,
     iter_limit = 250,
     time_limit = solve_time_limit,
-    tol_abs_opt = tol,
+    tol_abs_opt = 1e-3 * tol,
     tol_rel_opt = tol,
     tol_feas = tol,
+    tol_infeas = 1e-3 * tol
     ))
 mosek_solver = ("Mosek", Mosek.Optimizer, (
     QUIET = false,
@@ -72,21 +73,23 @@ JuMP_example_names = [
     "shapeconregr",
     ]
 
-function run_instance_check(
-    ex_type::Type{<:ExampleInstanceJuMP{Float64}},
-    inst_data::Tuple,
-    extender,
-    solver::Tuple,
-    )
-    return (false, run_instance(ex_type, inst_data, extender, NamedTuple(), solver[2], default_options = solver[3], test = false))
+for ex_name in JuMP_example_names
+    include(joinpath(examples_dir, ex_name, "JuMP.jl"))
 end
 
 if spawn_runs
     include(joinpath(examples_dir, "spawn.jl"))
-    spawn_setup()
-    instance_check_fun = spawn_instance_check
+    kill_workers()
 else
-    instance_check_fun = run_instance_check
+    function run_instance_check(
+        ex_name::String,
+        ex_type::Type{<:ExampleInstanceJuMP{Float64}},
+        inst_data::Tuple,
+        extender,
+        solver::Tuple,
+        )
+        return (false, run_instance(ex_type, inst_data, extender, NamedTuple(), solver[2], default_options = solver[3], test = false))
+    end
 end
 
 perf = DataFrames.DataFrame(
@@ -120,8 +123,7 @@ time_all = time()
 
 @info("starting benchmark runs")
 for ex_name in JuMP_example_names
-    @everywhere include(joinpath($examples_dir, $ex_name, "JuMP.jl"))
-    @everywhere (ex_type, ex_insts) = include(joinpath($examples_dir, $ex_name, "JuMP_benchmark.jl"))
+    (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
 
     for (inst_set, solver) in instance_sets
         haskey(ex_insts, inst_set) || continue
@@ -132,25 +134,20 @@ for ex_name in JuMP_example_names
         for inst_subset in inst_subsets
             for (inst_num, inst) in enumerate(inst_subset)
                 println("\n$ex_type $inst_set $(solver[1]) $inst_num: $inst ...")
-                time_inst = @elapsed (is_killed, p) = instance_check_fun(ex_type{Float64}, inst, extender, solver)
+                time_inst = @elapsed (is_killed, p) = run_instance_check(ex_name, ex_type{Float64}, inst, extender, solver)
 
                 push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], p..., time_inst))
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
                 @printf("... %8.2e seconds\n\n", time_inst)
                 flush(stdout); flush(stderr)
 
-                if is_killed
-                    spawn_runs && spawn_reload(ex_name)
-                    break
-                end
+                is_killed && break
             end
         end
     end
-    sleep(1)
 end
 
 spawn_runs && kill_workers()
-
 @printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)
 DataFrames.show(perf, allrows = true, allcols = true)
 println()

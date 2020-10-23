@@ -9,51 +9,18 @@ Base.eval(Distributed, :(function redirect_worker_output(ident, stream)
     end
 end))
 
-function get_worker()
-    if nprocs() < 2
-        println("adding worker")
-        addprocs(1, enable_threaded_blas = true, exeflags = `--threads $num_threads`)
-        sleep(5)
-    end
-    global worker = workers()[end]
-end
-
 function kill_workers()
-    for w in workers()[2:end]
-        println("killing worker $w")
-        @spawnat w begin flush(stdout); flush(stderr) end
-        sleep(1)
+    try
+        interrupt()
+    catch e
+    end
+    sleep(5)
+    while nprocs() > 1
+        w = workers()[end]
         run(`kill -SIGKILL $(remotecall_fetch(getpid, w))`)
-    end
-    sleep(5)
-end
-
-function spawn_setup()
-    kill_workers()
-    get_worker()
-    @fetchfrom worker begin
-        @eval import LinearAlgebra
-        LinearAlgebra.BLAS.set_num_threads(num_threads)
-        @eval using MosekTools
-        include(joinpath(examples_dir, "common_JuMP.jl"))
-    end
-    sleep(5)
-end
-
-function spawn_reload(ex_name::String)
-    if nprocs() < 2
-        get_worker()
-        @fetchfrom worker begin
-            @eval import LinearAlgebra
-            LinearAlgebra.BLAS.set_num_threads(num_threads)
-            @eval using MosekTools
-            include(joinpath(examples_dir, "common_JuMP.jl"))
-            include(joinpath(examples_dir, ex_name, "JuMP.jl"))
-            include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
-            flush(stdout); flush(stderr)
-        end
         sleep(5)
     end
+    @assert nprocs() == 1
 end
 
 function spawn_step(fun::Function, fun_name::Symbol)
@@ -80,10 +47,7 @@ function spawn_step(fun::Function, fun_name::Symbol)
             sleep(1)
             continue
         end
-        interrupt()
-        sleep(5)
         isready(fut) || kill_workers()
-        sleep(5)
         status = Symbol(fun_name, killstatus)
         println("status: ", status)
         break
@@ -98,28 +62,51 @@ function spawn_step(fun::Function, fun_name::Symbol)
     return (status, output)
 end
 
-function spawn_instance_check(
+function run_instance_check(
+    ex_name::String,
     ex_type::Type{<:ExampleInstanceJuMP{Float64}},
     inst_data::Tuple,
     extender,
     solver::Tuple,
     )
-    println("setup model")
-    fun = () -> setup_model(ex_type, inst_data, extender, solver[3], solver[2])
-    setup_time = @elapsed (status, output) = spawn_step(fun, :SetupModel)
+    if nprocs() < 2
+        println("adding worker")
+        addprocs(1, enable_threaded_blas = true, exeflags = `--threads $num_threads`)
+        sleep(5)
+        @assert nprocs() == 2
+        global worker = workers()[end]
+        @fetchfrom worker begin
+            @eval import LinearAlgebra
+            LinearAlgebra.BLAS.set_num_threads(num_threads)
+            @eval using MosekTools
+            include(joinpath(examples_dir, "common_JuMP.jl"))
+            include(joinpath(examples_dir, ex_name, "JuMP.jl"))
+            include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
+            flush(stdout); flush(stderr)
+        end
+        sleep(2)
+    end
 
-    check_time = @elapsed if status == :ok
-        (model, model_stats) = output
+    println("setup model")
+    setup_fun() = @eval begin
+        (model, model_stats) = setup_model($ex_type, $inst_data, $extender, $(solver[3]), $(solver[2]))
+        return model_stats
+    end
+    setup_time = @elapsed (setup_status, model_stats) = spawn_step(setup_fun, :SetupModel)
+
+    if setup_status == :ok
         println("solve and check")
-        fun = () -> solve_check(model, test = false)
-        (status, solve_stats) = spawn_step(fun, :SolveCheck)
+        solve_fun() = @eval solve_check(model, test = false)
+        check_time = @elapsed (status, solve_stats) = spawn_step(solve_fun, :SolveCheck)
     else
+        check_time = 0.0
         model_stats = (-1, -1, -1, String[])
+        status = setup_status
     end
 
     if status != :ok
         solve_stats = (status, NaN, -1, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
     end
 
-    return (status != :ok, (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time))
+    return (setup_status != :ok, (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time))
 end
