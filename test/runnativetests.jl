@@ -84,7 +84,7 @@ end
 @testset "indirect solvers tests" begin
     println("\nstarting indirect solvers tests")
     for inst_name in inst_indirect, T in diff_reals
-        options = (; default_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.SymIndefIndirectSystemSolver{T}(), tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4)
+        options = (; default_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.SymIndefIndirectSystemSolver{T}(), tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_infeas = 1e-6)
         test_instance_solver(inst_name, T, options)
     end
 end

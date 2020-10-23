@@ -24,7 +24,6 @@ TODO
 mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
     use_heuristic_neighborhood::Bool
-    max_neighborhood::T
     dim::Int
     side::Int
     row_idxs::Vector{Int}
@@ -75,7 +74,6 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
         col_idxs::Vector{Int};
         use_dual::Bool = false,
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
-        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: BlasReal}
         # check validity of inputs
@@ -102,7 +100,6 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
         @assert cone.dim >= 1
         cone.use_dual_barrier = use_dual
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
-        cone.max_neighborhood = max_neighborhood
         cone.side = side # side dimension of sparse matrix
         cone.row_idxs = row_idxs
         cone.col_idxs = col_idxs
@@ -257,7 +254,7 @@ end
 get_nu(cone::PosSemidefTriSparse) = cone.side
 
 function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse{T, T}) where {T <: BlasReal}
-    for i in eachindex(arr)
+    @inbounds for i in eachindex(arr)
         if cone.row_idxs[i] == cone.col_idxs[i]
             arr[i] = 1
         else
@@ -270,7 +267,7 @@ end
 
 function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse{T, Complex{T}}) where {T <: BlasReal}
     idx = 1
-    for (row_idx, col_idx) in zip(cone.row_idxs, cone.col_idxs)
+    @inbounds for (row_idx, col_idx) in zip(cone.row_idxs, cone.col_idxs)
         if row_idx == col_idx
             arr[idx] = 1
             idx += 1
@@ -294,7 +291,7 @@ function update_feas(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
     sx_ptr = unsafe_load(pointer(sparse_point)).x
     if cone.is_complex
         idx = 1
-        for (p_idx, s_idx) in enumerate(cone.sparse_point_map)
+        @inbounds for (p_idx, s_idx) in enumerate(cone.sparse_point_map)
             if cone.row_idxs[p_idx] == cone.col_idxs[p_idx]
                 p = Complex(point[idx])
                 idx += 1
@@ -305,7 +302,7 @@ function update_feas(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
             unsafe_store!(sx_ptr, p, s_idx)
         end
     else
-        for (p_idx, s_idx) in enumerate(cone.sparse_point_map)
+        @inbounds for (p_idx, s_idx) in enumerate(cone.sparse_point_map)
             p = point[p_idx]
             if cone.row_idxs[p_idx] != cone.col_idxs[p_idx]
                 p /= cone.rt2
@@ -330,7 +327,7 @@ function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
 
     # update L blocks from CHOLMOD numerical factorization
     lx_ptr = unsafe_load(pointer(cone.symb_mat)).x
-    for k in 1:length(num_cols)
+    @inbounds for k in 1:length(num_cols)
         L_block = cone.L_blocks[k]
         for (l, lx_idx) in enumerate(cone.L_idxs[k])
             L_block[l] = unsafe_load(lx_ptr, lx_idx)
@@ -338,7 +335,7 @@ function update_grad(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
     end
 
     # build inv blocks
-    for k in reverse(1:length(num_cols))
+    @inbounds for k in reverse(1:length(num_cols))
         num_col = num_cols[k]
         num_row = num_rows[k]
         idxs_n = 1:num_col
@@ -388,7 +385,7 @@ function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
     H = cone.hess.data
 
     H_idx_j = 1
-    for (j, (super_j, row_idx_j, col_idx_j, scal_j, swapped_j)) in enumerate(cone.map_blocks)
+    @inbounds for (j, (super_j, row_idx_j, col_idx_j, scal_j, swapped_j)) in enumerate(cone.map_blocks)
         for H_block in temp_blocks
             H_block .= 0
         end
@@ -478,7 +475,7 @@ end
 function _hess_step1(cone::PosSemidefTriSparse{T, R}, temp_blocks, supernode_list) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     @assert cone.grad_updated
 
-    for k in supernode_list
+    @inbounds for k in supernode_list
         num_col = cone.num_cols[k]
         num_row = cone.num_rows[k]
         idxs_n = 1:num_col
@@ -490,7 +487,7 @@ function _hess_step1(cone::PosSemidefTriSparse{T, R}, temp_blocks, supernode_lis
         F_block[:, idxs_n] = temp_block
     end
 
-    for k in supernode_list
+    @inbounds for k in supernode_list
         num_col = cone.num_cols[k]
         num_row = cone.num_rows[k]
         idxs_n = 1:num_col
@@ -516,7 +513,7 @@ function _hess_step1(cone::PosSemidefTriSparse{T, R}, temp_blocks, supernode_lis
 end
 
 function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks, supernode_list, save_L_pr::Bool) where {R <: RealOrComplex{T}} where {T <: BlasReal}
-    for k in supernode_list
+    @inbounds for k in supernode_list
         num_col = cone.num_cols[k]
         num_row = cone.num_rows[k]
         idxs_n = 1:num_col
@@ -550,7 +547,7 @@ function _hess_step2(cone::PosSemidefTriSparse{T, R}, temp_blocks, supernode_lis
 end
 
 function _hess_step3(cone::PosSemidefTriSparse{T, R}, temp_blocks) where {R <: RealOrComplex{T}} where {T <: BlasReal}
-    for k in reverse(1:length(cone.num_cols))
+    @inbounds for k in reverse(1:length(cone.num_cols))
         num_col = cone.num_cols[k]
         num_row = cone.num_rows[k]
         idxs_n = 1:num_col
@@ -604,14 +601,14 @@ function correction(cone::PosSemidefTriSparse, primal_dir::AbstractVector)
     _hess_step1(cone, temp_blocks, eachindex(cone.num_cols))
     _hess_step2(cone, temp_blocks, eachindex(cone.num_cols), true)
     _hess_step3(cone, temp_blocks)
-    for k in eachindex(cone.num_cols)
+    @inbounds for k in eachindex(cone.num_cols)
         idxs_a = (cone.num_cols[k] + 1):cone.num_rows[k]
         F_block = cone.F_blocks[k]
         @. @views cone.S_pr_blocks[k] = F_block[idxs_a, idxs_a]
         F_block .= 0
     end
 
-    for k in eachindex(cone.num_cols)
+    @inbounds for k in eachindex(cone.num_cols)
         num_col = cone.num_cols[k]
         num_row = cone.num_rows[k]
         idxs_n = 1:num_col
@@ -667,7 +664,7 @@ function svec_to_smat_sparse!(blocks::Vector{Matrix{T}}, vec::AbstractVector{T},
     for b in blocks
         b .= 0
     end
-    for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
+    @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
         vec_i = vec[i]
         if scal
             vec_i /= cone.rt2
@@ -679,7 +676,7 @@ function svec_to_smat_sparse!(blocks::Vector{Matrix{T}}, vec::AbstractVector{T},
 end
 
 function smat_to_svec_sparse!(vec::AbstractVector{T}, blocks::Vector{Matrix{T}}, cone::PosSemidefTriSparse{T, T}) where {T <: BlasReal}
-    for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
+    @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
         vec_i = blocks[super][row_idx, col_idx]
         if scal
             vec_i *= cone.rt2
@@ -695,7 +692,7 @@ function svec_to_smat_sparse!(blocks::Vector{Matrix{Complex{T}}}, vec::AbstractV
         b .= 0
     end
     idx = 1
-    for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
+    @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
         if scal
             blocks[super][row_idx, col_idx] = Complex(vec[idx], (swapped ? -vec[idx + 1] : vec[idx + 1])) / cone.rt2
             idx += 2
@@ -710,7 +707,7 @@ end
 
 function smat_to_svec_sparse!(vec::AbstractVector{T}, blocks::Vector{Matrix{Complex{T}}}, cone::PosSemidefTriSparse{T, Complex{T}}) where {T <: BlasReal}
     idx = 1
-    for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
+    @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.map_blocks)
         vec_R = blocks[super][row_idx, col_idx]
         if scal
             vec_R *= cone.rt2

@@ -61,6 +61,7 @@ mutable struct Solver{T <: Real}
     tol_rel_opt::T
     tol_abs_opt::T
     tol_feas::T
+    tol_infeas::T
     tol_slow::T
     preprocess::Bool
     reduce::Bool
@@ -68,7 +69,6 @@ mutable struct Solver{T <: Real}
     init_use_indirect::Bool
     init_tol_qr::T
     init_use_fallback::Bool
-    max_nbhd::T
     stepper::Stepper{T}
     system_solver::SystemSolver{T}
 
@@ -116,7 +116,6 @@ mutable struct Solver{T <: Real}
     primal_obj::T
     dual_obj::T
     gap::T
-    rel_gap::T
     x_feas::T
     y_feas::T
     z_feas::T
@@ -128,7 +127,6 @@ mutable struct Solver{T <: Real}
     prev_is_slow::Bool
     prev2_is_slow::Bool
     prev_gap::T
-    prev_rel_gap::T
     prev_x_feas::T
     prev_y_feas::T
     prev_z_feas::T
@@ -146,6 +144,8 @@ mutable struct Solver{T <: Real}
         tol_rel_opt::RealOrNothing = nothing,
         tol_abs_opt::RealOrNothing = nothing,
         tol_feas::RealOrNothing = nothing,
+        tol_infeas::RealOrNothing = nothing,
+        default_tol_power::RealOrNothing = nothing,
         default_tol_relax::RealOrNothing = nothing,
         tol_slow::Real = 1e-3,
         preprocess::Bool = true,
@@ -154,9 +154,7 @@ mutable struct Solver{T <: Real}
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
         init_use_fallback::Bool = true,
-        max_nbhd::Real = Cones.default_max_neighborhood(), # TODO cleanup - only for taukap, maybe use full name
         stepper::Stepper{T} = HeurCombStepper{T}(),
-        # stepper::Stepper{T} = PredOrCentStepper{T}(),
         system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
@@ -167,18 +165,27 @@ mutable struct Solver{T <: Real}
         end
         @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
 
-        default_tol = (T <: LinearAlgebra.BlasReal ? sqrt(eps(T)) : eps(T) ^ 0.4)
+        if isnothing(default_tol_power)
+            default_tol_power = (T <: LinearAlgebra.BlasReal ? 0.5 : 0.4)
+        end
+        default_tol_power = T(default_tol_power)
+        default_tol_loose = eps(T) ^ default_tol_power
+        default_tol_tight = eps(T) ^ (T(1.5) * default_tol_power)
         if !isnothing(default_tol_relax)
-            default_tol *= default_tol_relax
+            default_tol_loose *= T(default_tol_relax)
+            default_tol_tight *= T(default_tol_relax)
         end
         if isnothing(tol_rel_opt)
-            tol_rel_opt = default_tol
+            tol_rel_opt = default_tol_loose
         end
         if isnothing(tol_abs_opt)
-            tol_abs_opt = default_tol
+            tol_abs_opt = default_tol_tight
         end
         if isnothing(tol_feas)
-            tol_feas = default_tol
+            tol_feas = default_tol_loose
+        end
+        if isnothing(tol_infeas)
+            tol_infeas = default_tol_tight
         end
 
         solver = new{T}()
@@ -189,6 +196,7 @@ mutable struct Solver{T <: Real}
         solver.tol_rel_opt = tol_rel_opt
         solver.tol_abs_opt = tol_abs_opt
         solver.tol_feas = tol_feas
+        solver.tol_infeas = tol_infeas
         solver.tol_slow = tol_slow
         solver.preprocess = preprocess
         solver.reduce = reduce
@@ -196,7 +204,6 @@ mutable struct Solver{T <: Real}
         solver.init_use_indirect = init_use_indirect
         solver.init_tol_qr = init_tol_qr
         solver.init_use_fallback = init_use_fallback
-        solver.max_nbhd = max_nbhd
         solver.stepper = stepper
         solver.system_solver = system_solver
         solver.status = NotLoaded
@@ -224,7 +231,6 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.primal_obj = NaN
     solver.dual_obj = NaN
     solver.gap = NaN
-    solver.rel_gap = NaN
     solver.x_feas = NaN
     solver.y_feas = NaN
     solver.z_feas = NaN
@@ -235,14 +241,14 @@ function solve(solver::Solver{T}) where {T <: Real}
     model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
     TimerOutputs.@timeit timer "initialize" begin
     (init_z, init_s) = initialize_cone_point(solver.orig_model)
-    solver.rescale && rescale_data(solver)
+    solver.used_rescaling = rescale_data(solver)
     if solver.reduce
         # TODO don't find point / unnecessary stuff before reduce
-        init_y = find_initial_y(solver, init_s, true)
-        init_x = find_initial_x(solver, init_z)
+        init_y = find_initial_y(solver, init_z, true)
+        init_x = find_initial_x(solver, init_s)
     else
-        init_x = find_initial_x(solver, init_z)
-        init_y = find_initial_y(solver, init_s, false)
+        init_x = find_initial_x(solver, init_s)
+        init_y = find_initial_y(solver, init_z, false)
     end
     end
 
@@ -266,13 +272,12 @@ function solve(solver::Solver{T}) where {T <: Real}
         solver.y_residual = zero(model.b)
         solver.z_residual = zero(model.h)
 
-        solver.x_conv_tol = inv(max(one(T), norm(model.c)))
-        solver.y_conv_tol = inv(max(one(T), norm(model.b)))
-        solver.z_conv_tol = inv(max(one(T), norm(model.h)))
+        solver.x_conv_tol = inv(1 + norm(model.c, Inf))
+        solver.y_conv_tol = inv(1 + norm(model.b, Inf))
+        solver.z_conv_tol = inv(1 + norm(model.h, Inf))
         solver.prev_is_slow = false
         solver.prev2_is_slow = false
         solver.prev_gap = NaN
-        solver.prev_rel_gap = NaN
         solver.prev_x_feas = NaN
         solver.prev_y_feas = NaN
         solver.prev_z_feas = NaN
@@ -328,14 +333,15 @@ function solve(solver::Solver{T}) where {T <: Real}
 end
 
 function calc_mu(solver::Solver{T}) where {T <: Real}
-    solver.mu = (dot(solver.point.z, solver.point.s) + dot(solver.point.tau, solver.point.kap)) / (1 + solver.model.nu)
+    point = solver.point
+    solver.mu = (dot(point.z, point.s) + point.tau[1] * point.kap[1]) / (solver.model.nu + 1)
     return solver.mu
 end
 
 function calc_residual(solver::Solver{T}) where {T <: Real}
     model = solver.model
     point = solver.point
-    tau = solver.point.tau[1]
+    tau = point.tau[1]
 
     # x_residual = -A'*y - G'*z - c*tau
     x_residual = solver.x_residual
@@ -369,7 +375,6 @@ function calc_convergence_params(solver::Solver{T}) where {T <: Real}
     point = solver.point
 
     solver.prev_gap = solver.gap
-    solver.prev_rel_gap = solver.rel_gap
     solver.prev_x_feas = solver.x_feas
     solver.prev_y_feas = solver.y_feas
     solver.prev_z_feas = solver.z_feas
@@ -379,13 +384,6 @@ function calc_convergence_params(solver::Solver{T}) where {T <: Real}
     solver.primal_obj = solver.primal_obj_t / solver.point.tau[1] + model.obj_offset
     solver.dual_obj = solver.dual_obj_t / solver.point.tau[1] + model.obj_offset
     solver.gap = dot(point.z, point.s)
-    if solver.primal_obj < -eps(T)
-        solver.rel_gap = solver.gap / -solver.primal_obj
-    elseif solver.dual_obj > eps(T)
-        solver.rel_gap = solver.gap / solver.dual_obj
-    else
-        solver.rel_gap = NaN
-    end
 
     solver.x_feas = solver.x_norm_res * solver.x_conv_tol
     solver.y_feas = solver.y_norm_res * solver.y_conv_tol
@@ -397,33 +395,37 @@ end
 function check_convergence(solver::Solver{T}) where {T <: Real}
     # check convergence criteria
     # TODO nearly primal or dual infeasible or nearly optimal cases?
-    if max(solver.x_feas, solver.y_feas, solver.z_feas) <= solver.tol_feas &&
-        (solver.gap <= solver.tol_abs_opt || (!isnan(solver.rel_gap) && solver.rel_gap <= solver.tol_rel_opt))
+    tau = solver.point.tau[1]
+    primal_obj_t = solver.primal_obj_t
+    dual_obj_t = solver.dual_obj_t
+
+    is_feas = (max(solver.x_feas, solver.y_feas, solver.z_feas) <= solver.tol_feas)
+    is_abs_opt = (solver.gap <= solver.tol_abs_opt)
+    is_rel_opt = (min(solver.gap / tau, abs(primal_obj_t - dual_obj_t)) <= solver.tol_rel_opt * max(tau, min(abs(primal_obj_t), abs(dual_obj_t))))
+    if is_feas && (is_abs_opt || is_rel_opt)
         solver.verbose && println("optimal solution found; terminating")
         solver.status = Optimal
         return true
     end
-    if solver.dual_obj_t > eps(T)
-        infres_pr = solver.x_norm_res_t * solver.x_conv_tol / solver.dual_obj_t
-        if infres_pr <= solver.tol_feas
-            solver.verbose && println("primal infeasibility detected; terminating")
-            solver.status = PrimalInfeasible
-            solver.primal_obj = solver.primal_obj_t
-            solver.dual_obj = solver.dual_obj_t
-            return true
-        end
+
+    if dual_obj_t > eps(T) && solver.x_norm_res_t <= solver.tol_infeas * dual_obj_t
+        solver.verbose && println("primal infeasibility detected; terminating")
+        solver.status = PrimalInfeasible
+        solver.primal_obj = primal_obj_t
+        solver.dual_obj = dual_obj_t
+        return true
     end
-    if solver.primal_obj_t < -eps(T)
-        infres_du = -max(solver.y_norm_res_t * solver.y_conv_tol, solver.z_norm_res_t * solver.z_conv_tol) / solver.primal_obj_t
-        if infres_du <= solver.tol_feas
-            solver.verbose && println("dual infeasibility detected; terminating")
-            solver.status = DualInfeasible
-            solver.primal_obj = solver.primal_obj_t
-            solver.dual_obj = solver.dual_obj_t
-            return true
-        end
+
+    if primal_obj_t < -eps(T) && max(solver.y_norm_res_t, solver.z_norm_res_t) <= solver.tol_infeas * -primal_obj_t
+        solver.verbose && println("dual infeasibility detected; terminating")
+        solver.status = DualInfeasible
+        solver.primal_obj = primal_obj_t
+        solver.dual_obj = dual_obj_t
+        return true
     end
-    if solver.mu <= solver.tol_feas * T(1e-2) && solver.point.tau[1] <= solver.tol_feas * T(1e-2) * min(one(T), solver.point.kap[1])
+
+    # TODO experiment with ill-posedness check
+    if solver.mu <= solver.tol_infeas && tau <= solver.tol_infeas * min(one(T), solver.point.kap[1])
         solver.verbose && println("ill-posedness detected; terminating")
         solver.status = IllPosed
         return true
@@ -431,8 +433,7 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
 
     if expect_improvement(solver.stepper)
         max_improve = zero(T)
-        for (curr, prev) in ((solver.gap, solver.prev_gap), (solver.rel_gap, solver.prev_rel_gap),
-            (solver.x_feas, solver.prev_x_feas), (solver.y_feas, solver.prev_y_feas), (solver.z_feas, solver.prev_z_feas))
+        for (curr, prev) in ((solver.gap, solver.prev_gap), (solver.x_feas, solver.prev_x_feas), (solver.y_feas, solver.prev_y_feas), (solver.z_feas, solver.prev_z_feas))
             if isnan(prev) || isnan(curr)
                 continue
             end

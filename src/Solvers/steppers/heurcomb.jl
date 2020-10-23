@@ -86,7 +86,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     # calculate centering factor gamma by finding distance pred_alpha for stepping in pred direction
     copyto!(dir.vec, dir_pred)
     # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
-    TimerOutputs.@timeit timer "find_max_alpha" stepper.prev_pred_alpha = pred_alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2), max_nbhd = one(T))
+    TimerOutputs.@timeit timer "find_max_alpha" stepper.prev_pred_alpha = pred_alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = stepper.prev_pred_alpha, min_alpha = T(1e-2))
     stepper.prev_gamma = gamma = stepper.gamma_fun(pred_alpha)
 
     # calculate combined direction and keep in dir
@@ -130,36 +130,36 @@ expect_improvement(::HeurCombStepper) = true
 function print_iteration_stats(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     if iszero(solver.num_iters)
         if iszero(solver.model.p)
-            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
-                "iter", "p_obj", "d_obj", "rel_gap", "abs_gap",
+            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s\n",
+                "iter", "p_obj", "d_obj", "abs_gap",
                 "x_feas", "z_feas", "tau", "kap", "mu",
                 "gamma", "alpha",
                 )
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
                 solver.x_feas, solver.z_feas, solver.point.tau[1], solver.point.kap[1], solver.mu
                 )
         else
-            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
-                "iter", "p_obj", "d_obj", "rel_gap", "abs_gap",
+            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %9s %9s\n",
+                "iter", "p_obj", "d_obj", "abs_gap",
                 "x_feas", "y_feas", "z_feas", "tau", "kap", "mu",
                 "gamma", "alpha",
                 )
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
                 solver.x_feas, solver.y_feas, solver.z_feas, solver.point.tau[1], solver.point.kap[1], solver.mu
                 )
         end
     else
         if iszero(solver.model.p)
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
                 solver.x_feas, solver.z_feas, solver.point.tau[1], solver.point.kap[1], solver.mu,
                 stepper.prev_gamma, stepper.prev_alpha,
                 )
         else
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.rel_gap, solver.gap,
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
+                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
                 solver.x_feas, solver.y_feas, solver.z_feas, solver.point.tau[1], solver.point.kap[1], solver.mu,
                 stepper.prev_gamma, stepper.prev_alpha,
                 )

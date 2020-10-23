@@ -1,5 +1,5 @@
 #=
-see description in native.jl
+portfolio rebalancing problem
 =#
 
 struct PortfolioJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -17,9 +17,9 @@ function build(inst::PortfolioJuMP{T}) where {T <: Float64}
     gamma = sum(abs, sigma_half * x) / sqrt(num_stocks)
 
     model = JuMP.Model()
-    JuMP.@variable(model, invest[1:num_stocks] >= 0)
+    JuMP.@variable(model, invest[1:num_stocks])
     JuMP.@objective(model, Max, dot(returns, invest))
-    JuMP.@constraint(model, sum(invest) == 1)
+    JuMP.@constraint(model, sum(invest) == 0)
 
     aff_expr = sigma_half * invest
     if inst.epipernormeucl_constr

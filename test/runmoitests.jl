@@ -27,7 +27,7 @@ end
 default_options = (
     # verbose = true,
     verbose = false,
-    default_tol_relax = 3,
+    default_tol_relax = 2,
     )
 
 @testset "MOI.Test tests" begin
