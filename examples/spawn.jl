@@ -17,10 +17,12 @@ function kill_workers()
     sleep(5)
     while nprocs() > 1
         w = workers()[end]
-        run(`kill -SIGKILL $(remotecall_fetch(getpid, w))`)
+        try
+            run(`kill -SIGKILL $(remotecall_fetch(getpid, w))`)
+        catch e
+        end
         sleep(5)
     end
-    @assert nprocs() == 1
 end
 
 function spawn_step(fun::Function, fun_name::Symbol)
@@ -47,6 +49,11 @@ function spawn_step(fun::Function, fun_name::Symbol)
             sleep(1)
             continue
         end
+        try
+            isready(fut) || interrupt()
+        catch e
+        end
+        sleep(5)
         isready(fut) || kill_workers()
         status = Symbol(fun_name, killstatus)
         println("status: ", status)
