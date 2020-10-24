@@ -10,25 +10,27 @@ Base.eval(Distributed, :(function redirect_worker_output(ident, stream)
 end))
 
 function kill_workers()
-    try
-        interrupt()
-    catch e
+    if nprocs() > 1
+        try
+            interrupt()
+        catch e
+        end
+        sleep(5)
     end
-    sleep(5)
-    while nprocs() > 1
+    if nprocs() > 1
         w = workers()[end]
         try
             run(`kill -SIGKILL $(remotecall_fetch(getpid, w))`)
         catch e
         end
-        sleep(5)
+        sleep(10)
     end
+    @assert nprocs() == 1
 end
 
-function spawn_step(fun::Function, fun_name::Symbol)
+function spawn_step(fun::Function, fun_name::Symbol, time_limit::Real)
     @assert nprocs() == 2
-    status = :ok
-    output = nothing
+    status = :OK
     time_start = time()
 
     fut = Future()
@@ -40,28 +42,36 @@ function spawn_step(fun::Function, fun_name::Symbol)
         end
     end)
 
+    killed_proc = false
     while !isready(fut)
         if Sys.free_memory() < free_memory_limit
             killstatus = :KilledMemory
-        elseif time() - time_start > setup_time_limit
+        elseif time() - time_start > time_limit
             killstatus = :KilledTime
         else
             sleep(1)
             continue
         end
         try
-            isready(fut) || interrupt()
+            if !isready(fut)
+                interrupt()
+                sleep(5)
+            end
+            if !isready(fut) && nprocs() > 1
+                w = workers()[end]
+                run(`kill -SIGKILL $(remotecall_fetch(getpid, w))`)
+                killed_proc = true
+                sleep(10)
+            end
         catch e
         end
-        sleep(5)
-        isready(fut) || kill_workers()
         status = Symbol(fun_name, killstatus)
         println("status: ", status)
         break
     end
 
-    output = isready(fut) ? fetch(fut) : nothing
-    if isnothing(output) && status == :ok
+    output = (killed_proc || !isready(fut)) ? nothing : fetch(fut)
+    if isnothing(output) && status == :OK
         status = Symbol(fun_name, :CaughtError)
     end
     flush(stdout); flush(stderr)
@@ -75,6 +85,7 @@ function run_instance_check(
     inst_data::Tuple,
     extender,
     solver::Tuple,
+    solve::Bool,
     )
     if nprocs() < 2
         println("adding worker")
@@ -99,21 +110,37 @@ function run_instance_check(
         (model, model_stats) = setup_model($ex_type, $inst_data, $extender, $(solver[3]), $(solver[2]))
         return model_stats
     end
-    setup_time = @elapsed (setup_status, model_stats) = spawn_step(setup_fun, :SetupModel)
+    setup_time = @elapsed (status, model_stats) = spawn_step(setup_fun, :SetupModel, setup_time_limit)
+    setup_killed = (status != :OK)
+    if setup_killed
+        println("setup model failed: $status")
+        model_stats = (-1, -1, -1, String[])
+    end
 
-    if setup_status == :ok
+    if solve && !setup_killed
         println("solve and check")
-        solve_fun() = @eval solve_check(model, test = false)
-        check_time = @elapsed (status, solve_stats) = spawn_step(solve_fun, :SolveCheck)
+        check_fun() = @eval solve_check(model, test = false)
+        check_time = @elapsed (status, check_stats) = spawn_step(check_fun, :SolveCheck, check_time_limit)
+        check_killed = (status != :OK)
+        check_killed && println("solve and check failed: $status")
     else
         check_time = 0.0
-        model_stats = (-1, -1, -1, String[])
-        status = setup_status
+        check_killed = true
+    end
+    if check_killed
+        if status == :OK
+            @assert !solve
+            status = :SkippedSolveCheck
+        end
+        check_stats = (string(status), NaN, -1, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
+        solver_hit_limit = true
+    else
+        solver_status = string(check_stats[1])
+        check_stats = (solver_status, check_stats[2:end]...)
+        solver_hit_limit = (solver_status == "TimeLimit")
+        solver_hit_limit && println("solver hit limit: $solver_status")
     end
 
-    if status != :ok
-        solve_stats = (status, NaN, -1, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
-    end
 
-    return (setup_status != :ok, (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time))
+    return (setup_killed, solver_hit_limit, (model_stats..., check_stats..., setup_time, check_time))
 end
