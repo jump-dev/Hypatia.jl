@@ -12,8 +12,7 @@ using Distributed
 using Hypatia
 using MosekTools
 
-num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
-LinearAlgebra.BLAS.set_num_threads(num_threads)
+@assert nprocs() == 1
 println()
 
 examples_dir = @__DIR__
@@ -25,17 +24,15 @@ results_path = joinpath(homedir(), "bench", "bench.csv")
 
 spawn_runs = true # needed for running Julia process with multiple threads
 # spawn_runs = false
-
 setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
-
+num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
 free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
 optimizer_time_limit = 1800
 setup_time_limit = optimizer_time_limit
 check_time_limit = 1.2 * optimizer_time_limit
-
-# options to solvers
 tol_loose = 1e-7
 tol_tight = 1e-3 * tol_loose
+
 hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     verbose = true,
     iter_limit = 250,
@@ -77,20 +74,22 @@ JuMP_example_names = [
     # "shapeconregr",
     ]
 
-free_memory_GB() = (Float64(Sys.free_memory()) / 2^30)
-print_free_memory() = println("free memory (GB): ", free_memory_GB())
-
 for ex_name in JuMP_example_names
     include(joinpath(examples_dir, ex_name, "JuMP.jl"))
 end
 
+print_memory() = println("free memory (GB): ", Float64(Sys.free_memory()) / 2^30)
+
+print_memory()
+
 if spawn_runs
     include(joinpath(examples_dir, "spawn.jl"))
-    kill_workers()
 else
+    LinearAlgebra.BLAS.set_num_threads(num_threads)
     function run_instance_check(
         ::String,
         ex_type::Type{<:ExampleInstanceJuMP{Float64}},
+        ::Tuple,
         inst_data::Tuple,
         extender,
         solver::Tuple,
@@ -129,7 +128,6 @@ perf = DataFrames.DataFrame(
 isnothing(results_path) || CSV.write(results_path, perf)
 time_all = time()
 
-print_free_memory()
 @info("starting benchmark runs")
 for ex_name in JuMP_example_names
     (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
@@ -142,16 +140,18 @@ for ex_name in JuMP_example_names
 
         for inst_subset in inst_subsets
             solve = true
-            for (inst_num, inst) in enumerate(inst_subset)
-                println("\n$ex_type $inst_set $(solver[1]) $inst_num: $inst ...")
-                print_free_memory()
-                time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, inst, extender, solver, solve)
+            compile_inst = inst_subset[1]
+            for (inst_num, inst) in enumerate(inst_subset[2:end])
+                println()
+                @info("starting $ex_type $inst_set $(solver[1]) $inst_num: $inst ...")
+                flush(stdout); flush(stderr)
+
+                time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, compile_inst, inst, extender, solver, solve)
 
                 push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], p..., time_inst))
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
                 @printf("... %8.2e seconds\n\n", time_inst)
                 flush(stdout); flush(stderr)
-                GC.gc()
 
                 setup_killed && break
                 if check_killed
@@ -166,10 +166,9 @@ for ex_name in JuMP_example_names
     end
 end
 
-spawn_runs && kill_workers()
-print_free_memory()
 @printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)
 DataFrames.show(perf, allrows = true, allcols = true)
 println()
+spawn_runs && interrupt()
 flush(stdout); flush(stderr)
 ;
