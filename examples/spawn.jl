@@ -74,6 +74,7 @@ function spawn_step(fun::Function, fun_name::Symbol, time_limit::Real)
     if isnothing(output) && status == :OK
         status = Symbol(fun_name, :CaughtError)
     end
+    finalize(fut)
     flush(stdout); flush(stderr)
 
     return (status, output)
