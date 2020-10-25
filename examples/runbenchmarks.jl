@@ -1,7 +1,7 @@
 #=
 run benchmarks from the examples folder
 to use the bench instance set and run on cmd line:
-~/julia/julia examples/runbenchmarks.jl &> ~/bench/bench.txt
+killall julia; ~/julia/julia examples/runbenchmarks.jl &> ~/bench/bench.txt
 =#
 
 import DataFrames
@@ -28,7 +28,7 @@ spawn_runs = true # needed for running Julia process with multiple threads
 
 setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
 
-free_memory_limit = 16 * 2^30 # keep at least X GB of RAM available
+free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
 optimizer_time_limit = 1800
 setup_time_limit = optimizer_time_limit
 check_time_limit = 1.2 * optimizer_time_limit
@@ -76,6 +76,9 @@ JuMP_example_names = [
     # "portfolio",
     # "shapeconregr",
     ]
+
+free_memory_GB() = (Float64(Sys.free_memory()) / 2^30)
+print_free_memory() = println("free memory (GB): ", free_memory_GB())
 
 for ex_name in JuMP_example_names
     include(joinpath(examples_dir, ex_name, "JuMP.jl"))
@@ -126,6 +129,7 @@ perf = DataFrames.DataFrame(
 isnothing(results_path) || CSV.write(results_path, perf)
 time_all = time()
 
+print_free_memory()
 @info("starting benchmark runs")
 for ex_name in JuMP_example_names
     (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
@@ -140,12 +144,14 @@ for ex_name in JuMP_example_names
             solve = true
             for (inst_num, inst) in enumerate(inst_subset)
                 println("\n$ex_type $inst_set $(solver[1]) $inst_num: $inst ...")
+                print_free_memory()
                 time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, inst, extender, solver, solve)
 
                 push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], p..., time_inst))
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
                 @printf("... %8.2e seconds\n\n", time_inst)
                 flush(stdout); flush(stderr)
+                GC.gc()
 
                 setup_killed && break
                 if check_killed
@@ -161,6 +167,7 @@ for ex_name in JuMP_example_names
 end
 
 spawn_runs && kill_workers()
+print_free_memory()
 @printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)
 DataFrames.show(perf, allrows = true, allcols = true)
 println()

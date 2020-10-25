@@ -108,6 +108,7 @@ function run_instance_check(
     println("setup model")
     setup_fun() = @eval begin
         (model, model_stats) = setup_model($ex_type, $inst_data, $extender, $(solver[3]), $(solver[2]))
+        GC.gc()
         return model_stats
     end
     setup_time = @elapsed (status, model_stats) = spawn_step(setup_fun, :SetupModel, setup_time_limit)
@@ -119,7 +120,12 @@ function run_instance_check(
 
     if solve && !setup_killed
         println("solve and check")
-        check_fun() = @eval solve_check(model, test = false)
+        check_fun() = @eval begin
+            solve_stats = solve_check(model, test = false)
+            finalize(model)
+            GC.gc()
+            return solve_stats
+        end
         check_time = @elapsed (status, check_stats) = spawn_step(check_fun, :SolveCheck, check_time_limit)
         check_killed = (status != :OK)
         check_killed && println("solve and check failed: $status")
@@ -140,7 +146,6 @@ function run_instance_check(
         solver_hit_limit = (solver_status == "TimeLimit")
         solver_hit_limit && println("solver hit limit: $solver_status")
     end
-
 
     return (setup_killed, solver_hit_limit, (model_stats..., check_stats..., setup_time, check_time))
 end
