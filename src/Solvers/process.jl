@@ -32,7 +32,7 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
             end
         else
             # TODO store single scale value only?
-            @inbounds h_scale[idxs] .= sqrt(max(maxabsmin(view(h, idxs)), maxabsminrows(G, idxs)))
+            @inbounds @views h_scale[idxs] .= sqrt(max(maxabsmin(h[idxs]), maxabsminrows(G, idxs)))
         end
     end
 
@@ -375,7 +375,7 @@ function postprocess(solver::Solver{T}) where {T <: Real}
             # unreduce solver's solution
             # x = Q * [(R' \ b0), x]
             xa = zeros(T, solver.orig_model.n - length(solver.reduce_Rpib0))
-            @. xa[solver.x_keep_idxs] = point.x / tau
+            @. @views xa[solver.x_keep_idxs] = point.x / tau
             if in(solver.status, (PrimalInfeasible, DualInfeasible))
                 Rpib0 = zeros(T, length(solver.reduce_Rpib0))
             else
@@ -386,10 +386,10 @@ function postprocess(solver::Solver{T}) where {T <: Real}
             if isempty(solver.reduce_row_piv_inv)
                 result.x .= xb
             else
-                @. result.x = xb[solver.reduce_row_piv_inv]
+                @. @views result.x = xb[solver.reduce_row_piv_inv]
             end
         else
-            @. result.x[solver.x_keep_idxs] = point.x / tau
+            @. @views result.x[solver.x_keep_idxs] = point.x / tau
         end
     else
         @. result.x = point.x / tau
@@ -406,9 +406,9 @@ function postprocess(solver::Solver{T}) where {T <: Real}
                 ya .+= solver.reduce_cQ1
             end
             @views ldiv!(solver.reduce_Ap_R, ya[1:length(solver.reduce_y_keep_idxs)])
-            @. result.y[solver.reduce_y_keep_idxs] = -ya
+            @. @views result.y[solver.reduce_y_keep_idxs] = -ya
         else
-            @. result.y[solver.y_keep_idxs] = point.y / tau
+            @. @views result.y[solver.y_keep_idxs] = point.y / tau
         end
     else
         @. result.y = point.y / tau

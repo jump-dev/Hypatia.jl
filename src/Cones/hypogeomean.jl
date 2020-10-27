@@ -66,7 +66,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoGeoMean{T}) where {
     wdim = cone.dim - 1
     c = sqrt(T(5 * wdim ^ 2 + 2 * wdim + 1))
     arr[1] = -sqrt((-c + 3 * wdim + 1) / T(2 * cone.dim))
-    arr[2:end] .= (c - wdim + 1) / sqrt(cone.dim * (-2 * c + 6 * wdim + 2))
+    @views arr[2:end] .= (c - wdim + 1) / sqrt(cone.dim * (-2 * c + 6 * wdim + 2))
     return arr
 end
 
@@ -105,7 +105,7 @@ function update_grad(cone::HypoGeoMean)
 
     cone.grad[1] = inv(cone.z)
     gconst = -cone.iwdim * cone.wgeo / cone.z - 1
-    @. cone.grad[2:end] = gconst / w
+    @. @views cone.grad[2:end] = gconst / w
 
     cone.grad_updated = true
     return cone.grad
@@ -149,7 +149,7 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::H
     wgeozm1 = wgeoz - iwdim
     constww = wgeoz + 1
 
-    @views @inbounds for j in 1:size(arr, 2)
+    @inbounds @views for j in 1:size(arr, 2)
         arr_u = arr[1, j]
         auz = arr_u / z
         prod_w = prod[2:end, j]
@@ -200,7 +200,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
     denom = cone.dim * wgeo - wdim * u
     zd2 = wdim * cone.z / denom
 
-    @views @inbounds for j in 1:size(prod, 2)
+    @inbounds @views for j in 1:size(prod, 2)
         arr_u = arr[1, j]
         prod_w = prod[2:end, j]
         @. prod_w = w * arr[2:end, j]

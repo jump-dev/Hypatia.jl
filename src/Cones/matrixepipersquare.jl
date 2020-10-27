@@ -224,7 +224,7 @@ function update_hess(cone::MatrixEpiPerSquare)
     # H_U_U part
     @views H_U_U = H[U_idxs, U_idxs]
     symm_kron(H_U_U, Zi, cone.rt2)
-    @. @views H_U_U *= 4 * abs2(v)
+    @. H_U_U *= 4 * abs2(v)
 
     # H_v_v part
     @views H[v_idx, v_idx] = cone.Hvv

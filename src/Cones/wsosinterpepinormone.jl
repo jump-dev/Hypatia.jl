@@ -124,8 +124,8 @@ get_nu(cone::WSOSInterpEpiNormOne) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
 use_sqrt_oracles(::WSOSInterpEpiNormOne) = false
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormOne)
-    arr[1:cone.U] .= 1
-    arr[(cone.U + 1):end] .= 0
+    @views arr[1:cone.U] .= 1
+    @views arr[(cone.U + 1):end] .= 0
     return arr
 end
 
@@ -298,13 +298,13 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInt
     prod .= 0
 
     @views mul!(prod[1:U, :], Symmetric(cone.hess_diag_blocks[1], :U), arr[1:U, :])
-    @inbounds for r in 1:(R - 1)
+    @inbounds @views for r in 1:(R - 1)
         idxs = block_idxs(U, r + 1)
         edge_r = Symmetric(cone.hess_edge_blocks[r], :U)
-        @views arr_r = arr[idxs, :]
-        @views mul!(prod[1:U, :], edge_r, arr_r, true, true)
-        @views mul!(prod[idxs, :], edge_r, arr[1:U, :])
-        @views mul!(prod[idxs, :], Symmetric(cone.hess_diag_blocks[r + 1], :U), arr_r, true, true)
+        arr_r = arr[idxs, :]
+        mul!(prod[1:U, :], edge_r, arr_r, true, true)
+        mul!(prod[idxs, :], edge_r, arr[1:U, :])
+        mul!(prod[idxs, :], Symmetric(cone.hess_diag_blocks[r + 1], :U), arr_r, true, true)
     end
 
     return prod
@@ -321,7 +321,7 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where {T}
     Diz = cone.tmpURU2
     schur_backup = cone.tmpUU
 
-    @views copyto!(schur, Symmetric(cone.hess_diag_blocks[1], :U))
+    copyto!(schur, Symmetric(cone.hess_diag_blocks[1], :U))
 
     @inbounds for r in 2:R
         r1 = r - 1

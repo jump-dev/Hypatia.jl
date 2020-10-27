@@ -67,8 +67,8 @@ end
 get_nu(cone::EpiPerSquare) = 2
 
 function set_initial_point(arr::AbstractVector, cone::EpiPerSquare)
-    arr[1:2] .= 1
-    arr[3:end] .= 0
+    @views arr[1:2] .= 1
+    @views arr[3:end] .= 0
     return arr
 end
 
@@ -154,7 +154,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
         ga = (dot(w, wj) - v * uj - u * vj) / cone.dist
         prod[1, j] = -ga * v - vj
         prod[2, j] = -ga * u - uj
-        @. prod[3:end, j] = ga * w + wj
+        @. @views prod[3:end, j] = ga * w + wj
     end
     @. prod /= cone.dist
 
@@ -164,8 +164,8 @@ end
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
     @assert cone.is_feas
 
-    @inbounds for j in 1:size(prod, 2)
-        @views pa = dot(cone.point, arr[:, j])
+    @inbounds @views for j in 1:size(prod, 2)
+        pa = dot(cone.point, arr[:, j])
         @. prod[:, j] = pa * cone.point
     end
     @. @views prod[1, :] -= cone.dist * arr[2, :]
@@ -211,8 +211,8 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, co
     vec = cone.hess_sqrt_vec
     rtdist = cone.rtdist
 
-    @inbounds for j in 1:size(arr, 2)
-        @views dotj = dot(vec, arr[:, j]) / cone.denom
+    @inbounds @views for j in 1:size(arr, 2)
+        dotj = dot(vec, arr[:, j]) / cone.denom
         @. prod[:, j] = dotj * vec
     end
     @. @views prod[1, :] -= arr[2, :] / rtdist
@@ -229,8 +229,8 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}
     vec = cone.inv_hess_sqrt_vec
     rtdist = cone.rtdist
 
-    @inbounds for j in 1:size(arr, 2)
-        @views dotj = dot(vec, arr[:, j]) / cone.denom
+    @inbounds @views for j in 1:size(arr, 2)
+        dotj = dot(vec, arr[:, j]) / cone.denom
         @. prod[:, j] = dotj * vec
     end
     @. @views prod[1, :] -= arr[2, :] * rtdist

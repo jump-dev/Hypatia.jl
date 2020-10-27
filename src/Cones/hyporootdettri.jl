@@ -212,8 +212,8 @@ function update_hess_aux(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T
     cone.dot_const = sigma * (sigma - inv(T(cone.side)))
     # update first row in the Hessian
     hess = cone.hess.data
-    @. hess[1, :] = cone.grad / cone.rootdetu
-    @. hess[1, 2:end] *= sigma / cone.kron_const
+    @. @views hess[1, :] = cone.grad / cone.rootdetu
+    @. @views hess[1, 2:end] *= sigma / cone.kron_const
 
     cone.hess_aux_updated = true
     return

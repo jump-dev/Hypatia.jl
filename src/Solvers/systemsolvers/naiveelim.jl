@@ -65,7 +65,7 @@ function solve_subsystem4(
 
     sol_sub = system_solver.sol_sub
     solve_inner_system(system_solver, sol_sub, rhs_sub)
-    @inbounds sol.vec[1:dim4] .= sol_sub.vec
+    @inbounds @views sol.vec[1:dim4] .= sol_sub.vec
 
     return sol
 end
@@ -140,8 +140,8 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
             len_kj = length(nz_rows_kj)
             IJV_idxs = offset:(offset + len_kj - 1)
             offset += len_kj
-            @. H_Is[IJV_idxs] = nz_rows_kj
-            @. H_Js[IJV_idxs] = z_start_k + j
+            @. @views H_Is[IJV_idxs] = nz_rows_kj
+            @. @views H_Js[IJV_idxs] = z_start_k + j
         end
     end
     append!(Is, H_Is)
@@ -250,7 +250,7 @@ function update_lhs(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
             @views Cones.hess_prod!(lhs_sub[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
-            @. lhs_sub[z_rows_k, 1:n] *= -1
+            @. @views lhs_sub[z_rows_k, 1:n] *= -1
             @views Cones.hess_prod!(lhs_sub[z_rows_k, end], model.h[idxs_k], cone_k)
         end
     end

@@ -84,11 +84,15 @@ function run_instance_check(
         return nothing
     end
     println("running compile instance")
+    original_stdout = stdout
+    (out_rd, out_wr) = redirect_stdout() # don't print output
     @fetchfrom worker begin
         run_instance(ex_type, compile_inst, extender, NamedTuple(), solver[2], default_options = solver[3], test = false)
         flush(stdout); flush(stderr)
         return nothing
     end
+    redirect_stdout(original_stdout)
+    close(out_wr)
     println("finished compile instance")
 
     println("\nsetup model")

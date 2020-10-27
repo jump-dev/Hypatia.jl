@@ -101,8 +101,8 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
             len_kj = length(nz_rows_kj)
             IJV_idxs = offset:(offset + len_kj - 1)
             offset += len_kj
-            @. H_Is[IJV_idxs] = nz_rows_kj
-            @. H_Js[IJV_idxs] = z_start_k + j
+            @. @views H_Is[IJV_idxs] = nz_rows_kj
+            @. @views H_Js[IJV_idxs] = z_start_k + j
         end
     end
     append!(Is, H_Is)
@@ -218,7 +218,7 @@ function update_lhs(system_solver::SymIndefDenseSystemSolver, solver::Solver)
     for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
         z_rows_k = z_start .+ idxs_k
         H_k = (Cones.use_dual_barrier(cone_k) ? Cones.hess : Cones.inv_hess)(cone_k)
-        @. lhs_sub[z_rows_k, z_rows_k] = -H_k
+        @. @views lhs_sub[z_rows_k, z_rows_k] = -H_k
     end
 
     update_fact(system_solver.fact_cache, system_solver.lhs_sub)

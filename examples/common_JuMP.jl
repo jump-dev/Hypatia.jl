@@ -62,7 +62,8 @@ function setup_model(
     inst = ex_type(inst_data...)
     model = build(inst)
 
-    opt = hyp_opt = (solver_type == Hypatia.Optimizer) ? Hypatia.Optimizer(; solver_options...) : Hypatia.Optimizer()
+    is_hypatia_opt = (solver_type == Hypatia.Optimizer)
+    opt = hyp_opt = (is_hypatia_opt ? Hypatia.Optimizer(; solver_options...) : Hypatia.Optimizer(use_dense_model = false))
     if !isnothing(extender)
         # use MOI automated extended formulation
         opt = MOI.Bridges.full_bridge_optimizer(MOI.Utilities.CachingOptimizer(extender{Float64}(), opt), Float64)
@@ -78,11 +79,12 @@ function setup_model(
     flush(stdout); flush(stderr)
 
     hyp_model = hyp_opt.model
-    if solver_type != Hypatia.Optimizer
+    if is_hypatia_opt
+        model.ext[:inst] = inst
+    else
         # not using Hypatia to solve, so setup new JuMP model corresponding to Hypatia data
         (A, b, c, G, h) = (hyp_model.A, hyp_model.b, hyp_model.c, hyp_model.G, hyp_model.h)
         (cones, cone_idxs) = (hyp_model.cones, hyp_model.cone_idxs)
-
         new_model = JuMP.Model()
         new_model.ext[:hyp_data] = hyp_model
         JuMP.@variable(new_model, x_var[1:length(c)])
@@ -97,7 +99,7 @@ function setup_model(
             if Hypatia.needs_untransform(moi_set)
                 Hypatia.untransform_affine(moi_set, h_k)
                 for j in 1:size(G_k, 2)
-                    @views Hypatia.untransform_affine(moi_set, G_k[:, j])
+                    @inbounds @views Hypatia.untransform_affine(moi_set, G_k[:, j])
                 end
             end
             cone_refs[k] = JuMP.@constraint(new_model, h_k - G_k * x_var in moi_set)
@@ -110,8 +112,6 @@ function setup_model(
         JuMP.set_optimizer(new_model, () -> opt)
         model = new_model
         flush(stdout); flush(stderr)
-    else
-        model.ext[:inst] = inst
     end
 
     string_cones = [string(nameof(c)) for c in unique(typeof.(hyp_model.cones))]

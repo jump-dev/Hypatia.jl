@@ -186,7 +186,7 @@ function solve_subsystem4(
     sol_tau = tau_num / tau_denom
 
     dim3 = length(sol_sub.vec)
-    @. sol.vec[1:dim3] = sol_sub.vec + sol_tau * sol_const.vec
+    @. @views sol.vec[1:dim3] = sol_sub.vec + sol_tau * sol_const.vec
     sol.tau[1] = sol_tau
 
     return sol
