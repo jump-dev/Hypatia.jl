@@ -1,7 +1,7 @@
 #=
 run benchmarks from the examples folder
 to use the bench instance set and run on cmd line:
-~/julia/julia examples/runbenchmarks.jl &> ~/bench/bench.txt
+killall julia; ~/julia/julia examples/runbenchmarks.jl &> ~/bench/bench.txt
 =#
 
 import DataFrames
@@ -12,8 +12,8 @@ using Distributed
 using Hypatia
 using MosekTools
 
-num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
-LinearAlgebra.BLAS.set_num_threads(num_threads)
+interrupt()
+@assert nprocs() == 1
 println()
 
 examples_dir = @__DIR__
@@ -25,32 +25,34 @@ results_path = joinpath(homedir(), "bench", "bench.csv")
 
 spawn_runs = true # needed for running Julia process with multiple threads
 # spawn_runs = false
-
-free_memory_limit = 16 * 2^30 # keep at least X GB of RAM available
+setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
+num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
+free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
 optimizer_time_limit = 1800
-solve_time_limit = 1.2 * optimizer_time_limit
 setup_time_limit = optimizer_time_limit
+check_time_limit = 1.2 * optimizer_time_limit
+tol_loose = 1e-7
+tol_tight = 1e-3 * tol_loose
 
-# options to solvers
-tol = 1e-7
 hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     verbose = true,
     iter_limit = 250,
-    time_limit = solve_time_limit,
-    tol_abs_opt = 1e-3 * tol,
-    tol_rel_opt = tol,
-    tol_feas = tol,
-    tol_infeas = 1e-3 * tol
+    time_limit = optimizer_time_limit,
+    tol_abs_opt = tol_tight,
+    tol_rel_opt = tol_loose,
+    tol_feas = tol_loose,
+    tol_infeas = tol_tight,
     ))
 mosek_solver = ("Mosek", Mosek.Optimizer, (
     QUIET = false,
     MSK_IPAR_NUM_THREADS = num_threads,
     MSK_IPAR_OPTIMIZER = Mosek.MSK_OPTIMIZER_CONIC,
     MSK_IPAR_INTPNT_BASIS = Mosek.MSK_BI_NEVER, # do not do basis identification for LO problems
-    MSK_DPAR_OPTIMIZER_MAX_TIME = solve_time_limit,
-    MSK_DPAR_INTPNT_CO_TOL_PFEAS = tol,
-    MSK_DPAR_INTPNT_CO_TOL_DFEAS = tol,
-    MSK_DPAR_INTPNT_CO_TOL_REL_GAP = tol,
+    MSK_DPAR_OPTIMIZER_MAX_TIME = optimizer_time_limit,
+    MSK_DPAR_INTPNT_CO_TOL_REL_GAP = tol_loose,
+    MSK_DPAR_INTPNT_CO_TOL_PFEAS = tol_loose,
+    MSK_DPAR_INTPNT_CO_TOL_DFEAS = tol_loose,
+    MSK_DPAR_INTPNT_CO_TOL_INFEAS = tol_tight,
     ))
 
 # instance sets and solvers to run
@@ -77,18 +79,24 @@ for ex_name in JuMP_example_names
     include(joinpath(examples_dir, ex_name, "JuMP.jl"))
 end
 
+print_memory() = println("free memory (GB): ", Float64(Sys.free_memory()) / 2^30)
+
+print_memory()
+
 if spawn_runs
     include(joinpath(examples_dir, "spawn.jl"))
-    kill_workers()
 else
+    LinearAlgebra.BLAS.set_num_threads(num_threads)
     function run_instance_check(
-        ex_name::String,
+        ::String,
         ex_type::Type{<:ExampleInstanceJuMP{Float64}},
+        ::Tuple,
         inst_data::Tuple,
         extender,
         solver::Tuple,
+        ::Bool,
         )
-        return (false, run_instance(ex_type, inst_data, extender, NamedTuple(), solver[2], default_options = solver[3], test = false))
+        return (false, false, run_instance(ex_type, inst_data, extender, NamedTuple(), solver[2], default_options = solver[3], test = false))
     end
 end
 
@@ -132,24 +140,36 @@ for ex_name in JuMP_example_names
         @info("starting instances for $ex_type $inst_set")
 
         for inst_subset in inst_subsets
-            for (inst_num, inst) in enumerate(inst_subset)
-                println("\n$ex_type $inst_set $(solver[1]) $inst_num: $inst ...")
-                time_inst = @elapsed (is_killed, p) = run_instance_check(ex_name, ex_type{Float64}, inst, extender, solver)
+            solve = true
+            compile_inst = inst_subset[1]
+            for (inst_num, inst) in enumerate(inst_subset[2:end])
+                println()
+                @info("starting $ex_type $inst_set $(solver[1]) $inst_num: $inst ...")
+                flush(stdout); flush(stderr)
+
+                time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, compile_inst, inst, extender, solver, solve)
 
                 push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], p..., time_inst))
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
                 @printf("... %8.2e seconds\n\n", time_inst)
                 flush(stdout); flush(stderr)
 
-                is_killed && break
+                setup_killed && break
+                if check_killed
+                    if setup_model_anyway
+                        solve = false
+                    else
+                        break
+                    end
+                end
             end
         end
     end
 end
 
-spawn_runs && kill_workers()
 @printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)
 DataFrames.show(perf, allrows = true, allcols = true)
 println()
+spawn_runs && interrupt()
 flush(stdout); flush(stderr)
 ;

@@ -59,8 +59,8 @@ function load(system_solver::NaiveSparseSystemSolver{T}, solver::Solver{T}) wher
             len_kj = length(nz_rows_kj)
             IJV_idxs = offset:(offset + len_kj - 1)
             offset += len_kj
-            @. H_Is[IJV_idxs] = nz_rows_kj
-            @. H_Js[IJV_idxs] = H_start_k + j
+            @. @views H_Is[IJV_idxs] = nz_rows_kj
+            @. @views H_Js[IJV_idxs] = H_start_k + j
         end
     end
     append!(Is, H_Is)

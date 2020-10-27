@@ -483,8 +483,8 @@ function _hess_step1(cone::PosSemidefTriSparse{T, R}, temp_blocks, supernode_lis
         F_block = cone.F_blocks[k]
         temp_block = temp_blocks[k]
 
-        F_block[idxs_a, idxs_a] .= 0
-        F_block[:, idxs_n] = temp_block
+        @views F_block[idxs_a, idxs_a] .= 0
+        @views F_block[:, idxs_n] .= temp_block
     end
 
     @inbounds for k in supernode_list

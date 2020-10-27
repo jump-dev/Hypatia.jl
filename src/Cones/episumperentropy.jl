@@ -93,8 +93,8 @@ get_nu(cone::EpiSumPerEntropy) = cone.dim
 
 function set_initial_point(arr::AbstractVector, cone::EpiSumPerEntropy)
     (arr[1], v, w) = get_central_ray_episumperentropy(cone.w_dim)
-    arr[cone.v_idxs] .= v
-    arr[cone.w_idxs] .= w
+    @views arr[cone.v_idxs] .= v
+    @views arr[cone.w_idxs] .= w
     return arr
 end
 
@@ -139,8 +139,8 @@ function update_grad(cone::EpiSumPerEntropy)
 
     @. tau = (cone.lwv + 1) / -z
     g[1] = -inv(z)
-    @. g[cone.v_idxs] = (-w / z - 1) / v
-    @. g[cone.w_idxs] = -inv(w) - tau
+    @. @views g[cone.v_idxs] = (-w / z - 1) / v
+    @. @views g[cone.w_idxs] = -inv(w) - tau
 
     cone.grad_updated = true
     return cone.grad
@@ -165,8 +165,8 @@ function update_hess(cone::EpiSumPerEntropy{T}) where {T}
     # H_u_u, H_u_v, H_u_w parts
     H[1, 1] = abs2(cone.grad[1])
     @. sigma = w / v / z
-    @. H[1, v_idxs] = sigma / z
-    @. H[1, w_idxs] = tau / z
+    @. @views H[1, v_idxs] = sigma / z
+    @. @views H[1, w_idxs] = tau / z
 
     # H_v_v, H_v_w, H_w_w parts
     zi = inv(z)
@@ -278,7 +278,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumP
     sigma = w ./ v / z # TODO update somewhere else
     tau = cone.tau
 
-    @views @inbounds begin
+    @inbounds @views begin
         u_arr = arr[1, :]
         mul!(prod[1, :], arr[v_idxs, :]', sigma)
         mul!(prod[1, :], arr[w_idxs, :]', tau, true, true)
@@ -288,7 +288,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumP
         @. prod /= z
     end
 
-    @views @inbounds for j in 1:size(prod, 2)
+    @inbounds @views for j in 1:size(prod, 2)
         vj = arr[v_idxs, j]
         wj = arr[w_idxs, j]
         dotprods = dot(sigma, vj) + dot(tau, wj)
@@ -302,7 +302,7 @@ end
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
 
-    @views @inbounds begin
+    @inbounds @views begin
         @. prod[1, :] = cone.Hiuu * arr[1, :]
         mul!(prod[1, :], arr[2:2:end, :]', cone.Hiuv, true, true)
         mul!(prod[1, :], arr[3:2:end, :]', cone.Hiuw, true, true)

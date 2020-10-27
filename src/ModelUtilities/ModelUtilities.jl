@@ -20,7 +20,7 @@ function vec_to_svec!(arr::AbstractVecOrMat{T}; rt2 = sqrt(T(2)), incr::Int = 1)
     k = 1
     for i in 1:side
         for j in 1:(i - 1)
-            @. @views arr[k:(k + incr - 1), :] *= rt2
+            @inbounds @. @views arr[k:(k + incr - 1), :] *= rt2
             k += incr
         end
         k += incr
@@ -35,7 +35,7 @@ function svec_to_vec!(arr::AbstractVecOrMat{T}; rt2 = sqrt(T(2)), incr::Int = 1)
     k = 1
     for i in 1:side
         for j in 1:(i - 1)
-            @. arr[k:(k + incr - 1), :] /= rt2
+            @inbounds @. @views arr[k:(k + incr - 1), :] /= rt2
             k += incr
         end
         k += incr

@@ -153,7 +153,7 @@ function update_grad(cone::DoublyNonnegativeTri)
     smat_to_svec!(cone.grad, cone.inv_mat, cone.rt2)
     cone.grad .*= -1
     @. @views cone.inv_vec = inv(cone.point[cone.offdiag_idxs])
-    @. cone.grad[cone.offdiag_idxs] -= cone.inv_vec
+    @. @views cone.grad[cone.offdiag_idxs] -= cone.inv_vec
 
     cone.grad_updated = true
     return cone.grad
