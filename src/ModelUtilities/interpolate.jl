@@ -17,13 +17,13 @@ function interp_sample(dom::Box{T}, npts::Int) where {T <: Real}
     pts = rand(T, npts, dim) .- T(0.5)
     shift = (dom.u + dom.l) .* T(0.5)
     for i in 1:npts
-        pts[i, :] = pts[i, :] .* (dom.u - dom.l) + shift
+        @views pts[i, :] = pts[i, :] .* (dom.u - dom.l) + shift
     end
     return pts
 end
 
 function get_weights(dom::Box{T}, pts::AbstractMatrix{T}) where {T <: Real}
-    g = [(pts[:, i] .- dom.l[i]) .* (dom.u[i] .- pts[:, i]) for i in 1:size(pts, 2)]
+    @views g = [(pts[:, i] .- dom.l[i]) .* (dom.u[i] .- pts[:, i]) for i in 1:size(pts, 2)]
     @assert all(all(gi .>= 0) for gi in g)
     return g
 end
@@ -132,7 +132,7 @@ function wsos_box_params(
     # scale and shift points, get WSOS matrices
     pscale = [T(0.5) * (dom.u[mod(j - 1, get_dimension(dom)) + 1] - dom.l[mod(j - 1, get_dimension(dom)) + 1]) for j in 1:n]
     pshift = [T(0.5) * (dom.u[mod(j - 1, get_dimension(dom)) + 1] + dom.l[mod(j - 1, get_dimension(dom)) + 1]) for j in 1:n]
-    Wtsfun = (j -> sqrt.(1 .- abs2.(pts[:, j])) * pscale[j])
+    @views Wtsfun = (j -> sqrt.(1 .- abs2.(pts[:, j])) * pscale[j])
     PWts = [Wtsfun(j) .* P0sub for j in 1:get_dimension(dom)]
     trpts = pts .* pscale' .+ pshift'
 
@@ -172,8 +172,8 @@ function calc_univariate_chebyshev(
     ) where {T <: Real}
     @assert d > 0
     u = zeros(T, length(pts_i), d + 1)
-    @. u[:, 1] = 1
-    @. u[:, 2] = pts_i
+    @. @views u[:, 1] = 1
+    @. @views u[:, 2] = pts_i
     for t in 3:(d + 1)
         @. @views u[:, t] = 2 * pts_i * u[:, t - 1] - u[:, t - 2]
     end
@@ -185,8 +185,8 @@ function calc_univariate_chebyshev(
 
     # calculate gradient
     ug = zero(u)
-    @. ug[:, 1] = 0
-    @. ug[:, 2] = 1
+    @. @views ug[:, 1] = 0
+    @. @views ug[:, 2] = 1
     for t in 3:(d + 1)
         @. @views ug[:, t] = 2 * (u[:, t - 1] + pts_i * ug[:, t - 1]) - ug[:, t - 2]
     end
@@ -198,7 +198,7 @@ function calc_univariate_chebyshev(
 
     # calculate hessian
     uh = zero(u)
-    @. uh[:, 1:2] = 0
+    @. @views uh[:, 1:2] = 0
     for t in 3:(d + 1)
         @. @views uh[:, t] = 2 * (2 * ug[:, t - 1] + pts_i * uh[:, t - 1]) - uh[:, t - 2]
     end
@@ -232,7 +232,7 @@ function cheb2_data(
     # weights for Clenshaw-Curtis quadrature at pts
     if calc_w
         wa = T[2 / T(1 - j^2) for j in 0:2:(U - 1)]
-        append!(wa, wa[div(U, 2):-1:2])
+        @views append!(wa, wa[div(U, 2):-1:2])
         tmpconst = pi / T(length(wa)) * 2 * im
         w = [abs(sum(wa[j] * exp(tmpconst * (i - 1) * j) for j in eachindex(wa)) / length(wa)) for i in eachindex(wa)] # inverse fft
         w[1] /= 2
@@ -284,10 +284,10 @@ function padua_data(
         to1 = [cospi(T(i * j) / T(2d)) for i in 0:2:2d, j in 1:2:2d]
         te2 = [cospi(T(i * j) / T(2d + 1)) for i in 0:2:2d, j in 0:2:(2d + 1)]
         to2 = [cospi(T(i * j) / T(2d + 1)) for i in 0:2:2d, j in 1:2:(2d + 1)]
-        te1[2:(d + 1), :] .*= sqrt(T(2))
-        to1[2:(d + 1), :] .*= sqrt(T(2))
-        te2[2:(d + 1), :] .*= sqrt(T(2))
-        to2[2:(d + 1), :] .*= sqrt(T(2))
+        @views te1[2:(d + 1), :] .*= sqrt(T(2))
+        @views to1[2:(d + 1), :] .*= sqrt(T(2))
+        @views te2[2:(d + 1), :] .*= sqrt(T(2))
+        @views to2[2:(d + 1), :] .*= sqrt(T(2))
         # even, even moments matrix
         mom = T(2) * sqrt(T(2)) ./ [T(1 - i^2) for i in 0:2:2d]
         mom[1] = 2
@@ -299,11 +299,11 @@ function padua_data(
         Mmom[1, d + 1] /= 2
         # cubature weights as matrices on the subgrids
         W = zeros(T, d + 1, 2d + 1)
-        W[:, 1:2:(2d + 1)] .= to2' * Mmom * te1
-        W[:, 2:2:(2d + 1)] .= te2' * Mmom * to1
-        W[:, [1, (2d + 1)]] ./= 2
-        W[1, 2:2:(2d + 1)] ./= 2
-        W[d + 1, 1:2:(2d + 1)] ./= 2
+        @views W[:, 1:2:(2d + 1)] .= to2' * Mmom * te1
+        @views W[:, 2:2:(2d + 1)] .= te2' * Mmom * to1
+        @views W[:, [1, (2d + 1)]] ./= 2
+        @views W[1, 2:2:(2d + 1)] ./= 2
+        @views W[d + 1, 1:2:(2d + 1)] ./= 2
         w = vec(W)
     else
         w = T[]
@@ -333,7 +333,7 @@ function approxfekete_data(
         i = 1
         l = 1
         while true
-            candidate_pts[i:(i + ig - 1), j] .= cs[l]
+            @views candidate_pts[i:(i + ig - 1), j] .= cs[l]
             i += ig
             l += 1
             if l >= 2d + 1 + j

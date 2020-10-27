@@ -61,7 +61,7 @@ get_nu(cone::HypoPerLog) = cone.dim
 
 function set_initial_point(arr::AbstractVector, cone::HypoPerLog)
     (arr[1], arr[2], w) = get_central_ray_hypoperlog(cone.dim - 2)
-    arr[3:end] .= w
+    @views arr[3:end] .= w
     return arr
 end
 
@@ -107,7 +107,7 @@ function update_grad(cone::HypoPerLog)
     cone.lvwnivlwvu = (d - cone.lwv) / cone.vlwvu
     g[2] = cone.lvwnivlwvu - inv(v)
     gden = -1 - v / cone.vlwvu
-    @. g[3:end] = gden / w
+    @. @views g[3:end] = gden / w
 
     cone.grad_updated = true
     return cone.grad
@@ -128,10 +128,10 @@ function update_hess(cone::HypoPerLog)
     @. tmpw = vivlwvu / w
     H[1, 1] = abs2(g[1])
     H[1, 2] = lvwnivlwvu / cone.vlwvu
-    @. H[1, 3:end] = -tmpw / cone.vlwvu
+    @. @views H[1, 3:end] = -tmpw / cone.vlwvu
     H[2, 2] = abs2(lvwnivlwvu) + (d * g[1] + inv(v)) / v
     hden = (-v * lvwnivlwvu - 1) / cone.vlwvu
-    @. H[2, 3:end] = hden / w
+    @. @views H[2, 3:end] = hden / w
     @inbounds for j in 1:d
         j2 = 2 + j
         @inbounds for i in 1:j

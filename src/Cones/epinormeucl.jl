@@ -136,7 +136,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
         wj = @view arr[2:end, j]
         ga = (dot(w, wj) - u * uj) / cone.dist
         prod[1, j] = -ga * u - uj
-        @. prod[2:end, j] = ga * w + wj
+        @. @views prod[2:end, j] = ga * w + wj
     end
     @. prod ./= cone.dist
 
@@ -148,7 +148,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
 
     @inbounds for j in 1:size(prod, 2)
         @views pa = dot(cone.point, arr[:, j])
-        @. prod[:, j] = pa * cone.point
+        @. @views prod[:, j] = pa * cone.point
     end
     @. @views prod[1, :] -= cone.dist * arr[1, :]
     @. @views prod[2:end, :] += cone.dist * arr[2:end, :]
@@ -171,7 +171,7 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, co
         dotwwj = dot(w, wj)
         prod[1, j] = (u * uj - dotwwj) / distrt2
         wmulj = (dotwwj / urtdist - uj) / distrt2
-        @. prod[2:end, j] = w * wmulj + wj / rtdist
+        @. @views prod[2:end, j] = w * wmulj + wj / rtdist
     end
 
     return prod
@@ -191,7 +191,7 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}
         dotwwj = dot(w, wj)
         prod[1, j] = (u * uj + dotwwj) / rt2
         wmulj = (dotwwj / urtdist + uj) / rt2
-        @. prod[2:end, j] = w * wmulj + wj * rtdist
+        @. @views prod[2:end, j] = w * wmulj + wj * rtdist
     end
 
     return prod

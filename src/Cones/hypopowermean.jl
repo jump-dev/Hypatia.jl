@@ -70,10 +70,10 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoPowerMean{T}) where
         n = cone.dim - 1
         c = sqrt(T(5 * n ^ 2 + 2 * n + 1))
         arr[1] = -sqrt((-c + 3 * n + 1) / T(2 * n + 2))
-        arr[2:end] .= (c - n + 1) / sqrt(T(n + 1) * (-2 * c + 6 * n + 2))
+        @views arr[2:end] .= (c - n + 1) / sqrt(T(n + 1) * (-2 * c + 6 * n + 2))
     else
         (arr[1], w) = get_central_ray_hypopowermean(cone.alpha)
-        arr[2:end] = w
+        @views arr[2:end] = w
     end
     return arr
 end
@@ -115,7 +115,7 @@ function update_grad(cone::HypoPowerMean)
 
     cone.grad[1] = inv(cone.z)
     wwprodu = -cone.wprod / cone.z
-    @. cone.grad[2:end] = (wwprodu * cone.alpha - 1) / w
+    @. @views cone.grad[2:end] = (wwprodu * cone.alpha - 1) / w
 
     cone.grad_updated = true
     return cone.grad
@@ -161,7 +161,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPow
     aw = alpha ./ w # TODO
     awwwprodu = wwprodu * aw # TODO
 
-    @views for j in 1:size(arr, 2)
+    @inbounds @views for j in 1:size(arr, 2)
         arr_u = arr[1, j]
         arr_w = arr[2:end, j]
         auz = arr_u / z

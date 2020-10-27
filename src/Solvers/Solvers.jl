@@ -45,6 +45,7 @@ include("point.jl")
     IterationLimit
     TimeLimit
     NumericalFailure
+    UnknownStatus
 end
 
 abstract type Stepper{T <: Real} end

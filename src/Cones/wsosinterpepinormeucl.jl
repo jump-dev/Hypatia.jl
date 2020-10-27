@@ -112,8 +112,8 @@ get_nu(cone::WSOSInterpEpiNormEucl) = 2 * sum(size(Psk, 2) for Psk in cone.Ps)
 use_correction(::WSOSInterpEpiNormEucl) = false
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormEucl)
-    arr[1:cone.U] .= 1
-    arr[(cone.U + 1):end] .= 0
+    @views arr[1:cone.U] .= 1
+    @views arr[(cone.U + 1):end] .= 0
     return arr
 end
 
@@ -256,40 +256,40 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
             hess[k, i] -= abs2(PΛ11iP[k, i]) * R2
         end
 
-        @. hess[1:U, 1:U] += abs2(PΛiPs[1][1])
+        @. @views hess[1:U, 1:U] += abs2(PΛiPs[1][1])
         @inbounds for r in 2:R
             idxs = block_idxs(U, r)
             @inbounds for s in 1:(r - 1)
                 # block (1,1)
                 @. UU = abs2(PΛiPs[r][s])
                 @. UUk = UU + UU'
-                @. hess[1:U, 1:U] += UUk
+                @. @views hess[1:U, 1:U] += UUk
                 # blocks (1,r)
-                @. hess[1:U, idxs] += PΛiPs[s][1] * PΛiPs[r][s]'
+                @. @views hess[1:U, idxs] += PΛiPs[s][1] * PΛiPs[r][s]'
             end
             # block (1,1)
-            @. hess[1:U, 1:U] += abs2(PΛiPs[r][r])
+            @. @views hess[1:U, 1:U] += abs2(PΛiPs[r][r])
             # blocks (1,r)
-            @. hess[1:U, idxs] += PΛiPs[r][1] * PΛiPs[r][r]
+            @. @views hess[1:U, idxs] += PΛiPs[r][1] * PΛiPs[r][r]
             # blocks (1,r)
             @inbounds for s in (r + 1):R
-                @. hess[1:U, idxs] += PΛiPs[s][1] * PΛiPs[s][r]
+                @. @views hess[1:U, idxs] += PΛiPs[s][1] * PΛiPs[s][r]
             end
 
             # blocks (r, r2)
             # NOTE for hess[idxs, idxs], UU and UUk are symmetric
             @. UU = PΛiPs[r][1] * PΛiPs[r][1]'
             @. UUk = PΛiPs[1][1] * PΛiPs[r][r]
-            @. hess[idxs, idxs] += UU + UUk
+            @. @views hess[idxs, idxs] += UU + UUk
             @inbounds for r2 in (r + 1):R
                 @. UU = PΛiPs[r][1] * PΛiPs[r2][1]'
                 @. UUk = PΛiPs[1][1] * PΛiPs[r2][r]'
                 idxs2 = block_idxs(U, r2)
-                @. hess[idxs, idxs2] += UU + UUk
+                @. @views hess[idxs, idxs2] += UU + UUk
             end
         end
     end
-    @. hess[:, (U + 1):cone.dim] *= 2
+    @. @views hess[:, (U + 1):cone.dim] *= 2
 
     cone.hess_updated = true
     return cone.hess
@@ -313,22 +313,22 @@ function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T
         PΛP_dirs_pqq = [zeros(T, U, U) for _ in 1:R, _ in 1:R]
         PΛP_dirs_pq1 = [zeros(T, U, U) for _ in 1:R, _ in 1:R]
         PΛP_dirs_p1q = [zeros(T, U, U) for _ in 1:R, _ in 1:R]
-        for p in 1:R, q in 1:R
+        @views for p in 1:R, q in 1:R
             PΛP_dirs_pqq[p, q] = PΛP(p, q) * Diagonal(primal_dir[block_idxs(U, q)])
             PΛP_dirs_pq1[p, q] = PΛP(p, q) * Diagonal(primal_dir[1:U])
             PΛP_dirs_p1q[p, q] = PΛP(p, 1) * Diagonal(primal_dir[block_idxs(U, q)])
         end
-        LU = cone.Λ11iP[pk] * Diagonal(primal_dir[1:U]) * PΛ11iP
+        @views LU = cone.Λ11iP[pk] * Diagonal(primal_dir[1:U]) * PΛ11iP
 
         # 111
         for j in 1:U
-            corr[j] -= sum(abs2, LU[:, j]) * (R - 2)
+            @views corr[j] -= sum(abs2, LU[:, j]) * (R - 2)
         end
         M = sum(PΛP_dirs_pq1[i, k] * PΛP_dirs_pq1[k, m] * PΛP(m, i) for i in 1:R for k in 1:R for m in 1:R)
         @views corr[1:U] .+= diag(M)
 
         # 11m
-        for m in 2:R
+        @inbounds for m in 2:R
             M = sum(
                 PΛP_dirs_pq1[i, k] * (PΛP_dirs_pqq[k, m] * PΛP(1, i) + PΛP(k, 1) * PΛP_dirs_pqq[i, m]')
                 for i in 1:R, k in 1:R)

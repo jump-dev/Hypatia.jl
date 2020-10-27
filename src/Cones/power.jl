@@ -79,8 +79,8 @@ get_nu(cone::Power) = length(cone.alpha) + 1
 
 function set_initial_point(arr::AbstractVector, cone::Power)
     m = length(cone.alpha)
-    @. arr[1:m] = sqrt(1 + cone.alpha)
-    arr[(m + 1):cone.dim] .= 0
+    @. @views arr[1:m] = sqrt(1 + cone.alpha)
+    @views arr[(m + 1):cone.dim] .= 0
     return arr
 end
 
@@ -124,9 +124,9 @@ function update_grad(cone::Power)
     @. cone.aui = 2 * cone.alpha / u
     cone.produuw = cone.produ / cone.produw
     @. cone.auiproduuw = -cone.aui * cone.produuw
-    @. cone.grad[1:m] = cone.auiproduuw - (1 - cone.alpha) / u
+    @. @views cone.grad[1:m] = cone.auiproduuw - (1 - cone.alpha) / u
     produwi2 = 2 / cone.produw
-    @. cone.grad[(m + 1):end] = produwi2 * w
+    @. @views cone.grad[(m + 1):end] = produwi2 * w
 
     cone.grad_updated = true
     return cone.grad
@@ -180,7 +180,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
     tmpm = cone.tmpm
     @. tmpm = (1 + const1 * cone.alpha) / u / u
 
-    @views @inbounds for i in 1:size(arr, 2)
+    @inbounds @views for i in 1:size(arr, 2)
         arr_u = arr[1:m, i]
         arr_w = arr[w_idxs, i]
         dot1 = -produuw * dot(aui, arr_u)

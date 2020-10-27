@@ -12,6 +12,7 @@ using Distributed
 using Hypatia
 using MosekTools
 
+interrupt()
 @assert nprocs() == 1
 println()
 

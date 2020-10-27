@@ -33,31 +33,30 @@ function certificate_violations(
     ) where {T <: Real}
     (c, A, b, G, h, obj_offset) = (model.c, model.A, model.b, model.G, model.h, model.obj_offset)
 
-    if status == Solvers.Optimal
-        x_res = G' * z + A' * y + c
-        y_res = A * x - b
-        z_res = G * x + s - h
-        x_viol = relative_residual(x_res, c)
-        y_viol = relative_residual(y_res, b)
-        z_viol = relative_residual(z_res, h)
-    elseif status == Solvers.PrimalInfeasible
+    if status == Solvers.PrimalInfeasible
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         x_res = G' * z + A' * y
         x_viol = relative_residual(x_res, c)
-        y_viol = NaN
-        z_viol = NaN
+        y_viol = T(NaN)
+        z_viol = T(NaN)
     elseif status == Solvers.DualInfeasible
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         y_res = A * x
         z_res = G * x + s
         y_viol = relative_residual(y_res, b)
         z_viol = relative_residual(z_res, h)
-        x_viol = NaN
+        x_viol = T(NaN)
     # TODO elseif status == Solvers.IllPosed # primal vs dual ill-posed statuses and conditions
-    else # failure
-        x_viol = NaN
-        y_viol = NaN
-        z_viol = NaN
+    else
+        if status != Solvers.Optimal
+            println("status $status not handled, but computing optimality certficate violations anyway")
+        end
+        x_res = G' * z + A' * y + c
+        y_res = A * x - b
+        z_res = G * x + s - h
+        x_viol = relative_residual(x_res, c)
+        y_viol = relative_residual(y_res, b)
+        z_viol = relative_residual(z_res, h)
     end
 
     return (x_viol, y_viol, z_viol)

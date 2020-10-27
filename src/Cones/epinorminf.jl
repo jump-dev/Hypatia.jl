@@ -303,7 +303,7 @@ end
 function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, T}) where {T <: Real}
     cone.hess_aux_updated || update_hess_aux(cone)
 
-    @views @inbounds begin
+    @inbounds @views begin
         copyto!(prod[1, :], arr[1, :])
         mul!(prod[1, :], arr[2:end, :]', cone.Hure, true, cone.Huu)
         mul!(prod[2:end, :], cone.Hure, arr[1, :]')
@@ -316,7 +316,7 @@ end
 function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, Complex{T}}) where {T <: Real}
     cone.hess_aux_updated || update_hess_aux(cone)
 
-    @views @inbounds begin
+    @inbounds @views begin
         @. prod[1, :] = cone.Huu * arr[1, :]
         mul!(prod[1, :], arr[2:2:end, :]', cone.Hure, true, true)
         mul!(prod[1, :], arr[3:2:end, :]', cone.Huim, true, true)
@@ -332,7 +332,7 @@ end
 function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, T}) where {T <: Real}
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
 
-    @views @inbounds begin
+    @inbounds @views begin
         copyto!(prod[1, :], arr[1, :])
         mul!(prod[1, :], arr[2:end, :]', cone.Hiure, true, true)
         @. prod[2:end, :] = cone.Hiure * prod[1, :]'
@@ -346,7 +346,7 @@ end
 function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, Complex{T}}) where {T <: Real}
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
 
-    @views @inbounds begin
+    @inbounds @views begin
         copyto!(prod[1, :], arr[1, :])
         mul!(prod[1, :], arr[2:2:end, :]', cone.Hiure, true, true)
         mul!(prod[1, :], arr[3:2:end, :]', cone.Hiuim, true, true)
@@ -354,7 +354,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
         @. prod[3:2:end, :] = cone.Hiuim * prod[1, :]'
         prod ./= cone.schur
     end
-    @views @inbounds for j in 1:cone.n
+    @inbounds @views for j in 1:cone.n
         j2 = 2j
         @. prod[j2, :] += (cone.Himim[j] * arr[j2, :] - cone.Hreim[j] * arr[j2 + 1, :]) / cone.idet[j]
         @. prod[j2 + 1, :] += (cone.Hrere[j] * arr[j2 + 1, :] - cone.Hreim[j] * arr[j2, :]) / cone.idet[j]

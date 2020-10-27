@@ -108,7 +108,7 @@ function set_initial_point(arr::AbstractVector, cone::WSOSInterpPosSemidefTri)
     arr .= 0
     block = 1
     @inbounds for i in 1:cone.R
-        arr[block_idxs(cone.U, block)] .= 1
+        @views arr[block_idxs(cone.U, block)] .= 1
         block += i + 1
     end
     return arr
@@ -237,9 +237,9 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
             @views Hview = H[idxs, idxs2]
             for k in eachindex(cone.Ps)
                 PlambdaPk = cone.PlambdaP_blocks_U[k]
-                @inbounds @. @views Hview += PlambdaPk[p, p2] * PlambdaPk[q, q2]
+                @inbounds @. Hview += PlambdaPk[p, p2] * PlambdaPk[q, q2]
                 if (p != q) && (p2 != q2)
-                    @inbounds @. @views Hview += PlambdaPk[p, q2] * PlambdaPk[q, p2]
+                    @inbounds @. Hview += PlambdaPk[p, q2] * PlambdaPk[q, p2]
                 end
             end
             if xor(p == q, p2 == q2)
