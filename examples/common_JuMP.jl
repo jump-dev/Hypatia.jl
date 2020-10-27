@@ -148,7 +148,12 @@ function solve_check(
     primal_obj = JuMP.objective_value(model)
     dual_obj = JuMP.dual_objective_value(model)
     moi_status = MOI.get(model, MOI.TerminationStatus())
-    hyp_status = haskey(moi_hyp_status_map, moi_status) ? moi_hyp_status_map[moi_status] : :OtherStatus
+    if haskey(moi_hyp_status_map, moi_status)
+        hyp_status = moi_hyp_status_map[moi_status]
+    else
+        @warn("MOI status $moi_status not handled")
+        hyp_status = Solvers.UnknownStatus
+    end
 
     hyp_data = model.ext[:hyp_data]
     eq_refs = model.ext[:eq_refs]
@@ -214,6 +219,10 @@ moi_hyp_status_map = Dict(
     MOI.OPTIMAL => Solvers.Optimal,
     MOI.INFEASIBLE => Solvers.PrimalInfeasible,
     MOI.DUAL_INFEASIBLE => Solvers.DualInfeasible,
+    MOI.SLOW_PROGRESS => Solvers.SlowProgress,
+    MOI.ITERATION_LIMIT => Solvers.IterationLimit,
+    MOI.TIME_LIMIT => Solvers.TimeLimit,
+    MOI.OTHER_ERROR => Solvers.UnknownStatus,
     )
 
 cone_from_hyp(cone::Cones.Cone) = error("cannot transform a Hypatia cone of type $(typeof(cone)) to an MOI cone")
