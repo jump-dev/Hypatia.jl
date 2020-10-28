@@ -149,7 +149,7 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
 
     corr .= 0
     @inbounds for k in eachindex(cone.Ps)
-        mul!(cone.tmpLU2[k], cone.tmpLU[k],  Diagonal(primal_dir))
+        mul!(cone.tmpLU2[k], cone.tmpLU[k], Diagonal(primal_dir))
         LpdU = mul!(cone.tmpLU3[k], cone.tmpLU2[k], cone.tmpUU[k])
         @inbounds @views for j in 1:cone.dim
             corr[j] += sum(abs2, LpdU[:, j])
