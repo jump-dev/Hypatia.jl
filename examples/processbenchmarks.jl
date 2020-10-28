@@ -7,14 +7,14 @@ output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 # uncomment examples to run
 examples_params = Dict(
-    "DensityEstJuMP"    => ([:m, :twod], [2, 3]), # TODO 2d?
-    "ExpDesignJuMP"     => ([:logdetobj, :k], [5, 1]),
+    "DensityEstJuMP"    => ([:m, :deg], [2, 3]),
+    "ExpDesignJuMP"     => ([:logdet, :k], [5, 1]),
     "MatrixCompletionJuMP" => ([:k, :d], [1, 2]),
     "MatrixRegressionJuMP" => ([:m], [2]),
     "NearestPSDJuMP"    => ([:compl, :d], [2, 1]),
-    "PolyMinJuMP"       => ([:m, :twod], [1, 2]),
+    "PolyMinJuMP"       => ([:m, :halfdeg], [1, 2]),
     "PortfolioJuMP"     => ([:k], [1]),
-    "ShapeConRegrJuMP"  => ([:m, :twod], [1, 5]),
+    "ShapeConRegrJuMP"  => ([:m, :deg], [1, 5]),
     )
 println("running examples:\n", keys(examples_params), "\n")
 
