@@ -132,7 +132,7 @@ function update_grad(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
     w = cone.w
     den = cone.den
 
-    for (j, wj) in enumerate(w)
+    @inbounds for (j, wj) in enumerate(w)
         absw = abs(wj)
         den[j] = T(0.5) * (u - absw) * (u + absw)
     end
