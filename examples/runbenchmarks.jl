@@ -71,8 +71,8 @@ JuMP_example_names = [
     # "matrixregression",
     # "nearestpsd",
     # "polymin",
-    "portfolio",
-    "shapeconregr",
+    # "portfolio",
+    # "shapeconregr",
     ]
 
 for ex_name in JuMP_example_names
