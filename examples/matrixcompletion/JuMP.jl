@@ -5,13 +5,15 @@ see description in native.jl
 using SparseArrays
 
 struct MatrixCompletionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    size_ratio::Int
     num_rows::Int
-    num_cols::Int
 end
 
 function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64}
-    (num_rows, num_cols) = (inst.num_rows, inst.num_cols)
-    @assert num_rows <= num_cols
+    (size_ratio, num_rows) = (inst.size_ratio, inst.num_rows)
+    @assert size_ratio >= 1
+    num_cols = size_ratio * num_rows
+
     (rows, cols, Avals) = findnz(sprand(num_rows, num_cols, 0.1))
     mat_to_vec_idx(i::Int, j::Int) = (j - 1) * num_rows + i
     is_unknown = fill(true, num_rows * num_cols)

@@ -1,19 +1,19 @@
 
 insts = Dict()
 insts["minimal"] = [
-    ((2, 3),),
-    ((2, 3), StandardConeOptimizer),
+    ((2, 2),),
+    ((2, 2), StandardConeOptimizer),
     ]
 insts["fast"] = [
-    ((5, 8),),
-    ((5, 8), StandardConeOptimizer),
-    ((12, 20),),
+    ((3, 4),),
+    ((3, 4), StandardConeOptimizer),
+    ((4, 5),),
     ]
 insts["slow"] = [
-    ((12, 24), StandardConeOptimizer),
-    ((14, 140),),
-    ((14, 140), StandardConeOptimizer),
-    ((40, 70),),
-    ((18, 180),),
+    ((2, 12), StandardConeOptimizer),
+    ((10, 14),),
+    ((10, 14), StandardConeOptimizer),
+    ((2, 40),),
+    ((10, 18),),
     ]
 return (MatrixCompletionJuMP, insts)

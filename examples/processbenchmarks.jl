@@ -9,12 +9,12 @@ output_folder = mkpath(joinpath(@__DIR__, "results"))
 examples_params = Dict(
     "DensityEstJuMP"    => ([:m, :twod], [2, 3]), # TODO 2d?
     "ExpDesignJuMP"     => ([:logdetobj, :k], [5, 1]),
-    "MatrixCompletionJuMP" => ([:d1, :d2], [1, 2]),
+    "MatrixCompletionJuMP" => ([:k, :d], [1, 2]),
     "MatrixRegressionJuMP" => ([:m], [2]),
     "NearestPSDJuMP"    => ([:compl, :d], [2, 1]),
     "PolyMinJuMP"       => ([:m, :twod], [1, 2]),
     "PortfolioJuMP"     => ([:k], [1]),
-    # "ShapeConRegrJuMP"  => ([:m, :twod], [1, 5]),
+    "ShapeConRegrJuMP"  => ([:m, :twod], [1, 5]),
     )
 println("running examples:\n", keys(examples_params), "\n")
 
@@ -40,7 +40,6 @@ status_map = Dict(
     "TimeLimit" => "tl",
     "SlowProgress" => "sp",
     "NumericalFailure" => "er",
-    # "KilledMemory" => "rl",
     "SkippedSolveCheck" => "sk",
     "SetupModelKilledTime" => "tl",
     "SolveCheckKilledTime" => "tl",
@@ -77,15 +76,15 @@ function make_wide_csv(ex_name, ex_params, all_df)
     end
 
     # check objectives if solver claims optimality
-    for sub_df in groupby(ex_df, inst_keys)
+    for group_df in groupby(ex_df, inst_keys)
         # check all pairs of converged results
-        co_idxs = findall(sub_df[:status] .== "co")
+        co_idxs = findall(group_df[:status] .== "co")
         if length(co_idxs) >= 2
             for i in eachindex(co_idxs)
-                first_optval = sub_df[co_idxs[i], :prim_obj]
-                other_optvals = sub_df[co_idxs[Not(i)], :prim_obj]
+                first_optval = group_df[co_idxs[i], :prim_obj]
+                other_optvals = group_df[co_idxs[Not(i)], :prim_obj]
                 if !all(rel_tol_satisfied.(other_optvals, first_optval))
-                    println("objective values of: $(ex_name) $(sub_df[:inst_data][1]) do not agree")
+                    println("objective values of: $(ex_name) $(group_df[:inst_data][1]) do not agree")
                 end
             end
         end
@@ -150,34 +149,35 @@ function make_table_tex(ex_name, ex_params)
     return nothing
 end
 
-# TODO which make_plot_csv function?
+function transform_plot_cols(ex_df_wide, inst_solver::Symbol)
+    old_cols = Symbol.([:converged_, :solve_time_], inst_solver)
+    transform!(ex_df_wide, old_cols => ByRow((x, y) -> ((!ismissing(x) && x) ? y : missing)) => inst_solver)
+end
+
+inst_solvers = (:nat_Hypatia, :ext_Hypatia, :ext_Mosek)
 
 function make_plot_csv(ex_name, ex_params)
     @info("making plot csv for $ex_name")
     ex_df_wide = CSV.read(ex_wide_file(ex_name))
+    inst_keys = ex_params[1]
+    num_params = length(inst_keys)
+    @assert 1 <= num_params <= 2 # handle case of more parameters if/when needed
 
-    # TODO use examples_params dict instead of hard-coding conditions here
-    if ex_name == "MatrixCompletionJuMP"
-        transform!(ex_df_wide, [:d1, :d2] => ((x, y) -> round.(Int, y ./ x)) => :gr)
-        x_var = :d1
-    elseif ex_name in ["DensityEstJuMP", "PolyMinJuMP", "ShapeConRegrJuMP"]
-        rename!(ex_df_wide, :m => :gr)
-        x_var = :twod
-    else
-        ex_short = ex_name[1:(match(r"JuMP", ex_name).offset + 3)] # in case of suffix
-        x_var = examples_params[ex_short][1][1]
-        ex_df_wide.gr = fill("", nrow(ex_df_wide))
+    for inst_solver in inst_solvers
+        transform_plot_cols(ex_df_wide, inst_solver)
     end
 
-    # TODO refac
-    transform!(ex_df_wide, [:converged_nat_Hypatia, :solve_time_nat_Hypatia] => ByRow((x, y) -> (!ismissing(x) && x ? y : missing)) => :nat)
-    transform!(ex_df_wide, [:converged_ext_Hypatia, :solve_time_ext_Hypatia] => ByRow((x, y) -> (!ismissing(x) && x ? y : missing)) => :ext)
-    transform!(ex_df_wide, [:converged_ext_Mosek, :solve_time_ext_Mosek] => ByRow((x, y) -> (!ismissing(x) && x ? y : missing)) => :mosek)
-
-    success_df = select(ex_df_wide, x_var, :gr, :nat, :ext, :mosek)
-    for sub_df in groupby(success_df, :gr)
-        plot_file = joinpath(output_folder, ex_name * "_plot_" * string(sub_df.gr[1]) * ".csv")
-        CSV.write(plot_file, select(sub_df, Not(:gr)))
+    plot_file_start = joinpath(output_folder, ex_name * "_plot")
+    axis_name = last(inst_keys)
+    if num_params == 1
+        success_df = select(ex_df_wide, axis_name, inst_solvers...)
+        CSV.write(plot_file_start * ".csv", success_df)
+    else
+        group_name = first(inst_keys)
+        success_df = select(ex_df_wide, axis_name, group_name, inst_solvers...)
+        for (group_id, group_df) in pairs(groupby(success_df, group_name))
+            CSV.write(plot_file_start * "_$(group_id[1]).csv", select(group_df, Not(group_name)))
+        end
     end
 
     return nothing
