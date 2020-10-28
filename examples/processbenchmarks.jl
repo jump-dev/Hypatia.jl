@@ -6,30 +6,37 @@ bench_file = joinpath(@__DIR__, "bench.csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 # uncomment examples to run
+all_dims = [:n_nat, :p_nat, :q_nat, :n_ext, :p_ext, :q_ext]
 examples_params = Dict(
-    "DensityEstJuMP"    => ([:m, :deg], [2, 3]),
-    "ExpDesignJuMP"     => ([:logdet, :k], [5, 1]),
-    "MatrixCompletionJuMP" => ([:k, :d], [1, 2]),
-    "MatrixRegressionJuMP" => ([:m], [2]),
-    "NearestPSDJuMP"    => ([:compl, :d], [2, 1]),
-    "PolyMinJuMP"       => ([:m, :halfdeg], [1, 2]),
-    "PortfolioJuMP"     => ([:k], [1]),
-    "ShapeConRegrJuMP"  => ([:m, :deg], [1, 5]),
+    "DensityEstJuMP"    => ([:m, :deg], [2, 3], [:n_nat, :n_ext]),
+    "ExpDesignJuMP"     => ([:logdet, :k], [5, 1], [:n_nat, :q_nat, :q_ext]),
+    "MatrixCompletionJuMP" => ([:k, :d], [1, 2], [:n_nat, :p_nat, :q_ext]),
+    "MatrixRegressionJuMP" => ([:m], [2], all_dims),
+    "NearestPSDJuMP"    => ([:compl, :d], [2, 1], [:n_nat, :q_ext]),
+    "PolyMinJuMP"       => ([:m, :halfdeg], [1, 2], [:n_nat, :q_ext]),
+    "PortfolioJuMP"     => ([:k], [1], Symbol[]),
+    "ShapeConRegrJuMP"  => ([:m, :deg], [1, 5], [:n_nat, :q_nat, :n_ext]),
     )
-println("running examples:\n", keys(examples_params), "\n")
+
+inst_solvers = (:nat_Hypatia, :ext_Hypatia, :ext_Mosek)
+
+println("running examples:")
+for k in keys(examples_params)
+    println(k)
+end
 
 function post_process()
-    @info("starting all")
     all_df = make_all_df()
     for (ex_name, ex_params) in examples_params
-        @info("starting $ex_name with params: $ex_params")
         println()
+        @info("starting $ex_name with params: $ex_params")
         # uncomment functions to run for each example
-        make_wide_csv(ex_name, ex_params, all_df)
+        make_wide_csv(all_df, ex_name, ex_params)
         make_table_tex(ex_name, ex_params) # requires running make_wide_csv
         make_plot_csv(ex_name, ex_params) # requires running make_wide_csv
         @info("finished $ex_name")
     end
+    println()
     @info("finished all")
 end
 
@@ -65,13 +72,13 @@ rel_tol_satisfied(a, b) = (abs(a - b) / (1 + max(abs(a), abs(b))) < 1e-5)
 
 ex_wide_file(ex_name::String) = joinpath(output_folder, ex_name * "_wide.csv")
 
-function make_wide_csv(ex_name, ex_params, all_df)
+function make_wide_csv(all_df, ex_name, ex_params)
     @info("making wide csv for $ex_name")
     ex_df = all_df[all_df.example .== ex_name, :]
 
     # make columns out of tuple
     inst_keys = ex_params[1]
-    for (name, pos) in zip(ex_params...)
+    for (name, pos) in zip(inst_keys, ex_params[2])
         transform!(ex_df, :inst_data => ByRow(x -> eval(Meta.parse(x))[pos]) => name)
     end
 
@@ -90,6 +97,7 @@ function make_wide_csv(ex_name, ex_params, all_df)
         end
     end
 
+    # TODO check that ext npq agrees for hypatia and mosek, and don't emit duplicate warnings
     unstacked_dims = [
         unstack(ex_df, inst_keys, :inst_set, v, renamecols = x -> Symbol(v, :_, x))
         for v in [:n, :p, :q]
@@ -120,29 +128,42 @@ function process_entry(x::Float64)
     end
 end
 process_entry(st::String, converged::Bool) = (converged ? "\\underline{$(st)}" : st)
+process_entry(x) = string(x)
+
+function process_inst_solver(row, inst_solver)
+    sep = " & "
+    row_str = sep * process_entry(row[Symbol(:status_, inst_solver)], row[Symbol(:converged_, inst_solver)])
+    row_str *= sep * process_entry(row[Symbol(:iters_, inst_solver)])
+    row_str *= sep * process_entry(row[Symbol(:solve_time_, inst_solver)])
+    return row_str
+end
 
 function make_table_tex(ex_name, ex_params)
     @info("making table tex for $ex_name")
     ex_df_wide = CSV.read(ex_wide_file(ex_name))
+    inst_keys = ex_params[1]
+    num_params = length(inst_keys)
+    @assert 1 <= num_params <= 2 # handle case of more parameters if/when needed
+    print_sizes = ex_params[3]
 
+    sep = " & "
     ex_tex = open(joinpath(output_folder, ex_name * "_table.tex"), "w")
-    for r in eachrow(ex_df_wide)
-        # TODO refac a bit
-        # TODO print the size columns we want at start
-        print(ex_tex,
-            # nat_Hypatia
-            process_entry(r.status_nat_Hypatia, r.converged_nat_Hypatia) * " & ",
-            process_entry(r.iters_nat_Hypatia) * " & ",
-            process_entry(r.solve_time_nat_Hypatia) * " & ",
-            # ext_Hypatia
-            process_entry(r.status_ext_Hypatia, r.converged_ext_Hypatia) * " & ",
-            process_entry(r.iters_ext_Hypatia) * " & ",
-            process_entry(r.solve_time_ext_Hypatia) * " & ",
-            # ext_Mosek
-            process_entry(r.status_ext_Mosek, r.converged_ext_Mosek) * " & ",
-            process_entry(r.iters_ext_Mosek) * " & ",
-            process_entry(r.solve_time_ext_Mosek) * " \\\\\n",
-            )
+    for row in eachrow(ex_df_wide)
+        row_str = process_entry(row[1])
+        if num_params == 2
+            row_str *= sep * process_entry(row[2])
+        end
+
+        for s in print_sizes
+            row_str *= sep * process_entry(row[s])
+        end
+
+        for inst_solver in inst_solvers
+            row_str *= process_inst_solver(row, inst_solver)
+        end
+
+        row_str *= " \\\\\n"
+        print(ex_tex, row_str)
     end
     close(ex_tex)
 
@@ -153,8 +174,6 @@ function transform_plot_cols(ex_df_wide, inst_solver::Symbol)
     old_cols = Symbol.([:converged_, :solve_time_], inst_solver)
     transform!(ex_df_wide, old_cols => ByRow((x, y) -> ((!ismissing(x) && x) ? y : missing)) => inst_solver)
 end
-
-inst_solvers = (:nat_Hypatia, :ext_Hypatia, :ext_Mosek)
 
 function make_plot_csv(ex_name, ex_params)
     @info("making plot csv for $ex_name")
