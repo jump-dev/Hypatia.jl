@@ -237,7 +237,7 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
     U = cone.U
     R = cone.R
 
-    @inbounds for k in eachindex(cone.Ps)
+    for k in eachindex(cone.Ps)
         L = size(cone.Ps[k], 2)
         ΛFLP = cone.ΛFLP[k]
         # ΛFLP * scattered Diagonal of primal_dir
@@ -247,32 +247,39 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
             for p in 1:i # only go up to i since ΛFLP is lower block triangular
                 for j in 1:(p - 1)
                     sidx = svec_idx(p, j)
-                    ΛFLP_dir[block_idxs(L, i), block_idxs(U, j)] += ΛFLP[block_idxs(L, i), block_idxs(U, p)] * Diagonal(primal_dir[block_idxs(U, sidx)]) * cone.rt2i
+                    @views mul!(ΛFLP_dir[block_idxs(L, i), block_idxs(U, j)], ΛFLP[block_idxs(L, i), block_idxs(U, p)], Diagonal(primal_dir[block_idxs(U, sidx)]), cone.rt2i, true)
                 end
                 sidx = svec_idx(p, p)
-                ΛFLP_dir[block_idxs(L, i), block_idxs(U, p)] += ΛFLP[block_idxs(L, i), block_idxs(U, p)] * Diagonal(primal_dir[block_idxs(U, sidx)])
+                @views mul!(ΛFLP_dir[block_idxs(L, i), block_idxs(U, p)], ΛFLP[block_idxs(L, i), block_idxs(U, p)], Diagonal(primal_dir[block_idxs(U, sidx)]), true, true)
                 for j in (p + 1):R
                     sidx = svec_idx(j, p)
-                    ΛFLP_dir[block_idxs(L, i), block_idxs(U, j)] += ΛFLP[block_idxs(L, i), block_idxs(U, p)] * Diagonal(primal_dir[block_idxs(U, sidx)]) * cone.rt2i
+                    @views mul!(ΛFLP_dir[block_idxs(L, i), block_idxs(U, j)], ΛFLP[block_idxs(L, i), block_idxs(U, p)], Diagonal(primal_dir[block_idxs(U, sidx)]), cone.rt2i, true)
                 end
             end
         end
 
         big_mat_half = mul!(cone.tmpLRUR2[k], ΛFLP_dir, Symmetric(cone.PlambdaP[k], :U))
+        # diagonal from each (i, j) block in big_mat_half' * big_mat_half
         idx = 1
+        j_offset = 1
         for j in 1:R
-            j_idxs = block_idxs(U, j)
+            i_idx = 1
             for i in 1:(j - 1)
-                i_idxs = block_idxs(U, i)
+                j_idx = j_offset
                 for u in 1:U
-                    corr[idx] += dot(big_mat_half[:, i_idxs[u]], big_mat_half[:, j_idxs[u]]) * cone.rt2
+                    @views corr[idx] += dot(big_mat_half[:, i_idx], big_mat_half[:, j_idx]) * cone.rt2
+                    i_idx += 1
+                    j_idx += 1
                     idx += 1
                 end
             end
+            j_idx = j_offset
             for u in 1:U
-                corr[idx] += sum(abs2, big_mat_half[:, j_idxs[u]])
+                @views corr[idx] += sum(abs2, big_mat_half[:, j_idx])
+                j_idx += 1
                 idx += 1
             end
+            j_offset += U
         end
 
     end
