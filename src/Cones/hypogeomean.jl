@@ -62,7 +62,7 @@ end
 
 get_nu(cone::HypoGeoMean) = cone.dim
 
-function set_initial_point(arr::AbstractVector{T}, cone::HypoGeoMean{T}) where {T}
+function set_initial_point(arr::AbstractVector{T}, cone::HypoGeoMean{T}) where T
     wdim = cone.dim - 1
     c = sqrt(T(5 * wdim ^ 2 + 2 * wdim + 1))
     arr[1] = -sqrt((-c + 3 * wdim + 1) / T(2 * cone.dim))
@@ -70,7 +70,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoGeoMean{T}) where {
     return arr
 end
 
-function update_feas(cone::HypoGeoMean{T}) where {T}
+function update_feas(cone::HypoGeoMean{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -87,7 +87,7 @@ function update_feas(cone::HypoGeoMean{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::HypoGeoMean{T}) where {T}
+function is_dual_feas(cone::HypoGeoMean{T}) where T
     u = cone.dual_point[1]
     @views w = cone.dual_point[2:end]
 
@@ -139,7 +139,7 @@ function update_hess(cone::HypoGeoMean)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where {T}
+function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where T
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -163,7 +163,7 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::H
     return prod
 end
 
-function update_inv_hess(cone::HypoGeoMean{T}) where {T}
+function update_inv_hess(cone::HypoGeoMean{T}) where T
     @assert !cone.inv_hess_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -190,7 +190,7 @@ function update_inv_hess(cone::HypoGeoMean{T}) where {T}
     return cone.inv_hess
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where {T}
+function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where T
     u = cone.point[1]
     @views w = cone.point[2:end]
     wdim = length(w)

@@ -310,7 +310,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInt
     return prod
 end
 
-function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where {T}
+function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where T
     if !cone.hess_prod_updated
         update_hess_prod(cone)
     end

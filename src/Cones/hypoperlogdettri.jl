@@ -112,7 +112,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdetTri{T, R})
     return arr
 end
 
-function update_feas(cone::HypoPerLogdetTri{T}) where {T}
+function update_feas(cone::HypoPerLogdetTri{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
@@ -135,7 +135,7 @@ function update_feas(cone::HypoPerLogdetTri{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::HypoPerLogdetTri{T}) where {T}
+function is_dual_feas(cone::HypoPerLogdetTri{T}) where T
     u = cone.dual_point[1]
     v = cone.dual_point[2]
     if u < -eps(T)

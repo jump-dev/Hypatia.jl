@@ -98,7 +98,7 @@ function set_initial_point(arr::AbstractVector, cone::EpiSumPerEntropy)
     return arr
 end
 
-function update_feas(cone::EpiSumPerEntropy{T}) where {T}
+function update_feas(cone::EpiSumPerEntropy{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
     @views v = cone.point[cone.v_idxs]
@@ -116,7 +116,7 @@ function update_feas(cone::EpiSumPerEntropy{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::EpiSumPerEntropy{T}) where {T}
+function is_dual_feas(cone::EpiSumPerEntropy{T}) where T
     u = cone.dual_point[1]
     @views v = cone.dual_point[cone.v_idxs]
     @views w = cone.dual_point[cone.w_idxs]
@@ -146,7 +146,7 @@ function update_grad(cone::EpiSumPerEntropy)
     return cone.grad
 end
 
-function update_hess(cone::EpiSumPerEntropy{T}) where {T}
+function update_hess(cone::EpiSumPerEntropy{T}) where T
     @assert cone.grad_updated
     if !isdefined(cone, :hess)
         cone.hess = Symmetric(zeros(T, cone.dim, cone.dim), :U)
@@ -195,7 +195,7 @@ function update_hess(cone::EpiSumPerEntropy{T}) where {T}
 end
 
 # auxiliary calculations for inverse Hessian
-function update_inv_hess_aux(cone::EpiSumPerEntropy{T}) where {T}
+function update_inv_hess_aux(cone::EpiSumPerEntropy{T}) where T
     @assert !cone.inv_hess_aux_updated
     point = cone.point
     @views v = point[cone.v_idxs]
@@ -229,7 +229,7 @@ function update_inv_hess_aux(cone::EpiSumPerEntropy{T}) where {T}
 end
 
 # updates for nonzero values in the inverse Hessian
-function update_inv_hess(cone::EpiSumPerEntropy{T}) where {T}
+function update_inv_hess(cone::EpiSumPerEntropy{T}) where T
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
 
     if !isdefined(cone, :inv_hess)
@@ -251,7 +251,7 @@ function update_inv_hess(cone::EpiSumPerEntropy{T}) where {T}
 end
 
 # auxiliary calculations for sqrt prod and hess prod oracles
-function update_inv_hess_sqrt_aux(cone::EpiSumPerEntropy{T}) where {T}
+function update_inv_hess_sqrt_aux(cone::EpiSumPerEntropy{T}) where T
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     @assert !cone.inv_hess_sqrt_aux_updated
 

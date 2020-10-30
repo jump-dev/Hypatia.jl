@@ -20,7 +20,7 @@ import Hypatia.Cones
 import Hypatia.Cones.Cone
 import Hypatia.Solvers
 
-test_tol(::Type{T}) where {T} = sqrt(sqrt(eps(T)))
+test_tol(::Type{T}) where T = sqrt(sqrt(eps(T)))
 
 # build model, solve, test conic certificates, and return solve information
 function build_solve_check(

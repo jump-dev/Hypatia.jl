@@ -28,7 +28,7 @@ diff_reals = [
     ]
 
 string_nameof(T) = string(nameof(T))
-type_name(::T) where {T} = string_nameof(T)
+type_name(::T) where T = string_nameof(T)
 
 function test_instance_solver(
     inst_name::String,

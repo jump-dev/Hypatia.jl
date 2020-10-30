@@ -213,7 +213,7 @@ svec_idx(row::Int, col::Int) = (div((row - 1) * row, 2) + col)
 block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
 
 # TODO rt2::T doesn't work with tests using ForwardDiff
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where {T}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -227,7 +227,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Numb
     return vec
 end
 
-function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where {T}
+function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -241,7 +241,7 @@ function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Number) where {T}
+function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -255,7 +255,7 @@ function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Numb
     return mat
 end
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where {T}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -273,7 +273,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, 
     return vec
 end
 
-function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where {T}
+function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -291,7 +291,7 @@ function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, rt2::Number) where {T}
+function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     @inbounds for j in 1:m, i in 1:j
@@ -307,7 +307,7 @@ function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, 
 end
 
 # utilities for converting between real and complex vectors
-function rvec_to_cvec!(cvec::AbstractVecOrMat{Complex{T}}, rvec::AbstractVecOrMat{T}) where {T}
+function rvec_to_cvec!(cvec::AbstractVecOrMat{Complex{T}}, rvec::AbstractVecOrMat{T}) where T
     k = 1
     @inbounds for i in eachindex(cvec)
         cvec[i] = Complex(rvec[k], rvec[k + 1])
@@ -316,7 +316,7 @@ function rvec_to_cvec!(cvec::AbstractVecOrMat{Complex{T}}, rvec::AbstractVecOrMa
     return cvec
 end
 
-function cvec_to_rvec!(rvec::AbstractVecOrMat{T}, cvec::AbstractVecOrMat{Complex{T}}) where {T}
+function cvec_to_rvec!(rvec::AbstractVecOrMat{T}, cvec::AbstractVecOrMat{Complex{T}}) where T
     k = 1
     @inbounds for i in eachindex(cvec)
         ci = cvec[i]
@@ -448,24 +448,7 @@ function sparse_upper_arrow(T::Type{<:Real}, w_dim::Int)
     return sparse(I, J, V, dim, dim)
 end
 
-function factor_upper_arrow(uu, uw, ww, nzval)
-    minval = sqrt(eps(uu)) # TODO tune
-    nzidx = 2
-    @inbounds for i in eachindex(ww)
-        ww1i = ww[i]
-        ww1i < eps(uu) && return false
-        wwi = sqrt(ww1i)
-        uwi = uw[i] / wwi
-        uu -= abs2(uwi)
-        uu < minval && return false
-        nzval[nzidx] = uwi
-        nzval[nzidx + 1] = wwi
-        nzidx += 2
-    end
-    nzval[1] = sqrt(uu)
-    return true
-end
-
+# 2x2 block case
 function sparse_upper_arrow_block2(T::Type{<:Real}, w_dim::Int)
     dim = 2 * w_dim + 1
     nnz_tri = 2 * dim - 1 + w_dim
@@ -484,26 +467,22 @@ function sparse_upper_arrow_block2(T::Type{<:Real}, w_dim::Int)
     return sparse(I, J, V, dim, dim)
 end
 
-function factor_upper_arrow_block2(uu, uv, uw, vv, vw, ww, nzval)
-    minval = sqrt(eps(uu)) # TODO tune
-    nzidx = 1
-    @inbounds for i in eachindex(ww)
-        ww1i = ww[i]
-        ww1i < eps(uu) && return false
-        wwi = sqrt(ww1i)
-        vwi = vw[i] / wwi
-        uwi = uw[i] / wwi
-        vv2i = vv[i] - abs2(vwi)
-        vv2i < eps(uu) && return false
-        vvi = sqrt(vv2i)
-        uvi = (uv[i] - vwi * uwi) / vvi
-        uu -= abs2(uwi) + abs2(uvi)
-        uu < minval && return false
-        @. @views nzval[nzidx .+ (1:5)] = (uvi, vvi, uwi, vwi, wwi)
-        nzidx += 5
-    end
-    nzval[1] = sqrt(uu)
-    return true
+sqrt_pos(x::T) where {T <: Real} = sqrt(max(x, eps(T)))
+
+function factor_upper_arrow(uu, uw, ww, rtuw, rtww)
+    @. rtww = sqrt_pos(ww)
+    @. rtuw = uw / rtww
+    return sqrt_pos(uu - sum(abs2, rtuw))
+end
+
+# 2x2 block case
+function factor_upper_arrow(uu, uv, uw, vv, vw, ww, rtuv, rtuw, rtvv, rtvw, rtww)
+    @. rtww = sqrt_pos(ww)
+    @. rtvw = vw / rtww
+    @. rtuw = uw / rtww
+    @. rtvv = sqrt_pos(vv - abs2(rtvw))
+    @. rtuv = (uv - rtvw * rtuw) / rtvv
+    return sqrt_pos(uu - sum(abs2, rtuv) - sum(abs2, rtuw))
 end
 
 end

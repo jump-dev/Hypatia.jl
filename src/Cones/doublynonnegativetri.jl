@@ -79,7 +79,7 @@ end
 
 get_nu(cone::DoublyNonnegativeTri) = cone.dim
 
-function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegativeTri{T}) where {T}
+function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegativeTri{T}) where T
     side = cone.side
 
     # for small side dimension, use closed-form solutions
@@ -128,7 +128,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegativeTri{T}
     return arr
 end
 
-function update_feas(cone::DoublyNonnegativeTri{T}) where {T}
+function update_feas(cone::DoublyNonnegativeTri{T}) where T
     @assert !cone.feas_updated
 
     if all(>(eps(T)), cone.point)

@@ -111,7 +111,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T, R}) w
     return arr
 end
 
-function update_feas(cone::HypoRootdetTri{T}) where {T}
+function update_feas(cone::HypoRootdetTri{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
 
@@ -130,7 +130,7 @@ function update_feas(cone::HypoRootdetTri{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::HypoRootdetTri{T}) where {T}
+function is_dual_feas(cone::HypoRootdetTri{T}) where T
     u = cone.dual_point[1]
 
     if u < -eps(T)

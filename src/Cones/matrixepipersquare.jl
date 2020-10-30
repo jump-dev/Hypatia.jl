@@ -113,7 +113,7 @@ function set_initial_point(arr::AbstractVector, cone::MatrixEpiPerSquare{T, R}) 
     return arr
 end
 
-function update_feas(cone::MatrixEpiPerSquare{T}) where {T}
+function update_feas(cone::MatrixEpiPerSquare{T}) where T
     @assert !cone.feas_updated
     v = cone.point[cone.v_idx]
 
@@ -132,7 +132,7 @@ function update_feas(cone::MatrixEpiPerSquare{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::MatrixEpiPerSquare{T}) where {T}
+function is_dual_feas(cone::MatrixEpiPerSquare{T}) where T
     v = cone.dual_point[cone.v_idx]
 
     if v > eps(T)

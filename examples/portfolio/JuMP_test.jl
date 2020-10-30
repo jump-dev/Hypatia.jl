@@ -24,13 +24,15 @@ insts["fast"] = [
     ((400, true, true),),
     ]
 insts["slow"] = [
-    ((1000, true, false),),
-    ((1000, false, true),),
-    ((1000, false, true), StandardConeOptimizer),
-    ((1000, true, true),),
-    ((3000, true, false),),
-    ((3000, false, true),),
-    ((3000, false, true), StandardConeOptimizer),
-    ((3000, true, true),),
+    # ((500, false, true),),
+    # ((1000, true, false),),
+    # ((1000, false, true),),
+    # ((1000, false, true), StandardConeOptimizer),
+    # ((1000, true, true),),
+    # ((2000, true, false),),
+    ((1500, false, true),),
+    # ((2000, false, true), StandardConeOptimizer),
+    # ((2000, true, true),),
+    # ((3000, false, true),),
     ]
 return (PortfolioJuMP, insts)

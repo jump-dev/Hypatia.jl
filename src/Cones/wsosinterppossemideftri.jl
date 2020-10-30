@@ -252,7 +252,7 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     return cone.hess
 end
 
-function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where {T}
+function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where T
     @assert cone.grad_updated
     if !cone.blocks_R_updated
         update_blocks_R(cone)

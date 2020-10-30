@@ -105,7 +105,7 @@ function set_initial_point(arr::AbstractVector, cone::EpiNormSpectral{T, R}) whe
     return arr
 end
 
-function update_feas(cone::EpiNormSpectral{T}) where {T}
+function update_feas(cone::EpiNormSpectral{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
 

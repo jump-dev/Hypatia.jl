@@ -168,7 +168,7 @@ end
 
 is_dual_feas(cone::WSOSInterpEpiNormEucl) = true
 
-function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
+function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
     @assert cone.is_feas
     U = cone.U
     R = cone.R
@@ -296,7 +296,7 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
 end
 
 # TODO allocations, inbounds etc
-function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T}) where {T}
+function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T}) where T
     corr = cone.correction
     corr .= 0
     R = cone.R
