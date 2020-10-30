@@ -237,7 +237,7 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
     U = cone.U
     R = cone.R
 
-    for k in eachindex(cone.Ps)
+    @inbounds for k in eachindex(cone.Ps)
         L = size(cone.Ps[k], 2)
         ΛFLP = cone.ΛFLP[k]
         # ΛFLP * scattered Diagonal of primal_dir
