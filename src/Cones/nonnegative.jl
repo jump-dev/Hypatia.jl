@@ -54,14 +54,14 @@ get_nu(cone::Nonnegative) = cone.dim
 
 set_initial_point(arr::AbstractVector, cone::Nonnegative) = (arr .= 1)
 
-function update_feas(cone::Nonnegative{T}) where {T}
+function update_feas(cone::Nonnegative{T}) where T
     @assert !cone.feas_updated
     cone.is_feas = all(>(eps(T)), cone.point)
     cone.feas_updated = true
     return cone.is_feas
 end
 
-is_dual_feas(cone::Nonnegative{T}) where {T} = all(>(eps(T)), cone.dual_point)
+is_dual_feas(cone::Nonnegative{T}) where T = all(>(eps(T)), cone.dual_point)
 
 function update_grad(cone::Nonnegative)
     @assert cone.is_feas

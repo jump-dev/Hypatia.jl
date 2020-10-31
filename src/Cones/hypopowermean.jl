@@ -31,7 +31,7 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
 
     wprod::T
     z::T
-    tmpw::Vector{T}
+    tempw::Vector{T}
 
     function HypoPowerMean{T}(
         alpha::Vector{T};
@@ -58,13 +58,13 @@ function setup_extra_data(cone::HypoPowerMean{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.tmpw = zeros(T, dim - 1)
+    cone.tempw = zeros(T, dim - 1)
     return cone
 end
 
 get_nu(cone::HypoPowerMean) = cone.dim
 
-function set_initial_point(arr::AbstractVector{T}, cone::HypoPowerMean{T}) where {T}
+function set_initial_point(arr::AbstractVector{T}, cone::HypoPowerMean{T}) where T
     # get closed form central ray if all powers are equal, else use fitting
     if all(isequal(inv(T(cone.dim - 1))), cone.alpha)
         n = cone.dim - 1
@@ -78,7 +78,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoPowerMean{T}) where
     return arr
 end
 
-function update_feas(cone::HypoPowerMean{T}) where {T}
+function update_feas(cone::HypoPowerMean{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -96,7 +96,7 @@ function update_feas(cone::HypoPowerMean{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::HypoPowerMean{T}) where {T}
+function is_dual_feas(cone::HypoPowerMean{T}) where T
     u = cone.dual_point[1]
     @views w = cone.dual_point[2:end]
     alpha = cone.alpha
@@ -184,7 +184,7 @@ function correction(cone::HypoPowerMean, primal_dir::AbstractVector)
     pi = cone.wprod # TODO rename
     z = cone.z
     alpha = cone.alpha
-    wdw = cone.tmpw
+    wdw = cone.tempw
 
     piz = pi / z
     @. wdw = w_dir / w

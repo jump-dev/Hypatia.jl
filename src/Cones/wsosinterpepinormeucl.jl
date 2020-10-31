@@ -39,10 +39,10 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     matfact::Vector
     ΛLi_Λ::Vector{Vector{Matrix{T}}}
     Λ11::Vector{Matrix{T}}
-    tmpLU::Vector{Matrix{T}}
-    tmpLU2::Vector{Matrix{T}}
-    tmpUU_vec::Vector{Matrix{T}} # reused in update_hess
-    tmpUU::Matrix{T}
+    tempLU::Vector{Matrix{T}}
+    tempLU2::Vector{Matrix{T}}
+    tempUU_vec::Vector{Matrix{T}} # reused in update_hess
+    tempUU::Matrix{T}
     ΛLiPs_edge::Vector{Vector{Matrix{T}}}
     PΛiPs::Vector{Matrix{T}}
     PΛiP_blocks_U::Vector{Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}}
@@ -88,10 +88,10 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.matfact = Vector{Any}(undef, length(Ps))
     cone.ΛLi_Λ = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
     cone.Λ11 = [zeros(T, L, L) for L in Ls]
-    cone.tmpLU = [zeros(T, L, U) for L in Ls]
-    cone.tmpLU2 = [zeros(T, L, U) for L in Ls]
-    cone.tmpUU_vec = [zeros(T, U, U) for _ in eachindex(Ps)]
-    cone.tmpUU = zeros(T, U, U)
+    cone.tempLU = [zeros(T, L, U) for L in Ls]
+    cone.tempLU2 = [zeros(T, L, U) for L in Ls]
+    cone.tempUU_vec = [zeros(T, U, U) for _ in eachindex(Ps)]
+    cone.tempUU = zeros(T, U, U)
     cone.ΛLiPs_edge = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.matLiP = [zeros(T, L, U) for L in Ls]
     cone.PΛiPs = [zeros(T, R * U, R * U) for _ in eachindex(Ls)]
@@ -125,7 +125,7 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
     @inbounds for k in eachindex(cone.Ps)
         Psk = cone.Ps[k]
         Λ11k = cone.Λ11[k]
-        LUk = cone.tmpLU[k]
+        LUk = cone.tempLU[k]
         ΛLi_Λ = cone.ΛLi_Λ[k]
         mat = cone.mat[k]
 
@@ -163,7 +163,7 @@ end
 
 is_dual_feas(cone::WSOSInterpEpiNormEucl) = true
 
-function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
+function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
     @assert cone.is_feas
     U = cone.U
     R = cone.R
@@ -226,16 +226,15 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
     R = cone.R
     R2 = R - 2
     hess = cone.hess.data
-    UU = cone.tmpUU
+    UU = cone.tempUU
     matfact = cone.matfact
 
     hess .= 0
     @inbounds for k in eachindex(cone.Ps)
         PΛiPs = cone.PΛiP_blocks_U[k]
         PΛ11iP = cone.PΛ11iP[k]
-        UUk = cone.tmpUU_vec[k]
+        UUk = cone.tempUU_vec[k]
         ΛLiP_edge = cone.ΛLiPs_edge[k]
-
         # get the PΛiPs not calculated in update_grad
         for r in 2:R, r2 in 2:(r - 1)
             mul!(PΛiPs[r, r2], ΛLiP_edge[r - 1]', ΛLiP_edge[r2 - 1])
@@ -286,7 +285,7 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
 end
 
 # TODO allocations, inbounds etc
-function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T}) where {T}
+function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T}) where T
     @assert cone.hess_updated
     corr = cone.correction
     corr .= 0
@@ -294,10 +293,10 @@ function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T
     U = cone.U
 
     for pk in eachindex(cone.Ps)
-        mul!(cone.tmpLU[pk], cone.Λ11LiP[pk], Diagonal(primal_dir[1:U]))
-        tmpLU2 = mul!(cone.tmpLU2[pk], cone.tmpLU[pk], cone.PΛ11iP[pk])
+        mul!(cone.tempLU[pk], cone.Λ11LiP[pk], Diagonal(primal_dir[1:U]))
+        tempLU2 = mul!(cone.tempLU2[pk], cone.tempLU[pk], cone.PΛ11iP[pk])
         @views for u in 1:U
-            corr[u] += sum(abs2, tmpLU2[:, u])
+            corr[u] += sum(abs2, tempLU2[:, u])
         end
     end
     @. @views corr[1:U] *= 2 - R

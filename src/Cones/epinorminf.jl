@@ -29,8 +29,6 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     is_feas::Bool
     hess::Symmetric{T, SparseMatrixCSC{T, Int}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_sqrt::UpperTriangular{T, SparseMatrixCSC{T, Int}}
-    no_sqrts::Bool
 
     w::AbstractVector{R}
     den::AbstractVector{T}
@@ -42,9 +40,15 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     Hrere::Vector{T}
     Hreim::Vector{T}
     Himim::Vector{T}
+    rtuim::Vector{T}
+    rtreim::Vector{T}
+    rtimim::Vector{T}
     Hiure::Vector{T}
     Hiuim::Vector{T}
     schur::T
+    rtuu::T
+    rture::Vector{T}
+    rtrere::Vector{T}
     idet::Vector{T}
 
     function EpiNormInf{T, R}(
@@ -65,11 +69,7 @@ use_heuristic_neighborhood(cone::EpiNormInf) = false
 
 reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.hess_sqrt_aux_updated = cone.inv_hess_aux_updated = false)
 
-function use_sqrt_oracles(cone::EpiNormInf)
-    cone.no_sqrts && return false
-    cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
-    return !cone.no_sqrts
-end
+use_sqrt_oracles(cone::EpiNormInf) = true
 
 # TODO only allocate the fields we use
 function setup_extra_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -81,10 +81,15 @@ function setup_extra_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} 
     cone.Hure = zeros(T, n)
     cone.Hrere = zeros(T, n)
     cone.Hiure = zeros(T, n)
+    cone.rture = zeros(T, n)
+    cone.rtrere = zeros(T, n)
     if cone.is_complex
         cone.Huim = zeros(T, n)
         cone.Hreim = zeros(T, n)
         cone.Himim = zeros(T, n)
+        cone.rtuim = zeros(T, n)
+        cone.rtreim = zeros(T, n)
+        cone.rtimim = zeros(T, n)
         cone.Hiuim = zeros(T, n)
         cone.idet = zeros(T, n)
     end
@@ -99,7 +104,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::EpiNormInf{T}) where {T
     return arr
 end
 
-function update_feas(cone::EpiNormInf{T}) where {T}
+function update_feas(cone::EpiNormInf{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
     @views vec_copy_to!(cone.w, cone.point[2:end])
@@ -110,13 +115,13 @@ function update_feas(cone::EpiNormInf{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::EpiNormInf{T}) where {T}
+function is_dual_feas(cone::EpiNormInf{T}) where T
     dp = cone.dual_point
     u = dp[1]
 
     if u > eps(T)
         if cone.is_complex
-            norm1 = sum(hypot(dp[2i], dp[2i + 1]) for i in 1:cone.n)
+            @inbounds norm1 = sum(hypot(dp[2i], dp[2i + 1]) for i in 1:cone.n)
         else
             @views norm1 = norm(dp[2:end], 1)
         end
@@ -146,7 +151,7 @@ function update_grad(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
 end
 
 function update_hess_aux(cone::EpiNormInf{T}) where {T <: Real}
-    @assert cone.grad_updated
+    Cones.grad(cone)
     u = cone.point[1]
     w = cone.w
     uden = cone.uden
@@ -177,7 +182,7 @@ function update_hess(cone::EpiNormInf{T}) where {T <: Real}
 
     if !isdefined(cone, :hess)
         # initialize sparse idxs for upper triangle of Hessian
-        spfun = (cone.is_complex ? sparse_upper_arrow_block2 : sparse_upper_arrow)
+        spfun = (cone.is_complex ? sparse_arrow_block2 : sparse_arrow)
         cone.hess = Symmetric(spfun(T, cone.n), :U)
     end
 
@@ -201,6 +206,15 @@ function update_hess(cone::EpiNormInf{T}) where {T <: Real}
 
     cone.hess_updated = true
     return cone.hess
+end
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+    cone.hess_aux_updated || update_hess_aux(cone)
+    if cone.is_complex
+        return arrow_prod(prod, arr, cone.Huu, cone.Hure, cone.Huim, cone.Hrere, cone.Hreim, cone.Himim)
+    else
+        return arrow_prod(prod, arr, cone.Huu, cone.Hure, cone.Hrere)
+    end
 end
 
 function update_inv_hess_aux(cone::EpiNormInf{T}) where {T <: Real}
@@ -250,7 +264,7 @@ function update_inv_hess(cone::EpiNormInf{T}) where {T <: Real}
         end
     end
 
-    rtschur = sqrt(cone.schur)
+    rtschur = sqrt_pos(cone.schur)
     Hi[1, :] ./= rtschur
     @inbounds for j in 2:cone.dim, i in 2:j
         Hi[i, j] = Hi[1, j] * Hi[1, i]
@@ -277,105 +291,65 @@ function update_inv_hess(cone::EpiNormInf{T}) where {T <: Real}
     return cone.inv_hess
 end
 
-# auxiliary calculations for sqrt prod and hess prod oracles
-function update_hess_sqrt_aux(cone::EpiNormInf{T}) where {T}
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+    cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
+
+    if cone.is_complex
+        @inbounds @views begin
+            copyto!(prod[1, :], arr[1, :])
+            mul!(prod[1, :], arr[2:2:end, :]', cone.Hiure, true, true)
+            mul!(prod[1, :], arr[3:2:end, :]', cone.Hiuim, true, true)
+            @. prod[2:2:end, :] = cone.Hiure * prod[1, :]'
+            @. prod[3:2:end, :] = cone.Hiuim * prod[1, :]'
+            prod ./= cone.schur
+        end
+
+        @inbounds @views for j in 1:cone.n
+            j2 = 2j
+            @. prod[j2, :] += (cone.Himim[j] * arr[j2, :] - cone.Hreim[j] * arr[j2 + 1, :]) / cone.idet[j]
+            @. prod[j2 + 1, :] += (cone.Hrere[j] * arr[j2 + 1, :] - cone.Hreim[j] * arr[j2, :]) / cone.idet[j]
+        end
+    else
+        @inbounds @views begin
+            copyto!(prod[1, :], arr[1, :])
+            mul!(prod[1, :], arr[2:end, :]', cone.Hiure, true, true)
+            @. prod[2:end, :] = cone.Hiure * prod[1, :]'
+            prod ./= cone.schur
+            @. prod[2:end, :] += arr[2:end, :] / cone.Hrere
+        end
+    end
+
+    return prod
+end
+
+function update_hess_sqrt_aux(cone::EpiNormInf)
     cone.hess_aux_updated || update_hess_aux(cone)
     @assert !cone.hess_sqrt_aux_updated
-
-    if !isdefined(cone, :hess_sqrt)
-        # initialize sparse idxs for upper triangular factor of Hessian
-        spfun = (cone.is_complex ? sparse_upper_arrow_block2 : sparse_upper_arrow)
-        cone.hess_sqrt = UpperTriangular(spfun(T, cone.n))
-    end
-
-    # modify nonzeros of upper triangular factor of inverse Hessian
     if cone.is_complex
-        cone.no_sqrts = !factor_upper_arrow_block2(cone.Huu, cone.Hure, cone.Huim, cone.Hrere, cone.Hreim, cone.Himim, cone.hess_sqrt.data.nzval)
+        cone.rtuu = arrow_sqrt(cone.Huu, cone.Hure, cone.Huim, cone.Hrere, cone.Hreim, cone.Himim, cone.rture, cone.rtuim, cone.rtrere, cone.rtreim, cone.rtimim)
     else
-        cone.no_sqrts = !factor_upper_arrow(cone.Huu, cone.Hure, cone.Hrere, cone.hess_sqrt.data.nzval)
+        cone.rtuu = arrow_sqrt(cone.Huu, cone.Hure, cone.Hrere, cone.rture, cone.rtrere)
     end
-    # cone.no_sqrts && println("no sqrt") # TODO remove later
-
     cone.hess_sqrt_aux_updated = true
     return
 end
 
-function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, T}) where {T <: Real}
-    cone.hess_aux_updated || update_hess_aux(cone)
-
-    @inbounds @views begin
-        copyto!(prod[1, :], arr[1, :])
-        mul!(prod[1, :], arr[2:end, :]', cone.Hure, true, cone.Huu)
-        mul!(prod[2:end, :], cone.Hure, arr[1, :]')
-        @. prod[2:end, :] += cone.Hrere * arr[2:end, :]
-    end
-
-    return prod
-end
-
-function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, Complex{T}}) where {T <: Real}
-    cone.hess_aux_updated || update_hess_aux(cone)
-
-    @inbounds @views begin
-        @. prod[1, :] = cone.Huu * arr[1, :]
-        mul!(prod[1, :], arr[2:2:end, :]', cone.Hure, true, true)
-        mul!(prod[1, :], arr[3:2:end, :]', cone.Huim, true, true)
-        mul!(prod[2:2:end, :], cone.Hure, arr[1, :]')
-        mul!(prod[3:2:end, :], cone.Huim, arr[1, :]')
-        @. prod[2:2:end, :] += cone.Hrere * arr[2:2:end, :] + cone.Hreim * arr[3:2:end, :]
-        @. prod[3:2:end, :] += cone.Himim * arr[3:2:end, :] + cone.Hreim * arr[2:2:end, :]
-    end
-
-    return prod
-end
-
-function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, T}) where {T <: Real}
-    cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-
-    @inbounds @views begin
-        copyto!(prod[1, :], arr[1, :])
-        mul!(prod[1, :], arr[2:end, :]', cone.Hiure, true, true)
-        @. prod[2:end, :] = cone.Hiure * prod[1, :]'
-        prod ./= cone.schur
-        @. prod[2:end, :] += arr[2:end, :] / cone.Hrere
-    end
-
-    return prod
-end
-
-function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormInf{T, Complex{T}}) where {T <: Real}
-    cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-
-    @inbounds @views begin
-        copyto!(prod[1, :], arr[1, :])
-        mul!(prod[1, :], arr[2:2:end, :]', cone.Hiure, true, true)
-        mul!(prod[1, :], arr[3:2:end, :]', cone.Hiuim, true, true)
-        @. prod[2:2:end, :] = cone.Hiure * prod[1, :]'
-        @. prod[3:2:end, :] = cone.Hiuim * prod[1, :]'
-        prod ./= cone.schur
-    end
-    @inbounds @views for j in 1:cone.n
-        j2 = 2j
-        @. prod[j2, :] += (cone.Himim[j] * arr[j2, :] - cone.Hreim[j] * arr[j2 + 1, :]) / cone.idet[j]
-        @. prod[j2 + 1, :] += (cone.Hrere[j] * arr[j2 + 1, :] - cone.Hreim[j] * arr[j2, :]) / cone.idet[j]
-    end
-
-    return prod
-end
-
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
-    @assert !cone.no_sqrts
-    copyto!(prod, arr)
-    lmul!(cone.hess_sqrt', prod)
-    return prod
+    if cone.is_complex
+        return arrow_sqrt_prod(prod, arr, cone.rtuu, cone.rture, cone.rtuim, cone.rtrere, cone.rtreim, cone.rtimim)
+    else
+        return arrow_sqrt_prod(prod, arr, cone.rtuu, cone.rture, cone.rtrere)
+    end
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
     cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
-    @assert !cone.no_sqrts
-    ldiv!(prod, cone.hess_sqrt, arr)
-    return prod
+    if cone.is_complex
+        return inv_arrow_sqrt_prod(prod, arr, cone.rtuu, cone.rture, cone.rtuim, cone.rtrere, cone.rtreim, cone.rtimim)
+    else
+        return inv_arrow_sqrt_prod(prod, arr, cone.rtuu, cone.rture, cone.rtrere)
+    end
 end
 
 function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T <: Real}
@@ -425,6 +399,7 @@ function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T
     return corr
 end
 
+# TODO remove this in favor of new hess_nz_count etc functions that directly use uu, uw, ww etc
 hess_nz_count(cone::EpiNormInf{<:Real, <:Real}) = 3 * cone.dim - 2
 hess_nz_count(cone::EpiNormInf{<:Real, <:Complex}) = 3 * cone.dim - 2 + 2 * cone.n
 hess_nz_count_tril(cone::EpiNormInf{<:Real, <:Real}) = 2 * cone.dim - 1

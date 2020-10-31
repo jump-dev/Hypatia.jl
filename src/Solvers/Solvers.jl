@@ -153,8 +153,8 @@ mutable struct Solver{T <: Real}
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
         init_use_fallback::Bool = true,
-        stepper::Stepper{T} = HeurCombStepper{T}(),
-        system_solver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
+        stepper::Stepper{T} = default_stepper(T),
+        system_solver::SystemSolver{T} = default_system_solver(T),
         ) where {T <: Real}
         if isa(system_solver, QRCholSystemSolver{T})
             @assert preprocess # require preprocessing for QRCholSystemSolver # TODO only need primal eq preprocessing or reduction
@@ -210,6 +210,9 @@ mutable struct Solver{T <: Real}
         return solver
     end
 end
+
+default_stepper(T) = HeurCombStepper{T}()
+default_system_solver(T) = QRCholDenseSystemSolver{T}()
 
 function solve(solver::Solver{T}) where {T <: Real}
     @assert solver.status == Loaded

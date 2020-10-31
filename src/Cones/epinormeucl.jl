@@ -61,7 +61,7 @@ function set_initial_point(arr::AbstractVector, cone::EpiNormEucl{T}) where {T <
 end
 
 # TODO refac with dual feas check
-function update_feas(cone::EpiNormEucl{T}) where {T}
+function update_feas(cone::EpiNormEucl{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
 
@@ -77,7 +77,7 @@ function update_feas(cone::EpiNormEucl{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::EpiNormEucl{T}) where {T}
+function is_dual_feas(cone::EpiNormEucl{T}) where T
     u = cone.dual_point[1]
 
     if u > eps(T)
