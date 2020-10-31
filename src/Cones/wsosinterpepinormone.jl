@@ -33,15 +33,15 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     matfact::Vector{Vector}
     Λi_Λ::Vector{Vector{Matrix{T}}}
     Λ11::Vector{Matrix{T}}
-    tmpΛ11::Vector{Matrix{T}}
-    tmpLL::Vector{Matrix{T}}
-    tmpLU::Vector{Matrix{T}}
-    tmpLU2::Vector{Matrix{T}}
-    tmpUU_vec::Vector{Matrix{T}} # reused in update_hess
-    tmpUU::Matrix{T}
-    tmpUU2::Matrix{T}
-    tmpURU::Matrix{T}
-    tmpURU2::Matrix{T}
+    tempΛ11::Vector{Matrix{T}}
+    tempLL::Vector{Matrix{T}}
+    tempLU::Vector{Matrix{T}}
+    tempLU2::Vector{Matrix{T}}
+    tempUU_vec::Vector{Matrix{T}} # reused in update_hess
+    tempUU::Matrix{T}
+    tempUU2::Matrix{T}
+    tempURU::Matrix{T}
+    tempURU2::Matrix{T}
     PΛiPs1::Vector{Vector{Matrix{T}}} # for each (2, 2)-block pertaining to (lambda_1, lambda_i), P * inv(Λ)[1, 1] * Ps = P * inv(Λ)i[2, 2] * Ps
     PΛiPs2::Vector{Vector{Matrix{T}}} # for each (2, 2)-block pertaining to (lambda_1, lambda_i), P * inv(Λ)[2, 1] * Ps = P * inv(Λ)[1, 2]' * Ps
     lambdafact::Vector
@@ -94,15 +94,15 @@ function setup_extra_data(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
         cone.Λi_Λ[k][r] = zeros(T, size(Ps[k], 2), size(Ps[k], 2))
     end
     cone.Λ11 = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
-    cone.tmpΛ11 = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
-    cone.tmpLL = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
-    cone.tmpLU = [zeros(T, size(Psk, 2), U) for Psk in Ps]
-    cone.tmpLU2 = [zeros(T, size(Psk, 2), U) for Psk in Ps]
-    cone.tmpUU_vec = [zeros(T, U, U) for _ in eachindex(Ps)]
-    cone.tmpUU = zeros(T, U, U)
-    cone.tmpUU2 = zeros(T, U, U)
-    cone.tmpURU = zeros(T, U, U * (R - 1))
-    cone.tmpURU2 = zeros(T, U * (R - 1), U)
+    cone.tempΛ11 = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
+    cone.tempLL = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
+    cone.tempLU = [zeros(T, size(Psk, 2), U) for Psk in Ps]
+    cone.tempLU2 = [zeros(T, size(Psk, 2), U) for Psk in Ps]
+    cone.tempUU_vec = [zeros(T, U, U) for _ in eachindex(Ps)]
+    cone.tempUU = zeros(T, U, U)
+    cone.tempUU2 = zeros(T, U, U)
+    cone.tempURU = zeros(T, U, U * (R - 1))
+    cone.tempURU2 = zeros(T, U * (R - 1), U)
     cone.PΛiPs1 = [Vector{Matrix{T}}(undef, R) for Psk in Ps]
     cone.PΛiPs2 = [Vector{Matrix{T}}(undef, R) for Psk in Ps]
     @inbounds for k in eachindex(Ps), r in 1:(R - 1)
@@ -140,18 +140,18 @@ function update_feas(cone::WSOSInterpEpiNormOne)
     @inbounds for k in eachindex(cone.Ps)
         Psk = cone.Ps[k]
         Λ11j = cone.Λ11[k]
-        tmpΛ11j = cone.tmpΛ11[k]
-        LLk = cone.tmpLL[k]
-        LUk = cone.tmpLU[k]
+        tempΛ11j = cone.tempΛ11[k]
+        LLk = cone.tempLL[k]
+        LUk = cone.tempLU[k]
         Λi_Λ = cone.Λi_Λ[k]
         matsk = cone.mats[k]
         factk = cone.matfact[k]
 
         # first lambda
         @. LUk = Psk' * point_views[1]'
-        mul!(tmpΛ11j, LUk, Psk)
-        copyto!(Λ11j, tmpΛ11j)
-        lambdafact[k] = cholesky!(Symmetric(tmpΛ11j, :U), check = false)
+        mul!(tempΛ11j, LUk, Psk)
+        copyto!(Λ11j, tempΛ11j)
+        lambdafact[k] = cholesky!(Symmetric(tempΛ11j, :U), check = false)
         if !isposdef(lambdafact[k])
             cone.is_feas = false
             break
@@ -194,9 +194,9 @@ function update_grad(cone::WSOSInterpEpiNormOne)
     cone.grad .= 0
     @inbounds for k in eachindex(cone.Ps)
         Psk = cone.Ps[k]
-        LUk = cone.tmpLU[k]
-        LUk2 = cone.tmpLU2[k]
-        UUk = cone.tmpUU_vec[k]
+        LUk = cone.tempLU[k]
+        LUk2 = cone.tempLU2[k]
+        UUk = cone.tempUU_vec[k]
         PΛiPs1 = cone.PΛiPs1[k]
         PΛiPs2 = cone.PΛiPs2[k]
         Λi_Λ = cone.Λi_Λ[k]
@@ -271,7 +271,7 @@ function update_hess_prod(cone::WSOSInterpEpiNormOne)
         PΛiPs1 = cone.PΛiPs1[k]
         PΛiPs2 = cone.PΛiPs2[k]
 
-        UUk = cone.tmpUU_vec[k]
+        UUk = cone.tempUU_vec[k]
         for r in 1:(R - 1), j in 1:U, i in 1:j
             ij1 = PΛiPs1[r][i, j]
             ij2 = (PΛiPs2[r][i, j] + PΛiPs2[r][j, i]) / 2 # NOTE PΛiPs2[r] should be symmetric
@@ -316,10 +316,10 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where T
     end
     U = cone.U
     R = cone.R
-    schur = cone.tmpUU2
+    schur = cone.tempUU2
     hess_diag_facts = cone.hess_diag_facts
-    Diz = cone.tmpURU2
-    schur_backup = cone.tmpUU
+    Diz = cone.tempURU2
+    schur_backup = cone.tempUU
 
     copyto!(schur, Symmetric(cone.hess_diag_blocks[1], :U))
 
@@ -379,8 +379,8 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSO
     end
     U = cone.U
     R = cone.R
-    edge = cone.tmpURU
-    Diz = cone.tmpURU2
+    edge = cone.tempURU
+    Diz = cone.tempURU2
     s_fact = cone.hess_schur_fact
 
     @inbounds for r in 1:(R - 1)

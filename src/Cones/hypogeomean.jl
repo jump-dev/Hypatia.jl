@@ -31,7 +31,7 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     iwdim::T
     wgeo::T
     z::T
-    tmpw::Vector{T}
+    tempw::Vector{T}
 
     function HypoGeoMean{T}(
         dim::Int;
@@ -55,7 +55,7 @@ function setup_extra_data(cone::HypoGeoMean{T}) where {T <: Real}
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     wdim = dim - 1
-    cone.tmpw = zeros(T, wdim)
+    cone.tempw = zeros(T, wdim)
     cone.iwdim = inv(T(wdim))
     return cone
 end
@@ -221,7 +221,7 @@ function correction(cone::HypoGeoMean, primal_dir::AbstractVector)
     @views w_dir = primal_dir[2:end]
     corr = cone.correction
     z = cone.z
-    wdw = cone.tmpw
+    wdw = cone.tempw
     iwdim = cone.iwdim
 
     piz = cone.wgeo / z

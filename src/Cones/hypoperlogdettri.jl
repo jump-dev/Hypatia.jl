@@ -50,7 +50,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     ldWvuv::T
     vzip1::T
     Wivzi::Matrix{R}
-    tmpw::Vector{T}
+    tempw::Vector{T}
 
     function HypoPerLogdetTri{T, R}(
         dim::Int;
@@ -93,7 +93,7 @@ function setup_extra_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComple
     cone.mat3 = zeros(R, side, side)
     cone.mat4 = zeros(R, side, side)
     cone.Wivzi = zeros(R, side, side)
-    cone.tmpw = zeros(T, dim - 2)
+    cone.tempw = zeros(T, dim - 2)
     return cone
 end
 
@@ -180,7 +180,7 @@ function update_hess(cone::HypoPerLogdetTri)
     @views Hww = cone.hess.data[3:cone.dim, 3:cone.dim]
     symm_kron(Hww, Wi, cone.rt2)
     Hww .*= cone.vzip1
-    Wivzi_vec = smat_to_svec!(cone.tmpw, Wivzi, cone.rt2)
+    Wivzi_vec = smat_to_svec!(cone.tempw, Wivzi, cone.rt2)
     mul!(Hww, Wivzi_vec, Wivzi_vec', true, true)
 
     cone.hess_updated = true
@@ -318,7 +318,7 @@ function correction(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}) wh
     @views w_corr = corr[3:end]
     v = cone.point[2]
     z = cone.z
-    tmpw = cone.tmpw
+    tempw = cone.tempw
     Wi = Hermitian(cone.Wi, :U)
     pi = cone.ldWv # TODO rename
     nLz = cone.nLz
@@ -328,7 +328,7 @@ function correction(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}) wh
     udz = u_dir / z
     vdz = v_dir / z
 
-    vec_Wi = smat_to_svec!(tmpw, Wi, cone.rt2)
+    vec_Wi = smat_to_svec!(tempw, Wi, cone.rt2)
     dot_Wi_S = dot(vec_Wi, w_dir)
     S = copytri!(svec_to_smat!(cone.mat2, w_dir, cone.rt2), 'U', cone.is_complex)
     ldiv!(cone.fact_mat, S)
@@ -347,10 +347,10 @@ function correction(cone::HypoPerLogdetTri{T}, primal_dir::AbstractVector{T}) wh
     @. w_corr = const11 * vec_Wi
     rdiv!(S, cone.fact_mat.U)
     mul!(cone.mat3, S, S')
-    vec_S2 = smat_to_svec!(tmpw, cone.mat3, cone.rt2)
+    vec_S2 = smat_to_svec!(tempw, cone.mat3, cone.rt2)
     @. w_corr += const8 * vec_S2
     skron2 = rdiv!(S, cone.fact_mat.U')
-    vec_skron2 = smat_to_svec!(tmpw, skron2, cone.rt2)
+    vec_skron2 = smat_to_svec!(tempw, skron2, cone.rt2)
     t4awd = (2 * vz * abs2(dot_Wi_S) + dot(vec_skron2, w_dir)) / z
     @. w_corr += const9 * vec_skron2
 
