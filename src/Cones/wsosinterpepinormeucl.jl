@@ -294,15 +294,22 @@ function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T
     U = cone.U
 
     for pk in eachindex(cone.Ps)
+        mul!(cone.tmpLU[pk], cone.Λ11LiP[pk], Diagonal(primal_dir[1:U]))
+        tmpLU2 = mul!(cone.tmpLU2[pk], cone.tmpLU[pk], cone.PΛ11iP[pk])
+        @views for u in 1:U
+            corr[u] += sum(abs2, tmpLU2[:, u])
+        end
+    end
+    @. @views corr[1:U] *= 2 - R
+
+    for pk in eachindex(cone.Ps)
         L = size(cone.Ps[pk], 2)
-        PΛ11iP = cone.PΛ11iP[pk]
         ΛLiP_edge = cone.ΛLiPs_edge[pk]
         matLiP = cone.matLiP[pk]
         PΛiP = cone.PΛiPs[pk]
         Λ11LiP = cone.Λ11LiP[pk]
 
         # get ΛLiP * D * PΛiP where D is diagonalized primal_dir scattered in an arrow and ΛLiP is half an arrow
-
         # ΛLiP * D is an arrow matrix but row edge doesn't equal column edge
         scaled_row = [zeros(T, L, U) for _ in 1:(R - 1)]
         scaled_col = [zeros(T, L, U) for _ in 1:(R - 1)]
@@ -324,16 +331,14 @@ function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T
             end
         end
 
-        mul!(cone.tmpLU[pk], Λ11LiP, Diagonal(primal_dir[1:U]))
-        tmpLU2 = mul!(cone.tmpLU2[pk], cone.tmpLU[pk], PΛ11iP)
-        for u in 1:U
-            corr[u] += sum(abs2, mat_half[:, u]) - (R - 2) * sum(abs2, tmpLU2[:, u])
-        end
-        idx = U + 1
-        for r in 2:R, u in 1:U
-            corr[idx] += 2 * dot(mat_half[:, block_idxs(U, r)[u]], mat_half[:, u])
-            corr[u] += sum(abs2, mat_half[:, block_idxs(U, r)[u]])
-            idx += 1
+        @views for u in 1:U
+            corr[u] += sum(abs2, mat_half[:, u])
+            idx = U + u
+            for r in 2:R
+                corr[idx] += 2 * dot(mat_half[:, idx], mat_half[:, u])
+                corr[u] += sum(abs2, mat_half[:, idx])
+                idx += U
+            end
         end
 
     end

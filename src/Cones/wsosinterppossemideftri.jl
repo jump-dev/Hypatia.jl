@@ -260,26 +260,20 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
 
         big_mat_half = mul!(cone.tmpLRUR2[k], ΛFLP_dir, Symmetric(cone.PlambdaP[k], :U))
         # diagonal from each (i, j) block in big_mat_half' * big_mat_half
-        idx = 1
-        j_offset = 1
-        for j in 1:R
-            i_idx = 1
-            for i in 1:(j - 1)
-                j_idx = j_offset
-                for u in 1:U
+        for u in 1:U
+            idx = u
+            j_idx = u
+            for j in 1:R
+                i_idx = u
+                for i in 1:(j - 1)
                     @views corr[idx] += dot(big_mat_half[:, i_idx], big_mat_half[:, j_idx]) * cone.rt2
-                    i_idx += 1
-                    j_idx += 1
-                    idx += 1
+                    idx += U
+                    i_idx += U
                 end
-            end
-            j_idx = j_offset
-            for u in 1:U
                 @views corr[idx] += sum(abs2, big_mat_half[:, j_idx])
-                j_idx += 1
-                idx += 1
+                j_idx += U
+                idx += U
             end
-            j_offset += U
         end
 
     end
