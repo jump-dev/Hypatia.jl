@@ -32,15 +32,15 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
 
     rt2::T
     rt2i::T
-    tmpU::Vector{T}
-    tmpLRLR::Vector{Symmetric{T, Matrix{T}}}
-    tmpRR::Matrix{T}
-    tmpRR2::Matrix{T}
-    tmpRR3::Matrix{T}
-    tmpRRUU::Vector{Vector{Matrix{T}}}
+    tempU::Vector{T}
+    tempLRLR::Vector{Symmetric{T, Matrix{T}}}
+    tempRR::Matrix{T}
+    tempRR2::Matrix{T}
+    tempRR3::Matrix{T}
+    tempRRUU::Vector{Vector{Matrix{T}}}
     ΛFL::Vector
     ΛFLP::Vector{Matrix{T}}
-    tmpLU::Vector{Matrix{T}}
+    tempLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
     PlambdaP_blocks_U::Vector{Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}}
     PlambdaP_blocks_R::Vector{Matrix{Matrix{T}}}
@@ -79,13 +79,13 @@ function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.rt2 = sqrt(T(2))
     cone.rt2i = inv(cone.rt2)
-    cone.tmpU = zeros(T, U)
-    cone.tmpLRLR = [Symmetric(zeros(T, size(Pk, 2) * R, size(Pk, 2) * R), :L) for Pk in Ps]
-    cone.tmpLU = [zeros(T, size(Pk, 2), U) for Pk in Ps]
-    cone.tmpRR = zeros(T, R, R)
-    cone.tmpRR2 = zeros(T, R, R)
-    cone.tmpRR3 = zeros(T, R, R)
-    cone.tmpRRUU = [[zeros(T, R, R) for _ in 1:U] for _ in 1:U]
+    cone.tempU = zeros(T, U)
+    cone.tempLRLR = [Symmetric(zeros(T, size(Pk, 2) * R, size(Pk, 2) * R), :L) for Pk in Ps]
+    cone.tempLU = [zeros(T, size(Pk, 2), U) for Pk in Ps]
+    cone.tempRR = zeros(T, R, R)
+    cone.tempRR2 = zeros(T, R, R)
+    cone.tempRR3 = zeros(T, R, R)
+    cone.tempRRUU = [[zeros(T, R, R) for _ in 1:U] for _ in 1:U]
     cone.ΛFL = Vector{Any}(undef, length(Ps))
     cone.ΛFLP = [zeros(T, R * size(Pk, 2), R * U) for Pk in Ps]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
@@ -120,16 +120,16 @@ function update_feas(cone::WSOSInterpPosSemidefTri)
     cone.is_feas = true
     @inbounds for k in eachindex(cone.Ps)
         Pk = cone.Ps[k]
-        LU = cone.tmpLU[k]
+        LU = cone.tempLU[k]
         L = size(Pk, 2)
-        Λ = cone.tmpLRLR[k]
+        Λ = cone.tempLRLR[k]
 
         for p in 1:cone.R, q in 1:p
-            @. @views cone.tmpU = cone.point[block_idxs(cone.U, svec_idx(p, q))]
+            @. @views cone.tempU = cone.point[block_idxs(cone.U, svec_idx(p, q))]
             if p != q
-                cone.tmpU .*= cone.rt2i
+                cone.tempU .*= cone.rt2i
             end
-            mul!(LU, Pk', Diagonal(cone.tmpU)) # TODO check efficiency
+            mul!(LU, Pk', Diagonal(cone.tempU)) # TODO check efficiency
             @views mul!(Λ.data[block_idxs(L, p), block_idxs(L, q)], LU, Pk)
         end
 
@@ -262,10 +262,10 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
     U = cone.U
     UR = U * cone.R
     dim = cone.dim
-    PlambdaP_dirs = cone.tmpRRUU
-    matRR = cone.tmpRR
-    matRR2 = cone.tmpRR2
-    matRR3 = cone.tmpRR3
+    PlambdaP_dirs = cone.tempRRUU
+    matRR = cone.tempRR
+    matRR2 = cone.tempRR2
+    matRR3 = cone.tempRR3
 
     @inbounds for k in eachindex(cone.Ps)
         PlambdaPk = cone.PlambdaP_blocks_R[k]

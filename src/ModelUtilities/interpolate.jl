@@ -233,8 +233,8 @@ function cheb2_data(
     if calc_w
         wa = T[2 / T(1 - j^2) for j in 0:2:(U - 1)]
         @views append!(wa, wa[div(U, 2):-1:2])
-        tmpconst = pi / T(length(wa)) * 2 * im
-        w = [abs(sum(wa[j] * exp(tmpconst * (i - 1) * j) for j in eachindex(wa)) / length(wa)) for i in eachindex(wa)] # inverse fft
+        tempconst = pi / T(length(wa)) * 2 * im
+        w = [abs(sum(wa[j] * exp(tempconst * (i - 1) * j) for j in eachindex(wa)) / length(wa)) for i in eachindex(wa)] # inverse fft
         w[1] /= 2
         push!(w, w[1])
     else

@@ -30,12 +30,12 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
 
-    tmpLL::Vector{Matrix{R}}
-    tmpUL::Vector{Matrix{R}}
-    tmpLU::Vector{Matrix{R}}
-    tmpLU2::Vector{Matrix{R}}
-    tmpLU3::Vector{Matrix{R}}
-    tmpUU::Vector{Matrix{R}} # TODO for corrector, this can stay as a single matrix if we only use LU
+    tempLL::Vector{Matrix{R}}
+    tempUL::Vector{Matrix{R}}
+    tempLU::Vector{Matrix{R}}
+    tempLU2::Vector{Matrix{R}}
+    tempLU3::Vector{Matrix{R}}
+    tempUU::Vector{Matrix{R}} # TODO for corrector, this can stay as a single matrix if we only use LU
     ΛF::Vector
 
     function WSOSInterpNonnegative{T, R}(
@@ -64,12 +64,12 @@ function setup_extra_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrC
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     Ls = [size(Pk, 2) for Pk in cone.Ps]
-    cone.tmpLL = [zeros(R, L, L) for L in Ls]
-    cone.tmpUL = [zeros(R, dim, L) for L in Ls]
-    cone.tmpLU = [zeros(R, L, dim) for L in Ls]
-    cone.tmpLU2 = [zeros(R, L, dim) for L in Ls]
-    cone.tmpLU3 = [zeros(R, L, dim) for L in Ls]
-    cone.tmpUU = [zeros(R, dim, dim) for L in Ls]
+    cone.tempLL = [zeros(R, L, L) for L in Ls]
+    cone.tempUL = [zeros(R, dim, L) for L in Ls]
+    cone.tempLU = [zeros(R, L, dim) for L in Ls]
+    cone.tempLU2 = [zeros(R, L, dim) for L in Ls]
+    cone.tempLU3 = [zeros(R, L, dim) for L in Ls]
+    cone.tempUU = [zeros(R, dim, dim) for L in Ls]
     cone.ΛF = Vector{Any}(undef, length(Ls))
     return cone
 end
@@ -90,8 +90,8 @@ function update_feas(cone::WSOSInterpNonnegative)
         # Λ = Pk' * Diagonal(point) * Pk
         # TODO mul!(A, B', Diagonal(x)) calls extremely inefficient method but doesn't need ULk
         Pk = cone.Ps[k]
-        ULk = cone.tmpUL[k]
-        LLk = cone.tmpLL[k]
+        ULk = cone.tempUL[k]
+        LLk = cone.tempLL[k]
         mul!(ULk, D, Pk)
         mul!(LLk, Pk', ULk)
 
@@ -117,7 +117,7 @@ function update_grad(cone::WSOSInterpNonnegative)
 
     cone.grad .= 0
     @inbounds for k in eachindex(cone.Ps)
-        LUk = cone.tmpLU[k]
+        LUk = cone.tempLU[k]
         ldiv!(LUk, cone.ΛF[k].L, cone.Ps[k]')
         @inbounds for j in 1:cone.dim
             cone.grad[j] -= sum(abs2, view(LUk, :, j))
@@ -133,8 +133,8 @@ function update_hess(cone::WSOSInterpNonnegative)
 
     cone.hess .= 0
     @inbounds for k in eachindex(cone.Ps)
-        LUk = cone.tmpLU[k]
-        UUk = mul!(cone.tmpUU[k], LUk', LUk) # TODO use syrk
+        LUk = cone.tempLU[k]
+        UUk = mul!(cone.tempUU[k], LUk', LUk) # TODO use syrk
         @inbounds for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end
@@ -149,8 +149,8 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
 
     corr .= 0
     @inbounds for k in eachindex(cone.Ps)
-        mul!(cone.tmpLU2[k], cone.tmpLU[k], Diagonal(primal_dir))
-        LpdU = mul!(cone.tmpLU3[k], cone.tmpLU2[k], cone.tmpUU[k])
+        mul!(cone.tempLU2[k], cone.tempLU[k], Diagonal(primal_dir))
+        LpdU = mul!(cone.tempLU3[k], cone.tempLU2[k], cone.tempUU[k])
         @inbounds @views for j in 1:cone.dim
             corr[j] += sum(abs2, LpdU[:, j])
         end

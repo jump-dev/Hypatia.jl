@@ -39,11 +39,11 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     matfact::Vector
     Λi_Λ::Vector{Vector{Matrix{T}}}
     Λ11::Vector{Matrix{T}}
-    tmpLL::Vector{Matrix{T}}
-    tmpLU::Vector{Matrix{T}}
-    tmpLU2::Vector{Matrix{T}}
-    tmpUU_vec::Vector{Matrix{T}} # reused in update_hess
-    tmpUU::Matrix{T}
+    tempLL::Vector{Matrix{T}}
+    tempLU::Vector{Matrix{T}}
+    tempLU2::Vector{Matrix{T}}
+    tempUU_vec::Vector{Matrix{T}} # reused in update_hess
+    tempUU::Matrix{T}
     PΛiPs::Vector{Vector{Vector{Matrix{T}}}}
     Λ11iP::Vector{Matrix{T}}
     PΛ11iP::Vector{Matrix{T}}
@@ -88,11 +88,11 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
         cone.Λi_Λ[k][r] = zeros(T, size(Ps[k], 2), size(Ps[k], 2))
     end
     cone.Λ11 = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
-    cone.tmpLL = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
-    cone.tmpLU = [zeros(T, size(Psk, 2), U) for Psk in Ps]
-    cone.tmpLU2 = [zeros(T, size(Psk, 2), U) for Psk in Ps]
-    cone.tmpUU_vec = [zeros(T, U, U) for _ in eachindex(Ps)]
-    cone.tmpUU = zeros(T, U, U)
+    cone.tempLL = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
+    cone.tempLU = [zeros(T, size(Psk, 2), U) for Psk in Ps]
+    cone.tempLU2 = [zeros(T, size(Psk, 2), U) for Psk in Ps]
+    cone.tempUU_vec = [zeros(T, U, U) for _ in eachindex(Ps)]
+    cone.tempUU = zeros(T, U, U)
     cone.PΛiPs = [Vector{Vector{Matrix{T}}}(undef, R) for Psk in Ps]
     @inbounds for k in eachindex(Ps), r1 in 1:R
         cone.PΛiPs[k][r1] = Vector{Matrix{T}}(undef, r1)
@@ -128,8 +128,8 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
     @inbounds for k in eachindex(cone.Ps)
         Psk = cone.Ps[k]
         Λ11j = cone.Λ11[k]
-        LLk = cone.tmpLL[k]
-        LUk = cone.tmpLU[k]
+        LLk = cone.tempLL[k]
+        LUk = cone.tempLU[k]
         Λi_Λ = cone.Λi_Λ[k]
         mat = cone.mat[k]
 
@@ -180,8 +180,8 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
     @inbounds for k in eachindex(cone.Ps)
         Psk = cone.Ps[k]
         Λ11iP = cone.Λ11iP[k]
-        LUk = cone.tmpLU[k]
-        LUk2 = cone.tmpLU2[k]
+        LUk = cone.tempLU[k]
+        LUk2 = cone.tempLU2[k]
         PΛ11iP = cone.PΛ11iP[k]
         PΛiPs = cone.PΛiPs[k]
         Λi_Λ = cone.Λi_Λ[k]
@@ -231,7 +231,7 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
     R = cone.R
     R2 = R - 2
     hess = cone.hess.data
-    UU = cone.tmpUU
+    UU = cone.tempUU
     matfact = cone.matfact
 
     hess .= 0
@@ -240,9 +240,9 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
         PΛiPs = cone.PΛiPs[k]
         Λi_Λ = cone.Λi_Λ[k]
         PΛ11iP = cone.PΛ11iP[k]
-        UUk = cone.tmpUU_vec[k]
-        LUk = cone.tmpLU[k]
-        LUk2 = cone.tmpLU2[k]
+        UUk = cone.tempUU_vec[k]
+        LUk = cone.tempLU[k]
+        LUk2 = cone.tempLU2[k]
 
         # get the PΛiPs not calculated in update_grad
         @inbounds for r in 2:R, r2 in 2:(r - 1)

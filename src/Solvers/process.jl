@@ -152,9 +152,9 @@ function find_initial_x(
     solver.x_keep_idxs = x_keep_idxs
 
     # init_x = AG_R \ ((AG_fact.Q' * vcat(b, h - point.s))[1:AG_rank])
-    tmp = vcat(model.b, model.h - init_s)
-    lmul!(AG_fact.Q', tmp)
-    init_x = tmp[1:model.n]
+    temp = vcat(model.b, model.h - init_s)
+    lmul!(AG_fact.Q', temp)
+    init_x = temp[1:model.n]
     ldiv!(AG_R, init_x)
 
     return init_x
@@ -311,10 +311,10 @@ function find_initial_y(
     end
 
     # init_y = Ap_R \ ((Ap_fact.Q' * (-c - G' * point.z))[1:Ap_rank])
-    tmp = copy(model.c)
-    mul!(tmp, model.G', init_z, true, true)
-    lmul!(Ap_fact.Q', tmp)
-    init_y = tmp[1:Ap_rank]
+    temp = copy(model.c)
+    mul!(temp, model.G', init_z, true, true)
+    lmul!(Ap_fact.Q', temp)
+    init_y = temp[1:Ap_rank]
     init_y .*= -1
     ldiv!(Ap_R, init_y)
 

@@ -35,7 +35,7 @@ mutable struct Power{T <: Real} <: Cone{T}
     produuw::T
     aui::Vector{T}
     auiproduuw::Vector{T}
-    tmpm::Vector{T}
+    tempm::Vector{T}
 
     function Power{T}(
         alpha::Vector{T},
@@ -71,7 +71,7 @@ function setup_extra_data(cone::Power{T}) where {T <: Real}
     m = length(cone.alpha)
     cone.aui = zeros(T, m)
     cone.auiproduuw = zeros(T, m)
-    cone.tmpm = zeros(T, m)
+    cone.tempm = zeros(T, m)
     return cone
 end
 
@@ -177,8 +177,8 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
     w_idxs = (m + 1):cone.dim
     produwi2 = 2 / cone.produw
     const1 = 2 * produuw - 1
-    tmpm = cone.tmpm
-    @. tmpm = (1 + const1 * cone.alpha) / u / u
+    tempm = cone.tempm
+    @. tempm = (1 + const1 * cone.alpha) / u / u
 
     @inbounds @views for i in 1:size(arr, 2)
         arr_u = arr[1:m, i]
@@ -187,7 +187,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
         dot2 = dot1 + produwi2 * dot(w, arr_w)
         dot3 = dot1 - produuw * dot2
         dot4 = produwi2 * dot2
-        @. prod[1:m, i] = dot3 * aui + tmpm * arr_u
+        @. prod[1:m, i] = dot3 * aui + tempm * arr_u
         @. prod[w_idxs, i] = dot4 * w + produwi2 * arr_w
     end
 
@@ -208,7 +208,7 @@ function correction(cone::Power, primal_dir::AbstractVector)
     produuw = cone.produuw
 
     wwd = 2 * dot(w, w_dir)
-    udu = cone.tmpm
+    udu = cone.tempm
     @. udu = u_dir / u
     audu = dot(alpha, udu)
     const8 = 2 * produuw - 1

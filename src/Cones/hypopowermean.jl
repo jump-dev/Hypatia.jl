@@ -31,7 +31,7 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
 
     wprod::T
     z::T
-    tmpw::Vector{T}
+    tempw::Vector{T}
 
     function HypoPowerMean{T}(
         alpha::Vector{T};
@@ -58,7 +58,7 @@ function setup_extra_data(cone::HypoPowerMean{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.tmpw = zeros(T, dim - 1)
+    cone.tempw = zeros(T, dim - 1)
     return cone
 end
 
@@ -184,7 +184,7 @@ function correction(cone::HypoPowerMean, primal_dir::AbstractVector)
     pi = cone.wprod # TODO rename
     z = cone.z
     alpha = cone.alpha
-    wdw = cone.tmpw
+    wdw = cone.tempw
 
     piz = pi / z
     @. wdw = w_dir / w
