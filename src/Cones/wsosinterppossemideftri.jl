@@ -241,7 +241,7 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
         L = size(cone.Ps[k], 2)
         ΛFLP = cone.ΛFLP[k]
         # ΛFLP * scattered Diagonal of primal_dir
-        ΛFLP_dir = cone.tmpLRUR[k]
+        ΛFLP_dir = cone.tempLRUR[k]
         ΛFLP_dir .= 0
         for i in 1:R
             for p in 1:i # only go up to i since ΛFLP is lower block triangular
@@ -258,7 +258,7 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
             end
         end
 
-        big_mat_half = mul!(cone.tmpLRUR2[k], ΛFLP_dir, Symmetric(cone.PlambdaP[k], :U))
+        big_mat_half = mul!(cone.tempLRUR2[k], ΛFLP_dir, Symmetric(cone.PlambdaP[k], :U))
         # diagonal from each (i, j) block in big_mat_half' * big_mat_half
         for u in 1:U
             idx = u

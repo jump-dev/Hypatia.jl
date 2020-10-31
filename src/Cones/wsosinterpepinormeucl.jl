@@ -41,6 +41,7 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     Λ11::Vector{Matrix{T}}
     tempLU::Vector{Matrix{T}}
     tempLU2::Vector{Matrix{T}}
+    tempLRUR::Vector{Matrix{T}}
     tempUU_vec::Vector{Matrix{T}} # reused in update_hess
     tempUU::Matrix{T}
     ΛLiPs_edge::Vector{Vector{Matrix{T}}}
@@ -90,6 +91,7 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.Λ11 = [zeros(T, L, L) for L in Ls]
     cone.tempLU = [zeros(T, L, U) for L in Ls]
     cone.tempLU2 = [zeros(T, L, U) for L in Ls]
+    cone.tempLRUR = [zeros(T, L * R, U * R) for L in Ls]
     cone.tempUU_vec = [zeros(T, U, U) for _ in eachindex(Ps)]
     cone.tempUU = zeros(T, U, U)
     cone.ΛLiPs_edge = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
@@ -321,21 +323,23 @@ function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T
             scaled_col[c - 1] = Λ11LiP * Diagonal(primal_dir[block_idxs(U, c)])
         end
 
-        mat_half = zeros(T, L * R, U * R)
-        for c in 1:R
-            mat_half[1:L, block_idxs(U, c)] = scaled_pt * PΛiP[1:U, block_idxs(U, c)]
+        corr_half = cone.tempLRUR[pk]
+        corr_half .= 0
+        @views for c in 1:R
+            mul!(corr_half[1:L, block_idxs(U, c)], scaled_pt, PΛiP[1:U, block_idxs(U, c)])
             for r in 2:R
-                mat_half[1:L, block_idxs(U, c)] += scaled_row[r - 1] * PΛiP[block_idxs(U, r), block_idxs(U, c)]
-                mat_half[block_idxs(L, r), block_idxs(U, c)] = scaled_col[r - 1] * PΛiP[1:U, block_idxs(U, c)] + scaled_diag * PΛiP[block_idxs(U, r), block_idxs(U, c)]
+                mul!(corr_half[1:L, block_idxs(U, c)], scaled_row[r - 1], PΛiP[block_idxs(U, r), block_idxs(U, c)], true, true)
+                mul!(corr_half[block_idxs(L, r), block_idxs(U, c)], scaled_col[r - 1], PΛiP[1:U, block_idxs(U, c)])
+                mul!(corr_half[block_idxs(L, r), block_idxs(U, c)], scaled_diag, PΛiP[block_idxs(U, r), block_idxs(U, c)], true, true)
             end
         end
 
         @views for u in 1:U
-            corr[u] += sum(abs2, mat_half[:, u])
+            corr[u] += sum(abs2, corr_half[:, u])
             idx = U + u
             for r in 2:R
-                corr[idx] += 2 * dot(mat_half[:, idx], mat_half[:, u])
-                corr[u] += sum(abs2, mat_half[:, idx])
+                corr[idx] += 2 * dot(corr_half[:, idx], corr_half[:, u])
+                corr[u] += sum(abs2, corr_half[:, idx])
                 idx += U
             end
         end
