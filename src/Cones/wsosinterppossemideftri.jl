@@ -34,17 +34,13 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     rt2i::T
     tempU::Vector{T}
     tempLRLR::Vector{Symmetric{T, Matrix{T}}}
-    tempRR::Matrix{T}
-    tempRR2::Matrix{T}
-    tempRR3::Matrix{T}
-    tempRRUU::Vector{Vector{Matrix{T}}}
+    tempLRUR::Vector{Matrix{T}}
+    tempLRUR2::Vector{Matrix{T}}
     ΛFL::Vector
     ΛFLP::Vector{Matrix{T}}
     tempLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
     PlambdaP_blocks_U::Vector{Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}}
-    PlambdaP_blocks_R::Vector{Matrix{Matrix{T}}}
-    blocks_R_updated::Bool
 
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
@@ -80,27 +76,20 @@ function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.rt2 = sqrt(T(2))
     cone.rt2i = inv(cone.rt2)
     cone.tempU = zeros(T, U)
-    cone.tempLRLR = [Symmetric(zeros(T, size(Pk, 2) * R, size(Pk, 2) * R), :L) for Pk in Ps]
-    cone.tempLU = [zeros(T, size(Pk, 2), U) for Pk in Ps]
-    cone.tempRR = zeros(T, R, R)
-    cone.tempRR2 = zeros(T, R, R)
-    cone.tempRR3 = zeros(T, R, R)
-    cone.tempRRUU = [[zeros(T, R, R) for _ in 1:U] for _ in 1:U]
+    Ls = [size(Pk, 2) for Pk in cone.Ps]
+    cone.tempLRLR = [Symmetric(zeros(T, L * R, L * R), :L) for L in Ls]
+    cone.tempLRUR = [zeros(T, L * R, U * R) for L in Ls]
+    cone.tempLRUR2 = [zeros(T, L * R, U * R) for L in Ls]
+    cone.tempLU = [zeros(T, L, U) for L in Ls]
     cone.ΛFL = Vector{Any}(undef, length(Ps))
-    cone.ΛFLP = [zeros(T, R * size(Pk, 2), R * U) for Pk in Ps]
+    cone.ΛFLP = [zeros(T, R * L, R * U) for L in Ls]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
     cone.PlambdaP_blocks_U = [Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}(undef, R, R) for _ in eachindex(Ps)]
     @inbounds for k in eachindex(Ps), r in 1:R, s in 1:R
         cone.PlambdaP_blocks_U[k][r, s] = view(cone.PlambdaP[k], block_idxs(U, r), block_idxs(U, s))
     end
-    cone.PlambdaP_blocks_R = [Matrix{Matrix{T}}(undef, U, U) for _ in eachindex(Ps)]
-    @inbounds for k in eachindex(Ps), r in 1:U, s in 1:U
-        cone.PlambdaP_blocks_R[k][r, s] = zeros(T, R, R)
-    end
     return cone
 end
-
-reset_data(cone::WSOSInterpPosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.blocks_R_updated = false)
 
 get_nu(cone::WSOSInterpPosSemidefTri) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
 
@@ -206,17 +195,6 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
     return cone.grad
 end
 
-function update_blocks_R(cone::WSOSInterpPosSemidefTri)
-    @assert cone.grad_updated
-    U = cone.U
-    # TODO only upper triangle
-    @inbounds for k in eachindex(cone.Ps), q in 1:U, p in 1:U
-        @views copyto!(cone.PlambdaP_blocks_R[k][p, q], cone.PlambdaP[k][p:U:(U * cone.R), q:U:(U * cone.R)])
-    end
-    cone.blocks_R_updated = true
-    return
-end
-
 function update_hess(cone::WSOSInterpPosSemidefTri)
     @assert cone.grad_updated
     R = cone.R
@@ -254,49 +232,51 @@ end
 
 function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where T
     @assert cone.grad_updated
-    if !cone.blocks_R_updated
-        update_blocks_R(cone)
-    end
     corr = cone.correction
     corr .= 0
     U = cone.U
-    UR = U * cone.R
-    dim = cone.dim
-    PlambdaP_dirs = cone.tempRRUU
-    matRR = cone.tempRR
-    matRR2 = cone.tempRR2
-    matRR3 = cone.tempRR3
+    R = cone.R
 
     @inbounds for k in eachindex(cone.Ps)
-        PlambdaPk = cone.PlambdaP_blocks_R[k]
-
-        @inbounds for p in 1:U, q in 1:U
-            @views primal_dir_mat_q = Symmetric(svec_to_smat!(matRR, primal_dir[q:U:dim], cone.rt2))
-            PlambdaPk_slice_pq = PlambdaPk[p, q]
-            mul!(PlambdaP_dirs[p][q], PlambdaPk_slice_pq, primal_dir_mat_q)
-        end
-
-        @inbounds for p in 1:U
-            @views primal_dir_mat_p = Symmetric(svec_to_smat!(matRR, primal_dir[p:U:dim], cone.rt2))
-            @inbounds for q in 1:U
-                pq_q = PlambdaP_dirs[p][q] # PlambdaPk_slice_pq * primal_dir_mat_q
-                @inbounds for r in 1:q
-                    PlambdaPk_slice_qr = PlambdaPk[q, r]
-                    r_rp = PlambdaP_dirs[p][r]'
-
-                    # O(R^3) done O(U^3) times
-                    mul!(matRR2, PlambdaPk_slice_qr, r_rp)
-                    mul!(matRR3, pq_q, matRR2)
-                    axpy!(true, matRR3, matRR3')
-                    if q != r
-                        matRR3 .*= 2
-                    end
-                    @views smat_to_svec_add!(corr[p:U:dim], matRR3, cone.rt2)
+        L = size(cone.Ps[k], 2)
+        ΛFLP = cone.ΛFLP[k]
+        # ΛFLP * scattered Diagonal of primal_dir
+        ΛFLP_dir = cone.tempLRUR[k]
+        ΛFLP_dir .= 0
+        for i in 1:R
+            for p in 1:i # only go up to i since ΛFLP is lower block triangular
+                for j in 1:(p - 1)
+                    sidx = svec_idx(p, j)
+                    @views mul!(ΛFLP_dir[block_idxs(L, i), block_idxs(U, j)], ΛFLP[block_idxs(L, i), block_idxs(U, p)], Diagonal(primal_dir[block_idxs(U, sidx)]), cone.rt2i, true)
+                end
+                sidx = svec_idx(p, p)
+                @views mul!(ΛFLP_dir[block_idxs(L, i), block_idxs(U, p)], ΛFLP[block_idxs(L, i), block_idxs(U, p)], Diagonal(primal_dir[block_idxs(U, sidx)]), true, true)
+                for j in (p + 1):R
+                    sidx = svec_idx(j, p)
+                    @views mul!(ΛFLP_dir[block_idxs(L, i), block_idxs(U, j)], ΛFLP[block_idxs(L, i), block_idxs(U, p)], Diagonal(primal_dir[block_idxs(U, sidx)]), cone.rt2i, true)
                 end
             end
         end
+
+        big_mat_half = mul!(cone.tempLRUR2[k], ΛFLP_dir, Symmetric(cone.PlambdaP[k], :U))
+        # diagonal from each (i, j) block in big_mat_half' * big_mat_half
+        for u in 1:U
+            idx = u
+            j_idx = u
+            for j in 1:R
+                i_idx = u
+                for i in 1:(j - 1)
+                    @views corr[idx] += dot(big_mat_half[:, i_idx], big_mat_half[:, j_idx]) * cone.rt2
+                    idx += U
+                    i_idx += U
+                end
+                @views corr[idx] += sum(abs2, big_mat_half[:, j_idx])
+                j_idx += U
+                idx += U
+            end
+        end
+
     end
-    corr ./= 2
 
     return corr
 end
