@@ -4,19 +4,21 @@ find a polynomial f such that f² >= Σᵢ gᵢ² or f >= Σᵢ |gᵢ| where g�
 
 struct PolyNormJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
-    deg::Int
+    rand_deg::Int # maximum degree of randomly generated polynomials
+    epi_halfdeg::Int # half of maximum degree of epigraph / all polynomial components in the WSOS-like cone
     num_polys::Int
     use_l1::Bool # use epigraph of one norm, otherwise Euclidean norm
     use_norm_cone::Bool # use Euclidean / one norm cone, otherwise use WSOS matrix / WSOS cones
 end
 
 function build(inst::PolyNormJuMP{T}) where {T <: Float64}
-    (n, num_polys) = (inst.n, inst.num_polys)
+    (n, num_polys, epi_halfdeg, rand_deg) = (inst.n, inst.num_polys, inst.epi_halfdeg, inst.rand_deg)
+    @assert 2 * epi_halfdeg >= rand_deg
 
-    dom = ModelUtilities.FreeDomain{Float64}(n)
-    halfdeg = div(inst.deg + 1, 2)
-    (U, pts, Ps, _, w) = ModelUtilities.interpolate(dom, halfdeg, calc_w = true)
-    polys = Ps[1] * rand(-9:9, size(Ps[1], 2), num_polys)
+    dom = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))
+    (U, pts, Ps, V, w) = ModelUtilities.interpolate(dom, epi_halfdeg, calc_V = true, calc_w = true)
+    rand_U = binomial(n + rand_deg, n)
+    polys = V[:, 1:rand_U] * rand(-9:9, rand_U, num_polys)
 
     model = JuMP.Model()
     JuMP.@variable(model, f[1:U])
