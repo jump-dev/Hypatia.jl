@@ -31,7 +31,7 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     iwdim::T
     wgeo::T
     z::T
-    tmpw::Vector{T}
+    tempw::Vector{T}
 
     function HypoGeoMean{T}(
         dim::Int;
@@ -55,14 +55,14 @@ function setup_extra_data(cone::HypoGeoMean{T}) where {T <: Real}
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     wdim = dim - 1
-    cone.tmpw = zeros(T, wdim)
+    cone.tempw = zeros(T, wdim)
     cone.iwdim = inv(T(wdim))
     return cone
 end
 
 get_nu(cone::HypoGeoMean) = cone.dim
 
-function set_initial_point(arr::AbstractVector{T}, cone::HypoGeoMean{T}) where {T}
+function set_initial_point(arr::AbstractVector{T}, cone::HypoGeoMean{T}) where T
     wdim = cone.dim - 1
     c = sqrt(T(5 * wdim ^ 2 + 2 * wdim + 1))
     arr[1] = -sqrt((-c + 3 * wdim + 1) / T(2 * cone.dim))
@@ -70,7 +70,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoGeoMean{T}) where {
     return arr
 end
 
-function update_feas(cone::HypoGeoMean{T}) where {T}
+function update_feas(cone::HypoGeoMean{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -87,7 +87,7 @@ function update_feas(cone::HypoGeoMean{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::HypoGeoMean{T}) where {T}
+function is_dual_feas(cone::HypoGeoMean{T}) where T
     u = cone.dual_point[1]
     @views w = cone.dual_point[2:end]
 
@@ -139,7 +139,7 @@ function update_hess(cone::HypoGeoMean)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where {T}
+function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where T
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -163,7 +163,7 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::H
     return prod
 end
 
-function update_inv_hess(cone::HypoGeoMean{T}) where {T}
+function update_inv_hess(cone::HypoGeoMean{T}) where T
     @assert !cone.inv_hess_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -190,7 +190,7 @@ function update_inv_hess(cone::HypoGeoMean{T}) where {T}
     return cone.inv_hess
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where {T}
+function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where T
     u = cone.point[1]
     @views w = cone.point[2:end]
     wdim = length(w)
@@ -221,7 +221,7 @@ function correction(cone::HypoGeoMean, primal_dir::AbstractVector)
     @views w_dir = primal_dir[2:end]
     corr = cone.correction
     z = cone.z
-    wdw = cone.tmpw
+    wdw = cone.tempw
     iwdim = cone.iwdim
 
     piz = cone.wgeo / z

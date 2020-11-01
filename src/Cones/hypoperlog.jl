@@ -29,7 +29,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     lwv::T
     vlwvu::T
     lvwnivlwvu::T
-    tmpw::Vector{T}
+    tempw::Vector{T}
 
     function HypoPerLog{T}(
         dim::Int;
@@ -53,7 +53,7 @@ function setup_extra_data(cone::HypoPerLog{T}) where {T <: Real}
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.tmpw = zeros(T, dim - 2)
+    cone.tempw = zeros(T, dim - 2)
     return cone
 end
 
@@ -65,7 +65,7 @@ function set_initial_point(arr::AbstractVector, cone::HypoPerLog)
     return arr
 end
 
-function update_feas(cone::HypoPerLog{T}) where {T}
+function update_feas(cone::HypoPerLog{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
@@ -83,7 +83,7 @@ function update_feas(cone::HypoPerLog{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::HypoPerLog{T}) where {T}
+function is_dual_feas(cone::HypoPerLog{T}) where T
     u = cone.dual_point[1]
     v = cone.dual_point[2]
     @views w = cone.dual_point[3:cone.dim]
@@ -119,23 +119,23 @@ function update_hess(cone::HypoPerLog)
     v = cone.point[2]
     w = view(cone.point, 3:cone.dim)
     d = length(w)
-    tmpw = cone.tmpw
+    tempw = cone.tempw
     lvwnivlwvu = cone.lvwnivlwvu
     g = cone.grad
     H = cone.hess.data
 
     vivlwvu = v / cone.vlwvu
-    @. tmpw = vivlwvu / w
+    @. tempw = vivlwvu / w
     H[1, 1] = abs2(g[1])
     H[1, 2] = lvwnivlwvu / cone.vlwvu
-    @. @views H[1, 3:end] = -tmpw / cone.vlwvu
+    @. @views H[1, 3:end] = -tempw / cone.vlwvu
     H[2, 2] = abs2(lvwnivlwvu) + (d * g[1] + inv(v)) / v
     hden = (-v * lvwnivlwvu - 1) / cone.vlwvu
     @. @views H[2, 3:end] = hden / w
     @inbounds for j in 1:d
         j2 = 2 + j
         @inbounds for i in 1:j
-            H[2 + i, j2] = tmpw[i] * tmpw[j]
+            H[2 + i, j2] = tempw[i] * tempw[j]
         end
         H[j2, j2] -= g[j2] / w[j]
     end
@@ -155,7 +155,7 @@ function update_inv_hess(cone::HypoPerLog)
     vlwvu = cone.vlwvu
     const1 = vlwvu + v
     denom = vlwvu + (d + 1) * v
-    vw = cone.tmpw
+    vw = cone.tempw
 
     H[1, 2] = v * (v * abs2(lwv) - (u + (d - 1) * v) * lwv + d * u) * v
     @. @views H[1, 3:end] = w * v * (v * lwv + vlwvu) # = (2 * v * lwv - u)
@@ -187,7 +187,7 @@ function correction(cone::HypoPerLog{T}, primal_dir::AbstractVector{T}) where {T
     w_dim = length(w)
     z = v * sum(log(wi / v) for wi in w) - u # TODO cache?
     dzdv = -w_dim * log(v) - w_dim + sum(log, w)
-    wdw = cone.tmpw
+    wdw = cone.tempw
     @. wdw = w_dir / w
     sumwdw = 2 * sum(wdw)
     sum2wdw = sum(abs2, wdw)

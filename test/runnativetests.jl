@@ -28,7 +28,7 @@ diff_reals = [
     ]
 
 string_nameof(T) = string(nameof(T))
-type_name(::T) where {T} = string_nameof(T)
+type_name(::T) where T = string_nameof(T)
 
 function test_instance_solver(
     inst_name::String,
@@ -107,13 +107,13 @@ end
 end
 
 @testset "steppers tests" begin
-    println("\nstarting steppers tests")
+    println("\nstarting steppers tests (with printing)")
     steppers = [
         (Solvers.HeurCombStepper, diff_reals),
         (Solvers.PredOrCentStepper, diff_reals),
         ]
     for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in diff_reals
-        options = (; default_options..., stepper = stepper{T}())
+        options = (; default_options..., verbose = true, stepper = stepper{T}())
         test_instance_solver(inst_name, T, options, string_nameof(stepper))
     end
 end

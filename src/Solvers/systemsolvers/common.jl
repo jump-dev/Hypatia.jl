@@ -45,7 +45,6 @@ function get_directions(
         axpby!(true, dir_temp, -1, dir.vec)
         res = apply_lhs(stepper, solver, tau_scal) # modifies res
         res.vec .-= rhs.vec
-        # @show res
 
         norm_inf_new = norm(res.vec, Inf)
         norm_2_new = norm(res.vec, 2)
@@ -56,8 +55,6 @@ function get_directions(
         end
 
         # residual has improved, so use the iterative refinement
-        # TODO only print if using debug mode
-        # solver.verbose && @printf("iter ref round %d norms: inf %9.2e to %9.2e, two %9.2e to %9.2e\n", i, norm_inf, norm_inf_new, norm_2, norm_2_new)
         copyto!(dir_temp, dir.vec)
         norm_inf = norm_inf_new
         norm_2 = norm_2_new

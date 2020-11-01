@@ -35,7 +35,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_fact_cache
 
     W::Matrix{R}
-    tmpW::Matrix{R}
+    tempW::Matrix{R}
     work_mat::Matrix{R}
     work_mat2::Matrix{R}
     fact_W
@@ -46,7 +46,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     sigma::T
     kron_const::T
     dot_const::T
-    tmpw::Vector{T}
+    tempw::Vector{T}
 
     function HypoRootdetTri{T, R}(
         dim::Int;
@@ -86,11 +86,11 @@ function setup_extra_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{
     load_matrix(cone.hess_fact_cache, cone.hess)
     side = cone.side
     cone.W = zeros(R, side, side)
-    cone.tmpW = zeros(R, side, side)
+    cone.tempW = zeros(R, side, side)
     cone.Wi_vec = zeros(T, dim - 1)
     cone.work_mat = zeros(R, side, side)
     cone.work_mat2 = zeros(R, side, side)
-    cone.tmpw = zeros(T, dim - 1)
+    cone.tempw = zeros(T, dim - 1)
     return cone
 end
 
@@ -111,13 +111,13 @@ function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T, R}) w
     return arr
 end
 
-function update_feas(cone::HypoRootdetTri{T}) where {T}
+function update_feas(cone::HypoRootdetTri{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
 
     @views svec_to_smat!(cone.W, cone.point[2:end], cone.rt2)
-    copyto!(cone.tmpW, cone.W)
-    cone.fact_W = cholesky!(Hermitian(cone.tmpW, :U), check = false) # mutates W, which isn't used anywhere else
+    copyto!(cone.tempW, cone.W)
+    cone.fact_W = cholesky!(Hermitian(cone.tempW, :U), check = false) # mutates W, which isn't used anywhere else
     if isposdef(cone.fact_W)
         cone.rootdet = exp(logdet(cone.fact_W) / cone.side)
         cone.rootdetu = cone.rootdet - u
@@ -130,7 +130,7 @@ function update_feas(cone::HypoRootdetTri{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::HypoRootdetTri{T}) where {T}
+function is_dual_feas(cone::HypoRootdetTri{T}) where T
     u = cone.dual_point[1]
 
     if u < -eps(T)
@@ -281,9 +281,9 @@ function correction(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}) wher
     @views w_corr = corr[2:end]
     sigma = cone.sigma
     z = cone.rootdetu
-    tmpw = cone.tmpw
+    tempw = cone.tempw
 
-    vec_Wi = smat_to_svec!(tmpw, cone.Wi, cone.rt2)
+    vec_Wi = smat_to_svec!(tempw, cone.Wi, cone.rt2)
     S = copytri!(svec_to_smat!(cone.work_mat, w_dir, cone.rt2), 'U', cone.is_complex)
     dot_Wi_S = dot(vec_Wi, w_dir)
     ldiv!(cone.fact_W, S)
@@ -305,7 +305,7 @@ function correction(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}) wher
     @. w_corr += scal5 * vec_Wi
 
     skron2 = rdiv!(S, cone.fact_W.U')
-    vec_skron2 = smat_to_svec!(tmpw, skron2, cone.rt2)
+    vec_skron2 = smat_to_svec!(tempw, skron2, cone.rt2)
 
     @. w_corr += scal6 * vec_skron2
     corr[1] = (sigma * (dot(vec_skron2, w_dir) - (scal2 + 4 * udz) * dot_wdwi) + 2 * abs2(udz)) / z

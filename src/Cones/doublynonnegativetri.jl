@@ -79,7 +79,7 @@ end
 
 get_nu(cone::DoublyNonnegativeTri) = cone.dim
 
-function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegativeTri{T}) where {T}
+function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegativeTri{T}) where T
     side = cone.side
 
     # for small side dimension, use closed-form solutions
@@ -100,9 +100,9 @@ function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegativeTri{T}
             # TODO this poly seems to always have real roots, prove
             if offd_real > 0
                 # get trial point on the diagonal
-                tmp = d - (d - n) * abs2(offd_real)
-                if tmp > sqrt(eps(T))
-                    ond_try = sqrt(tmp / n)
+                temp = d - (d - n) * abs2(offd_real)
+                if temp > sqrt(eps(T))
+                    ond_try = sqrt(temp / n)
                     denom = abs2(ond_try) + (n - 2) / cone.rt2 * ond_try * offd_real - (n - 1) * abs2(offd_real) / 2
                     # check s = -g(s) conditions
                     if ond_try * cone.rt2 + (n - 2) * offd_real ≈ ond_try * denom * cone.rt2 && denom ≈ abs2(offd_real) * (denom + 1)
@@ -128,7 +128,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegativeTri{T}
     return arr
 end
 
-function update_feas(cone::DoublyNonnegativeTri{T}) where {T}
+function update_feas(cone::DoublyNonnegativeTri{T}) where T
     @assert !cone.feas_updated
 
     if all(>(eps(T)), cone.point)

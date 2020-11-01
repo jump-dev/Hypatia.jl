@@ -28,9 +28,9 @@ insts["slow"] = [
     ((1000, false, true),),
     ((1000, false, true), StandardConeOptimizer),
     ((1000, true, true),),
-    ((3000, true, false),),
+    ((2000, true, false),),
+    ((2000, false, true), StandardConeOptimizer),
+    ((2000, true, true),),
     ((3000, false, true),),
-    ((3000, false, true), StandardConeOptimizer),
-    ((3000, true, true),),
     ]
 return (PortfolioJuMP, insts)

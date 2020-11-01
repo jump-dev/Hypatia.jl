@@ -134,13 +134,13 @@ function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
     corr = cone.correction
     dim = cone.dim
 
-    tmp = zero(sumAinvAs[1])
-    tmp .= 0
+    temp = zero(sumAinvAs[1])
+    temp .= 0
     @inbounds for j in 1:dim, k in 1:dim
-        mul!(tmp, sumAinvAs[j], sumAinvAs[k], primal_dir[j] * primal_dir[k], true)
+        mul!(temp, sumAinvAs[j], sumAinvAs[k], primal_dir[j] * primal_dir[k], true)
     end
     @inbounds for i in 1:dim
-        corr[i] = real(dot(sumAinvAs[i], tmp'))
+        corr[i] = real(dot(sumAinvAs[i], temp'))
     end
 
     return corr

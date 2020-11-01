@@ -213,7 +213,7 @@ svec_idx(row::Int, col::Int) = (div((row - 1) * row, 2) + col)
 block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
 
 # TODO rt2::T doesn't work with tests using ForwardDiff
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where {T}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -227,7 +227,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Numb
     return vec
 end
 
-function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where {T}
+function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -241,7 +241,7 @@ function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Number) where {T}
+function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -255,7 +255,7 @@ function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Numb
     return mat
 end
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where {T}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -273,7 +273,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, 
     return vec
 end
 
-function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where {T}
+function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -291,7 +291,7 @@ function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, rt2::Number) where {T}
+function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     @inbounds for j in 1:m, i in 1:j
@@ -307,7 +307,7 @@ function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, 
 end
 
 # utilities for converting between real and complex vectors
-function rvec_to_cvec!(cvec::AbstractVecOrMat{Complex{T}}, rvec::AbstractVecOrMat{T}) where {T}
+function rvec_to_cvec!(cvec::AbstractVecOrMat{Complex{T}}, rvec::AbstractVecOrMat{T}) where T
     k = 1
     @inbounds for i in eachindex(cvec)
         cvec[i] = Complex(rvec[k], rvec[k + 1])
@@ -316,7 +316,7 @@ function rvec_to_cvec!(cvec::AbstractVecOrMat{Complex{T}}, rvec::AbstractVecOrMa
     return cvec
 end
 
-function cvec_to_rvec!(rvec::AbstractVecOrMat{T}, cvec::AbstractVecOrMat{Complex{T}}) where {T}
+function cvec_to_rvec!(rvec::AbstractVecOrMat{T}, cvec::AbstractVecOrMat{Complex{T}}) where T
     k = 1
     @inbounds for i in eachindex(cvec)
         ci = cvec[i]
@@ -433,7 +433,9 @@ function hess_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, t
     return
 end
 
-function sparse_upper_arrow(T::Type{<:Real}, w_dim::Int)
+# set up sparse arrow matrix data structure
+# TODO remove this in favor of new hess_nz_count etc functions that directly use uu, uw, ww etc
+function sparse_arrow(T::Type{<:Real}, w_dim::Int)
     dim = w_dim + 1
     nnz_tri = 2 * dim - 1
     I = Vector{Int}(undef, nnz_tri)
@@ -448,25 +450,8 @@ function sparse_upper_arrow(T::Type{<:Real}, w_dim::Int)
     return sparse(I, J, V, dim, dim)
 end
 
-function factor_upper_arrow(uu, uw, ww, nzval)
-    minval = sqrt(eps(uu)) # TODO tune
-    nzidx = 2
-    @inbounds for i in eachindex(ww)
-        ww1i = ww[i]
-        ww1i < eps(uu) && return false
-        wwi = sqrt(ww1i)
-        uwi = uw[i] / wwi
-        uu -= abs2(uwi)
-        uu < minval && return false
-        nzval[nzidx] = uwi
-        nzval[nzidx + 1] = wwi
-        nzidx += 2
-    end
-    nzval[1] = sqrt(uu)
-    return true
-end
-
-function sparse_upper_arrow_block2(T::Type{<:Real}, w_dim::Int)
+# 2x2 block case
+function sparse_arrow_block2(T::Type{<:Real}, w_dim::Int)
     dim = 2 * w_dim + 1
     nnz_tri = 2 * dim - 1 + w_dim
     I = Vector{Int}(undef, nnz_tri)
@@ -484,26 +469,102 @@ function sparse_upper_arrow_block2(T::Type{<:Real}, w_dim::Int)
     return sparse(I, J, V, dim, dim)
 end
 
-function factor_upper_arrow_block2(uu, uv, uw, vv, vw, ww, nzval)
-    minval = sqrt(eps(uu)) # TODO tune
-    nzidx = 1
-    @inbounds for i in eachindex(ww)
-        ww1i = ww[i]
-        ww1i < eps(uu) && return false
-        wwi = sqrt(ww1i)
-        vwi = vw[i] / wwi
-        uwi = uw[i] / wwi
-        vv2i = vv[i] - abs2(vwi)
-        vv2i < eps(uu) && return false
-        vvi = sqrt(vv2i)
-        uvi = (uv[i] - vwi * uwi) / vvi
-        uu -= abs2(uwi) + abs2(uvi)
-        uu < minval && return false
-        @. @views nzval[nzidx .+ (1:5)] = (uvi, vvi, uwi, vwi, wwi)
-        nzidx += 5
+# lmul with arrow matrix
+function arrow_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, uu::T, uw::Vector{T}, ww::Vector{T}) where {T <: Real}
+    @inbounds @views begin
+        arru = arr[1, :]
+        arrw = arr[2:end, :]
+        produ = prod[1, :]
+        prodw = prod[2:end, :]
+        copyto!(produ, arru)
+        mul!(produ, arrw', uw, true, uu)
+        mul!(prodw, uw, arru')
+        @. prodw += ww * arrw
     end
-    nzval[1] = sqrt(uu)
-    return true
+    return prod
+end
+
+# 2x2 block case
+function arrow_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, uu::T, uv::Vector{T}, uw::Vector{T}, vv::Vector{T}, vw::Vector{T}, ww::Vector{T}) where {T <: Real}
+    @inbounds @views begin
+        arru = arr[1, :]
+        arrv = arr[2:2:end, :]
+        arrw = arr[3:2:end, :]
+        produ = prod[1, :]
+        prodv = prod[2:2:end, :]
+        prodw = prod[3:2:end, :]
+        @. produ = uu * arru
+        mul!(produ, arrv', uv, true, true)
+        mul!(produ, arrw', uw, true, true)
+        mul!(prodv, uv, arru')
+        mul!(prodw, uw, arru')
+        @. prodv += vv * arrv + vw * arrw
+        @. prodw += ww * arrw + vw * arrv
+    end
+    return prod
+end
+
+sqrt_pos(x::T) where {T <: Real} = sqrt(max(x, eps(T)))
+
+# factorize arrow matrix
+function arrow_sqrt(uu::T, uw::Vector{T}, ww::Vector{T}, rtuw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+    @. rtww = sqrt_pos(ww)
+    @. rtuw = uw / rtww
+    return sqrt_pos(uu - sum(abs2, rtuw))
+end
+
+# 2x2 block case
+function arrow_sqrt(uu::T, uv::Vector{T}, uw::Vector{T}, vv::Vector{T}, vw::Vector{T}, ww::Vector{T}, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+    @. rtww = sqrt_pos(ww)
+    @. rtvw = vw / rtww
+    @. rtuw = uw / rtww
+    @. rtvv = sqrt_pos(vv - abs2(rtvw))
+    @. rtuv = (uv - rtvw * rtuw) / rtvv
+    return sqrt_pos(uu - sum(abs2, rtuv) - sum(abs2, rtuw))
+end
+
+# lmul with lower Cholesky factor of arrow matrix
+function arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+    @inbounds @views begin
+        arr1 = arr[1, :]
+        @. prod[1, :] = rtuu * arr1
+        @. prod[2:end, :] = rtuw * arr1' + rtww * arr[2:end, :]
+    end
+    return prod
+end
+
+# 2x2 block case
+function arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+    @inbounds @views begin
+        arr1 = arr[1, :]
+        arrv = arr[2:2:end, :]
+        @. prod[1, :] = rtuu * arr1
+        @. prod[2:2:end, :] = rtuv * arr1' + rtvv * arrv
+        @. prod[3:2:end, :] = rtuw * arr1' + rtvw * arrv + rtww * arr[3:2:end, :]
+    end
+    return prod
+end
+
+# ldiv with upper Cholesky factor of arrow matrix
+function inv_arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+    @inbounds @. @views prod[2:end, :] = arr[2:end, :] / rtww
+    @inbounds @views for j in 1:size(arr, 2)
+        prod[1, j] = (arr[1, j] - dot(prod[2:end, j], rtuw)) / rtuu
+    end
+    return prod
+end
+
+# 2x2 block case
+function inv_arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+    @inbounds @views begin
+        prodw = prod[3:2:end, :]
+        @. prodw = arr[3:2:end, :] / rtww
+        @. prod[2:2:end, :] = (arr[2:2:end, :] - rtvw * prodw) / rtvv
+    end
+    @inbounds @views for j in 1:size(arr, 2)
+        prod[1, j] = (arr[1, j] - dot(prod[2:2:end, j], rtuv) - dot(prod[3:2:end, j], rtuw)) / rtuu
+    end
+    return prod
 end
 
 end

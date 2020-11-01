@@ -37,15 +37,18 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
 
     mat::Vector{Matrix{T}}
     matfact::Vector
-    Λi_Λ::Vector{Vector{Matrix{T}}}
+    ΛLi_Λ::Vector{Vector{Matrix{T}}}
     Λ11::Vector{Matrix{T}}
-    tmpLL::Vector{Matrix{T}}
-    tmpLU::Vector{Matrix{T}}
-    tmpLU2::Vector{Matrix{T}}
-    tmpUU_vec::Vector{Matrix{T}} # reused in update_hess
-    tmpUU::Matrix{T}
-    PΛiPs::Vector{Vector{Vector{Matrix{T}}}}
-    Λ11iP::Vector{Matrix{T}}
+    tempLU::Vector{Matrix{T}}
+    tempLU2::Vector{Matrix{T}}
+    tempLRUR::Vector{Matrix{T}}
+    tempUU_vec::Vector{Matrix{T}} # reused in update_hess
+    tempUU::Matrix{T}
+    ΛLiPs_edge::Vector{Vector{Matrix{T}}}
+    PΛiPs::Vector{Matrix{T}}
+    PΛiP_blocks_U::Vector{Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}}
+    Λ11LiP::Vector{Matrix{T}} # also equal to the block on the diagonal of ΛLiP
+    matLiP::Vector{Matrix{T}} # also equal to block (1, 1) of ΛLiP
     PΛ11iP::Vector{Matrix{T}}
     lambdafact::Vector
     point_views
@@ -78,38 +81,34 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     U = cone.U
     R = cone.R
     Ps = cone.Ps
+    Ls = [size(Pk, 2) for Pk in cone.Ps]
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.mat = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
+    cone.mat = [zeros(T, L, L) for L in Ls]
     cone.matfact = Vector{Any}(undef, length(Ps))
-    cone.Λi_Λ = [Vector{Matrix{T}}(undef, R - 1) for Psk in Ps]
-    @inbounds for k in eachindex(Ps), r in 1:(R - 1)
-        cone.Λi_Λ[k][r] = zeros(T, size(Ps[k], 2), size(Ps[k], 2))
-    end
-    cone.Λ11 = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
-    cone.tmpLL = [zeros(T, size(Psk, 2), size(Psk, 2)) for Psk in Ps]
-    cone.tmpLU = [zeros(T, size(Psk, 2), U) for Psk in Ps]
-    cone.tmpLU2 = [zeros(T, size(Psk, 2), U) for Psk in Ps]
-    cone.tmpUU_vec = [zeros(T, U, U) for _ in eachindex(Ps)]
-    cone.tmpUU = zeros(T, U, U)
-    cone.PΛiPs = [Vector{Vector{Matrix{T}}}(undef, R) for Psk in Ps]
-    @inbounds for k in eachindex(Ps), r1 in 1:R
-        cone.PΛiPs[k][r1] = Vector{Matrix{T}}(undef, r1)
-        for r2 in 1:r1
-            cone.PΛiPs[k][r1][r2] = zeros(T, U, U)
-        end
-    end
-    cone.Λ11iP = [zeros(T, size(P, 2), U) for P in Ps]
+    cone.ΛLi_Λ = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
+    cone.Λ11 = [zeros(T, L, L) for L in Ls]
+    cone.tempLU = [zeros(T, L, U) for L in Ls]
+    cone.tempLU2 = [zeros(T, L, U) for L in Ls]
+    cone.tempLRUR = [zeros(T, L * R, U * R) for L in Ls]
+    cone.tempUU_vec = [zeros(T, U, U) for _ in eachindex(Ps)]
+    cone.tempUU = zeros(T, U, U)
+    cone.ΛLiPs_edge = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
+    cone.matLiP = [zeros(T, L, U) for L in Ls]
+    cone.PΛiPs = [zeros(T, R * U, R * U) for _ in eachindex(Ls)]
+    cone.Λ11LiP = [zeros(T, L, U) for L in Ls]
     cone.PΛ11iP = [zeros(T, U, U) for _ in eachindex(Ps)]
+    cone.PΛiP_blocks_U = [Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}(undef, R, R) for _ in eachindex(Ps)]
+    @inbounds for k in eachindex(Ps), r in 1:R, s in 1:R
+        cone.PΛiP_blocks_U[k][r, s] = view(cone.PΛiPs[k], block_idxs(U, r), block_idxs(U, s))
+    end
     cone.lambdafact = Vector{Any}(undef, length(Ps))
     cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
     return cone
 end
 
 get_nu(cone::WSOSInterpEpiNormEucl) = 2 * sum(size(Psk, 2) for Psk in cone.Ps)
-
-use_correction(::WSOSInterpEpiNormEucl) = false
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormEucl)
     @views arr[1:cone.U] .= 1
@@ -127,17 +126,16 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
     cone.is_feas = true
     @inbounds for k in eachindex(cone.Ps)
         Psk = cone.Ps[k]
-        Λ11j = cone.Λ11[k]
-        LLk = cone.tmpLL[k]
-        LUk = cone.tmpLU[k]
-        Λi_Λ = cone.Λi_Λ[k]
+        Λ11k = cone.Λ11[k]
+        LUk = cone.tempLU[k]
+        ΛLi_Λ = cone.ΛLi_Λ[k]
         mat = cone.mat[k]
 
         # first lambda
         @. LUk = Psk' * point_views[1]'
-        mul!(Λ11j, LUk, Psk)
-        copyto!(mat, Λ11j)
-        lambdafact[k] = cholesky!(Symmetric(Λ11j, :U), check = false)
+        mul!(Λ11k, LUk, Psk)
+        copyto!(mat, Λ11k)
+        lambdafact[k] = cholesky!(Symmetric(Λ11k, :U), check = false)
         if !isposdef(lambdafact[k])
             cone.is_feas = false
             break
@@ -145,13 +143,12 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
 
         # subtract others
         uo = U + 1
-        @inbounds for r in 2:cone.R
-            @. LUk = Psk' * point_views[r]'
-            mul!(LLk, LUk, Psk)
+        for r in 1:(cone.R - 1)
+            @. LUk = Psk' * point_views[r + 1]'
+            mul!(ΛLi_Λ[r], LUk, Psk)
 
-            # not using lambdafact.L \ lambda with an syrk because storing lambdafact \ lambda is useful later
-            ldiv!(Λi_Λ[r - 1], lambdafact[k], LLk)
-            mul!(mat, LLk, Λi_Λ[r - 1], -1, true)
+            ldiv!(lambdafact[k].L, ΛLi_Λ[r])
+            mul!(mat, ΛLi_Λ[r]', ΛLi_Λ[r], -1, true)
             uo += U
         end
 
@@ -168,7 +165,7 @@ end
 
 is_dual_feas(cone::WSOSInterpEpiNormEucl) = true
 
-function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
+function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
     @assert cone.is_feas
     U = cone.U
     R = cone.R
@@ -179,44 +176,44 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where {T}
     cone.grad .= 0
     @inbounds for k in eachindex(cone.Ps)
         Psk = cone.Ps[k]
-        Λ11iP = cone.Λ11iP[k]
-        LUk = cone.tmpLU[k]
-        LUk2 = cone.tmpLU2[k]
+        Λ11LiP = cone.Λ11LiP[k]
         PΛ11iP = cone.PΛ11iP[k]
-        PΛiPs = cone.PΛiPs[k]
-        Λi_Λ = cone.Λi_Λ[k]
+        ΛLiP_edge = cone.ΛLiPs_edge[k]
+        matLiP = cone.matLiP[k]
+        PΛiPs = cone.PΛiP_blocks_U[k]
+        ΛLi_Λ = cone.ΛLi_Λ[k]
 
         # P * inv(Λ_11) * P' for (1, 1) hessian block and adding to PΛiPs[r][r]
-        ldiv!(Λ11iP, cone.lambdafact[k].L, Psk') # TODO may be more efficient to do ldiv(fact.U', B) than ldiv(fact.L, B) here and elsewhere since the factorizations are of symmetric :U matrices
-        mul!(PΛ11iP, Λ11iP', Λ11iP)
+        ldiv!(Λ11LiP, cone.lambdafact[k].L, Psk') # TODO may be more efficient to do ldiv(fact.U', B) than ldiv(fact.L, B) here and elsewhere since the factorizations are of symmetric :U matrices
+        mul!(PΛ11iP, Λ11LiP', Λ11LiP)
 
         # prep PΛiPs
         # block-(1,1) is P * inv(mat) * P'
-        ldiv!(LUk, matfact[k].L, Psk')
-        mul!(PΛiPs[1][1], LUk', LUk)
+        ldiv!(matLiP, matfact[k].L, Psk')
+        mul!(PΛiPs[1, 1], matLiP', matLiP)
+        # top edge of sqrt of Λ
+        for r in 1:(R - 1)
+            mul!(ΛLiP_edge[r], ΛLi_Λ[r]', Λ11LiP, -1, false)
+            ldiv!(matfact[k].L, ΛLiP_edge[r])
+        end
         # get all the PΛiPs that are in row one or on the diagonal
-        @inbounds for r in 2:R
-            ldiv!(LUk, matfact[k], Psk')
-            mul!(LUk2, Λi_Λ[r - 1], LUk)
-            mul!(PΛiPs[r][1], Psk, LUk2, -1, false)
-            # PΛiPs[r][r] .= Symmetric(Psk * Λi_Λ[r - 1] * (matfact[k] \ (Λi_Λ[r - 1]' * Psk')), :U)
-            mul!(LUk, Λi_Λ[r - 1]', Psk')
-            ldiv!(matfact[k].L, LUk)
-            mul!(PΛiPs[r][r], LUk', LUk)
-            @. PΛiPs[r][r] += PΛ11iP
+        for r in 2:R
+            mul!(PΛiPs[r, 1], ΛLiP_edge[r - 1]', matLiP)
+            mul!(PΛiPs[r, r], ΛLiP_edge[r - 1]', ΛLiP_edge[r - 1])
+            @. PΛiPs[r, r] += PΛ11iP
         end
 
         # (1, 1)-block
         # gradient is diag of sum(-PΛiPs[i][i] for i in 1:R) + (R - 1) * P((Lambda_11)\P') - P((Lambda_11)\P')
-        @inbounds for i in 1:U
+        for i in 1:U
             cone.grad[i] += PΛ11iP[i, i] * R2
-            @inbounds for r in 1:R
-                cone.grad[i] -= PΛiPs[r][r][i, i]
+            for r in 1:R
+                cone.grad[i] -= PΛiPs[r, r][i, i]
             end
         end
         idx = U + 1
-        @inbounds for r in 2:R, i in 1:U
-            cone.grad[idx] -= 2 * PΛiPs[r][1][i, i]
+        for r in 2:R, i in 1:U
+            cone.grad[idx] -= 2 * PΛiPs[r, 1][i, i]
             idx += 1
         end
     end
@@ -231,59 +228,53 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
     R = cone.R
     R2 = R - 2
     hess = cone.hess.data
-    UU = cone.tmpUU
+    UU = cone.tempUU
     matfact = cone.matfact
 
     hess .= 0
     @inbounds for k in eachindex(cone.Ps)
-        Psk = cone.Ps[k]
-        PΛiPs = cone.PΛiPs[k]
-        Λi_Λ = cone.Λi_Λ[k]
+        PΛiPs = cone.PΛiP_blocks_U[k]
         PΛ11iP = cone.PΛ11iP[k]
-        UUk = cone.tmpUU_vec[k]
-        LUk = cone.tmpLU[k]
-        LUk2 = cone.tmpLU2[k]
-
+        UUk = cone.tempUU_vec[k]
+        ΛLiP_edge = cone.ΛLiPs_edge[k]
         # get the PΛiPs not calculated in update_grad
-        @inbounds for r in 2:R, r2 in 2:(r - 1)
-            mul!(LUk, Λi_Λ[r2 - 1]', Psk')
-            ldiv!(matfact[k], LUk)
-            mul!(LUk2, Λi_Λ[r - 1], LUk)
-            mul!(PΛiPs[r][r2], Psk, LUk2)
+        for r in 2:R, r2 in 2:(r - 1)
+            mul!(PΛiPs[r, r2], ΛLiP_edge[r - 1]', ΛLiP_edge[r2 - 1])
         end
+        copytri!(cone.PΛiPs[k], 'L')
 
-        @inbounds for i in 1:U, k in 1:i
+        for i in 1:U, k in 1:i
             hess[k, i] -= abs2(PΛ11iP[k, i]) * R2
         end
 
-        @. @views hess[1:U, 1:U] += abs2(PΛiPs[1][1])
-        @inbounds for r in 2:R
+        @. @views hess[1:U, 1:U] += abs2(PΛiPs[1, 1])
+        for r in 2:R
             idxs = block_idxs(U, r)
-            @inbounds for s in 1:(r - 1)
+            for s in 1:(r - 1)
                 # block (1,1)
-                @. UU = abs2(PΛiPs[r][s])
+                @. UU = abs2(PΛiPs[r, s])
                 @. UUk = UU + UU'
                 @. @views hess[1:U, 1:U] += UUk
                 # blocks (1,r)
-                @. @views hess[1:U, idxs] += PΛiPs[s][1] * PΛiPs[r][s]'
+                @. @views hess[1:U, idxs] += PΛiPs[s, 1] * PΛiPs[s, r]
             end
             # block (1,1)
-            @. @views hess[1:U, 1:U] += abs2(PΛiPs[r][r])
+            @. @views hess[1:U, 1:U] += abs2(PΛiPs[r, r])
             # blocks (1,r)
-            @. @views hess[1:U, idxs] += PΛiPs[r][1] * PΛiPs[r][r]
+            @. @views hess[1:U, idxs] += PΛiPs[r, 1] * PΛiPs[r, r]
             # blocks (1,r)
-            @inbounds for s in (r + 1):R
-                @. @views hess[1:U, idxs] += PΛiPs[s][1] * PΛiPs[s][r]
+            for s in (r + 1):R
+                @. @views hess[1:U, idxs] += PΛiPs[s, 1] * PΛiPs[s, r]
             end
 
             # blocks (r, r2)
             # NOTE for hess[idxs, idxs], UU and UUk are symmetric
-            @. UU = PΛiPs[r][1] * PΛiPs[r][1]'
-            @. UUk = PΛiPs[1][1] * PΛiPs[r][r]
+            @. UU = PΛiPs[r, 1] * PΛiPs[r, 1]'
+            @. UUk = PΛiPs[1, 1] * PΛiPs[r, r]
             @. @views hess[idxs, idxs] += UU + UUk
-            @inbounds for r2 in (r + 1):R
-                @. UU = PΛiPs[r][1] * PΛiPs[r2][1]'
-                @. UUk = PΛiPs[1][1] * PΛiPs[r2][r]'
+            for r2 in (r + 1):R
+                @. UU = PΛiPs[r, 1] * PΛiPs[r2, 1]'
+                @. UUk = PΛiPs[1, 1] * PΛiPs[r2, r]'
                 idxs2 = block_idxs(U, r2)
                 @. @views hess[idxs, idxs2] += UU + UUk
             end
@@ -296,82 +287,63 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
 end
 
 # TODO allocations, inbounds etc
-function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T}) where {T}
+function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T}) where T
+    @assert cone.hess_updated
     corr = cone.correction
     corr .= 0
     R = cone.R
     U = cone.U
-    UR = U * R
-    @views primal_dir_1 = Diagonal(primal_dir[1:U])
-    dim = cone.dim
 
     for pk in eachindex(cone.Ps)
-        PlambdaPk = cone.PΛiPs[pk]
-        PΛP(i, j) = (j <= i ? PlambdaPk[i][j] : PlambdaPk[j][i]')
-        PΛ11iP = cone.PΛ11iP[pk]
-
-        PΛP_dirs_pqq = [zeros(T, U, U) for _ in 1:R, _ in 1:R]
-        PΛP_dirs_pq1 = [zeros(T, U, U) for _ in 1:R, _ in 1:R]
-        PΛP_dirs_p1q = [zeros(T, U, U) for _ in 1:R, _ in 1:R]
-        @views for p in 1:R, q in 1:R
-            PΛP_dirs_pqq[p, q] = PΛP(p, q) * Diagonal(primal_dir[block_idxs(U, q)])
-            PΛP_dirs_pq1[p, q] = PΛP(p, q) * Diagonal(primal_dir[1:U])
-            PΛP_dirs_p1q[p, q] = PΛP(p, 1) * Diagonal(primal_dir[block_idxs(U, q)])
+        mul!(cone.tempLU[pk], cone.Λ11LiP[pk], Diagonal(primal_dir[1:U]))
+        tempLU2 = mul!(cone.tempLU2[pk], cone.tempLU[pk], cone.PΛ11iP[pk])
+        @views for u in 1:U
+            corr[u] += sum(abs2, tempLU2[:, u])
         end
-        @views LU = cone.Λ11iP[pk] * Diagonal(primal_dir[1:U]) * PΛ11iP
+    end
+    @. @views corr[1:U] *= 2 - R
 
-        # 111
-        for j in 1:U
-            @views corr[j] -= sum(abs2, LU[:, j]) * (R - 2)
-        end
-        M = sum(PΛP_dirs_pq1[i, k] * PΛP_dirs_pq1[k, m] * PΛP(m, i) for i in 1:R for k in 1:R for m in 1:R)
-        @views corr[1:U] .+= diag(M)
+    for pk in eachindex(cone.Ps)
+        L = size(cone.Ps[pk], 2)
+        ΛLiP_edge = cone.ΛLiPs_edge[pk]
+        matLiP = cone.matLiP[pk]
+        PΛiP = cone.PΛiPs[pk]
+        Λ11LiP = cone.Λ11LiP[pk]
 
-        # 11m
-        @inbounds for m in 2:R
-            M = sum(
-                PΛP_dirs_pq1[i, k] * (PΛP_dirs_pqq[k, m] * PΛP(1, i) + PΛP(k, 1) * PΛP_dirs_pqq[i, m]')
-                for i in 1:R, k in 1:R)
-            @views corr[1:U] .+= diag(M) * 2
-        end
-
-        # 1km
-        for k in 2:R, m in 2:R
-            M = sum(
-                PΛP_dirs_pqq[i, k] * (PΛP_dirs_p1q[1, m] * PΛP(m, i) + PΛP_dirs_pqq[1, m] * PΛP(1, i)) +
-                PΛP_dirs_p1q[i, k] * (PΛP_dirs_p1q[k, m] * PΛP(m, i) + PΛP_dirs_pqq[k, m] * PΛP(1, i))
-                for i in 1:R)
-            @views corr[1:U] .+= diag(M)
+        # get ΛLiP * D * PΛiP where D is diagonalized primal_dir scattered in an arrow and ΛLiP is half an arrow
+        # ΛLiP * D is an arrow matrix but row edge doesn't equal column edge
+        scaled_row = [zeros(T, L, U) for _ in 1:(R - 1)]
+        scaled_col = [zeros(T, L, U) for _ in 1:(R - 1)]
+        scaled_diag = Λ11LiP * Diagonal(primal_dir[1:U])
+        scaled_pt = matLiP * Diagonal(primal_dir[1:U])
+        for c in 2:R
+            scaled_pt += ΛLiP_edge[c - 1] * Diagonal(primal_dir[block_idxs(U, c)])
+            scaled_row[c - 1] = matLiP * Diagonal(primal_dir[block_idxs(U, c)])
+            scaled_row[c - 1] += ΛLiP_edge[c - 1] * Diagonal(primal_dir[1:U])
+            scaled_col[c - 1] = Λ11LiP * Diagonal(primal_dir[block_idxs(U, c)])
         end
 
-        for i in 2:R
-            # 11i
-            M = sum(PΛP_dirs_pq1[i, m] * PΛP_dirs_pq1[m, k] * PΛP(k, 1) + PΛP_dirs_pq1[1, m] * PΛP_dirs_pq1[m, k] * PΛP(k, i)
-                for k in 1:R for m in 1:R)
-            @views corr[block_idxs(U, i)] .+= diag(M)
-
-            # im1
-            for m in 2:R
-                M = sum(
-                    PΛP_dirs_pq1[i, k] * (PΛP_dirs_pqq[k, m] * PΛP(1, 1) + PΛP_dirs_p1q[k, m] * PΛP(m, 1)) +
-                    PΛP_dirs_pq1[1, k] * (PΛP_dirs_pqq[k, m] * PΛP(1, i) + PΛP_dirs_p1q[k, m] * PΛP(m, i))
-                    for k in 1:R)
-                @views corr[block_idxs(U, i)] .+= diag(M) * 2
-            end
-
-            # ikm
-            for k in 2:R, m in 2:R
-                M = PΛP_dirs_p1q[i, k] * PΛP_dirs_p1q[k, m] * PΛP(1, m)' +
-                    PΛP_dirs_p1q[1, k] * PΛP_dirs_p1q[k, m] * PΛP(i, m)' +
-                    PΛP_dirs_pqq[i, k] * PΛP_dirs_p1q[1, m] * PΛP(1, m)' +
-                    PΛP_dirs_pqq[1, k] * PΛP_dirs_p1q[1, m] * PΛP(i, m)' +
-                    PΛP_dirs_p1q[i, k] * PΛP_dirs_pqq[k, m] * PΛP(1, 1)' +
-                    PΛP_dirs_p1q[1, k] * PΛP_dirs_pqq[k, m] * PΛP(i, 1)' +
-                    PΛP_dirs_pqq[i, k] * PΛP_dirs_pqq[1, m] * PΛP(1, 1)' +
-                    PΛP_dirs_pqq[1, k] * PΛP_dirs_pqq[1, m] * PΛP(i, 1)'
-                @views corr[block_idxs(U, i)] .+= diag(M)
+        corr_half = cone.tempLRUR[pk]
+        corr_half .= 0
+        @views for c in 1:R
+            mul!(corr_half[1:L, block_idxs(U, c)], scaled_pt, PΛiP[1:U, block_idxs(U, c)])
+            for r in 2:R
+                mul!(corr_half[1:L, block_idxs(U, c)], scaled_row[r - 1], PΛiP[block_idxs(U, r), block_idxs(U, c)], true, true)
+                mul!(corr_half[block_idxs(L, r), block_idxs(U, c)], scaled_col[r - 1], PΛiP[1:U, block_idxs(U, c)])
+                mul!(corr_half[block_idxs(L, r), block_idxs(U, c)], scaled_diag, PΛiP[block_idxs(U, r), block_idxs(U, c)], true, true)
             end
         end
+
+        @views for u in 1:U
+            corr[u] += sum(abs2, corr_half[:, u])
+            idx = U + u
+            for r in 2:R
+                corr[idx] += 2 * dot(corr_half[:, idx], corr_half[:, u])
+                corr[u] += sum(abs2, corr_half[:, idx])
+                idx += U
+            end
+        end
+
     end
 
     return corr
