@@ -286,7 +286,7 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
     return cone.hess
 end
 
-# TODO allocations, inbounds etc
+# TODO allocations for scaled_row, scaled_col
 function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T}) where T
     @assert cone.hess_updated
     corr = cone.correction
@@ -294,8 +294,8 @@ function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T
     R = cone.R
     U = cone.U
 
-    for pk in eachindex(cone.Ps)
-        mul!(cone.tempLU[pk], cone.Λ11LiP[pk], Diagonal(primal_dir[1:U]))
+    @inbounds for pk in eachindex(cone.Ps)
+        @views mul!(cone.tempLU[pk], cone.Λ11LiP[pk], Diagonal(primal_dir[1:U]))
         tempLU2 = mul!(cone.tempLU2[pk], cone.tempLU[pk], cone.PΛ11iP[pk])
         @views for u in 1:U
             corr[u] += sum(abs2, tempLU2[:, u])
@@ -303,7 +303,7 @@ function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T
     end
     @. @views corr[1:U] *= 2 - R
 
-    for pk in eachindex(cone.Ps)
+    @inbounds for pk in eachindex(cone.Ps)
         L = size(cone.Ps[pk], 2)
         ΛLiP_edge = cone.ΛLiPs_edge[pk]
         matLiP = cone.matLiP[pk]
@@ -314,13 +314,13 @@ function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T
         # ΛLiP * D is an arrow matrix but row edge doesn't equal column edge
         scaled_row = [zeros(T, L, U) for _ in 1:(R - 1)]
         scaled_col = [zeros(T, L, U) for _ in 1:(R - 1)]
-        scaled_diag = Λ11LiP * Diagonal(primal_dir[1:U])
-        scaled_pt = matLiP * Diagonal(primal_dir[1:U])
-        for c in 2:R
-            scaled_pt += ΛLiP_edge[c - 1] * Diagonal(primal_dir[block_idxs(U, c)])
-            scaled_row[c - 1] = matLiP * Diagonal(primal_dir[block_idxs(U, c)])
-            scaled_row[c - 1] += ΛLiP_edge[c - 1] * Diagonal(primal_dir[1:U])
-            scaled_col[c - 1] = Λ11LiP * Diagonal(primal_dir[block_idxs(U, c)])
+        @views scaled_diag = mul!(cone.tempLU[pk], Λ11LiP, Diagonal(primal_dir[1:U]))
+        @views scaled_pt = mul!(cone.tempLU2[pk], matLiP, Diagonal(primal_dir[1:U]))
+        @views for c in 2:R
+            mul!(scaled_pt, ΛLiP_edge[c - 1], Diagonal(primal_dir[block_idxs(U, c)]), true, true)
+            mul!(scaled_row[c - 1], matLiP, Diagonal(primal_dir[block_idxs(U, c)]))
+            mul!(scaled_row[c - 1], ΛLiP_edge[c - 1], Diagonal(primal_dir[1:U]), true, true)
+            mul!(scaled_col[c - 1], Λ11LiP, Diagonal(primal_dir[block_idxs(U, c)]))
         end
 
         corr_half = cone.tempLRUR[pk]
