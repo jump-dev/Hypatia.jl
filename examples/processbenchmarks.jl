@@ -10,12 +10,12 @@ all_dims = [:n_nat, :p_nat, :q_nat, :n_ext, :p_ext, :q_ext]
 examples_params = Dict(
     "DensityEstJuMP"    => ([:m, :deg], [2, 3], [:n_nat, :n_ext]),
     "ExpDesignJuMP"     => ([:logdet, :k], [5, 1], [:n_nat, :q_nat, :q_ext]),
-    "MatrixCompletionJuMP" => ([:k, :d], [1, 2], [:n_nat, :p_nat, :q_ext]),
-    "MatrixRegressionJuMP" => ([:m], [2], all_dims),
-    "NearestPSDJuMP"    => ([:compl, :d], [2, 1], [:n_nat, :q_ext]),
-    "PolyMinJuMP"       => ([:m, :halfdeg], [1, 2], [:n_nat, :q_ext]),
-    "PortfolioJuMP"     => ([:k], [1], Symbol[]),
-    "ShapeConRegrJuMP"  => ([:m, :deg], [1, 5], [:n_nat, :q_nat, :n_ext]),
+    # "MatrixCompletionJuMP" => ([:k, :d], [1, 2], [:n_nat, :p_nat, :q_ext]),
+    # "MatrixRegressionJuMP" => ([:m], [2], all_dims),
+    # "NearestPSDJuMP"    => ([:compl, :d], [2, 1], [:n_nat, :q_ext]),
+    # "PolyMinJuMP"       => ([:m, :halfdeg], [1, 2], [:n_nat, :q_ext]),
+    # "PortfolioJuMP"     => ([:k], [1], Symbol[]),
+    # "ShapeConRegrJuMP"  => ([:m, :deg], [1, 5], [:n_nat, :q_nat, :n_ext]),
     )
 
 inst_solvers = (:nat_Hypatia, :ext_Hypatia, :ext_Mosek) # TODO generate automatically for each example depending on data available
@@ -57,18 +57,19 @@ status_map = Dict(
     "SolveCheckCaughtError" => "er",
     )
 
+residual_tol_satisfied(a, tol = 1e-6) = (all(isfinite, a) && maximum(a) < tol)
+relative_tol_satisfied(a::T, b::T, tol::T = 1e-5) where {T <: Real} = (abs(a - b) / (1 + max(abs(a), abs(b))) < tol)
+
 function make_all_df()
     all_df = DataFrame(CSV.File(bench_file))
     transform!(
         all_df,
         [:inst_set, :solver] => ((x, y) -> x .* "_" .* y) => :inst_solver,
-        [:x_viol, :y_viol, :z_viol, :rel_obj_diff] => ByRow((res...) -> (all(isfinite.(res)) && maximum(res) < 1e-6)) => :converged,
+        [:x_viol, :y_viol, :z_viol, :rel_obj_diff] => ByRow((res...) -> residual_tol_satisfied(res)) => :converged,
         :status => ByRow(x -> status_map[x]) => :status,
         )
     return all_df
 end
-
-rel_tol_satisfied(a, b) = (abs(a - b) / (1 + max(abs(a), abs(b))) < 1e-5)
 
 ex_wide_file(ex_name::String) = joinpath(output_folder, ex_name * "_wide.csv")
 
@@ -90,7 +91,7 @@ function make_wide_csv(all_df, ex_name, ex_params)
             for i in eachindex(co_idxs)
                 first_optval = group_df[co_idxs[i], :prim_obj]
                 other_optvals = group_df[co_idxs[Not(i)], :prim_obj]
-                if !all(rel_tol_satisfied.(other_optvals, first_optval))
+                if !all(relative_tol_satisfied.(other_optvals, first_optval))
                     println("objective values of: $(ex_name) $(group_df[:inst_data][1]) do not agree")
                 end
             end
