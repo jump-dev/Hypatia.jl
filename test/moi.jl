@@ -23,22 +23,22 @@ unit_exclude = [
     ]
 
 conic_exclude = String[
-    # "lin",
-    # "norminf",
-    # "normone",
-    # "soc",
-    # "rsoc",
-    # "exp",
-    # "dualexp",
-    # "pow",
-    # "dualpow",
+    "lin",
+    "norminf",
+    "normone",
+    "soc",
+    "rsoc",
+    "exp",
+    "dualexp",
+    "pow",
+    "dualpow",
     # "geomean",
-    # "relentr",
-    # "normspec",
-    # "normnuc",
-    # "sdp",
-    # "logdet", # TODO currently failing due to barrier with high parameter
-    # "rootdet",
+    "relentr",
+    "normspec",
+    "normnuc",
+    "sdp",
+    "logdet", # TODO currently failing due to barrier with high parameter
+    "rootdet",
     # square logdet and rootdet cones not handled
     "logdets",
     "rootdets",
@@ -58,17 +58,22 @@ function test_moi(T::Type{<:Real}; solver_options...)
         infeas_certificates = true,
         )
 
-    @testset "linear tests" begin
-        MOIT.contlineartest(optimizer, config)
-    end
+    # @testset "linear tests" begin
+    #     MOIT.contlineartest(optimizer, config)
+    # end
 
     if T == Float64
         # NOTE test other real types, waiting for https://github.com/jump-dev/MathOptInterface.jl/issues/841
-        @testset "unit tests" begin
-            MOIT.unittest(optimizer, config, unit_exclude)
-        end
+        # @testset "unit tests" begin
+        #     MOIT.unittest(optimizer, config, unit_exclude)
+        # end
         @testset "conic tests" begin
-            MOIT.contconictest(MOI.Bridges.Constraint.Square{T}(optimizer), config, conic_exclude)
+            @info("no bridges")
+            MOIT.contconictest(optimizer, config, conic_exclude)
+            @info("relentr then geomean bridge")
+            MOIT.contconictest(MOI.Bridges.Constraint.GeoMeantoRelEntr{T}(MOI.Bridges.Constraint.RelativeEntropy{T}(optimizer)), config, conic_exclude)
+            @info("geomean then relentr bridge")
+            MOIT.contconictest(MOI.Bridges.Constraint.RelativeEntropy{T}(MOI.Bridges.Constraint.GeoMeantoRelEntr{T}(optimizer)), config, conic_exclude)
         end
     end
 

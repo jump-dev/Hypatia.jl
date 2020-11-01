@@ -467,6 +467,7 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
 
     Solvers.load(solver, model)
     Solvers.solve(solver)
+    @show typeof.(opt.moi_other_cones)
 
     status = Solvers.get_status(solver)
     primal_obj = Solvers.get_primal_obj(solver)
