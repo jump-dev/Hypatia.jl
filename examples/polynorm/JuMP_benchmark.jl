@@ -1,5 +1,6 @@
 
 l2_n_d_m = [
+    (1, 1, 2), # compile run
     (4, 1, 3),
     (4, 2, 3),
     (5, 1, 3),
@@ -19,6 +20,7 @@ l2_n_d_m = [
     ]
 
 l1_n_d_m = [
+    (1, 1, 2), # compile run
     (4, 2, 3),
     (4, 4, 3),
     (5, 2, 3),
@@ -68,19 +70,19 @@ l1_n_d_m = [
     (4, 3, 80),
     ]
 
-polynorml2_insts(use_l2::Bool) = [
+polynorml2_insts(use_l2::Bool) = [[
     (n, f * d, d, m, false, use_l2)
     for f in [1, 2] for (n, d, m) in l2_n_d_m
-    ]
+    ]]
 
-polynorml1_insts(use_l1::Bool) = [
+polynorml1_insts(use_l1::Bool) = [[
     (n, 2 * d, d, m, true, use_l1)
     for (n, d, m) in l2_n_d_m
-    ]
+    ]]
 
 insts = Dict()
-insts["L2_WSOSL2"] = (nothing, polymin_insts(true))
-insts["L2_WSOSPSD"] = (nothing, polymin_insts(false))
-insts["L1_WSOSL1"] = (nothing, polymin_insts(true))
-insts["L1_WSOS"] = (nothing, polymin_insts(false))
+insts["L2_WSOSL2"] = (nothing, polynorml2_insts(true))
+insts["L2_WSOSPSD"] = (nothing, polynorml2_insts(false))
+insts["L1_WSOSL1"] = (nothing, polynorml1_insts(true))
+insts["L1_WSOS"] = (nothing, polynorml1_insts(false))
 return (PolyNormJuMP, insts)

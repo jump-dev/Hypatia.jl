@@ -1,5 +1,6 @@
 
-n_d_m = [
+rpm_n_d_m = [
+    (1, 1, 2), # compile run
     (4, 2, 3),
     (4, 4, 3),
     (4, 8, 3),
@@ -25,6 +26,6 @@ n_d_m = [
     ]
 
 insts = Dict()
-insts["WSOS"] = (nothing, [(n, d, m, true, false, false) for (n, d, m) in n_d_m])
-insts["WSOSPSD"] = (nothing, [(n, d, m, false, true, false) for (n, d, m) in n_d_m])
+insts["WSOS"] = (nothing, [[(n, d, m, true, false, false) for (n, d, m) in rpm_n_d_m]])
+insts["WSOSPSD"] = (nothing, [[(n, d, m, false, true, false) for (n, d, m) in rpm_n_d_m]])
 return (RandomPolyMatJuMP, insts)

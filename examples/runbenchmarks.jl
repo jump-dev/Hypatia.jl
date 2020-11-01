@@ -57,9 +57,15 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
 
 # instance sets and solvers to run
 instance_sets = [
-    ("nat", hyp_solver),
-    ("ext", hyp_solver),
-    ("ext", mosek_solver),
+    # ("nat", hyp_solver),
+    # ("ext", hyp_solver),
+    # ("ext", mosek_solver),
+    ("L2_WSOSL2", hyp_solver),
+    ("L2_WSOSPSD", hyp_solver),
+    ("L1_WSOSL1", hyp_solver),
+    ("L1_WSOS", hyp_solver),
+    ("WSOS", hyp_solver),
+    ("WSOSPSD", hyp_solver),
     ]
 
 # models to run
@@ -71,7 +77,9 @@ JuMP_example_names = [
     # "matrixregression",
     # "nearestpsd",
     # "polymin",
+    # "polynorm",
     # "portfolio",
+    # "randompolymat",
     # "shapeconregr",
     ]
 
