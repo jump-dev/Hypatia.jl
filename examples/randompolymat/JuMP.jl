@@ -1,14 +1,15 @@
 #=
-find a polynomial matrix Q such that Q - H is SOS when H is random and the volume under the polynomials in Q is minimized
+given a random polynomial matrix H, find a polynomial matrix Q such that Q - H is SOS-PSD over a unit box
+and the total volume of all polynomials in Q over the unit box is minimized
 =#
 
 struct RandomPolyMatJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
     halfdeg::Int
-    R::Int
-    use_wsos::Bool
-    use_matrixwsos::Bool
-    use_sdp::Bool
+    R::Int # side dimension of polynomial matrices
+    use_wsos::Bool # use WSOS cone with auxiliary polynomial
+    use_matrixwsos::Bool # use WSOS PSD cone
+    use_sdp::Bool # use SDP formulation with auxiliary polynomial
 end
 
 function build(inst::RandomPolyMatJuMP{T}) where {T <: Float64}
@@ -24,6 +25,7 @@ function build(inst::RandomPolyMatJuMP{T}) where {T <: Float64}
     model = JuMP.Model()
     JuMP.@variable(model, q_poly[1:(U * svec_dim)])
 
+    # generate random polynomial matrix H and symmetrize
     full_mat = [randn(U) for _ in 1:R, _ in 1:R]
     for j in 1:R, i in 1:j
         full_mat[i, j] .+= full_mat[j, i]
