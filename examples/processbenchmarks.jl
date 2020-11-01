@@ -18,7 +18,7 @@ examples_params = Dict(
     "ShapeConRegrJuMP"  => ([:m, :deg], [1, 5], [:n_nat, :q_nat, :n_ext]),
     )
 
-inst_solvers = (:nat_Hypatia, :ext_Hypatia, :ext_Mosek)
+inst_solvers = (:nat_Hypatia, :ext_Hypatia, :ext_Mosek) # TODO generate automatically for each example depending on data available
 
 println("running examples:")
 for k in keys(examples_params)
@@ -97,7 +97,7 @@ function make_wide_csv(all_df, ex_name, ex_params)
         end
     end
 
-    # TODO check that ext npq agrees for hypatia and mosek, and don't emit duplicate warnings
+    # TODO check that ext npq agrees for each formulation-instance
     unstacked_dims = [
         unstack(ex_df, inst_keys, :inst_set, v, renamecols = x -> Symbol(v, :_, x))
         for v in [:n, :p, :q]
@@ -153,11 +153,9 @@ function make_table_tex(ex_name, ex_params)
         if num_params == 2
             row_str *= sep * process_entry(row[2])
         end
-
         for s in print_sizes
             row_str *= sep * process_entry(row[s])
         end
-
         for inst_solver in inst_solvers
             row_str *= process_inst_solver(row, inst_solver)
         end
