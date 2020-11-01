@@ -79,7 +79,6 @@ function run_instance_check(
         @eval using MosekTools
         include(joinpath(examples_dir, "common_JuMP.jl"))
         include(joinpath(examples_dir, ex_name, "JuMP.jl"))
-        # include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
         flush(stdout); flush(stderr)
         return nothing
     end
@@ -137,7 +136,11 @@ function run_instance_check(
         solver_hit_limit && println("solver hit limit: $solver_status")
     end
 
-    wait(rmprocs(worker))
+    try
+        wait(rmprocs(worker))
+    catch e
+        @warn("error during process shutdown: ", e)
+    end
     @assert nprocs() == 1
 
     return (setup_killed, solver_hit_limit, (model_stats..., check_stats..., setup_time, check_time))
