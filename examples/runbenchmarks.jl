@@ -23,8 +23,8 @@ include(joinpath(examples_dir, "common_JuMP.jl"))
 results_path = joinpath(homedir(), "bench", "bench.csv")
 # results_path = nothing
 
-# spawn_runs = true # needed for running Julia process with multiple threads
-spawn_runs = false
+spawn_runs = true # needed for running Julia process with multiple threads
+# spawn_runs = false
 setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
 num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
 free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
@@ -60,12 +60,6 @@ instance_sets = [
     ("nat", hyp_solver),
     # ("ext", hyp_solver),
     # ("ext", mosek_solver),
-    # ("L2_WSOSL2", hyp_solver),
-    # ("L2_WSOSPSD", hyp_solver),
-    # ("L1_WSOSL1", hyp_solver),
-    # ("L1_WSOS", hyp_solver),
-    # ("WSOS", hyp_solver),
-    # ("WSOSPSD", hyp_solver),
     ]
 
 # models to run

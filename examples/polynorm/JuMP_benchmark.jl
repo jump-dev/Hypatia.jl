@@ -1,147 +1,162 @@
 
-l2_n_d_m = [
+polynorm_l2_n_d_ms = [
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (4, 2, 3),
     (4, 4, 3),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (5, 2, 3),
     (5, 4, 3),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (6, 2, 3),
     (6, 4, 3),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (4, 2, 5),
     (4, 4, 5),
     ],
     [
+    (3, 1, 2), # compile run
     (5, 2, 5),
     (5, 4, 5),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (4, 2, 10),
     (4, 4, 10),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (5, 2, 10),
+    (5, 4, 10),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (4, 2, 15),
     (4, 4, 15),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (4, 2, 30),
+    (4, 4, 30),
     ],
     ]
 
-l1_n_d_m = [
+polynorm_l1_n_d_ms = [
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (4, 2, 3),
     (4, 4, 3),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (5, 2, 3),
     (5, 4, 3),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (6, 2, 3),
     (6, 4, 3),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (4, 2, 5),
     (4, 4, 5),
     ],
     [
+    (3, 1, 2), # compile run
     (5, 2, 5),
     (5, 4, 5),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (4, 2, 10),
     (4, 4, 10),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (5, 2, 10),
-    (5, 4, 10), # not in l2
+    (5, 4, 10),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (4, 2, 15),
     (4, 4, 15),
     ],
     [
-    (1, 1, 2), # compile run
+    (3, 1, 2), # compile run
     (4, 2, 30),
-    (4, 4, 30), # not in l2
+    (4, 4, 30),
     ],
     [
-    (1, 1, 2), # compile run
+    (2, 1, 2), # compile run
     (2, 3, 20),
     (2, 4, 20),
+    ],
+    [
+    (3, 1, 2), # compile run
     (4, 2, 20),
     (4, 3, 20),
     (4, 4, 20),
     ],
     [
-    (1, 1, 2), # compile run
+    (2, 1, 2), # compile run
     (2, 3, 40),
     (2, 4, 40),
+    ],
+    [
+    (3, 1, 2), # compile run
     (4, 2, 40),
     (4, 3, 40),
     ],
     [
-    (1, 1, 2), # compile run
+    (2, 1, 2), # compile run
     (2, 2, 50),
     (2, 3, 50),
+    ],
+    [
+    (3, 1, 2), # compile run
     (4, 2, 50),
     (4, 3, 50),
     ],
     [
-    (1, 1, 2), # compile run
+    (2, 1, 2), # compile run
     (2, 2, 60),
     (2, 3, 60),
+    ],
+    [
+    (3, 1, 2), # compile run
     (4, 2, 60),
     (4, 3, 60),
     ],
     [
-    (1, 1, 2), # compile run
+    (2, 1, 2), # compile run
     (2, 2, 80),
     (2, 3, 80),
+    ],
+    [
+    (3, 1, 2), # compile run
     (4, 2, 80),
     (4, 3, 80),
     ],
     ]
 
-polynorml2_insts(use_l2::Bool) = [
-    [(n, f * d, d, m, false, use_l2) for (n, d, m) in ndms]
-    for f in [1, 2] for ndms in l2_n_d_m
-    ]
-
-polynorml1_insts(use_l1::Bool) = [
-    [(n, d, d, m, true, use_l1) for (n, d, m) in ndms]
-    for ndms in l1_n_d_m
+polynorm_insts(use_l1::Bool, use_norm_cone::Bool, d_factors::Vector{Int}) = [
+    [(n, f * d, d, m, use_l1, use_norm_cone) for (n, d, m) in ndms]
+    for f in d_factors
+    for ndms in (use_l1 ? polynorm_l1_n_d_ms : polynorm_l2_n_d_ms)
     ]
 
 insts = Dict()
 insts["nat"] = (nothing, vcat(
-    polynorml1_insts(true),
-    polynorml1_insts(false),
-    polynorml2_insts(true),
-    polynorml2_insts(false),
+    polynorm_insts(false, true, [1, 2]),
+    polynorm_insts(false, false, [1, 2]),
+    polynorm_insts(true, true, [1,]),
+    polynorm_insts(true, false, [1,]),
     ))
 return (PolyNormJuMP, insts)
