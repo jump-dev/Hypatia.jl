@@ -2,12 +2,11 @@
 densityest_n_ds = [
     [
     (1, 3), # compile run
-    (1, 75),
-    (1, 150),
-    (1, 300),
-    (1, 600),
-    (1, 900),
-    (1, 1200),
+    (1, 50),
+    (1, 100),
+    (1, 200),
+    (1, 500),
+    (1, 1000),
     (1, 1500),
     ],
     [
@@ -16,6 +15,7 @@ densityest_n_ds = [
     (2, 20),
     (2, 30),
     (2, 40),
+    (2, 50),
     ],
     [
     (3, 2), # compile run
@@ -23,17 +23,20 @@ densityest_n_ds = [
     (3, 6),
     (3, 9),
     (3, 12),
+    (3, 15),
     ],
     [
     (3, 2), # compile run
     (4, 2),
     (4, 4),
     (4, 6),
+    (4, 8),
     ],
     [
     (3, 2), # compile run
     (8, 2),
     (8, 3),
+    (8, 4),
     ],
     [
     (3, 2), # compile run
@@ -56,5 +59,5 @@ densityest_insts(use_nat::Bool) = [
 
 insts = Dict()
 insts["nat"] = (nothing, densityest_insts(true))
-insts["ext"] = (StandardConeOptimizer, densityest_insts(false))
+insts["ext"] = (ExpPSDOptimizer, densityest_insts(false))
 return (DensityEstJuMP, insts)

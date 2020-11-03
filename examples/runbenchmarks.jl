@@ -23,19 +23,25 @@ include(joinpath(examples_dir, "common_JuMP.jl"))
 results_path = joinpath(homedir(), "bench", "bench.csv")
 # results_path = nothing
 
-spawn_runs = true # needed for running Julia process with multiple threads
-# spawn_runs = false
+# spawn_runs = true # spawn new process for each instance
+spawn_runs = false
+
 setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
+# setup_model_anyway = false
+
+# verbose = true # make solvers print output
+verbose = false
+
 num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
 free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
 optimizer_time_limit = 1800
-setup_time_limit = optimizer_time_limit
+setup_time_limit = 2 * optimizer_time_limit
 check_time_limit = 1.2 * optimizer_time_limit
 tol_loose = 1e-7
 tol_tight = 1e-3 * tol_loose
 
 hyp_solver = ("Hypatia", Hypatia.Optimizer, (
-    verbose = true,
+    verbose = verbose,
     iter_limit = 250,
     time_limit = optimizer_time_limit,
     tol_abs_opt = tol_tight,
@@ -44,7 +50,7 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     tol_infeas = tol_tight,
     ))
 mosek_solver = ("Mosek", Mosek.Optimizer, (
-    QUIET = false,
+    QUIET = !verbose,
     MSK_IPAR_NUM_THREADS = num_threads,
     MSK_IPAR_OPTIMIZER = Mosek.MSK_OPTIMIZER_CONIC,
     MSK_IPAR_INTPNT_BASIS = Mosek.MSK_BI_NEVER, # do not do basis identification for LO problems
@@ -64,9 +70,9 @@ instance_sets = [
 
 # models to run
 JuMP_example_names = [
-    # "densityest",
-    # "expdesign",
-    # "matrixcompletion",
+    "densityest",
+    "expdesign",
+    "matrixcompletion",
     # "matrixquadratic",
     # "matrixregression",
     # "nearestpsd",
@@ -110,6 +116,7 @@ perf = DataFrames.DataFrame(
     n = Int[],
     p = Int[],
     q = Int[],
+    nu = Float64[],
     cone_types = Vector{String}[],
     status = String[],
     solve_time = Float64[],
