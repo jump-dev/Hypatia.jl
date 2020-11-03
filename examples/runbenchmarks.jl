@@ -23,8 +23,8 @@ include(joinpath(examples_dir, "common_JuMP.jl"))
 results_path = joinpath(homedir(), "bench", "bench.csv")
 # results_path = nothing
 
-# spawn_runs = true # spawn new process for each instance
-spawn_runs = false
+spawn_runs = true # spawn new process for each instance
+# spawn_runs = false
 
 setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
 # setup_model_anyway = false
@@ -70,9 +70,9 @@ instance_sets = [
 
 # models to run
 JuMP_example_names = [
-    "densityest",
-    "expdesign",
-    "matrixcompletion",
+    # "densityest",
+    # "expdesign",
+    # "matrixcompletion",
     # "matrixquadratic",
     # "matrixregression",
     # "nearestpsd",

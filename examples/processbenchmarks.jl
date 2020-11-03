@@ -8,12 +8,12 @@ output_folder = mkpath(joinpath(@__DIR__, "results"))
 # uncomment examples to run
 all_dims = [:n_nat, :p_nat, :q_nat, :n_ext, :p_ext, :q_ext]
 examples_params = Dict(
-    # "DensityEstJuMP"    => ([:m, :deg], [2, 3], [:n_nat, :n_ext]),
+    "DensityEstJuMP"    => ([:m, :deg], [2, 3], [:n_nat, :n_ext]),
     "ExpDesignJuMP"     => ([:logdet, :k], [5, 1], [:n_nat, :q_nat, :q_ext]),
-    # "MatrixCompletionJuMP" => ([:k, :d], [1, 2], [:n_nat, :p_nat, :q_ext]),
-    # "MatrixRegressionJuMP" => ([:m], [2], all_dims),
-    # "NearestPSDJuMP"    => ([:compl, :d], [2, 1], [:n_nat, :q_ext]),
-    # "PolyMinJuMP"       => ([:m, :halfdeg], [1, 2], [:n_nat, :q_ext]),
+    "MatrixCompletionJuMP" => ([:k, :d], [1, 2], [:n_nat, :p_nat, :q_ext]),
+    "MatrixRegressionJuMP" => ([:m], [2], all_dims),
+    "NearestPSDJuMP"    => ([:compl, :d], [2, 1], [:n_nat, :q_ext]),
+    "PolyMinJuMP"       => ([:m, :halfdeg], [1, 2], [:n_nat, :q_ext]),
     "PortfolioJuMP"     => ([:k], [1], Symbol[]),
     "ShapeConRegrJuMP"  => ([:m, :deg], [1, 5], [:n_nat, :q_nat, :n_ext]),
     )
