@@ -14,11 +14,11 @@ examples_params = Dict(
     "MatrixRegressionJuMP" => ([:m], [2], all_dims),
     "NearestPSDJuMP"    => ([:compl, :d], [2, 1], [:n_nat, :q_ext]),
     "PolyMinJuMP"       => ([:m, :halfdeg], [1, 2], [:n_nat, :q_ext]),
+    "PolyNormJuMP"      => ([:L1, :n, :d, :m], [5, 1, 3, 4], Symbol[]),
     "PortfolioJuMP"     => ([:k], [1], Symbol[]),
+    "RandomPolyMatJuMP" => ([:n, :d, :m], [1, 2, 3], Symbol[]),
     "ShapeConRegrJuMP"  => ([:m, :deg], [1, 5], [:n_nat, :q_nat, :n_ext]),
     )
-
-inst_solvers = (:nat_Hypatia, :ext_Hypatia, :ext_Mosek) # TODO generate automatically for each example depending on data available
 
 println("running examples:")
 for k in keys(examples_params)
@@ -27,13 +27,14 @@ end
 
 function post_process()
     all_df = make_all_df()
+    inst_solvers = unique(all_df[:inst_solver])
     for (ex_name, ex_params) in examples_params
         println()
         @info("starting $ex_name with params: $ex_params")
         # uncomment functions to run for each example
         make_wide_csv(all_df, ex_name, ex_params)
-        make_table_tex(ex_name, ex_params) # requires running make_wide_csv
-        make_plot_csv(ex_name, ex_params) # requires running make_wide_csv
+        make_table_tex(ex_name, ex_params, inst_solvers) # requires running make_wide_csv
+        make_plot_csv(ex_name, ex_params, inst_solvers) # requires running make_wide_csv
         @info("finished $ex_name")
     end
     println()
@@ -139,20 +140,19 @@ function process_inst_solver(row, inst_solver)
     return row_str
 end
 
-function make_table_tex(ex_name, ex_params)
+function make_table_tex(ex_name, ex_params, inst_solvers)
     @info("making table tex for $ex_name")
     ex_df_wide = CSV.read(ex_wide_file(ex_name))
     inst_keys = ex_params[1]
     num_params = length(inst_keys)
-    @assert 1 <= num_params <= 2 # handle case of more parameters if/when needed
     print_sizes = ex_params[3]
 
     sep = " & "
     ex_tex = open(joinpath(output_folder, ex_name * "_table.tex"), "w")
     for row in eachrow(ex_df_wide)
         row_str = process_entry(row[1])
-        if num_params == 2
-            row_str *= sep * process_entry(row[2])
+        for i in 2:num_params
+            row_str *= sep * process_entry(row[i])
         end
         for s in print_sizes
             row_str *= sep * process_entry(row[s])
@@ -174,7 +174,7 @@ function transform_plot_cols(ex_df_wide, inst_solver::Symbol)
     transform!(ex_df_wide, old_cols => ByRow((x, y) -> ((!ismissing(x) && x) ? y : missing)) => inst_solver)
 end
 
-function make_plot_csv(ex_name, ex_params)
+function make_plot_csv(ex_name, ex_params, inst_solvers)
     @info("making plot csv for $ex_name")
     ex_df_wide = CSV.read(ex_wide_file(ex_name))
     inst_keys = ex_params[1]
