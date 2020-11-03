@@ -29,8 +29,8 @@ spawn_runs = true # spawn new process for each instance
 setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
 # setup_model_anyway = false
 
-# verbose = true # make solvers print output
-verbose = false
+verbose = true # make solvers print output
+# verbose = false
 
 num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
 free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
