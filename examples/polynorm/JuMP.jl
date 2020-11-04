@@ -12,8 +12,8 @@ struct PolyNormJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 function build(inst::PolyNormJuMP{T}) where {T <: Float64}
-    (n, num_polys, epi_halfdeg, rand_deg) = (inst.n, inst.num_polys, inst.epi_halfdeg, inst.rand_deg)
-    @assert 2 * epi_halfdeg >= rand_deg
+    (n, num_polys, epi_halfdeg, rand_halfdeg) = (inst.n, inst.num_polys, inst.epi_halfdeg, inst.rand_halfdeg)
+    @assert epi_halfdeg >= rand_halfdeg
 
     dom = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))
     (U, pts, Ps, _, w) = ModelUtilities.interpolate(dom, epi_halfdeg, calc_V = false, calc_w = true)
