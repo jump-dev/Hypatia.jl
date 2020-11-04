@@ -1,10 +1,10 @@
 
 insts = Dict()
 insts["minimal"] = [
-    ((1, 2, 1, 2, true, true),),
-    ((1, 2, 1, 2, true, false),),
-    ((1, 2, 1, 2, false, true),),
-    ((1, 2, 1, 2, false, false),),
+    ((1, 1, 1, 2, true, true),),
+    ((1, 1, 1, 2, true, false),),
+    ((1, 1, 1, 2, false, true),),
+    ((1, 1, 1, 2, false, false),),
     ]
 insts["fast"] = [
     ((2, 2, 1, 2, true, true),),

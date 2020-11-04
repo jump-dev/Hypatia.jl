@@ -1,48 +1,80 @@
 
 polynorm_l2_n_d_ms = [
+    # [
+    # (3, 1, 2), # compile run
+    # (4, 2, 3),
+    # (4, 4, 3),
+    # ],
+    # [
+    # (3, 1, 2), # compile run
+    # (5, 2, 3),
+    # (5, 4, 3),
+    # ],
+    # [
+    # (3, 1, 2), # compile run
+    # (6, 2, 3),
+    # (6, 4, 3),
+    # ],
+    # [
+    # (3, 1, 2), # compile run
+    # (4, 2, 5),
+    # (4, 4, 5),
+    # ],
+    # [
+    # (3, 1, 2), # compile run
+    # (5, 2, 5),
+    # (5, 4, 5),
+    # ],
+    # [
+    # (3, 1, 2), # compile run
+    # (4, 2, 10),
+    # (4, 4, 10),
+    # ],
+    # [
+    # (3, 1, 2), # compile run
+    # (5, 2, 10),
+    # (5, 4, 10),
+    # ],
+    # [
+    # (3, 1, 2), # compile run
+    # (4, 2, 15),
+    # (4, 4, 15),
+    # ],
+    # [
+    # (3, 1, 2), # compile run
+    # (4, 2, 30),
+    # (4, 4, 30),
+    # ],
+    [
+    (1, 1, 2), # compile run
+    (1, 2, 3),
+    (1, 2, 5),
+    (1, 2, 10),
+    (1, 2, 15),
+    (1, 2, 30),
+    ],
+    [
+    (1, 1, 2), # compile run
+    (1, 4, 3),
+    (1, 4, 5),
+    (1, 4, 10),
+    (1, 4, 15),
+    (1, 4, 30),
+    ],
     [
     (3, 1, 2), # compile run
     (4, 2, 3),
-    (4, 4, 3),
-    ],
-    [
-    (3, 1, 2), # compile run
-    (5, 2, 3),
-    (5, 4, 3),
-    ],
-    [
-    (3, 1, 2), # compile run
-    (6, 2, 3),
-    (6, 4, 3),
-    ],
-    [
-    (3, 1, 2), # compile run
     (4, 2, 5),
-    (4, 4, 5),
-    ],
-    [
-    (3, 1, 2), # compile run
-    (5, 2, 5),
-    (5, 4, 5),
-    ],
-    [
-    (3, 1, 2), # compile run
     (4, 2, 10),
-    (4, 4, 10),
-    ],
-    [
-    (3, 1, 2), # compile run
-    (5, 2, 10),
-    (5, 4, 10),
-    ],
-    [
-    (3, 1, 2), # compile run
     (4, 2, 15),
-    (4, 4, 15),
+    (4, 2, 30),
     ],
     [
     (3, 1, 2), # compile run
-    (4, 2, 30),
+    (4, 4, 3),
+    (4, 4, 5),
+    (4, 4, 10),
+    (4, 4, 15),
     (4, 4, 30),
     ],
     ]
@@ -147,7 +179,7 @@ polynorm_l1_n_d_ms = [
     ]
 
 polynorm_insts(use_l1::Bool, use_norm_cone::Bool, d_factors::Vector{Int}) = [
-    [(n, f * d, d, m, use_l1, use_norm_cone) for (n, d, m) in ndms]
+    [(n, d, f * d, m, use_l1, use_norm_cone) for (n, d, m) in ndms]
     for f in d_factors
     for ndms in (use_l1 ? polynorm_l1_n_d_ms : polynorm_l2_n_d_ms)
     ]
@@ -155,8 +187,10 @@ polynorm_insts(use_l1::Bool, use_norm_cone::Bool, d_factors::Vector{Int}) = [
 insts = Dict()
 insts["nat"] = (nothing, vcat(
     polynorm_insts(false, true, [1, 2]),
-    polynorm_insts(false, false, [1, 2]),
     polynorm_insts(true, true, [1,]),
+    ))
+insts["ext"] = (nothing, vcat(
+    polynorm_insts(false, false, [1, 2]),
     polynorm_insts(true, false, [1,]),
     ))
 return (PolyNormJuMP, insts)

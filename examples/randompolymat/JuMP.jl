@@ -20,13 +20,14 @@ function build(inst::RandomPolyMatJuMP{T}) where {T <: Float64}
     svec_dim = div(R * (R + 1), 2)
 
     domain = ModelUtilities.Box{Float64}(-ones(n), ones(n))
-    (U, points, Ps, _, w) = ModelUtilities.interpolate(domain, halfdeg, calc_w = true)
+    (U, points, Ps, V, w) = ModelUtilities.interpolate(domain, halfdeg, calc_V = true, calc_w = true)
 
     model = JuMP.Model()
     JuMP.@variable(model, q_poly[1:(U * svec_dim)])
 
     # generate random polynomial matrix H and symmetrize
-    full_mat = [randn(U) for _ in 1:R, _ in 1:R]
+    # full_mat = [randn(U) for _ in 1:R, _ in 1:R]
+    full_mat = [V * rand(-9:9, U) for _ in 1:R, _ in 1:R]
     for j in 1:R, i in 1:j
         full_mat[i, j] .+= full_mat[j, i]
         full_mat[j, i] .= full_mat[i, j]

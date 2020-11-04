@@ -4,7 +4,7 @@ find a polynomial f such that f² >= Σᵢ gᵢ² or f >= Σᵢ |gᵢ| where g�
 
 struct PolyNormJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
-    rand_deg::Int # maximum degree of randomly generated polynomials
+    rand_halfdeg::Int # maximum degree of randomly generated polynomials
     epi_halfdeg::Int # half of maximum degree of epigraph / all polynomial components in the WSOS-like cone
     num_polys::Int
     use_l1::Bool # use epigraph of one norm, otherwise Euclidean norm
@@ -16,9 +16,9 @@ function build(inst::PolyNormJuMP{T}) where {T <: Float64}
     @assert 2 * epi_halfdeg >= rand_deg
 
     dom = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))
-    (U, pts, Ps, V, w) = ModelUtilities.interpolate(dom, epi_halfdeg, calc_V = true, calc_w = true)
-    rand_U = binomial(n + rand_deg, n)
-    polys = V[:, 1:rand_U] * rand(-9:9, rand_U, num_polys)
+    (U, pts, Ps, _, w) = ModelUtilities.interpolate(dom, epi_halfdeg, calc_V = false, calc_w = true)
+    (rand_U, _, _, rand_V, _) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(n), epi_halfdeg, calc_V = true, calc_w = false)
+    polys = rand_V * rand(-9:9, rand_U, num_polys)
 
     model = JuMP.Model()
     JuMP.@variable(model, f[1:U])
