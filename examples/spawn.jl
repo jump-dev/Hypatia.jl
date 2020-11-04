@@ -105,7 +105,7 @@ function run_instance_check(
     setup_killed = (status != :OK)
     if setup_killed
         println("setup model failed: $status")
-        model_stats = (-1, -1, -1, String[])
+        model_stats = ntuple(_ -> missing, 5)
     end
 
     if solve && !setup_killed
@@ -127,7 +127,7 @@ function run_instance_check(
             @assert !solve
             status = :SkippedSolveCheck
         end
-        check_stats = (string(status), NaN, -1, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
+        check_stats = (string(status), ntuple(_ -> missing, 9)...)
         solver_hit_limit = true
     else
         solver_status = string(check_stats[1])

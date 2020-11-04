@@ -132,6 +132,7 @@ perf = DataFrames.DataFrame(
     check_time = Float64[],
     total_time = Float64[],
     )
+DataFrames.allowmissing!(perf, 7:21)
 
 isnothing(results_path) || CSV.write(results_path, perf)
 time_all = time()
