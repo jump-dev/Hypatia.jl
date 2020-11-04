@@ -27,8 +27,8 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     hess_fact_cache
 
     lwv::T
-    vlwvu::T
-    lvwnivlwvu::T
+    z::T
+    lvwniz::T
     tempw::Vector{T}
 
     function HypoPerLog{T}(
@@ -47,7 +47,6 @@ end
 
 use_heuristic_neighborhood(cone::HypoPerLog) = false
 
-# TODO only allocate the fields we use
 function setup_extra_data(cone::HypoPerLog{T}) where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -73,8 +72,8 @@ function update_feas(cone::HypoPerLog{T}) where T
 
     if v > eps(T) && all(>(eps(T)), w)
         cone.lwv = sum(log(wi / v) for wi in w)
-        cone.vlwvu = v * cone.lwv - u
-        cone.is_feas = (cone.vlwvu > eps(T))
+        cone.z = v * cone.lwv - u
+        cone.is_feas = (cone.z > eps(T))
     else
         cone.is_feas = false
     end
@@ -99,14 +98,14 @@ function update_grad(cone::HypoPerLog)
     @assert cone.is_feas
     u = cone.point[1]
     v = cone.point[2]
-    w = view(cone.point, 3:cone.dim)
+    @views w = cone.point[3:end]
     d = length(w)
     g = cone.grad
 
-    g[1] = inv(cone.vlwvu)
-    cone.lvwnivlwvu = (d - cone.lwv) / cone.vlwvu
-    g[2] = cone.lvwnivlwvu - inv(v)
-    gden = -1 - v / cone.vlwvu
+    g[1] = inv(cone.z)
+    cone.lvwniz = (d - cone.lwv) / cone.z
+    g[2] = cone.lvwniz - inv(v)
+    gden = -1 - v / cone.z
     @. @views g[3:end] = gden / w
 
     cone.grad_updated = true
@@ -117,25 +116,30 @@ function update_hess(cone::HypoPerLog)
     @assert cone.grad_updated
     u = cone.point[1]
     v = cone.point[2]
-    w = view(cone.point, 3:cone.dim)
+    @views w = cone.point[3:end]
     d = length(w)
     tempw = cone.tempw
-    lvwnivlwvu = cone.lvwnivlwvu
+    lvwniz = cone.lvwniz
+    viz = v / cone.z
+    @. tempw = viz / w
     g = cone.grad
     H = cone.hess.data
 
-    vivlwvu = v / cone.vlwvu
-    @. tempw = vivlwvu / w
-    H[1, 1] = abs2(g[1])
-    H[1, 2] = lvwnivlwvu / cone.vlwvu
-    @. @views H[1, 3:end] = -tempw / cone.vlwvu
-    H[2, 2] = abs2(lvwnivlwvu) + (d * g[1] + inv(v)) / v
-    hden = (-v * lvwnivlwvu - 1) / cone.vlwvu
-    @. @views H[2, 3:end] = hden / w
+    @inbounds begin
+        H[1, 1] = abs2(g[1])
+        H[1, 2] = lvwniz / cone.z
+        @. @views H[1, 3:end] = -tempw / cone.z
+
+        H[2, 2] = abs2(lvwniz) + (d * g[1] + inv(v)) / v
+        hden = (-v * lvwniz - 1) / cone.z
+        @. @views H[2, 3:end] = hden / w
+    end
+
     @inbounds for j in 1:d
         j2 = 2 + j
+        tempwj = tempw[j]
         @inbounds for i in 1:j
-            H[2 + i, j2] = tempw[i] * tempw[j]
+            H[2 + i, j2] = tempw[i] * tempwj
         end
         H[j2, j2] -= g[j2] / w[j]
     end
@@ -148,30 +152,48 @@ function update_inv_hess(cone::HypoPerLog)
     @assert cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
-    w = view(cone.point, 3:cone.dim)
+    @views w = cone.point[3:end]
     d = length(w)
-    H = cone.inv_hess.data
+    Hi = cone.inv_hess.data
     lwv = cone.lwv
-    vlwvu = cone.vlwvu
-    const1 = vlwvu + v
-    denom = vlwvu + (d + 1) * v
-    vw = cone.tempw
+    z = cone.z
+    zv = z + v
+    zu = z + u
+    den = zv + d * v
+    vden = v / den
+    tempw = cone.tempw
 
-    H[1, 2] = v * (v * abs2(lwv) - (u + (d - 1) * v) * lwv + d * u) * v
-    @. @views H[1, 3:end] = w * v * (v * lwv + vlwvu) # = (2 * v * lwv - u)
-    @views H[1, 1] = (denom - dot(H[1, 2:end], cone.hess[1, 2:end])) / cone.hess[1, 1] # TODO complicated but doable
-    H[2, 2] = v * const1 * v
-    @. vw = w * v
-    @. @views H[2, 3:end] = v * vw
-    @views mul!(H[3:end, 3:end], vw, vw')
-    H ./= denom
-    for j in 3:cone.dim
-        H[j, j] += abs2(w[j - 2]) * vlwvu
+    @inbounds begin
+        Hi[1, 1] = abs2(zu) + z * (den - v) - (d * v * abs2(zu + z)) / den
+        Hi[1, 2] = v * (lwv * (zv - d * v) + d * u) * vden
+        Hi3const = (zu + z) * vden
+        @. @views Hi[1, 3:end] = Hi3const * w
+
+        @. tempw = w * v
+        Hi[2, 2] = v * zv * vden
+        @. @views Hi[2, 3:end] = vden * tempw
     end
-    @views H[3:end, :] ./= const1
+
+    @. tempw = w / zv
+    @inbounds for j in 1:d
+        j2 = 2 + j
+        vwvdenj = Hi[2, j2]
+        for i in 1:(j - 1)
+            Hi[2 + i, j2] = vwvdenj * tempw[i]
+        end
+        Hi[j2, j2] = (vwvdenj + w[j] * z) * tempw[j]
+    end
 
     cone.inv_hess_updated = true
     return cone.inv_hess
+end
+
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLog)
+    if !cone.inv_hess_updated
+        update_inv_hess(cone)
+    end
+    mul!(prod, cone.inv_hess, arr)
+    return prod
 end
 
 function correction(cone::HypoPerLog{T}, primal_dir::AbstractVector{T}) where {T <: Real}
@@ -207,8 +229,7 @@ function correction(cone::HypoPerLog{T}, primal_dir::AbstractVector{T}) where {T
 
     corr[1] = (const9 - sumwdw * v_dir + w_dim * vd2 / v) / z / z
 
-    corr[2] = ((-dzdv * const9 - w_dim * v_dir * (const5 + const4) / v + sumwdw * (v_dir * const7 - u_dir)) / z + const3) / z -
-        abs2(v_dir / v) * (w_dim * inv(z) + 2 / v)
+    corr[2] = ((-dzdv * const9 - w_dim * v_dir * (const5 + const4) / v + sumwdw * (v_dir * const7 - u_dir)) / z + const3) / z - abs2(v_dir / v) * (w_dim * inv(z) + 2 / v)
 
     @. w_corr = const11 .+ const12 * wdw
     w_corr .*= wdw

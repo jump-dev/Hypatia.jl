@@ -4,8 +4,7 @@ interpolation-based weighted-sum-of-squares (multivariate) polynomial cone param
 definition and dual barrier from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 
 TODO
-- perform loop for calculating g and H in parallel
-- scale the interior direction
+in complex case, can maybe compute Lambda fast in feas check by taking sqrt of point and doing outer product
 =#
 
 mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
@@ -37,6 +36,8 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tempLU3::Vector{Matrix{R}}
     tempUU::Vector{Matrix{R}} # TODO for corrector, this can stay as a single matrix if we only use LU
     ΛF::Vector
+    Ps_times::Vector{Float64}
+    Ps_order::Vector{Int}
 
     function WSOSInterpNonnegative{T, R}(
         U::Int,
@@ -70,37 +71,41 @@ function setup_extra_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrC
     cone.tempLU2 = [zeros(R, L, dim) for L in Ls]
     cone.tempLU3 = [zeros(R, L, dim) for L in Ls]
     cone.tempUU = [zeros(R, dim, dim) for L in Ls]
-    cone.ΛF = Vector{Any}(undef, length(Ls))
+    K = length(Ls)
+    cone.ΛF = Vector{Any}(undef, K)
+    cone.Ps_times = zeros(K)
+    cone.Ps_order = collect(1:K)
     return cone
 end
 
 get_nu(cone::WSOSInterpNonnegative) = sum(size(Pk, 2) for Pk in cone.Ps)
 
-# TODO find "central" initial point, like for other cones
 set_initial_point(arr::AbstractVector, cone::WSOSInterpNonnegative) = (arr .= 1)
 
-# TODO order the k indices so that fastest and most recently infeasible k are first
-# TODO can be done in parallel
 function update_feas(cone::WSOSInterpNonnegative)
     @assert !cone.feas_updated
     D = Diagonal(cone.point)
 
-    cone.is_feas = true
-    @inbounds for k in eachindex(cone.Ps)
-        # Λ = Pk' * Diagonal(point) * Pk
-        # TODO mul!(A, B', Diagonal(x)) calls extremely inefficient method but doesn't need ULk
-        Pk = cone.Ps[k]
-        ULk = cone.tempUL[k]
-        LLk = cone.tempLL[k]
-        mul!(ULk, D, Pk)
-        mul!(LLk, Pk', ULk)
+    # order the Ps by how long it takes to check feasibility, to improve efficiency
+    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # NOTE stochastic
 
-        ΛFk = cholesky!(Hermitian(LLk, :L), check = false)
-        if !isposdef(ΛFk)
-            cone.is_feas = false
-            break
+    cone.is_feas = true
+    for k in cone.Ps_order
+        cone.Ps_times[k] = @elapsed @inbounds begin
+            # Λ = Pk' * Diagonal(point) * Pk
+            # TODO mul!(A, B', Diagonal(x)) calls inefficient method but doesn't need ULk
+            Pk = cone.Ps[k]
+            ULk = cone.tempUL[k]
+            LLk = cone.tempLL[k]
+            mul!(ULk, D, Pk)
+            mul!(LLk, Pk', ULk)
+
+            ΛFk = cone.ΛF[k] = cholesky!(Hermitian(LLk, :L), check = false)
+            if !isposdef(ΛFk)
+                cone.is_feas = false
+                break
+            end
         end
-        cone.ΛF[k] = ΛFk
     end
 
     cone.feas_updated = true
@@ -110,8 +115,6 @@ end
 is_dual_feas(cone::WSOSInterpNonnegative) = true
 
 # TODO decide whether to compute the LUk' * LUk in grad or in hess (only diag needed for grad)
-# TODO can be done in parallel
-# TODO may be faster (but less numerically stable) with explicit inverse here
 function update_grad(cone::WSOSInterpNonnegative)
     @assert cone.is_feas
 
@@ -119,8 +122,8 @@ function update_grad(cone::WSOSInterpNonnegative)
     @inbounds for k in eachindex(cone.Ps)
         LUk = cone.tempLU[k]
         ldiv!(LUk, cone.ΛF[k].L, cone.Ps[k]')
-        @inbounds for j in 1:cone.dim
-            cone.grad[j] -= sum(abs2, view(LUk, :, j))
+        for j in 1:cone.dim
+            @views cone.grad[j] -= sum(abs2, LUk[:, j])
         end
     end
 
@@ -134,8 +137,9 @@ function update_hess(cone::WSOSInterpNonnegative)
     cone.hess .= 0
     @inbounds for k in eachindex(cone.Ps)
         LUk = cone.tempLU[k]
-        UUk = mul!(cone.tempUU[k], LUk', LUk) # TODO use syrk
-        @inbounds for j in 1:cone.dim, i in 1:j
+        UUk = cone.tempUU[k]
+        outer_prod(LUk, UUk, true, false)
+        for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UUk[i, j])
         end
     end
@@ -150,9 +154,9 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
     corr .= 0
     @inbounds for k in eachindex(cone.Ps)
         mul!(cone.tempLU2[k], cone.tempLU[k], Diagonal(primal_dir))
-        LpdU = mul!(cone.tempLU3[k], cone.tempLU2[k], cone.tempUU[k])
-        @inbounds @views for j in 1:cone.dim
-            corr[j] += sum(abs2, LpdU[:, j])
+        LpdU = mul!(cone.tempLU3[k], cone.tempLU2[k], Hermitian(cone.tempUU[k], :U))
+        for j in 1:cone.dim
+            @views corr[j] += sum(abs2, LpdU[:, j])
         end
     end
 

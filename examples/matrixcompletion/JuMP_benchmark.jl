@@ -1,7 +1,7 @@
 
 matrixcompletion_insts = [
     [(k, d) for d in vcat(3, 10:5:max_d)] # includes compile run
-    for (k, max_d) in ((5, 70), (10, 45))
+    for (k, max_d) in ((5, 60), (10, 45))
     ]
 
 insts = Dict()
