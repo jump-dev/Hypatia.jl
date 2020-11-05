@@ -195,7 +195,7 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
         # block-(1,1) is P * inv(mat) * P'
         ldiv!(matLiP, matfact[k].L, Psk')
         mul!(PΛiPs[1, 1], matLiP', matLiP)
-        # top edge of sqrt of Λ
+        # top edge of ΛLiP
         for r in 1:(R - 1)
             mul!(ΛLiP_edge[r], ΛLi_Λ[r]', Λ11LiP, -1, false)
             ldiv!(matfact[k].L, ΛLiP_edge[r])
@@ -290,7 +290,7 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
     return cone.hess
 end
 
-function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T}) where T
+function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
     @assert cone.hess_updated
     corr = cone.correction
     corr .= 0
@@ -319,11 +319,11 @@ function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T
         # ΛLiP * D is an arrow matrix but row edge doesn't equal column edge
         @views scaled_diag = mul!(cone.tempLU[pk], Λ11LiP, Diagonal(primal_dir[1:U]))
         @views scaled_pt = mul!(cone.tempLU2[pk], matLiP, Diagonal(primal_dir[1:U]))
-        @views for c in 2:R
-            mul!(scaled_pt, ΛLiP_edge[c - 1], Diagonal(primal_dir[block_idxs(U, c)]), true, true)
-            mul!(scaled_row[c - 1], matLiP, Diagonal(primal_dir[block_idxs(U, c)]))
-            mul!(scaled_row[c - 1], ΛLiP_edge[c - 1], Diagonal(primal_dir[1:U]), true, true)
-            mul!(scaled_col[c - 1], Λ11LiP, Diagonal(primal_dir[block_idxs(U, c)]))
+        @views for r in 2:R
+            mul!(scaled_pt, ΛLiP_edge[r - 1], Diagonal(primal_dir[block_idxs(U, r)]), true, true)
+            mul!(scaled_row[r - 1], matLiP, Diagonal(primal_dir[block_idxs(U, r)]))
+            mul!(scaled_row[r - 1], ΛLiP_edge[r - 1], Diagonal(primal_dir[1:U]), true, true)
+            mul!(scaled_col[r - 1], Λ11LiP, Diagonal(primal_dir[block_idxs(U, r)]))
         end
 
         corr_half = cone.tempLRUR[pk]
