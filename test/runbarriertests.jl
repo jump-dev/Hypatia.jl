@@ -7,33 +7,33 @@ using Printf
 include(joinpath(@__DIR__, "barrier.jl"))
 
 barrier_test_names = [
-    "nonnegative",
-    "epinorminf",
-    "epinormeucl",
-    "epipersquare",
-    "episumperentropy",
-    "hypoperlog",
-    "power",
-    "hypopowermean",
-    "hypogeomean",
-    "epinormspectral",
-    "linmatrixineq", # NOTE failing on Julia v1.5.1 with ForwardDiff or BigFloat
-    "possemideftri",
-    "possemideftrisparse",
-    "doublynonnegativetri",
-    "matrixepipersquare",
+    # "nonnegative",
+    # "epinorminf",
+    # "epinormeucl",
+    # "epipersquare",
+    # "episumperentropy",
+    # "hypoperlog",
+    # "power",
+    # "hypopowermean",
+    # "hypogeomean",
+    # "epinormspectral",
+    # "linmatrixineq", # NOTE failing on Julia v1.5.1 with ForwardDiff or BigFloat
+    # "possemideftri",
+    # "possemideftrisparse",
+    # "doublynonnegativetri",
+    # "matrixepipersquare",
     "hypoperlogdettri",
-    "hyporootdettri",
-    "wsosinterpnonnegative",
-    "wsosinterpepinormone",
-    "wsosinterpepinormeucl",
-    "wsosinterppossemideftri",
+    # "hyporootdettri",
+    # "wsosinterpnonnegative",
+    # "wsosinterpepinormone",
+    # "wsosinterpepinormeucl",
+    # "wsosinterppossemideftri",
     ]
 
 real_types = [
     Float64,
-    Float32,
-    BigFloat,
+    # Float32,
+    # BigFloat,
     ]
 
 @testset "barrier tests" begin

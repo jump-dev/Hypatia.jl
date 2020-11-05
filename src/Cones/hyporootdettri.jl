@@ -1,5 +1,5 @@
 #=
-hypograph of the root determinant of a (row-wise lower triangle) symmetric positive definite matrix
+hypograph of the root determinant of a (row-wise lower triangle) symmetric positive definite matrix with side dimension d
 (u in R, W in S_n+) : u <= det(W)^(1/n)
 
 SC barrier from correspondence with A. Nemirovski
@@ -12,7 +12,7 @@ TODO
 mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
-    side::Int
+    d::Int
     is_complex::Bool
     rt2::T
     sc_const::T
@@ -60,15 +60,15 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
         if R <: Complex
-            side = isqrt(dim - 1) # real lower triangle and imaginary under diagonal
-            @assert side^2 == dim - 1
+            d = isqrt(dim - 1) # real lower triangle and imaginary under diagonal
+            @assert d^2 == dim - 1
             cone.is_complex = true
         else
-            side = round(Int, sqrt(0.25 + 2 * (dim - 1)) - 0.5)
-            @assert side * (side + 1) == 2 * (dim - 1)
+            d = round(Int, sqrt(0.25 + 2 * (dim - 1)) - 0.5)
+            @assert d * (d + 1) == 2 * (dim - 1)
             cone.is_complex = false
         end
-        cone.side = side
+        cone.d = d
         cone.sc_const = sc_const
         cone.hess_fact_cache = hess_fact_cache
         return cone
@@ -84,27 +84,27 @@ function setup_extra_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    side = cone.side
-    cone.W = zeros(R, side, side)
-    cone.tempW = zeros(R, side, side)
+    d = cone.d
+    cone.W = zeros(R, d, d)
+    cone.tempW = zeros(R, d, d)
     cone.Wi_vec = zeros(T, dim - 1)
-    cone.work_mat = zeros(R, side, side)
-    cone.work_mat2 = zeros(R, side, side)
+    cone.work_mat = zeros(R, d, d)
+    cone.work_mat2 = zeros(R, d, d)
     cone.tempw = zeros(T, dim - 1)
     return cone
 end
 
-get_nu(cone::HypoRootdetTri) = (cone.side + 1) * cone.sc_const
+get_nu(cone::HypoRootdetTri) = (cone.d + 1) * cone.sc_const
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
-    side = cone.side
-    const1 = sqrt(T(5side^2 + 2side + 1))
-    const2 = arr[1] = -sqrt(cone.sc_const * (3side + 1 - const1) / T(2side + 2))
-    const3 = -const2 * (side + 1 + const1) / 2side
+    d = cone.d
+    const1 = sqrt(T(5d^2 + 2d + 1))
+    const2 = arr[1] = -sqrt(cone.sc_const * (3d + 1 - const1) / T(2d + 2))
+    const3 = -const2 * (d + 1 + const1) / 2d
     incr = (cone.is_complex ? 2 : 1)
     k = 2
-    @inbounds for i in 1:side
+    @inbounds for i in 1:d
         arr[k] = const3
         k += incr * i + 1
     end
@@ -119,7 +119,7 @@ function update_feas(cone::HypoRootdetTri{T}) where T
     copyto!(cone.tempW, cone.W)
     cone.fact_W = cholesky!(Hermitian(cone.tempW, :U), check = false) # mutates W, which isn't used anywhere else
     if isposdef(cone.fact_W)
-        cone.rootdet = exp(logdet(cone.fact_W) / cone.side)
+        cone.rootdet = exp(logdet(cone.fact_W) / cone.d)
         cone.rootdetu = cone.rootdet - u
         cone.is_feas = (cone.rootdetu > eps(T))
     else
@@ -132,13 +132,11 @@ end
 
 function is_dual_feas(cone::HypoRootdetTri{T}) where T
     u = cone.dual_point[1]
-
     if u < -eps(T)
         @views svec_to_smat!(cone.work_mat, cone.dual_point[2:end], cone.rt2)
         dual_fact_W = cholesky!(Hermitian(cone.work_mat, :U), check = false)
-        return isposdef(dual_fact_W) && (logdet(dual_fact_W) - cone.side * log(-u / cone.side) > eps(T))
+        return isposdef(dual_fact_W) && (logdet(dual_fact_W) - cone.d * log(-u / cone.d) > eps(T))
     end
-
     return false
 end
 
@@ -153,11 +151,28 @@ function update_grad(cone::HypoRootdetTri)
     # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0)) # TODO inplace for bigfloat
     cone.Wi = inv(cone.fact_W)
     smat_to_svec!(cone.Wi_vec, cone.Wi, cone.rt2)
-    cone.sigma = cone.rootdet / cone.rootdetu / cone.side
+    cone.sigma = cone.rootdet / cone.rootdetu / cone.d
     @. @views cone.grad[2:end] = -cone.Wi_vec * cone.sc_const * (cone.sigma + 1)
 
     cone.grad_updated = true
     return cone.grad
+end
+
+# update first row of the Hessian
+function update_hess_aux(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+    @assert cone.grad_updated
+
+    sigma = cone.sigma # rootdet / rootdetu / d
+    # update constants used in the Hessian
+    cone.kron_const = sigma + 1
+    cone.dot_const = sigma * (sigma - inv(T(cone.d)))
+    # update first row in the Hessian
+    hess = cone.hess.data
+    @. @views hess[1, :] = cone.grad / cone.rootdetu
+    @. @views hess[1, 2:end] *= sigma / cone.kron_const
+
+    cone.hess_aux_updated = true
+    return
 end
 
 function update_hess(cone::HypoRootdetTri)
@@ -166,7 +181,7 @@ function update_hess(cone::HypoRootdetTri)
     end
     Wi = cone.Wi
     H = cone.hess.data
-    side = cone.side
+    d = cone.d
     Wi_vec = cone.Wi_vec
     @views Hww = H[2:end, 2:end]
 
@@ -179,46 +194,6 @@ function update_hess(cone::HypoRootdetTri)
     return cone.hess
 end
 
-function update_inv_hess(cone::HypoRootdetTri)
-    H = cone.inv_hess.data
-    rootdet = cone.rootdet
-    rootdetu = cone.rootdetu
-    side = cone.side
-    W = Hermitian(cone.W, :U)
-    @views w = cone.point[2:end]
-    @views Hww = H[2:end, 2:end]
-
-    H[1, 1] = abs2(rootdetu) + abs2(rootdet) / side
-    symm_kron(Hww, W, cone.rt2)
-    Hww .*= rootdetu * abs2(side)
-    mul!(Hww, w, w', rootdet, true)
-    denom = side * (side * rootdetu + rootdet) # abs2(side) * rootdetu + side * rootdet # TODO could write using cone.u, check if this is better because rootdetu is derived from u
-    Hww ./= denom
-
-    @views H[1, 2:end] = rootdet * w / side
-    H ./= cone.sc_const
-
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
-
-# update first row of the Hessian
-function update_hess_aux(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
-    @assert cone.grad_updated
-
-    sigma = cone.sigma # rootdet / rootdetu / side
-    # update constants used in the Hessian
-    cone.kron_const = sigma + 1
-    cone.dot_const = sigma * (sigma - inv(T(cone.side)))
-    # update first row in the Hessian
-    hess = cone.hess.data
-    @. @views hess[1, :] = cone.grad / cone.rootdetu
-    @. @views hess[1, 2:end] *= sigma / cone.kron_const
-
-    cone.hess_aux_updated = true
-    return
-end
-
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
     if !cone.hess_aux_updated
         update_hess_aux(cone)
@@ -227,38 +202,61 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
     const_diag = cone.dot_const / cone.kron_const
     @views mul!(prod[1, :]', cone.hess[1, :]', arr)
     @inbounds for i in 1:size(arr, 2)
-        svec_to_smat!(cone.work_mat, view(arr, 2:cone.dim, i), cone.rt2)
+        @views svec_to_smat!(cone.work_mat, arr[2:end, i], cone.rt2)
         copytri!(cone.work_mat, 'U', cone.is_complex)
         rdiv!(cone.work_mat, cone.fact_W)
         const_i = tr(cone.work_mat) * const_diag
-        for j in 1:cone.side
+        for j in 1:cone.d
             @inbounds cone.work_mat[j, j] += const_i
         end
         ldiv!(cone.fact_W, cone.work_mat)
-        smat_to_svec!(view(prod, 2:cone.dim, i), cone.work_mat, cone.rt2)
+        @views smat_to_svec!(prod[2:end, i], cone.work_mat, cone.rt2)
     end
     @views mul!(prod[2:cone.dim, :], cone.hess[2:end, 1], arr[1, :]', true, cone.sc_const * cone.kron_const)
 
     return prod
 end
 
+function update_inv_hess(cone::HypoRootdetTri)
+    H = cone.inv_hess.data
+    rootdet = cone.rootdet
+    rootdetu = cone.rootdetu
+    d = cone.d
+    W = Hermitian(cone.W, :U)
+    @views w = cone.point[2:end]
+    @views Hww = H[2:end, 2:end]
+
+    H[1, 1] = abs2(rootdetu) + abs2(rootdet) / d
+    symm_kron(Hww, W, cone.rt2)
+    Hww .*= rootdetu * abs2(d)
+    mul!(Hww, w, w', rootdet, true)
+    denom = d * (d * rootdetu + rootdet) # abs2(d) * rootdetu + d * rootdet # TODO could write using cone.u, check if this is better because rootdetu is derived from u
+    Hww ./= denom
+
+    @views H[1, 2:end] = rootdet * w / d
+    H ./= cone.sc_const
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
     H = cone.inv_hess.data
     rootdet = cone.rootdet
     rootdetu = cone.rootdetu
-    side = cone.side
+    d = cone.d
     W = Hermitian(cone.W, :U)
     @views w = cone.point[2:end]
-    const1 = rootdet / side
+    const1 = rootdet / d
 
-    denom = side * (side * rootdetu + rootdet) # TODO could write using cone.u, check if this is better because rootdetu is derived from u
+    denom = d * (d * rootdetu + rootdet) # TODO could write using cone.u, check if this is better because rootdetu is derived from u
     @inbounds for i in 1:size(arr, 2)
         @views arr_w = arr[2:end, i]
         @views prod_w = prod[2:end, i]
         Hermitian(svec_to_smat!(cone.work_mat, arr_w, cone.rt2), :U)
         copytri!(cone.work_mat, 'U', cone.is_complex)
         mul!(cone.work_mat2, cone.work_mat, W)
-        mul!(cone.work_mat, W, cone.work_mat2, rootdetu * abs2(side), false)
+        mul!(cone.work_mat, W, cone.work_mat2, rootdetu * abs2(d), false)
 
         smat_to_svec!(prod_w, cone.work_mat, cone.rt2)
         prod_w .+= dot(w, arr_w) * rootdet .* w
@@ -295,7 +293,7 @@ function correction(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}) wher
     @views smat_to_svec!(w_corr, cone.work_mat2, cone.rt2)
     w_corr .*= -2 * (sigma + 1)
 
-    ssigma = inv(T(cone.side)) - sigma
+    ssigma = inv(T(cone.d)) - sigma
     scal1 = sigma * ssigma
     scal2 = dot_Wi_S * (ssigma - sigma)
     udz = u_dir / z
