@@ -16,9 +16,10 @@ function build(inst::PolyNormJuMP{T}) where {T <: Float64}
     @assert epi_halfdeg >= rand_halfdeg
 
     dom = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))
-    (rand_U, _, _, rand_V, _) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(n), epi_halfdeg, calc_V = true, calc_w = false)
-    (U, pts, Ps, _, w) = ModelUtilities.interpolate(dom, epi_halfdeg, calc_V = false, calc_w = true)
-    polys = rand_V * rand(-9:9, rand_U, num_polys)
+    rand_U = binomial(n + 2 * rand_halfdeg, n)
+    rand_coeffs = rand(-9:9, rand_U, num_polys)
+    (U, pts, Ps, V, w) = ModelUtilities.interpolate(dom, epi_halfdeg, calc_V = true, calc_w = true)
+    polys = V[:, 1:rand_U] * rand_coeffs
 
     model = JuMP.Model()
     JuMP.@variable(model, f[1:U])
