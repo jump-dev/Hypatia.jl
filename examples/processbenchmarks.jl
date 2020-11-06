@@ -120,7 +120,7 @@ process_entry(x::Int) = (isnan(x) ? "\$\\ast\$" : string(x))
 function process_entry(x::Float64)
     isnan(x) && return "\$\\ast\$"
     @assert x > 0
-    if x < 1
+    if x < 0.99
         str = @sprintf("%.2f", x)
         return str[2:end]
     elseif x < 10
