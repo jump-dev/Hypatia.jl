@@ -253,13 +253,13 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hyp
     @. wzvi = w / zv
     @views vwvden = Hi[2, 3:end]
 
-    @views mul!(prod[1:2, :], Hi[1:2, :], arr)
+    @inbounds @views mul!(prod[1:2, :], Hi[1:2, :], arr)
     @inbounds for i in 1:size(arr, 2)
         @views arr_w = arr[3:end, i]
         dot_i = dot(vwvden, arr_w)
         @. @views prod[3:end, i] = (dot_i + z * arr_w * w) * wzvi
     end
-    @views mul!(prod[3:end, :], Hi[1:2, 3:end]', arr[1:2, :], true, true)
+    @inbounds @views mul!(prod[3:end, :], Hi[1:2, 3:end]', arr[1:2, :], true, true)
 
     return prod
 end

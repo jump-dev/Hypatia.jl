@@ -38,10 +38,10 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     mat::Matrix{R}
     mat2::Matrix{R}
     mat3::Matrix{R}
-    W::Matrix{R}
-    fact_mat
+    fact_W
     lwv::T
     z::T
+    W::Matrix{R}
     Wi::Matrix{R}
     Wi_vec::Vector{T}
     tempw::Vector{T}
@@ -112,7 +112,7 @@ function update_feas(cone::HypoPerLogdetTri{T}) where T
     if v > eps(T)
         u = cone.point[1]
         @views svec_to_smat!(cone.mat, cone.point[3:end], cone.rt2)
-        fact = cone.fact_mat = cholesky!(Hermitian(cone.mat, :U), check = false)
+        fact = cone.fact_W = cholesky!(Hermitian(cone.mat, :U), check = false)
         if isposdef(fact)
             cone.lwv = logdet(fact) - cone.d * log(v)
             cone.z = v * cone.lwv - u
@@ -133,8 +133,8 @@ function is_dual_feas(cone::HypoPerLogdetTri{T}) where T
     if u < -eps(T)
         v = cone.dual_point[2]
         @views svec_to_smat!(cone.mat2, cone.dual_point[3:end], cone.rt2)
-        dual_fact = cholesky!(Hermitian(cone.mat2, :U), check = false)
-        return isposdef(dual_fact) && (v - u * (logdet(dual_fact) + cone.d * (1 - log(-u))) > eps(T))
+        fact = cholesky!(Hermitian(cone.mat2, :U), check = false)
+        return isposdef(fact) && (v - u * (logdet(fact) + cone.d * (1 - log(-u))) > eps(T))
     end
     return false
 end
@@ -143,15 +143,15 @@ function update_grad(cone::HypoPerLogdetTri)
     @assert cone.is_feas
     u = cone.point[1]
     v = cone.point[2]
-    z = cone.z
     g = cone.grad
+    z = cone.z
 
     g[1] = inv(z)
     g[2] = (cone.d - cone.lwv) / z - inv(v)
     # TODO in-place
-    # copyto!(cone.Wi, cone.fact_mat.factors)
+    # copyto!(cone.Wi, cone.fact_W.factors)
     # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0))
-    cone.Wi = inv(cone.fact_mat)
+    cone.Wi = inv(cone.fact_W)
     smat_to_svec!(cone.Wi_vec, cone.Wi, cone.rt2)
     zvzi = -(z + v) / z
     @inbounds @. @views g[3:end] = zvzi * cone.Wi_vec
@@ -165,10 +165,10 @@ function update_hess_aux(cone::HypoPerLogdetTri)
     @assert cone.grad_updated
     @assert !cone.hess_aux_updated
     v = cone.point[2]
+    H = cone.hess.data
     z = cone.z
     d = cone.d
     Wi_vec = cone.Wi_vec
-    H = cone.hess.data
     dlzi = (d - cone.lwv) / z
 
     @inbounds begin
@@ -191,9 +191,9 @@ function update_hess(cone::HypoPerLogdetTri)
         update_hess_aux(cone)
     end
     v = cone.point[2]
+    H = cone.hess.data
     z = cone.z
     Wi_vec = cone.Wi_vec
-    H = cone.hess.data
     zvzi = (z + v) / z
     vzi = zvzi - 1
     Wivzi = cone.tempw
@@ -217,20 +217,20 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         update_hess_aux(cone)
     end
     v = cone.point[2]
-    z = cone.z
     H = cone.hess.data
+    z = cone.z
     const_diag = v / z * v / (z + v)
 
     @inbounds @views mul!(prod[1:2, :], H[1:2, :], arr)
     @inbounds for i in 1:size(arr, 2)
         @views svec_to_smat!(cone.mat2, arr[3:end, i], cone.rt2)
         copytri!(cone.mat2, 'U', cone.is_complex)
-        rdiv!(cone.mat2, cone.fact_mat)
+        rdiv!(cone.mat2, cone.fact_W)
         const_i = tr(cone.mat2) * const_diag
         for j in 1:cone.d
             cone.mat2[j, j] += const_i
         end
-        ldiv!(cone.fact_mat, cone.mat2)
+        ldiv!(cone.fact_W, cone.mat2)
         @views smat_to_svec!(prod[3:end, i], cone.mat2, cone.rt2)
     end
     @inbounds @views mul!(prod[3:end, :], H[1:2, 3:end]', arr[1:2, :], true, (z + v) / z)
@@ -310,7 +310,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hyp
     zv = z + v
     const_w = v / (zv + d * v) * v / z
 
-    @views mul!(prod[1:2, :], Hi[1:2, :], arr)
+    @inbounds @views mul!(prod[1:2, :], Hi[1:2, :], arr)
     @inbounds for i in 1:size(arr, 2)
         @views arr_w = arr[3:end, i]
         @views prod_w = prod[3:end, i]
@@ -322,7 +322,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hyp
         const_i = const_w * dot(w, arr_w)
         @. prod_w += const_i * w
     end
-    @views mul!(prod[3:end, :], Hi[1:2, 3:end]', arr[1:2, :], true, z / zv)
+    @inbounds @views mul!(prod[3:end, :], Hi[1:2, 3:end]', arr[1:2, :], true, z / zv)
 
     return prod
 end
@@ -346,7 +346,7 @@ function correction(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
 
     dot_Wi_S = dot(Wi_vec, w_dir)
     S = copytri!(svec_to_smat!(cone.mat2, w_dir, cone.rt2), 'U', cone.is_complex)
-    ldiv!(cone.fact_mat, S)
+    ldiv!(cone.fact_W, S)
     dot_skron = real(dot(S, S'))
 
     const6 = 1 + v * dlzi
@@ -360,11 +360,11 @@ function correction(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
     const11 = -vz * (vz * dot_skron + 2 * (abs2(vz * dot_Wi_S) - dot_Wi_S * const10)) + u_dir * const7 + vvw_scal * v_dir
 
     @. w_corr = const11 * Wi_vec
-    rdiv!(S, cone.fact_mat.U)
+    rdiv!(S, cone.fact_W.U)
     mul!(cone.mat3, S, S')
     vec_S2 = smat_to_svec!(tempw, cone.mat3, cone.rt2)
     @. w_corr += const8 * vec_S2
-    skron2 = rdiv!(S, cone.fact_mat.U')
+    skron2 = rdiv!(S, cone.fact_W.U')
     vec_skron2 = smat_to_svec!(tempw, skron2, cone.rt2)
     t4awd = (2 * vz * abs2(dot_Wi_S) + dot(vec_skron2, w_dir)) / z
     @. w_corr += const9 * vec_skron2
