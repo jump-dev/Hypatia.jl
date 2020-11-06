@@ -48,12 +48,14 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     tempUU::Matrix{T}
     ΛLiPs_edge::Vector{Vector{Matrix{T}}}
     PΛiPs::Vector{Matrix{T}}
-    PΛiP_blocks_U::Vector{Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}}
+    PΛiP_blocks_U::Vector
     Λ11LiP::Vector{Matrix{T}} # also equal to the block on the diagonal of ΛLiP
     matLiP::Vector{Matrix{T}} # also equal to block (1, 1) of ΛLiP
     PΛ11iP::Vector{Matrix{T}}
-    lambdafact::Vector
-    point_views
+    Λfact::Vector
+    point_views::Vector
+    Ps_times::Vector{Float64}
+    Ps_order::Vector{Int}
 
     function WSOSInterpEpiNormEucl{T}(
         R::Int,
@@ -83,12 +85,13 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     U = cone.U
     R = cone.R
     Ps = cone.Ps
+    K = length(Ps)
     Ls = [size(Pk, 2) for Pk in cone.Ps]
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.mat = [zeros(T, L, L) for L in Ls]
-    cone.matfact = Vector{Any}(undef, length(Ps))
+    cone.matfact = Vector{Any}(undef, K)
     cone.ΛLi_Λ = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
     cone.Λ11 = [zeros(T, L, L) for L in Ls]
     cone.tempLU = [zeros(T, L, U) for L in Ls]
@@ -103,16 +106,15 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.PΛiPs = [zeros(T, R * U, R * U) for _ in eachindex(Ls)]
     cone.Λ11LiP = [zeros(T, L, U) for L in Ls]
     cone.PΛ11iP = [zeros(T, U, U) for _ in eachindex(Ps)]
-    cone.PΛiP_blocks_U = [Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}(undef, R, R) for _ in eachindex(Ps)]
-    @inbounds for k in eachindex(Ps), r in 1:R, s in 1:R
-        cone.PΛiP_blocks_U[k][r, s] = view(cone.PΛiPs[k], block_idxs(U, r), block_idxs(U, s))
-    end
-    cone.lambdafact = Vector{Any}(undef, length(Ps))
+    cone.PΛiP_blocks_U = [[view(PΛiPk, block_idxs(U, r), block_idxs(U, s)) for r in 1:R, s in 1:R] for PΛiPk in cone.PΛiPs]
+    cone.Λfact = Vector{Any}(undef, K)
     cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
+    cone.Ps_times = zeros(K)
+    cone.Ps_order = collect(1:K)
     return cone
 end
 
-get_nu(cone::WSOSInterpEpiNormEucl) = 2 * sum(size(Psk, 2) for Psk in cone.Ps)
+get_nu(cone::WSOSInterpEpiNormEucl) = 2 * sum(size(Pk, 2) for Pk in cone.Ps)
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormEucl)
     @views arr[1:cone.U] .= 1
@@ -123,43 +125,47 @@ end
 function update_feas(cone::WSOSInterpEpiNormEucl)
     @assert !cone.feas_updated
     U = cone.U
-    lambdafact = cone.lambdafact
+    Λfact = cone.Λfact
     matfact = cone.matfact
     point_views = cone.point_views
 
+    # order the Ps by how long it takes to check feasibility, to improve efficiency
+    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # NOTE stochastic
+
     cone.is_feas = true
-    @inbounds for k in eachindex(cone.Ps)
-        Psk = cone.Ps[k]
-        Λ11k = cone.Λ11[k]
-        LUk = cone.tempLU[k]
-        ΛLi_Λ = cone.ΛLi_Λ[k]
-        mat = cone.mat[k]
+    for k in cone.Ps_order
+        cone.Ps_times[k] = @elapsed @inbounds begin
+            Pk = cone.Ps[k]
+            Λ11k = cone.Λ11[k]
+            LUk = cone.tempLU[k]
+            ΛLi_Λ = cone.ΛLi_Λ[k]
+            mat = cone.mat[k]
 
-        # first lambda
-        @. LUk = Psk' * point_views[1]'
-        mul!(Λ11k, LUk, Psk)
-        copyto!(mat, Λ11k)
-        lambdafact[k] = cholesky!(Symmetric(Λ11k, :U), check = false)
-        if !isposdef(lambdafact[k])
-            cone.is_feas = false
-            break
-        end
+            # first lambda
+            @. LUk = Pk' * point_views[1]'
+            mul!(Λ11k, LUk, Pk)
+            copyto!(mat, Λ11k)
+            Λfact[k] = cholesky!(Symmetric(Λ11k, :U), check = false)
+            if !isposdef(Λfact[k])
+                cone.is_feas = false
+                break
+            end
 
-        # subtract others
-        uo = U + 1
-        for r in 1:(cone.R - 1)
-            @. LUk = Psk' * point_views[r + 1]'
-            mul!(ΛLi_Λ[r], LUk, Psk)
+            # subtract others
+            uo = U + 1
+            for r in 1:(cone.R - 1)
+                @. LUk = Pk' * point_views[r + 1]'
+                mul!(ΛLi_Λ[r], LUk, Pk)
+                ldiv!(Λfact[k].L, ΛLi_Λ[r])
+                mul!(mat, ΛLi_Λ[r]', ΛLi_Λ[r], -1, true)
+                uo += U
+            end
 
-            ldiv!(lambdafact[k].L, ΛLi_Λ[r])
-            mul!(mat, ΛLi_Λ[r]', ΛLi_Λ[r], -1, true)
-            uo += U
-        end
-
-        matfact[k] = cholesky!(Symmetric(mat, :U), check = false)
-        if !isposdef(matfact[k])
-            cone.is_feas = false
-            break
+            matfact[k] = cholesky!(Symmetric(mat, :U), check = false)
+            if !isposdef(matfact[k])
+                cone.is_feas = false
+                break
+            end
         end
     end
 
@@ -174,12 +180,12 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
     U = cone.U
     R = cone.R
     R2 = R - 2
-    lambdafact = cone.lambdafact
+    Λfact = cone.Λfact
     matfact = cone.matfact
 
     cone.grad .= 0
     @inbounds for k in eachindex(cone.Ps)
-        Psk = cone.Ps[k]
+        Pk = cone.Ps[k]
         Λ11LiP = cone.Λ11LiP[k]
         PΛ11iP = cone.PΛ11iP[k]
         ΛLiP_edge = cone.ΛLiPs_edge[k]
@@ -188,12 +194,12 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
         ΛLi_Λ = cone.ΛLi_Λ[k]
 
         # P * inv(Λ_11) * P' for (1, 1) hessian block and adding to PΛiPs[r][r]
-        ldiv!(Λ11LiP, cone.lambdafact[k].L, Psk') # TODO may be more efficient to do ldiv(fact.U', B) than ldiv(fact.L, B) here and elsewhere since the factorizations are of symmetric :U matrices
+        ldiv!(Λ11LiP, cone.Λfact[k].L, Pk') # TODO may be more efficient to do ldiv(fact.U', B) than ldiv(fact.L, B) here and elsewhere since the factorizations are of symmetric :U matrices
         mul!(PΛ11iP, Λ11LiP', Λ11LiP)
 
         # prep PΛiPs
         # block-(1,1) is P * inv(mat) * P'
-        ldiv!(matLiP, matfact[k].L, Psk')
+        ldiv!(matLiP, matfact[k].L, Pk')
         mul!(PΛiPs[1, 1], matLiP', matLiP)
         # top edge of ΛLiP
         for r in 1:(R - 1)

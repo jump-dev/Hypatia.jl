@@ -3,14 +3,14 @@
 insts = Dict()
 insts["minimal"] = [
     ((4, true),),
-    ((4, false), StandardConeOptimizer),
+    ((4, false), SOCExpPSDOptimizer),
     ]
 insts["fast"] = [
     ((6, true),),
-    ((6, false), StandardConeOptimizer),
+    ((6, false), SOCExpPSDOptimizer),
     ((8, true),),
     ]
 insts["slow"] = [
-    ((8, false), StandardConeOptimizer),
+    ((8, false), SOCExpPSDOptimizer),
     ]
 return (RegionOfAttrJuMP, insts)

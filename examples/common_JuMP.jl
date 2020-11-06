@@ -7,13 +7,26 @@ include(joinpath(@__DIR__, "common.jl"))
 import JuMP
 const MOI = JuMP.MOI
 
-# nonnegative, second-order, PSD, exponential, 3-dim power cones only
-MOI.Utilities.@model(StandardConeOptimizer,
+MOI.Utilities.@model(SOCExpPSDOptimizer,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone, MOI.PositiveSemidefiniteConeTriangle, MOI.ExponentialCone,),
-    (MOI.PowerCone, MOI.DualPowerCone,),
+    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
+    MOI.ExponentialCone, MOI.PositiveSemidefiniteConeTriangle,),
+    (),
+    (),
+    (MOI.ScalarAffineFunction,),
+    (MOI.VectorOfVariables,),
+    (MOI.VectorAffineFunction,),
+    true,
+    )
+
+MOI.Utilities.@model(ExpPSDOptimizer,
+    (),
+    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
+    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
+    MOI.ExponentialCone, MOI.PositiveSemidefiniteConeTriangle,),
+    (),
     (),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),
@@ -114,8 +127,7 @@ function setup_model(
         flush(stdout); flush(stderr)
     end
 
-    string_cones = [string(nameof(c)) for c in unique(typeof.(hyp_model.cones))]
-    model_stats = (hyp_model.n, hyp_model.p, hyp_model.q, string_cones)
+    model_stats = get_model_stats(hyp_model)
     return (model, model_stats)
 end
 
@@ -203,9 +215,7 @@ function run_cbf(
         MOI.Utilities.reset_optimizer(backend, opt)
         MOI.Utilities.attach_optimizer(backend)
 
-        hyp_model = opt.model
-        string_cones = [string(nameof(c)) for c in unique(typeof.(hyp_model.cones))]
-        model_stats = (hyp_model.n, hyp_model.p, hyp_model.q, string_cones)
+        model_stats = get_model_stats(opt.model)
         flush(stdout); flush(stderr)
     end
 

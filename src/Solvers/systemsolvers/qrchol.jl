@@ -174,10 +174,6 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
     return system_solver
 end
 
-# NOTE move to dense.jl if useful elsewhere
-outer_prod(A::AbstractMatrix{T}, B::AbstractMatrix{T}, alpha::Real, beta::Real) where {T <: LinearAlgebra.BlasReal} = BLAS.syrk!('U', 'T', alpha, A, beta, B)
-outer_prod(A::AbstractMatrix{T}, B::AbstractMatrix{T}, alpha::Real, beta::Real) where {T <: Real} = mul!(B, A', A, alpha, beta)
-
 function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
     lhs = system_solver.lhs1.data

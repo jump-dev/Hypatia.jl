@@ -79,7 +79,6 @@ function run_instance_check(
         @eval using MosekTools
         include(joinpath(examples_dir, "common_JuMP.jl"))
         include(joinpath(examples_dir, ex_name, "JuMP.jl"))
-        # include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
         flush(stdout); flush(stderr)
         return nothing
     end
@@ -106,7 +105,7 @@ function run_instance_check(
     setup_killed = (status != :OK)
     if setup_killed
         println("setup model failed: $status")
-        model_stats = (-1, -1, -1, String[])
+        model_stats = ntuple(_ -> missing, 5)
     end
 
     if solve && !setup_killed
@@ -128,7 +127,7 @@ function run_instance_check(
             @assert !solve
             status = :SkippedSolveCheck
         end
-        check_stats = (string(status), NaN, -1, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
+        check_stats = (string(status), ntuple(_ -> missing, 9)...)
         solver_hit_limit = true
     else
         solver_status = string(check_stats[1])
@@ -137,7 +136,11 @@ function run_instance_check(
         solver_hit_limit && println("solver hit limit: $solver_status")
     end
 
-    wait(rmprocs(worker))
+    try
+        wait(rmprocs(worker))
+    catch e
+        @warn("error during process shutdown: ", e)
+    end
     @assert nprocs() == 1
 
     return (setup_killed, solver_hit_limit, (model_stats..., check_stats..., setup_time, check_time))
