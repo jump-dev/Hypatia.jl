@@ -185,40 +185,55 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
     return prod
 end
 
-function update_inv_hess(cone::HypoPerLog)
+# update first two rows of the inverse Hessian
+function update_inv_hess_aux(cone::HypoPerLog)
     @assert cone.feas_updated
+    @assert !cone.inv_hess_aux_updated
     u = cone.point[1]
     v = cone.point[2]
     @views w = cone.point[3:end]
-    d = length(w)
     Hi = cone.inv_hess.data
-    lwv = cone.lwv
+    d = length(w)
     z = cone.z
     zv = z + v
-    zu = z + u
+    zuz = 2 * z + u
     den = zv + d * v
     vden = v / den
-    tempw = cone.tempw
+    zuzvden = zuz * vden
+    vvden = v * vden
 
     @inbounds begin
-        Hi[1, 1] = abs2(zu) + z * (den - v) - (d * v * abs2(zu + z)) / den
-        Hi[1, 2] = v * (lwv * (zv - d * v) + d * u) * vden
-        Hi3const = (zu + z) * vden
-        @. @views Hi[1, 3:end] = Hi3const * w
+        Hi[1, 1] = abs2(z + u) + z * (den - v) - d * zuz * zuzvden
+        Hi[1, 2] = Hi[2, 1] = vvden * (cone.lwv * (zv - d * v) + d * u)
+        @. @views Hi[1, 3:end] = zuzvden * w
 
-        @. tempw = w * v
-        Hi[2, 2] = v * zv * vden
-        @. @views Hi[2, 3:end] = vden * tempw
+        Hi[2, 2] = vvden * zv
+        @. @views Hi[2, 3:end] = vvden * w
     end
 
-    @. tempw = w / zv
-    @inbounds for j in 1:d
+    cone.inv_hess_aux_updated = true
+    return
+end
+
+function update_inv_hess(cone::HypoPerLog)
+    if !cone.inv_hess_aux_updated
+        update_inv_hess_aux(cone)
+    end
+    v = cone.point[2]
+    @views w = cone.point[3:end]
+    Hi = cone.inv_hess.data
+    z = cone.z
+    zv = z + v
+    wzvi = cone.tempw
+    @. wzvi = w / zv
+
+    @inbounds for j in eachindex(w)
         j2 = 2 + j
         vwvdenj = Hi[2, j2]
-        for i in 1:(j - 1)
-            Hi[2 + i, j2] = vwvdenj * tempw[i]
+        for i in 1:j
+            Hi[2 + i, j2] = vwvdenj * wzvi[i]
         end
-        Hi[j2, j2] = (vwvdenj + w[j] * z) * tempw[j]
+        Hi[j2, j2] += z * w[j] * wzvi[j]
     end
 
     cone.inv_hess_updated = true
@@ -226,10 +241,26 @@ function update_inv_hess(cone::HypoPerLog)
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLog)
-    if !cone.inv_hess_updated
-        update_inv_hess(cone)
+    if !cone.inv_hess_aux_updated
+        update_inv_hess_aux(cone)
     end
-    mul!(prod, cone.inv_hess, arr)
+    v = cone.point[2]
+    @views w = cone.point[3:end]
+    Hi = cone.inv_hess.data
+    z = cone.z
+    zv = z + v
+    wzvi = cone.tempw
+    @. wzvi = w / zv
+    @views vwvden = Hi[2, 3:end]
+
+    @views mul!(prod[1:2, :], Hi[1:2, :], arr)
+    @inbounds for i in 1:size(arr, 2)
+        @views arr_w = arr[3:end, i]
+        dot_i = dot(vwvden, arr_w)
+        @. @views prod[3:end, i] = (dot_i + z * arr_w * w) * wzvi
+    end
+    @views mul!(prod[3:end, :], Hi[1:2, 3:end]', arr[1:2, :], true, true)
+
     return prod
 end
 

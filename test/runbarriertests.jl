@@ -22,7 +22,7 @@ barrier_test_names = [
     # "possemideftrisparse",
     # "doublynonnegativetri",
     # "matrixepipersquare",
-    # "hypoperlogdettri",
+    "hypoperlogdettri",
     # "hyporootdettri",
     # "wsosinterpnonnegative",
     # "wsosinterpepinormone",

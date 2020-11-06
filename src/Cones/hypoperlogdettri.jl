@@ -248,10 +248,9 @@ function update_inv_hess_aux(cone::HypoPerLogdetTri)
     svec_to_smat!(cone.W, w, cone.rt2)
     Hi = cone.inv_hess.data
     d = cone.d
-    lwv = cone.lwv
     z = cone.z
     zv = z + v
-    zuz = z + u + z
+    zuz = 2 * z + u
     den = zv + d * v
     vden = v / den
     zuzvden = zuz * vden
@@ -259,7 +258,7 @@ function update_inv_hess_aux(cone::HypoPerLogdetTri)
 
     @inbounds begin
         Hi[1, 1] = abs2(z + u) + z * (den - v) - d * zuz * zuzvden
-        Hi[1, 2] = Hi[2, 1] = vvden * (lwv * (zv - d * v) + d * u)
+        Hi[1, 2] = Hi[2, 1] = vvden * (cone.lwv * (zv - d * v) + d * u)
         @. @views Hi[1, 3:end] = zuzvden * w
 
         Hi[2, 2] = vvden * zv
