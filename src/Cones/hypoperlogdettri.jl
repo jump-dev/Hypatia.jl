@@ -12,7 +12,6 @@ TODO
 
 mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     dim::Int
     d::Int
     is_complex::Bool
@@ -37,7 +36,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_fact_cache
 
     mat::Matrix{R}
-    mat2::Matrix{R} # TODO named differently in some cones, fix inconsistency
+    mat2::Matrix{R}
     mat3::Matrix{R}
     W::Matrix{R}
     fact_mat
@@ -50,13 +49,11 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     function HypoPerLogdetTri{T, R}(
         dim::Int;
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 3
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
         if R <: Complex
@@ -73,6 +70,8 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         return cone
     end
 end
+
+use_heuristic_neighborhood(cone::HypoPerLogdetTri) = false
 
 reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
 
@@ -149,17 +148,16 @@ function update_grad(cone::HypoPerLogdetTri)
 
     g[1] = inv(z)
     g[2] = (cone.d - cone.lwv) / z - inv(v)
-
     # TODO in-place
     # copyto!(cone.Wi, cone.fact_mat.factors)
     # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0))
     cone.Wi = inv(cone.fact_mat)
     smat_to_svec!(cone.Wi_vec, cone.Wi, cone.rt2)
     zvzi = -(z + v) / z
-    @inbounds @views @. g[3:end] = zvzi * cone.Wi_vec
+    @inbounds @. @views g[3:end] = zvzi * cone.Wi_vec
 
     cone.grad_updated = true
-    return g
+    return cone.grad
 end
 
 # update first two rows of the Hessian
@@ -171,17 +169,17 @@ function update_hess_aux(cone::HypoPerLogdetTri)
     d = cone.d
     Wi_vec = cone.Wi_vec
     H = cone.hess.data
-    nLz = (d - cone.lwv) / z
+    dlzi = (d - cone.lwv) / z
 
     @inbounds begin
         H[1, 1] = abs2(inv(z))
-        H[1, 2] = H[2, 1] = nLz / z
+        H[1, 2] = H[2, 1] = dlzi / z
         H13const = -v / z / z
-        @views @. H[1, 3:end] = H13const * Wi_vec
+        @. @views H[1, 3:end] = H13const * Wi_vec
 
-        H[2, 2] = abs2(nLz) + (d / z + inv(v)) / v
+        H[2, 2] = abs2(dlzi) + (d / z + inv(v)) / v
         H23const = ((cone.lwv - d) * v / z - 1) / z
-        @views @. H[2, 3:end] = H23const * Wi_vec
+        @. @views H[2, 3:end] = H23const * Wi_vec
     end
 
     cone.hess_aux_updated = true
@@ -195,10 +193,10 @@ function update_hess(cone::HypoPerLogdetTri)
     v = cone.point[2]
     z = cone.z
     Wi_vec = cone.Wi_vec
-    Wivzi = cone.tempw
     H = cone.hess.data
     zvzi = (z + v) / z
     vzi = zvzi - 1
+    Wivzi = cone.tempw
     @. Wivzi = vzi * Wi_vec
 
     @inbounds @views symm_kron(H[3:end, 3:end], cone.Wi, cone.rt2)
@@ -342,7 +340,7 @@ function correction(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
     tempw = cone.tempw
     Wi_vec = cone.Wi_vec
     d = cone.d
-    nLz = (d - cone.lwv) / z
+    dlzi = (d - cone.lwv) / z
     vz = v / z
     udz = u_dir / z
     vdz = v_dir / z
@@ -352,10 +350,10 @@ function correction(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
     ldiv!(cone.fact_mat, S)
     dot_skron = real(dot(S, S'))
 
-    const6 = 1 + v * nLz
+    const6 = 1 + v * dlzi
     uuw_scal = -2 * udz * vz / z
-    vvw_scal = -vdz * (2 * const6 * nLz + d / z)
-    uvw_scal = -2 * (2 * vz * nLz + inv(z)) / z
+    vvw_scal = -vdz * (2 * const6 * dlzi + d / z)
+    uvw_scal = -2 * (2 * vz * dlzi + inv(z)) / z
     const8 = -2 * (1 + vz)
     const10 = 2 * (vz * udz + vdz * const6)
     const9 = -2 * abs2(vz) * dot_Wi_S + const10
@@ -372,10 +370,10 @@ function correction(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
     t4awd = (2 * vz * abs2(dot_Wi_S) + dot(vec_skron2, w_dir)) / z
     @. w_corr += const9 * vec_skron2
 
-    const2 = 2 * udz * nLz / z
-    const3 = (2 * abs2(nLz) + d / z / v) * vdz
+    const2 = 2 * udz * dlzi / z
+    const3 = (2 * abs2(dlzi) + d / z / v) * vdz
     const5 = d / v / z
-    const4 = nLz * (2 * abs2(nLz) + 3 * const5) - (const5 + 2 * inv(v) / v) / v
+    const4 = dlzi * (2 * abs2(dlzi) + 3 * const5) - (const5 + 2 * inv(v) / v) / v
     corr[1] = 2 * abs2(udz) / z + (2 * const2 + const3) * v_dir + (uuw_scal + const7) * dot_Wi_S + vz * t4awd
     corr[2] = const4 * abs2(v_dir) + (2 * vvw_scal + uvw_scal * u_dir) * dot_Wi_S + u_dir * (const2 + 2 * const3) + const6 * t4awd
 

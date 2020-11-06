@@ -12,7 +12,7 @@ barrier_test_names = [
     # "epinormeucl",
     # "epipersquare",
     # "episumperentropy",
-    # "hypoperlog",
+    "hypoperlog",
     # "power",
     # "hypopowermean",
     # "hypogeomean",
@@ -22,7 +22,7 @@ barrier_test_names = [
     # "possemideftrisparse",
     # "doublynonnegativetri",
     # "matrixepipersquare",
-    "hypoperlogdettri",
+    # "hypoperlogdettri",
     # "hyporootdettri",
     # "wsosinterpnonnegative",
     # "wsosinterpepinormone",
@@ -32,8 +32,8 @@ barrier_test_names = [
 
 real_types = [
     Float64,
-    # Float32,
-    # BigFloat,
+    Float32,
+    BigFloat,
     ]
 
 @testset "barrier tests" begin
