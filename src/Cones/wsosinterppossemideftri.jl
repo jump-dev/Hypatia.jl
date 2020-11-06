@@ -40,7 +40,9 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     ΛFLP::Vector{Matrix{T}}
     tempLU::Vector{Matrix{T}}
     PlambdaP::Vector{Matrix{T}}
-    PlambdaP_blocks_U::Vector{Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}}
+    PlambdaP_blocks_U::Vector
+    Ps_times::Vector{Float64}
+    Ps_order::Vector{Int}
 
     function WSOSInterpPosSemidefTri{T}(
         R::Int,
@@ -70,6 +72,7 @@ function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     U = cone.U
     R = cone.R
     Ps = cone.Ps
+    K = length(Ps)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
@@ -81,13 +84,12 @@ function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.tempLRUR = [zeros(T, L * R, U * R) for L in Ls]
     cone.tempLRUR2 = [zeros(T, L * R, U * R) for L in Ls]
     cone.tempLU = [zeros(T, L, U) for L in Ls]
-    cone.ΛFL = Vector{Any}(undef, length(Ps))
+    cone.ΛFL = Vector{Any}(undef, K)
     cone.ΛFLP = [zeros(T, R * L, R * U) for L in Ls]
     cone.PlambdaP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
-    cone.PlambdaP_blocks_U = [Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}(undef, R, R) for _ in eachindex(Ps)]
-    @inbounds for k in eachindex(Ps), r in 1:R, s in 1:R
-        cone.PlambdaP_blocks_U[k][r, s] = view(cone.PlambdaP[k], block_idxs(U, r), block_idxs(U, s))
-    end
+    cone.PlambdaP_blocks_U = [[view(PlambdaPk, block_idxs(U, r), block_idxs(U, s)) for r in 1:R, s in 1:R] for PlambdaPk in cone.PlambdaP]
+    cone.Ps_times = zeros(K)
+    cone.Ps_order = collect(1:K)
     return cone
 end
 
@@ -106,26 +108,31 @@ end
 function update_feas(cone::WSOSInterpPosSemidefTri)
     @assert !cone.feas_updated
 
+    # order the Ps by how long it takes to check feasibility, to improve efficiency
+    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # NOTE stochastic
+
     cone.is_feas = true
-    @inbounds for k in eachindex(cone.Ps)
-        Pk = cone.Ps[k]
-        LU = cone.tempLU[k]
-        L = size(Pk, 2)
-        Λ = cone.tempLRLR[k]
+    for k in cone.Ps_order
+        cone.Ps_times[k] = @elapsed @inbounds begin
+            Pk = cone.Ps[k]
+            LU = cone.tempLU[k]
+            L = size(Pk, 2)
+            Λ = cone.tempLRLR[k]
 
-        for p in 1:cone.R, q in 1:p
-            @. @views cone.tempU = cone.point[block_idxs(cone.U, svec_idx(p, q))]
-            if p != q
-                cone.tempU .*= cone.rt2i
+            for p in 1:cone.R, q in 1:p
+                @. @views cone.tempU = cone.point[block_idxs(cone.U, svec_idx(p, q))]
+                if p != q
+                    cone.tempU .*= cone.rt2i
+                end
+                mul!(LU, Pk', Diagonal(cone.tempU)) # TODO check efficiency
+                @views mul!(Λ.data[block_idxs(L, p), block_idxs(L, q)], LU, Pk)
             end
-            mul!(LU, Pk', Diagonal(cone.tempU)) # TODO check efficiency
-            @views mul!(Λ.data[block_idxs(L, p), block_idxs(L, q)], LU, Pk)
-        end
 
-        ΛFLk = cone.ΛFL[k] = cholesky!(Λ, check = false)
-        if !isposdef(ΛFLk)
-            cone.is_feas = false
-            break
+            ΛFLk = cone.ΛFL[k] = cholesky!(Λ, check = false)
+            if !isposdef(ΛFLk)
+                cone.is_feas = false
+                break
+            end
         end
     end
 
