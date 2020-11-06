@@ -52,7 +52,7 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     Λ11LiP::Vector{Matrix{T}} # also equal to the block on the diagonal of ΛLiP
     matLiP::Vector{Matrix{T}} # also equal to block (1, 1) of ΛLiP
     PΛ11iP::Vector{Matrix{T}}
-    lambdafact::Vector
+    Λfact::Vector
     point_views::Vector
     Ps_times::Vector{Float64}
     Ps_order::Vector{Int}
@@ -107,7 +107,7 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.Λ11LiP = [zeros(T, L, U) for L in Ls]
     cone.PΛ11iP = [zeros(T, U, U) for _ in eachindex(Ps)]
     cone.PΛiP_blocks_U = [[view(PΛiPk, block_idxs(U, r), block_idxs(U, s)) for r in 1:R, s in 1:R] for PΛiPk in cone.PΛiPs]
-    cone.lambdafact = Vector{Any}(undef, K)
+    cone.Λfact = Vector{Any}(undef, K)
     cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
     cone.Ps_times = zeros(K)
     cone.Ps_order = collect(1:K)
@@ -125,7 +125,7 @@ end
 function update_feas(cone::WSOSInterpEpiNormEucl)
     @assert !cone.feas_updated
     U = cone.U
-    lambdafact = cone.lambdafact
+    Λfact = cone.Λfact
     matfact = cone.matfact
     point_views = cone.point_views
 
@@ -145,8 +145,8 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
             @. LUk = Pk' * point_views[1]'
             mul!(Λ11k, LUk, Pk)
             copyto!(mat, Λ11k)
-            lambdafact[k] = cholesky!(Symmetric(Λ11k, :U), check = false)
-            if !isposdef(lambdafact[k])
+            Λfact[k] = cholesky!(Symmetric(Λ11k, :U), check = false)
+            if !isposdef(Λfact[k])
                 cone.is_feas = false
                 break
             end
@@ -156,7 +156,7 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
             for r in 1:(cone.R - 1)
                 @. LUk = Pk' * point_views[r + 1]'
                 mul!(ΛLi_Λ[r], LUk, Pk)
-                ldiv!(lambdafact[k].L, ΛLi_Λ[r])
+                ldiv!(Λfact[k].L, ΛLi_Λ[r])
                 mul!(mat, ΛLi_Λ[r]', ΛLi_Λ[r], -1, true)
                 uo += U
             end
@@ -180,7 +180,7 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
     U = cone.U
     R = cone.R
     R2 = R - 2
-    lambdafact = cone.lambdafact
+    Λfact = cone.Λfact
     matfact = cone.matfact
 
     cone.grad .= 0
@@ -194,14 +194,14 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
         ΛLi_Λ = cone.ΛLi_Λ[k]
 
         # P * inv(Λ_11) * P' for (1, 1) hessian block and adding to PΛiPs[r][r]
-        ldiv!(Λ11LiP, cone.lambdafact[k].L, Pk') # TODO may be more efficient to do ldiv(fact.U', B) than ldiv(fact.L, B) here and elsewhere since the factorizations are of symmetric :U matrices
+        ldiv!(Λ11LiP, cone.Λfact[k].L, Pk') # TODO may be more efficient to do ldiv(fact.U', B) than ldiv(fact.L, B) here and elsewhere since the factorizations are of symmetric :U matrices
         mul!(PΛ11iP, Λ11LiP', Λ11LiP)
 
         # prep PΛiPs
         # block-(1,1) is P * inv(mat) * P'
         ldiv!(matLiP, matfact[k].L, Pk')
         mul!(PΛiPs[1, 1], matLiP', matLiP)
-        # top edge of sqrt of Λ
+        # top edge of ΛLiP
         for r in 1:(R - 1)
             mul!(ΛLiP_edge[r], ΛLi_Λ[r]', Λ11LiP, -1, false)
             ldiv!(matfact[k].L, ΛLiP_edge[r])
@@ -296,7 +296,7 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
     return cone.hess
 end
 
-function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T}) where T
+function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
     @assert cone.hess_updated
     corr = cone.correction
     corr .= 0
@@ -325,11 +325,11 @@ function correction(cone::WSOSInterpEpiNormEucl{T}, primal_dir::AbstractVector{T
         # ΛLiP * D is an arrow matrix but row edge doesn't equal column edge
         @views scaled_diag = mul!(cone.tempLU[pk], Λ11LiP, Diagonal(primal_dir[1:U]))
         @views scaled_pt = mul!(cone.tempLU2[pk], matLiP, Diagonal(primal_dir[1:U]))
-        @views for c in 2:R
-            mul!(scaled_pt, ΛLiP_edge[c - 1], Diagonal(primal_dir[block_idxs(U, c)]), true, true)
-            mul!(scaled_row[c - 1], matLiP, Diagonal(primal_dir[block_idxs(U, c)]))
-            mul!(scaled_row[c - 1], ΛLiP_edge[c - 1], Diagonal(primal_dir[1:U]), true, true)
-            mul!(scaled_col[c - 1], Λ11LiP, Diagonal(primal_dir[block_idxs(U, c)]))
+        @views for r in 2:R
+            mul!(scaled_pt, ΛLiP_edge[r - 1], Diagonal(primal_dir[block_idxs(U, r)]), true, true)
+            mul!(scaled_row[r - 1], matLiP, Diagonal(primal_dir[block_idxs(U, r)]))
+            mul!(scaled_row[r - 1], ΛLiP_edge[r - 1], Diagonal(primal_dir[1:U]), true, true)
+            mul!(scaled_col[r - 1], Λ11LiP, Diagonal(primal_dir[block_idxs(U, r)]))
         end
 
         corr_half = cone.tempLRUR[pk]
