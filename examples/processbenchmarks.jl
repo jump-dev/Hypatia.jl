@@ -2,7 +2,7 @@ using Printf
 using CSV
 using DataFrames
 
-bench_file = joinpath(homedir(), "bench/bench_polynorml1.csv")
+bench_file = joinpath(homedir(), "bench/bench_nocorr14.csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 # uncomment examples to run
@@ -14,9 +14,9 @@ examples_params = Dict(
     # "MatrixRegressionJuMP" => ([:m], [2], all_dims),
     # "NearestPSDJuMP"    => ([:compl, :d], [2, 1], [:n_nat, :q_ext]),
     # "PolyMinJuMP"       => ([:m, :halfdeg], [1, 2], [:n_nat, :q_ext]),
-    "PolyNormJuMP"      => ([:L1, :n, :dr, :d, :m], [5, 1, 2, 3, 4], Symbol[]),
+    # "PolyNormJuMP"      => ([:L1, :n, :dr, :d, :m], [5, 1, 2, 3, 4], Symbol[]),
     # "PortfolioJuMP"     => ([:k], [1], Symbol[]),
-    # "RandomPolyMatJuMP" => ([:n, :d, :m], [1, 2, 3], Symbol[]),
+    "RandomPolyMatJuMP" => ([:n, :d, :m], [1, 2, 3], Symbol[]),
     # "ShapeConRegrJuMP"  => ([:m, :deg], [1, 5], [:n_nat, :q_nat, :n_ext]),
     )
 
@@ -175,7 +175,12 @@ function make_table_tex_polys(ex_name, ex_params, inst_solvers)
 
     sep = " & "
     ex_tex = open(joinpath(output_folder, ex_name * "_table.tex"), "w")
-    for df1 in groupby(filter!(:L1 => (x -> x), ex_df_wide), :n)
+    if ex_name == "PolyNormJuMP"
+        df = filter!(:L1 => (x -> x), ex_df_wide)
+    else
+        df = ex_df_wide
+    end
+    for df1 in groupby(df, :n)
         print(ex_tex, "\\multirow{$(nrow(df1))}{*}{$(df1[1, :n])}\n")
         for df2 in groupby(df1, :d)
             print(ex_tex, sep, "\\multirow{$(nrow(df2))}{*}{$(df2[1, :d])}\n")

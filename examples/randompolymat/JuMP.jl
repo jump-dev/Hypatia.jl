@@ -19,7 +19,7 @@ function build(inst::RandomPolyMatJuMP{T}) where {T <: Float64}
     L = binomial(n + halfdeg, n)
     svec_dim = div(R * (R + 1), 2)
 
-    domain = ModelUtilities.Box{Float64}(-ones(n), ones(n))
+    domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))
     (U, points, Ps, V, w) = ModelUtilities.interpolate(domain, halfdeg, calc_V = true, calc_w = true)
 
     model = JuMP.Model()

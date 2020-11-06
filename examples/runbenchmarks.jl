@@ -20,12 +20,12 @@ examples_dir = @__DIR__
 include(joinpath(examples_dir, "common_JuMP.jl"))
 
 # path to write results DataFrame to CSV, if any
-results_path = joinpath(homedir(), "bench", "bench.csv")
+results_path = joinpath(homedir(), "bench", "bench_nocorr1.csv")
 # results_path = nothing
 
 spawn_runs = true # needed for running Julia process with multiple threads
 # spawn_runs = false
-setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
+setup_model_anyway = false # keep setting up models of larger size even if previous solve-check was killed
 num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
 free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
 optimizer_time_limit = 1800
@@ -58,7 +58,7 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
 # instance sets and solvers to run
 instance_sets = [
     ("nat", hyp_solver),
-    # ("ext", hyp_solver),
+    ("ext", hyp_solver),
     # ("ext", mosek_solver),
     ]
 
@@ -71,9 +71,9 @@ JuMP_example_names = [
     # "matrixregression",
     # "nearestpsd",
     # "polymin",
-    "polynorm",
+    # "polynorm",
     # "portfolio",
-    # "randompolymat",
+    "randompolymat",
     # "shapeconregr",
     ]
 
