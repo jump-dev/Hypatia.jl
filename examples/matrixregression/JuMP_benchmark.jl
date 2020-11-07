@@ -5,5 +5,5 @@ matrixregression_insts = [
 
 insts = Dict()
 insts["nat"] = (nothing, matrixregression_insts)
-insts["ext"] = (StandardConeOptimizer, matrixregression_insts)
+insts["ext"] = (SOCExpPSDOptimizer, matrixregression_insts)
 return (MatrixRegressionJuMP, insts)

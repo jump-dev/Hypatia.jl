@@ -2,11 +2,11 @@
 insts = Dict()
 insts["minimal"] = [
     ((2, 2),),
-    ((2, 2), StandardConeOptimizer),
+    ((2, 2), SOCExpPSDOptimizer),
     ]
 insts["fast"] = [
     ((:motzkin2,),),
-    ((:motzkin2,), StandardConeOptimizer),
+    ((:motzkin2,), SOCExpPSDOptimizer),
     ((:motzkin3,),),
     ((:CS16ex8_13,),),
     ((:CS16ex8_14,),),
@@ -15,16 +15,16 @@ insts["fast"] = [
     ((:CS16ex13,),),
     ((:MCW19ex1_mod,),),
     ((:MCW19ex8,),),
-    ((:MCW19ex8,), StandardConeOptimizer),
+    ((:MCW19ex8,), SOCExpPSDOptimizer),
     ((3, 2),),
-    ((3, 2), StandardConeOptimizer),
+    ((3, 2), SOCExpPSDOptimizer),
     ((6, 6),),
     ((20, 3),),
-    ((20, 3), StandardConeOptimizer),
+    ((20, 3), SOCExpPSDOptimizer),
     ]
 insts["slow"] = [
     ((10, 10),),
-    ((10, 10), StandardConeOptimizer),
+    ((10, 10), SOCExpPSDOptimizer),
     ((20, 6),),
     ((40, 3),),
     ]

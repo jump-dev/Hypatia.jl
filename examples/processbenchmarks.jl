@@ -120,7 +120,7 @@ process_entry(x::Int) = (isnan(x) ? "\$\\ast\$" : string(x))
 function process_entry(x::Float64)
     isnan(x) && return "\$\\ast\$"
     @assert x > 0
-    if x < 1
+    if x < 0.99
         str = @sprintf("%.2f", x)
         return str[2:end]
     elseif x < 10
@@ -244,7 +244,7 @@ function transform_plot_cols(ex_df_wide, inst_solver::Symbol)
     transform!(ex_df_wide, old_cols => ByRow((x, y) -> ((!ismissing(x) && x) ? y : missing)) => inst_solver)
 end
 
-function make_plot_csv(ex_name, ex_params)
+function make_plot_csv(ex_name, ex_params, inst_solvers)
     @info("making plot csv for $ex_name")
     ex_df_wide = CSV.read(ex_wide_file(ex_name))
     inst_keys = ex_params[1]

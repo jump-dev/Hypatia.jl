@@ -85,3 +85,8 @@ function process_result(
     flush(stdout); flush(stderr)
     return solve_stats
 end
+
+function get_model_stats(model::Models.Model)
+    string_cones = [string(nameof(c)) for c in unique(typeof.(model.cones))]
+    return (model.n, model.p, model.q, model.nu, string_cones)
+end

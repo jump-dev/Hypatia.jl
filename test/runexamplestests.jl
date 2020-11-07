@@ -89,6 +89,7 @@ perf = DataFrames.DataFrame(
     n = Int[],
     p = Int[],
     q = Int[],
+    nu = Float64[],
     cone_types = Vector{String}[],
     status = String[],
     solve_time = Float64[],

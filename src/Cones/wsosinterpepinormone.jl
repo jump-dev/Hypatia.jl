@@ -52,13 +52,15 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     ΛLiP_dir12::Vector{Vector{Matrix{T}}}
     ΛLiP_dir21::Vector{Vector{Matrix{T}}}
     corr_half::Vector{Vector{Matrix}}
-    lambdafact::Vector
+    Λfact::Vector
     hess_edge_blocks::Vector{Matrix{T}}
     hess_diag_blocks::Vector{Matrix{T}}
     hess_diag_facts::Vector
     hess_diags::Vector{Matrix{T}}
     hess_schur_fact
-    point_views
+    point_views::Vector
+    Ps_times::Vector{Float64}
+    Ps_order::Vector{Int}
 
     function WSOSInterpEpiNormOne{T}(
         R::Int,
@@ -89,6 +91,7 @@ function setup_extra_data(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     U = cone.U
     R = cone.R
     Ps = cone.Ps
+    K = length(Ps)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
@@ -106,28 +109,29 @@ function setup_extra_data(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     cone.tempLU = [zeros(T, L, U) for L in Ls]
     cone.tempLU2 = [zeros(T, L, U) for L in Ls]
     cone.Λ11LiP = [zeros(T, L, U) for L in Ls]
-    cone.tempUU_vec = [zeros(T, U, U) for _ in eachindex(Ps)]
+    cone.tempUU_vec = [zeros(T, U, U) for _ in Ps]
     cone.tempUU = zeros(T, U, U)
     cone.tempUU2 = zeros(T, U, U)
     cone.tempURU = zeros(T, U, U * (R - 1))
     cone.tempURU2 = zeros(T, U * (R - 1), U)
-    cone.PΛiPs1 = [Vector{Matrix{T}}(undef, R) for Psk in Ps]
-    cone.PΛiPs2 = [Vector{Matrix{T}}(undef, R) for Psk in Ps]
-    cone.PΛiPs1 = [[zeros(T, U, U) for _ in 1:(R - 1)] for Psk in Ps]
-    cone.PΛiPs2 = [[zeros(T, U, U) for _ in 1:(R - 1)] for Psk in Ps]
+    cone.PΛiPs1 = [Vector{Matrix{T}}(undef, R) for Pk in Ps]
+    cone.PΛiPs2 = [Vector{Matrix{T}}(undef, R) for Pk in Ps]
+    cone.PΛiPs1 = [[zeros(T, U, U) for _ in 1:(R - 1)] for Pk in Ps]
+    cone.PΛiPs2 = [[zeros(T, U, U) for _ in 1:(R - 1)] for Pk in Ps]
     cone.ΛLiPs11 = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.ΛLiPs12 = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.ΛLiP_dir11 = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.ΛLiP_dir12 = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.ΛLiP_dir21 = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.corr_half = [[zeros(T, 2 * L, 2 * U) for _ in 1:(R - 1)] for L in Ls]
-    cone.lambdafact = Vector{Any}(undef, length(Ps))
+    cone.Λfact = Vector{Any}(undef, K)
     cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
+    cone.Ps_times = zeros(K)
+    cone.Ps_order = collect(1:K)
     return cone
 end
 
-reset_data(cone::WSOSInterpEpiNormOne) = (cone.feas_updated = cone.grad_updated = cone.hess_updated =
-    cone.inv_hess_updated = cone.hess_fact_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
+reset_data(cone::WSOSInterpEpiNormOne) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
 
 get_nu(cone::WSOSInterpEpiNormOne) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
 
@@ -143,48 +147,54 @@ function update_feas(cone::WSOSInterpEpiNormOne)
     @assert !cone.feas_updated
     U = cone.U
     R = cone.R
-    lambdafact = cone.lambdafact
+    Λfact = cone.Λfact
     point_views = cone.point_views
 
+    # order the Ps by how long it takes to check feasibility, to improve efficiency
+    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # NOTE stochastic
+
     cone.is_feas = true
-    @inbounds for k in eachindex(cone.Ps)
-        Psk = cone.Ps[k]
-        Λ11j = cone.Λ11[k]
-        tempΛ11j = cone.tempΛ11[k]
-        LLk = cone.tempLL[k]
-        LUk = cone.tempLU[k]
-        ΛLi_Λ = cone.ΛLi_Λ[k]
-        matsk = cone.mats[k]
-        factk = cone.matfact[k]
+    for k in cone.Ps_order
+        cone.Ps_times[k] = @elapsed @inbounds begin
+            Pk = cone.Ps[k]
+            Λ11j = cone.Λ11[k]
+            tempΛ11j = cone.tempΛ11[k]
+            LLk = cone.tempLL[k]
+            LUk = cone.tempLU[k]
+            ΛLi_Λ = cone.ΛLi_Λ[k]
+            matsk = cone.mats[k]
+            factk = cone.matfact[k]
 
-        # first lambda
-        @. LUk = Psk' * point_views[1]'
-        mul!(tempΛ11j, LUk, Psk)
-        copyto!(Λ11j, tempΛ11j)
-        lambdafact[k] = cholesky!(Symmetric(tempΛ11j, :U), check = false)
-        if !isposdef(lambdafact[k])
-            cone.is_feas = false
-            break
-        end
-        uo = U + 1
-        @inbounds for r in 2:R
-            r1 = r - 1
-            matr = matsk[r1]
-            factr = factk[r1]
-            @. LUk = Psk' * point_views[r]'
-            mul!(LLk, LUk, Psk)
-
-            ldiv!(ΛLi_Λ[r1], lambdafact[k].L, LLk)
-            copyto!(matr, Λ11j)
-            mul!(matr, ΛLi_Λ[r1]', ΛLi_Λ[r1], -1, 1)
-
-            factk[r1] = cholesky!(Symmetric(matr, :U), check = false)
-            if !isposdef(factk[r1])
+            # first lambda
+            @. LUk = Pk' * point_views[1]'
+            mul!(tempΛ11j, LUk, Pk)
+            copyto!(Λ11j, tempΛ11j)
+            Λfact[k] = cholesky!(Symmetric(tempΛ11j, :U), check = false)
+            if !isposdef(Λfact[k])
                 cone.is_feas = false
-                cone.feas_updated = true
-                return cone.is_feas
+                break
             end
-            uo += U
+
+            uo = U + 1
+            @inbounds for r in 2:R
+                r1 = r - 1
+                matr = matsk[r1]
+                factr = factk[r1]
+                @. LUk = Pk' * point_views[r]'
+                mul!(LLk, LUk, Pk)
+
+                ldiv!(ΛLi_Λ[r1], Λfact[k].L, LLk)
+                copyto!(matr, Λ11j)
+                mul!(matr, ΛLi_Λ[r1]', ΛLi_Λ[r1], -1, 1)
+
+                factk[r1] = cholesky!(Symmetric(matr, :U), check = false)
+                if !isposdef(factk[r1])
+                    cone.is_feas = false
+                    cone.feas_updated = true
+                    return cone.is_feas
+                end
+                uo += U
+            end
         end
     end
 
@@ -199,12 +209,12 @@ function update_grad(cone::WSOSInterpEpiNormOne)
     U = cone.U
     R = cone.R
     R2 = R - 2
-    lambdafact = cone.lambdafact
+    Λfact = cone.Λfact
     matfact = cone.matfact
 
     cone.grad .= 0
     for k in eachindex(cone.Ps)
-        Psk = cone.Ps[k]
+        Pk = cone.Ps[k]
         Λ11LiP = cone.Λ11LiP[k]
         PΛ11iP = cone.tempUU_vec[k]
         PΛiPs1 = cone.PΛiPs1[k]
@@ -215,18 +225,18 @@ function update_grad(cone::WSOSInterpEpiNormOne)
         ΛLiPs12 = cone.ΛLiPs12[k]
 
         # P * inv(Λ_11) * P' for (1, 1) hessian block and adding to PΛiPs[r][r]
-        ldiv!(Λ11LiP, cone.lambdafact[k].L, Psk')
+        ldiv!(Λ11LiP, cone.Λfact[k].L, Pk')
         mul!(PΛ11iP, Λ11LiP', Λ11LiP)
 
         # prep PΛiPs
-        L = size(Psk, 2)
+        L = size(Pk, 2)
         for r in 1:(R - 1)
             mul!(ΛLiPs12[r], ΛLi_Λ[r]', Λ11LiP, -1, false)
             ldiv!(factk[r].L, ΛLiPs12[r])
         end
         # get all the PΛiPs that are in row one or on the diagonal
         for r in 1:(R - 1)
-            ldiv!(ΛLiPs11[r], factk[r].L, Psk')
+            ldiv!(ΛLiPs11[r], factk[r].L, Pk')
             mul!(PΛiPs2[r], ΛLiPs12[r]', ΛLiPs11[r])
             mul!(PΛiPs1[r], ΛLiPs12[r]', ΛLiPs12[r])
             @. PΛiPs1[r] += PΛ11iP

@@ -1,10 +1,10 @@
 
 matrixcompletion_insts = [
-    [(d1, f * d1) for d1 in vcat(3, 10:5:50)] # includes compile run
-    for f in (5, 10)
+    [(k, d) for d in vcat(3, 10:5:max_d)] # includes compile run
+    for (k, max_d) in ((5, 60), (10, 45))
     ]
 
 insts = Dict()
 insts["nat"] = (nothing, matrixcompletion_insts)
-insts["ext"] = (StandardConeOptimizer, matrixcompletion_insts)
+insts["ext"] = (ExpPSDOptimizer, matrixcompletion_insts)
 return (MatrixCompletionJuMP, insts)

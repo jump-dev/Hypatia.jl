@@ -28,10 +28,7 @@ function run_instance(
         Random.seed!(rseed)
         inst = ex_type(inst_data...)
         model = build(inst)
-
-        string_cones = [string(nameof(c)) for c in unique(typeof.(model.cones))]
-        model_stats = (model.n, model.p, model.q, string_cones)
-
+        model_stats = get_model_stats(model)
         solver = Solvers.Solver{T}(; default_options..., inst_options...)
     end
     flush(stdout); flush(stderr)
