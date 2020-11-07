@@ -2,7 +2,7 @@ using Printf
 using CSV
 using DataFrames
 
-bench_file = joinpath(homedir(), "bench/bench_nocorr14.csv")
+bench_file = joinpath(homedir(), "bench/bench_polynorml2.csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 # uncomment examples to run
@@ -14,9 +14,9 @@ examples_params = Dict(
     # "MatrixRegressionJuMP" => ([:m], [2], all_dims),
     # "NearestPSDJuMP"    => ([:compl, :d], [2, 1], [:n_nat, :q_ext]),
     # "PolyMinJuMP"       => ([:m, :halfdeg], [1, 2], [:n_nat, :q_ext]),
-    # "PolyNormJuMP"      => ([:L1, :n, :dr, :d, :m], [5, 1, 2, 3, 4], Symbol[]),
+    "PolyNormJuMP"      => ([:L1, :n, :dr, :d, :m], [5, 1, 2, 3, 4], Symbol[]),
     # "PortfolioJuMP"     => ([:k], [1], Symbol[]),
-    "RandomPolyMatJuMP" => ([:n, :d, :m], [1, 2, 3], Symbol[]),
+    # "RandomPolyMatJuMP" => ([:n, :d, :m], [1, 2, 3], Symbol[]),
     # "ShapeConRegrJuMP"  => ([:m, :deg], [1, 5], [:n_nat, :q_nat, :n_ext]),
     )
 
@@ -33,7 +33,8 @@ function post_process()
         @info("starting $ex_name with params: $ex_params")
         # uncomment functions to run for each example
         make_wide_csv(all_df, ex_name, ex_params)
-        make_table_tex_polys(ex_name, ex_params, inst_solvers) # requires running make_wide_csv
+        # make_table_tex_polys(ex_name, ex_params, inst_solvers) # requires running make_wide_csv
+        make_table_tex_polynorm_l2(ex_name, ex_params, inst_solvers)
         # make_plot_csv(ex_name, ex_params) # requires running make_wide_csv
         @info("finished $ex_name")
     end
@@ -66,7 +67,7 @@ function make_all_df()
     transform!(
         all_df,
         [:inst_set, :solver] => ((x, y) -> x .* "_" .* y) => :inst_solver,
-        [:x_viol, :y_viol, :z_viol, :rel_obj_diff] => ByRow((res...) -> residual_tol_satisfied(res)) => :converged,
+        [:x_viol, :y_viol, :z_viol, :rel_obj_diff] => ByRow((res...) -> residual_tol_satisfied(coalesce.(res, NaN))) => :converged,
         :status => ByRow(x -> status_map[x]) => :status,
         )
     return all_df
@@ -106,7 +107,7 @@ function make_wide_csv(all_df, ex_name, ex_params)
         ]
     unstacked_res = [
         unstack(ex_df, inst_keys, :inst_solver, v, renamecols = x -> Symbol(v, :_, x))
-        for v in [:status, :converged, :iters, :solve_time]
+        for v in [:status, :converged, :iters, :solve_time, :prim_obj]
         ]
     ex_df_wide = join(unstacked_dims..., unstacked_res..., on = inst_keys)
     CSV.write(ex_wide_file(ex_name), ex_df_wide)
@@ -211,20 +212,20 @@ function make_table_tex_polynorm_l2(ex_name, ex_params, inst_solvers)
     sep = " & "
     ex_tex = open(joinpath(output_folder, ex_name * "_table.tex"), "w")
     for df1 in groupby(filter!(:L1 => (x -> !x), ex_df_wide), :n)
-        print(ex_tex, "\\multirow{$(nrow(df1))}{*}{$(df1[1, :n])}\n")
+        print(ex_tex, "\\multirow{$(8)}{*}{$(df1[1, :n])}\n")
         for df2 in groupby(df1, :dr)
-            print(ex_tex, sep, "\\multirow{$(nrow(df2))}{*}{$(df2[1, :dr])}\n")
+            print(ex_tex, sep, "\\multirow{$(div(nrow(df2), 2))}{*}{$(df2[1, :dr])}\n")
             add_sep = false
-            for df3 in gropuby(df2, [:n, :dr, :m])
+            for df3 in groupby(df2, [:n, :dr, :m])
                 row_str = (add_sep ? sep : "")
                 add_sep = true
+                row_str *= sep * process_entry(df3[1, :m])
                 for row in eachrow(df3)
-                    row_str *= sep * process_entry(row[:m])
                     for inst_solver in inst_solvers
                         row_str *= sep * process_entry(row[Symbol(:status_, inst_solver)], row[Symbol(:converged_, inst_solver)])
                         row_str *= sep * process_entry(row[Symbol(:solve_time_, inst_solver)])
                     end
-                    obj_diff = row[:prim_obj_Hypatia_ext] / row[:prim_obj_Hypatia_nat]
+                    obj_diff = row[:prim_obj_ext_Hypatia] / row[:prim_obj_nat_Hypatia]
                     row_str *= sep * process_entry(obj_diff)
                 end
                 row_str *= " \\\\\n"
