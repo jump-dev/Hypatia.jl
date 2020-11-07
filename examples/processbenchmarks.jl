@@ -2,7 +2,7 @@ using Printf
 using CSV
 using DataFrames
 
-bench_file = joinpath(homedir(), "bench/bench_polynorml2.csv")
+bench_file = joinpath(homedir(), "bench/bench_rpm.csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 # uncomment examples to run
@@ -14,9 +14,9 @@ examples_params = Dict(
     # "MatrixRegressionJuMP" => ([:m], [2], all_dims),
     # "NearestPSDJuMP"    => ([:compl, :d], [2, 1], [:n_nat, :q_ext]),
     # "PolyMinJuMP"       => ([:m, :halfdeg], [1, 2], [:n_nat, :q_ext]),
-    "PolyNormJuMP"      => ([:L1, :n, :dr, :d, :m], [5, 1, 2, 3, 4], Symbol[]),
+    # "PolyNormJuMP"      => ([:L1, :n, :dr, :d, :m], [5, 1, 2, 3, 4], Symbol[]),
     # "PortfolioJuMP"     => ([:k], [1], Symbol[]),
-    # "RandomPolyMatJuMP" => ([:n, :d, :m], [1, 2, 3], Symbol[]),
+    "RandomPolyMatJuMP" => ([:n, :d, :m], [1, 2, 3], Symbol[]),
     # "ShapeConRegrJuMP"  => ([:m, :deg], [1, 5], [:n_nat, :q_nat, :n_ext]),
     )
 
@@ -33,8 +33,8 @@ function post_process()
         @info("starting $ex_name with params: $ex_params")
         # uncomment functions to run for each example
         make_wide_csv(all_df, ex_name, ex_params)
-        # make_table_tex_polys(ex_name, ex_params, inst_solvers) # requires running make_wide_csv
-        make_table_tex_polynorm_l2(ex_name, ex_params, inst_solvers)
+        make_table_tex_polys(ex_name, ex_params, inst_solvers) # requires running make_wide_csv
+        # make_table_tex_polynorm_l2(ex_name, ex_params, inst_solvers)
         # make_plot_csv(ex_name, ex_params) # requires running make_wide_csv
         @info("finished $ex_name")
     end
@@ -63,7 +63,8 @@ residual_tol_satisfied(a, tol = 1e-6) = (all(isfinite, a) && maximum(a) < tol)
 relative_tol_satisfied(a::T, b::T, tol::T = 1e-5) where {T <: Real} = (abs(a - b) / (1 + max(abs(a), abs(b))) < tol)
 
 function make_all_df()
-    all_df = DataFrame(CSV.File(bench_file))
+    # all_df = DataFrame(CSV.File(bench_file))
+    all_df = CSV.read(bench_file, DataFrame) # julia/CSV main
     transform!(
         all_df,
         [:inst_set, :solver] => ((x, y) -> x .* "_" .* y) => :inst_solver,
@@ -172,7 +173,8 @@ end
 
 function make_table_tex_polys(ex_name, ex_params, inst_solvers)
     @info("making table tex for $ex_name")
-    ex_df_wide = CSV.read(ex_wide_file(ex_name))
+    # ex_df_wide = CSV.read(ex_wide_file(ex_name))
+    ex_df_wide = CSV.read(ex_wide_file(ex_name), DataFrame) # CSV/julia main
 
     sep = " & "
     ex_tex = open(joinpath(output_folder, ex_name * "_table.tex"), "w")
@@ -207,7 +209,8 @@ end
 
 function make_table_tex_polynorm_l2(ex_name, ex_params, inst_solvers)
     @info("making table tex for $ex_name")
-    ex_df_wide = CSV.read(ex_wide_file(ex_name))
+    # ex_df_wide = CSV.read(ex_wide_file(ex_name))
+    ex_df_wide = CSV.read(ex_wide_file(ex_name), DataFrame) # CSV/julia main
 
     sep = " & "
     ex_tex = open(joinpath(output_folder, ex_name * "_table.tex"), "w")
