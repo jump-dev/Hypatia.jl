@@ -1,7 +1,6 @@
 
 shapeconregr_n_ds = [
     [
-    [
     (2, 2), # compile run
     (2, 5),
     (2, 10),
