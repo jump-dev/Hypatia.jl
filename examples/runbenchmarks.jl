@@ -20,14 +20,14 @@ examples_dir = @__DIR__
 include(joinpath(examples_dir, "common_JuMP.jl"))
 
 # path to write results DataFrame to CSV, if any
-results_path = joinpath(homedir(), "bench", "bench_nocorr1.csv")
+results_path = joinpath(homedir(), "bench", "bench.csv")
 # results_path = nothing
 
 spawn_runs = true # spawn new process for each instance
 # spawn_runs = false
 
-# setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
-setup_model_anyway = false
+setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
+# setup_model_anyway = false
 
 verbose = true # make solvers print output
 # verbose = false
@@ -65,7 +65,7 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
 instance_sets = [
     ("nat", hyp_solver),
     ("ext", hyp_solver),
-    # ("ext", mosek_solver),
+    ("ext", mosek_solver),
     ]
 
 # models to run
@@ -79,7 +79,7 @@ JuMP_example_names = [
     # "polymin",
     # "polynorm",
     # "portfolio",
-    "randompolymat",
+    # "randompolymat",
     # "shapeconregr",
     ]
 

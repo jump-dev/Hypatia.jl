@@ -76,10 +76,10 @@ polynorm_insts(use_l1::Bool, use_norm_cone::Bool, d_factors::Vector{Int}) = [
 insts = Dict()
 insts["nat"] = (nothing, vcat(
     polynorm_insts(false, true, [1, 2]),
-    # polynorm_insts(true, true, [1,]),
+    polynorm_insts(true, true, [1,]),
     ))
 insts["ext"] = (nothing, vcat(
     polynorm_insts(false, false, [1, 2]),
-    # polynorm_insts(true, false, [1,]),
+    polynorm_insts(true, false, [1,]),
     ))
 return (PolyNormJuMP, insts)
