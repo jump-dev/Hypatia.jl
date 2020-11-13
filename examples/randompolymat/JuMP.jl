@@ -26,14 +26,16 @@ function build(inst::RandomPolyMatJuMP{T}) where {T <: Float64}
     JuMP.@variable(model, q_poly[1:(U * svec_dim)])
 
     # generate random polynomial matrix H and symmetrize
-    # full_mat = [randn(U) for _ in 1:R, _ in 1:R]
-    full_mat = [V * rand(-9:9, U) for _ in 1:R, _ in 1:R]
-    for j in 1:R, i in 1:j
-        full_mat[i, j] .+= full_mat[j, i]
-        full_mat[j, i] .= full_mat[i, j]
+    full_coeffs = [Vector{JuMP.AffExpr}(undef, U) for _ in 1:R, _ in 1:R]
+    idx = 1
+    for j in 1:R
+        for i in 1:(j - 1)
+            full_coeffs[i, j] = full_coeffs[j, i] = V * rand(-9:9, U) - q_poly[Cones.block_idxs(U, idx)]
+            idx += 1
+        end
+        full_coeffs[j, j] = V * rand(-9:9, U) - q_poly[Cones.block_idxs(U, idx)]
+        idx += 1
     end
-    svec_idx(row::Int, col::Int) = (row >= col ? Cones.svec_idx(row, col) : Cones.svec_idx(col, row))
-    full_coeffs = full_mat - [q_poly[Cones.block_idxs(U, svec_idx(i, j))] for j in 1:R, i in 1:R]
 
     if inst.use_matrixwsos
         JuMP.@constraint(model, vcat([full_coeffs[i, j] * (i == j ? 1 : sqrt(2)) for j in 1:R for i in 1:j]...) in Hypatia.WSOSInterpPosSemidefTriCone{Float64}(R, U, Ps))
