@@ -67,19 +67,22 @@ polynorm_l1_n_d_ms = [
     ],
     ]
 
-polynorm_insts(use_l1::Bool, use_norm_cone::Bool, d_factors::Vector{Int}) = [
-    [(n, d, f * d, m, use_l1, use_norm_cone) for (n, d, m) in ndms]
+polynorm_insts(use_l1::Bool, use_norm_cone::Bool, use_wsos::Bool, d_factors::Vector{Int}) = [
+    [(n, d, f * d, m, use_l1, use_norm_cone, use_wsos) for (n, d, m) in ndms]
     for f in d_factors
     for ndms in (use_l1 ? polynorm_l1_n_d_ms : polynorm_l2_n_d_ms)
     ]
 
 insts = Dict()
 insts["nat"] = (nothing, vcat(
-    polynorm_insts(false, true, [1, 2]),
-    polynorm_insts(true, true, [1,]),
+    polynorm_insts(false, true, false, [1, 2]),
+    polynorm_insts(true, true, false, [1,]),
     ))
-insts["ext"] = (nothing, vcat(
-    polynorm_insts(false, false, [1, 2]),
-    polynorm_insts(true, false, [1,]),
+insts["extwsos"] = (nothing, vcat(
+    polynorm_insts(false, false, true, [1, 2]),
+    polynorm_insts(true, false, true, [1,]),
     ))
+insts["extwsospsd"] = (nothing,
+    polynorm_insts(false, false, false, [1, 2]),
+    )
 return (PolyNormJuMP, insts)

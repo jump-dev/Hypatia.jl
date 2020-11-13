@@ -8,7 +8,8 @@ struct PolyNormJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     epi_halfdeg::Int # half of maximum degree of epigraph / all polynomial components in the WSOS-like cone
     num_polys::Int
     use_l1::Bool # use epigraph of one norm, otherwise Euclidean norm
-    use_norm_cone::Bool # use Euclidean / one norm cone, otherwise use WSOS matrix / WSOS cones
+    use_norm_cone::Bool # use Euclidean / L1 norm WSOS cones
+    use_wsos::Bool # use WSOS cone, if false and solving Euclidean norm problem, will use matrix WSOS
 end
 
 function build(inst::PolyNormJuMP{T}) where {T <: Float64}
@@ -44,18 +45,44 @@ function build(inst::PolyNormJuMP{T}) where {T <: Float64}
         JuMP.@constraint(model, lhs in Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps))
     else
         R = num_polys + 1
-        polyvec = zeros(JuMP.AffExpr, div(R * (R + 1), 2) * U)
-        # construct vectorized arrow matrix polynomial
+        svec_dim = div(R * (R + 1), 2)
+        polyvec = zeros(JuMP.AffExpr, svec_dim * U)
         polyvec[1:U] .= f
-        idx = 2
-        rt2 = sqrt(T(2))
-        for i in 1:inst.num_polys
-            polyvec[Cones.block_idxs(U, idx)] .= rt2 * polys[:, i]
-            idx += i
-            polyvec[Cones.block_idxs(U, idx)] .= f
-            idx += 1
+
+        if !inst.use_wsos
+            idx = 2
+            rt2 = sqrt(T(2))
+            for i in 1:inst.num_polys
+                polyvec[Cones.block_idxs(U, idx)] = rt2 * polys[:, i]
+                idx += i
+                polyvec[Cones.block_idxs(U, idx)] = f
+                idx += 1
+            end
+            cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(R, U, Ps)
+        else
+            ypts = zeros(svec_dim, R)
+            ypts[1, 1] = 1
+            idx = 2
+            for j in 2:R
+                polyvec[Cones.block_idxs(U, idx)] = 2 * (polys[:, j - 1] + f)
+                ypts[idx, 1] = ypts[idx, j] = 1
+                idx += 1
+                for i in 2:(j - 1)
+                    polyvec[Cones.block_idxs(U, idx)] = 2 * f
+                    ypts[idx, i] = ypts[idx, j] = 1
+                    idx += 1
+                end
+                polyvec[Cones.block_idxs(U, idx)] = f
+                ypts[idx, j] = 1
+                idx += 1
+            end
+            new_Ps = Matrix{Float64}[]
+            for P in Ps
+                push!(new_Ps, kron(ypts, P))
+            end
+            cone = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U * svec_dim, new_Ps)
         end
-        JuMP.@constraint(model, polyvec in Hypatia.WSOSInterpPosSemidefTriCone{Float64}(R, U, Ps))
+        JuMP.@constraint(model, polyvec in cone)
     end
 
     return model

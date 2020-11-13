@@ -2,7 +2,7 @@ using Printf
 using CSV
 using DataFrames
 
-bench_file = joinpath(homedir(), "bench/bench_rpm.csv")
+bench_file = joinpath(homedir(), "bench/bench_polynorml1.csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 # uncomment examples to run
@@ -14,9 +14,9 @@ examples_params = Dict(
     # "MatrixRegressionJuMP" => ([:m], [2], all_dims),
     # "NearestPSDJuMP"    => ([:compl, :d], [2, 1], [:n_nat, :q_ext]),
     # "PolyMinJuMP"       => ([:m, :halfdeg], [1, 2], [:n_nat, :q_ext]),
-    # "PolyNormJuMP"      => ([:L1, :n, :dr, :d, :m], [5, 1, 2, 3, 4], Symbol[]),
+    "PolyNormJuMP"      => ([:L1, :n, :dr, :d, :m], [5, 1, 2, 3, 4], Symbol[]),
     # "PortfolioJuMP"     => ([:k], [1], Symbol[]),
-    "RandomPolyMatJuMP" => ([:n, :d, :m], [1, 2, 3], Symbol[]),
+    # "RandomPolyMatJuMP" => ([:n, :d, :m], [1, 2, 3], Symbol[]),
     # "ShapeConRegrJuMP"  => ([:m, :deg], [1, 5], [:n_nat, :q_nat, :n_ext]),
     )
 
@@ -137,7 +137,7 @@ process_entry(x) = string(x)
 function process_inst_solver(row, inst_solver)
     sep = " & "
     row_str = sep * process_entry(row[Symbol(:status_, inst_solver)], row[Symbol(:converged_, inst_solver)])
-    row_str *= sep * process_entry(row[Symbol(:iters_, inst_solver)])
+    # row_str *= sep * process_entry(row[Symbol(:iters_, inst_solver)])
     row_str *= sep * process_entry(row[Symbol(:solve_time_, inst_solver)])
     return row_str
 end
@@ -198,9 +198,9 @@ function make_table_tex_polys(ex_name, ex_params, inst_solvers)
                 row_str *= " \\\\\n"
                 print(ex_tex, row_str)
             end
-            print(ex_tex, "\\cmidrule(lr){2-11}\n")
+            print(ex_tex, "\\cmidrule(lr){2-7}\n")
         end
-        print(ex_tex, "\\cmidrule(lr){2-11}\n")
+        print(ex_tex, "\\cmidrule(lr){1-7}\n")
     end
     close(ex_tex)
 
@@ -215,7 +215,7 @@ function make_table_tex_polynorm_l2(ex_name, ex_params, inst_solvers)
     sep = " & "
     ex_tex = open(joinpath(output_folder, ex_name * "_table.tex"), "w")
     for df1 in groupby(filter!(:L1 => (x -> !x), ex_df_wide), :n)
-        print(ex_tex, "\\multirow{$(8)}{*}{$(df1[1, :n])}\n")
+        print(ex_tex, "\\multirow{$(10)}{*}{$(df1[1, :n])}\n")
         for df2 in groupby(df1, :dr)
             print(ex_tex, sep, "\\multirow{$(div(nrow(df2), 2))}{*}{$(df2[1, :dr])}\n")
             add_sep = false
@@ -228,15 +228,15 @@ function make_table_tex_polynorm_l2(ex_name, ex_params, inst_solvers)
                         row_str *= sep * process_entry(row[Symbol(:status_, inst_solver)], row[Symbol(:converged_, inst_solver)])
                         row_str *= sep * process_entry(row[Symbol(:solve_time_, inst_solver)])
                     end
-                    obj_diff = row[:prim_obj_ext_Hypatia] / row[:prim_obj_nat_Hypatia]
+                    obj_diff = row[:prim_obj_extwsos_Hypatia] / row[:prim_obj_nat_Hypatia]
                     row_str *= sep * process_entry(obj_diff)
                 end
                 row_str *= " \\\\\n"
                 print(ex_tex, row_str)
             end
-            print(ex_tex, "\\cmidrule(lr){2-13}\n")
+            print(ex_tex, "\\cmidrule(lr){2-17}\n")
         end
-        print(ex_tex, "\\cmidrule(lr){1-13}\n")
+        print(ex_tex, "\\cmidrule(lr){1-17}\n")
     end
     close(ex_tex)
 
