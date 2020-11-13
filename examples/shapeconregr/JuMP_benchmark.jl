@@ -19,7 +19,6 @@ shapeconregr_n_ds = [
     ],
     [
     (3, 2), # compile run
-    (4, 2),
     (4, 3),
     (4, 4),
     (4, 5),
@@ -47,17 +46,14 @@ shapeconregr_n_ds = [
     [
     (3, 2), # compile run
     (12, 2),
-    (12, 3),
     ],
     [
     (3, 2), # compile run
     (14, 2),
-    (14, 3),
     ],
     [
     (3, 2), # compile run
     (16, 2),
-    (16, 3),
     ],
     ]
 shapeconregr_insts(use_nat::Bool) = [

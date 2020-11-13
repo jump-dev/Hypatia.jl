@@ -29,7 +29,6 @@ polymin_n_ds = [
     ],
     [
     (3, 2), # compile run
-    (4, 4),
     (4, 6),
     (4, 8),
     (4, 10),
@@ -56,7 +55,6 @@ polymin_n_ds = [
     [
     (3, 2), # compile run
     (64, 1),
-    (64, 2),
     ],
     ]
 polymin_insts(use_nat::Bool) = [
