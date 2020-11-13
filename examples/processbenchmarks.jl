@@ -2,7 +2,7 @@ using Printf
 using CSV
 using DataFrames
 
-bench_file = joinpath(homedir(), "bench/bench_polynorml1.csv")
+bench_file = joinpath(@__DIR__, "bench.csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 # uncomment examples to run
@@ -147,7 +147,7 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         ]
     unstacked_res = [
         unstack(ex_df, inst_keys, :inst_solver, v, renamecols = x -> Symbol(v, :_, x))
-        for v in [:status, :converged, :iters, :solve_time, :prim_obj]
+        for v in [:status, :converged, :iters, :solve_time]
         ]
     ex_df_wide = join(unstacked_dims..., unstacked_res..., on = inst_keys)
     CSV.write(ex_wide_file(ex_name), ex_df_wide)
@@ -177,7 +177,7 @@ process_entry(x) = string(x)
 function process_inst_solver(row, inst_solver)
     sep = " & "
     row_str = sep * process_entry(row[Symbol(:status_, inst_solver)], row[Symbol(:converged_, inst_solver)])
-    # row_str *= sep * process_entry(row[Symbol(:iters_, inst_solver)])
+    row_str *= sep * process_entry(row[Symbol(:iters_, inst_solver)])
     row_str *= sep * process_entry(row[Symbol(:solve_time_, inst_solver)])
     return row_str
 end
