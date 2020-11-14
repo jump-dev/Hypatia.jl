@@ -77,7 +77,9 @@ JuMP_example_names = [
     # "matrixregression",
     # "nearestpsd",
     # "polymin",
+    # "polynorm",
     # "portfolio",
+    # "randompolymat",
     # "shapeconregr",
     ]
 

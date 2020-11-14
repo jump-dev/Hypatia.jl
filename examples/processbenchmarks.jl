@@ -103,7 +103,6 @@ status_map = Dict(
 residual_tol_satisfied(a, tol = 1e-6) = (all(isfinite, a) && maximum(a) < tol)
 relative_tol_satisfied(a::T, b::T, tol::T = 1e-5) where {T <: Real} = (abs(a - b) / (1 + max(abs(a), abs(b))) < tol)
 
-
 ex_wide_file(ex_name::String) = joinpath(output_folder, ex_name * "_wide.csv")
 
 function make_wide_csv(ex_df, ex_name, ex_params)

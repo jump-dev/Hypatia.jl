@@ -69,6 +69,7 @@ JuMP_example_names = [
     "polymin",
     "polynorm",
     "portfolio",
+    "randompolymat",
     "regionofattr",
     "robustgeomprog",
     "secondorderpoly",
