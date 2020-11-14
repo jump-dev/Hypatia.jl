@@ -78,11 +78,10 @@ insts["nat"] = (nothing, vcat(
     polynorm_insts(false, true, false, [1, 2]),
     polynorm_insts(true, true, false, [1,]),
     ))
-insts["extwsos"] = (nothing, vcat(
+insts["ext"] = (nothing, vcat(
     polynorm_insts(false, false, true, [1, 2]),
+    polynorm_insts(false, false, false, [1, 2]),
     polynorm_insts(true, false, true, [1,]),
     ))
-insts["extwsospsd"] = (nothing,
-    polynorm_insts(false, false, false, [1, 2]),
-    )
+
 return (PolyNormJuMP, insts)
