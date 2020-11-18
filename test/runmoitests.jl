@@ -33,16 +33,16 @@ default_options = (
 @testset "MOI.Test tests" begin
     println("\nstarting MOI.Test tests")
     options = [
-        (Float64, Solvers.SymIndefSparseSystemSolver, false),
-        (Float64, Solvers.QRCholDenseSystemSolver, true),
-        # (Float32, Solvers.QRCholDenseSystemSolver, false), # TODO fails a few
-        # (BigFloat, Solvers.QRCholDenseSystemSolver, true), # TODO uncomment when MOI has been tagged
+        (Float64, false),
+        (Float64, true),
+        (Float32, true),
+        (BigFloat, true),
         ]
-    for (T, system_solver, use_dense_model) in options
-        test_info = "$system_solver, $T, $use_dense_model"
+    for (T, use_dense_model) in options
+        test_info = "$T, $use_dense_model"
         @testset "$test_info" begin
             println(test_info, " ...")
-            test_time = @elapsed test_moi(T, system_solver = system_solver{T}(), use_dense_model = use_dense_model; default_options...)
+            test_time = @elapsed test_moi(T, use_dense_model = use_dense_model; default_options...)
             @printf("%8.2e seconds\n", test_time)
         end
     end
