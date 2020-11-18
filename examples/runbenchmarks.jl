@@ -23,8 +23,8 @@ include(joinpath(examples_dir, "common_JuMP.jl"))
 results_path = joinpath(homedir(), "bench", "bench.csv")
 # results_path = nothing
 
-spawn_runs = true # spawn new process for each instance
-# spawn_runs = false
+# spawn_runs = true # spawn new process for each instance
+spawn_runs = false
 
 setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
 # setup_model_anyway = false
@@ -64,7 +64,7 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
 # instance sets and solvers to run
 instance_sets = [
     ("nat", hyp_solver),
-    ("ext", hyp_solver),
+    # ("ext", hyp_solver),
     ("ext", mosek_solver),
     ]
 
@@ -74,7 +74,7 @@ JuMP_example_names = [
     # "expdesign",
     # "matrixcompletion",
     # "matrixquadratic",
-    # "matrixregression",
+    "matrixregression",
     # "nearestpsd",
     # "polymin",
     # "polynorm",
