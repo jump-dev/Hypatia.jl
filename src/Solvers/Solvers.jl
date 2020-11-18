@@ -68,7 +68,6 @@ mutable struct Solver{T <: Real}
     rescale::Bool
     init_use_indirect::Bool
     init_tol_qr::T
-    init_use_fallback::Bool
     stepper::Stepper{T}
     system_solver::SystemSolver{T}
 
@@ -153,7 +152,6 @@ mutable struct Solver{T <: Real}
         rescale::Bool = true,
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
-        init_use_fallback::Bool = true,
         stepper::Stepper{T} = default_stepper(T),
         system_solver::SystemSolver{T} = default_system_solver(T),
         ) where {T <: Real}
@@ -163,7 +161,7 @@ mutable struct Solver{T <: Real}
         if reduce
             @assert preprocess # cannot use reduction without preprocessing # TODO only need primal eq preprocessing
         end
-        @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
+        # @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
 
         if isnothing(default_tol_power)
             default_tol_power = (T <: LinearAlgebra.BlasReal ? 0.5 : 0.4)
@@ -203,7 +201,6 @@ mutable struct Solver{T <: Real}
         solver.rescale = rescale
         solver.init_use_indirect = init_use_indirect
         solver.init_tol_qr = init_tol_qr
-        solver.init_use_fallback = init_use_fallback
         solver.stepper = stepper
         solver.system_solver = system_solver
         solver.status = NotLoaded

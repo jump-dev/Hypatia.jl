@@ -47,7 +47,7 @@ conic_exclude = String[
 function test_moi(T::Type{<:Real}; solver_options...)
     optimizer = MOIU.CachingOptimizer(MOIU.UniversalFallback(MOIU.Model{T}()), Hypatia.Optimizer{T}(; solver_options...))
 
-    tol = sqrt(sqrt(Float64(eps(T)))) # TODO remove Float64, waiting for MOI to be tagged after https://github.com/jump-dev/MathOptInterface.jl/pull/1176
+    tol = sqrt(sqrt(eps(T))) # TODO remove Float64, waiting for MOI to be tagged after https://github.com/jump-dev/MathOptInterface.jl/pull/1176
     config = MOIT.TestConfig{T}(
         atol = tol,
         rtol = tol,

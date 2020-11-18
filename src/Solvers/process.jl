@@ -101,12 +101,8 @@ function find_initial_x(
     end
     if issparse(AG)
         if !(T <: Float64)
-            if solver.init_use_fallback
-                @warn("using dense factorization of [A; G] in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
-                AG_fact = qr!(Matrix(AG), Val(true))
-            else
-                error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot preprocess and find an initial point")
-            end
+            @warn("using dense factorization of [A; G] in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
+            AG_fact = qr!(Matrix(AG), Val(true))
         else
             AG_fact = qr(AG, tol = solver.init_tol_qr)
         end
@@ -198,12 +194,8 @@ function find_initial_y(
     # factorize A'
     if issparse(A)
         if !(T <: Float64)
-            if solver.init_use_fallback
-                @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
-                Ap_fact = qr!(Matrix(A'), Val(true))
-            else
-                error("sparse factorization for number type $T is not supported by SuiteSparse packages, so Hypatia cannot preprocess and find an initial point")
-            end
+            @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
+            Ap_fact = qr!(Matrix(A'), Val(true))
         else
             Ap_fact = qr(sparse(A'), tol = solver.init_tol_qr)
         end
@@ -338,12 +330,13 @@ function find_initial_y(
 end
 
 # NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
-# TODO could replace this with rank(Ap_fact) when available for both dense and sparse
-function get_rank_est(qr_fact, init_tol_qr::Real)
-    R = qr_fact.R
+# TODO could replace this with rank(qr_fact) when available for both dense and sparse
+get_rank_est(qr_fact::SuiteSparse.SPQR.QRSparse, init_tol_qr::Real) = rank(qr_fact)
+function get_rank_est(qr_fact::QRPivoted, init_tol_qr::Real)
+    factors = qr_fact.factors
     rank_est = 0
-    for i in 1:size(R, 1) # TODO could replace this with rank(AG_fact) when available for both dense and sparse
-        if abs(R[i, i]) > init_tol_qr
+    for i in diagind(factors)
+        if abs(factors[i]) > init_tol_qr
             rank_est += 1
         end
     end
