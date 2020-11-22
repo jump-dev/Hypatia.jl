@@ -142,7 +142,7 @@ function make_wide_csv(ex_df, ex_name, ex_params)
 
     # TODO check that ext nu,n,p,q agrees for each formulation-instance
     unstacked_dims = [
-        unstack(filter(:solver => (x -> x != "Mosek"), ex_df, view = true), inst_keys, :inst_ext, v, renamecols = x -> Symbol(v, :_, x))
+        unstack(ex_df, inst_keys, :inst_ext, v, renamecols = x -> Symbol(v, :_, x), allowduplicates = true)
         for v in [:nu, :n, :p, :q]
         ]
     unstacked_res = [
