@@ -122,13 +122,13 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         transform!(ex_df, :inst_data => ByRow(x -> eval(Meta.parse(x))[pos]) => name)
     end
 
-    inst_solvers = unique(ex_df[:inst_solver])
+    inst_solvers = unique(ex_df[:, :inst_solver])
     @info("instance solver combinations: $inst_solvers")
 
     # check objectives if solver claims optimality
     for group_df in groupby(ex_df, inst_keys)
         # check all pairs of converged results
-        co_idxs = findall(group_df[:status] .== "co")
+        co_idxs = findall(group_df[:, :status] .== "co")
         if length(co_idxs) >= 2
             for i in eachindex(co_idxs)
                 first_optval = group_df[co_idxs[i], :prim_obj]
@@ -140,10 +140,10 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         end
     end
 
-    # TODO check that ext npq agrees for each formulation-instance
+    # TODO check that ext nu,n,p,q agrees for each formulation-instance
     unstacked_dims = [
         unstack(ex_df, inst_keys, :inst_ext, v, renamecols = x -> Symbol(v, :_, x))
-        for v in [:n, :p, :q]
+        for v in [:nu, :n, :p, :q]
         ]
     unstacked_res = [
         unstack(ex_df, inst_keys, :inst_solver, v, renamecols = x -> Symbol(v, :_, x))
