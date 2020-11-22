@@ -7,52 +7,52 @@ output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 # uncomment examples to run
 examples_params = Dict(
-    # "DensityEstJuMP" => (
-    #     [:m, :deg], [2, 3],
-    #     [:EP,], [:n_nat, :n_EP]
-    #     # [:SEP,], [:n_nat, :n_SEP, :q_nat, :q_SEP]
-    #     # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :q_nat, :q_EP, :q_SEP]
-    #     ),
-    # "ExpDesignJuMP" => (
-    #     [:logdet, :k], [5, 1],
-    #     # [:EP,], [:n_nat, :n_EP, :q_nat, :q_EP]
-    #     [:SEP,], [:n_SEP, :q_nat, :q_SEP]
-    #     # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :q_nat, :q_EP, :q_SEP]
-    #     ),
-    # "MatrixCompletionJuMP" => (
-    #     [:k, :d], [1, 2],
-    #     [:EP,], [:n_EP, :p_nat, :q_EP]
-    #     # [:SEP,], [:n_nat, :n_SEP, :p_nat, :q_SEP]
-    #     # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :p_nat, :q_EP, :q_SEP]
-    #     ),
-    # "MatrixRegressionJuMP" => (
-    #     [:m], [2],
-    #     [:SEP,], [:n_nat, :n_SEP, :p_SEP, :q_nat, :q_SEP]
-    #     ),
-    # "NearestPSDJuMP" => (
-    #     [:compl, :d], [2, 1],
-    #     [:SEP,], [:n_nat, :q_SEP]
-    #     ),
-    # "PolyMinJuMP" => (
-    #     [:m, :halfdeg], [1, 2],
-    #     [:SEP,], [:n_nat, :q_SEP]
-    #     ),
-    # "PolyNormJuMP" => (
-    #     [:L1, :n, :d, :m], [5, 1, 3, 4],
-    #     [:SEP,], Symbol[]
-    #     ),
+    "DensityEstJuMP" => (
+        [:m, :deg], [2, 3],
+        [:EP,], [:n_nat, :n_EP]
+        # [:SEP,], [:n_nat, :n_SEP, :q_nat, :q_SEP]
+        # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :q_nat, :q_EP, :q_SEP]
+        ),
+    "ExpDesignJuMP" => (
+        [:logdet, :k], [5, 1],
+        # [:EP,], [:n_nat, :n_EP, :q_nat, :q_EP]
+        [:SEP,], [:n_SEP, :q_nat, :q_SEP]
+        # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :q_nat, :q_EP, :q_SEP]
+        ),
+    "MatrixCompletionJuMP" => (
+        [:k, :d], [1, 2],
+        [:EP,], [:n_EP, :p_nat, :q_EP]
+        # [:SEP,], [:n_nat, :n_SEP, :p_nat, :q_SEP]
+        # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :p_nat, :q_EP, :q_SEP]
+        ),
+    "MatrixRegressionJuMP" => (
+        [:m], [2],
+        [:SEP,], [:n_nat, :n_SEP, :p_SEP, :q_nat, :q_SEP]
+        ),
+    "NearestPSDJuMP" => (
+        [:compl, :d], [2, 1],
+        [:SEP,], [:n_nat, :q_SEP]
+        ),
+    "PolyMinJuMP" => (
+        [:m, :halfdeg], [1, 2],
+        [:SEP,], [:n_nat, :q_SEP]
+        ),
+    "PolyNormJuMP" => (
+        [:L1, :n, :d, :m], [5, 1, 3, 4],
+        [:SEP,], Symbol[]
+        ),
     "PortfolioJuMP" => (
         [:k], [1],
         [:SEP,], Symbol[]
         ),
-    # "RandomPolyMatJuMP" => (
-    #     [:n, :d, :m], [1, 2, 3],
-    #     [:SEP,], Symbol[]
-    #     ),
-    # "ShapeConRegrJuMP" => (
-    #     [:m, :deg], [1, 5],
-    #     [:SEP,], [:n_nat, :n_SEP, :q_nat]
-    #     ),
+    "RandomPolyMatJuMP" => (
+        [:n, :d, :m], [1, 2, 3],
+        [:SEP,], Symbol[]
+        ),
+    "ShapeConRegrJuMP" => (
+        [:m, :deg], [1, 5],
+        [:SEP,], [:n_nat, :n_SEP, :q_nat]
+        ),
     )
 
 @info("running examples: $(keys(examples_params))")
