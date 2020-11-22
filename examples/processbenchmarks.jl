@@ -7,52 +7,52 @@ output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 # uncomment examples to run
 examples_params = Dict(
-    "DensityEstJuMP" => (
-        [:m, :deg], [2, 3],
-        [:EP,], [:n_nat, :n_EP]
-        # [:SEP,], [:n_nat, :n_SEP, :q_nat, :q_SEP]
-        # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :q_nat, :q_EP, :q_SEP]
-        ),
-    "ExpDesignJuMP" => (
-        [:logdet, :k], [5, 1],
-        # [:EP,], [:n_nat, :n_EP, :q_nat, :q_EP]
-        [:SEP,], [:n_SEP, :q_nat, :q_SEP]
-        # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :q_nat, :q_EP, :q_SEP]
-        ),
-    "MatrixCompletionJuMP" => (
-        [:k, :d], [1, 2],
-        [:EP,], [:n_EP, :p_nat, :q_EP]
-        # [:SEP,], [:n_nat, :n_SEP, :p_nat, :q_SEP]
-        # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :p_nat, :q_EP, :q_SEP]
-        ),
-    "MatrixRegressionJuMP" => (
-        [:m], [2],
-        [:SEP,], [:n_nat, :n_SEP, :p_SEP, :q_nat, :q_SEP]
-        ),
-    "NearestPSDJuMP" => (
-        [:compl, :d], [2, 1],
-        [:SEP,], [:n_nat, :q_SEP]
-        ),
-    "PolyMinJuMP" => (
-        [:m, :halfdeg], [1, 2],
-        [:SEP,], [:n_nat, :q_SEP]
-        ),
-    "PolyNormJuMP" => (
-        [:L1, :n, :d, :m], [5, 1, 3, 4],
-        [:SEP,], Symbol[]
-        ),
+    # "DensityEstJuMP" => (
+    #     [:m, :deg], [2, 3],
+    #     [:EP,], [:n_nat, :n_EP]
+    #     # [:SEP,], [:n_nat, :n_SEP, :q_nat, :q_SEP]
+    #     # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :q_nat, :q_EP, :q_SEP]
+    #     ),
+    # "ExpDesignJuMP" => (
+    #     [:logdet, :k], [5, 1],
+    #     # [:EP,], [:n_nat, :n_EP, :q_nat, :q_EP]
+    #     [:SEP,], [:n_SEP, :q_nat, :q_SEP]
+    #     # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :q_nat, :q_EP, :q_SEP]
+    #     ),
+    # "MatrixCompletionJuMP" => (
+    #     [:k, :d], [1, 2],
+    #     [:EP,], [:n_EP, :p_nat, :q_EP]
+    #     # [:SEP,], [:n_nat, :n_SEP, :p_nat, :q_SEP]
+    #     # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :p_nat, :q_EP, :q_SEP]
+    #     ),
+    # "MatrixRegressionJuMP" => (
+    #     [:m], [2],
+    #     [:SEP,], [:n_nat, :n_SEP, :p_SEP, :q_nat, :q_SEP]
+    #     ),
+    # "NearestPSDJuMP" => (
+    #     [:compl, :d], [2, 1],
+    #     [:SEP,], [:n_nat, :q_SEP]
+    #     ),
+    # "PolyMinJuMP" => (
+    #     [:m, :halfdeg], [1, 2],
+    #     [:SEP,], [:n_nat, :q_SEP]
+    #     ),
+    # "PolyNormJuMP" => (
+    #     [:L1, :n, :d, :m], [5, 1, 3, 4],
+    #     [:SEP,], Symbol[]
+    #     ),
     "PortfolioJuMP" => (
         [:k], [1],
         [:SEP,], Symbol[]
         ),
-    "RandomPolyMatJuMP" => (
-        [:n, :d, :m], [1, 2, 3],
-        [:SEP,], Symbol[]
-        ),
-    "ShapeConRegrJuMP" => (
-        [:m, :deg], [1, 5],
-        [:SEP,], [:n_nat, :n_SEP, :q_nat]
-        ),
+    # "RandomPolyMatJuMP" => (
+    #     [:n, :d, :m], [1, 2, 3],
+    #     [:SEP,], Symbol[]
+    #     ),
+    # "ShapeConRegrJuMP" => (
+    #     [:m, :deg], [1, 5],
+    #     [:SEP,], [:n_nat, :n_SEP, :q_nat]
+    #     ),
     )
 
 @info("running examples: $(keys(examples_params))")
@@ -122,13 +122,13 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         transform!(ex_df, :inst_data => ByRow(x -> eval(Meta.parse(x))[pos]) => name)
     end
 
-    inst_solvers = unique(ex_df[:inst_solver])
+    inst_solvers = unique(ex_df[:, :inst_solver])
     @info("instance solver combinations: $inst_solvers")
 
     # check objectives if solver claims optimality
     for group_df in groupby(ex_df, inst_keys)
         # check all pairs of converged results
-        co_idxs = findall(group_df[:status] .== "co")
+        co_idxs = findall(group_df[:, :status] .== "co")
         if length(co_idxs) >= 2
             for i in eachindex(co_idxs)
                 first_optval = group_df[co_idxs[i], :prim_obj]
@@ -140,10 +140,10 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         end
     end
 
-    # TODO check that ext npq agrees for each formulation-instance
+    # TODO check that ext nu,n,p,q agrees for each formulation-instance
     unstacked_dims = [
         unstack(ex_df, inst_keys, :inst_ext, v, renamecols = x -> Symbol(v, :_, x))
-        for v in [:n, :p, :q]
+        for v in [:nu, :n, :p, :q]
         ]
     unstacked_res = [
         unstack(ex_df, inst_keys, :inst_solver, v, renamecols = x -> Symbol(v, :_, x))
