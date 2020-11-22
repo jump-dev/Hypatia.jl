@@ -2,7 +2,7 @@ using Printf
 using CSV
 using DataFrames
 
-bench_file = joinpath(@__DIR__, "bench.csv")
+bench_file = joinpath(homedir(), "bench", "bench.csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 # uncomment examples to run
@@ -122,19 +122,19 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         transform!(ex_df, :inst_data => ByRow(x -> eval(Meta.parse(x))[pos]) => name)
     end
 
-    inst_solvers = unique(ex_df[:, :inst_solver])
+    inst_solvers = unique(ex_df[!, :inst_solver])
     @info("instance solver combinations: $inst_solvers")
 
     # check objectives if solver claims optimality
     for group_df in groupby(ex_df, inst_keys)
         # check all pairs of converged results
-        co_idxs = findall(group_df[:, :status] .== "co")
+        co_idxs = findall(group_df[!, :status] .== "co")
         if length(co_idxs) >= 2
             for i in eachindex(co_idxs)
                 first_optval = group_df[co_idxs[i], :prim_obj]
                 other_optvals = group_df[co_idxs[Not(i)], :prim_obj]
                 if !all(relative_tol_satisfied.(other_optvals, first_optval))
-                    println("objective values of: $(ex_name) $(group_df[:inst_data][1]) do not agree")
+                    println("objective values of: $(ex_name) $(group_df[!, :inst_data][1]) do not agree")
                 end
             end
         end
@@ -142,14 +142,14 @@ function make_wide_csv(ex_df, ex_name, ex_params)
 
     # TODO check that ext nu,n,p,q agrees for each formulation-instance
     unstacked_dims = [
-        unstack(ex_df, inst_keys, :inst_ext, v, renamecols = x -> Symbol(v, :_, x))
+        unstack(filter(:solver => (x -> x != "Mosek"), ex_df), inst_keys, :inst_ext, v, renamecols = x -> Symbol(v, :_, x))
         for v in [:nu, :n, :p, :q]
         ]
     unstacked_res = [
         unstack(ex_df, inst_keys, :inst_solver, v, renamecols = x -> Symbol(v, :_, x))
         for v in [:status, :converged, :iters, :solve_time]
         ]
-    ex_df_wide = join(unstacked_dims..., unstacked_res..., on = inst_keys)
+    ex_df_wide = outerjoin(unstacked_dims..., unstacked_res..., on = inst_keys)
     CSV.write(ex_wide_file(ex_name), ex_df_wide)
 
     return (ex_df_wide, inst_solvers)
