@@ -2,7 +2,7 @@
 see description in native.jl
 
 allows objective to minimize frobenius norm or nuclear norm of residual matrix, plus regularization
-similar to https://arxiv.org/ftp/arxiv/papers/1405/1405.1207.pdf but with L1 instead of L2 regularization, for sparsity
+similar to https://arxiv.org/ftp/arxiv/papers/1405/1405.1207.pdf
 =#
 
 using SparseArrays
@@ -10,6 +10,7 @@ using SparseArrays
 struct MatrixRegressionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     Y::Matrix{T}
     X::Matrix{T}
+    nuc_obj::Bool # use nuclear norm loss, else squared loss
     lam_fro::Real # penalty on Frobenius norm
     lam_nuc::Real # penalty on nuclear norm
     lam_las::Real # penalty on l1 norm
@@ -25,7 +26,7 @@ function MatrixRegressionJuMP{Float64}(
     A_sparsity::Real = max(0.2, inv(sqrt(m * p))),
     Y_noise::Real = 0.01,
     )
-    # @assert p >= m
+    @assert p >= m
     @assert 1 <= A_max_rank <= m
     @assert 0 < A_sparsity <= 1
     A_left = sprandn(p, A_max_rank, A_sparsity)
@@ -35,6 +36,12 @@ function MatrixRegressionJuMP{Float64}(
     Y = X * A + Y_noise * randn(n, m)
     return MatrixRegressionJuMP{Float64}(Y, X, args...)
 end
+function MatrixRegressionJuMP{Float64}(n::Int, m::Int)
+    @assert n >= m >= 1
+    X = randn(n, m)
+    Y = randn(n, m)
+    return MatrixRegressionJuMP{Float64}(Y, X, true, 0.1, 0, 0, 0, 0)
+end
 
 function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64}
     (Y, X) = (inst.Y, inst.X)
@@ -42,25 +49,23 @@ function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64}
     (data_n, data_m) = size(Y)
     data_p = size(X, 2)
     @assert size(X, 1) == data_n
-    # @assert data_p >= data_m
-    # @assert !inst.nuc_obj || (data_n <= data_m)
-
+    @assert data_p >= data_m
+    @assert !inst.nuc_obj || data_m <= data_n
     model = JuMP.Model()
     JuMP.@variable(model, A[1:data_p, 1:data_m])
     JuMP.@variable(model, loss)
     loss_mat = Y - X * A
 
-    @show data_n, data_m, data_p
-    # if inst.nuc_obj
-        JuMP.@constraint(model, vcat(loss, vec(loss_mat)) in MOI.NormNuclearCone(data_n, data_m))
-    # else
-    #     if data_n > data_p
-    #         # dimension reduction via QR # TODO can similar be done for nuclear objective?
-    #         F = qr(X, Val(true))
-    #         loss_mat = (F.Q' * Y)[1:data_p, :] - F.R[1:data_p, 1:data_p] * F.P' * A
-    #     end
-    #     JuMP.@constraint(model, vcat(loss, 1, vec(loss_mat) / sqrt(data_n)) in JuMP.RotatedSecondOrderCone())
-    # end
+    if inst.nuc_obj
+        JuMP.@constraint(model, vcat(loss, vec(loss_mat')) in MOI.NormNuclearCone(data_m, data_n))
+    else
+        if data_n > data_p
+            # dimension reduction via QR
+            F = qr(X, Val(true))
+            loss_mat = (F.Q' * Y)[1:data_p, :] - F.R[1:data_p, 1:data_p] * F.P' * A
+        end
+        JuMP.@constraint(model, vcat(loss, 1, vec(loss_mat) / sqrt(data_n)) in JuMP.RotatedSecondOrderCone())
+    end
 
     obj = one(T) * loss
     if !iszero(inst.lam_fro)
@@ -102,15 +107,14 @@ function test_extra(inst::MatrixRegressionJuMP{T}, model::JuMP.Model) where T
         (Y, X) = (inst.Y, inst.X)
         A_opt = JuMP.value.(model.ext[:A_var])
         loss_mat = Y - X * A_opt
-        # if inst.nuc_obj
-            loss = sum(svd(loss_mat).S)
-        # else
-        #     loss = sum(abs2, loss_mat) / (2 * size(Y, 1))
-        # end
-
+        if inst.nuc_obj
+            loss = sum(svdvals(loss_mat))
+        else
+            loss = sum(abs2, loss_mat) / (2 * size(Y, 1))
+        end
         obj_result = loss +
             inst.lam_fro * norm(vec(A_opt), 2) +
-            inst.lam_nuc * sum(svd(A_opt).S) +
+            inst.lam_nuc * sum(svdvals(A_opt)) +
             inst.lam_las * norm(vec(A_opt), 1) +
             inst.lam_glr * sum(norm, eachrow(A_opt)) +
             inst.lam_glc * sum(norm, eachcol(A_opt))

@@ -23,11 +23,11 @@ include(joinpath(examples_dir, "common_JuMP.jl"))
 results_path = joinpath(homedir(), "bench", "bench.csv")
 # results_path = nothing
 
-# spawn_runs = true # spawn new process for each instance
-spawn_runs = false
+spawn_runs = true # spawn new process for each instance
+# spawn_runs = false
 
-setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
-# setup_model_anyway = false
+# setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
+setup_model_anyway = false
 
 verbose = true # make solvers print output
 # verbose = false
@@ -48,7 +48,7 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     tol_rel_opt = tol_loose,
     tol_feas = tol_loose,
     tol_infeas = tol_tight,
-    init_use_indirect = true, # skips dual equalities preprocessing
+    # init_use_indirect = true, # skips dual equalities preprocessing
     use_dense_model = true,
     ))
 mosek_solver = ("Mosek", Mosek.Optimizer, (
@@ -66,7 +66,7 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
 # instance sets and solvers to run
 instance_sets = [
     ("nat", hyp_solver),
-    # ("ext", hyp_solver),
+    ("ext", hyp_solver),
     ("ext", mosek_solver),
     ]
 

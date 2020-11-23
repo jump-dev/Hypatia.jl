@@ -73,7 +73,7 @@ function find_initial_x(
     rhs = vcat(model.b, model.h - init_s)
 
     # indirect method
-    # if solver.init_use_indirect || !isa(A, MatrixyAG) || !isa(G, MatrixyAG)
+    if solver.init_use_indirect || !isa(A, MatrixyAG) || !isa(G, MatrixyAG)
         # TODO pick lsqr or lsmr
         if iszero(p)
             AG = G
@@ -82,9 +82,9 @@ function find_initial_x(
             linmap(M) = LinearMaps.LinearMap(M)
             AG = vcat(linmap(A), linmap(G))
         end
-        @time init_x = IterativeSolvers.lsqr(AG, rhs)
+        init_x = IterativeSolvers.lsqr(AG, rhs)
         return init_x
-    # end
+    end
 
     # direct method
     if iszero(p)
@@ -107,9 +107,9 @@ function find_initial_x(
             AG_fact = qr(AG, tol = solver.init_tol_qr)
         end
     else
-        @time AG_fact = qr!(AG, Val(true))
+        AG_fact = qr!(AG, Val(true))
     end
-    @time AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
+    AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
 
     if !solver.preprocess || (AG_rank == n)
         AG_rank < n && @warn("some dual equalities appear to be dependent (possibly inconsistent); try using preprocess = true")

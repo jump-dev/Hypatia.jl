@@ -2,6 +2,9 @@
 regularized matrix regression problems
 
 min 1/(2n) * ||Y - X * A||_fro^2 + lam_fro * ||A||_fro + lam_nuc * ||A||_nuc + lam_lass * ||A||_las + lam_glr * ||A||_glr + lamb_glc * ||A||_glc
+- X is n x p
+- Y is n x m
+- A (variable) is p x m
 - ||.||_fro is the Frobenius norm
 - ||.||_nuc is the nuclear norm
 - ||.||_las is the L1 norm
