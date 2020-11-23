@@ -6,5 +6,5 @@ expdesign_insts = [
 
 insts = Dict()
 insts["nat"] = (nothing, expdesign_insts)
-insts["ext"] = (ExpPSDOptimizer, expdesign_insts)
+insts["ext"] = (SOCExpPSDOptimizer, expdesign_insts)
 return (ExpDesignJuMP, insts)

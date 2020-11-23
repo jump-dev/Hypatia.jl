@@ -30,12 +30,29 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     moi_other_cones::Vector{MOI.AbstractVectorSet}
 
     function Optimizer{T}(;
-        use_dense_model::Bool = true,
-        solver_options...
+        use_dense_model::Bool = true, # TODO should depend on the size and sparsity of A, G in the model
+        solver_options... # TODO allow passing in a solver?
         ) where {T <: Real}
         opt = new{T}()
         opt.use_dense_model = use_dense_model
-        opt.solver = Solvers.Solver{T}(; solver_options...) # TODO allow passing in a solver?
+        if !haskey(solver_options, :system_solver)
+            # choose default system solver based on use_dense_model
+            sstype = (use_dense_model ? Solvers.QRCholDenseSystemSolver : Solvers.SymIndefSparseSystemSolver)
+            solver_options = (solver_options..., system_solver = sstype{T}())
+        end
+        if !haskey(solver_options, :preprocess)
+            # only preprocess if using dense model # TODO maybe should preprocess if sparse
+            solver_options = (solver_options..., preprocess = use_dense_model)
+        end
+        if !haskey(solver_options, :reduce)
+            # only reduce if using dense model
+            solver_options = (solver_options..., reduce = use_dense_model)
+        end
+        if !haskey(solver_options, :init_use_indirect)
+            # only use indirect if not using dense model
+            solver_options = (solver_options..., init_use_indirect = !use_dense_model)
+        end
+        opt.solver = Solvers.Solver{T}(; solver_options...)
         return opt
     end
 end

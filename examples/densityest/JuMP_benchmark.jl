@@ -59,5 +59,5 @@ densityest_insts(use_nat::Bool) = [
 
 insts = Dict()
 insts["nat"] = (nothing, densityest_insts(true))
-insts["ext"] = (ExpPSDOptimizer, densityest_insts(false))
+insts["ext"] = (SOCExpPSDOptimizer, densityest_insts(false))
 return (DensityEstJuMP, insts)
