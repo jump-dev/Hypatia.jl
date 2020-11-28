@@ -8,7 +8,9 @@ struct DensityEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     dataset_name::Symbol
     X::Matrix{T}
     deg::Int
+    geomean_obj::Bool # use geomean in objective, else sum of logs
     use_wsos::Bool # use WSOS cone formulation, else PSD formulation
+    use_nlog::Bool # if using log obj, use n-dim HypoPerLog cone, else use many 3-dim HypoPerLog cones
 end
 function DensityEstJuMP{Float64}(dataset_name::Symbol, deg::Int, use_wsos::Bool)
     X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
@@ -44,7 +46,17 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64}
     JuMP.@variable(model, f_pts[1:U])
 
     # objective epigraph
-    JuMP.@constraint(model, vcat(z, X_pts_polys' * f_pts) in MOI.GeometricMeanCone(1 + num_obs))
+    obj_vec = X_pts_polys' * f_pts
+    if inst.geomean_obj
+        JuMP.@constraint(model, vcat(z, obj_vec) in MOI.GeometricMeanCone(1 + num_obs))
+    elseif inst.use_nlog
+        JuMP.@constraint(model, vcat(z, 1, obj_vec) in Hypatia.HypoPerLogCone{Float64}(2 + num_obs))
+    else
+        # EF for big log cone using 3-dim log cones (equivalent to MOI exponential cones)
+        JuMP.@variable(model, y[1:num_obs])
+        JuMP.@constraint(model, z <= sum(y))
+        JuMP.@constraint(model, [i in 1:num_obs], [y[i], 1, obj_vec[i]] in MOI.ExponentialCone())
+    end
 
     # density integrates to 1
     JuMP.@constraint(model, dot(w, f_pts) == 1)

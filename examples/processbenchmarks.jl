@@ -8,52 +8,56 @@ output_folder = mkpath(joinpath(@__DIR__, "results"))
 # uncomment examples to run
 examples_params = Dict(
     "DensityEstJuMP" => (
-        [:m, :deg], [2, 3],
-        [:EP,], [:n_nat, :n_EP]
-        # [:SEP,], [:n_nat, :n_SEP, :q_nat, :q_SEP]
-        # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :q_nat, :q_EP, :q_SEP]
+        [:m, :twod], [2, 3],
+        # [:EP,], [:n_nat, :n_EP]
+        # [:SEP,], [:n_nat, :n_SEP, :q_SEP]
+        [:EP, :SEP], []#[:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
         ),
-    "ExpDesignJuMP" => (
-        [:logdet, :k], [5, 1],
-        # [:EP,], [:n_nat, :n_EP, :q_nat, :q_EP]
-        [:SEP,], [:n_SEP, :q_nat, :q_SEP]
-        # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :q_nat, :q_EP, :q_SEP]
-        ),
-    "MatrixCompletionJuMP" => (
-        [:k, :d], [1, 2],
-        [:EP,], [:n_EP, :p_nat, :q_EP]
-        # [:SEP,], [:n_nat, :n_SEP, :p_nat, :q_SEP]
-        # [:EP, :SEP], [:n_nat, :n_EP, :n_SEP, :p_nat, :q_EP, :q_SEP]
-        ),
-    "MatrixRegressionJuMP" => (
-        [:m], [2],
-        [:SEP,], [:n_nat, :n_SEP, :p_SEP, :q_nat, :q_SEP]
-        ),
-    "NearestPSDJuMP" => (
-        [:compl, :d], [2, 1],
-        [:SEP,], [:n_nat, :q_SEP]
-        ),
-    "PolyMinJuMP" => (
-        [:m, :halfdeg], [1, 2],
-        [:SEP,], [:n_nat, :q_SEP]
-        ),
-    "PolyNormJuMP" => (
-        [:L1, :n, :d, :m], [5, 1, 3, 4],
-        [:SEP,], Symbol[]
-        ),
-    "PortfolioJuMP" => (
-        [:k], [1],
-        [:SEP,], Symbol[]
-        ),
-    "RandomPolyMatJuMP" => (
-        [:n, :d, :m], [1, 2, 3],
-        [:SEP,], Symbol[]
-        ),
-    "ShapeConRegrJuMP" => (
-        [:m, :deg], [1, 5],
-        [:SEP,], [:n_nat, :n_SEP, :q_nat]
-        ),
+    # "ExpDesignJuMP" => (
+    #     [:logdet, :k], [5, 1],
+    #     # [:EP,], [:n_nat, :n_EP, :q_nat, :q_EP]
+    #     # [:SEP,], [:n_SEP, :q_nat, :q_SEP]
+    #     [:EP, :SEP], []# [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
+    #     ),
+    # "MatrixCompletionJuMP" => (
+    #     [:k, :d], [1, 2],
+    #     # [:EP,], [:n_EP, :p_nat, :q_EP]
+    #     # [:SEP,], [:n_SEP, :p_nat, :q_SEP]
+    #     [:EP, :SEP], [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
+    #     ),
+    # "MatrixRegressionJuMP" => (
+    #     [:k, :l], [2, 1],
+    #     [:SEP,], [:n_SEP, :q_nat]
+    #     ),
+    # "NearestPSDJuMP" => (
+    #     [:compl, :d], [2, 1],
+    #     [:SEP,], [:n_nat, :q_SEP]
+    #     ),
+    # "PolyMinJuMP" => (
+    #     [:m, :d], [1, 2],
+    #     [:SEP,], [:n_nat, :q_SEP]
+    #     ),
+    # # "PolyNormJuMP" => (
+    # #     [:L1, :n, :d, :m], [5, 1, 3, 4],
+    # #     [:SEP,], Symbol[]
+    # #     ),
+    # "PortfolioJuMP" => (
+    #     [:k], [1],
+    #     [:SEP,], Symbol[]
+    #     ),
+    # # "RandomPolyMatJuMP" => (
+    # #     [:n, :d, :m], [1, 2, 3],
+    # #     [:SEP,], Symbol[]
+    # #     ),
+    # "ShapeConRegrJuMP" => (
+    #     [:m, :twod], [1, 5],
+    #     [:SEP,], [:n_nat, :n_SEP, :q_nat]
+    #     ),
     )
+
+print_table_solvers =
+    true # add solver results to tex tables
+    # false # just put formulation sizes in tex tables
 
 @info("running examples: $(keys(examples_params))")
 
@@ -79,28 +83,26 @@ end
 
 extender_map = Dict(
     "nothing" => "",
-    "SOCExpPSDOptimizer" => "SEP",
     "ExpPSDOptimizer" => "EP",
+    "SOCExpPSDOptimizer" => "SEP",
     )
 
 # TODO distinguish dying on model building vs solve/check
 status_map = Dict(
+    "SetupModelCaughtError" => "m",
+    "SetupModelKilledTime" => "m",
+    "SetupModelKilledMemory" => "m",
     "Optimal" => "co",
-    "KilledTime" => "tl",
     "TimeLimit" => "tl",
+    "SolveCheckKilledTime" => "tl",
+    "SolveCheckKilledMemory" => "rl",
     "SlowProgress" => "sp",
     "NumericalFailure" => "er",
     "SkippedSolveCheck" => "sk",
-    "SetupModelKilledTime" => "tl",
-    "SolveCheckKilledTime" => "tl",
-    "SetupModelKilledMemory" => "rl",
-    "SolveCheckKilledMemory" => "rl",
-    # TODO remove if not needed
-    "SetupModelCaughtError" => "er",
-    "SolveCheckCaughtError" => "er",
+    "SolveCheckCaughtError" => "other",
     )
 
-residual_tol_satisfied(a, tol = 1e-6) = (all(isfinite, a) && maximum(a) < tol)
+residual_tol_satisfied(a, tol = 1e-5) = (all(isfinite, a) && maximum(a) < tol)
 relative_tol_satisfied(a::T, b::T, tol::T = 1e-5) where {T <: Real} = (abs(a - b) / (1 + max(abs(a), abs(b))) < tol)
 
 ex_wide_file(ex_name::String) = joinpath(output_folder, ex_name * "_wide.csv")
@@ -122,13 +124,13 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         transform!(ex_df, :inst_data => ByRow(x -> eval(Meta.parse(x))[pos]) => name)
     end
 
-    inst_solvers = unique(ex_df[!, :inst_solver])
+    inst_solvers = unique(ex_df[:, :inst_solver])
     @info("instance solver combinations: $inst_solvers")
 
     # check objectives if solver claims optimality
     for group_df in groupby(ex_df, inst_keys)
-        # check all pairs of converged results
-        co_idxs = findall(group_df[!, :status] .== "co")
+        # check all pairs of verified converged results
+        co_idxs = findall((group_df[:, :status] .== "co") .& group_df[:, :converged])
         if length(co_idxs) >= 2
             for i in eachindex(co_idxs)
                 first_optval = group_df[co_idxs[i], :prim_obj]
@@ -142,11 +144,11 @@ function make_wide_csv(ex_df, ex_name, ex_params)
 
     # TODO check that ext nu,n,p,q agrees for each formulation-instance
     unstacked_dims = [
-        unstack(ex_df, inst_keys, :inst_ext, v, renamecols = x -> Symbol(v, :_, x), allowduplicates = true)
+        unstack(ex_df, inst_keys, :inst_ext, v, renamecols = x -> Symbol(v, :_, x), allowduplicates=true)
         for v in [:nu, :n, :p, :q]
         ]
     unstacked_res = [
-        unstack(ex_df, inst_keys, :inst_solver, v, renamecols = x -> Symbol(v, :_, x))
+        unstack(ex_df, inst_keys, :inst_solver, v, renamecols = x -> Symbol(v, :_, x), allowduplicates=true)
         for v in [:status, :converged, :iters, :solve_time]
         ]
     ex_df_wide = outerjoin(unstacked_dims..., unstacked_res..., on = inst_keys)
@@ -155,11 +157,13 @@ function make_wide_csv(ex_df, ex_name, ex_params)
     return (ex_df_wide, inst_solvers)
 end
 
-process_entry(::Missing) = "\$\\ast\$"
-process_entry(::Missing, ::Missing) = "sk"
-process_entry(x::Int) = (isnan(x) ? "\$\\ast\$" : string(x))
+string_ast = "\$\\ast\$"
+process_entry_round(x::Float64) = (isnan(x) ? string_ast : string(round(Int, x)))
+process_entry_round(x) = process_entry(x)
+process_entry(::Missing) = string_ast
+process_entry(::Missing, ::Missing) = "sk" # no data so instance was skipped
 function process_entry(x::Float64)
-    isnan(x) && return "\$\\ast\$"
+    isnan(x) && return string_ast
     @assert x > 0
     # if x < 0.99
     #     str = @sprintf("%.2f", x)
@@ -190,7 +194,9 @@ function make_table_tex(ex_name, ex_params, ex_df_wide, inst_solvers)
     sep = " & "
     ex_tex = open(joinpath(output_folder, ex_name * "_table.tex"), "w")
     header_str = prod(string(s) * sep for s in vcat(inst_keys, print_sizes))
-    header_str *= prod(s * " & & & " for s in inst_solvers)
+    if print_table_solvers
+        header_str *= prod(s * " & & & " for s in inst_solvers)
+    end
     header_str = replace(header_str[1:(end - 2)], "_" => " ") * "\\\\"
     println(ex_tex, header_str)
     for row in eachrow(ex_df_wide)
@@ -199,10 +205,12 @@ function make_table_tex(ex_name, ex_params, ex_df_wide, inst_solvers)
             row_str *= sep * process_entry(row[i])
         end
         for s in print_sizes
-            row_str *= sep * process_entry(row[s])
+            row_str *= sep * process_entry_round(row[s]) # NOTE rounds nu to integer
         end
-        for inst_solver in inst_solvers
-            row_str *= process_inst_solver(row, inst_solver)
+        if print_table_solvers
+            for inst_solver in inst_solvers
+                row_str *= process_inst_solver(row, inst_solver)
+            end
         end
         row_str *= " \\\\"
         println(ex_tex, row_str)

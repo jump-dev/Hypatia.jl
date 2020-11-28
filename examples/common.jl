@@ -49,7 +49,7 @@ function certificate_violations(
     # TODO elseif status == Solvers.IllPosed # primal vs dual ill-posed statuses and conditions
     else
         if status != Solvers.Optimal
-            println("status $status not handled, but computing optimality certficate violations anyway")
+            println("status $status not handled, but computing optimality certificate violations anyway")
         end
         x_res = G' * z + A' * y + c
         y_res = A * x - b
