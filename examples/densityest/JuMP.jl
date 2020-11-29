@@ -22,7 +22,7 @@ function DensityEstJuMP{Float64}(dataset_name::Symbol, deg::Int, use_wsos::Bool)
     return DensityEstJuMP{Float64}(dataset_name, X, deg, use_wsos)
 end
 function DensityEstJuMP{Float64}(num_obs::Int, n::Int, args...)
-    X = 1.99 * (rand(num_obs, n) .- 0.5)
+    X = 2 * rand(num_obs, n) .- 1
     return DensityEstJuMP{Float64}(:Random, X, args...)
 end
 
@@ -36,7 +36,7 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64}
     (U, _, Ps, V, w) = ModelUtilities.interpolate(domain, halfdeg, calc_V = true, calc_w = true)
     # TODO maybe incorporate this interp-basis transform into MU, and do something smarter for uni/bi-variate
     F = qr!(Array(V'), Val(true))
-    V_X = ModelUtilities.make_chebyshev_vandermonde(X, 2halfdeg)
+    V_X = ModelUtilities.make_chebyshev_vandermonde(X, 2 * halfdeg)
     X_pts_polys = F \ V_X'
 
     model = JuMP.Model()
@@ -58,7 +58,7 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64}
     end
 
     # density integrates to 1
-    JuMP.@constraint(model, dot(w, f_pts) == U)
+    JuMP.@constraint(model, dot(w, f_pts) == 1)
 
     # density nonnegative
     if inst.use_wsos
