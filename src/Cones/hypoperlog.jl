@@ -76,7 +76,8 @@ function update_feas(cone::HypoPerLog{T}) where T
 
     if v > eps(T) && all(>(eps(T)), w)
         u = cone.point[1]
-        cone.lwv = sum(log, w) - length(w) * log(v)
+        # cone.lwv = sum(log, w) - length(w) * log(v)
+        cone.lwv = sum(log(wi / v) for wi in w)
         cone.z = v * cone.lwv - u
         cone.is_feas = (cone.z > eps(T))
     else

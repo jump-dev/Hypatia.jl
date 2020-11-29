@@ -22,7 +22,7 @@ function DensityEstJuMP{Float64}(dataset_name::Symbol, deg::Int, use_wsos::Bool)
     return DensityEstJuMP{Float64}(dataset_name, X, deg, use_wsos)
 end
 function DensityEstJuMP{Float64}(num_obs::Int, n::Int, args...)
-    X = 1.99 * rand(num_obs, n) .- 1
+    X = 1.99 * (rand(num_obs, n) .- 0.5)
     return DensityEstJuMP{Float64}(:Random, X, args...)
 end
 
@@ -38,7 +38,6 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64}
     F = qr!(Array(V'), Val(true))
     V_X = ModelUtilities.make_chebyshev_vandermonde(X, 2 * halfdeg)
     X_pts_polys = F \ V_X'
-    X_pts_polys .*= U
 
     model = JuMP.Model()
     JuMP.@variable(model, z)
