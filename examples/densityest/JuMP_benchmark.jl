@@ -49,13 +49,9 @@ densityest_n_ds = [
     (3, 2), # compile run
     (32, 1),
     ],
-    [
-    (3, 2), # compile run
-    (64, 1),
-    ],
     ]
 densityest_insts(use_nat::Bool) = [
-    [(ceil(Int, 1.1 * binomial(n + 2d, n)), n, 2d, false, use_nat,  use_nat) for (n, d) in nds]
+    [(binomial(n + 2d, n), n, 2d, false, use_nat, use_nat) for (n, d) in nds]
     for nds in densityest_n_ds
     ]
 

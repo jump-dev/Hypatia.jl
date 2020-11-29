@@ -12,10 +12,8 @@
 
 matrixregression_insts = [
     vcat((4, 3), [(n, m) for n in ns]) # includes compile run
-    # for (m, ns) in ((15, 100:100:1000), (30, 50:50:500))
-    for (m, ns) in ((15, vcat(50:50:200, 400:200:2000)), (30, vcat(25:25:100, 200:100:1000)))
+    for (m, ns) in ((15, vcat(50:50:150, 250:250:3000)), (30, vcat(50:50:150, 250:250:1500)))
     ]
-
 
 insts = Dict()
 insts["nat"] = (nothing, matrixregression_insts)

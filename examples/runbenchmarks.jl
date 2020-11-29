@@ -48,7 +48,7 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     tol_rel_opt = tol_loose,
     tol_feas = tol_loose,
     tol_infeas = tol_tight,
-    init_use_indirect = true, # skips dual equalities preprocessing
+    # init_use_indirect = true, # skips dual equalities preprocessing
     use_dense_model = true,
     ))
 mosek_solver = ("Mosek", Mosek.Optimizer, (

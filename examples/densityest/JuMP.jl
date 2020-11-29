@@ -14,10 +14,15 @@ struct DensityEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 function DensityEstJuMP{Float64}(dataset_name::Symbol, deg::Int, use_wsos::Bool)
     X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
+    # rescale X to be in unit box
+    minX = minimum(X, dims = 1)
+    maxX = maximum(X, dims = 1)
+    X .-= (minX + maxX) / 2
+    X ./= (maxX - minX) / 2
     return DensityEstJuMP{Float64}(dataset_name, X, deg, use_wsos)
 end
 function DensityEstJuMP{Float64}(num_obs::Int, n::Int, args...)
-    X = randn(num_obs, n)
+    X = 1.99 * (rand(num_obs, n) .- 0.5)
     return DensityEstJuMP{Float64}(:Random, X, args...)
 end
 
@@ -25,12 +30,6 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64}
     X = inst.X
     (num_obs, n) = size(X)
     domain = ModelUtilities.Box{Float64}(-ones(n), ones(n)) # domain is unit box [-1,1]^n
-
-    # rescale X to be in unit box
-    minX = minimum(X, dims = 1)
-    maxX = maximum(X, dims = 1)
-    X .-= (minX + maxX) / 2
-    X ./= (maxX - minX) / 2
 
     # setup interpolation
     halfdeg = div(inst.deg + 1, 2)
@@ -59,7 +58,7 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64}
     end
 
     # density integrates to 1
-    JuMP.@constraint(model, dot(w, f_pts) == 1)
+    JuMP.@constraint(model, dot(w, f_pts) == U)
 
     # density nonnegative
     if inst.use_wsos
