@@ -26,8 +26,8 @@ results_path = joinpath(homedir(), "bench", "bench.csv")
 spawn_runs = true # spawn new process for each instance
 # spawn_runs = false
 
-# setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
-setup_model_anyway = false
+setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
+# setup_model_anyway = false
 
 verbose = true # make solvers print output
 # verbose = false
@@ -48,7 +48,7 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     tol_rel_opt = tol_loose,
     tol_feas = tol_loose,
     tol_infeas = tol_tight,
-    # init_use_indirect = true, # skips dual equalities preprocessing
+    init_use_indirect = true, # skips dual equalities preprocessing
     use_dense_model = true,
     ))
 mosek_solver = ("Mosek", Mosek.Optimizer, (
@@ -72,7 +72,7 @@ instance_sets = [
 
 # models to run
 JuMP_example_names = [
-    "densityest",
+    # "densityest",
     # "expdesign",
     # "matrixcompletion",
     # "matrixquadratic",

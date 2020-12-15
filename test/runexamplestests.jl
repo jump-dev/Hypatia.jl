@@ -16,8 +16,8 @@ results_path = nothing
 
 # default options to solvers
 default_options = (
-    # verbose = false,
-    verbose = true,
+    verbose = false,
+    # verbose = true,
     default_tol_relax = 10,
     )
 
@@ -26,13 +26,13 @@ instance_sets = [
     ("minimal", Float64, 60),
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
-    ("fast", Float64, 60),
+    # ("fast", Float64, 60),
     # ("slow", Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
+    "native",
     "JuMP",
     ]
 
@@ -52,31 +52,31 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    # "centralpolymat",
-    # "conditionnum",
-    # "contraction",
-    # "densityest",
-    # "envelope",
-    # "expdesign",
-    # "lotkavolterra",
-    # "lyapunovstability",
-    # "matrixcompletion",
-    # "matrixquadratic",
+    "centralpolymat",
+    "conditionnum",
+    "contraction",
+    "densityest",
+    "envelope",
+    "expdesign",
+    "lotkavolterra",
+    "lyapunovstability",
+    "matrixcompletion",
+    "matrixquadratic",
     "matrixregression",
-    # "maxvolume",
-    # "muconvexity",
-    # "nearestpsd",
-    # "polymin",
-    # "polynorm",
-    # "portfolio",
-    # "randompolymat",
-    # "regionofattr",
-    # "robustgeomprog",
-    # "secondorderpoly",
-    # "semidefinitepoly",
-    # "shapeconregr",
-    # "signomialmin",
-    # "stabilitynumber",
+    "maxvolume",
+    "muconvexity",
+    "nearestpsd",
+    "polymin",
+    "polynorm",
+    "portfolio",
+    "randompolymat",
+    "regionofattr",
+    "robustgeomprog",
+    "secondorderpoly",
+    "semidefinitepoly",
+    "shapeconregr",
+    "signomialmin",
+    "stabilitynumber",
     ]
 
 perf = DataFrames.DataFrame(
@@ -137,10 +137,10 @@ for (inst_set, real_T, time_limit) in instance_sets
 end
 end
 
-println("\n")
-DataFrames.show(perf, allrows = true, allcols = true)
-println("\n")
-@show sum(perf[:iters])
-@show sum(perf[:solve_time])
+# println("\n")
+# DataFrames.show(perf, allrows = true, allcols = true)
+# println("\n")
+# @show sum(perf[:iters])
+# @show sum(perf[:solve_time])
 end
 ;
