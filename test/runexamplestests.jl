@@ -109,7 +109,8 @@ perf = DataFrames.DataFrame(
 isnothing(results_path) || CSV.write(results_path, perf)
 
 @testset "examples tests" begin
-@testset "$ex_name" for mod_type in model_types, ex_name in eval(Symbol(mod_type, "_example_names"))
+@testset "$mod_type" for mod_type in model_types
+@testset "$ex_name" for ex_name in eval(Symbol(mod_type, "_example_names"))
 include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
 (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, mod_type * "_test.jl"))
 
@@ -136,11 +137,12 @@ for (inst_set, real_T, time_limit) in instance_sets
     end
 end
 end
+end
 
 # println("\n")
 # DataFrames.show(perf, allrows = true, allcols = true)
 # println("\n")
-# @show sum(perf[:iters])
-# @show sum(perf[:solve_time])
+# @show sum(perf[!, :iters])
+# @show sum(perf[!, :solve_time])
 end
 ;

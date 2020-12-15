@@ -4,10 +4,12 @@ densityest_n_ds = [
     (1, 3), # compile run
     (1, 50),
     (1, 100),
-    (1, 200),
+    (1, 250),
     (1, 500),
     (1, 1000),
     (1, 1500),
+    (1, 2000),
+    (1, 2500),
     ],
     [
     (2, 2), # compile run
@@ -19,7 +21,6 @@ densityest_n_ds = [
     ],
     [
     (3, 2), # compile run
-    (3, 3),
     (3, 6),
     (3, 9),
     (3, 12),
@@ -27,7 +28,6 @@ densityest_n_ds = [
     ],
     [
     (3, 2), # compile run
-    (4, 2),
     (4, 4),
     (4, 6),
     (4, 8),
@@ -36,24 +36,15 @@ densityest_n_ds = [
     (3, 2), # compile run
     (8, 2),
     (8, 3),
-    (8, 4),
     ],
     [
     (3, 2), # compile run
     (16, 1),
     (16, 2),
     ],
-    [
-    (3, 2), # compile run
-    (32, 1),
-    ],
-    [
-    (3, 2), # compile run
-    (64, 1),
-    ],
     ]
 densityest_insts(use_nat::Bool) = [
-    [(ceil(Int, 1.1 * binomial(n + 2d, n)), n, 2d, use_nat) for (n, d) in nds]
+    [(500, n, 2d, false, use_nat, use_nat) for (n, d) in nds]
     for nds in densityest_n_ds
     ]
 

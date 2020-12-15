@@ -1,6 +1,7 @@
 
 matrixregression_insts = [
-    [(ceil(Int, 6m), m, 5m, 0, 0.2, 0, 0, 0) for m in vcat(3, 5:5:55)] # includes compile run
+    vcat((4, 3), [(n, m) for n in ns]) # includes compile run
+    for (m, ns) in ((15, vcat(50:50:150, 250:250:3000)), (30, vcat(50:50:150, 250:250:1500)))
     ]
 
 insts = Dict()

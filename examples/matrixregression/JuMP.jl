@@ -1,5 +1,8 @@
 #=
 see description in native.jl
+
+allows objective to minimize frobenius norm or nuclear norm of residual matrix, plus regularization
+similar to https://arxiv.org/ftp/arxiv/papers/1405/1405.1207.pdf
 =#
 
 using SparseArrays
@@ -7,6 +10,7 @@ using SparseArrays
 struct MatrixRegressionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     Y::Matrix{T}
     X::Matrix{T}
+    nuc_obj::Bool # use nuclear norm loss, else squared loss
     lam_fro::Real # penalty on Frobenius norm
     lam_nuc::Real # penalty on nuclear norm
     lam_las::Real # penalty on l1 norm
@@ -32,6 +36,12 @@ function MatrixRegressionJuMP{Float64}(
     Y = X * A + Y_noise * randn(n, m)
     return MatrixRegressionJuMP{Float64}(Y, X, args...)
 end
+function MatrixRegressionJuMP{Float64}(n::Int, m::Int)
+    @assert n >= m >= 1
+    X = randn(n, m)
+    Y = randn(n, m)
+    return MatrixRegressionJuMP{Float64}(Y, X, true, 0.1, 0, 0, 0, 0)
+end
 
 function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64}
     (Y, X) = (inst.Y, inst.X)
@@ -40,21 +50,24 @@ function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64}
     data_p = size(X, 2)
     @assert size(X, 1) == data_n
     @assert data_p >= data_m
-
+    @assert !inst.nuc_obj || data_m <= data_n
     model = JuMP.Model()
     JuMP.@variable(model, A[1:data_p, 1:data_m])
     JuMP.@variable(model, loss)
-    if data_n > data_p
-        # dimension reduction via QR
-        F = qr(X, Val(true))
-        loss_mat = (F.Q' * Y)[1:data_p, :] - F.R[1:data_p, 1:data_p] * F.P' * A
-    else
-        loss_mat = Y - X * A
-    end
-    JuMP.@constraint(model, vcat(loss, 1, vec(loss_mat) / sqrt(data_n)) in JuMP.RotatedSecondOrderCone())
-    # JuMP.@constraint(model, vcat(loss, vec(loss_mat)) in MOI.NormOneCone(1 + length(loss_mat)))
+    loss_mat = Y - X * A
 
-    obj = loss
+    if inst.nuc_obj
+        JuMP.@constraint(model, vcat(loss, vec(loss_mat')) in MOI.NormNuclearCone(data_m, data_n))
+    else
+        if data_n > data_p
+            # dimension reduction via QR
+            F = qr(X, Val(true))
+            loss_mat = (F.Q' * Y)[1:data_p, :] - F.R[1:data_p, 1:data_p] * F.P' * A
+        end
+        JuMP.@constraint(model, vcat(loss, 1, vec(loss_mat) / sqrt(data_n)) in JuMP.RotatedSecondOrderCone())
+    end
+
+    obj = one(T) * loss
     if !iszero(inst.lam_fro)
         JuMP.@variable(model, t_fro)
         JuMP.@constraint(model, vcat(t_fro, inst.lam_fro * vec(A)) in JuMP.SecondOrderCone())
@@ -93,10 +106,15 @@ function test_extra(inst::MatrixRegressionJuMP{T}, model::JuMP.Model) where T
         # check objective value is correct
         (Y, X) = (inst.Y, inst.X)
         A_opt = JuMP.value.(model.ext[:A_var])
-        loss = sum(abs2, Y - X * A_opt) / (2 * size(Y, 1))
+        loss_mat = Y - X * A_opt
+        if inst.nuc_obj
+            loss = sum(svdvals(loss_mat))
+        else
+            loss = sum(abs2, loss_mat) / (2 * size(Y, 1))
+        end
         obj_result = loss +
             inst.lam_fro * norm(vec(A_opt), 2) +
-            inst.lam_nuc * sum(svd(A_opt).S) +
+            inst.lam_nuc * sum(svdvals(A_opt)) +
             inst.lam_las * norm(vec(A_opt), 1) +
             inst.lam_glr * sum(norm, eachrow(A_opt)) +
             inst.lam_glc * sum(norm, eachcol(A_opt))
