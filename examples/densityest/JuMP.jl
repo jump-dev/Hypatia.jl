@@ -12,14 +12,14 @@ struct DensityEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_wsos::Bool # use WSOS cone formulation, else PSD formulation
     use_nlog::Bool # if using log obj, use n-dim HypoPerLog cone, else use many 3-dim HypoPerLog cones
 end
-function DensityEstJuMP{Float64}(dataset_name::Symbol, deg::Int, use_wsos::Bool)
+function DensityEstJuMP{Float64}(dataset_name::Symbol, deg::Int, args...)
     X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)
     maxX = maximum(X, dims = 1)
     X .-= (minX + maxX) / 2
     X ./= (maxX - minX) / 2
-    return DensityEstJuMP{Float64}(dataset_name, X, deg, use_wsos)
+    return DensityEstJuMP{Float64}(dataset_name, X, deg, args...)
 end
 function DensityEstJuMP{Float64}(num_obs::Int, n::Int, args...)
     X = 1.99 * (rand(num_obs, n) .- 0.5)
