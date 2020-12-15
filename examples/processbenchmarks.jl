@@ -5,54 +5,54 @@ using DataFrames
 bench_file = joinpath(@__DIR__, "bench.csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
-# uncomment examples to run
+# uncomment examples to process
 examples_params = Dict(
+    # Hypatia paper examples:
     "DensityEstJuMP" => (
-        [:m, :twod], [2, 3],
-        # [:EP,], [:n_nat, :n_EP]
-        # [:SEP,], [:n_nat, :n_SEP, :q_SEP]
-        [:EP, :SEP], []#[:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
+        [:m, :twok], [2, 3],
+        [:SEP,], [:nu_nat, :n_nat, :n_SEP]
         ),
-    # "ExpDesignJuMP" => (
-    #     [:logdet, :k], [5, 1],
-    #     # [:EP,], [:n_nat, :n_EP, :q_nat, :q_EP]
-    #     # [:SEP,], [:n_SEP, :q_nat, :q_SEP]
-    #     [:EP, :SEP], []# [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
-    #     ),
-    # "MatrixCompletionJuMP" => (
-    #     [:k, :d], [1, 2],
-    #     # [:EP,], [:n_EP, :p_nat, :q_EP]
-    #     # [:SEP,], [:n_SEP, :p_nat, :q_SEP]
-    #     [:EP, :SEP], [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
-    #     ),
-    # "MatrixRegressionJuMP" => (
-    #     [:k, :l], [2, 1],
-    #     [:SEP,], [:n_SEP, :q_nat]
-    #     ),
-    # "NearestPSDJuMP" => (
-    #     [:compl, :d], [2, 1],
-    #     [:SEP,], [:n_nat, :q_SEP]
-    #     ),
-    # "PolyMinJuMP" => (
-    #     [:m, :d], [1, 2],
-    #     [:SEP,], [:n_nat, :q_SEP]
-    #     ),
-    # # "PolyNormJuMP" => (
-    # #     [:L1, :n, :d, :m], [5, 1, 3, 4],
-    # #     [:SEP,], Symbol[]
-    # #     ),
-    # "PortfolioJuMP" => (
-    #     [:k], [1],
-    #     [:SEP,], Symbol[]
-    #     ),
-    # # "RandomPolyMatJuMP" => (
-    # #     [:n, :d, :m], [1, 2, 3],
-    # #     [:SEP,], Symbol[]
-    # #     ),
-    # "ShapeConRegrJuMP" => (
-    #     [:m, :twod], [1, 5],
-    #     [:SEP,], [:n_nat, :n_SEP, :q_nat]
-    #     ),
+    "ExpDesignJuMP" => (
+        [:logdet, :k], [5, 1],
+        # [:EP,], [:n_nat, :n_EP, :q_nat, :q_EP]
+        # [:SEP,], [:n_SEP, :q_nat, :q_SEP]
+        [:EP, :SEP], [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
+        ),
+    "MatrixCompletionJuMP" => (
+        [:m, :k], [1, 2],
+        # [:EP,], [:n_EP, :p_nat, :q_EP]
+        # [:SEP,], [:n_SEP, :p_nat, :q_SEP]
+        [:EP, :SEP], [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
+        ),
+    "MatrixRegressionJuMP" => (
+        [:m, :k], [2, 1],
+        [:SEP,], [:n_SEP, :q_nat]
+        ),
+    "NearestPSDJuMP" => (
+        [:compl, :k], [2, 1],
+        [:SEP,], [:n_nat, :q_SEP]
+        ),
+    "PolyMinJuMP" => (
+        [:m, :k], [1, 2],
+        [:SEP,], [:nu_nat, :n_nat, :q_SEP]
+        ),
+    "PortfolioJuMP" => (
+        [:k], [1],
+        [:SEP,], Symbol[]
+        ),
+    "ShapeConRegrJuMP" => (
+        [:m, :twok], [1, 5],
+        [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
+        ),
+    # SOS paper examples:
+    "PolyNormJuMP" => (
+        [:L1, :n, :d, :m], [5, 1, 3, 4],
+        [:SEP,], Symbol[]
+        ),
+    "RandomPolyMatJuMP" => (
+        [:n, :d, :m], [1, 2, 3],
+        [:SEP,], Symbol[]
+        ),
     )
 
 print_table_solvers =
@@ -87,7 +87,6 @@ extender_map = Dict(
     "SOCExpPSDOptimizer" => "SEP",
     )
 
-# TODO distinguish dying on model building vs solve/check
 status_map = Dict(
     "SetupModelCaughtError" => "m",
     "SetupModelKilledTime" => "m",
@@ -142,7 +141,6 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         end
     end
 
-    # TODO check that ext nu,n,p,q agrees for each formulation-instance
     unstacked_dims = [
         unstack(ex_df, inst_keys, :inst_ext, v, renamecols = x -> Symbol(v, :_, x), allowduplicates=true)
         for v in [:nu, :n, :p, :q]
@@ -165,10 +163,6 @@ process_entry(::Missing, ::Missing) = "sk" # no data so instance was skipped
 function process_entry(x::Float64)
     isnan(x) && return string_ast
     @assert x > 0
-    # if x < 0.99
-    #     str = @sprintf("%.2f", x)
-    #     return str[2:end]
-    # elseif x < 10
     if x < 10
         return @sprintf("%.1f", x)
     else
