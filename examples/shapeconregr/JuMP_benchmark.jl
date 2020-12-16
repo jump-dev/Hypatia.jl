@@ -51,10 +51,6 @@ shapeconregr_n_ds = [
     (3, 2), # compile run
     (14, 2),
     ],
-    [
-    (3, 2), # compile run
-    (16, 2),
-    ],
     ]
 shapeconregr_insts(use_nat::Bool) = [
     [(n, ceil(Int, 1.1 * binomial(n + 2d, n)), :func4, 100.0, 2d, use_nat, false, false, true, false) for (n, d) in nds]
