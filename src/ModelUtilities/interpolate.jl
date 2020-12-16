@@ -6,7 +6,7 @@ TODO put unused domains into polymin example (note ball and ellipse require GSL 
 
 interp_sample(dom::FreeDomain{T}, npts::Int) where {T <: Real} = interp_sample(Box{T}(-ones(T, dom.n), ones(T, dom.n)), npts)
 
-get_weights(::FreeDomain{T}, ::AbstractMatrix{T}) where {T <: Real} = T[]
+get_weights(::FreeDomain{T}, ::AbstractMatrix{T}) where {T <: Real} = Vector{T}[]
 
 # interp_sample(dom::SemiFreeDomain, npts::Int) = hcat(interp_sample(dom.restricted_halfregion, npts), interp_sample(dom.restricted_halfregion, npts))
 #
@@ -133,10 +133,10 @@ function wsos_box_params(
     pscale = [T(0.5) * (dom.u[mod(j - 1, get_dimension(dom)) + 1] - dom.l[mod(j - 1, get_dimension(dom)) + 1]) for j in 1:n]
     pshift = [T(0.5) * (dom.u[mod(j - 1, get_dimension(dom)) + 1] + dom.l[mod(j - 1, get_dimension(dom)) + 1]) for j in 1:n]
     @views Wtsfun = (j -> sqrt.(1 .- abs2.(pts[:, j])) * pscale[j])
-    PWts = [Wtsfun(j) .* P0sub for j in 1:get_dimension(dom)]
+    PWts = Matrix{T}[Wtsfun(j) .* P0sub for j in 1:get_dimension(dom)]
     trpts = pts .* pscale' .+ pshift'
 
-    return (U = U, pts = trpts, Ps = [P0, PWts...], V = V, w = w)
+    return (U = U, pts = trpts, Ps = Matrix{T}[P0, PWts...], V = V, w = w)
 end
 
 function wsos_box_params(
@@ -148,7 +148,7 @@ function wsos_box_params(
     ) where {T <: Real}
     # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
     (U, pts, P0, P0sub, V, w) = wsos_box_params(T, n, d, calc_V, calc_w)
-    return (U = U, pts = pts, Ps = [P0], V = V, w = w)
+    return (U = U, pts = pts, Ps = Matrix{T}[P0,], V = V, w = w)
 end
 
 function wsos_box_params(T::Type{<:Real}, n::Int, d::Int, calc_V::Bool, calc_w::Bool)
@@ -369,17 +369,17 @@ end
 
 # sampling-based point selection for general domains
 function wsos_sample_params(
-    dom::Domain,
+    dom::Domain{T},
     d::Int,
     calc_w::Bool,
     sample_factor::Int,
-    )
+    ) where {T <: Real}
     U = get_U(get_dimension(dom), d)
     candidate_pts = interp_sample(dom, U * sample_factor)
     (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, candidate_pts, d, calc_w)
     g = get_weights(dom, pts)
-    PWts = [sqrt.(gi) .* P0sub for gi in g]
-    return (U = U, pts = pts, Ps = [P0, PWts...], V = V, w = w)
+    PWts = Matrix{T}[sqrt.(gi) .* P0sub for gi in g]
+    return (U = U, pts = pts, Ps = Matrix{T}[P0, PWts...], V = V, w = w)
 end
 
 n_deg_exponents(n::Int, deg::Int) = [xp for t in 0:deg for xp in Combinatorics.multiexponents(n, t)]
