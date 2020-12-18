@@ -56,7 +56,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     update_lhs(solver.system_solver, solver)
 
     # decide whether to predict or center
-    is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))
+    is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05))) # TODO tune
     stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
     (rhs_fun_nocorr, rhs_fun_corr) = (is_pred ? (update_rhs_pred, update_rhs_predcorr) : (update_rhs_cent, update_rhs_centcorr))
 
@@ -78,11 +78,9 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
             # TODO change prev_alpha?
             alpha_nocorr = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3))
-            # @show alpha_nocorr
-
             if iszero(alpha_nocorr)
-                @warn("very small alpha for uncorrected direction ($(round(alpha_nocorr, digits = 4)))")
-                alpha_nocorr = T(0.5) # attempt recovery
+                # @warn("very small alpha for uncorrected direction ($alpha_nocorr)")
+                alpha_nocorr = T(0.5) # attempt recovery TODO tune
             end
 
             # get direction with correction
@@ -94,18 +92,17 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     # get alpha step length
     # TODO change prev_alpha?
     alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
-    if is_corrected && alpha < 0.99 * alpha_nocorr
-        @warn("alpha worse after correction ($(round(alpha, digits = 4)) < $(round(alpha_nocorr, digits = 4)))")
-        # TODO test whether this helps:
-        # step alpha_nocorr in uncorrected direction
-        # alpha = alpha_nocorr
-        # copyto!(dir.vec, dir_nocorr)
-    end
+    # if is_corrected && alpha < 0.99 * alpha_nocorr
+    #     @warn("alpha worse after correction ($alpha < $alpha_nocorr)")
+    #     # # TODO test whether this helps:
+    #     # # step alpha_nocorr in uncorrected direction
+    #     # alpha = alpha_nocorr
+    #     # copyto!(dir.vec, dir_nocorr)
+    # end
     stepper.prev_alpha = alpha
-
-    if !is_pred && alpha < 0.99
-        @warn("small alpha for centering step")
-    end
+    # if !is_pred && alpha < 0.99
+    #     @warn("small alpha for centering step")
+    # end
     if iszero(alpha)
         # TODO attempt recovery
         @warn("very small alpha")
