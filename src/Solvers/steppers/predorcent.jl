@@ -41,7 +41,7 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         stepper.dir_corr = zeros(T, dim)
     end
 
-    # stepper.line_searcher = LineSearcher{T}(model)
+    stepper.line_searcher = LineSearcher{T}(model)
 
     return stepper
 end
@@ -105,7 +105,7 @@ end
 #     # end
 #     if iszero(alpha)
 #         # TODO attempt recovery
-#         @warn("very small alpha")
+#         @warn("very small alpha; terminating")
 #         solver.status = NumericalFailure
 #         return false
 #     end
@@ -141,20 +141,25 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
     copyto!(dir_corr, dir.vec)
 
-    # get alpha
+    # get alpha and step
     cand = stepper.res # TODO rename?
     alpha = find_alpha_curve(point, cand, dir_nocorr, dir_corr, model)
-    stepper.prev_alpha = alpha
     if iszero(alpha)
-        # TODO attempt recovery
+        # try not using correction
         @warn("very small alpha")
-        solver.status = NumericalFailure
-        return false
+        copyto!(dir.vec, dir_nocorr)
+        alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-5), max_nbhd = T(0.9999))
+        if iszero(alpha)
+            @warn("very small alpha again; terminating")
+            solver.status = NumericalFailure
+            return false
+        end
+        @. point.vec += alpha * dir.vec
+    else
+        # TODO or just use mu and point that come out of find_alpha_curve
+        @. point.vec += alpha * (dir_nocorr + alpha * dir_corr)
     end
-
-    # step
-    # TODO or just use mu and point that come out of find_alpha_curve
-    @. point.vec += alpha * (dir_nocorr + alpha * dir_corr)
+    stepper.prev_alpha = alpha
     calc_mu(solver)
 
     return true
@@ -178,6 +183,7 @@ function find_alpha_curve(
 
     min_alpha = T(1e-3)
     alpha_reduce = T(0.95)
+    # TODO use an alpha schedule like T[0.9999, 0.99, 0.97, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0] or a log-scale
 
     alpha = T(0.9999)
     alpha /= alpha_reduce
@@ -191,6 +197,7 @@ function find_alpha_curve(
 
         @. cand.vec = point.vec + alpha * (dir_nocorr + alpha * dir_corr)
 
+        min(cand.tau[1], cand.kap[1]) < eps(T) && continue
         taukap_c = cand.tau[1] * cand.kap[1]
         (taukap_c < eps(T)) && continue
         for k in eachindex(cones)
