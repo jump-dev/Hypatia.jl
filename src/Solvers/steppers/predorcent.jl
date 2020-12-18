@@ -41,10 +41,81 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         stepper.dir_corr = zeros(T, dim)
     end
 
-    stepper.line_searcher = LineSearcher{T}(model)
+    # stepper.line_searcher = LineSearcher{T}(model)
 
     return stepper
 end
+
+# function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
+#     point = solver.point
+#     model = solver.model
+#     rhs = stepper.rhs
+#     dir = stepper.dir
+#
+#     # update linear system solver factorization
+#     update_lhs(solver.system_solver, solver)
+#
+#     # decide whether to predict or center
+#     is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05))) # TODO tune
+#     stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
+#     (rhs_fun_nocorr, rhs_fun_corr) = (is_pred ? (update_rhs_pred, update_rhs_predcorr) : (update_rhs_cent, update_rhs_centcorr))
+#
+#     # get direction
+#     rhs_fun_nocorr(solver, rhs)
+#     get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
+#     is_corrected = false
+#     if stepper.use_correction
+#         rhs_fun_corr(solver, rhs, dir)
+#         if !iszero(rhs.vec)
+#             dir_nocorr = stepper.dir_nocorr
+#             dir_corr = stepper.dir_corr
+#             copyto!(dir_nocorr, dir.vec)
+#             get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
+#             copyto!(dir_corr, dir.vec)
+#
+#             # get nocorr alpha step length
+#             copyto!(dir.vec, dir_nocorr)
+#             # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
+#             # TODO change prev_alpha?
+#             alpha_nocorr = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3))
+#             if iszero(alpha_nocorr)
+#                 # @warn("very small alpha for uncorrected direction ($alpha_nocorr)")
+#                 alpha_nocorr = T(0.5) # attempt recovery TODO tune
+#             end
+#
+#             # get direction with correction
+#             @. dir.vec = dir_nocorr + alpha_nocorr * dir_corr
+#             is_corrected = true
+#         end
+#     end
+#
+#     # get alpha step length
+#     # TODO change prev_alpha?
+#     alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
+#     # if is_corrected && alpha < 0.99 * alpha_nocorr
+#     #     @warn("alpha worse after correction ($alpha < $alpha_nocorr)")
+#     #     # # TODO test whether this helps:
+#     #     # # step alpha_nocorr in uncorrected direction
+#     #     # alpha = alpha_nocorr
+#     #     # copyto!(dir.vec, dir_nocorr)
+#     # end
+#     stepper.prev_alpha = alpha
+#     # if !is_pred && alpha < 0.99
+#     #     @warn("small alpha for centering step")
+#     # end
+#     if iszero(alpha)
+#         # TODO attempt recovery
+#         @warn("very small alpha")
+#         solver.status = NumericalFailure
+#         return false
+#     end
+#
+#     # step
+#     @. point.vec += alpha * dir.vec
+#     calc_mu(solver)
+#
+#     return true
+# end
 
 function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
@@ -61,48 +132,19 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     (rhs_fun_nocorr, rhs_fun_corr) = (is_pred ? (update_rhs_pred, update_rhs_predcorr) : (update_rhs_cent, update_rhs_centcorr))
 
     # get direction
+    dir_nocorr = stepper.dir_nocorr
+    dir_corr = stepper.dir_corr
     rhs_fun_nocorr(solver, rhs)
     get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
-    is_corrected = false
-    if stepper.use_correction
-        rhs_fun_corr(solver, rhs, dir)
-        if !iszero(rhs.vec)
-            dir_nocorr = stepper.dir_nocorr
-            dir_corr = stepper.dir_corr
-            copyto!(dir_nocorr, dir.vec)
-            get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
-            copyto!(dir_corr, dir.vec)
+    copyto!(dir_nocorr, dir.vec)
+    rhs_fun_corr(solver, rhs, dir)
+    get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
+    copyto!(dir_corr, dir.vec)
 
-            # get nocorr alpha step length
-            copyto!(dir.vec, dir_nocorr)
-            # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
-            # TODO change prev_alpha?
-            alpha_nocorr = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3))
-            if iszero(alpha_nocorr)
-                # @warn("very small alpha for uncorrected direction ($alpha_nocorr)")
-                alpha_nocorr = T(0.5) # attempt recovery TODO tune
-            end
-
-            # get direction with correction
-            @. dir.vec = dir_nocorr + alpha_nocorr * dir_corr
-            is_corrected = true
-        end
-    end
-
-    # get alpha step length
-    # TODO change prev_alpha?
-    alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
-    # if is_corrected && alpha < 0.99 * alpha_nocorr
-    #     @warn("alpha worse after correction ($alpha < $alpha_nocorr)")
-    #     # # TODO test whether this helps:
-    #     # # step alpha_nocorr in uncorrected direction
-    #     # alpha = alpha_nocorr
-    #     # copyto!(dir.vec, dir_nocorr)
-    # end
+    # get alpha
+    cand = stepper.res # TODO rename?
+    alpha = find_alpha_curve(point, cand, dir_nocorr, dir_corr, model)
     stepper.prev_alpha = alpha
-    # if !is_pred && alpha < 0.99
-    #     @warn("small alpha for centering step")
-    # end
     if iszero(alpha)
         # TODO attempt recovery
         @warn("very small alpha")
@@ -111,10 +153,76 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     end
 
     # step
-    @. point.vec += alpha * dir.vec
+    # TODO or just use mu and point that come out of find_alpha_curve
+    @. point.vec += alpha * (dir_nocorr + alpha * dir_corr)
     calc_mu(solver)
 
     return true
+end
+
+# TODO move
+function find_alpha_curve(
+    point,
+    cand,
+    dir_nocorr,
+    dir_corr,
+    model::Models.Model{T},
+    ) where {T <: Real}
+    cones = model.cones
+
+    min_nbhd = T(0.01)
+    max_nbhd = T(0.99)
+
+    skzk = zeros(T, length(cones))
+    nup1 = model.nu + 1
+
+    min_alpha = T(1e-3)
+    alpha_reduce = T(0.95)
+
+    alpha = T(0.9999)
+    alpha /= alpha_reduce
+    while true
+        if alpha < min_alpha
+            # alpha is very small so finish
+            alpha = zero(T)
+            break
+        end
+        alpha *= alpha_reduce
+
+        @. cand.vec = point.vec + alpha * (dir_nocorr + alpha * dir_corr)
+
+        taukap_c = cand.tau[1] * cand.kap[1]
+        (taukap_c < eps(T)) && continue
+        for k in eachindex(cones)
+            skzk[k] = dot(cand.primal_views[k], cand.dual_views[k])
+        end
+        any(<(eps(T)), skzk) && continue
+
+        mu_c = (sum(skzk) + taukap_c) / nup1
+        (mu_c < eps(T)) && continue
+
+        min_nbhd_mu = min_nbhd * mu_c
+        (taukap_c < min_nbhd_mu) && continue
+        any(skzk[k] < min_nbhd_mu * Cones.get_nu(cone_k) for (k, cone_k) in enumerate(cones)) && continue
+        isfinite(max_nbhd) && (abs(taukap_c - mu_c) > max_nbhd * mu_c) && continue
+
+        rtmu = sqrt(mu_c)
+        irtmu = inv(rtmu)
+        in_nbhd = true
+        for (k, cone_k) in enumerate(cones)
+            Cones.load_point(cone_k, cand.primal_views[k], irtmu)
+            Cones.load_dual_point(cone_k, cand.dual_views[k])
+            Cones.reset_data(cone_k)
+            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
+            if !in_nbhd_k
+                in_nbhd = false
+                break
+            end
+        end
+        in_nbhd && break
+    end
+
+    return alpha
 end
 
 expect_improvement(stepper::PredOrCentStepper) = iszero(stepper.cent_count)
