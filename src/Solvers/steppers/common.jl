@@ -25,12 +25,9 @@ end
 function update_rhs_predcorr(
     solver::Solver{T},
     rhs::Point{T},
-    dir::Point{T};
-    add::Bool = true,
+    dir::Point{T},
     ) where {T <: Real}
-    if !add
-        rhs.vec .= 0
-    end
+    rhs.vec .= 0
 
     irtrtmu = inv(sqrt(sqrt(solver.mu))) # TODO or mu^-0.25
     for (k, cone_k) in enumerate(solver.model.cones)
@@ -46,15 +43,17 @@ function update_rhs_predcorr(
         corr_point = dot(corr_k, cone_k.point)
         corr_viol = abs(corr_point - irtrtmu * dot(prim_k_scal, H_prim_dir_k)) / abs(corr_point + 10eps(T))
         if corr_viol < T(1e-3)
-            @. rhs.s_views[k] += H_prim_dir_k + corr_k
+            @. rhs.s_views[k] = H_prim_dir_k + corr_k
+        else
+            @warn("pred corr_viol: $(round(corr_viol, digits = 5))")
         end
     end
 
     # TODO NT way:
-    rhs.kap[1] += dir.tau[1] * dir.kap[1] / solver.point.tau[1]
+    rhs.kap[1] = dir.tau[1] * dir.kap[1] / solver.point.tau[1]
     # TODO SY way:
     # tau_dir_tau = dir.tau / solver.point.tau
-    # rhs[end] += tau_dir_tau * solver.mu / solver.point.tau * (1 + tau_dir_tau)
+    # rhs[end] = tau_dir_tau * solver.mu / solver.point.tau * (1 + tau_dir_tau)
 
     return rhs
 end
@@ -86,12 +85,9 @@ end
 function update_rhs_centcorr(
     solver::Solver{T},
     rhs::Point{T},
-    dir::Point{T};
-    add::Bool = true,
+    dir::Point{T},
     ) where {T <: Real}
-    if !add
-        rhs.vec .= 0
-    end
+    rhs.vec .= 0
 
     irtrtmu = inv(sqrt(sqrt(solver.mu)))
     for (k, cone_k) in enumerate(solver.model.cones)
@@ -107,7 +103,9 @@ function update_rhs_centcorr(
         corr_point = dot(corr_k, cone_k.point)
         corr_viol = abs(corr_point - dot(prim_k_scal, H_prim_dir_k_scal)) / abs(corr_point + 10eps(T))
         if corr_viol < T(1e-3)
-            rhs.s_views[k] .+= corr_k
+            rhs.s_views[k] .= corr_k
+        else
+            @warn("cent corr_viol: $(round(corr_viol, digits = 5))")
         end
     end
 

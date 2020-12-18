@@ -69,7 +69,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     update_rhs_cent(solver, rhs)
     get_directions(stepper, solver, false, iter_ref_steps = 3)
     copyto!(dir_cent, dir.vec)
-    update_rhs_centcorr(solver, rhs, dir, add = false)
+    update_rhs_centcorr(solver, rhs, dir)
     get_directions(stepper, solver, false, iter_ref_steps = 3)
     copyto!(dir_centcorr, dir.vec)
 
@@ -77,7 +77,7 @@ function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
     update_rhs_pred(solver, rhs)
     get_directions(stepper, solver, true, iter_ref_steps = 3)
     copyto!(dir_pred, dir.vec)
-    update_rhs_predcorr(solver, rhs, dir, add = false)
+    update_rhs_predcorr(solver, rhs, dir)
     get_directions(stepper, solver, true, iter_ref_steps = 3)
     copyto!(dir_predcorr, dir.vec)
 
