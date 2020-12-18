@@ -49,33 +49,81 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     rhs = stepper.rhs
     dir = stepper.dir
 
+    dir_nocorr = similar(dir.vec) # TODO
+    dir_corr = similar(dir.vec) # TODO
+
     # update linear system solver factorization
     update_lhs(solver.system_solver, solver)
 
     stepper.prev_is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))
+    # TODO refac?
+    # TODO remove add option from update rhs funcs
     if stepper.prev_is_pred
         # predict
         stepper.cent_count = 0
+
+        # update_rhs_pred(solver, rhs)
+        # get_directions(stepper, solver, true, iter_ref_steps = 3)
+        # if stepper.use_correction
+        #     update_rhs_predcorr(solver, rhs, dir)
+        #     get_directions(stepper, solver, true, iter_ref_steps = 3)
+        # end
+
+        # TODO make correction optional
+
+        # get pred and predcorr directions
         update_rhs_pred(solver, rhs)
         get_directions(stepper, solver, true, iter_ref_steps = 3)
-        if stepper.use_correction
-            update_rhs_predcorr(solver, rhs, dir)
-            get_directions(stepper, solver, true, iter_ref_steps = 3)
-        end
+        copyto!(dir_nocorr, dir.vec)
+        update_rhs_predcorr(solver, rhs, dir, add = false)
+        get_directions(stepper, solver, true, iter_ref_steps = 3)
+        copyto!(dir_corr, dir.vec)
+
+        # get prediction alpha
+        copyto!(dir.vec, dir_nocorr)
+        # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
+        alpha_nocorr = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3)) # TODO change prev_alpha
+        # @show alpha_nocorr
+
+        # get corrected prediction direction
+        @. dir.vec = dir_nocorr + alpha_nocorr * dir_corr
     else
         # center
         stepper.cent_count += 1
+
+        # update_rhs_cent(solver, rhs)
+        # get_directions(stepper, solver, false, iter_ref_steps = 3)
+        # if stepper.use_correction
+        #     update_rhs_centcorr(solver, rhs, dir)
+        #     get_directions(stepper, solver, false, iter_ref_steps = 3)
+        # end
+
+        # TODO make correction optional
+
+        # get cent and centcorr directions
         update_rhs_cent(solver, rhs)
         get_directions(stepper, solver, false, iter_ref_steps = 3)
-        if stepper.use_correction
-            update_rhs_centcorr(solver, rhs, dir)
-            get_directions(stepper, solver, false, iter_ref_steps = 3)
-        end
+        copyto!(dir_nocorr, dir.vec)
+        update_rhs_centcorr(solver, rhs, dir, add = false)
+        get_directions(stepper, solver, false, iter_ref_steps = 3)
+        copyto!(dir_corr, dir.vec)
+
+        # get centering alpha
+        copyto!(dir.vec, dir_nocorr)
+        # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
+        alpha_nocorr = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3)) # TODO change prev_alpha
+        # @show alpha_nocorr
+
+        # get corrected centering direction
+        @. dir.vec = dir_nocorr + alpha_nocorr * dir_corr
     end
 
     # alpha step length
-    stepper.prev_alpha = alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
+    stepper.prev_alpha = alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99)) # TODO change prev_alpha
 
+    if !stepper.prev_is_pred && alpha < 0.99
+        @warn("didn't step 1 for centering")
+    end
     if iszero(alpha)
         # TODO attempt recovery
         @warn("very small alpha")
