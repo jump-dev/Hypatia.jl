@@ -4,15 +4,15 @@ predict or center stepper
 
 mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     use_correction::Bool
-    prev_pred_alpha::T
     prev_alpha::T
-    prev_is_pred::Bool
     cent_count::Int
 
     rhs::Point{T}
     dir::Point{T}
     res::Point{T}
     dir_temp::Vector{T}
+    dir_nocorr::Vector{T}
+    dir_corr::Vector{T}
 
     line_searcher::LineSearcher{T}
 
@@ -27,8 +27,6 @@ end
 
 # create the stepper cache
 function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
-    stepper.prev_pred_alpha = one(T)
-    stepper.prev_is_pred = false
     stepper.prev_alpha = one(T)
     stepper.cent_count = 0
 
@@ -36,7 +34,12 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     stepper.rhs = Point(model)
     stepper.dir = Point(model)
     stepper.res = Point(model)
-    stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
+    dim = length(stepper.rhs.vec)
+    stepper.dir_temp = zeros(T, dim)
+    if stepper.use_correction
+        stepper.dir_nocorr = zeros(T, dim)
+        stepper.dir_corr = zeros(T, dim)
+    end
 
     stepper.line_searcher = LineSearcher{T}(model)
 
@@ -52,38 +55,59 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     # update linear system solver factorization
     update_lhs(solver.system_solver, solver)
 
-    stepper.prev_is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))
-    if stepper.prev_is_pred
-        # predict
-        stepper.cent_count = 0
-        update_rhs_pred(solver, rhs)
-        get_directions(stepper, solver, true, iter_ref_steps = 3)
-        if stepper.use_correction
-            update_rhs_predcorr(solver, rhs, dir)
-            get_directions(stepper, solver, true, iter_ref_steps = 3)
-        end
-    else
-        # center
-        stepper.cent_count += 1
-        update_rhs_cent(solver, rhs)
-        get_directions(stepper, solver, false, iter_ref_steps = 3)
-        if stepper.use_correction
-            update_rhs_centcorr(solver, rhs, dir)
-            get_directions(stepper, solver, false, iter_ref_steps = 3)
+    # decide whether to predict or center
+    is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05))) # TODO tune
+    stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
+    (rhs_fun_nocorr, rhs_fun_corr) = (is_pred ? (update_rhs_pred, update_rhs_predcorr) : (update_rhs_cent, update_rhs_centcorr))
+
+    # get direction
+    rhs_fun_nocorr(solver, rhs)
+    get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
+    is_corrected = false
+    if stepper.use_correction
+        rhs_fun_corr(solver, rhs, dir)
+        if !iszero(rhs.vec)
+            dir_nocorr = stepper.dir_nocorr
+            dir_corr = stepper.dir_corr
+            copyto!(dir_nocorr, dir.vec)
+            get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
+            copyto!(dir_corr, dir.vec)
+
+            # get nocorr alpha step length
+            copyto!(dir.vec, dir_nocorr)
+            # TODO try max_nbhd = Inf, but careful of cones with no dual feas check
+            # TODO change prev_alpha?
+            alpha_nocorr = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3))
+            if iszero(alpha_nocorr)
+                # @warn("very small alpha for uncorrected direction ($alpha_nocorr)")
+                alpha_nocorr = T(0.5) # attempt recovery TODO tune
+            end
+
+            # get direction with correction
+            @. dir.vec = dir_nocorr + alpha_nocorr * dir_corr
+            is_corrected = true
         end
     end
 
-    # alpha step length
-    stepper.prev_alpha = alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
-
+    # get alpha step length
+    # TODO change prev_alpha?
+    alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-3), max_nbhd = T(0.99))
+    # if is_corrected && alpha < 0.99 * alpha_nocorr
+    #     @warn("alpha worse after correction ($alpha < $alpha_nocorr)")
+    #     # # TODO test whether this helps:
+    #     # # step alpha_nocorr in uncorrected direction
+    #     # alpha = alpha_nocorr
+    #     # copyto!(dir.vec, dir_nocorr)
+    # end
+    stepper.prev_alpha = alpha
+    # if !is_pred && alpha < 0.99
+    #     @warn("small alpha for centering step")
+    # end
     if iszero(alpha)
         # TODO attempt recovery
         @warn("very small alpha")
         solver.status = NumericalFailure
         return false
-    end
-    if stepper.prev_is_pred
-        stepper.prev_pred_alpha = alpha
     end
 
     # step
@@ -93,7 +117,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     return true
 end
 
-expect_improvement(stepper::PredOrCentStepper) = stepper.prev_is_pred
+expect_improvement(stepper::PredOrCentStepper) = iszero(stepper.cent_count)
 
 function print_iteration_stats(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
     if iszero(solver.num_iters)
@@ -119,7 +143,7 @@ function print_iteration_stats(stepper::PredOrCentStepper{T}, solver::Solver{T})
                 )
         end
     else
-        step = (stepper.prev_is_pred ? "pred" : "cent")
+        step = (iszero(stepper.cent_count) ? "pred" : "cent")
         if iszero(solver.model.p)
             @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %5s %9.2e\n",
                 solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
