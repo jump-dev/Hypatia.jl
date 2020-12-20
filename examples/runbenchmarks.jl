@@ -10,7 +10,7 @@ using Printf
 import LinearAlgebra
 using Distributed
 using Hypatia
-using MosekTools
+# using MosekTools
 
 interrupt()
 @assert nprocs() == 1
@@ -23,18 +23,18 @@ include(joinpath(examples_dir, "common_JuMP.jl"))
 results_path = joinpath(homedir(), "bench", "bench.csv")
 # results_path = nothing
 
-spawn_runs = true # spawn new process for each instance
-# spawn_runs = false
+# spawn_runs = true # spawn new process for each instance
+spawn_runs = false
 
-setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
-# setup_model_anyway = false
+# setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
+setup_model_anyway = false
 
 verbose = true # make solvers print output
 # verbose = false
 
-num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
+num_threads = 8 # number of threads to use for BLAS and Julia processes that run instances
 free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
-optimizer_time_limit = 1800
+optimizer_time_limit = 60
 setup_time_limit = 2 * optimizer_time_limit
 check_time_limit = 1.2 * optimizer_time_limit
 tol_loose = 1e-7
@@ -50,24 +50,25 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     tol_infeas = tol_tight,
     init_use_indirect = true, # skips dual equalities preprocessing
     use_dense_model = true,
+    stepper = Solvers.PredOrCentStepper{Float64}(), # TODO
     ))
-mosek_solver = ("Mosek", Mosek.Optimizer, (
-    QUIET = !verbose,
-    MSK_IPAR_NUM_THREADS = num_threads,
-    MSK_IPAR_OPTIMIZER = Mosek.MSK_OPTIMIZER_CONIC,
-    MSK_IPAR_INTPNT_BASIS = Mosek.MSK_BI_NEVER, # do not do basis identification for LO problems
-    MSK_DPAR_OPTIMIZER_MAX_TIME = optimizer_time_limit,
-    MSK_DPAR_INTPNT_CO_TOL_REL_GAP = tol_loose,
-    MSK_DPAR_INTPNT_CO_TOL_PFEAS = tol_loose,
-    MSK_DPAR_INTPNT_CO_TOL_DFEAS = tol_loose,
-    MSK_DPAR_INTPNT_CO_TOL_INFEAS = tol_tight,
-    ))
+# mosek_solver = ("Mosek", Mosek.Optimizer, (
+#     QUIET = !verbose,
+#     MSK_IPAR_NUM_THREADS = num_threads,
+#     MSK_IPAR_OPTIMIZER = Mosek.MSK_OPTIMIZER_CONIC,
+#     MSK_IPAR_INTPNT_BASIS = Mosek.MSK_BI_NEVER, # do not do basis identification for LO problems
+#     MSK_DPAR_OPTIMIZER_MAX_TIME = optimizer_time_limit,
+#     MSK_DPAR_INTPNT_CO_TOL_REL_GAP = tol_loose,
+#     MSK_DPAR_INTPNT_CO_TOL_PFEAS = tol_loose,
+#     MSK_DPAR_INTPNT_CO_TOL_DFEAS = tol_loose,
+#     MSK_DPAR_INTPNT_CO_TOL_INFEAS = tol_tight,
+#     ))
 
 # instance sets and solvers to run
 instance_sets = [
     ("nat", hyp_solver),
-    ("ext", hyp_solver),
-    ("ext", mosek_solver),
+    # ("ext", hyp_solver),
+    # ("ext", mosek_solver),
     ]
 
 # models to run
@@ -80,7 +81,7 @@ JuMP_example_names = [
     # "nearestpsd",
     # "polymin",
     # "polynorm",
-    # "portfolio",
+    "portfolio",
     # "randompolymat",
     # "shapeconregr",
     ]
