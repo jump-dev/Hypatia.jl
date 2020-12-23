@@ -10,9 +10,9 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     rhs::Point{T}
     dir::Point{T}
     res::Point{T}
+    dir_nocorr::Point{T}
+    dir_corr::Point{T}
     dir_temp::Vector{T}
-    dir_nocorr::Vector{T}
-    dir_corr::Vector{T}
 
     line_searcher::LineSearcher{T}
 
@@ -35,11 +35,11 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     stepper.dir = Point(model)
     stepper.res = Point(model)
     dim = length(stepper.rhs.vec)
-    stepper.dir_temp = zeros(T, dim)
     if stepper.use_correction
-        stepper.dir_nocorr = zeros(T, dim)
-        stepper.dir_corr = zeros(T, dim)
+        stepper.dir_nocorr = Point(model)
+        stepper.dir_corr = Point(model)
     end
+    stepper.dir_temp = zeros(T, dim)
 
     stepper.line_searcher = LineSearcher{T}(model)
 
@@ -136,18 +136,19 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     dir_corr = stepper.dir_corr
     rhs_fun_nocorr(solver, rhs)
     get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
-    copyto!(dir_nocorr, dir.vec)
+    copyto!(dir_nocorr.vec, dir.vec)
     rhs_fun_corr(solver, rhs, dir)
     get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
-    copyto!(dir_corr, dir.vec)
+    copyto!(dir_corr.vec, dir.vec)
 
     # get alpha and step
     cand = stepper.res # TODO rename?
-    alpha = find_alpha_curve(point, cand, dir_nocorr, dir_corr, model)
-    if iszero(alpha)
+    (a_pr, a_du) = find_alpha_curve(point, cand, dir_nocorr, dir_corr, model)
+    # @show a_pr, a_du
+    if iszero(a_pr) || iszero(a_du)
         # try not using correction
         @warn("very small alpha")
-        copyto!(dir.vec, dir_nocorr)
+        copyto!(dir.vec, dir_nocorr.vec)
         alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-5), max_nbhd = T(0.9999))
         if iszero(alpha)
             @warn("very small alpha again; terminating")
@@ -156,16 +157,22 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         end
         @. point.vec += alpha * dir.vec
     else
-        # TODO or just use mu and point that come out of find_alpha_curve
-        @. point.vec += alpha * (dir_nocorr + alpha * dir_corr)
+        # # TODO or just use mu and point that come out of find_alpha_curve
+        # @. point.vec += alpha * (dir_nocorr.vec + alpha * dir_corr.vec)
+        point.kap[1] += a_pr * (dir_nocorr.kap[1] + a_pr * dir_corr.kap[1])
+        @. point.s += a_pr * (dir_nocorr.s + a_pr * dir_corr.s)
+        @. point.x += a_pr * (dir_nocorr.x + a_pr * dir_corr.x)
+        point.tau[1] += a_du * (dir_nocorr.tau[1] + a_du * dir_corr.tau[1])
+        @. point.z += a_du * (dir_nocorr.z + a_du * dir_corr.z)
+        @. point.y += a_du * (dir_nocorr.y + a_du * dir_corr.y)
     end
-    stepper.prev_alpha = alpha
+    stepper.prev_alpha = NaN
     calc_mu(solver)
 
     return true
 end
 
-# TODO move
+
 function find_alpha_curve(
     point,
     cand,
@@ -176,7 +183,8 @@ function find_alpha_curve(
     cones = model.cones
 
     min_nbhd = T(0.01)
-    max_nbhd = T(0.99)
+    # max_nbhd = T(0.99)
+    max_nbhd = T(Inf)
 
     skzk = zeros(T, length(cones))
     nup1 = model.nu + 1
@@ -185,33 +193,109 @@ function find_alpha_curve(
     alpha_reduce = T(0.95)
     # TODO use an alpha schedule like T[0.9999, 0.99, 0.97, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0] or a log-scale
 
-    alpha = T(0.9999)
-    alpha /= alpha_reduce
+    a_pr = T(0.9999) / alpha_reduce # for x, s, kap
+    a_du = T(0.9999) / alpha_reduce # for y, z, tau
+
+    # primal alpha feasibility
     while true
-        if alpha < min_alpha
-            # alpha is very small so finish
-            alpha = zero(T)
+        if a_pr < min_alpha
+            a_pr = zero(T)
             break
         end
-        alpha *= alpha_reduce
+        a_pr *= alpha_reduce
 
-        @. cand.vec = point.vec + alpha * (dir_nocorr + alpha * dir_corr)
+        kap_c = cand.kap[1] = point.kap[1] + a_pr * (dir_nocorr.kap[1] + a_pr * dir_corr.kap[1])
+        (kap_c < eps(T)) && continue
 
-        min(cand.tau[1], cand.kap[1]) < eps(T) && continue
-        taukap_c = cand.tau[1] * cand.kap[1]
+        @. cand.s = point.s + a_pr * (dir_nocorr.s + a_pr * dir_corr.s)
+        all_feas = true
+        for (k, cone_k) in enumerate(cones)
+            if Cones.use_dual_barrier(cone_k)
+                Cones.load_dual_point(cone_k, cand.dual_views[k])
+                Cones.reset_data(cone_k)
+                is_feas_k = Cones.is_dual_feas(cone_k)
+            else
+                Cones.load_point(cone_k, cand.primal_views[k])
+                Cones.reset_data(cone_k)
+                is_feas_k = Cones.is_feas(cone_k)
+            end
+            if !is_feas_k
+                all_feas = false
+                break
+            end
+        end
+        all_feas && break
+    end
+
+    # dual alpha feasibility
+    while true
+        if a_du < min_alpha
+            a_du = zero(T)
+            break
+        end
+        a_du *= alpha_reduce
+
+        tau_c = cand.tau[1] = point.tau[1] + a_du * (dir_nocorr.tau[1] + a_du * dir_corr.tau[1])
+        (tau_c < eps(T)) && continue
+
+        @. cand.z = point.z + a_du * (dir_nocorr.z + a_du * dir_corr.z)
+        all_feas = true
+        for (k, cone_k) in enumerate(cones)
+            if Cones.use_dual_barrier(cone_k)
+                Cones.load_point(cone_k, cand.primal_views[k])
+                Cones.reset_data(cone_k)
+                is_feas_k = Cones.is_feas(cone_k)
+            else
+                Cones.load_dual_point(cone_k, cand.dual_views[k])
+                Cones.reset_data(cone_k)
+                is_feas_k = Cones.is_dual_feas(cone_k)
+            end
+            if !is_feas_k
+                all_feas = false
+                break
+            end
+        end
+        all_feas && break
+    end
+
+    # println("feas: ", a_pr, ", ", a_du)
+
+    # both alpha nbhd
+    a_pr /= alpha_reduce
+    a_du /= alpha_reduce
+    while true
+        # TODO ?
+        a_pr *= alpha_reduce
+        if a_pr < min_alpha
+            a_pr = zero(T)
+        end
+        a_du *= alpha_reduce
+        if a_du < min_alpha
+            a_du = zero(T)
+        end
+        iszero(a_pr * a_du) && break
+
+        kap_c = cand.kap[1] = point.kap[1] + a_pr * (dir_nocorr.kap[1] + a_pr * dir_corr.kap[1])
+        (kap_c < eps(T)) && continue
+        tau_c = cand.tau[1] = point.tau[1] + a_du * (dir_nocorr.tau[1] + a_du * dir_corr.tau[1])
+        (tau_c < eps(T)) && continue
+        taukap_c = tau_c * kap_c
         (taukap_c < eps(T)) && continue
+
+        @. cand.s = point.s + a_pr * (dir_nocorr.s + a_pr * dir_corr.s)
+        # @. cand.x = point.x + a_pr * (dir_nocorr.x + a_pr * dir_corr.x)
+        @. cand.z = point.z + a_du * (dir_nocorr.z + a_du * dir_corr.z)
+        # @. cand.y = point.y + a_du * (dir_nocorr.y + a_du * dir_corr.y)
         for k in eachindex(cones)
             skzk[k] = dot(cand.primal_views[k], cand.dual_views[k])
         end
-        any(<(eps(T)), skzk) && continue
-
         mu_c = (sum(skzk) + taukap_c) / nup1
         (mu_c < eps(T)) && continue
 
+        isfinite(max_nbhd) && (abs(taukap_c - mu_c) > max_nbhd * mu_c) && continue
         min_nbhd_mu = min_nbhd * mu_c
         (taukap_c < min_nbhd_mu) && continue
         any(skzk[k] < min_nbhd_mu * Cones.get_nu(cone_k) for (k, cone_k) in enumerate(cones)) && continue
-        isfinite(max_nbhd) && (abs(taukap_c - mu_c) > max_nbhd * mu_c) && continue
 
         rtmu = sqrt(mu_c)
         irtmu = inv(rtmu)
@@ -220,7 +304,9 @@ function find_alpha_curve(
             Cones.load_point(cone_k, cand.primal_views[k], irtmu)
             Cones.load_dual_point(cone_k, cand.dual_views[k])
             Cones.reset_data(cone_k)
-            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
+            in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k))# && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
+    Cones.in_neighborhood(cone_k, rtmu, max_nbhd)
+
             if !in_nbhd_k
                 in_nbhd = false
                 break
@@ -229,8 +315,80 @@ function find_alpha_curve(
         in_nbhd && break
     end
 
-    return alpha
+
+    # println("final: ", a_pr, ", ", a_du)
+
+    return (a_pr, a_du)
 end
+
+
+
+# TODO move
+# function find_alpha_curve(
+#     point,
+#     cand,
+#     dir_nocorr,
+#     dir_corr,
+#     model::Models.Model{T},
+#     ) where {T <: Real}
+#     cones = model.cones
+#
+#     min_nbhd = T(0.01)
+#     max_nbhd = T(0.99)
+#
+#     skzk = zeros(T, length(cones))
+#     nup1 = model.nu + 1
+#
+#     min_alpha = T(1e-3)
+#     alpha_reduce = T(0.95)
+#     # TODO use an alpha schedule like T[0.9999, 0.99, 0.97, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0] or a log-scale
+#
+#     alpha = T(0.9999)
+#     alpha /= alpha_reduce
+#     while true
+#         if alpha < min_alpha
+#             # alpha is very small so finish
+#             alpha = zero(T)
+#             break
+#         end
+#         alpha *= alpha_reduce
+#
+#         @. cand.vec = point.vec + alpha * (dir_nocorr + alpha * dir_corr)
+#
+#         min(cand.tau[1], cand.kap[1]) < eps(T) && continue
+#         taukap_c = cand.tau[1] * cand.kap[1]
+#         (taukap_c < eps(T)) && continue
+#         for k in eachindex(cones)
+#             skzk[k] = dot(cand.primal_views[k], cand.dual_views[k])
+#         end
+#         any(<(eps(T)), skzk) && continue
+#
+#         mu_c = (sum(skzk) + taukap_c) / nup1
+#         (mu_c < eps(T)) && continue
+#
+#         min_nbhd_mu = min_nbhd * mu_c
+#         (taukap_c < min_nbhd_mu) && continue
+#         any(skzk[k] < min_nbhd_mu * Cones.get_nu(cone_k) for (k, cone_k) in enumerate(cones)) && continue
+#         isfinite(max_nbhd) && (abs(taukap_c - mu_c) > max_nbhd * mu_c) && continue
+#
+#         rtmu = sqrt(mu_c)
+#         irtmu = inv(rtmu)
+#         in_nbhd = true
+#         for (k, cone_k) in enumerate(cones)
+#             Cones.load_point(cone_k, cand.primal_views[k], irtmu)
+#             Cones.load_dual_point(cone_k, cand.dual_views[k])
+#             Cones.reset_data(cone_k)
+#             in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
+#             if !in_nbhd_k
+#                 in_nbhd = false
+#                 break
+#             end
+#         end
+#         in_nbhd && break
+#     end
+#
+#     return alpha
+# end
 
 expect_improvement(stepper::PredOrCentStepper) = iszero(stepper.cent_count)
 

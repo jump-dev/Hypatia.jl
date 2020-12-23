@@ -16,8 +16,8 @@ results_path = nothing
 
 # default options to solvers
 default_options = (
-    verbose = false,
-    # verbose = true,
+    # verbose = false,
+    verbose = true,
     default_tol_relax = 10,
     # stepper = Solvers.HeurCombStepper{Float64}()
     stepper = Solvers.PredOrCentStepper{Float64}()
@@ -35,21 +35,21 @@ instance_sets = [
 # types of models to run and corresponding options and example names
 model_types = [
     "native",
-    "JuMP",
+    # "JuMP",
     ]
 
 # list of names of native examples to run
 native_example_names = [
-    "densityest",
-    "envelope",
-    "expdesign",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
     "linearopt",
-    "matrixcompletion",
-    "matrixregression",
-    "maxvolume",
-    "polymin",
-    "portfolio",
-    "sparsepca",
+    # "matrixcompletion",
+    # "matrixregression",
+    # "maxvolume",
+    # "polymin",
+    # "portfolio",
+    # "sparsepca",
     ]
 
 # list of names of JuMP examples to run
