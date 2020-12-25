@@ -8,10 +8,10 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     cent_count::Int
     rhs::Point{T}
     dir::Point{T}
-    res::Point{T} # TODO used for res and searcher, maybe rename if need
+    res::Point{T}
+    dir_nocorr::Point{T}
+    dir_corr::Point{T}
     dir_temp::Vector{T}
-    dir_nocorr::Vector{T}
-    dir_corr::Vector{T}
     step_searcher::StepSearcher{T}
 
     function PredOrCentStepper{T}(;
@@ -36,12 +36,11 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     stepper.rhs = Point(model)
     stepper.dir = Point(model)
     stepper.res = Point(model)
-    dim = length(stepper.rhs.vec)
-    stepper.dir_temp = zeros(T, dim)
     if stepper.use_correction
-        stepper.dir_nocorr = zeros(T, dim)
-        stepper.dir_corr = zeros(T, dim)
+        stepper.dir_nocorr = Point(model)
+        stepper.dir_corr = Point(model)
     end
+    stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
     stepper.step_searcher = StepSearcher{T}(model)
 
     return stepper
@@ -57,7 +56,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     update_lhs(solver.system_solver, solver)
 
     # decide whether to predict or center
-    is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05))) # TODO tune
+    is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05))) # TODO tune, make option
     stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
     rhs_fun_nocorr = (is_pred ? update_rhs_pred : update_rhs_cent)
 
@@ -71,27 +70,27 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         rhs_fun_corr = (is_pred ? update_rhs_predcorr : update_rhs_centcorr)
         dir_nocorr = stepper.dir_nocorr
         dir_corr = stepper.dir_corr
-        copyto!(dir_nocorr, dir.vec)
+        copyto!(dir_nocorr.vec, dir.vec)
         rhs_fun_corr(solver, rhs, dir)
         get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
-        copyto!(dir_corr, dir.vec)
+        copyto!(dir_corr.vec, dir.vec)
 
         # do curve search with correction
-        cand = stepper.res # TODO rename?
-        alpha = find_alpha_curve(point, cand, dir_nocorr, dir_corr, model)
+        alpha = search_alpha(point, dir_nocorr, dir_corr, stepper.step_searcher, model)
         if iszero(alpha)
             # try not using correction
             @warn("very small alpha in curve search; trying without correction")
-            copyto!(dir.vec, dir_nocorr)
+            copyto!(dir.vec, dir_nocorr.vec)
         else
             # step
-            @. point.vec += alpha * (dir_nocorr + alpha * dir_corr)
+            @. point.vec += alpha * (dir_nocorr.vec + alpha * dir_corr.vec)
         end
     end
 
     if iszero(alpha)
         # do line search in uncorrected direction
-        alpha = find_max_alpha(point, dir, stepper.step_searcher, model, prev_alpha = one(T), min_alpha = T(1e-5), max_nbhd = T(0.99))
+        # alpha = search_alpha_line(point, dir, stepper.step_searcher, model, prev_alpha = one(T), min_alpha = T(1e-5), max_nbhd = T(0.99))
+        alpha = search_alpha(point, dir, nothing, stepper.step_searcher, model)
         if iszero(alpha)
             @warn("very small alpha in line search; terminating")
             solver.status = NumericalFailure
@@ -212,7 +211,7 @@ end
 #
 #     # TODO check cent point (step 1) is acceptable
 #     @. stepper.dir = dir_cent + dir_centcorr
-#     alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(0.1)) # TODO only check end point alpha = 1 maybe
+#     alpha = search_alpha_line(stepper, solver, prev_alpha = one(T), min_alpha = T(0.1)) # TODO only check end point alpha = 1 maybe
 #     # TODO cleanup
 #     if alpha < 0.99
 #         # @show alpha
@@ -225,7 +224,7 @@ end
 #         s_centcorr = copy(s_dir)
 #
 #         @. stepper.dir = dir_cent + dir_centcorr
-#         alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(0.1))
+#         alpha = search_alpha_line(stepper, solver, prev_alpha = one(T), min_alpha = T(0.1))
 #         @show alpha
 #     end
 #
@@ -338,7 +337,7 @@ end
 #
 #         copyto!(stepper.dir, dir_cent)
 #
-#         alpha = find_max_alpha(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-3))
+#         alpha = search_alpha_line(stepper, solver, prev_alpha = one(T), min_alpha = T(1e-3))
 #         if iszero(alpha)
 #             @warn("numerical failure: could not step in centering direction; terminating")
 #             solver.status = NumericalFailure
