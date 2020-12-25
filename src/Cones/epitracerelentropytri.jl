@@ -6,7 +6,7 @@ derivatives for quantum relative entropy function adapted from
 "Long-Step Path-Following Algorithm in Quantum Information Theory: Some Numerical Aspects and Applications"
 by L. Faybusovich and C. Zhou
 
-uses the log-homogenous but not self-concordant barrier
+uses the log-homogeneous but not self-concordant barrier
 -log(u - tr(W * log(W) - W * log(V))) - logdet(W) - logdet(V)
 =#
 
@@ -114,15 +114,17 @@ end
 
 get_nu(cone::EpiTraceRelEntropyTri) = 2 * cone.d + 1
 
+
 function set_initial_point(arr::AbstractVector, cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     arr .= 0
+    # at the initial point V and W are diagonal, equivalent to episumperentropy
+    (arr[1], v, w) = get_central_ray_episumperentropy(cone.d)
     k = 1
     for i in 1:cone.d
-        arr[1 + k] = 1
-        arr[cone.vw_dim + 1 + k] = 1
+        arr[1 + k] = v
+        arr[cone.vw_dim + 1 + k] = w
         k += i + 1
     end
-    arr[1] = 1
     return arr
 end
 
