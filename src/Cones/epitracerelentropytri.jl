@@ -236,20 +236,23 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     end
 
     W_similar = cone.W_similar
-    dz_sqr_dV_sqr = hess_tr_logm(V_vecs, W_similar, diff_tensor_V, vw_dim, d)
+    dz_sqr_dV_sqr = zeros(T, vw_dim, vw_dim)
+    hess_tr_logm!(dz_sqr_dV_sqr, V_vecs, W_similar, diff_tensor_V, cone.rt2)
     dzdV = cone.dzdV
     dz_dV_sqr = dzdV * dzdV'
     ViVi = symm_kron(zeros(vw_dim, vw_dim), Vi, rt2)
     Hvv = dz_dV_sqr - dz_sqr_dV_sqr / z + ViVi
 
-    dz_sqr_dW_sqr = grad_logm(W_vecs, diff_mat_W, vw_dim, d)
+    dz_sqr_dW_sqr = zeros(T, vw_dim, vw_dim)
+    grad_logm!(dz_sqr_dW_sqr, W_vecs, diff_mat_W, cone.rt2)
     dz_dW = cone.dzdW
     dz_dW_vec = smat_to_svec!(zeros(vw_dim), dz_dW, rt2)
     dz_dW_sqr = dz_dW_vec * dz_dW_vec'
     WiWi = symm_kron(zeros(vw_dim, vw_dim), Wi, rt2)
     Hww = dz_dW_sqr + dz_sqr_dW_sqr / z + WiWi
 
-    dz_sqr_dW_dV = grad_logm(V_vecs, diff_mat_V, vw_dim, d)
+    dz_sqr_dW_dV = zeros(T, vw_dim, vw_dim)
+    grad_logm!(dz_sqr_dW_dV, V_vecs, diff_mat_V, cone.rt2)
     dz_dW_dz_dV = dz_dW_vec * dzdV'
     Hwv = -dz_sqr_dW_dV / z - dz_dW_dz_dV
 
@@ -265,44 +268,46 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     return cone.hess
 end
 
-function grad_logm(V_vecs, diff_mat, sdim, d)
-    ret = zeros(sdim, sdim)
+function grad_logm!(mat, vecs, diff_mat, rt2)
+    d = size(vecs, 1)
     row_idx = 1
     for j in 1:d, i in 1:j
         col_idx = 1
         for l in 1:d, k in 1:l
-            ret[row_idx, col_idx] += sum(diff_mat[m, n] * (
-                V_vecs[i, m] * V_vecs[k, m] * V_vecs[l, n] * V_vecs[j, n] +
-                V_vecs[j, m] * V_vecs[k, m] * V_vecs[l, n] * V_vecs[i, n] +
-                V_vecs[i, m] * V_vecs[l, m] * V_vecs[k, n] * V_vecs[j, n] +
-                V_vecs[j, m] * V_vecs[l, m] * V_vecs[k, n] * V_vecs[i, n]
-                ) * (m == n ? 1 : 2) * (i == j ? 1 : sqrt(2)) * (k == l ? 1 : sqrt(2)) / 4
+            mat[row_idx, col_idx] += sum(diff_mat[m, n] * (
+                vecs[i, m] * vecs[k, m] * vecs[l, n] * vecs[j, n] +
+                vecs[j, m] * vecs[k, m] * vecs[l, n] * vecs[i, n] +
+                vecs[i, m] * vecs[l, m] * vecs[k, n] * vecs[j, n] +
+                vecs[j, m] * vecs[l, m] * vecs[k, n] * vecs[i, n]
+                ) * (m == n ? 1 : 2) * (i == j ? 1 : rt2) * (k == l ? 1 : rt2)
                 for m in 1:d for n in 1:m)
             col_idx += 1
         end
         row_idx += 1
     end
-    return ret
+    mat ./= 4
+    return mat
 end
 
-function hess_tr_logm(V_vecs, W_similar, diff_tensor_V, sdim, d)
-    ret = zeros(sdim, sdim)
+function hess_tr_logm!(mat, vecs, mat_inner, diff_tensor, rt2)
+    d = size(vecs, 1)
     row_idx = 1
     for j in 1:d, i in 1:j
         col_idx = 1
         for l in 1:d, k in 1:l
-            ret[row_idx, col_idx] += sum(
+            mat[row_idx, col_idx] += sum(
                 (
-                V_vecs[i, m] * V_vecs[j, n] * (V_vecs[k, m] * dot(V_vecs[l, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[l, n] * dot(V_vecs[k, :], W_similar[:, m] .* diff_tensor_V[m, n, :])) +
-                V_vecs[j, m] * V_vecs[i, n] * (V_vecs[k, m] * dot(V_vecs[l, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[l, n] * dot(V_vecs[k, :], W_similar[:, m] .* diff_tensor_V[m, n, :])) +
-                V_vecs[i, m] * V_vecs[j, n] * (V_vecs[l, m] * dot(V_vecs[k, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[k, n] * dot(V_vecs[l, :], W_similar[:, m] .* diff_tensor_V[m, n, :])) +
-                V_vecs[j, m] * V_vecs[i, n] * (V_vecs[l, m] * dot(V_vecs[k, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[k, n] * dot(V_vecs[l, :], W_similar[:, m] .* diff_tensor_V[m, n, :]))
+                vecs[i, m] * vecs[j, n] * (vecs[k, m] * dot(vecs[l, :], mat_inner[:, n] .* diff_tensor[m, n, :]) + vecs[l, n] * dot(vecs[k, :], mat_inner[:, m] .* diff_tensor[m, n, :])) +
+                vecs[j, m] * vecs[i, n] * (vecs[k, m] * dot(vecs[l, :], mat_inner[:, n] .* diff_tensor[m, n, :]) + vecs[l, n] * dot(vecs[k, :], mat_inner[:, m] .* diff_tensor[m, n, :])) +
+                vecs[i, m] * vecs[j, n] * (vecs[l, m] * dot(vecs[k, :], mat_inner[:, n] .* diff_tensor[m, n, :]) + vecs[k, n] * dot(vecs[l, :], mat_inner[:, m] .* diff_tensor[m, n, :])) +
+                vecs[j, m] * vecs[i, n] * (vecs[l, m] * dot(vecs[k, :], mat_inner[:, n] .* diff_tensor[m, n, :]) + vecs[k, n] * dot(vecs[l, :], mat_inner[:, m] .* diff_tensor[m, n, :]))
                 ) *
-                (m == n ? 1 : 2) * (i == j ? 1 : sqrt(2)) * (k == l ? 1 : sqrt(2)) / 4
+                (m == n ? 1 : 2) * (i == j ? 1 : rt2) * (k == l ? 1 : rt2)
                 for m in 1:d for n in 1:m)
             col_idx += 1
         end
         row_idx += 1
     end
-    return ret
+    mat ./= 4
+    return mat
 end

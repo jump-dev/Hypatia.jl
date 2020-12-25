@@ -214,7 +214,6 @@ function test_episumperentropy_barrier(T::Type{<:Real})
 end
 
 function test_hypogeomean_barrier(T::Type{<:Real})
-    Random.seed!(1)
     for dim in [2, 3, 5, 8]
         invn = inv(T(dim - 1))
         function barrier(s)
@@ -279,7 +278,6 @@ function test_epinormspectral_barrier(T::Type{<:Real})
 end
 
 function test_epitracerelentropytri_barrier(T::Type{<:Real})
-    Random.seed!(1)
     rt2 = sqrt(T(2))
     for side in [1, 2, 3, 8, 12]
         @show side
