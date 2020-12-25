@@ -1,25 +1,22 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 epigraph of perspective of (half) square function (AKA rotated second-order cone)
 (u in R, v in R_+, w in R^n) : u >= v*1/2*norm_2(w/v)^2
 note v*1/2*norm_2(w/v)^2 = 1/2*sum_i(w_i^2)/v
 
 barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
 -log(2*u*v - norm_2(w)^2)
-
-TODO
-- try to derive faster neighborhood calculations for this cone specifically
 =#
 
 mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    max_neighborhood::T
     dim::Int
+
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
-
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
@@ -27,12 +24,8 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     hess_sqrt_prod_updated::Bool
     inv_hess_sqrt_prod_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     dist::T
     rtdist::T
@@ -43,12 +36,10 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     function EpiPerSquare{T}(
         dim::Int;
         use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
-        max_neighborhood::Real = default_max_neighborhood(),
         ) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
         cone.use_dual_barrier = use_dual
-        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         return cone
     end
@@ -60,32 +51,26 @@ reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.h
 
 use_sqrt_oracles(cone::EpiPerSquare) = true
 
-function setup_data(cone::EpiPerSquare{T}) where {T <: Real}
-    reset_data(cone)
+# TODO only allocate the fields we use
+function setup_extra_data(cone::EpiPerSquare{T}) where {T <: Real}
     dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     cone.hess_sqrt_vec = zeros(T, dim)
     cone.inv_hess_sqrt_vec = zeros(T, dim)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
-    return
+    return cone
 end
 
 get_nu(cone::EpiPerSquare) = 2
 
 function set_initial_point(arr::AbstractVector, cone::EpiPerSquare)
-    arr[1:2] .= 1
-    arr[3:end] .= 0
+    @views arr[1:2] .= 1
+    @views arr[3:end] .= 0
     return arr
 end
 
 # TODO refac with dual feas check
-function update_feas(cone::EpiPerSquare{T}) where {T}
+function update_feas(cone::EpiPerSquare{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
@@ -102,7 +87,7 @@ function update_feas(cone::EpiPerSquare{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::EpiPerSquare{T}) where {T}
+function is_dual_feas(cone::EpiPerSquare{T}) where T
     u = cone.dual_point[1]
     v = cone.dual_point[2]
 
@@ -110,6 +95,7 @@ function is_dual_feas(cone::EpiPerSquare{T}) where {T}
         @views w = cone.dual_point[3:end]
         return (u * v - sum(abs2, w) / 2 > eps(T))
     end
+
     return false
 end
 
@@ -165,7 +151,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
         ga = (dot(w, wj) - v * uj - u * vj) / cone.dist
         prod[1, j] = -ga * v - vj
         prod[2, j] = -ga * u - uj
-        @. prod[3:end, j] = ga * w + wj
+        @. @views prod[3:end, j] = ga * w + wj
     end
     @. prod /= cone.dist
 
@@ -175,8 +161,8 @@ end
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
     @assert cone.is_feas
 
-    @inbounds for j in 1:size(prod, 2)
-        @views pa = dot(cone.point, arr[:, j])
+    @inbounds @views for j in 1:size(prod, 2)
+        pa = dot(cone.point, arr[:, j])
         @. prod[:, j] = pa * cone.point
     end
     @. @views prod[1, :] -= cone.dist * arr[2, :]
@@ -222,8 +208,8 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, co
     vec = cone.hess_sqrt_vec
     rtdist = cone.rtdist
 
-    @inbounds for j in 1:size(arr, 2)
-        @views dotj = dot(vec, arr[:, j]) / cone.denom
+    @inbounds @views for j in 1:size(arr, 2)
+        dotj = dot(vec, arr[:, j]) / cone.denom
         @. prod[:, j] = dotj * vec
     end
     @. @views prod[1, :] -= arr[2, :] / rtdist
@@ -240,8 +226,8 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}
     vec = cone.inv_hess_sqrt_vec
     rtdist = cone.rtdist
 
-    @inbounds for j in 1:size(arr, 2)
-        @views dotj = dot(vec, arr[:, j]) / cone.denom
+    @inbounds @views for j in 1:size(arr, 2)
+        dotj = dot(vec, arr[:, j]) / cone.denom
         @. prod[:, j] = dotj * vec
     end
     @. @views prod[1, :] -= arr[2, :] * rtdist

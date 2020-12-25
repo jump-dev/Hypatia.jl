@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 symmetric-indefinite linear system solver
 solves linear system in naive.jl by first eliminating s and kap via the method in naiveelim.jl and then eliminating tau via a procedure similar to that described by S7.4 of
 http://www.seas.ucla.edu/~vandenbe/publications/coneprog.pdf
@@ -26,69 +24,27 @@ A*x = [-yrhs, b]
 
 abstract type SymIndefSystemSolver{T <: Real} <: SystemSolver{T} end
 
-# TODO refac to use this for QRChol too
-function solve_system(
-    system_solver::SymIndefSystemSolver{T},
-    solver::Solver{T},
-    sol::Vector{T},
-    rhs::Vector{T},
-    tau_scal::T,
+function setup_rhs3(
+    ::SymIndefSystemSolver{T},
+    model::Models.Model{T},
+    rhs::Point{T},
+    sol::Point{T},
+    rhs_sub::Point{T},
     ) where {T <: Real}
-    model = solver.model
-    (n, p, q) = (model.n, model.p, model.q)
-
-    rhs3 = system_solver.rhs3
-    sol3 = system_solver.sol3
-    dim3 = length(rhs3)
-    x_rows = 1:n
-    y_rows = n .+ (1:p)
-    z_rows = (n + p) .+ (1:q)
-
-    @. @views rhs3[x_rows] = rhs[x_rows]
-    @. @views rhs3[y_rows] = -rhs[y_rows]
-
-    for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
-        z_rows_k = (n + p) .+ idxs_k
-        z_k = @view rhs[z_rows_k]
-        z3_k = @view rhs3[z_rows_k]
-        s_rows_k = (dim3 + 1) .+ idxs_k
-        s_k = @view rhs[s_rows_k]
-
+    @inbounds for (k, cone_k) in enumerate(model.cones)
+        rhs_z_k = rhs.z_views[k]
+        rhs_s_k = rhs.s_views[k]
+        rhs_sub_z_k = rhs_sub.z_views[k]
         if Cones.use_dual_barrier(cone_k)
             # G_k*x - mu*H_k*z_k = [-zrhs_k - srhs_k, h_k]
-            @. z3_k = -z_k - s_k
+            @. rhs_sub_z_k = -rhs_z_k - rhs_s_k
         else
             # G_k*x - (mu*H_k)\z_k = [-zrhs_k - (mu*H_k)\srhs_k, h_k]
-            Cones.inv_hess_prod!(z3_k, s_k, cone_k)
-            axpby!(-1, z_k, -1, z3_k)
+            Cones.inv_hess_prod!(rhs_sub_z_k, rhs_s_k, cone_k)
+            axpby!(-1, rhs_z_k, -1, rhs_sub_z_k)
         end
     end
-
-    @timeit solver.timer "solve_subsystem" solve_subsystem(system_solver, sol3, rhs3)
-
-    # TODO refactor all below
-    # TODO maybe use higher precision here
-    const_sol = system_solver.const_sol
-
-    # lift to get tau
-    @views tau_num = rhs[dim3 + 1] + rhs[end] + dot(model.c, sol3[x_rows]) + dot(model.b, sol3[y_rows]) + dot(model.h, sol3[z_rows])
-    @views tau_denom = tau_scal - dot(model.c, const_sol[x_rows]) - dot(model.b, const_sol[y_rows]) - dot(model.h, const_sol[z_rows])
-    sol_tau = tau_num / tau_denom
-
-    @. sol[1:dim3] = sol3 + sol_tau * const_sol
-    sol[dim3 + 1] = sol_tau
-
-    # lift to get s and kap
-    # TODO refactor below for use with symindef and qrchol methods
-    # s = -G*x + h*tau - zrhs
-    s = @view sol[(dim3 + 2):(end - 1)]
-    @. @views s = model.h * sol_tau - rhs[z_rows]
-    @views mul!(s, model.G, sol[x_rows], -1, true)
-
-    # kap = -tau_scal*tau + kaprhs
-    sol[end] = -tau_scal * sol_tau + rhs[end]
-
-    return sol
+    return nothing
 end
 
 #=
@@ -96,13 +52,13 @@ direct sparse
 =#
 
 mutable struct SymIndefSparseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
-    lhs3::SparseMatrixCSC # TODO type will depend on Int type
-    rhs3::Vector{T}
-    sol3::Vector{T}
-    hess_idxs::Vector
+    lhs_sub::SparseMatrixCSC # TODO type will depend on Int type
     fact_cache::SparseSymCache{T}
-    const_sol::Vector{T}
-    const_rhs::Vector{T}
+    hess_idxs::Vector
+    rhs_sub::Point{T}
+    sol_sub::Point{T}
+    sol_const::Point{T}
+    rhs_const::Point{T}
     function SymIndefSparseSystemSolver{T}(;
         fact_cache::SparseSymCache{T} = SparseSymCache{T}(),
         ) where {T <: Real}
@@ -118,20 +74,15 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     (n, p, q) = (model.n, model.p, model.q)
     cones = model.cones
     cone_idxs = model.cone_idxs
-    dim = n + p + q
-
-    system_solver.sol3 = zeros(dim)
-    system_solver.rhs3 = similar(system_solver.sol3)
 
     # form sparse LHS without Hessians and inverse Hessians in z/z block
-    lhs3 = T[
+    lhs_sub = T[
         spzeros(T, n, n)  spzeros(T, n, p)  spzeros(T, n, q);
         model.A           spzeros(T, p, p)  spzeros(T, p, q);
         model.G           spzeros(T, q, p)  sparse(-one(T) * I, q, q);
         ]
-    @assert issparse(lhs3)
-    dropzeros!(lhs3)
-    (Is, Js, Vs) = findnz(lhs3)
+    dropzeros!(lhs_sub)
+    (Is, Js, Vs) = findnz(lhs_sub)
 
     # add I, J, V for Hessians and inverse Hessians
     if isempty(cones)
@@ -150,16 +101,15 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
             len_kj = length(nz_rows_kj)
             IJV_idxs = offset:(offset + len_kj - 1)
             offset += len_kj
-            @. H_Is[IJV_idxs] = nz_rows_kj
-            @. H_Js[IJV_idxs] = z_start_k + j
+            @. @views H_Is[IJV_idxs] = nz_rows_kj
+            @. @views H_Js[IJV_idxs] = z_start_k + j
         end
     end
-    @assert offset == hess_nz_total + 1
     append!(Is, H_Is)
     append!(Js, H_Js)
     append!(Vs, ones(T, hess_nz_total))
 
-    pert = T(system_solver.fact_cache.diag_pert) # TODO not happy with where this is stored
+    pert = T(system_solver.fact_cache.diag_pert) # TODO change where this is stored
     append!(Is, 1:(n + p))
     append!(Js, 1:(n + p))
     append!(Vs, fill(pert, n))
@@ -170,7 +120,8 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
     # prefer conversions of integer types to happen here than inside external wrappers
     Is = convert(Vector{Ti}, Is)
     Js = convert(Vector{Ti}, Js)
-    lhs3 = system_solver.lhs3 = sparse(Is, Js, Vs, dim, dim)
+    dim = size(lhs_sub, 1)
+    lhs_sub = system_solver.lhs_sub = sparse(Is, Js, Vs, dim, dim)
 
     # cache indices of nonzeros of Hessians and inverse Hessians in sparse LHS nonzeros vector
     system_solver.hess_idxs = [Vector{Union{UnitRange, Vector{Int}}}(undef, Cones.dimension(cone_k)) for cone_k in cones]
@@ -180,8 +131,8 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
         for j in 1:Cones.dimension(cone_k)
             col = z_start_k + j
             # get nonzero rows in the current column of the LHS
-            col_idx_start = lhs3.colptr[col]
-            nz_rows = lhs3.rowval[col_idx_start:(lhs3.colptr[col + 1] - 1)]
+            col_idx_start = lhs_sub.colptr[col]
+            nz_rows = lhs_sub.rowval[col_idx_start:(lhs_sub.colptr[col + 1] - 1)]
             # get nonzero rows in column j of the Hessian or inverse Hessian
             nz_hess_indices = (Cones.use_dual_barrier(cone_k) ? Cones.hess_nz_idxs_col_tril(cone_k, j) : Cones.inv_hess_nz_idxs_col_tril(cone_k, j))
             # get index corresponding to first nonzero Hessian element of the current column of the LHS
@@ -191,8 +142,7 @@ function load(system_solver::SymIndefSparseSystemSolver{T}, solver::Solver{T}) w
         end
     end
 
-    system_solver.const_rhs = vcat(-model.c, model.b, model.h)
-    system_solver.const_sol = similar(system_solver.const_rhs)
+    setup_point_sub(system_solver, model)
 
     return system_solver
 end
@@ -202,19 +152,24 @@ function update_lhs(system_solver::SymIndefSparseSystemSolver, solver::Solver)
         H_k = (Cones.use_dual_barrier(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
             nz_rows = (Cones.use_dual_barrier(cone_k) ? Cones.hess_nz_idxs_col_tril(cone_k, j) : Cones.inv_hess_nz_idxs_col_tril(cone_k, j))
-            @. @views system_solver.lhs3.nzval[system_solver.hess_idxs[k][j]] = -H_k[nz_rows, j]
+            @. @views system_solver.lhs_sub.nzval[system_solver.hess_idxs[k][j]] = -H_k[nz_rows, j]
         end
     end
 
-    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs3)
-    @timeit solver.timer "solve_subsystem" solve_subsystem(system_solver, system_solver.const_sol, system_solver.const_rhs)
+    update_fact(system_solver.fact_cache, system_solver.lhs_sub)
+    solve_subsystem3(system_solver, solver, system_solver.sol_const, system_solver.rhs_const)
 
     return system_solver
 end
 
-function solve_subsystem(system_solver::SymIndefSparseSystemSolver, sol3::Vector, rhs3::Vector)
-    inv_prod(system_solver.fact_cache, sol3, system_solver.lhs3, rhs3)
-    return sol3
+function solve_subsystem3(
+    system_solver::SymIndefSparseSystemSolver,
+    ::Solver,
+    sol_sub::Point,
+    rhs_sub::Point,
+    )
+    inv_prod(system_solver.fact_cache, sol_sub.vec, system_solver.lhs_sub, rhs_sub.vec)
+    return sol_sub
 end
 
 #=
@@ -222,12 +177,12 @@ direct dense
 =#
 
 mutable struct SymIndefDenseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
-    lhs3::Symmetric{T, Matrix{T}}
-    rhs3::Vector{T}
-    sol3::Vector{T}
+    lhs_sub::Symmetric{T, Matrix{T}}
     fact_cache::DenseSymCache{T}
-    const_sol::Vector{T}
-    const_rhs::Vector{T}
+    rhs_sub::Point{T}
+    sol_sub::Point{T}
+    sol_const::Point{T}
+    rhs_const::Point{T}
     function SymIndefDenseSystemSolver{T}(;
         fact_cache::DenseSymCache{T} = DenseSymCache{T}(),
         ) where {T <: Real}
@@ -241,50 +196,109 @@ function load(system_solver::SymIndefDenseSystemSolver{T}, solver::Solver{T}) wh
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
 
-    system_solver.sol3 = zeros(T, n + p + q)
-    system_solver.rhs3 = similar(system_solver.sol3)
-
     # fill symmetric lower triangle
-    system_solver.lhs3 = Symmetric(T[
+    system_solver.lhs_sub = Symmetric(T[
         zeros(T, n, n)  zeros(T, n, p)  zeros(T, n, q);
         model.A         zeros(T, p, p)  zeros(T, p, q);
         model.G         zeros(T, q, p)  Matrix(-one(T) * I, q, q);
         ], :L)
 
-    load_matrix(system_solver.fact_cache, system_solver.lhs3)
+    load_matrix(system_solver.fact_cache, system_solver.lhs_sub)
 
-    system_solver.const_rhs = vcat(-model.c, model.b, model.h)
-    system_solver.const_sol = similar(system_solver.const_rhs)
+    setup_point_sub(system_solver, model)
 
     return system_solver
 end
 
 function update_lhs(system_solver::SymIndefDenseSystemSolver, solver::Solver)
     model = solver.model
-    (n, p) = (model.n, model.p)
-    lhs3 = system_solver.lhs3.data
+    z_start = model.n + model.p
+    lhs_sub = system_solver.lhs_sub.data
 
     for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
-        z_rows_k = (n + p) .+ idxs_k
-        if Cones.use_dual_barrier(cone_k)
-            # G_k*x - mu*H_k*z_k = [-zrhs_k - srhs_k, h_k]
-            H_k = Cones.hess(cone_k)
-            @. lhs3[z_rows_k, z_rows_k] = -H_k
-        else
-            # G_k*x - (mu*H_k)\z_k = [-zrhs_k - (mu*H_k)\srhs_k, h_k]
-            Hi_k = Cones.inv_hess(cone_k)
-            @. lhs3[z_rows_k, z_rows_k] = -Hi_k
-        end
+        z_rows_k = z_start .+ idxs_k
+        H_k = (Cones.use_dual_barrier(cone_k) ? Cones.hess : Cones.inv_hess)(cone_k)
+        @. @views lhs_sub[z_rows_k, z_rows_k] = -H_k
     end
 
-    @timeit solver.timer "update_fact" update_fact(system_solver.fact_cache, system_solver.lhs3)
-    @timeit solver.timer "solve_subsystem" solve_subsystem(system_solver, system_solver.const_sol, system_solver.const_rhs)
+    update_fact(system_solver.fact_cache, system_solver.lhs_sub)
+    solve_subsystem3(system_solver, solver, system_solver.sol_const, system_solver.rhs_const)
 
     return system_solver
 end
 
-function solve_subsystem(system_solver::SymIndefDenseSystemSolver, sol3::Vector, rhs3::Vector)
-    copyto!(sol3, rhs3)
-    inv_prod(system_solver.fact_cache, sol3)
-    return sol3
+function solve_subsystem3(
+    system_solver::SymIndefDenseSystemSolver,
+    ::Solver,
+    sol_sub::Point,
+    rhs_sub::Point,
+    )
+    copyto!(sol_sub.vec, rhs_sub.vec)
+    inv_prod(system_solver.fact_cache, sol_sub.vec)
+    return sol_sub
+end
+
+#=
+indirect (using LinearMaps and IterativeSolvers)
+TODO
+- precondition
+- optimize operations
+- tune tolerances etc
+- try to make initial point in sol_sub a good guess (currently zeros)
+=#
+
+mutable struct SymIndefIndirectSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
+    lhs::LinearMaps.LinearMap{T}
+    rhs_sub::Point{T}
+    sol_sub::Point{T}
+    sol_const::Point{T}
+    rhs_const::Point{T}
+    SymIndefIndirectSystemSolver{T}() where {T <: Real} = new{T}()
+end
+
+function load(system_solver::SymIndefIndirectSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+    model = solver.model
+    (n, p, q) = (model.n, model.p, model.q)
+    x_idxs = 1:n
+    y_idxs = n .+ (1:p)
+    z_start = n + p
+    z_idxs = z_start .+ (1:q)
+
+    function symindef_mul(b::AbstractVector, a::AbstractVector)
+        # x part
+        @views mul!(b[x_idxs], model.A', a[y_idxs])
+        @views mul!(b[x_idxs], model.G', a[z_idxs], true, true)
+        # y part
+        @views mul!(b[y_idxs], model.A, a[x_idxs])
+        # z part
+        for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
+            z_rows_k = z_start .+ idxs_k
+            prod_fun = (Cones.use_dual_barrier(cone_k) ? Cones.hess_prod! : Cones.inv_hess_prod!)
+            @views prod_fun(b[z_rows_k], a[z_rows_k], cone_k)
+        end
+        @views mul!(b[z_idxs], model.G, a[x_idxs], true, -one(T))
+        return b
+    end
+
+    system_solver.lhs = LinearMaps.LinearMap{T}(symindef_mul, z_start + q, ismutating = true, issymmetric = true, isposdef = false)
+
+    setup_point_sub(system_solver, model)
+
+    return system_solver
+end
+
+function update_lhs(system_solver::SymIndefIndirectSystemSolver, solver::Solver)
+    solve_subsystem3(system_solver, solver, system_solver.sol_const, system_solver.rhs_const)
+    return system_solver
+end
+
+function solve_subsystem3(
+    system_solver::SymIndefIndirectSystemSolver,
+    ::Solver,
+    sol_sub::Point,
+    rhs_sub::Point,
+    )
+    sol_sub.vec .= 0 # initially_zero = true
+    IterativeSolvers.minres!(sol_sub.vec, system_solver.lhs, rhs_sub.vec, initially_zero = true)#, maxiter = 2 * size(sol_sub.vec, 1)) # TODO tune options, initial guess?
+    return sol_sub
 end

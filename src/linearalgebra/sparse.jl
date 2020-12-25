@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 helpers for sparse factorizations and linear solves
 =#
 
@@ -34,7 +32,7 @@ function update_fact(cache::UMFPACKNonSymCache, A::SparseMatrixCSC{Float64, Suit
         cache.umfpack = lu(A) # symbolic and numeric factorization
         cache.analyzed = true
     else
-        lu!(cache.umfpack, A, check = true)
+        lu!(cache.umfpack, A, check = false)
     end
     return
 end

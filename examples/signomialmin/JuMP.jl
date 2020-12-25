@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 signomial minimization problem
 see "Signomial and Polynomial Optimization via Relative Entropy and Partial Dualization" (2019) by Murray, Chandrasekaran, & Wierman
 
@@ -41,7 +39,7 @@ end
 SignomialMinJuMP{Float64}(sig_name::Symbol) = SignomialMinJuMP{Float64}(signomialmin_data[sig_name]...)
 SignomialMinJuMP{Float64}(m::Int, n::Int) = SignomialMinJuMP{Float64}(signomialmin_random(m, n)...)
 
-function build(inst::SignomialMinJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::SignomialMinJuMP{T}) where {T <: Float64}
     (fc, fA, gc, gA) = (inst.fc, inst.fA, inst.gc, inst.gA)
     (fm, n) = size(fA)
     @assert length(fc) == fm
@@ -120,40 +118,3 @@ function test_extra(inst::SignomialMinJuMP{T}, model::JuMP.Model) where T
         @test JuMP.objective_value(model) <= inst.obj_ub + tol
     end
 end
-
-instances[SignomialMinJuMP]["minimal"] = [
-    ((2, 2),),
-    ((2, 2), ClassicConeOptimizer),
-    ]
-instances[SignomialMinJuMP]["fast"] = [
-    ((:motzkin2,),),
-    ((:motzkin2,), ClassicConeOptimizer),
-    ((:motzkin3,),),
-    ((:CS16ex8_13,),),
-    ((:CS16ex8_14,),),
-    ((:CS16ex18,),),
-    ((:CS16ex12,),),
-    ((:CS16ex13,),),
-    ((:MCW19ex1_mod,),),
-    ((:MCW19ex8,),),
-    ((:MCW19ex8,), ClassicConeOptimizer),
-    ((3, 2),),
-    ((3, 2), ClassicConeOptimizer),
-    ((6, 6),),
-    ((20, 3),),
-    ((20, 3), ClassicConeOptimizer),
-    ]
-instances[SignomialMinJuMP]["slow"] = [
-    ((10, 10),),
-    ((10, 10), ClassicConeOptimizer),
-    ((20, 6),),
-    ((40, 3),),
-    ]
-
-# benchmark 1 instances
-instances[SignomialMinJuMP]["bench1"] = (
-    ((m, n), ext)
-    for m in vcat(1, 3:3:30) # includes compile run
-    for n in (div(m, 3), m, 3m)
-    for ext in (nothing, ClassicConeOptimizer)
-    )

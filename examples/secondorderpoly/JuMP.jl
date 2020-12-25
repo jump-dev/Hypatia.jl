@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 check a sufficient condition for pointwise membership of vector valued polynomials in the second order cone
 =#
 
@@ -10,7 +8,7 @@ struct SecondOrderPolyJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     is_feas::Bool # whether model should be primal-dual feasible; only for testing
 end
 
-function build(inst::SecondOrderPolyJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::SecondOrderPolyJuMP{T}) where {T <: Float64}
     halfdeg = div(inst.deg + 1, 2)
     (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{Float64}(1), halfdeg)
     vals = secondorderpoly_data[inst.polys_name].(pts)
@@ -38,18 +36,3 @@ secondorderpoly_data = Dict(
     :polys8 => (x -> [x + 2, x]),
     :polys9 => (x -> [x - 1, x, x]),
     )
-
-instances[SecondOrderPolyJuMP]["minimal"] = [
-    ((:polys1, 2, true),),
-    ]
-instances[SecondOrderPolyJuMP]["fast"] = [
-    ((:polys2, 2, true),),
-    ((:polys3, 2, true),),
-    ((:polys4, 4, true),),
-    ((:polys5, 2, false),),
-    ((:polys6, 2, false),),
-    ((:polys7, 2, false),),
-    ((:polys8, 2, false),),
-    ((:polys9, 2, false),),
-    ]
-instances[SecondOrderPolyJuMP]["slow"] = Tuple[]

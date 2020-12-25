@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 hypograph of generalized geomean (product of powers) parametrized by alpha in R_+^n on unit simplex
 (u in R, w in R_+^n) : u <= prod_i(w_i^alpha_i)
 where sum_i(alpha_i) = 1, alpha_i >= 0
@@ -11,12 +9,14 @@ barrier from "Constructing self-concordant barriers for convex cones" by Yu. Nes
 
 mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
-    max_neighborhood::T
     dim::Int
+
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
 
     feas_updated::Bool
     grad_updated::Bool
@@ -24,66 +24,53 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     iwdim::T
     wgeo::T
     z::T
-    tmpw::Vector{T}
+    tempw::Vector{T}
 
     function HypoGeoMean{T}(
         dim::Int;
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
-        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim >= 2
         cone = new{T}()
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
-        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
 
-function setup_data(cone::HypoGeoMean{T}) where {T <: Real}
-    reset_data(cone)
+use_heuristic_neighborhood(cone::HypoGeoMean) = false
+
+function setup_extra_data(cone::HypoGeoMean{T}) where {T <: Real}
     dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
     wdim = dim - 1
-    cone.tmpw = zeros(T, wdim)
+    cone.tempw = zeros(T, wdim)
     cone.iwdim = inv(T(wdim))
-    return
+    return cone
 end
 
 get_nu(cone::HypoGeoMean) = cone.dim
 
-function set_initial_point(arr::AbstractVector{T}, cone::HypoGeoMean{T}) where {T}
+function set_initial_point(arr::AbstractVector{T}, cone::HypoGeoMean{T}) where T
     wdim = cone.dim - 1
     c = sqrt(T(5 * wdim ^ 2 + 2 * wdim + 1))
     arr[1] = -sqrt((-c + 3 * wdim + 1) / T(2 * cone.dim))
-    arr[2:end] .= (c - wdim + 1) / sqrt(cone.dim * (-2 * c + 6 * wdim + 2))
+    @views arr[2:end] .= (c - wdim + 1) / sqrt(cone.dim * (-2 * c + 6 * wdim + 2))
     return arr
 end
 
-function update_feas(cone::HypoGeoMean{T}) where {T}
+function update_feas(cone::HypoGeoMean{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -100,13 +87,14 @@ function update_feas(cone::HypoGeoMean{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::HypoGeoMean{T}) where {T}
+function is_dual_feas(cone::HypoGeoMean{T}) where T
     u = cone.dual_point[1]
     @views w = cone.dual_point[2:end]
+
     if u < -eps(T) && all(>(eps(T)), w)
-        dual_wgeou = (cone.dim - 1) * exp(cone.iwdim * sum(log, w)) + u
-        return (dual_wgeou > eps(T))
+        return ((cone.dim - 1) * exp(cone.iwdim * sum(log, w)) + u > eps(T))
     end
+
     return false
 end
 
@@ -117,7 +105,7 @@ function update_grad(cone::HypoGeoMean)
 
     cone.grad[1] = inv(cone.z)
     gconst = -cone.iwdim * cone.wgeo / cone.z - 1
-    @. cone.grad[2:end] = gconst / w
+    @. @views cone.grad[2:end] = gconst / w
 
     cone.grad_updated = true
     return cone.grad
@@ -151,7 +139,7 @@ function update_hess(cone::HypoGeoMean)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where {T}
+function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where T
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -161,7 +149,7 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::H
     wgeozm1 = wgeoz - iwdim
     constww = wgeoz + 1
 
-    @views @inbounds for j in 1:size(arr, 2)
+    @inbounds @views for j in 1:size(arr, 2)
         arr_u = arr[1, j]
         auz = arr_u / z
         prod_w = prod[2:end, j]
@@ -175,7 +163,7 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::H
     return prod
 end
 
-function update_inv_hess(cone::HypoGeoMean{T}) where {T}
+function update_inv_hess(cone::HypoGeoMean{T}) where T
     @assert !cone.inv_hess_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -202,7 +190,7 @@ function update_inv_hess(cone::HypoGeoMean{T}) where {T}
     return cone.inv_hess
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where {T}
+function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where T
     u = cone.point[1]
     @views w = cone.point[2:end]
     wdim = length(w)
@@ -212,7 +200,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
     denom = cone.dim * wgeo - wdim * u
     zd2 = wdim * cone.z / denom
 
-    @views @inbounds for j in 1:size(prod, 2)
+    @inbounds @views for j in 1:size(prod, 2)
         arr_u = arr[1, j]
         prod_w = prod[2:end, j]
         @. prod_w = w * arr[2:end, j]
@@ -233,7 +221,7 @@ function correction(cone::HypoGeoMean, primal_dir::AbstractVector)
     @views w_dir = primal_dir[2:end]
     corr = cone.correction
     z = cone.z
-    wdw = cone.tmpw
+    wdw = cone.tempw
     iwdim = cone.iwdim
 
     piz = cone.wgeo / z

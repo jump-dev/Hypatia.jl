@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 TODO
 - reference paper for model
 - add options to use standard PSD cone formulation vs interpolation-based WSOS cone formulation
@@ -19,7 +17,7 @@ struct LotkaVolterraJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     deg::Int # polynomial degrees
 end
 
-function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64}
     # parameters
     n = 4 # number of species
     m = 2 * n # number of control inputs (u)
@@ -75,13 +73,3 @@ function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64} # TODO generic r
 
     return model
 end
-
-instances[LotkaVolterraJuMP]["minimal"] = [
-    ((2,),),
-    ]
-instances[LotkaVolterraJuMP]["fast"] = [
-    ((4,),),
-    ]
-instances[LotkaVolterraJuMP]["slow"] = [
-    ((6,),),
-    ]

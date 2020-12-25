@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 TODO
 - write description
 - assumes first A matrix is PSD (eg identity)
@@ -9,28 +7,26 @@ TODO
 mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     use_heuristic_neighborhood::Bool
-    max_neighborhood::T
     dim::Int
     side::Int
     As::Vector
     is_complex::Bool
+
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
-
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     sumA
     fact
@@ -40,7 +36,6 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         As::Vector;
         use_dual::Bool = false,
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
-        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         dim = length(As)
@@ -54,7 +49,6 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
                     @assert size(A_i, 1) == side
                 end
             end
-            # @assert eltype(A_i) <: RealOrComplex{T}
             @assert ishermitian(A_i)
         end
         @assert side > 0
@@ -63,7 +57,6 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         cone = new{T}()
         cone.use_dual_barrier = use_dual
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
-        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.side = side
         cone.As = As
@@ -73,19 +66,12 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
 end
 
 # TODO only allocate the fields we use
-function setup_data(cone::LinMatrixIneq{T}) where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::LinMatrixIneq{T}) where {T <: Real}
     dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
-    return
+    return cone
 end
 
 get_nu(cone::LinMatrixIneq) = cone.side
@@ -106,8 +92,6 @@ function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
     # NOTE not in-place because typeof(A) is AbstractMatrix eg sparse
     # TODO if sumA is dense, can do in-place
     cone.sumA = sum(w_i * A_i for (w_i, A_i) in zip(cone.point, cone.As))
-    @assert ishermitian(cone.sumA) # TODO delete
-    @assert eltype(cone.sumA) <: RealOrComplex{T}
     cone.fact = lmi_fact(cone.sumA)
     cone.is_feas = isposdef(cone.fact)
 
@@ -150,13 +134,13 @@ function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
     corr = cone.correction
     dim = cone.dim
 
-    tmp = similar(sumAinvAs[1])
-    tmp .= 0
+    temp = zero(sumAinvAs[1])
+    temp .= 0
     @inbounds for j in 1:dim, k in 1:dim
-        mul!(tmp, sumAinvAs[j], sumAinvAs[k], primal_dir[j] * primal_dir[k], true)
+        mul!(temp, sumAinvAs[j], sumAinvAs[k], primal_dir[j] * primal_dir[k], true)
     end
     @inbounds for i in 1:dim
-        corr[i] = real(dot(sumAinvAs[i], tmp'))
+        corr[i] = real(dot(sumAinvAs[i], temp'))
     end
 
     return corr

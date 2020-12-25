@@ -6,4 +6,5 @@ Manifest.toml
 deps/deps.jl
 scratch.jl
 */scratch.jl
-benchmark/outputs/*
+examples/results/*
+examples/bench.csv

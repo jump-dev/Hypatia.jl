@@ -1,11 +1,9 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 D-optimal experimental design
 adapted from Boyd and Vandenberghe, "Convex Optimization", section 7.5
-  maximize    F(V*diagm(np)*V')
-  subject to  sum(np) == n
-              0 .<= np .<= n_max
+maximize    F(V*diagm(np)*V')
+subject to  sum(np) == n
+            0 .<= np .<= n_max
 where np is a vector of variables representing the number of experiment p to run (fractional),
 and the columns of V are the vectors representing each experiment
 
@@ -23,7 +21,7 @@ struct ExpDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     geomean_obj::Bool # use formulation with geomean objective
 end
 
-function build(inst::ExpDesignJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::ExpDesignJuMP{T}) where {T <: Float64}
     (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)
     @assert (p > q) && (n > q) && (n_max <= n)
     @assert inst.logdet_obj + inst.geomean_obj + inst.rootdet_obj == 1
@@ -59,45 +57,3 @@ function build(inst::ExpDesignJuMP{T}) where {T <: Float64} # TODO generic reals
 
     return model
 end
-
-instances[ExpDesignJuMP]["minimal"] = [
-    ((2, 3, 4, 2, true, false, false),),
-    ((2, 3, 4, 2, true, false, false), ClassicConeOptimizer),
-    ((2, 3, 4, 2, false, true, false),),
-    ((2, 3, 4, 2, false, true, false), ClassicConeOptimizer),
-    ((2, 3, 4, 2, false, false, true),),
-    ((2, 3, 4, 2, false, false, true), ClassicConeOptimizer),
-    ]
-instances[ExpDesignJuMP]["fast"] = [
-    ((3, 5, 7, 2, true, false, false),),
-    ((3, 5, 7, 2, true, false, false), ClassicConeOptimizer),
-    ((3, 5, 7, 2, false, true, false),),
-    ((3, 5, 7, 2, false, true, false), ClassicConeOptimizer),
-    ((3, 5, 7, 2, false, false, true),),
-    ((3, 5, 7, 2, false, false, true), ClassicConeOptimizer),
-    ((5, 15, 25, 5, true, false, false),),
-    ((5, 15, 25, 5, false, true, false),),
-    ((5, 15, 25, 5, false, false, true),),
-    ((10, 30, 50, 5, true, false, false),),
-    ((10, 30, 50, 5, false, true, false),),
-    ((10, 30, 50, 5, false, false, true),),
-    ((25, 75, 125, 10, true, false, false),),
-    ((25, 75, 125, 10, false, true, false),),
-    ((25, 75, 125, 10, false, false, true),),
-    ]
-instances[ExpDesignJuMP]["slow"] = [
-    ((25, 75, 125, 10, true, false, false), ClassicConeOptimizer),
-    ((25, 75, 125, 10, false, true, false), ClassicConeOptimizer),
-    ((25, 75, 125, 10, false, false, true), ClassicConeOptimizer),
-    ((100, 200, 200, 10, true, false, false),),
-    ((100, 200, 200, 10, false, true, false),),
-    ((100, 200, 200, 10, false, false, true),),
-    ]
-
-# benchmark 1 instances
-instances[ExpDesignJuMP]["bench1"] = (
-    ((q, 2q, 2q, 5, use_logdet, !use_logdet, false), ext)
-    for q in vcat(3, 20:20:220) # includes compile run
-    for use_logdet in (false, true)
-    for ext in (nothing, ClassicConeOptimizer)
-    )

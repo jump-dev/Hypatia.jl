@@ -1,19 +1,19 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 see description in native.jl
 =#
 
 using SparseArrays
 
 struct MatrixCompletionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+    size_ratio::Int
     num_rows::Int
-    num_cols::Int
 end
 
-function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64} # TODO generic reals
-    (num_rows, num_cols) = (inst.num_rows, inst.num_cols)
-    @assert num_rows <= num_cols
+function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64}
+    (size_ratio, num_rows) = (inst.size_ratio, inst.num_rows)
+    @assert size_ratio >= 1
+    num_cols = size_ratio * num_rows
+
     (rows, cols, Avals) = findnz(sprand(num_rows, num_cols, 0.1))
     mat_to_vec_idx(i::Int, j::Int) = (j - 1) * num_rows + i
     is_unknown = fill(true, num_rows * num_cols)
@@ -31,28 +31,3 @@ function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64} # TODO generi
 
     return model
 end
-
-instances[MatrixCompletionJuMP]["minimal"] = [
-    ((2, 3),),
-    ((2, 3), ClassicConeOptimizer),
-    ]
-instances[MatrixCompletionJuMP]["fast"] = [
-    ((5, 8),),
-    ((5, 8), ClassicConeOptimizer),
-    ((12, 20),),
-    ]
-instances[MatrixCompletionJuMP]["slow"] = [
-    ((12, 24), ClassicConeOptimizer),
-    ((14, 140),),
-    ((14, 140), ClassicConeOptimizer),
-    ((40, 70),),
-    ((18, 180),),
-    ]
-
-# benchmark 1 instances
-instances[MatrixCompletionJuMP]["bench1"] = (
-    ((d1, d2), ext)
-    for d1 in vcat(3, 10:5:50) # includes compile run
-    for d2 in (5d1, 10d1)
-    for ext in (nothing, ClassicConeOptimizer)
-    )

@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 smat(w) in S_+^d intersected with w in R_+^(sdim(d))
 
 barrier -logdet(W) - sum(log(W_ij) for i in 1:n, j in 1:(i-1))
@@ -8,33 +6,30 @@ where W = smat(w)
 
 TODO
 - improve description
-- complex generalization?
 =#
 
-mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
+mutable struct DoublyNonnegativeTri{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     use_heuristic_neighborhood::Bool
-    max_neighborhood::T
     dim::Int
     side::Int
+    rt2::T
+
     point::Vector{T}
     dual_point::Vector{T}
-    rt2::T
-    timer::TimerOutput
-
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     mat::Matrix{T}
     mat2::Matrix{T} # TODO rename to imply mutates fact_mat
@@ -45,57 +40,48 @@ mutable struct DoublyNonnegative{T <: Real} <: Cone{T}
     inv_vec::Vector{T}
     fact_mat
 
-    function DoublyNonnegative{T}(
+    function DoublyNonnegativeTri{T}(
         dim::Int;
         use_dual::Bool = false,
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
-        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim >= 1
         cone = new{T}()
         cone.use_dual_barrier = use_dual
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
-        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
-        side = round(Int, sqrt(0.25 + 2 * dim) - 0.5)
+        cone.side = side = round(Int, sqrt(0.25 + 2 * dim) - 0.5)
         @assert side * (side + 1) == 2 * dim
-        cone.side = side
         cone.offdiag_idxs = vcat([div(i * (i - 1), 2) .+ (1:(i - 1)) for i in 2:side]...)
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
 
-use_heuristic_neighborhood(cone::DoublyNonnegative) = false
+use_heuristic_neighborhood(cone::DoublyNonnegativeTri) = false
 
-reset_data(cone::DoublyNonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
+reset_data(cone::DoublyNonnegativeTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
-function setup_data(cone::DoublyNonnegative{T}) where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::DoublyNonnegativeTri{T}) where {T <: Real}
     dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
     cone.mat = zeros(T, cone.side, cone.side)
-    cone.mat2 = similar(cone.mat)
-    cone.mat3 = similar(cone.mat)
-    cone.mat4 = similar(cone.mat)
+    cone.mat2 = zero(cone.mat)
+    cone.mat3 = zero(cone.mat)
+    cone.mat4 = zero(cone.mat)
     cone.inv_vec = zeros(T, length(cone.offdiag_idxs))
-    return
+    return cone
 end
 
-get_nu(cone::DoublyNonnegative) = cone.dim
+get_nu(cone::DoublyNonnegativeTri) = cone.dim
 
-function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegative{T}) where {T}
+function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegativeTri{T}) where T
     side = cone.side
+
     # for small side dimension, use closed-form solutions
     if side == 1
         on_diag = off_diag = one(T)
@@ -114,9 +100,9 @@ function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegative{T}) w
             # TODO this poly seems to always have real roots, prove
             if offd_real > 0
                 # get trial point on the diagonal
-                tmp = d - (d - n) * abs2(offd_real)
-                if tmp > sqrt(eps(T))
-                    ond_try = sqrt(tmp / n)
+                temp = d - (d - n) * abs2(offd_real)
+                if temp > sqrt(eps(T))
+                    ond_try = sqrt(temp / n)
                     denom = abs2(ond_try) + (n - 2) / cone.rt2 * ond_try * offd_real - (n - 1) * abs2(offd_real) / 2
                     # check s = -g(s) conditions
                     if ond_try * cone.rt2 + (n - 2) * offd_real ≈ ond_try * denom * cone.rt2 && denom ≈ abs2(offd_real) * (denom + 1)
@@ -128,7 +114,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegative{T}) w
             end
         end
         if !found_soln
-            @warn("initial point inaccurate for DoublyNonnegative cone dimension $(cone.dim)")
+            @warn("initial point inaccurate for DoublyNonnegativeTri cone dimension $(cone.dim)")
         end
     end
 
@@ -142,7 +128,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegative{T}) w
     return arr
 end
 
-function update_feas(cone::DoublyNonnegative{T}) where {T}
+function update_feas(cone::DoublyNonnegativeTri{T}) where T
     @assert !cone.feas_updated
 
     if all(>(eps(T)), cone.point)
@@ -158,33 +144,35 @@ function update_feas(cone::DoublyNonnegative{T}) where {T}
     return cone.is_feas
 end
 
-is_dual_feas(cone::DoublyNonnegative) = true
+is_dual_feas(cone::DoublyNonnegativeTri) = true
 
-function update_grad(cone::DoublyNonnegative)
+function update_grad(cone::DoublyNonnegativeTri)
     @assert cone.is_feas
 
-    cone.inv_mat = inv(cone.fact_mat)
+    cone.inv_mat = inv(cone.fact_mat) # TODO in-place
     smat_to_svec!(cone.grad, cone.inv_mat, cone.rt2)
     cone.grad .*= -1
     @. @views cone.inv_vec = inv(cone.point[cone.offdiag_idxs])
-    @. cone.grad[cone.offdiag_idxs] -= cone.inv_vec
+    @. @views cone.grad[cone.offdiag_idxs] -= cone.inv_vec
 
     cone.grad_updated = true
     return cone.grad
 end
 
-function update_hess(cone::DoublyNonnegative)
+function update_hess(cone::DoublyNonnegativeTri)
     @assert cone.grad_updated
     H = cone.hess.data
+
     symm_kron(H, cone.inv_mat, cone.rt2)
     for (inv_od, idx) in zip(cone.inv_vec, cone.offdiag_idxs)
         H[idx, idx] += abs2(inv_od)
     end
+
     cone.hess_updated = true
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::DoublyNonnegative)
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::DoublyNonnegativeTri)
     @assert is_feas(cone)
 
     @inbounds for i in 1:size(arr, 2)
@@ -201,7 +189,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::DoublyN
     return prod
 end
 
-function correction(cone::DoublyNonnegative, primal_dir::AbstractVector)
+function correction(cone::DoublyNonnegativeTri, primal_dir::AbstractVector)
     @assert cone.grad_updated
 
     S = copytri!(svec_to_smat!(cone.mat4, primal_dir, cone.rt2), 'U')

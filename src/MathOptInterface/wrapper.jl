@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 MathOptInterface wrapper of Hypatia solver
 
 TODO generalize all code for T <: Real
@@ -32,12 +30,29 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     moi_other_cones::Vector{MOI.AbstractVectorSet}
 
     function Optimizer{T}(;
-        use_dense_model::Bool = true,
-        solver_options...
+        use_dense_model::Bool = true, # TODO should depend on the size and sparsity of A, G in the model
+        solver_options... # TODO allow passing in a solver?
         ) where {T <: Real}
         opt = new{T}()
         opt.use_dense_model = use_dense_model
-        opt.solver = Solvers.Solver{T}(; solver_options...) # TODO allow passing in a solver?
+        if !haskey(solver_options, :system_solver)
+            # choose default system solver based on use_dense_model
+            sstype = (use_dense_model ? Solvers.QRCholDenseSystemSolver : Solvers.SymIndefSparseSystemSolver)
+            solver_options = (solver_options..., system_solver = sstype{T}())
+        end
+        if !haskey(solver_options, :preprocess)
+            # only preprocess if using dense model # TODO maybe should preprocess if sparse
+            solver_options = (solver_options..., preprocess = use_dense_model)
+        end
+        if !haskey(solver_options, :reduce)
+            # only reduce if using dense model
+            solver_options = (solver_options..., reduce = use_dense_model)
+        end
+        if !haskey(solver_options, :init_use_indirect)
+            # only use indirect if not using dense model
+            solver_options = (solver_options..., init_use_indirect = !use_dense_model)
+        end
+        opt.solver = Solvers.Solver{T}(; solver_options...)
         return opt
     end
 end
@@ -47,10 +62,10 @@ Optimizer(; options...) = Optimizer{Float64}(; options...) # default to Float64
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 MOI.get(opt::Optimizer, ::MOI.RawSolver) = opt.solver
 
-MOI.is_empty(opt::Optimizer) = (opt.solver.status == :NotLoaded)
+MOI.is_empty(opt::Optimizer) = (opt.solver.status == Solvers.NotLoaded)
 
 function MOI.empty!(opt::Optimizer)
-    opt.solver.status = :NotLoaded
+    opt.solver.status = Solvers.NotLoaded
     return
 end
 
@@ -62,11 +77,11 @@ MOI.supports(::Optimizer{T}, ::Union{
 
 MOI.supports_constraint(::Optimizer{T},
     ::Type{<:Union{MOI.SingleVariable, MOI.ScalarAffineFunction{T}}},
-    ::Type{<:Union{MOI.EqualTo{T}, MOI.GreaterThan{T}, MOI.LessThan{T}, MOI.Interval{T}}}
+    ::Type{<:Union{MOI.EqualTo{T}, MOI.GreaterThan{T}, MOI.LessThan{T}, MOI.Interval{T}}},
     ) where {T <: Real} = true
 MOI.supports_constraint(::Optimizer{T},
     ::Type{<:Union{MOI.VectorOfVariables, MOI.VectorAffineFunction{T}}},
-    ::Type{<:Union{MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives, MOIOtherCones{T}}}
+    ::Type{<:SupportedCones{T}},
     ) where {T <: Real} = true
 
 # build representation as min c'x s.t. A*x = b, h - G*x in K
@@ -77,7 +92,7 @@ function MOI.copy_to(
     warn_attributes::Bool = true,
     ) where {T <: Real}
     @assert !copy_names
-    idx_map = Dict{MOI.Index, MOI.Index}()
+    idx_map = MOI.Utilities.IndexMap()
 
     # variables
     n = MOI.get(src, MOI.NumberOfVariables()) # columns of A
@@ -94,6 +109,8 @@ function MOI.copy_to(
         obj = MOI.ScalarAffineFunction{T}(MOI.get(src, MOI.ObjectiveFunction{F}()))
     elseif F == MOI.ScalarAffineFunction{T}
         obj = MOI.get(src, MOI.ObjectiveFunction{F}())
+    else
+        error("function type $F not supported")
     end
     (Jc, Vc) = (Int[], T[])
     for t in obj.terms
@@ -160,7 +177,7 @@ function MOI.copy_to(
         dim = MOI.output_dimension(fi)
         append!(IA, (p + 1):(p + dim))
         append!(JA, idx_map[vi].value for vi in fi.variables)
-        append!(VA, -ones(dim))
+        append!(VA, -ones(T, dim))
         p += dim
     end
 
@@ -331,7 +348,7 @@ function MOI.copy_to(
     SV_interval_cons = get_src_cons(MOI.SingleVariable, MOI.Interval{T})
     SAF_interval_cons = get_src_cons(MOI.ScalarAffineFunction{T}, MOI.Interval{T})
     num_intervals = length(SV_interval_cons) + length(SAF_interval_cons)
-    interval_scales = Vector{T}(undef, num_intervals)
+    interval_scales = zeros(T, num_intervals)
 
     if num_intervals > 0
         i += 1
@@ -353,8 +370,8 @@ function MOI.copy_to(
         lower = get_con_set(ci).lower
         @assert isfinite(upper) && isfinite(lower)
         @assert upper > lower
-        mid = (upper + lower) / 2
-        scal = 2 * inv(upper - lower)
+        mid = (upper + lower) / T(2)
+        scal = 2 / (upper - lower)
 
         push!(IG, q)
         push!(JG, idx_map[get_con_fun(ci).variable].value)
@@ -377,7 +394,7 @@ function MOI.copy_to(
         lower = get_con_set(ci).lower
         @assert isfinite(upper) && isfinite(lower)
         @assert upper > lower
-        mid = (upper + lower) / 2
+        mid = (upper + lower) / T(2)
         scal = 2 / (upper - lower)
 
         fi = get_con_fun(ci)
@@ -404,34 +421,41 @@ function MOI.copy_to(
     # non-LP conic constraints
     moi_other_cones_start = i + 1
     moi_other_cones = MOI.AbstractVectorSet[]
-    for S in MOIOtherConesList(T), F in (MOI.VectorOfVariables, MOI.VectorAffineFunction{T}), ci in get_src_cons(F, S)
-        i += 1
-        idx_map[ci] = MOI.ConstraintIndex{F, S}(i)
-        push!(constr_offset_cone, q)
-        fi = get_con_fun(ci)
-        si = get_con_set(ci)
-        push!(moi_other_cones, si)
-        dim = MOI.output_dimension(fi)
-        if F == MOI.VectorOfVariables
-            JGi = (idx_map[vj].value for vj in fi.variables)
-            IGi = permute_affine(si, 1:dim)
-            VGi = rescale_affine(si, fill(-1.0, dim))
-        else
-            JGi = (idx_map[vt.scalar_term.variable_index].value for vt in fi.terms)
-            IGi = permute_affine(si, [vt.output_index for vt in fi.terms])
-            VGi = rescale_affine(si, [-vt.scalar_term.coefficient for vt in fi.terms], IGi)
-            Ihi = permute_affine(si, 1:dim)
-            Vhi = rescale_affine(si, fi.constants)
-            Ihi = q .+ Ihi
-            append!(Ih, Ihi)
-            append!(Vh, Vhi)
+
+    for (F, S) in MOI.get(src, MOI.ListOfConstraints())
+        if S <: Union{MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives}
+            continue # already copied these constraints
         end
-        IGi = q .+ IGi
-        append!(IG, IGi)
-        append!(JG, JGi)
-        append!(VG, VGi)
-        push!(cones, cone_from_moi(T, si))
-        q += dim
+        @assert S <: SupportedCones{T}
+        for ci in get_src_cons(F, S)
+            i += 1
+            idx_map[ci] = MOI.ConstraintIndex{F, S}(i)
+            push!(constr_offset_cone, q)
+            fi = get_con_fun(ci)
+            si = get_con_set(ci)
+            push!(moi_other_cones, si)
+            dim = MOI.output_dimension(fi)
+            if F == MOI.VectorOfVariables
+                JGi = (idx_map[vj].value for vj in fi.variables)
+                IGi = permute_affine(si, 1:dim)
+                VGi = rescale_affine(si, fill(-one(T), dim))
+            else
+                JGi = (idx_map[vt.scalar_term.variable_index].value for vt in fi.terms)
+                IGi = permute_affine(si, [vt.output_index for vt in fi.terms])
+                VGi = rescale_affine(si, [-vt.scalar_term.coefficient for vt in fi.terms], IGi)
+                Ihi = permute_affine(si, 1:dim)
+                Vhi = rescale_affine(si, fi.constants)
+                Ihi = q .+ Ihi
+                append!(Ih, Ihi)
+                append!(Vh, Vhi)
+            end
+            IGi = q .+ IGi
+            append!(IG, IGi)
+            append!(JG, JGi)
+            append!(VG, VGi)
+            push!(cones, cone_from_moi(T, si))
+            q += dim
+        end
     end
 
     push!(constr_offset_cone, q)
@@ -512,19 +536,19 @@ MOI.get(opt::Optimizer, ::MOI.BarrierIterations) = opt.solver.num_iters
 
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     status = opt.solver.status
-    if status in (:NotLoaded, :Loaded)
+    if status in (Solvers.NotLoaded, Solvers.Loaded)
         return MOI.OPTIMIZE_NOT_CALLED
-    elseif status == :Optimal
+    elseif status == Solvers.Optimal
         return MOI.OPTIMAL
-    elseif status == :PrimalInfeasible
+    elseif status == Solvers.PrimalInfeasible
         return MOI.INFEASIBLE
-    elseif status == :DualInfeasible
+    elseif status == Solvers.DualInfeasible
         return MOI.DUAL_INFEASIBLE
-    elseif status == :SlowProgress
+    elseif status == Solvers.SlowProgress
         return MOI.SLOW_PROGRESS
-    elseif status == :IterationLimit
+    elseif status == Solvers.IterationLimit
         return MOI.ITERATION_LIMIT
-    elseif status == :TimeLimit
+    elseif status == Solvers.TimeLimit
         return MOI.TIME_LIMIT
     else
         @warn("Hypatia status $(opt.solver.status) not handled")
@@ -534,13 +558,13 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
     status = opt.solver.status
-    if status == :Optimal
+    if status == Solvers.Optimal
         return MOI.FEASIBLE_POINT
-    elseif status == :PrimalInfeasible
+    elseif status == Solvers.PrimalInfeasible
         return MOI.INFEASIBLE_POINT
-    elseif status == :DualInfeasible
+    elseif status == Solvers.DualInfeasible
         return MOI.INFEASIBILITY_CERTIFICATE
-    elseif status == :IllPosed
+    elseif status == Solvers.IllPosed
         return MOI.OTHER_RESULT_STATUS
     else
         return MOI.UNKNOWN_RESULT_STATUS
@@ -549,13 +573,13 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.DualStatus)
     status = opt.solver.status
-    if status == :Optimal
+    if status == Solvers.Optimal
         return MOI.FEASIBLE_POINT
-    elseif status == :PrimalInfeasible
+    elseif status == Solvers.PrimalInfeasible
         return MOI.INFEASIBILITY_CERTIFICATE
-    elseif status == :DualInfeasible
+    elseif status == Solvers.DualInfeasible
         return MOI.INFEASIBLE_POINT
-    elseif status == :IllPosed
+    elseif status == Solvers.IllPosed
         return MOI.OTHER_RESULT_STATUS
     else
         return MOI.UNKNOWN_RESULT_STATUS

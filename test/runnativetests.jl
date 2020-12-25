@@ -1,159 +1,125 @@
 #=
-Copyright 2019, Chris Coey and contributors
-
 run native instance tests from test/nativeinstances.jl and display basic benchmarks
 =#
 
 using Test
-using DataFrames
 using Printf
-using TimerOutputs
+import DataFrames
 import Hypatia
 import Hypatia.Solvers
-
 include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
 
+# default options to solvers
+default_options = (
+    # verbose = true,
+    verbose = false,
+    default_tol_relax = 10,
+    )
+
 all_reals = [
+    Float32,
     Float64,
-    # Float32,
-    # BigFloat,
+    BigFloat,
     ]
-default_reals = [
+diff_reals = [
     Float64,
+    BigFloat,
     ]
 
-# system solvers tests options
-system_solvers_instance_names = vcat(
-    # inst_preproc,
-    # inst_infeas,
-    inst_cones_few, # NOTE subset of inst_cones_many
-    # inst_cones_many,
-    )
-system_solvers = Dict(
-    # "NaiveDense" => all_reals,
-    # "NaiveSparse" => default_reals,
-    # # "NaiveIndirect" => all_reals, # TODO fix
-    # "NaiveElimDense" => all_reals,
-    # "NaiveElimSparse" => default_reals,
-    # "SymIndefDense" => all_reals,
-    # "SymIndefSparse" => default_reals,
-    "QRCholDense" => all_reals,
-    )
+string_nameof(T) = string(nameof(T))
+type_name(::T) where T = string_nameof(T)
 
-# preprocessing test options
-preprocess_instance_names = vcat(
-    inst_preproc,
-    # inst_infeas,
-    # inst_cones_few, # NOTE subset of inst_cones_many
-    # inst_cones_many,
+function test_instance_solver(
+    inst_name::String,
+    T::Type{<:Real},
+    options::NamedTuple,
+    test_info::String = "",
     )
-preprocess_system_solver = "SymIndefDense"
-preprocess_reals = all_reals
-preprocess_options = (init_use_indirect = false, reduce = false)
-preprocess_flags = [
-    # true,
-    # false,
-    ]
-
-# indirect initialization test options
-init_use_indirect_instance_names = vcat(
-    # inst_preproc,
-    # inst_infeas,
-    inst_cones_few, # NOTE subset of inst_cones_many
-    # inst_cones_many,
-    )
-init_use_indirect_system_solver = "SymIndefDense"
-init_use_indirect_reals = all_reals
-init_use_indirect_options = (preprocess = false, reduce = false)
-init_use_indirect_flags = [
-    # true,
-    # false,
-    ]
-
-# reduce test options
-reduce_instance_names = vcat(
-    # inst_preproc,
-    # inst_infeas,
-    inst_cones_few, # NOTE subset of inst_cones_many
-    # inst_cones_many,
-    )
-reduce_system_solver = "QRCholDense"
-reduce_reals = all_reals
-reduce_options = (preprocess = true, init_use_indirect = false)
-reduce_flags = [
-    # true,
-    # false,
-    ]
-
-# other solver options
-timer = TimerOutput()
-# tol = 1e-10
-# tol = 1e-7
-other_options = (
-    verbose = true,
-    # verbose = false,
-    iter_limit = 100,
-    time_limit = 6e1,
-    timer = timer,
-    # tol_feas = tol,
-    # tol_rel_opt = tol,
-    # tol_abs_opt = tol,
-    # rescale = false,
-    # preprocess = false,
-    # reduce = false,
-    )
-
-@info("starting native tests")
-
-perf = DataFrame(
-    inst_name = String[],
-    sys_solver = String[],
-    real_T = String[],
-    preprocess = Bool[],
-    init_use_indirect = Bool[],
-    reduce = Bool[],
-    test_time = Float64[],
-    )
-
-function run_instance_options(T::Type{<:Real}, inst_name::String, sys_name::String, test_info::String; kwargs...)
+    test_info = "$inst_name $T $test_info"
     @testset "$test_info" begin
-        println(test_info, "...")
-        inst_function = eval(Symbol(inst_name))
-        sys_solver = Solvers.eval(Symbol(sys_name, "SystemSolver"))
-        solver = Solvers.Solver{T}(; system_solver = sys_solver{T}(), kwargs..., other_options...)
-        test_time = @elapsed inst_function(T, solver = solver)
-        push!(perf, (inst_name, sys_name, string(T), solver.preprocess, solver.init_use_indirect, solver.reduce, test_time))
-        @printf("... %8.2e seconds\n", test_time)
+        println(test_info, " ...")
+        solver = Solvers.Solver{T}(; options...)
+        test_time = @elapsed eval(Symbol(inst_name))(T, solver = solver)
+        push!(perf, (inst_name, string(T), type_name(solver.stepper), type_name(solver.system_solver), solver.init_use_indirect, solver.preprocess, solver.reduce, test_time, string(Solvers.get_status(solver))))
+        @printf("%8.2e seconds\n", test_time)
     end
     return nothing
 end
 
-all_tests_time = time()
-global ITERS = 0
+perf = DataFrames.DataFrame(
+    inst_name = String[],
+    real_T = String[],
+    stepper = String[],
+    system_solver = String[],
+    init_use_indirect = Bool[],
+    preprocess = Bool[],
+    reduce = Bool[],
+    test_time = Float64[],
+    status = String[],
+    )
 
 @testset "native tests" begin
-    for inst_name in system_solvers_instance_names, (sys_name, real_types) in system_solvers, T in real_types
-        run_instance_options(T, inst_name, sys_name, "$inst_name system_solver = $sys_name $T")
+
+@testset "default options tests" begin
+    println("starting default options tests")
+    inst_defaults = vcat(
+        inst_preproc,
+        inst_infeas,
+        inst_cones_many,
+        )
+    for inst_name in inst_defaults
+        test_instance_solver(inst_name, Float64, default_options)
     end
+end
 
-    # for inst_name in preprocess_instance_names, preprocess in preprocess_flags, T in preprocess_reals
-    #     run_instance_options(T, inst_name, preprocess_system_solver, "$inst_name preprocess = $preprocess $T"; preprocess = preprocess, preprocess_options...)
-    # end
+@testset "no preprocess tests" begin
+    println("\nstarting no preprocess tests")
+    for inst_name in inst_cones_few, T in diff_reals
+        options = (; default_options..., preprocess = false, reduce = false, system_solver = Solvers.SymIndefDenseSystemSolver{T}())
+        test_instance_solver(inst_name, T, options)
+    end
+end
 
-    # for inst_name in init_use_indirect_instance_names, init_use_indirect in init_use_indirect_flags, T in init_use_indirect_reals
-    #     run_instance_options(T, inst_name, init_use_indirect_system_solver, "$inst_name init_use_indirect = $init_use_indirect $T"; init_use_indirect = init_use_indirect, init_use_indirect_options...)
-    # end
+@testset "indirect solvers tests" begin
+    println("\nstarting indirect solvers tests")
+    for inst_name in inst_indirect, T in diff_reals
+        options = (; default_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.SymIndefIndirectSystemSolver{T}(), tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_infeas = 1e-6)
+        test_instance_solver(inst_name, T, options)
+    end
+end
 
-    # for inst_name in reduce_instance_names, reduce in reduce_flags, T in reduce_reals
-    #     run_instance_options(T, inst_name, reduce_system_solver, "$inst_name reduce = $reduce $T"; reduce = reduce, reduce_options...)
-    # end
+@testset "system solvers tests" begin
+    println("\nstarting system solvers tests")
+    system_solvers = [
+        (Solvers.NaiveDenseSystemSolver, diff_reals),
+        (Solvers.NaiveSparseSystemSolver, [Float64,]),
+        (Solvers.NaiveElimDenseSystemSolver, diff_reals),
+        (Solvers.NaiveElimSparseSystemSolver, [Float64,]),
+        (Solvers.SymIndefDenseSystemSolver, all_reals),
+        (Solvers.SymIndefSparseSystemSolver, [Float64,]),
+        (Solvers.QRCholDenseSystemSolver, all_reals),
+        ]
+    for inst_name in inst_cones_few, (system_solver, real_types) in system_solvers, T in real_types
+        options = (; default_options..., system_solver = system_solver{T}(), reduce = false)
+        test_instance_solver(inst_name, T, options, string_nameof(system_solver))
+    end
+end
 
-    @printf("\nnative tests total time: %8.2e seconds\n\n", time() - all_tests_time)
-    show(perf, allrows = true, allcols = true)
-    println("\n")
-    # show(timer)
-    # println("\n")
-    @show ITERS
+@testset "steppers tests" begin
+    println("\nstarting steppers tests (with printing)")
+    steppers = [
+        (Solvers.HeurCombStepper, diff_reals),
+        (Solvers.PredOrCentStepper, diff_reals),
+        ]
+    for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in diff_reals
+        options = (; default_options..., verbose = true, stepper = stepper{T}())
+        test_instance_solver(inst_name, T, options, string_nameof(stepper))
+    end
+end
+
+# println("\n")
+# DataFrames.show(perf, allrows = true, allcols = true)
+# println("\n")
 end
 ;

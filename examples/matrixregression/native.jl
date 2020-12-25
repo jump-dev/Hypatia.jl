@@ -1,9 +1,10 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 regularized matrix regression problems
 
 min 1/(2n) * ||Y - X * A||_fro^2 + lam_fro * ||A||_fro + lam_nuc * ||A||_nuc + lam_lass * ||A||_las + lam_glr * ||A||_glr + lamb_glc * ||A||_glc
+- X is n x p
+- Y is n x m
+- A (variable) is p x m
 - ||.||_fro is the Frobenius norm
 - ||.||_nuc is the nuclear norm
 - ||.||_las is the L1 norm
@@ -257,11 +258,11 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
 end
 
 function test_extra(inst::MatrixRegressionNative{T}, result::NamedTuple) where T
-    @test result.status == :Optimal
-    if result.status == :Optimal
+    @test result.status == Solvers.Optimal
+    if result.status == Solvers.Optimal
         # check objective value is correct
         (Y, X) = (inst.Y, inst.X)
-        A_opt = similar(Y, size(X, 2), size(Y, 2))
+        A_opt = zeros(eltype(Y), size(X, 2), size(Y, 2))
         A_len = length(A_opt) * (inst.is_complex ? 2 : 1)
         @views Cones.vec_copy_to!(A_opt, result.x[1 .+ (1:A_len)])
         loss = (sum(abs2, X * A_opt) / 2 - real(dot(X' * Y, A_opt))) / size(Y, 1)
@@ -275,43 +276,3 @@ function test_extra(inst::MatrixRegressionNative{T}, result::NamedTuple) where T
         @test result.primal_obj ≈ obj_result atol = tol rtol = tol
     end
 end
-
-instances[MatrixRegressionNative]["minimal"] = [
-    ((false, 2, 3, 4, 0, 0, 0, 0, 0),),
-    ((false, 2, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((true, 5, 3, 4, 0, 0, 0, 0, 0),),
-    ((true, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ]
-instances[MatrixRegressionNative]["fast"] = [
-    ((false, 5, 3, 4, 0, 0, 0, 0, 0),),
-    ((false, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((false, 5, 3, 4, 0, 0.1, 0.1, 0, 0),),
-    ((false, 3, 4, 5, 0, 0, 0, 0, 0),),
-    ((false, 3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((false, 3, 4, 5, 0, 0.1, 0.1, 0, 0),),
-    ((true, 5, 3, 4, 0, 0, 0, 0, 0),),
-    ((true, 5, 3, 4, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((true, 5, 3, 4, 0, 0.1, 0.1, 0, 0),),
-    ((true, 3, 4, 5, 0, 0, 0, 0, 0),),
-    ((true, 3, 4, 5, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((true, 3, 4, 5, 0, 0.1, 0.1, 0, 0),),
-    ((false, 15, 10, 20, 0, 0, 0, 0, 0),),
-    ((false, 15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((false, 15, 10, 20, 0, 0.1, 0.1, 0, 0),),
-    ((true, 15, 10, 20, 0, 0, 0, 0, 0),),
-    ((true, 15, 10, 20, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((true, 15, 10, 20, 0, 0.1, 0.1, 0, 0),),
-    ((false, 100, 8, 12, 0, 0, 0, 0, 0),),
-    ((false, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((false, 100, 8, 12, 0, 0.1, 0.1, 0, 0),),
-    ((true, 100, 8, 12, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((true, 100, 8, 12, 0, 0.1, 0.1, 0, 0),),
-    ]
-instances[MatrixRegressionNative]["slow"] = [
-    ((false, 15, 20, 50, 0, 0, 0, 0, 0),),
-    ((false, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((false, 15, 20, 50, 0, 0.1, 0.1, 0, 0),),
-    ((true, 15, 20, 50, 0, 0, 0, 0, 0),),
-    ((true, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),),
-    ((true, 15, 20, 50, 0, 0.1, 0.1, 0, 0),),
-    ]

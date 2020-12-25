@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 compute a gram matrix of a polynomial, minimizing its log-determinant or root-determinant (equivalent optimal solutions with different optimal objective values)
 =#
 
@@ -12,7 +10,7 @@ struct CentralPolyMatJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     logdet_obj::Bool # use logdet, else rootdet
 end
 
-function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64}
     (n, halfdeg) = (inst.n, inst.halfdeg)
 
     DynamicPolynomials.@polyvar x[1:n]
@@ -40,44 +38,3 @@ function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64} # TODO generic 
 
     return model
 end
-
-instances[CentralPolyMatJuMP]["minimal"] = [
-    ((1, 2, false),),
-    ((1, 2, false), ClassicConeOptimizer),
-    ((2, 2, true),),
-    ((2, 2, true), ClassicConeOptimizer),
-    ]
-instances[CentralPolyMatJuMP]["fast"] = [
-    ((1, 10, true),),
-    ((1, 10, true), ClassicConeOptimizer),
-    ((1, 15, false),),
-    ((1, 15, false), ClassicConeOptimizer),
-    ((2, 3, true),),
-    ((2, 3, true), ClassicConeOptimizer),
-    ((2, 3, false),),
-    ((2, 3, false), ClassicConeOptimizer),
-    ((2, 6, true),),
-    ((2, 5, true), ClassicConeOptimizer),
-    ((2, 7, false),),
-    ((2, 6, false), ClassicConeOptimizer),
-    ((3, 2, true),),
-    ((3, 2, false),),
-    ((3, 4, true),),
-    ((3, 4, false),),
-    ((7, 2, true),),
-    ((7, 2, true), ClassicConeOptimizer),
-    ((7, 2, false),),
-    ((7, 2, false), ClassicConeOptimizer),
-    ]
-instances[CentralPolyMatJuMP]["slow"] = [
-    ((1, 20, false),),
-    ((2, 3, false),),
-    ((2, 10, false),),
-    ((2, 8, false), ClassicConeOptimizer),
-    ((3, 4, true), ClassicConeOptimizer),
-    ((3, 4, false), ClassicConeOptimizer),
-    ((3, 5, true),),
-    ((3, 5, false),),
-    ((6, 3, true),),
-    ((6, 3, false),),
-    ]

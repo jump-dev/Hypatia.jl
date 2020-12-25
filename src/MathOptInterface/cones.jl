@@ -1,11 +1,9 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 definitions of conic sets not already defined by MathOptInterface
 and functions for converting between Hypatia and MOI cone definitions
 =#
 
-cone_from_moi(::Type{<:Real}, cone::MOI.AbstractVectorSet) = error("MOI set $s is not recognized")
+cone_from_moi(::Type{<:Real}, cone::MOI.AbstractVectorSet) = error("MOI set $cone is not recognized")
 
 # MOI predefined cones
 
@@ -46,22 +44,16 @@ end
 
 function permute_affine(cone::MOI.RelativeEntropyCone, idxs::AbstractVector)
     dim = MOI.dimension(cone)
-    first_idx = 1 # TODO
     w_dim = div(dim - 1, 2)
     new_idxs = collect(idxs)
     for (i, idx) in enumerate(idxs)
-        if idx != first_idx
-            # if idx <= (w_dim + first_idx)
-            #     new_offset = 2 * (idx - first_idx)
-            # else
-            #     new_offset = 2 * (idx - w_dim) - first_idx
-            # end
-            new_idx = 2 * idx - first_idx - (idx <= (w_dim + first_idx) ? first_idx : 2 * w_dim)
-            new_idxs[i] = new_idx
+        idx <= 1 && continue
+        if idx <= 1 + w_dim
+            new_idxs[i] = 2 * (idx - 1)
+        else
+            new_idxs[i] = 2 * (idx - w_dim) - 1
         end
     end
-    # @show new_idxs
-
     return new_idxs
 end
 
@@ -90,8 +82,7 @@ function permute_affine(cone::NonSquareMatrixCone, idxs::AbstractVector)
 end
 
 # transformations (svec rescaling) for MOI symmetric matrix cones not in svec (scaled lower triangle) form
-const rt2 = sqrt(2)
-SvecCone = Union{MOI.PositiveSemidefiniteConeTriangle, MOI.LogDetConeTriangle, MOI.RootDetConeTriangle}
+const SvecCone = Union{MOI.PositiveSemidefiniteConeTriangle, MOI.LogDetConeTriangle, MOI.RootDetConeTriangle}
 
 svec_offset(::MOI.PositiveSemidefiniteConeTriangle) = 1
 svec_offset(::MOI.RootDetConeTriangle) = 2
@@ -101,19 +92,20 @@ needs_untransform(::SvecCone) = true
 
 function untransform_affine(cone::SvecCone, vals::AbstractVector)
     @views svec_vals = vals[svec_offset(cone):end]
-    ModelUtilities.svec_to_vec!(svec_vals, rt2 = rt2)
+    ModelUtilities.svec_to_vec!(svec_vals)
     return vals
 end
 
 function rescale_affine(cone::SvecCone, vals::AbstractVector)
     vals = collect(vals)
     @views svec_vals = vals[svec_offset(cone):end]
-    ModelUtilities.vec_to_svec!(svec_vals, rt2 = rt2)
+    ModelUtilities.vec_to_svec!(svec_vals)
     return vals
 end
 
 function rescale_affine(cone::SvecCone, vals::AbstractVector, idxs::AbstractVector)
     scal_start = svec_offset(cone) - 1
+    rt2 = sqrt(eltype(vals)(2))
     for i in eachindex(vals)
         shifted_idx = idxs[i] - scal_start
         if shifted_idx > 0 && !MOI.Utilities.is_diagonal_vectorized_index(shifted_idx)
@@ -277,7 +269,7 @@ struct DoublyNonnegativeTriCone{T <: Real} <: MOI.AbstractVectorSet
 end
 DoublyNonnegativeTriCone{T}(dim::Int) where {T <: Real} = DoublyNonnegativeTriCone{T}(dim, false)
 MOI.dimension(cone::DoublyNonnegativeTriCone where {T <: Real}) = cone.dim
-cone_from_moi(::Type{T}, cone::DoublyNonnegativeTriCone{T}) where {T <: Real} = Cones.DoublyNonnegative{T}(cone.dim, use_dual = cone.use_dual)
+cone_from_moi(::Type{T}, cone::DoublyNonnegativeTriCone{T}) where {T <: Real} = Cones.DoublyNonnegativeTri{T}(cone.dim, use_dual = cone.use_dual)
 
 export WSOSInterpNonnegativeCone
 struct WSOSInterpNonnegativeCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
@@ -311,25 +303,20 @@ WSOSInterpEpiNormEuclCone{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: 
 MOI.dimension(cone::WSOSInterpEpiNormEuclCone) = cone.U * cone.R
 cone_from_moi(::Type{T}, cone::WSOSInterpEpiNormEuclCone{T}) where {T <: Real} = Cones.WSOSInterpEpiNormEucl{T}(cone.R, cone.U, cone.Ps, use_dual = cone.use_dual)
 
+export WSOSInterpEpiNormOneCone
+struct WSOSInterpEpiNormOneCone{T <: Real} <: MOI.AbstractVectorSet
+    R::Int
+    U::Int
+    Ps::Vector{Matrix{T}}
+    use_dual::Bool
+end
+WSOSInterpEpiNormOneCone{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} = WSOSInterpEpiNormOneCone{T}(R, U, Ps, false)
+MOI.dimension(cone::WSOSInterpEpiNormOneCone) = cone.U * cone.R
+cone_from_moi(::Type{T}, cone::WSOSInterpEpiNormOneCone{T}) where {T <: Real} = Cones.WSOSInterpEpiNormOne{T}(cone.R, cone.U, cone.Ps, use_dual = cone.use_dual)
+
 # all cones
-# TODO avoid repeating the tuple and union below
 
-const MOIOtherConesList(::Type{T}) where {T <: Real} = (
-    MOI.NormInfinityCone,
-    MOI.NormOneCone,
-    MOI.SecondOrderCone,
-    MOI.RotatedSecondOrderCone,
-    MOI.ExponentialCone,
-    MOI.DualExponentialCone,
-    MOI.PowerCone{T},
-    MOI.DualPowerCone{T},
-    MOI.GeometricMeanCone,
-    MOI.RelativeEntropyCone,
-    MOI.NormSpectralCone,
-    MOI.NormNuclearCone,
-    MOI.PositiveSemidefiniteConeTriangle,
-    MOI.LogDetConeTriangle,
-    MOI.RootDetConeTriangle,
+const HypatiaCones{T <: Real} = Union{
     NonnegativeCone{T},
     EpiNormInfinityCone{T, T},
     EpiNormInfinityCone{T, Complex{T}},
@@ -358,50 +345,29 @@ const MOIOtherConesList(::Type{T}) where {T <: Real} = (
     WSOSInterpNonnegativeCone{T, Complex{T}},
     WSOSInterpPosSemidefTriCone{T},
     WSOSInterpEpiNormEuclCone{T},
-    )
-
-const MOIOtherCones{T <: Real} = Union{
-    MOI.NormInfinityCone,
-    MOI.NormOneCone,
-    MOI.SecondOrderCone,
-    MOI.RotatedSecondOrderCone,
-    MOI.ExponentialCone,
-    MOI.DualExponentialCone,
-    MOI.PowerCone{T},
-    MOI.DualPowerCone{T},
-    MOI.GeometricMeanCone,
-    MOI.RelativeEntropyCone,
-    MOI.NormSpectralCone,
-    MOI.NormNuclearCone,
-    MOI.PositiveSemidefiniteConeTriangle,
-    MOI.LogDetConeTriangle,
-    MOI.RootDetConeTriangle,
-    NonnegativeCone{T},
-    EpiNormInfinityCone{T, T},
-    EpiNormInfinityCone{T, Complex{T}},
-    EpiNormEuclCone{T},
-    EpiPerSquareCone{T},
-    PowerCone{T},
-    HypoPerLogCone{T},
-    EpiSumPerEntropyCone{T},
-    HypoGeoMeanCone{T},
-    HypoPowerMeanCone{T},
-    EpiNormSpectralCone{T, T},
-    EpiNormSpectralCone{T, Complex{T}},
-    MatrixEpiPerSquareCone{T, T},
-    MatrixEpiPerSquareCone{T, Complex{T}},
-    LinMatrixIneqCone{T},
-    PosSemidefTriCone{T, T},
-    PosSemidefTriCone{T, Complex{T}},
-    PosSemidefTriSparseCone{T, T},
-    PosSemidefTriSparseCone{T, Complex{T}},
-    HypoPerLogdetTriCone{T, T},
-    HypoPerLogdetTriCone{T, Complex{T}},
-    HypoRootdetTriCone{T, T},
-    HypoRootdetTriCone{T, Complex{T}},
-    DoublyNonnegativeTriCone{T},
-    WSOSInterpNonnegativeCone{T, T},
-    WSOSInterpNonnegativeCone{T, Complex{T}},
-    WSOSInterpPosSemidefTriCone{T},
-    WSOSInterpEpiNormEuclCone{T},
+    WSOSInterpEpiNormOneCone{T},
     }
+
+const SupportedCones{T <: Real} = Union{
+    HypatiaCones{T},
+    MOI.Zeros,
+    MOI.Nonnegatives,
+    MOI.Nonpositives,
+    MOI.NormInfinityCone,
+    MOI.NormOneCone,
+    MOI.SecondOrderCone,
+    MOI.RotatedSecondOrderCone,
+    MOI.ExponentialCone,
+    MOI.DualExponentialCone,
+    MOI.PowerCone{T},
+    MOI.DualPowerCone{T},
+    MOI.GeometricMeanCone,
+    MOI.RelativeEntropyCone,
+    MOI.NormSpectralCone,
+    MOI.NormNuclearCone,
+    MOI.PositiveSemidefiniteConeTriangle,
+    MOI.LogDetConeTriangle,
+    MOI.RootDetConeTriangle,
+    }
+
+Base.copy(cone::HypatiaCones) = cone # NOTE maybe should deep copy the cone struct, but this is expensive

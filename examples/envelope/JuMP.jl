@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 see description in examples/envelope/native.jl
 =#
 
@@ -11,7 +9,7 @@ struct EnvelopeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     env_halfdeg::Int
 end
 
-function build(inst::EnvelopeJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::EnvelopeJuMP{T}) where {T <: Float64}
     n = inst.n
     @assert inst.rand_halfdeg <= inst.env_halfdeg
     domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))
@@ -30,19 +28,3 @@ function build(inst::EnvelopeJuMP{T}) where {T <: Float64} # TODO generic reals
 
     return model
 end
-
-instances[EnvelopeJuMP]["minimal"] = [
-    ((1, 2, 2, 2),),
-    ]
-instances[EnvelopeJuMP]["fast"] = [
-    ((2, 2, 3, 2),),
-    ((3, 3, 3, 3),),
-    ((3, 3, 5, 4),),
-    ((5, 2, 5, 3),),
-    ((1, 30, 2, 30),),
-    ((10, 1, 3, 1),),
-    ]
-instances[EnvelopeJuMP]["slow"] = [
-    ((4, 5, 4, 6),),
-    ((2, 30, 4, 30),),
-    ]

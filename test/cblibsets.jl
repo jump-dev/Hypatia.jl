@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 sets of CBLIB test instances, see https://cblib.zib.de/
 =#
 

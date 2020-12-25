@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 find parameter of convexity mu for a given polynomial p(x)
 ie the largest mu such that p(x) - mu/2*||x||^2 is convex everywhere on given domain
 see https://en.wikipedia.org/wiki/Convex_function#Strongly_convex_functions
@@ -8,17 +6,19 @@ see https://en.wikipedia.org/wiki/Convex_function#Strongly_convex_functions
 
 import DynamicPolynomials
 const DP = DynamicPolynomials
+import SemialgebraicSets
+const SAS = SemialgebraicSets
 import SumOfSquares
 import PolyJuMP
 
 struct MuConvexityJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     poly::Symbol
     dom::Symbol
-    use_matrixwsos::Bool # use wsosinterpposeideftricone, else PSD formulation
+    use_matrixwsos::Bool # use wsosinterpposemideftricone, else PSD formulation
     true_mu::Real # optional true value of parameter for testing only
 end
 
-function build(inst::MuConvexityJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::MuConvexityJuMP{T}) where {T <: Float64}
     dom = muconvexity_data[inst.dom]
     n = ModelUtilities.get_dimension(dom)
     DP.@polyvar x[1:n]
@@ -39,7 +39,7 @@ function build(inst::MuConvexityJuMP{T}) where {T <: Float64} # TODO generic rea
         JuMP.@constraint(model, ModelUtilities.vec_to_svec!(H_interp, rt2 = sqrt(2), incr = U) in mat_wsos_cone)
     else
         PolyJuMP.setpolymodule!(model, SumOfSquares)
-        JuMP.@constraint(model, H in JuMP.PSDCone(), domain = ModelUtilities.get_domain_inequalities(dom, x))
+        JuMP.@constraint(model, H in JuMP.PSDCone(), domain = get_domain_inequalities(dom, x))
     end
 
     return model
@@ -54,25 +54,22 @@ function test_extra(inst::MuConvexityJuMP{T}, model::JuMP.Model) where T
     end
 end
 
+# construct domain inequalities for SumOfSquares models from Hypatia domains
+bss() = SAS.BasicSemialgebraicSet{Float64, DynamicPolynomials.Polynomial{true, Float64}}()
+function get_domain_inequalities(dom::ModelUtilities.Box, x)
+    box = bss()
+    for (xi, ui, li) in zip(x, dom.u, dom.l)
+        SAS.addinequality!(box, (-xi + ui) * (xi - li))
+    end
+    return box
+end
+get_domain_inequalities(dom::ModelUtilities.FreeDomain, x) = bss()
+
 muconvexity_data = Dict(
     :poly1 => (x -> (x[1] + 1)^2 * (x[1] - 1)^2),
     :poly2 => (x -> sum(x .^ 4) - sum(x .^ 2)),
     :dom1 => ModelUtilities.FreeDomain{Float64}(1),
     :dom2 => ModelUtilities.Box{Float64}([-1.0], [1.0]),
     :dom3 => ModelUtilities.FreeDomain{Float64}(3),
-    :dom4 => ModelUtilities.Ball{Float64}(ones(2), 5.0),
+    :dom4 => ModelUtilities.Box{Float64}([-1.0, 0.0], [1.0, 2.0]),
     )
-
-instances[MuConvexityJuMP]["minimal"] = [
-    ((:poly1, :dom1, true, -4),),
-    ]
-instances[MuConvexityJuMP]["fast"] = [
-    ((:poly1, :dom2, true, -4),),
-    ((:poly1, :dom1, false, -4),),
-    ((:poly1, :dom2, false, -4),),
-    ((:poly2, :dom3, true, -2),),
-    ((:poly2, :dom4, true, -2),),
-    ((:poly2, :dom3, false, -2),),
-    ((:poly2, :dom4, false, -2),),
-    ]
-instances[MuConvexityJuMP]["slow"] = Tuple[]

@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 TODO write proper description of the model
 
 references minimizing the nuclear norm:
@@ -167,7 +165,7 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
             cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(num_rows)]
             c = vcat(one(T), zeros(T, num_unknown))
         end
-    end # objective natural true/false
+    end
 
     if inst.geomean_constr
         if inst.use_hypogeomean
@@ -239,11 +237,11 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
                 ]
 
             c = vcat(c, zeros(T, num_unknown - 2))
-        end # constraints natural true/false
+        end
     else
         G = G_norm
         h = h_norm
-    end # add geomean constraint
+    end
 
     A = zeros(T, 0, size(G, 2))
     b = T[]
@@ -251,35 +249,3 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
     model = Models.Model{T}(c, A, b, G, h, cones)
     return model
 end
-
-instances[MatrixCompletionNative]["minimal"] = [
-    ((2, 3, true, true, true, true),),
-    ((2, 3, false, true, true, true),),
-    ((2, 3, true, false, true, true),),
-    ((2, 3, false, false, true, true),),
-    ((2, 3, true, true, false, true),),
-    ((2, 3, false, false, false, true),),
-    ((2, 3, true, true, false, false),),
-    ((2, 3, false, false, false, false),),
-    ]
-instances[MatrixCompletionNative]["fast"] = [
-    ((12, 24, true, true, true, true),),
-    ((12, 24, false, true, true, true),),
-    ((12, 24, true, false, true, true),),
-    ((12, 24, false, false, true, true),),
-    ((12, 24, true, true, false, true),),
-    ((12, 24, false, false, false, true),),
-    ((12, 24, true, true, false, false),),
-    ((12, 24, false, false, false, false),),
-    ]
-instances[MatrixCompletionNative]["slow"] = [
-    # TODO add missing boolean combinations
-    ((14, 140, true, true, true, true),),
-    ((14, 140, true, true, false, true),),
-    ((14, 140, true, true, true, false),),
-    ((14, 140, true, true, false, false),),
-    ((18, 180, true, true, true, true),),
-    ((18, 180, true, true, false, true),),
-    ((18, 180, true, true, true, false),),
-    ((18, 180, true, true, false, false),),
-    ]

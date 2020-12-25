@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 generalized power cone parametrized by alpha in R_++^n in unit simplex interior
 (u in R_++^m, w in R^n) : prod_i(u_i^alpha_i) => norm_2(w)
 where sum_i(alpha_i) = 1, alpha_i > 0
@@ -12,41 +10,38 @@ barrier from "On self-concordant barriers for generalized power cones" by Roy & 
 mutable struct Power{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     use_heuristic_neighborhood::Bool
-    max_neighborhood::T
     dim::Int
     alpha::Vector{T}
     n::Int
+
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
-
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     produ::T
     produw::T
     produuw::T
     aui::Vector{T}
     auiproduuw::Vector{T}
-    tmpm::Vector{T}
+    tempm::Vector{T}
 
     function Power{T}(
         alpha::Vector{T},
         n::Int;
         use_dual::Bool = false,
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
-        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert n >= 1
@@ -58,7 +53,6 @@ mutable struct Power{T <: Real} <: Cone{T}
         cone.n = n
         cone.use_dual_barrier = use_dual
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
-        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.alpha = alpha
         cone.hess_fact_cache = hess_fact_cache
@@ -69,31 +63,24 @@ end
 dimension(cone::Power) = length(cone.alpha) + cone.n
 
 # TODO only allocate the fields we use
-function setup_data(cone::Power{T}) where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::Power{T}) where {T <: Real}
     dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
     m = length(cone.alpha)
     cone.aui = zeros(T, m)
     cone.auiproduuw = zeros(T, m)
-    cone.tmpm = zeros(T, m)
-    return
+    cone.tempm = zeros(T, m)
+    return cone
 end
 
 get_nu(cone::Power) = length(cone.alpha) + 1
 
 function set_initial_point(arr::AbstractVector, cone::Power)
     m = length(cone.alpha)
-    @. arr[1:m] = sqrt(1 + cone.alpha)
-    arr[(m + 1):cone.dim] .= 0
+    @. @views arr[1:m] = sqrt(1 + cone.alpha)
+    @views arr[(m + 1):cone.dim] .= 0
     return arr
 end
 
@@ -118,11 +105,13 @@ function is_dual_feas(cone::Power{T}) where {T <: Real}
     alpha = cone.alpha
     m = length(cone.alpha)
     @views u = cone.dual_point[1:m]
+
     if all(>(eps(T)), u)
         @inbounds p = exp(2 * sum(alpha[i] * log(u[i] / alpha[i]) for i in eachindex(alpha)))
         @views w = cone.dual_point[(m + 1):end]
         return (p - sum(abs2, w) > eps(T))
     end
+
     return false
 end
 
@@ -135,9 +124,9 @@ function update_grad(cone::Power)
     @. cone.aui = 2 * cone.alpha / u
     cone.produuw = cone.produ / cone.produw
     @. cone.auiproduuw = -cone.aui * cone.produuw
-    @. cone.grad[1:m] = cone.auiproduuw - (1 - cone.alpha) / u
+    @. @views cone.grad[1:m] = cone.auiproduuw - (1 - cone.alpha) / u
     produwi2 = 2 / cone.produw
-    @. cone.grad[(m + 1):end] = produwi2 * w
+    @. @views cone.grad[(m + 1):end] = produwi2 * w
 
     cone.grad_updated = true
     return cone.grad
@@ -163,7 +152,7 @@ function update_hess(cone::Power)
     end
 
     offset = 2 / cone.produw
-    for j in m .+ (1:cone.n)
+    @inbounds for j in m .+ (1:cone.n)
         gj = g[j]
         @inbounds for i in 1:m
             H[i, j] = auiproduuw[i] * gj
@@ -188,17 +177,17 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
     w_idxs = (m + 1):cone.dim
     produwi2 = 2 / cone.produw
     const1 = 2 * produuw - 1
-    tmpm = cone.tmpm
-    @. tmpm = (1 + const1 * cone.alpha) / u / u
+    tempm = cone.tempm
+    @. tempm = (1 + const1 * cone.alpha) / u / u
 
-    @views @inbounds for i in 1:size(arr, 2)
+    @inbounds @views for i in 1:size(arr, 2)
         arr_u = arr[1:m, i]
         arr_w = arr[w_idxs, i]
         dot1 = -produuw * dot(aui, arr_u)
         dot2 = dot1 + produwi2 * dot(w, arr_w)
         dot3 = dot1 - produuw * dot2
         dot4 = produwi2 * dot2
-        @. prod[1:m, i] = dot3 * aui + tmpm * arr_u
+        @. prod[1:m, i] = dot3 * aui + tempm * arr_u
         @. prod[w_idxs, i] = dot4 * w + produwi2 * arr_w
     end
 
@@ -206,7 +195,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
 end
 
 function correction(cone::Power, primal_dir::AbstractVector)
-    @assert cone.hess_updated
     m = length(cone.alpha)
     @views u = cone.point[1:m]
     @views w = cone.point[(m + 1):end]
@@ -220,7 +208,7 @@ function correction(cone::Power, primal_dir::AbstractVector)
     produuw = cone.produuw
 
     wwd = 2 * dot(w, w_dir)
-    udu = cone.tmpm
+    udu = cone.tempm
     @. udu = u_dir / u
     audu = dot(alpha, udu)
     const8 = 2 * produuw - 1

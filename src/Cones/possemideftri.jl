@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 row-wise lower triangle of positive semidefinite matrix cone (scaled "svec" form)
 W \in S^n : 0 >= eigmin(W)
 
@@ -9,33 +7,29 @@ barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Program
 -logdet(W)
 
 TODO
-- describe svec scaling
 - describe hermitian complex PSD cone
-- try to derive faster neighborhood calculations for this cone specifically
 =#
 
 mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
-    max_neighborhood::T
     dim::Int
     side::Int
     is_complex::Bool
+    rt2::T
+
     point::Vector{T}
     dual_point::Vector{T}
-    rt2::T
-    timer::TimerOutput
-
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     mat::Matrix{R}
     mat2::Matrix{R}
@@ -47,12 +41,10 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     function PosSemidefTri{T, R}(
         dim::Int;
         use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
-        max_neighborhood::Real = default_max_neighborhood(),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 1
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
-        cone.max_neighborhood = max_neighborhood
         cone.dim = dim # real vector dimension
         cone.rt2 = sqrt(T(2))
         if R <: Complex
@@ -75,22 +67,15 @@ reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.
 
 use_sqrt_oracles(cone::PosSemidefTri) = true
 
-function setup_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::PosSemidefTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
     cone.mat = zeros(R, cone.side, cone.side)
-    cone.mat2 = similar(cone.mat)
-    cone.mat3 = similar(cone.mat)
-    cone.mat4 = similar(cone.mat)
-    return
+    cone.mat2 = zero(cone.mat)
+    cone.mat3 = zero(cone.mat)
+    cone.mat4 = zero(cone.mat)
+    return cone
 end
 
 get_nu(cone::PosSemidefTri) = cone.side
@@ -151,6 +136,7 @@ end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
+
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
         copytri!(cone.mat4, 'U', cone.is_complex)
@@ -158,22 +144,26 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemi
         ldiv!(cone.fact_mat, cone.mat4)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
     end
+
     return prod
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
+
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
         mul!(cone.mat3, Hermitian(cone.mat4, :U), cone.mat)
         mul!(cone.mat4, Hermitian(cone.mat, :U), cone.mat3)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
     end
+
     return prod
 end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
+
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
         copytri!(cone.mat4, 'U', cone.is_complex)
@@ -181,11 +171,13 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Po
         ldiv!(cone.fact_mat.U', cone.mat4)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
     end
+
     return prod
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
+
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
         copytri!(cone.mat4, 'U', cone.is_complex)
@@ -193,6 +185,7 @@ function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
         lmul!(cone.fact_mat.U, cone.mat4)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
     end
+
     return prod
 end
 

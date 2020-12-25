@@ -1,49 +1,52 @@
 #=
-Copyright 2019, Chris Coey and contributors
+run MOI tests
 =#
 
-# MOI wrapper Hypatia cone tests
-
+using Test
+using Printf
+import Hypatia
+import Hypatia.Solvers
 include(joinpath(@__DIR__, "moicones.jl"))
+include(joinpath(@__DIR__, "moi.jl"))
 
-real_types = [
-    Float64,
-    Float32,
-    BigFloat,
-    ]
+@testset "MOI tests" begin
 
-@info("starting MOI wrapper Hypatia cone tests")
-@testset "MOI wrapper Hypatia cone tests" begin
-    @testset "MOI wrapper Hypatia cone tests: $T" for T in real_types
+@testset "MOI wrapper cone tests" begin
+    println("starting MOI wrapper cone tests")
+    real_types = [
+        Float64,
+        Float32,
+        BigFloat,
+        ]
+    for T in real_types
+        println(T, " ...")
         test_moi_cones(T)
     end
 end
 
-# MOI.Test linear and conic tests
+default_options = (
+    # verbose = true,
+    verbose = false,
+    default_tol_relax = 2,
+    )
 
-include(joinpath(@__DIR__, "moi.jl"))
-
-system_solvers = [
-    SO.NaiveDenseSystemSolver,
-    SO.NaiveSparseSystemSolver,
-    # SO.NaiveIndirectSystemSolver,
-    SO.NaiveElimDenseSystemSolver,
-    SO.NaiveElimSparseSystemSolver,
-    SO.SymIndefDenseSystemSolver,
-    SO.SymIndefSparseSystemSolver,
-    SO.QRCholDenseSystemSolver,
-    ]
-
-real_types = [
-    Float64,
-    # TODO test when wrapper allows
-    # Float32,
-    # BigFloat,
-    ]
-
-@info("starting MOI.Test tests")
 @testset "MOI.Test tests" begin
-    @testset "MOI.Test tests: $s, $T" for s in system_solvers, T in real_types, use_dense_model in (false, true)
-        test_moi(T, use_dense_model, verbose = false, system_solver = s{T}())
+    println("\nstarting MOI.Test tests")
+    options = [
+        (Float64, false),
+        (Float64, true),
+        (Float32, true),
+        (BigFloat, true),
+        ]
+    for (T, use_dense_model) in options
+        test_info = "$T, $use_dense_model"
+        @testset "$test_info" begin
+            println(test_info, " ...")
+            test_time = @elapsed test_moi(T, use_dense_model = use_dense_model; default_options...)
+            @printf("%8.2e seconds\n", test_time)
+        end
     end
 end
+
+end
+;

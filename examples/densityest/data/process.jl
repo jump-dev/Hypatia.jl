@@ -1,6 +1,4 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 process predefined datasets into txt files for fast importing via readdlm
 =#
 

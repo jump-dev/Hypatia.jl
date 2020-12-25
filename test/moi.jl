@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 MOI.Test linear and conic tests
 =#
 
@@ -8,20 +6,8 @@ using Test
 import MathOptInterface
 const MOI = MathOptInterface
 const MOIT = MOI.Test
-const MOIB = MOI.Bridges
 const MOIU = MOI.Utilities
 import Hypatia
-const SO = Hypatia.Solvers
-
-config = MOIT.TestConfig(
-    atol = 2e-4,
-    rtol = 2e-4,
-    solve = true,
-    query = true,
-    modify_lhs = true,
-    duals = true,
-    infeas_certificates = true,
-    )
 
 unit_exclude = [
     "solve_qcp_edge_cases",
@@ -58,19 +44,32 @@ conic_exclude = String[
     "rootdets",
     ]
 
-function test_moi(T::Type{<:Real}, use_dense_model::Bool; solver_options...)
-    optimizer = MOIU.CachingOptimizer(MOIU.UniversalFallback(MOIU.Model{T}()), Hypatia.Optimizer{T}(use_dense_model = use_dense_model; solver_options...))
+function test_moi(T::Type{<:Real}; solver_options...)
+    optimizer = MOIU.CachingOptimizer(MOIU.UniversalFallback(MOIU.Model{T}()), Hypatia.Optimizer{T}(; solver_options...))
 
-    @testset "unit tests" begin
-        MOIT.unittest(optimizer, config, unit_exclude)
-    end
+    tol = sqrt(sqrt(eps(T))) # TODO remove Float64, waiting for MOI to be tagged after https://github.com/jump-dev/MathOptInterface.jl/pull/1176
+    config = MOIT.TestConfig{T}(
+        atol = tol,
+        rtol = tol,
+        solve = true,
+        query = true,
+        modify_lhs = true,
+        duals = true,
+        infeas_certificates = true,
+        )
 
     @testset "linear tests" begin
         MOIT.contlineartest(optimizer, config)
     end
 
-    @testset "conic tests" begin
-        MOIT.contconictest(MOIB.Constraint.Square{T}(optimizer), config, conic_exclude)
+    if T == Float64
+        # NOTE test other real types, waiting for https://github.com/jump-dev/MathOptInterface.jl/issues/841
+        @testset "unit tests" begin
+            MOIT.unittest(optimizer, config, unit_exclude)
+        end
+        @testset "conic tests" begin
+            MOIT.contconictest(MOI.Bridges.Constraint.Square{T}(optimizer), config, conic_exclude)
+        end
     end
 
     return

@@ -1,12 +1,11 @@
 #=
-Copyright 2018, Chris Coey and contributors
-
 functions and caches for cones
+
+TODO maybe write a fallback dual feas check that checks if ray of dual point intersects dikin ellipsoid at primal point
 =#
 
 module Cones
 
-using TimerOutputs
 using LinearAlgebra
 import LinearAlgebra.copytri!
 import LinearAlgebra.HermOrSym
@@ -23,8 +22,9 @@ import Hypatia.inv_prod
 import Hypatia.sqrt_prod
 import Hypatia.inv_sqrt_prod
 import Hypatia.invert
+import Hypatia.increase_diag!
+import Hypatia.outer_prod
 
-default_max_neighborhood() = 0.7
 default_use_heuristic_neighborhood() = false
 
 # hessian_cache(T::Type{<:BlasReal}) = DenseSymCache{T}() # use Bunch Kaufman for BlasReals from start
@@ -36,34 +36,49 @@ include("nonnegative.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")
 include("epipersquare.jl")
-include("hypoperlog.jl")
 include("episumperentropy.jl")
-include("hypogeomean.jl")
-include("hypopowermean.jl")
+include("hypoperlog.jl")
 include("power.jl")
+include("hypopowermean.jl")
+include("hypogeomean.jl")
 include("epinormspectral.jl")
 include("matrixepipersquare.jl")
 include("matrixepiperentropy.jl")
 include("linmatrixineq.jl")
 include("possemideftri.jl")
 include("possemideftrisparse.jl")
-include("doublynonnegative.jl")
+include("doublynonnegativetri.jl")
+include("matrixepipersquare.jl")
 include("hypoperlogdettri.jl")
 include("hyporootdettri.jl")
 include("wsosinterpnonnegative.jl")
-include("wsosinterppossemideftri.jl")
+include("wsosinterpepinormone.jl")
 include("wsosinterpepinormeucl.jl")
+include("wsosinterppossemideftri.jl")
 
 use_dual_barrier(cone::Cone) = cone.use_dual_barrier
 dimension(cone::Cone) = cone.dim
-set_timer(cone::Cone, timer::TimerOutput) = (cone.timer = timer)
+
+function setup_data(cone::Cone{T}) where {T <: Real}
+    reset_data(cone)
+    dim = cone.dim
+    cone.point = zeros(T, dim)
+    cone.dual_point = zeros(T, dim)
+    cone.grad = zeros(T, dim)
+    if hasfield(typeof(cone), :correction)
+        cone.correction = zeros(T, dim)
+    end
+    cone.vec1 = zeros(T, dim)
+    cone.vec2 = zeros(T, dim)
+    setup_extra_data(cone)
+    return cone
+end
 
 load_point(cone::Cone{T}, point::AbstractVector{T}, scal::T) where {T <: Real} = (@. cone.point = scal * point)
 load_point(cone::Cone, point::AbstractVector) = copyto!(cone.point, point)
 load_dual_point(cone::Cone, point::AbstractVector) = copyto!(cone.dual_point, point)
 
 is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))
-# is_dual_feas(cone::Cone) = # TODO maybe write a fallback dual feas check that checks if ray of dual point intersects dikin ellipsoid at primal point
 grad(cone::Cone) = (cone.grad_updated ? cone.grad : update_grad(cone))
 hess(cone::Cone) = (cone.hess_updated ? cone.hess : update_hess(cone))
 inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(cone))
@@ -79,7 +94,7 @@ end
 
 use_correction(::Cone) = true
 
-update_hess_prod(cone::Cone) = nothing
+update_hess_aux(cone::Cone) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     if !cone.hess_updated
@@ -99,18 +114,14 @@ function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
 
     if !fact_success
         recover || return false
-        # TODO if Chol, try adding sqrt(eps(T)) to diag and re-factorize
         if T <: BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
             # @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
             cone.hess_fact_cache = DenseSymCache{T}()
             load_matrix(cone.hess_fact_cache, cone.hess)
         else
             # attempt recovery
-            # TODO probably safer to only change the copy of the hessian that is getting factorized, not the hessian itself
-            rteps = sqrt(eps(T))
-            @inbounds for i in 1:size(cone.hess, 1)
-                cone.hess[i, i] += rteps
-            end
+            # TODO safer to only change the copy of the hessian that is getting factorized, not the hessian itself
+            increase_diag!(cone.hess.data)
         end
         if !update_fact(cone.hess_fact_cache, cone.hess)
             @warn("Hessian Bunch-Kaufman factorization failed after recovery")
@@ -123,7 +134,6 @@ function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
 end
 
 function update_inv_hess(cone::Cone)
-    @assert !cone.inv_hess_updated
     if !cone.hess_fact_updated
         update_hess_fact(cone)
     end
@@ -173,21 +183,20 @@ inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 use_heuristic_neighborhood(cone::Cone) = cone.use_heuristic_neighborhood
 
 function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
-    # norm(H^(-1/2) * (z + mu * grad))
-    nbhd_tmp = cone.nbhd_tmp
-    nbhd_tmp2 = cone.nbhd_tmp2
+    vec1 = cone.vec1
+    vec2 = cone.vec2
     g = grad(cone)
-    @. nbhd_tmp = cone.dual_point + rtmu * g
+    @. vec1 = cone.dual_point + rtmu * g
 
     if use_heuristic_neighborhood(cone)
-        nbhd = norm(nbhd_tmp, Inf) / norm(g, Inf)
-        # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(nbhd_tmp, g)) # TODO try this neighborhood
+        nbhd = norm(vec1, Inf) / norm(g, Inf)
+        # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(vec1, g)) # TODO try this neighborhood
     # elseif Cones.use_sqrt_oracles(cone) # NOTE can force factorization when we don't need it - better to use inv hess prod
-    #     inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
-    #     nbhd = norm(nbhd_tmp2)
+    #     inv_hess_sqrt_prod!(vec2, vec1, cone)
+    #     nbhd = norm(vec2)
     else
-        inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
-        nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
+        inv_hess_prod!(vec2, vec1, cone)
+        nbhd_sqr = dot(vec2, vec1)
         if nbhd_sqr < -100eps(T) # TODO possibly loosen
             # @warn("numerical failure: cone neighborhood is $nbhd_sqr")
             return false
@@ -198,63 +207,6 @@ function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
     return (nbhd < rtmu * max_nbhd)
 end
 
-# TODO cleanup / remove if not using
-# function in_neighborhood(cone::Cone{T}, dual_point::AbstractVector{T}, rtmu::T, max_nbhd::T) where {T <: Real}
-#     # norm(H^(-1/2) * (z + mu * grad))
-#     nbhd_tmp = cone.nbhd_tmp
-#     g = rtmu * grad(cone)
-#     dp = copy(dual_point)
-#
-#     # TODO trying to see if ray intersects dikin ellipsoid
-#     # TODO find point on ray closest to g in the hessian norm
-#     gdp = dot(dp, g)
-#     # gdp = dot(dp, hess_prod!(similar(g), g, cone)) / mu
-#     # gdp = -dot(dp, cone.point)
-#     if gdp > 0
-#         return false
-#     end
-#
-#     # TODO this can be used to check feasibility rather than nbhd
-#     # scal = -gdp / sum(abs2, dp)
-#     # dp .*= scal
-#     # @show scal
-#
-#     @. nbhd_tmp = dp + g
-#
-#     # if use_heuristic_neighborhood(cone)
-#     #     error("shouldn't be using heuristic nbhd")
-#     #     nbhd = norm(nbhd_tmp, Inf) / norm(g, Inf)
-#     #     # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(nbhd_tmp, g)) # TODO try this neighborhood
-#     # else
-#         has_hess_fact_cache = hasfield(typeof(cone), :hess_fact_cache)
-#         if has_hess_fact_cache && !update_hess_fact(cone)
-#             return false
-#         end
-#         nbhd_tmp2 = cone.nbhd_tmp2
-#         if has_hess_fact_cache && cone.hess_fact_cache isa DenseSymCache{T}
-#             inv_hess_prod!(nbhd_tmp2, nbhd_tmp, cone)
-#             nbhd_sqr = dot(nbhd_tmp2, nbhd_tmp)
-#             if nbhd_sqr < -eps(T) # TODO possibly loosen
-#                 # @warn("numerical failure: cone neighborhood is $nbhd_sqr")
-#                 return false
-#             end
-#             nbhd = sqrt(abs(nbhd_sqr))
-#         else
-#             inv_hess_sqrt_prod!(nbhd_tmp2, nbhd_tmp, cone)
-#             nbhd = norm(nbhd_tmp2)
-#         end
-#     # end
-#
-#     # @show nbhd, typeof(cone)
-#     # return (nbhd < mu * cone.max_neighborhood)
-#     # return (nbhd < 0.5 * mu)
-#     # @show nbhd
-#     return (nbhd < rtmu * max_nbhd)
-#     # return (nbhd < max_nbhd)
-#     # return (nbhd < T(0.5))
-# end
-
-
 # utilities for arrays
 
 svec_length(side::Int) = div(side * (side + 1), 2)
@@ -263,8 +215,8 @@ svec_idx(row::Int, col::Int) = (div((row - 1) * row, 2) + col)
 
 block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
 
-# TODO fix later, rt2::T doesn't work with tests using ForwardDiff
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where {T}
+# TODO rt2::T doesn't work with tests using ForwardDiff
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -278,7 +230,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Numb
     return vec
 end
 
-function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where {T}
+function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -292,7 +244,7 @@ function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Number) where {T}
+function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -306,7 +258,7 @@ function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Numb
     return mat
 end
 
-function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where {T}
+function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -324,7 +276,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, 
     return vec
 end
 
-function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where {T}
+function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T}}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     for j in 1:m, i in 1:j
@@ -342,7 +294,7 @@ function smat_to_svec_add!(vec::AbstractVector{T}, mat::AbstractMatrix{Complex{T
     return vec
 end
 
-function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, rt2::Number) where {T}
+function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, rt2::Number) where T
     k = 1
     m = size(mat, 1)
     @inbounds for j in 1:m, i in 1:j
@@ -358,7 +310,7 @@ function svec_to_smat!(mat::AbstractMatrix{Complex{T}}, vec::AbstractVector{T}, 
 end
 
 # utilities for converting between real and complex vectors
-function rvec_to_cvec!(cvec::AbstractVecOrMat{Complex{T}}, rvec::AbstractVecOrMat{T}) where {T}
+function rvec_to_cvec!(cvec::AbstractVecOrMat{Complex{T}}, rvec::AbstractVecOrMat{T}) where T
     k = 1
     @inbounds for i in eachindex(cvec)
         cvec[i] = Complex(rvec[k], rvec[k + 1])
@@ -367,7 +319,7 @@ function rvec_to_cvec!(cvec::AbstractVecOrMat{Complex{T}}, rvec::AbstractVecOrMa
     return cvec
 end
 
-function cvec_to_rvec!(rvec::AbstractVecOrMat{T}, cvec::AbstractVecOrMat{Complex{T}}) where {T}
+function cvec_to_rvec!(rvec::AbstractVecOrMat{T}, cvec::AbstractVecOrMat{Complex{T}}) where T
     k = 1
     @inbounds for i in eachindex(cvec)
         ci = cvec[i]
@@ -484,77 +436,138 @@ function hess_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, t
     return
 end
 
-function sparse_upper_arrow(T::Type{<:Real}, w_dim::Int)
+# set up sparse arrow matrix data structure
+# TODO remove this in favor of new hess_nz_count etc functions that directly use uu, uw, ww etc
+function sparse_arrow(T::Type{<:Real}, w_dim::Int)
     dim = w_dim + 1
     nnz_tri = 2 * dim - 1
     I = Vector{Int}(undef, nnz_tri)
     J = Vector{Int}(undef, nnz_tri)
     idxs1 = 1:dim
-    I[idxs1] .= 1
-    J[idxs1] .= idxs1
+    @views I[idxs1] .= 1
+    @views J[idxs1] .= idxs1
     idxs2 = (dim + 1):(2 * dim - 1)
-    I[idxs2] .= 2:dim
-    J[idxs2] .= 2:dim
+    @views I[idxs2] .= 2:dim
+    @views J[idxs2] .= 2:dim
     V = ones(T, nnz_tri)
     return sparse(I, J, V, dim, dim)
 end
 
-function factor_upper_arrow(uu, uw, ww, nzval)
-    minval = sqrt(eps(uu)) # TODO tune
-    nzidx = 2
-    @inbounds for i in eachindex(ww)
-        ww1i = ww[i]
-        ww1i < eps(uu) && return false
-        wwi = sqrt(ww1i)
-        uwi = uw[i] / wwi
-        uu -= abs2(uwi)
-        uu < minval && return false
-        nzval[nzidx] = uwi
-        nzval[nzidx + 1] = wwi
-        nzidx += 2
-    end
-    nzval[1] = sqrt(uu)
-    return true
-end
-
-function sparse_upper_arrow_block2(T::Type{<:Real}, w_dim::Int)
+# 2x2 block case
+function sparse_arrow_block2(T::Type{<:Real}, w_dim::Int)
     dim = 2 * w_dim + 1
     nnz_tri = 2 * dim - 1 + w_dim
     I = Vector{Int}(undef, nnz_tri)
     J = Vector{Int}(undef, nnz_tri)
     idxs1 = 1:dim
-    I[idxs1] .= 1
-    J[idxs1] .= idxs1
+    @views I[idxs1] .= 1
+    @views J[idxs1] .= idxs1
     idxs2 = (dim + 1):(2 * dim - 1)
-    I[idxs2] .= 2:dim
-    J[idxs2] .= 2:dim
+    @views I[idxs2] .= 2:dim
+    @views J[idxs2] .= 2:dim
     idxs3 = (2 * dim):nnz_tri
-    I[idxs3] .= 2:2:dim
-    J[idxs3] .= 3:2:dim
+    @views I[idxs3] .= 2:2:dim
+    @views J[idxs3] .= 3:2:dim
     V = ones(T, nnz_tri)
     return sparse(I, J, V, dim, dim)
 end
 
-function factor_upper_arrow_block2(uu, uv, uw, vv, vw, ww, nzval)
-    minval = sqrt(eps(uu)) # TODO tune
-    nzidx = 1
-    @inbounds for i in eachindex(ww)
-        ww1i = ww[i]
-        ww1i < eps(uu) && return false
-        wwi = sqrt(ww1i)
-        vwi = vw[i] / wwi
-        uwi = uw[i] / wwi
-        vv2i = vv[i] - abs2(vwi)
-        vv2i < eps(uu) && return false
-        vvi = sqrt(vv2i)
-        uvi = (uv[i] - vwi * uwi) / vvi
-        uu -= abs2(uwi) + abs2(uvi)
-        uu < minval && return false
-        @. nzval[nzidx .+ (1:5)] = (uvi, vvi, uwi, vwi, wwi)
-        nzidx += 5
+# lmul with arrow matrix
+function arrow_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, uu::T, uw::Vector{T}, ww::Vector{T}) where {T <: Real}
+    @inbounds @views begin
+        arru = arr[1, :]
+        arrw = arr[2:end, :]
+        produ = prod[1, :]
+        prodw = prod[2:end, :]
+        copyto!(produ, arru)
+        mul!(produ, arrw', uw, true, uu)
+        mul!(prodw, uw, arru')
+        @. prodw += ww * arrw
     end
-    nzval[1] = sqrt(uu)
-    return true
+    return prod
+end
+
+# 2x2 block case
+function arrow_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, uu::T, uv::Vector{T}, uw::Vector{T}, vv::Vector{T}, vw::Vector{T}, ww::Vector{T}) where {T <: Real}
+    @inbounds @views begin
+        arru = arr[1, :]
+        arrv = arr[2:2:end, :]
+        arrw = arr[3:2:end, :]
+        produ = prod[1, :]
+        prodv = prod[2:2:end, :]
+        prodw = prod[3:2:end, :]
+        @. produ = uu * arru
+        mul!(produ, arrv', uv, true, true)
+        mul!(produ, arrw', uw, true, true)
+        mul!(prodv, uv, arru')
+        mul!(prodw, uw, arru')
+        @. prodv += vv * arrv + vw * arrw
+        @. prodw += ww * arrw + vw * arrv
+    end
+    return prod
+end
+
+sqrt_pos(x::T) where {T <: Real} = sqrt(max(x, eps(T)))
+
+# factorize arrow matrix
+function arrow_sqrt(uu::T, uw::Vector{T}, ww::Vector{T}, rtuw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+    @. rtww = sqrt_pos(ww)
+    @. rtuw = uw / rtww
+    return sqrt_pos(uu - sum(abs2, rtuw))
+end
+
+# 2x2 block case
+function arrow_sqrt(uu::T, uv::Vector{T}, uw::Vector{T}, vv::Vector{T}, vw::Vector{T}, ww::Vector{T}, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+    @. rtww = sqrt_pos(ww)
+    @. rtvw = vw / rtww
+    @. rtuw = uw / rtww
+    @. rtvv = sqrt_pos(vv - abs2(rtvw))
+    @. rtuv = (uv - rtvw * rtuw) / rtvv
+    return sqrt_pos(uu - sum(abs2, rtuv) - sum(abs2, rtuw))
+end
+
+# lmul with lower Cholesky factor of arrow matrix
+function arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+    @inbounds @views begin
+        arr1 = arr[1, :]
+        @. prod[1, :] = rtuu * arr1
+        @. prod[2:end, :] = rtuw * arr1' + rtww * arr[2:end, :]
+    end
+    return prod
+end
+
+# 2x2 block case
+function arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+    @inbounds @views begin
+        arr1 = arr[1, :]
+        arrv = arr[2:2:end, :]
+        @. prod[1, :] = rtuu * arr1
+        @. prod[2:2:end, :] = rtuv * arr1' + rtvv * arrv
+        @. prod[3:2:end, :] = rtuw * arr1' + rtvw * arrv + rtww * arr[3:2:end, :]
+    end
+    return prod
+end
+
+# ldiv with upper Cholesky factor of arrow matrix
+function inv_arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+    @inbounds @. @views prod[2:end, :] = arr[2:end, :] / rtww
+    @inbounds @views for j in 1:size(arr, 2)
+        prod[1, j] = (arr[1, j] - dot(prod[2:end, j], rtuw)) / rtuu
+    end
+    return prod
+end
+
+# 2x2 block case
+function inv_arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+    @inbounds @views begin
+        prodw = prod[3:2:end, :]
+        @. prodw = arr[3:2:end, :] / rtww
+        @. prod[2:2:end, :] = (arr[2:2:end, :] - rtvw * prodw) / rtvv
+    end
+    @inbounds @views for j in 1:size(arr, 2)
+        prod[1, j] = (arr[1, j] - dot(prod[2:2:end, j], rtuv) - dot(prod[3:2:end, j], rtuw)) / rtuu
+    end
+    return prod
 end
 
 end

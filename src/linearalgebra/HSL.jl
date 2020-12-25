@@ -1,5 +1,5 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
+utilities for HSL 
 =#
 
 import LinearAlgebra.BlasReal

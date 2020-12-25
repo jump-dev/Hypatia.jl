@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 strengthening of the theta function towards the stability number of a graph
 
 TODO add sparse PSD formulation
@@ -10,10 +8,10 @@ using SparseArrays
 
 struct StabilityNumber{T <: Real} <: ExampleInstanceJuMP{T}
     side::Int
-    use_doublynonnegative::Bool
+    use_doublynonnegativetri::Bool
 end
 
-function build(inst::StabilityNumber{T}) where {T <: Float64} # TODO generic reals
+function build(inst::StabilityNumber{T}) where {T <: Float64}
     side = inst.side
     sparsity = 1 - inv(side)
     inv_graph = tril!(sprand(Bool, side, side, sparsity) + I)
@@ -27,7 +25,7 @@ function build(inst::StabilityNumber{T}) where {T <: Float64} # TODO generic rea
     JuMP.@constraint(model, sum(X_diag) == 1)
     X_lifted = sparse(row_idxs, col_idxs, X, side, side)
     X_vec = JuMP.AffExpr[X_lifted[i, j] for i in 1:side for j in 1:i]
-    if inst.use_doublynonnegative
+    if inst.use_doublynonnegativetri
         cone_dim = length(X_vec)
         JuMP.@constraint(model, X_vec .* ModelUtilities.vec_to_svec!(ones(cone_dim)) in Hypatia.DoublyNonnegativeTriCone{T}(cone_dim))
     else
@@ -37,18 +35,3 @@ function build(inst::StabilityNumber{T}) where {T <: Float64} # TODO generic rea
 
     return model
 end
-
-instances[StabilityNumber]["minimal"] = [
-    ((2, true),),
-    ((2, false),),
-    ]
-instances[StabilityNumber]["fast"] = [
-    ((20, true),),
-    ((20, false),),
-    ((50, true),),
-    ((50, false),),
-    ]
-instances[StabilityNumber]["slow"] = [
-    ((500, true),),
-    ((500, false),),
-    ]

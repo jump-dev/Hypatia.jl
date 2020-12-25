@@ -1,22 +1,23 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 minimize the condition number of positive definite matrix M(x) = M_0 + sum_i x_i*M_i
 subject to F(x) = F_0 + sum_i x_i*F_i in S_+
-from section 3.2 "Linear Matrix Inequalities in System and Control Theory" by
-S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan
+
 original formulation:
-min gamma
-mu >= 0
-F(x) in S_+
-M(x) - mu*I in S_+
+minimize    gamma
+subject to  mu >= 0
+            F(x) in S_+
+            M(x) - mu*I in S_+
 mu*gamma*I - M(x) in S_+
 introduce nu = inv(mu), y = x/mu:
-min gamma
-nu >= 0
-nu*F_0 + sum_i y_i*F_i in S_+
-nu*M_0 + sum_i y_i*M_i - I in S_+
-gamma*I - nu*M_0 - sum_i y_i*M_i in S_+
+minimize    gamma
+subject to  nu >= 0
+            nu*F_0 + sum_i y_i*F_i in S_+
+            nu*M_0 + sum_i y_i*M_i - I in S_+
+            gamma*I - nu*M_0 - sum_i y_i*M_i in S_+
 we make F_0 and M_0 positive definite to ensure existence of a feasible solution
+
+see section 3.2 "Linear Matrix Inequalities in System and Control Theory" by
+S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan
 =#
 
 struct ConditionNumJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -25,7 +26,7 @@ struct ConditionNumJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_linmatrixineq::Bool # use linmatrixineq cone, else PSD formulation
 end
 
-function build(inst::ConditionNumJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::ConditionNumJuMP{T}) where {T <: Float64}
     (side, len_y) = (inst.side, inst.len_y)
 
     rand_pd() = (Mh = randn(side, side); Symmetric(Mh * Mh'))
@@ -59,22 +60,3 @@ function build(inst::ConditionNumJuMP{T}) where {T <: Float64} # TODO generic re
 
     return model
 end
-
-tols7 = (tol_feas = 1e-7, tol_rel_opt = 1e-7, tol_abs_opt = 1e-7)
-tols6 = (tol_feas = 1e-6, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-instances[ConditionNumJuMP]["minimal"] = [
-    ((3, 2, true),),
-    ((3, 2, false),),
-    ]
-instances[ConditionNumJuMP]["fast"] = [
-    ((3, 4, true), nothing, tols7),
-    ((3, 4, false), nothing, tols7),
-    ((10, 15, true), nothing, tols7),
-    ((10, 15, false), nothing, tols7),
-    ((20, 10, true), nothing, tols6),
-    ((100, 40, false), nothing, tols6),
-    ]
-instances[ConditionNumJuMP]["slow"] = [
-    ((100, 10, true), nothing, tols7),
-    ((100, 40, true), nothing, tols7),
-    ]

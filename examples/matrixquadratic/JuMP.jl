@@ -1,10 +1,8 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 for variables X in R^{n, m} and Y in S^n:
-    max tr(C*X) :
-    Y - X*X' in S^n_+
-    Y_ij = P_ij for (i, j) in Omega
+maximize    tr(C*X) :
+subject to  Y - X*X' in S^n_+
+            Y_ij = P_ij for (i, j) in Omega
 where Omega is a set of fixed indices and P is a random PSD matrix
 
 the nonlinear constraint Y - X*X' in S^n_+ is equivalent to
@@ -21,7 +19,7 @@ struct MatrixQuadraticJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_matrixepipersquare::Bool # use matrixepipersquare cone, else PSD formulation
 end
 
-function build(inst::MatrixQuadraticJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::MatrixQuadraticJuMP{T}) where {T <: Float64}
     (num_rows, num_cols) = (inst.num_rows, inst.num_cols)
     C = randn(num_cols, num_rows)
     P = randn(num_rows, num_rows)
@@ -44,29 +42,3 @@ function build(inst::MatrixQuadraticJuMP{T}) where {T <: Float64} # TODO generic
 
     return model
 end
-
-instances[MatrixQuadraticJuMP]["minimal"] = [
-    ((2, 2, true),),
-    ((2, 2, false),),
-    ]
-instances[MatrixQuadraticJuMP]["fast"] = [
-    ((2, 3, true),),
-    ((2, 3, false),),
-    ((5, 6, true),),
-    ((5, 6, false),),
-    ((10, 20, true),),
-    ((10, 20, false),),
-    ((20, 40, true),),
-    ((20, 40, false),),
-    ]
-instances[MatrixQuadraticJuMP]["slow"] = [
-    ((60, 80, true),),
-    ((60, 80, false),),
-    ]
-
-# benchmark 1 instances
-instances[MatrixQuadraticJuMP]["bench1"] = (
-    ((d1, 5d1, use_matrixepipersquare),)
-    for d1 in vcat(3, 5:5:60) # includes compile run
-    for use_matrixepipersquare in (false, true)
-    )

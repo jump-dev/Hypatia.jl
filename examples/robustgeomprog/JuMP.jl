@@ -1,6 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
-
 robust geometric programming problem
 given a convex set C in R_+^k (described by conic constraints) and a matrix B in R^{k, n}, calculate
     f(C, B) = sup_{c in C} (inf_{x in R^n, z in R_+^k} c'*z : B_i*x <= log(z_i), i = 1..k)
@@ -17,7 +15,7 @@ struct RobustGeomProgJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     k::Int
 end
 
-function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64}
     (n, k) = (inst.n, inst.k)
     @assert n < k # want some degrees of freedom for v
     B = randn(T, k, n) # GP powers matrix
@@ -35,25 +33,3 @@ function build(inst::RobustGeomProgJuMP{T}) where {T <: Float64} # TODO generic 
 
     return model
 end
-
-tols6 = (tol_feas = 1e-6, tol_rel_opt = 1e-6, tol_abs_opt = 1e-6)
-instances[RobustGeomProgJuMP]["minimal"] = [
-    ((2, 3),),
-    ((2, 3), ClassicConeOptimizer),
-    ]
-instances[RobustGeomProgJuMP]["fast"] = [
-    ((5, 10), nothing, tols6),
-    ((5, 10), ClassicConeOptimizer, tols6),
-    ((10, 20), nothing, tols6),
-    ((10, 20), ClassicConeOptimizer, tols6),
-    ((20, 40), nothing, tols6),
-    ((20, 40), ClassicConeOptimizer, tols6),
-    ((40, 80), nothing, tols6),
-    ((40, 80), ClassicConeOptimizer, tols6),
-    ((100, 150), nothing, tols6),
-    ((100, 150), ClassicConeOptimizer, tols6),
-    ]
-instances[RobustGeomProgJuMP]["slow"] = [
-    ((40, 80), ClassicConeOptimizer, tols6),
-    ((100, 200), nothing, tols6),
-    ]

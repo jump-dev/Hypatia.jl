@@ -1,5 +1,4 @@
 #=
-Copyright 2020, Chris Coey, Lea Kapelevich and contributors
 list of predefined matrix polynomials
 =#
 

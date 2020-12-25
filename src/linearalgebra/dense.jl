@@ -1,24 +1,24 @@
 #=
-Copyright 2019, Chris Coey and contributors
-
 helpers for dense factorizations and linear solves
 =#
 
 import LinearAlgebra.BlasReal
+import LinearAlgebra.BlasFloat
 import LinearAlgebra.BlasInt
 import LinearAlgebra.BLAS.@blasfunc
 import LinearAlgebra.LAPACK.liblapack
 
+# outer product B = alpha * A' * A + beta * B
+outer_prod(A::AbstractMatrix{T}, B::AbstractMatrix{T}, alpha::Real, beta::Real) where {T <: LinearAlgebra.BlasReal} = BLAS.syrk!('U', 'T', alpha, A, beta, B)
+outer_prod(A::AbstractMatrix{Complex{T}}, B::AbstractMatrix{Complex{T}}, alpha::Real, beta::Real) where {T <: LinearAlgebra.BlasReal} = BLAS.herk!('U', 'C', alpha, A, beta, B)
+outer_prod(A::AbstractMatrix{R}, B::AbstractMatrix{R}, alpha::Real, beta::Real) where {R <: RealOrComplex} = mul!(B, A', A, alpha, beta)
+
 # ensure diagonal terms in symm/herm that should be PSD are not too small
-function set_min_diag!(A::Matrix{<:RealOrComplex{T}}, tol::T) where {T <: Real}
-    if tol <= 0
-        return A
-    end
+function increase_diag!(A::Matrix{<:RealOrComplex{T}}) where {T <: Real}
+    diag_pert = 1 + T(1e-5)
+    diag_min = 10eps(T)
     @inbounds for j in 1:size(A, 1)
-        Ajj = A[j, j]
-        if Ajj < tol
-            A[j, j] = tol
-        end
+        A[j, j] = diag_pert * max(A[j, j], diag_min)
     end
     return A
 end
@@ -42,7 +42,7 @@ function load_matrix(cache::LAPACKNonSymCache{T}, A::Matrix{T}; copy_A::Bool = t
     LinearAlgebra.chkstride1(A)
     n = LinearAlgebra.checksquare(A)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
+    cache.AF = (copy_A ? zero(A) : A) # copy over A to new matrix or use A directly
     cache.ipiv = Vector{BlasInt}(undef, n)
     cache.info = Ref{BlasInt}()
     return cache
@@ -106,7 +106,7 @@ end
 function load_matrix(cache::LUNonSymCache{T}, A::AbstractMatrix{T}; copy_A::Bool = true) where {T <: Real}
     n = LinearAlgebra.checksquare(A)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
+    cache.AF = (copy_A ? zero(A) : A) # copy over A to new matrix or use A directly
     return cache
 end
 
@@ -145,9 +145,9 @@ function load_matrix(cache::LAPACKSymCache{T}, A::Symmetric{T, <:AbstractMatrix{
     LinearAlgebra.chkstride1(A.data)
     n = LinearAlgebra.checksquare(A.data)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
+    cache.AF = (copy_A ? zero(A) : A) # copy over A to new matrix or use A directly
     cache.ipiv = Vector{BlasInt}(undef, n)
-    cache.work = Vector{T}(undef, n) # NOTE this will be resized according to query
+    cache.work = zeros(T, n) # NOTE this will be resized according to query
     cache.lwork = BlasInt(-1) # NOTE -1 initiates a query for optimal size of work
     cache.info = Ref{BlasInt}()
     return cache
@@ -236,7 +236,7 @@ end
 function load_matrix(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: Real}
     n = size(A, 1)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? similar(A) : A) # copy over A (symmetric) to new matrix or use A directly
+    cache.AF = (copy_A ? zero(A) : A) # copy over A (symmetric) to new matrix or use A directly
     return cache
 end
 
@@ -276,7 +276,7 @@ function load_matrix(cache::LAPACKPosDefCache{T}, A::Symmetric{T, <:AbstractMatr
     LinearAlgebra.chkstride1(A.data)
     n = LinearAlgebra.checksquare(A.data)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? similar(A) : A) # copy over A to new matrix or use A directly
+    cache.AF = (copy_A ? zero(A) : A) # copy over A to new matrix or use A directly
     cache.info = Ref{BlasInt}()
     return cache
 end
@@ -357,7 +357,7 @@ end
 function load_matrix(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: Real}
     n = LinearAlgebra.checksquare(A)
     cache.copy_A = copy_A
-    cache.AF = (copy_A ? similar(A) : A) # copy over A (symmetric) to new matrix or use A directly
+    cache.AF = (copy_A ? zero(A) : A) # copy over A (symmetric) to new matrix or use A directly
     return cache
 end
 

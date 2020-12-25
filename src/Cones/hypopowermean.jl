@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 hypograph of power mean (product of powers) parametrized by alpha in R_+^n on unit simplex
 (u in R, w in R_+^n) : u <= prod_i(w_i^alpha_i)
 where sum_i(alpha_i) = 1, alpha_i >= 0
@@ -12,36 +10,33 @@ barrier from "Constructing self-concordant barriers for convex cones" by Yu. Nes
 mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     use_heuristic_neighborhood::Bool
-    max_neighborhood::T
     dim::Int
     alpha::Vector{T}
+
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
-
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    correction::Vector{T}
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     wprod::T
     z::T
-    tmpw::Vector{T}
+    tempw::Vector{T}
 
     function HypoPowerMean{T}(
         alpha::Vector{T};
         use_dual::Bool = false,
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
-        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         dim = length(alpha) + 1
@@ -51,7 +46,6 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
         cone = new{T}()
         cone.use_dual_barrier = use_dual
         cone.use_heuristic_neighborhood = use_heuristic_neighborhood
-        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.alpha = alpha
         cone.hess_fact_cache = hess_fact_cache
@@ -59,39 +53,32 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     end
 end
 
-function setup_data(cone::HypoPowerMean{T}) where {T <: Real}
-    reset_data(cone)
+function setup_extra_data(cone::HypoPowerMean{T}) where {T <: Real}
     dim = cone.dim
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
-    cone.tmpw = zeros(T, dim - 1)
-    return
+    cone.tempw = zeros(T, dim - 1)
+    return cone
 end
 
 get_nu(cone::HypoPowerMean) = cone.dim
 
-function set_initial_point(arr::AbstractVector{T}, cone::HypoPowerMean{T}) where {T}
+function set_initial_point(arr::AbstractVector{T}, cone::HypoPowerMean{T}) where T
     # get closed form central ray if all powers are equal, else use fitting
     if all(isequal(inv(T(cone.dim - 1))), cone.alpha)
         n = cone.dim - 1
         c = sqrt(T(5 * n ^ 2 + 2 * n + 1))
         arr[1] = -sqrt((-c + 3 * n + 1) / T(2 * n + 2))
-        arr[2:end] .= (c - n + 1) / sqrt(T(n + 1) * (-2 * c + 6 * n + 2))
+        @views arr[2:end] .= (c - n + 1) / sqrt(T(n + 1) * (-2 * c + 6 * n + 2))
     else
         (arr[1], w) = get_central_ray_hypopowermean(cone.alpha)
-        arr[2:end] = w
+        @views arr[2:end] = w
     end
     return arr
 end
 
-function update_feas(cone::HypoPowerMean{T}) where {T}
+function update_feas(cone::HypoPowerMean{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -109,14 +96,15 @@ function update_feas(cone::HypoPowerMean{T}) where {T}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::HypoPowerMean{T}) where {T}
+function is_dual_feas(cone::HypoPowerMean{T}) where T
     u = cone.dual_point[1]
     @views w = cone.dual_point[2:end]
     alpha = cone.alpha
-    if u < -eps(T) && all(>(eps(T)), w)
-        @inbounds dual_wprodu = exp(sum(alpha[i] * log(w[i] / alpha[i]) for i in eachindex(alpha))) + u
-        return (dual_wprodu > eps(T))
+
+    @inbounds if u < -eps(T) && all(>(eps(T)), w)
+        return (exp(sum(alpha[i] * log(w[i] / alpha[i]) for i in eachindex(alpha))) + u > eps(T))
     end
+
     return false
 end
 
@@ -127,7 +115,7 @@ function update_grad(cone::HypoPowerMean)
 
     cone.grad[1] = inv(cone.z)
     wwprodu = -cone.wprod / cone.z
-    @. cone.grad[2:end] = (wwprodu * cone.alpha - 1) / w
+    @. @views cone.grad[2:end] = (wwprodu * cone.alpha - 1) / w
 
     cone.grad_updated = true
     return cone.grad
@@ -173,7 +161,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPow
     aw = alpha ./ w # TODO
     awwwprodu = wwprodu * aw # TODO
 
-    @views for j in 1:size(arr, 2)
+    @inbounds @views for j in 1:size(arr, 2)
         arr_u = arr[1, j]
         arr_w = arr[2:end, j]
         auz = arr_u / z
@@ -196,7 +184,7 @@ function correction(cone::HypoPowerMean, primal_dir::AbstractVector)
     pi = cone.wprod # TODO rename
     z = cone.z
     alpha = cone.alpha
-    wdw = cone.tmpw
+    wdw = cone.tempw
 
     piz = pi / z
     @. wdw = w_dir / w

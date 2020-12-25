@@ -1,30 +1,33 @@
 #=
-Copyright 2019, Chris Coey and contributors
+run barrier tests
 =#
 
+using Test
+using Printf
 include(joinpath(@__DIR__, "barrier.jl"))
 
-barrier_testfuns = [
-    test_nonnegative_barrier,
-    test_epinorminf_barrier,
-    test_epinormeucl_barrier,
-    test_epipersquare_barrier,
-    test_episumperentropy_barrier,
-    test_hypoperlog_barrier,
-    test_power_barrier,
-    test_hypogeomean_barrier,
-    test_hypopowermean_barrier,
-    test_epinormspectral_barrier,
-    test_linmatrixineq_barrier, # TODO experiencing ForwardDiff failures?
-    test_possemideftri_barrier,
-    test_possemideftrisparse_barrier,
-    test_doublynonnegative_barrier,
-    test_matrixepipersquare_barrier,
-    test_hypoperlogdettri_barrier,
-    test_hyporootdettri_barrier,
-    test_wsosinterpnonnegative_barrier,
-    test_wsosinterppossemideftri_barrier,
-    test_wsosinterpepinormeucl_barrier,
+barrier_test_names = [
+    "nonnegative",
+    "epinorminf",
+    "epinormeucl",
+    "epipersquare",
+    "episumperentropy",
+    "hypoperlog",
+    "power",
+    "hypopowermean",
+    "hypogeomean",
+    "epinormspectral",
+    "linmatrixineq", # NOTE failing on Julia v1.5.1 with ForwardDiff or BigFloat
+    "possemideftri",
+    "possemideftrisparse",
+    "doublynonnegativetri",
+    "matrixepipersquare",
+    "hypoperlogdettri",
+    "hyporootdettri",
+    "wsosinterpnonnegative",
+    "wsosinterpepinormone",
+    "wsosinterpepinormeucl",
+    "wsosinterppossemideftri",
     ]
 
 real_types = [
@@ -33,7 +36,13 @@ real_types = [
     BigFloat,
     ]
 
-@info("starting barrier tests")
-@testset "barrier tests: $t, $T" for t in barrier_testfuns, T in real_types
-    t(T)
+@testset "barrier tests" begin
+@testset "$name" for name in barrier_test_names
+@testset "$T" for T in real_types
+    println("$name: $T ...")
+    test_time = @elapsed eval(Symbol("test_", name, "_barrier"))(T)
+    @printf("%8.2e seconds\n", test_time)
 end
+end
+end
+;

@@ -1,23 +1,28 @@
 #=
-Copyright 2019, Chris Coey and contributors
+run model utilities tests
 =#
 
+using Test
+using Printf
 include(joinpath(@__DIR__, "modelutilities.jl"))
 
-generic_reals = [
+real_types = [
     Float64,
     Float32,
     BigFloat,
     ]
 
-@info("starting interpolation tests")
-@testset "interpolation tests: $T" for T in generic_reals
-    fekete_sample(T)
-    test_recover_lagrange_polys(T)
-    test_recover_cheb_polys(T)
+@testset "model utilities tests" begin
+@testset "$T" for T in real_types
+    println("$T ...")
+    test_time = @elapsed begin
+        test_svec_conversion(T)
+        test_fekete_sample(T)
+        test_cheb2_w(T)
+        # test_recover_lagrange_polys(T)
+        # test_recover_cheb_polys(T)
+    end
+    @printf("%8.2e seconds\n", test_time)
 end
-
-@info("starting miscellaneous tests")
-@testset "misc tests: $T" for T in generic_reals
-    test_svec_conversion(T)
 end
+;

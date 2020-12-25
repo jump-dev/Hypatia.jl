@@ -1,6 +1,4 @@
 #=
-Copyright 2018, Chris Coey, Lea Kapelevich and contributors
-
 univariate cubic dynamical system
 example taken from "Convex computation of the region of attraction of polynomial control systems" by D. Henrion and M. Korda
 =#
@@ -17,7 +15,7 @@ struct RegionOfAttrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_wsos::Bool # use wsosinterpnonnegative cone, else PSD formulation
 end
 
-function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64} # TODO generic reals
+function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64}
     deg = inst.deg
     DP.@polyvar x
     DP.@polyvar t
@@ -65,16 +63,3 @@ function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64} # TODO generic re
 
     return model
 end
-
-instances[RegionOfAttrJuMP]["minimal"] = [
-    ((4, true),),
-    ((4, false),),
-    ]
-instances[RegionOfAttrJuMP]["fast"] = [
-    ((6, true),),
-    ((6, false),),
-    ((8, true),),
-    ]
-instances[RegionOfAttrJuMP]["slow"] = [
-    ((8, false),),
-    ]

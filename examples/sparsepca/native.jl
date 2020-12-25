@@ -1,19 +1,17 @@
 #=
-Copyright 2019, Chris Coey, Lea Kapelevich and contributors
-
 see "A Direct Formulation for Sparse PCA Using Semidefinite Programming" by
 Alexandre d’Aspremont, Laurent El Ghaoui, Michael I. Jordan, Gert R. G. Lanckriet
 =#
 
-import Hypatia.BlockMatrix
 import Distributions
+using SparseArrays
+import LinearMaps
 
 struct SparsePCANative{T <: Real} <: ExampleInstanceNative{T}
     p::Int
     k::Int
     use_epinorminfdual::Bool # use dual of epinorminf cone, else nonnegative cones
-    noise_ratio::Real
-    use_linops::Bool
+    noise_ratio::T
 end
 
 function build(inst::SparsePCANative{T}) where {T <: Real}
@@ -29,12 +27,11 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
         sigma ./= tr(sigma)
     else
         # simulate some observations with noise
-        x = randn(p, 100)
+        x = randn(T, p, 100)
         sigma = x * x'
-        y = rand(Distributions.Normal(0, Float64(noise_ratio)), k)
+        y = rand(Distributions.Normal(zero(T), noise_ratio), k)
         sigma[signal_idxs, signal_idxs] .+= y * y'
         sigma ./= 100
-        sigma = T.(sigma)
     end
 
     dimx = Cones.svec_length(p)
@@ -43,8 +40,7 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
     b = T[1]
     A = zeros(T, 1, dimx)
     for i in 1:p
-        s = sum(1:i)
-        A[s] = 1
+        A[sum(1:i)] = 1
     end
     hpsd = zeros(T, dimx)
     cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(dimx)]
@@ -52,59 +48,26 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
     if inst.use_epinorminfdual
         # l1 cone
         # double off-diagonals, which are already scaled by rt2
-        if inst.use_linops
-            Gl1 = Diagonal(-one(T) * I, dimx)
-        else
-            Gl1 = -Matrix{T}(I, dimx, dimx)
-        end
-        ModelUtilities.vec_to_svec!(Gl1, rt2 = sqrt(T(2)))
-        if inst.use_linops
-            G = BlockMatrix{T}(
-                2 * dimx + 1,
-                dimx,
-                [-I, Gl1],
-                [1:dimx, (dimx + 2):(2 * dimx + 1)],
-                [1:dimx, 1:dimx]
-                )
-            A = BlockMatrix{T}(1, dimx, [A], [1:1], [1:dimx])
-        else
-            G = [
-                Matrix{T}(-I, dimx, dimx); # psd cone
-                zeros(T, 1, dimx);
-                Gl1;
-                ]
-        end
+        Gl1vec = fill(-one(T), dimx)
+        ModelUtilities.vec_to_svec!(Gl1vec, rt2 = sqrt(T(2)))
+        G = [
+            sparse(-one(T) * I, dimx, dimx);
+            spzeros(T, 1, dimx);
+            Diagonal(Gl1vec);
+            ]
         h = vcat(hpsd, T(k), zeros(T, dimx))
         push!(cones, Cones.EpiNormInf{T, T}(1 + dimx, use_dual = true))
     else
-        id = Matrix{T}(I, dimx, dimx)
         l1 = ModelUtilities.vec_to_svec!(ones(T, dimx), rt2 = sqrt(T(2)))
-        if inst.use_linops
-            A = BlockMatrix{T}(
-                dimx + 1,
-                3 * dimx,
-                [A, -I, -I, I],
-                [1:1, 2:(dimx + 1), 2:(dimx + 1), 2:(dimx + 1)],
-                [1:dimx, 1:dimx, (dimx + 1):(2 * dimx), (2 * dimx + 1):(3 * dimx)]
-                )
-            G = BlockMatrix{T}(
-                3 * dimx + 1,
-                3 * dimx,
-                [-I, -I, repeat(l1', 1, 2)],
-                [1:dimx, (dimx + 1):(3 * dimx), (3 * dimx + 1):(3 * dimx + 1)],
-                [1:dimx, (dimx + 1):(3 * dimx), (dimx + 1):(3 * dimx)]
-                )
-        else
-            A = T[
-                A    zeros(T, 1, 2 * dimx);
-                -id    -id    id;
-                ]
-            G = [
-                Matrix{T}(-I, dimx, dimx)    zeros(T, dimx, 2 * dimx);
-                zeros(T, 2 * dimx, dimx)    Matrix{T}(-I, 2 * dimx, 2 * dimx);
-                zeros(T, 1, dimx)    repeat(l1', 1, 2);
-                ]
-        end
+        G = [
+            -I    spzeros(T, dimx, 2 * dimx);
+            spzeros(T, 2 * dimx, dimx)    -I;
+            spzeros(T, 1, dimx)    repeat(l1', 1, 2);
+            ]
+        A = [
+            sparse(A)    spzeros(T, 1, 2 * dimx);
+            -I    -I    I;
+            ]
         c = vcat(c, zeros(T, 2 * dimx))
         b = vcat(b, zeros(T, dimx))
         h = vcat(hpsd, zeros(T, 2 * dimx), k)
@@ -115,39 +78,11 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
     return model
 end
 
-function test_extra(inst::SparsePCANative, result::NamedTuple)
-    @test result.status == :Optimal
-    if result.status == :Optimal && iszero(inst.noise_ratio)
+function test_extra(inst::SparsePCANative{T}, result::NamedTuple) where T
+    @test result.status == Solvers.Optimal
+    if result.status == Solvers.Optimal && iszero(inst.noise_ratio)
         # check objective value is correct
-        tol = eps(eltype(result.x))^0.25
+        tol = eps(T)^0.25
         @test result.primal_obj ≈ -1 atol = tol rtol = tol
     end
 end
-
-instances[SparsePCANative]["minimal"] = [
-    ((3, 2, true, 0, false),),
-    ((3, 2, false, 0, false),),
-    ((3, 2, true, 10, false),),
-    ((3, 2, false, 10, false),),
-    ]
-instances[SparsePCANative]["fast"] = [
-    ((5, 3, true, 0, false),),
-    ((5, 3, false, 0, false),),
-    ((5, 3, true, 10, false),),
-    ((5, 3, false, 10, false),),
-    ((30, 10, true, 0, false),),
-    ((30, 10, false, 0, false),),
-    ((30, 10, true, 10, false),),
-    ((30, 10, false, 10, false),),
-    ]
-instances[SparsePCANative]["slow"] = Tuple[]
-instances[SparsePCANative]["linops"] = [
-    ((5, 3, true, 0, true),),
-    ((5, 3, false, 0, true),),
-    ((5, 3, true, 10, true),),
-    ((5, 3, false, 10, true),),
-    ((30, 10, true, 0, true),),
-    ((30, 10, false, 0, true),),
-    ((30, 10, true, 10, true),),
-    ((30, 10, false, 10, true),),
-    ]

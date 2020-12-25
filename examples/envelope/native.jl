@@ -1,8 +1,4 @@
 #=
-Copyright 2018, Chris Coey and contributors
-Copyright 2018, David Papp, Sercan Yildiz
-
-modified from https://github.com/dpapp-github/alfonso/blob/master/polyEnv.m
 formulates and solves the (dual of the) polynomial envelope problem described in the paper:
 D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programming
 available at https://arxiv.org/abs/1712.01792
@@ -51,28 +47,3 @@ function build(inst::EnvelopeNative{T}) where {T <: Real}
     model = Models.Model{T}(c, A, b, G, h, cones)
     return model
 end
-
-instances[EnvelopeNative]["minimal"] = [
-    ((1, 2, 2, 2, true),),
-    ((1, 2, 2, 2, false),),
-    ]
-instances[EnvelopeNative]["fast"] = [
-    ((2, 2, 3, 2, true),),
-    ((2, 2, 3, 2, false),),
-    ((3, 3, 3, 3, true),),
-    ((3, 3, 3, 3, false),),
-    ((3, 3, 5, 4, true),),
-    ((5, 2, 5, 3, true),),
-    ((1, 30, 2, 30, true),),
-    ((1, 30, 2, 30, false),),
-    ((10, 1, 3, 1, true),),
-    ((10, 1, 3, 1, false),),
-    ]
-instances[EnvelopeNative]["slow"] = [
-    ((3, 3, 5, 4, false),),
-    ((5, 2, 5, 3, false),),
-    ((4, 6, 4, 5, true),),
-    ((4, 6, 4, 5, false),),
-    ((2, 30, 4, 30, true),),
-    ((2, 30, 4, 30, false),),
-    ]
