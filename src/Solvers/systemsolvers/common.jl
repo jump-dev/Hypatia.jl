@@ -29,6 +29,10 @@ function get_directions(
 
     solve_system(system_solver, solver, dir, rhs, tau_scal)
 
+    if iter_ref_steps < 1
+        return dir
+    end
+
     # use iterative refinement
     copyto!(dir_temp, dir.vec)
     apply_lhs(stepper, solver, tau_scal) # modifies res

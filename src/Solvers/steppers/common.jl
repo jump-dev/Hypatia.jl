@@ -52,11 +52,11 @@ function update_rhs_predcorr(
         end
     end
 
-    # TODO NT way:
-    rhs.kap[1] = dir.tau[1] * dir.kap[1] / solver.point.tau[1]
+    # # TODO NT way:
+    # rhs.kap[1] = dir.tau[1] * dir.kap[1] / solver.point.tau[1]
     # TODO SY way:
-    # tau_dir_tau = dir.tau / solver.point.tau
-    # rhs[end] = tau_dir_tau * solver.mu / solver.point.tau * (1 + tau_dir_tau)
+    tau_dir_tau = dir.tau / solver.point.tau
+    rhs[end] = tau_dir_tau * solver.mu / solver.point.tau * (1 + tau_dir_tau)
 
     return rhs
 end
