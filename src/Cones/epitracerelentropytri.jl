@@ -8,6 +8,8 @@ by L. Faybusovich and C. Zhou
 
 uses the log-homogeneous but not self-concordant barrier
 -log(u - tr(W * log(W) - W * log(V))) - logdet(W) - logdet(V)
+
+TODO allocations
 =#
 
 mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
@@ -114,7 +116,6 @@ end
 
 get_nu(cone::EpiTraceRelEntropyTri) = 2 * cone.d + 1
 
-
 function set_initial_point(arr::AbstractVector, cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     arr .= 0
     # at the initial point V and W are diagonal, equivalent to episumperentropy
@@ -155,6 +156,17 @@ end
 
 is_dual_feas(::EpiTraceRelEntropyTri) = true
 
+function diff_mat!(mat::Matrix{T}, vals::Vector{T}, log_vals::Vector{T}) where T
+    for j in eachindex(vals)
+        (vj, lvj) = (vals[j], log_vals[j])
+        for i in 1:j
+            (vi, lvi) = (vals[i], log_vals[i])
+            mat[i, j] = (abs(vi - vj) < sqrt(eps(T)) ? inv(vi) : (lvi - lvj) / (vi - vj))
+        end
+    end
+    return mat
+end
+
 function update_grad(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     @assert cone.is_feas
     d = cone.d
@@ -177,15 +189,7 @@ function update_grad(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     @views smat_to_svec!(cone.grad[W_idxs], grad_W, rt2)
 
     diff_mat_V = cone.diff_mat_V
-    for j in 1:d, i in 1:j
-        (vi, vj) = (V_vals[i], V_vals[j])
-        (lvi, lvj) = (cone.V_vals_log[i], cone.V_vals_log[j])
-        if abs(vi - vj) < sqrt(eps(T))
-            diff_mat_V[i, j] = inv(vi)
-        else
-            diff_mat_V[i, j] = (lvi - lvj) / (vi - vj)
-        end
-    end
+    diff_mat!(diff_mat_V, V_vals, cone.V_vals_log)
     W_similar = cone.W_similar = V_vecs' * W * V_vecs
     tmp = -V_vecs * (W_similar .* Hermitian(diff_mat_V, :U)) * V_vecs' / z
     dzdV = @views smat_to_svec!(cone.dzdV, tmp, rt2)
@@ -210,17 +214,9 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     Wi = cone.Wi
     H = cone.hess.data
 
+    diff_mat!(cone.diff_mat_W, W_vals, cone.W_vals_log)
     diff_mat_V = Hermitian(cone.diff_mat_V, :U)
     diff_mat_W = Hermitian(cone.diff_mat_W, :U)
-    for j in 1:d, i in 1:j
-        (wi, wj) = (W_vals[i], W_vals[j])
-        (lwi, lwj) = (cone.W_vals_log[i], cone.W_vals_log[j])
-        if abs(wi - wj) < sqrt(eps(T))
-            diff_mat_W.data[i, j] = inv(wi)
-        else
-            diff_mat_W.data[i, j] = (lwi - lwj) / (wi - wj)
-        end
-    end
 
     diff_tensor_V = zeros(d, d, d)
     for k in 1:d, j in 1:k, i in 1:j

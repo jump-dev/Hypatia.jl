@@ -13,6 +13,7 @@ using SparseArrays
 using LinearMaps
 import GenericLinearAlgebra.svdvals
 import GenericLinearAlgebra.eigvals
+import GenericLinearAlgebra.eigen
 import DynamicPolynomials
 import Hypatia
 import Hypatia.ModelUtilities
@@ -578,7 +579,6 @@ function episumperentropy5(T; options...)
     @test r.z ≈ inv(T(3)) * [1, 1, -1, 1, -1, 1, -1, 3] atol=tol rtol=tol
 end
 
-
 function epitracerelentropytri1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
@@ -598,9 +598,14 @@ function epitracerelentropytri1(T; options...)
     G[1, 1] = -1
     cones = Cone{T}[Cones.EpiTraceRelEntropyTri{T}(cone_dim)]
 
-    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == :Optimal
-    @test r.primal_obj ≈ tr(W * log(W) - W * log(V)) atol=tol rtol=tol # TODO need https://github.com/JuliaLinearAlgebra/GenericLinearAlgebra.jl/issues/51 for BF
+    # TODO need https://github.com/JuliaLinearAlgebra/GenericLinearAlgebra.jl/issues/51 to use log with BF
+    (vals_V, vecs_V) = eigen(Hermitian(V, :U))
+    (vals_W, vecs_W) = eigen(Hermitian(W, :U))
+    log_V = vecs_V * Diagonal(log.(vals_V)) * vecs_V'
+    log_W = vecs_W * Diagonal(log.(vals_W)) * vecs_W'
+    @test r.primal_obj ≈ tr(W * log_W - W * log_V) atol=tol rtol=tol
 end
 
 function epitracerelentropytri2(T; options...)
@@ -618,7 +623,7 @@ function epitracerelentropytri2(T; options...)
     G = vcat(zeros(T, 1, 2 * svec_dim), ModelUtilities.vec_to_svec!(Diagonal(-one(T) * I, 2 * svec_dim)))
     cones = Cone{T}[Cones.EpiTraceRelEntropyTri{T}(cone_dim)]
 
-    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...))
     @test r.status == :Optimal
     W = Hermitian(Cones.svec_to_smat!(zeros(T, side, side), r.s[(svec_dim + 2):end], rt2), :U)
     @test tr(W * log(W)) ≈ T(5) atol=tol rtol=tol
@@ -638,7 +643,7 @@ function epitracerelentropytri3(T; options...)
     G = Diagonal(-one(T) * I, cone_dim)
     cones = Cone{T}[Cones.EpiTraceRelEntropyTri{T}(cone_dim)]
 
-    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == :Optimal
     @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
     @test r.s[1] ≈ zero(T) atol=tol rtol=tol
@@ -659,7 +664,7 @@ function epitracerelentropytri4(T; options...)
     G = Diagonal(-one(T) * I, cone_dim)
     cones = Cone{T}[Cones.EpiTraceRelEntropyTri{T}(cone_dim)]
 
-    r = build_solve_check(c, A, b, G, h, cones; tol = tol, options...)
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == :Optimal
     @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
     @test r.s ≈ zeros(T, cone_dim) atol=tol rtol=tol

@@ -281,7 +281,7 @@ end
 function test_epitracerelentropytri_barrier(T::Type{<:Real})
     Random.seed!(1)
     rt2 = sqrt(T(2))
-    for side in [1, 2, 3, 8, 15]
+    for side in [1, 2, 3, 8, 12]
         @show side
         svec_dim = Cones.svec_length(side)
         function barrier(s)
