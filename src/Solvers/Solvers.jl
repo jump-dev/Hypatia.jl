@@ -500,7 +500,7 @@ end
 
 include("process.jl")
 
-include("linesearch.jl")
+include("search.jl")
 
 include("steppers/common.jl")
 
