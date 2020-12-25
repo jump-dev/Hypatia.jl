@@ -272,7 +272,7 @@ function test_epinormspectral_barrier(T::Type{<:Real})
     return
 end
 
-function test_matrixepiperentropy_barrier(T::Type{<:Real})
+function test_epitracerelentropytri_barrier(T::Type{<:Real})
     # TODO hack around https://github.com/JuliaLinearAlgebra/GenericLinearAlgebra.jl/issues/51 while using AD
     function logm(A)
         (vals, vecs) = eigen(Hermitian(A))
@@ -291,7 +291,7 @@ function test_matrixepiperentropy_barrier(T::Type{<:Real})
             W = Hermitian(CO.svec_to_smat!(similar(s, side, side), s[(svec_dim + 2):end], rt2), :U)
             return -log(u - tr(W * logm(W) - W * logm(V))) - logdet(V) - logdet(W)
         end
-        test_barrier_oracles(CO.MatrixEpiPerEntropy{T}(2 * svec_dim + 1), barrier, init_tol = Inf)
+        test_barrier_oracles(CO.EpiTraceRelEntropyTri{T}(2 * svec_dim + 1), barrier, init_tol = Inf)
     end
     return
 end

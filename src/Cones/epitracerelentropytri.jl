@@ -9,7 +9,7 @@ TODO
 initial point
 =#
 
-mutable struct MatrixEpiPerEntropy{T <: Real} <: Cone{T}
+mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     use_heuristic_neighborhood::Bool
     max_neighborhood::T
@@ -19,7 +19,6 @@ mutable struct MatrixEpiPerEntropy{T <: Real} <: Cone{T}
     is_complex::Bool
     point::Vector{T}
     dual_point::Vector{T}
-    timer::TimerOutput
 
     feas_updated::Bool
     grad_updated::Bool
@@ -57,7 +56,7 @@ mutable struct MatrixEpiPerEntropy{T <: Real} <: Cone{T}
     W_log
     WV_log
 
-    function MatrixEpiPerEntropy{T}(
+    function EpiTraceRelEntropyTri{T}(
         dim::Int;
         use_dual::Bool = false,
         use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
@@ -78,7 +77,7 @@ mutable struct MatrixEpiPerEntropy{T <: Real} <: Cone{T}
 end
 
 # TODO only allocate the fields we use
-function setup_data(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
+function setup_data(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.rt2 = sqrt(T(2))
@@ -112,11 +111,11 @@ function setup_data(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     return
 end
 
-get_nu(cone::MatrixEpiPerEntropy) = 2 * cone.side + 1
+get_nu(cone::EpiTraceRelEntropyTri) = 2 * cone.side + 1
 
-use_correction(::MatrixEpiPerEntropy) = false
+use_correction(::EpiTraceRelEntropyTri) = false
 
-function set_initial_point(arr::AbstractVector, cone::MatrixEpiPerEntropy{T}) where {T <: Real}
+function set_initial_point(arr::AbstractVector, cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     arr .= 0
     k = 1
     for i in 1:cone.side
@@ -128,7 +127,7 @@ function set_initial_point(arr::AbstractVector, cone::MatrixEpiPerEntropy{T}) wh
     return arr
 end
 
-function update_feas(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
+function update_feas(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     @assert !cone.feas_updated
     point = cone.point
     vw_dim = cone.vw_dim
@@ -153,8 +152,8 @@ function update_feas(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     return cone.is_feas
 end
 
-is_dual_feas(cone::MatrixEpiPerEntropy) = true
-# function is_dual_feas(cone::MatrixEpiPerEntropy{T}) where {T}
+is_dual_feas(cone::EpiTraceRelEntropyTri) = true
+# function is_dual_feas(cone::EpiTraceRelEntropyTri{T}) where {T}
 #     vw_dim = cone.vw_dim
 #     u = cone.dual_point[1]
 #     @views V = Hermitian(svec_to_smat!(similar(cone.V), cone.dual_point[cone.V_idxs], cone.rt2), :U)
@@ -174,7 +173,7 @@ is_dual_feas(cone::MatrixEpiPerEntropy) = true
 # end
 
 
-function update_grad(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
+function update_grad(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     @assert cone.is_feas
     side = cone.side
     rt2 = cone.rt2
@@ -215,7 +214,7 @@ function update_grad(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
     return cone.grad
 end
 
-function update_hess(cone::MatrixEpiPerEntropy{T}) where {T <: Real}
+function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     @assert cone.is_feas
     side = cone.side
     rt2 = cone.rt2

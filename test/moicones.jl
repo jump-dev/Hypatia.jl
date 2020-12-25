@@ -308,6 +308,13 @@ function test_moi_cones(T::Type{<:Real})
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
     end
 
+    @testset "DoublyNonnegativeTri" begin
+        moi_cone = Hypatia.EpiTraceRelEntropyTriCone{T}(3)
+        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa Cones.EpiTraceRelEntropyTri{T}
+        @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
+    end
+
     @testset "WSOSInterpNonnegative" begin
         Ps = [rand(T, 3, 2), rand(T, 3, 1)]
         moi_cone = Hypatia.WSOSInterpNonnegativeCone{T, T}(3, Ps)

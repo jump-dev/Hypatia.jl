@@ -271,6 +271,15 @@ DoublyNonnegativeTriCone{T}(dim::Int) where {T <: Real} = DoublyNonnegativeTriCo
 MOI.dimension(cone::DoublyNonnegativeTriCone where {T <: Real}) = cone.dim
 cone_from_moi(::Type{T}, cone::DoublyNonnegativeTriCone{T}) where {T <: Real} = Cones.DoublyNonnegativeTri{T}(cone.dim, use_dual = cone.use_dual)
 
+export EpiTraceRelEntropyTriCone
+struct EpiTraceRelEntropyTriCone{T <: Real} <: MOI.AbstractVectorSet
+    dim::Int
+    use_dual::Bool
+end
+EpiTraceRelEntropyTriCone{T}(dim::Int) where {T <: Real} = EpiTraceRelEntropyTriCone{T}(dim, false)
+MOI.dimension(cone::EpiTraceRelEntropyTriCone where {T <: Real}) = cone.dim
+cone_from_moi(::Type{T}, cone::EpiTraceRelEntropyTriCone{T}) where {T <: Real} = Cones.EpiTraceRelEntropyTri{T}(cone.dim, use_dual = cone.use_dual)
+
 export WSOSInterpNonnegativeCone
 struct WSOSInterpNonnegativeCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     U::Int
@@ -341,6 +350,7 @@ const HypatiaCones{T <: Real} = Union{
     HypoRootdetTriCone{T, T},
     HypoRootdetTriCone{T, Complex{T}},
     DoublyNonnegativeTriCone{T},
+    EpiTraceRelEntropyTriCone{T},
     WSOSInterpNonnegativeCone{T, T},
     WSOSInterpNonnegativeCone{T, Complex{T}},
     WSOSInterpPosSemidefTriCone{T},
