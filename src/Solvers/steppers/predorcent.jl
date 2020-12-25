@@ -148,7 +148,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         # try not using correction
         @warn("very small alpha")
         copyto!(dir.vec, dir_nocorr)
-        alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-5), max_nbhd = T(0.9999))
+        alpha = find_max_alpha(point, dir, stepper.line_searcher, model, prev_alpha = one(T), min_alpha = T(1e-5), max_nbhd = T(0.99))
         if iszero(alpha)
             @warn("very small alpha again; terminating")
             solver.status = NumericalFailure
@@ -165,7 +165,6 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     return true
 end
 
-# TODO move
 function find_alpha_curve(
     point,
     cand,
@@ -183,7 +182,7 @@ function find_alpha_curve(
 
     min_alpha = T(1e-3)
     alpha_reduce = T(0.95)
-    # TODO use an alpha schedule like T[0.9999, 0.99, 0.97, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0] or a log-scale
+    # TODO use an alpha schedule like T[0.9999, 0.99, 0.97, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1] or a log-scale
 
     alpha = T(0.9999)
     alpha /= alpha_reduce

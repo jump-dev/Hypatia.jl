@@ -112,7 +112,13 @@ perf = DataFrames.DataFrame(
         # (Solvers.HeurCombStepper, diff_reals),
         (Solvers.PredOrCentStepper, diff_reals),
         ]
-    for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in diff_reals
+    inst_defaults = vcat(
+        inst_preproc,
+        inst_infeas,
+        inst_cones_many,
+        )
+
+    for inst_name in inst_defaults, (stepper, real_types) in steppers, T in diff_reals
         options = (; default_options..., verbose = true, stepper = stepper{T}())
         test_instance_solver(inst_name, T, options, string_nameof(stepper))
     end

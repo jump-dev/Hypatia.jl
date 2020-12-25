@@ -47,8 +47,8 @@ function update_rhs_predcorr(
         corr_viol = abs(dot1 - dot2) / (rteps + abs(dot2))
         if corr_viol < T(1e-3) # TODO tune
             @. rhs.s_views[k] = H_prim_dir_k + corr_k
-        else
-            @warn("pred corr viol: $corr_viol")
+        # else
+        #     @warn("pred corr viol: $corr_viol")
         end
     end
 
@@ -110,8 +110,8 @@ function update_rhs_centcorr(
         corr_viol = abs(dot1 - dot2) / (rteps + abs(dot2))
         if corr_viol < T(1e-3) # TODO tune
             rhs.s_views[k] .= corr_k
-        else
-            @warn("cent corr viol: $corr_viol")
+        # else
+        #     @warn("cent corr viol: $corr_viol")
         end
     end
 
