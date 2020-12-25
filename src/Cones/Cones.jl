@@ -35,6 +35,8 @@ abstract type Cone{T <: Real} end
 include("nonnegative.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")
+include("epiperentropy.jl")
+include("epipertraceentropytri.jl")
 include("epipersquare.jl")
 include("episumperentropy.jl")
 include("hypoperlog.jl")
