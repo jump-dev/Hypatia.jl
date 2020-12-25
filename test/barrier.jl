@@ -283,15 +283,15 @@ function test_epitracerelentropytri_barrier(T::Type{<:Real})
     rt2 = sqrt(T(2))
     for side in 1:3
         @show side
-        svec_dim = CO.svec_length(side)
+        svec_dim = Cones.svec_length(side)
         function barrier(s)
             u = s[1]
             u = s[1]
-            V = Hermitian(CO.svec_to_smat!(similar(s, side, side), s[2:(svec_dim + 1)], rt2), :U)
-            W = Hermitian(CO.svec_to_smat!(similar(s, side, side), s[(svec_dim + 2):end], rt2), :U)
+            V = Hermitian(Cones.svec_to_smat!(similar(s, side, side), s[2:(svec_dim + 1)], rt2), :U)
+            W = Hermitian(Cones.svec_to_smat!(similar(s, side, side), s[(svec_dim + 2):end], rt2), :U)
             return -log(u - tr(W * logm(W) - W * logm(V))) - logdet(V) - logdet(W)
         end
-        test_barrier_oracles(CO.EpiTraceRelEntropyTri{T}(2 * svec_dim + 1), barrier, init_tol = Inf)
+        test_barrier_oracles(Cones.EpiTraceRelEntropyTri{T}(2 * svec_dim + 1), barrier, init_tol = Inf)
     end
     return
 end

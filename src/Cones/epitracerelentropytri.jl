@@ -1,36 +1,37 @@
 #=
-TODO describe cone
+epigraph of the relative entropy cone
+(u in R, V in S_+^d, W in S_+^d) : u >= tr(W * log(W) - W * log(V))
 
 derivatives for quantum relative entropy function adapted from
 "Long-Step Path-Following Algorithm in Quantum Information Theory: Some Numerical Aspects and Applications"
 by L. Faybusovich and C. Zhou
 
-TODO
-initial point
+uses the log-homogenous but not self-concordant barrier
+-log(u - tr(W * log(W) - W * log(V))) - logdet(W) - logdet(V)
 =#
 
 mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
-    max_neighborhood::T
     dim::Int
     rt2::T
-    side::Int
+    d::Int
     is_complex::Bool
     point::Vector{T}
     dual_point::Vector{T}
 
+    grad::Vector{T}
+    correction::Vector{T}
+    vec1::Vector{T}
+    vec2::Vector{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
-    grad::Vector{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    correction::Vector{T} # TODO
     nbhd_tmp::Vector{T}
     nbhd_tmp2::Vector{T}
 
@@ -59,25 +60,25 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     function EpiTraceRelEntropyTri{T}(
         dim::Int;
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
-        max_neighborhood::Real = default_max_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim > 1
         cone = new{T}()
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
-        cone.max_neighborhood = max_neighborhood
         cone.dim = dim
         cone.vw_dim = div(dim - 1, 2)
-        cone.side = round(Int, sqrt(0.25 + 2 * cone.vw_dim) - 0.5)
+        cone.d = round(Int, sqrt(0.25 + 2 * cone.vw_dim) - 0.5)
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
 
+use_correction(::EpiTraceRelEntropyTri) = false
+
+use_heuristic_neighborhood(::EpiTraceRelEntropyTri) = false
+
 # TODO only allocate the fields we use
-function setup_data(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
+function setup_extra_data(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     reset_data(cone)
     dim = cone.dim
     cone.rt2 = sqrt(T(2))
@@ -90,35 +91,33 @@ function setup_data(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     cone.correction = zeros(T, dim)
     cone.nbhd_tmp = zeros(T, dim)
     cone.nbhd_tmp2 = zeros(T, dim)
-    side = cone.side
-    cone.V = zeros(T, side, side)
-    cone.W = zeros(T, side, side)
-    cone.Vi = zeros(T, side, side)
-    cone.Wi = zeros(T, side, side)
+    d = cone.d
+    cone.V = zeros(T, d, d)
+    cone.W = zeros(T, d, d)
+    cone.Vi = zeros(T, d, d)
+    cone.Wi = zeros(T, d, d)
     cone.V_idxs = 2:(cone.vw_dim + 1)
     cone.W_idxs = (cone.vw_dim + 2):cone.dim
     cone.dzdV = zeros(T, cone.vw_dim)
     cone.dzdW = zeros(T, cone.vw_dim)
-    cone.W_similar = zeros(T, side, side)
-    cone.tmp = zeros(T, side, side)
-    cone.diff_mat_V = zeros(T, side, side)
-    cone.diff_mat_W = zeros(T, side, side)
-    cone.V_vals_log = zeros(T, side)
-    cone.W_vals_log = zeros(T, side)
-    cone.V_log = zeros(T, side, side)
-    cone.W_log = zeros(T, side, side)
-    cone.WV_log = zeros(T, side, side)
+    cone.W_similar = zeros(T, d, d)
+    cone.tmp = zeros(T, d, d)
+    cone.diff_mat_V = zeros(T, d, d)
+    cone.diff_mat_W = zeros(T, d, d)
+    cone.V_vals_log = zeros(T, d)
+    cone.W_vals_log = zeros(T, d)
+    cone.V_log = zeros(T, d, d)
+    cone.W_log = zeros(T, d, d)
+    cone.WV_log = zeros(T, d, d)
     return
 end
 
-get_nu(cone::EpiTraceRelEntropyTri) = 2 * cone.side + 1
-
-use_correction(::EpiTraceRelEntropyTri) = false
+get_nu(cone::EpiTraceRelEntropyTri) = 2 * cone.d + 1
 
 function set_initial_point(arr::AbstractVector, cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     arr .= 0
     k = 1
-    for i in 1:cone.side
+    for i in 1:cone.d
         arr[1 + k] = 1
         arr[cone.vw_dim + 1 + k] = 1
         k += i + 1
@@ -152,30 +151,11 @@ function update_feas(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     return cone.is_feas
 end
 
-is_dual_feas(cone::EpiTraceRelEntropyTri) = true
-# function is_dual_feas(cone::EpiTraceRelEntropyTri{T}) where {T}
-#     vw_dim = cone.vw_dim
-#     u = cone.dual_point[1]
-#     @views V = Hermitian(svec_to_smat!(similar(cone.V), cone.dual_point[cone.V_idxs], cone.rt2), :U)
-#     @views W = Hermitian(svec_to_smat!(similar(cone.W), cone.dual_point[cone.W_idxs], cone.rt2), :U)
-#     (V_vals, V_vecs) = V_fact = eigen(V)
-#     if isposdef(V_fact) && (u > eps(T))
-#         # V_log = V_vecs * Diagonal(log.(V_vals)) * V_vecs'
-#         W_vals = eigvals(W)
-#         # return isposdef(u * (I + log(V / u)) + W)
-#         # return isposdef(u * (I + log(V) - I * log(u)) + W)
-#         # return all(u * (1 + log(vi / u)) + wi > eps(T) for (vi, wi) in zip(V_vals, W_vals))
-#         return u * cone.side * (1 - log(u)) + u * logdet(V) > -minimum(W_vals)
-#         # return u * sum(1 + log(vi / u) for vi in V_vals) + sum(W_vals) > eps(T)
-#         # return all(u * (1 + log(vi / u)) + sum(W_vals) > eps(T) for vi in V_vals)
-#     end
-#     return false
-# end
-
+is_dual_feas(::EpiTraceRelEntropyTri) = true
 
 function update_grad(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     @assert cone.is_feas
-    side = cone.side
+    d = cone.d
     rt2 = cone.rt2
     V_idxs = cone.V_idxs
     W_idxs = cone.W_idxs
@@ -195,7 +175,7 @@ function update_grad(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     @views smat_to_svec!(cone.grad[W_idxs], grad_W, rt2)
 
     diff_mat_V = cone.diff_mat_V
-    for j in 1:side, i in 1:j
+    for j in 1:d, i in 1:j
         (vi, vj) = (V_vals[i], V_vals[j])
         (lvi, lvj) = (cone.V_vals_log[i], cone.V_vals_log[j])
         if abs(vi - vj) < sqrt(eps(T))
@@ -216,7 +196,7 @@ end
 
 function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     @assert cone.is_feas
-    side = cone.side
+    d = cone.d
     rt2 = cone.rt2
     V_idxs = cone.V_idxs
     W_idxs = cone.W_idxs
@@ -230,7 +210,7 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
 
     diff_mat_V = Hermitian(cone.diff_mat_V, :U)
     diff_mat_W = Hermitian(cone.diff_mat_W, :U)
-    for j in 1:side, i in 1:j
+    for j in 1:d, i in 1:j
         (wi, wj) = (W_vals[i], W_vals[j])
         (lwi, lwj) = (cone.W_vals_log[i], cone.W_vals_log[j])
         if abs(wi - wj) < sqrt(eps(T))
@@ -240,8 +220,8 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
         end
     end
 
-    diff_tensor_V = zeros(side, side, side)
-    for k in 1:side, j in 1:k, i in 1:j
+    diff_tensor_V = zeros(d, d, d)
+    for k in 1:d, j in 1:k, i in 1:j
         (vi, vj, vk) = (V_vals[i], V_vals[j], V_vals[k])
         if abs(vj - vk) < sqrt(eps())
             if abs(vi - vj) < sqrt(eps())
@@ -258,20 +238,20 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     end
 
     W_similar = cone.W_similar
-    dz_sqr_dV_sqr = hess_tr_logm(V_vecs, W_similar, diff_tensor_V, vw_dim, side)
+    dz_sqr_dV_sqr = hess_tr_logm(V_vecs, W_similar, diff_tensor_V, vw_dim, d)
     dzdV = cone.dzdV
     dz_dV_sqr = dzdV * dzdV'
     ViVi = symm_kron(zeros(vw_dim, vw_dim), Vi, rt2)
     Hvv = dz_dV_sqr - dz_sqr_dV_sqr / z + ViVi
 
-    dz_sqr_dW_sqr = grad_logm(W_vecs, diff_mat_W, vw_dim, side)
+    dz_sqr_dW_sqr = grad_logm(W_vecs, diff_mat_W, vw_dim, d)
     dz_dW = cone.dzdW
     dz_dW_vec = smat_to_svec!(zeros(vw_dim), dz_dW, rt2)
     dz_dW_sqr = dz_dW_vec * dz_dW_vec'
     WiWi = symm_kron(zeros(vw_dim, vw_dim), Wi, rt2)
     Hww = dz_dW_sqr + dz_sqr_dW_sqr / z + WiWi
 
-    dz_sqr_dW_dV = grad_logm(V_vecs, diff_mat_V, vw_dim, side)
+    dz_sqr_dW_dV = grad_logm(V_vecs, diff_mat_V, vw_dim, d)
     dz_dW_dz_dV = dz_dW_vec * dzdV'
     Hwv = -dz_sqr_dW_dV / z - dz_dW_dz_dV
 
@@ -287,19 +267,19 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     return cone.hess
 end
 
-function grad_logm(V_vecs, diff_mat, sdim, side)
+function grad_logm(V_vecs, diff_mat, sdim, d)
     ret = zeros(sdim, sdim)
     row_idx = 1
-    for j in 1:side, i in 1:j
+    for j in 1:d, i in 1:j
         col_idx = 1
-        for l in 1:side, k in 1:l
+        for l in 1:d, k in 1:l
             ret[row_idx, col_idx] += sum(diff_mat[m, n] * (
                 V_vecs[i, m] * V_vecs[k, m] * V_vecs[l, n] * V_vecs[j, n] +
                 V_vecs[j, m] * V_vecs[k, m] * V_vecs[l, n] * V_vecs[i, n] +
                 V_vecs[i, m] * V_vecs[l, m] * V_vecs[k, n] * V_vecs[j, n] +
                 V_vecs[j, m] * V_vecs[l, m] * V_vecs[k, n] * V_vecs[i, n]
                 ) * (m == n ? 1 : 2) * (i == j ? 1 : sqrt(2)) * (k == l ? 1 : sqrt(2)) / 4
-                for m in 1:side for n in 1:m)
+                for m in 1:d for n in 1:m)
             col_idx += 1
         end
         row_idx += 1
@@ -307,12 +287,12 @@ function grad_logm(V_vecs, diff_mat, sdim, side)
     return ret
 end
 
-function hess_tr_logm(V_vecs, W_similar, diff_tensor_V, sdim, side)
+function hess_tr_logm(V_vecs, W_similar, diff_tensor_V, sdim, d)
     ret = zeros(sdim, sdim)
     row_idx = 1
-    for j in 1:side, i in 1:j
+    for j in 1:d, i in 1:j
         col_idx = 1
-        for l in 1:side, k in 1:l
+        for l in 1:d, k in 1:l
             ret[row_idx, col_idx] += sum(
                 (
                 V_vecs[i, m] * V_vecs[j, n] * (V_vecs[k, m] * dot(V_vecs[l, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[l, n] * dot(V_vecs[k, :], W_similar[:, m] .* diff_tensor_V[m, n, :])) +
@@ -321,7 +301,7 @@ function hess_tr_logm(V_vecs, W_similar, diff_tensor_V, sdim, side)
                 V_vecs[j, m] * V_vecs[i, n] * (V_vecs[l, m] * dot(V_vecs[k, :], W_similar[:, n] .* diff_tensor_V[m, n, :]) + V_vecs[k, n] * dot(V_vecs[l, :], W_similar[:, m] .* diff_tensor_V[m, n, :]))
                 ) *
                 (m == n ? 1 : 2) * (i == j ? 1 : sqrt(2)) * (k == l ? 1 : sqrt(2)) / 4
-                for m in 1:side for n in 1:m)
+                for m in 1:d for n in 1:m)
             col_idx += 1
         end
         row_idx += 1

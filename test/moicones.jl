@@ -308,7 +308,7 @@ function test_moi_cones(T::Type{<:Real})
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
     end
 
-    @testset "DoublyNonnegativeTri" begin
+    @testset "EpiTraceRelEntropyTriCone" begin
         moi_cone = Hypatia.EpiTraceRelEntropyTriCone{T}(3)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
         @test hyp_cone isa Cones.EpiTraceRelEntropyTri{T}
