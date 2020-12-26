@@ -61,7 +61,7 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
         use_dual::Bool = false,
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
-        @assert dim > 1
+        @assert dim > 2
         cone = new{T}()
         cone.use_dual_barrier = use_dual
         cone.dim = dim
@@ -265,24 +265,29 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     return cone.hess
 end
 
-function grad_logm!(mat, vecs, diff_mat, rt2)
-    d = size(vecs, 1)
-    row_idx = 1
-    for j in 1:d, i in 1:j
-        col_idx = 1
-        for l in 1:d, k in 1:l
-            mat[row_idx, col_idx] += sum(diff_mat[m, n] * (
-                vecs[i, m] * vecs[k, m] * vecs[l, n] * vecs[j, n] +
-                vecs[j, m] * vecs[k, m] * vecs[l, n] * vecs[i, n] +
-                vecs[i, m] * vecs[l, m] * vecs[k, n] * vecs[j, n] +
-                vecs[j, m] * vecs[l, m] * vecs[k, n] * vecs[i, n]
-                ) * (m == n ? 1 : 2) * (i == j ? 1 : rt2) * (k == l ? 1 : rt2)
-                for m in 1:d for n in 1:m)
-            col_idx += 1
+function partial_symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T, p::Int) where T
+    side = size(mat, 1)
+    idx1 = 1
+    for j in 1:side, i in 1:j
+        idx2 = 1
+        for l in 1:side, k in 1:l
+            if p == 1
+                H[idx1, idx2] = mat[i, k] * mat[j, l] * (i == j ? 1 : rt2) * (k == l ? 1 : rt2)
+            elseif p == 2
+                H[idx1, idx2] = mat[i, l] * mat[j, k] * (i == j ? 1 : rt2) * (k == l ? 1 : rt2)
+            end
+            idx2 += 1
         end
-        row_idx += 1
+        idx1 += 1
     end
-    mat ./= 4
+    return H
+end
+
+# TODO optimize
+function grad_logm!(mat::Matrix{T}, vecs::Matrix{T}, diff_mat::Hermitian{T, Matrix{T}}, rt2::T) where T
+    A = symm_kron(similar(mat), vecs, rt2, upper_only = false)
+    l = smat_to_svec!(zeros(T, size(mat, 1)), diff_mat, one(T))
+    mat .= A' * Diagonal(l) * A
     return mat
 end
 
