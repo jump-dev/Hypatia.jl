@@ -265,24 +265,6 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     return cone.hess
 end
 
-function partial_symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T, p::Int) where T
-    side = size(mat, 1)
-    idx1 = 1
-    for j in 1:side, i in 1:j
-        idx2 = 1
-        for l in 1:side, k in 1:l
-            if p == 1
-                H[idx1, idx2] = mat[i, k] * mat[j, l] * (i == j ? 1 : rt2) * (k == l ? 1 : rt2)
-            elseif p == 2
-                H[idx1, idx2] = mat[i, l] * mat[j, k] * (i == j ? 1 : rt2) * (k == l ? 1 : rt2)
-            end
-            idx2 += 1
-        end
-        idx1 += 1
-    end
-    return H
-end
-
 # TODO optimize
 function grad_logm!(mat::Matrix{T}, vecs::Matrix{T}, diff_mat::Hermitian{T, Matrix{T}}, rt2::T) where T
     A = symm_kron(similar(mat), vecs, rt2, upper_only = false)
