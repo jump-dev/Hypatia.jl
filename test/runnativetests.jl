@@ -109,12 +109,12 @@ perf = DataFrames.DataFrame(
 @testset "steppers tests" begin
     println("\nstarting steppers tests (with printing)")
     steppers = [
-        # (Solvers.HeurCombStepper, diff_reals),
-        (Solvers.PredOrCentStepper, diff_reals),
+        (Solvers.HeurCombStepper, diff_reals),
+        # (Solvers.PredOrCentStepper, diff_reals),
         ]
     inst_defaults = vcat(
-        inst_preproc,
-        inst_infeas,
+        # inst_preproc,
+        # inst_infeas,
         inst_cones_many,
         )
 

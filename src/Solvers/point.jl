@@ -20,20 +20,26 @@ mutable struct Point{T <: Real}
     Point{T}() where {T <: Real} = new{T}()
 end
 
-function Point(model::Models.Model{T}) where {T <: Real}
+function Point(
+    model::Models.Model{T};
+    cones_only::Bool = false,
+    ) where {T <: Real}
     point = Point{T}()
     (n, p, q) = (model.n, model.p, model.q)
 
     tau_idx = n + p + q + 1
     vec = point.vec = zeros(T, tau_idx + q + 1)
+
     @views begin
-        point.x = vec[1:n]
-        point.y = vec[n .+ (1:p)]
         point.z = vec[n + p .+ (1:q)]
         point.tau = vec[tau_idx:tau_idx]
         point.s = vec[tau_idx .+ (1:q)]
         point.kap = vec[end:end]
     end
+    cones_only && return point
+
+    @views point.x = vec[1:n]
+    @views point.y = vec[n .+ (1:p)]
 
     point.z_views = [view(point.z, idxs) for idxs in model.cone_idxs]
     point.s_views = [view(point.s, idxs) for idxs in model.cone_idxs]

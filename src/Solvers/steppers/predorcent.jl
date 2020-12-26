@@ -37,8 +37,8 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     stepper.dir = Point(model)
     stepper.res = Point(model)
     if stepper.use_correction
-        stepper.dir_nocorr = Point(model)
-        stepper.dir_corr = Point(model)
+        stepper.dir_nocorr = Point(model, cones_only = true)
+        stepper.dir_corr = Point(model, cones_only = true)
     end
     stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
     stepper.step_searcher = StepSearcher{T}(model)
@@ -70,7 +70,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         rhs_fun_corr = (is_pred ? update_rhs_predcorr : update_rhs_centcorr)
         dir_nocorr = stepper.dir_nocorr
         dir_corr = stepper.dir_corr
-        copyto!(dir_nocorr.vec, dir.vec)
+        copyto!(dir_nocorr.vec, dir.vec) # TODO maybe instead of copying, pass in the dir point we want into the directions function
         rhs_fun_corr(solver, rhs, dir)
         get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
         copyto!(dir_corr.vec, dir.vec)
@@ -80,7 +80,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         if iszero(alpha)
             # try not using correction
             @warn("very small alpha in curve search; trying without correction")
-            copyto!(dir.vec, dir_nocorr.vec)
+            # copyto!(dir.vec, dir_nocorr.vec)
         else
             # step
             @. point.vec += alpha * dir_nocorr.vec + abs2(alpha) * dir_corr.vec
@@ -96,7 +96,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             return false
         end
         # step
-        @. point.vec += alpha * dir.vec
+        @. point.vec += alpha * dir_nocorr.vec
     end
 
     stepper.prev_alpha = alpha
@@ -115,6 +115,10 @@ function update_cone_points(
     ) where {T <: Real}
     cand = stepper.res # TODO rename
     dir_nocorr = stepper.dir_nocorr
+
+    # TODO check tau, kap, then update in one line entire z,t,s,k with a view in point
+
+
 
     if add_correction
         dir_corr = stepper.dir_corr
