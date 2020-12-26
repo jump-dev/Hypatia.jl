@@ -17,7 +17,6 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     dim::Int
     rt2::T
     d::Int
-    is_complex::Bool
     point::Vector{T}
     dual_point::Vector{T}
 
@@ -34,8 +33,6 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
-    nbhd_tmp::Vector{T}
-    nbhd_tmp2::Vector{T}
 
     V
     W
@@ -91,8 +88,6 @@ function setup_extra_data(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.correction = zeros(T, dim)
-    cone.nbhd_tmp = zeros(T, dim)
-    cone.nbhd_tmp2 = zeros(T, dim)
     d = cone.d
     cone.V = zeros(T, d, d)
     cone.W = zeros(T, d, d)
