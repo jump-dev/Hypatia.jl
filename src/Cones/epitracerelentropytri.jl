@@ -9,7 +9,7 @@ by L. Faybusovich and C. Zhou
 uses the log-homogeneous but not self-concordant barrier
 -log(u - tr(W * log(W) - W * log(V))) - logdet(W) - logdet(V)
 
-TODO allocations
+TODO allocations, corrector
 =#
 
 mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
@@ -151,6 +151,7 @@ end
 
 is_dual_feas(::EpiTraceRelEntropyTri) = true
 
+# TODO move out
 function diff_mat!(mat::Matrix{T}, vals::Vector{T}, log_vals::Vector{T}) where T
     rteps = sqrt(eps(T))
     for j in eachindex(vals)
@@ -265,7 +266,7 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     return cone.hess
 end
 
-# TODO optimize
+# TODO optimize and move out
 function grad_logm!(mat::Matrix{T}, vecs::Matrix{T}, diff_mat::Hermitian{T, Matrix{T}}, rt2::T) where T
     A = symm_kron(similar(mat), vecs, rt2, upper_only = false)
     l = smat_to_svec!(zeros(T, size(mat, 1)), diff_mat, one(T))
