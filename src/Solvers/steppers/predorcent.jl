@@ -8,7 +8,7 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     cent_count::Int
     rhs::Point{T}
     dir::Point{T}
-    res::Point{T}
+    res::Point{T} # TODO rename if used for cand and res
     dir_nocorr::Point{T}
     dir_corr::Point{T}
     dir_temp::Vector{T}
@@ -76,21 +76,20 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         copyto!(dir_corr.vec, dir.vec)
 
         # do curve search with correction
-        alpha = search_alpha(point, dir_nocorr, dir_corr, stepper.step_searcher, model)
+        alpha = search_alpha(true, point, model, stepper, min_alpha = T(1e-2)) # TODO tune min_alpha
         if iszero(alpha)
             # try not using correction
             @warn("very small alpha in curve search; trying without correction")
             copyto!(dir.vec, dir_nocorr.vec)
         else
             # step
-            @. point.vec += alpha * (dir_nocorr.vec + alpha * dir_corr.vec)
+            @. point.vec += alpha * dir_nocorr.vec + abs2(alpha) * dir_corr.vec
         end
     end
 
     if iszero(alpha)
         # do line search in uncorrected direction
-        # alpha = search_alpha_line(point, dir, stepper.step_searcher, model, prev_alpha = one(T), min_alpha = T(1e-5), max_nbhd = T(0.99))
-        alpha = search_alpha(point, dir, nothing, stepper.step_searcher, model)
+        alpha = search_alpha(false, point, model, stepper)
         if iszero(alpha)
             @warn("very small alpha in line search; terminating")
             solver.status = NumericalFailure
@@ -107,6 +106,37 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
 end
 
 expect_improvement(stepper::PredOrCentStepper) = iszero(stepper.cent_count)
+
+function update_cone_points(
+    add_correction::Bool,
+    alpha::T,
+    point::Point{T},
+    stepper::PredOrCentStepper{T}
+    ) where {T <: Real}
+    cand = stepper.res # TODO rename
+    dir_nocorr = stepper.dir_nocorr
+
+    if add_correction
+        dir_corr = stepper.dir_corr
+        alpha_sqr = abs2(alpha)
+
+        tau_c = cand.tau[1] = point.tau[1] + alpha * dir_nocorr.tau[1] + alpha_sqr * dir_corr.tau[1]
+        kap_c = cand.kap[1] = point.kap[1] + alpha * dir_nocorr.kap[1] + alpha_sqr * dir_corr.kap[1]
+        (min(tau_c, kap_c, tau_c * kap_c) < eps(T)) && return false
+
+        @. cand.z = point.z + alpha * dir_nocorr.z + alpha_sqr * dir_corr.z
+        @. cand.s = point.s + alpha * dir_nocorr.s + alpha_sqr * dir_corr.s
+    else
+        tau_c = cand.tau[1] = point.tau[1] + alpha * dir_nocorr.tau[1]
+        kap_c = cand.kap[1] = point.kap[1] + alpha * dir_nocorr.kap[1]
+        (min(tau_c, kap_c, tau_c * kap_c) < eps(T)) && return false
+
+        @. cand.z = point.z + alpha * dir_nocorr.z
+        @. cand.s = point.s + alpha * dir_nocorr.s
+    end
+
+    return true
+end
 
 function print_iteration_stats(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
     if iszero(solver.num_iters)

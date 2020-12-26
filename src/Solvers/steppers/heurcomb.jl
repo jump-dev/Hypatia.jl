@@ -7,7 +7,6 @@ mutable struct HeurCombStepper{T <: Real} <: Stepper{T}
     prev_pred_alpha::T
     prev_alpha::T
     prev_gamma::T
-
     rhs::Point{T}
     dir::Point{T}
     res::Point{T}
@@ -16,7 +15,6 @@ mutable struct HeurCombStepper{T <: Real} <: Stepper{T}
     dir_centcorr::Vector{T}
     dir_pred::Vector{T}
     dir_predcorr::Vector{T}
-
     step_searcher::StepSearcher{T}
 
     function HeurCombStepper{T}(;
@@ -50,6 +48,10 @@ function load(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}
 
     return stepper
 end
+
+
+# TODO make correction optional
+# TODO try using single curve search
 
 # original combined stepper
 function step(stepper::HeurCombStepper{T}, solver::Solver{T}) where {T <: Real}

@@ -3,10 +3,6 @@ step distance search helpers for s,z
 =#
 
 mutable struct StepSearcher{T <: Real}
-    z::Vector{T}
-    s::Vector{T}
-    dual_views::Vector{SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int}}, true}}
-    primal_views::Vector{SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int}}, true}}
     skzk::Vector{T}
     nup1::T
     cone_times::Vector{Float64}
@@ -18,10 +14,6 @@ mutable struct StepSearcher{T <: Real}
     function StepSearcher{T}(model::Models.Model{T}) where {T <: Real}
         cones = model.cones
         step_searcher = new{T}()
-        z = step_searcher.z = zeros(T, model.q)
-        s = step_searcher.s = zeros(T, model.q)
-        step_searcher.dual_views = [view(Cones.use_dual_barrier(cone) ? s : z, idxs) for (cone, idxs) in zip(cones, model.cone_idxs)]
-        step_searcher.primal_views = [view(Cones.use_dual_barrier(cone) ? z : s, idxs) for (cone, idxs) in zip(cones, model.cone_idxs)]
         step_searcher.skzk = zeros(T, length(cones))
         step_searcher.nup1 = T(model.nu + 1)
         step_searcher.cone_times = zeros(length(cones))
@@ -33,58 +25,26 @@ mutable struct StepSearcher{T <: Real}
     end
 end
 
-# backwards search
+# backwards search on alphas in alpha schedule
 function search_alpha(
+    add_correction::Bool,
     point::Point{T},
-    dir_nocorr::Point{T},
-    dir_corr::Union{Nothing, Point{T}},
-    step_searcher::StepSearcher{T},
-    model::Models.Model{T};
-    # prev_alpha::T = one(T),
+    model::Models.Model{T},
+    stepper::Stepper{T};
+    # prev_alpha::T = one(T), # TODO so don't try largest alpha first always
     min_alpha::T = T(1e-4),
     ) where {T <: Real}
-    # alpha_reduce = T(0.95) # TODO tune, maybe try smaller for pred_alpha since heuristic
-    # alpha = max(T(0.1), min(prev_alpha * T(1.4), one(T))) # TODO option for parameter
-
-    # alpha = one(T)
-    # alpha *= T(0.9999) / alpha_reduce
+    step_searcher = stepper.step_searcher
     for alpha in step_searcher.alpha_sched
-        if alpha < min_alpha
-            # alpha is very small so finish
-            break
-        end
-        # alpha *= alpha_reduce
-
-        corr_factor = (isnothing(dir_corr) ? zero(T) : abs2(alpha))
-
-        # update tau * kap # TODO refac?
-        tau_step = point.tau[1] + alpha * dir_nocorr.tau[1]
-        kap_step = point.kap[1] + alpha * dir_nocorr.kap[1]
-        if !iszero(corr_factor)
-            tau_step += corr_factor * dir_corr.tau[1]
-            kap_step += corr_factor * dir_corr.kap[1]
-        end
-        taukap_step = tau_step * kap_step
-        (min(tau_step, kap_step, taukap_step) < eps(T)) && continue
-
-        # update s, z # TODO refac?
-        @. step_searcher.z = point.z + alpha * dir_nocorr.z
-        @. step_searcher.s = point.s + alpha * dir_nocorr.s
-        if !iszero(corr_factor)
-            @. step_searcher.z += corr_factor * dir_corr.z
-            @. step_searcher.s += corr_factor * dir_corr.s
-        end
-
-        if check_alpha(taukap_step, step_searcher, model)
-            return alpha
-        end
+        (alpha < min_alpha) && break # alpha is very small so finish
+        update_cone_points(add_correction, alpha, point, stepper) || continue
+        check_cone_points(stepper.res, step_searcher, model) && return alpha
     end
-
     return zero(T)
 end
 
-function check_alpha(
-    taukap_step::T,
+function check_cone_points(
+    cand::Point{T},
     step_searcher::StepSearcher{T},
     model::Models.Model{T},
     ) where {T <: Real}
@@ -94,28 +54,28 @@ function check_alpha(
     max_nbhd = step_searcher.max_nbhd
 
     for k in cone_order
-        skzk[k] = dot(step_searcher.primal_views[k], step_searcher.dual_views[k])
+        skzk[k] = dot(cand.primal_views[k], cand.dual_views[k])
         (skzk[k] < eps(T)) && return false
     end
+    taukap_cand = cand.tau[1] * cand.kap[1]
+    mu_cand = (sum(skzk) + taukap_cand) / step_searcher.nup1
+    (mu_cand < eps(T)) && return false
 
-    mu_step = (sum(skzk) + taukap_step) / step_searcher.nup1
-    (mu_step < eps(T)) && return false
-
-    min_nbhd_mu = step_searcher.min_nbhd * mu_step
-    (taukap_step < min_nbhd_mu) && return false
+    min_nbhd_mu = step_searcher.min_nbhd * mu_cand
+    (taukap_cand < min_nbhd_mu) && return false
     any(skzk[k] < min_nbhd_mu * Cones.get_nu(cones[k]) for k in cone_order) && return false
-    isfinite(max_nbhd) && (abs(taukap_step - mu_step) > max_nbhd * mu_step) && return false
+    isfinite(max_nbhd) && (abs(taukap_cand - mu_cand) > max_nbhd * mu_cand) && return false
 
     # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
     sortperm!(cone_order, step_searcher.cone_times, initialized = true) # NOTE stochastic
 
-    rtmu = sqrt(mu_step)
+    rtmu = sqrt(mu_cand)
     irtmu = inv(rtmu)
     for k in cone_order
         cone_k = cones[k]
         start_time = time()
-        Cones.load_point(cone_k, step_searcher.primal_views[k], irtmu)
-        Cones.load_dual_point(cone_k, step_searcher.dual_views[k])
+        Cones.load_point(cone_k, cand.primal_views[k], irtmu)
+        Cones.load_dual_point(cone_k, cand.dual_views[k])
         Cones.reset_data(cone_k)
         in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
         step_searcher.cone_times[k] = time() - start_time
