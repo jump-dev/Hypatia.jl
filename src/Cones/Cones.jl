@@ -37,6 +37,7 @@ include("epinorminf.jl")
 include("epinormeucl.jl")
 include("epipersquare.jl")
 include("episumperentropy.jl")
+include("epitracerelentropytri.jl")
 include("hypoperlog.jl")
 include("power.jl")
 include("hypopowermean.jl")
@@ -335,32 +336,32 @@ vec_copy_to!(v1::AbstractVecOrMat{Complex{T}}, v2::AbstractVecOrMat{T}) where {T
 # utilities for hessians for cones with PSD parts
 
 # TODO parallelize
-function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T) where {T <: Real}
+function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T; upper_only::Bool = true) where {T <: Real}
     side = size(mat, 1)
     k = 1
-    @inbounds for i in 1:side
-        for j in 1:(i - 1)
+    @inbounds for j in 1:side
+        for i in 1:(j - 1)
             k2 = 1
-            for i2 in 1:side
-                k2 > k && continue
-                for j2 in 1:(i2 - 1)
+            for j2 in 1:side
+                upper_only && k2 > k && continue
+                for i2 in 1:(j2 - 1)
                     scal = (i == j ? 1 : rt2) * (i2 == j2 ? 1 : rt2) / 2
                     H[k2, k] = scal * (mat[i, i2] * mat[j, j2] + mat[i, j2] * mat[j, i2])
                     k2 += 1
                 end
-                H[k2, k] = rt2 * mat[i, i2] * mat[j, i2]
+                H[k2, k] = rt2 * mat[i, j2] * mat[j, j2]
                 k2 += 1
             end
             k += 1
         end
         k2 = 1
-        for i2 in 1:side
-            k2 > k && continue
-            for j2 in 1:(i2 - 1)
-                H[k2, k] = rt2 * mat[i, j2] * mat[i, i2]
+        for j2 in 1:side
+            upper_only && k2 > k && continue
+            for i2 in 1:(j2 - 1)
+                H[k2, k] = rt2 * mat[j, j2] * mat[j, i2]
                 k2 += 1
             end
-            H[k2, k] = abs2(mat[i, i2])
+            H[k2, k] = abs2(mat[j, j2])
             k2 += 1
         end
         k += 1
