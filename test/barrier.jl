@@ -47,9 +47,6 @@ function test_barrier_oracles(
     load_reset_check(cone, point, dual_point)
 
     # test gradient and Hessian oracles
-    fd_hess = ForwardDiff.hessian(barrier, point)
-    Cones.grad(cone)
-    # @show Cones.hess(cone) ./ fd_hess
     test_grad_hess(cone, point, dual_point, tol = tol)
 
     # check gradient and Hessian agree with ForwardDiff
@@ -68,13 +65,6 @@ function test_barrier_oracles(
     # end
 
     if Cones.use_correction(cone)
-        (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
-        grad = Cones.grad(cone)
-        hess = Cones.hess(cone)
-        corr = Cones.correction(cone, primal_dir)
-        barrier_dir(point, t) = barrier(point + t * primal_dir)
-        @show -2 * corr ./ ForwardDiff.gradient(x -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(x, t), s), 0), point)
-
         # check correction satisfies log-homog property F'''(s)[s, s] = -2F''(s) * s = 2F'(s)
         @test -Cones.correction(cone, point) ≈ grad atol=tol rtol=tol
         # check correction term agrees with directional 3rd derivative
@@ -221,13 +211,6 @@ function test_epiperentropy_barrier(T::Type{<:Real})
         test_barrier_oracles(Cones.EpiPerEntropy{T}(2 + w_dim), barrier, init_tol = 1e-1, init_only = true)
     end
     return
-end
-
-import GenericLinearAlgebra.eigen
-# TODO hack around https://github.com/JuliaLinearAlgebra/GenericLinearAlgebra.jl/issues/51 while using AD
-function logm(A)
-    (vals, vecs) = eigen(Hermitian(A))
-    return vecs * Diagonal(log.(vals)) * vecs'
 end
 
 function test_epipertraceentropytri_barrier(T::Type{<:Real})

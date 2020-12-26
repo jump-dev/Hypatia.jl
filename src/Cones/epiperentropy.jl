@@ -1,8 +1,11 @@
 #=
 (closure of) epigraph of perspective of the entropy function on R^d
-(u in R, v in R_+, w in R_+^d) : u >= sum_i w_i*log(w_i/v)
+(u in R, v in R_+, w in R_+^d) : u >= sum_i w_i*log(w_i / v)
 
-barrier -log(u - sum_i w_i*log(w_i/v)) - log(v) - sum_i log(w_i)
+barrier -log(u - sum_i w_i*log(w_i / v)) - log(v) - sum_i log(w_i)
+
+TODO
+simplify corrector
 =#
 
 mutable struct EpiPerEntropy{T <: Real} <: Cone{T}
@@ -29,6 +32,7 @@ mutable struct EpiPerEntropy{T <: Real} <: Cone{T}
     z::T
     lwv::Vector{T}
     tau::Vector{T}
+    wi::Vector{T}
     sigma::T
 
     function EpiPerEntropy{T}(
@@ -48,8 +52,6 @@ end
 
 use_heuristic_neighborhood(cone::EpiPerEntropy) = false
 
-use_correction(::EpiPerEntropy) = true
-
 function setup_extra_data(cone::EpiPerEntropy{T}) where T
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -57,6 +59,7 @@ function setup_extra_data(cone::EpiPerEntropy{T}) where T
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.lwv = zeros(T, cone.w_dim)
     cone.tau = zeros(T, cone.w_dim)
+    cone.wi = zeros(T, cone.w_dim)
     return cone
 end
 
@@ -93,7 +96,7 @@ function is_dual_feas(cone::EpiPerEntropy{T}) where T
     v = cone.dual_point[2]
     @views w = cone.dual_point[3:cone.dim]
     if u > eps(T)
-        return v - u * sum(exp.(-w ./ u .- 1)) > eps(T)
+        return v - u * sum(exp(-wi ./ u - 1) for wi in w) > eps(T)
     end
 
     return false
@@ -107,12 +110,11 @@ function update_grad(cone::EpiPerEntropy)
     z = cone.z
     cone.sigma = sum(w) / v / z
     @. cone.tau = (cone.lwv + 1) / z
-    tau = cone.tau
-    sigma = cone.sigma
+    @. cone.wi = inv(w)
 
     cone.grad[1] = -inv(z)
-    cone.grad[2] = -sigma - inv(v)
-    cone.grad[3:end] .= tau - inv.(w)
+    cone.grad[2] = -cone.sigma - inv(v)
+    @. cone.grad[3:end] = cone.tau - cone.wi
 
     cone.grad_updated = true
     return cone.grad
@@ -128,18 +130,22 @@ function update_hess(cone::EpiPerEntropy{T}) where T
     sigma = cone.sigma
     H = cone.hess.data
 
-    H[1, 1] = abs2(inv(z))
+    H[1, 1] = -cone.grad[1] / z
     H[1, 2] = sigma / z
-    H[1, 3:end] = -tau / z
-    H[2, 2] = abs2(sigma) + sigma / v + inv(v) / v
-    H[2, 3:end] = -sigma * tau .- inv.(v) ./ z
-    H[3:end, 3:end] = tau * tau' + Diagonal(inv.(w) / z + abs2.(inv.(w)))
+    @. @views H[1, 3:end] = -tau / z
+    H[2, 2] = abs2(sigma) - cone.grad[2] / v
+    @. @views H[2, 3:end] = -sigma * tau - inv(v) / z
+    @views Hww = H[3:end, 3:end]
+    mul!(Hww, tau, tau')
+    @inbounds for i in 1:cone.w_dim
+        Hww[i, i] += (inv(z) + cone.wi[i]) / w[i]
+    end
 
     cone.hess_updated = true
     return cone.hess
 end
 
-function correction(cone::EpiPerEntropy, primal_dir::AbstractVector)
+function correction(cone::EpiPerEntropy{T}, primal_dir::AbstractVector{T}) where T
     @assert cone.grad_updated
     tau = -cone.tau
     z = cone.z

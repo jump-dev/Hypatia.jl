@@ -579,6 +579,101 @@ function episumperentropy5(T; options...)
     @test r.z ≈ inv(T(3)) * [1, 1, -1, 1, -1, 1, -1, 3] atol=tol rtol=tol
 end
 
+# TODO add use_dual = true tests
+function epiperentropy1(T; options...)
+    tol = test_tol(T)
+    Random.seed!(1)
+    for w_dim in [1, 2, 3]
+        dim = 2 + w_dim
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = zeros(T, 0)
+        G = zeros(T, dim, 1)
+        G[1, 1] = -1
+        h = zeros(T, dim)
+        h[2] = 1
+        w = rand(T, w_dim) .+ 1
+        h[3:end] .= w
+        cones = Cone{T}[Cones.EpiPerEntropy{T}(dim)]
+
+        r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+        @test r.status == Solvers.Optimal
+        @test r.primal_obj ≈ sum(wi * log(wi) for wi in w) atol=tol rtol=tol
+    end
+end
+
+function epiperentropy2(T; options...)
+    tol = test_tol(T)
+    for w_dim in [1, 2, 4]
+        dim = 2 + w_dim
+        c = fill(-one(T), w_dim)
+        A = zeros(T, 0, w_dim)
+        b = zeros(T, 0)
+        G = vcat(zeros(T, 2, w_dim), Matrix{T}(-I, w_dim, w_dim))
+        h = zeros(T, dim)
+        h[2] = 1
+        cones = Cone{T}[Cones.EpiPerEntropy{T}(dim)]
+
+        r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+        @test r.status == Solvers.Optimal
+        @test r.primal_obj ≈ -w_dim atol=tol rtol=tol
+        @test r.x ≈ fill(1, w_dim) atol=tol rtol=tol
+    end
+end
+
+function epiperentropy3(T; options...)
+    tol = test_tol(T)
+    for w_dim in [2, 4]
+        dim = 2 + w_dim
+        c = T[-1]
+        A = ones(T, 1, 1)
+        b = T[dim]
+        G = zeros(T, dim, 1)
+        G[2, 1] = -1
+        h = zeros(T, dim)
+        h[3:end] .= 1
+        cones = Cone{T}[Cones.EpiPerEntropy{T}(dim)]
+
+        r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+        @test r.status == Solvers.Optimal
+        @test r.primal_obj ≈ -dim atol=tol rtol=tol
+        @test r.x ≈ [dim] atol=tol rtol=tol
+    end
+end
+
+function epiperentropy4(T; options...)
+    tol = test_tol(T)
+    c = T[1]
+    A = zeros(T, 0, 1)
+    b = zeros(T, 0)
+    G = Matrix{T}(-I, 4, 1)
+    h = T[0, 5, 2, 3]
+    cones = Cone{T}[Cones.EpiPerEntropy{T}(4)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    entr = 2 * log(2 / T(5)) + 3 * log(3 / T(5))
+    @test r.primal_obj ≈ entr atol=tol rtol=tol
+    @test r.s ≈ [entr, 5, 2, 3] atol=tol rtol=tol
+    @test r.z ≈ [1, 1, log(5 / T(2)) - 1, log(5 / T(3)) - 1] atol=tol rtol=tol
+end
+
+function epiperentropy5(T; options...)
+    tol = test_tol(T)
+    c = T[0, -1]
+    A = zeros(T, 0, 2)
+    b = zeros(T, 0)
+    G = vcat(zeros(T, 1, 2), zeros(T, 1, 2), fill(-1, 3, 2), [-1, 0]')
+    h = T[0, 1, 0, 0, 0, 0]
+    cones = Cone{T}[Cones.EpiPerEntropy{T}(5), Cones.Nonnegative{T}(1)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    @test r.s ≈ [0, 1, 1, 1, 1, 0] atol=tol rtol=tol
+    @test r.z ≈ inv(T(3)) * [1, 3, -1, -1, -1, 3] atol=tol rtol=tol
+end
+
 function epitracerelentropytri1(T; options...)
     tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)

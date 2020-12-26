@@ -370,7 +370,7 @@ const HypatiaCones{T <: Real} = Union{
     HypoRootdetTriCone{T, Complex{T}},
     DoublyNonnegativeTriCone{T},
     EpiTraceRelEntropyTriCone{T},
-    EpiPerTraceEntropyTri{T},
+    EpiPerTraceEntropyTriCone{T},
     WSOSInterpNonnegativeCone{T, T},
     WSOSInterpNonnegativeCone{T, Complex{T}},
     WSOSInterpPosSemidefTriCone{T},
