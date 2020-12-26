@@ -157,11 +157,12 @@ end
 is_dual_feas(::EpiTraceRelEntropyTri) = true
 
 function diff_mat!(mat::Matrix{T}, vals::Vector{T}, log_vals::Vector{T}) where T
+    rteps = sqrt(eps(T))
     for j in eachindex(vals)
         (vj, lvj) = (vals[j], log_vals[j])
         for i in 1:j
             (vi, lvi) = (vals[i], log_vals[i])
-            mat[i, j] = (abs(vi - vj) < sqrt(eps(T)) ? inv(vi) : (lvi - lvj) / (vi - vj))
+            mat[i, j] = (abs(vi - vj) < rteps ? inv(vi) : (lvi - lvj) / (vi - vj))
         end
     end
     return mat
@@ -204,6 +205,7 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     @assert cone.is_feas
     d = cone.d
     rt2 = cone.rt2
+    rteps = sqrt(eps(T))
     V_idxs = cone.V_idxs
     W_idxs = cone.W_idxs
     z = cone.z
@@ -218,16 +220,16 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     diff_mat_V = Hermitian(cone.diff_mat_V, :U)
     diff_mat_W = Hermitian(cone.diff_mat_W, :U)
 
-    diff_tensor_V = zeros(d, d, d)
+    diff_tensor_V = zeros(T, d, d, d)
     for k in 1:d, j in 1:k, i in 1:j
         (vi, vj, vk) = (V_vals[i], V_vals[j], V_vals[k])
-        if abs(vj - vk) < sqrt(eps())
-            if abs(vi - vj) < sqrt(eps())
+        if abs(vj - vk) < rteps
+            if abs(vi - vj) < rteps
                 diff_tensor_V[i, i, i] = -inv(vi) / vi / 2
             else
                 diff_tensor_V[i, j, j] = diff_tensor_V[j, i, j] = diff_tensor_V[j, j, i] = -(inv(vj) - diff_mat_V[i, j]) / (vi - vj)
             end
-        elseif abs(vi - vj) < sqrt(eps())
+        elseif abs(vi - vj) < rteps
             diff_tensor_V[k, j, j] = diff_tensor_V[j, k, j] = diff_tensor_V[j, j, k] = (inv(vi) - diff_mat_V[k, i]) / (vi - vk)
         else
             diff_tensor_V[i, j, k] = diff_tensor_V[i, k, j] = diff_tensor_V[j, i, k] =
@@ -240,15 +242,15 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     hess_tr_logm!(dz_sqr_dV_sqr, V_vecs, W_similar, diff_tensor_V, cone.rt2)
     dzdV = cone.dzdV
     dz_dV_sqr = dzdV * dzdV'
-    ViVi = symm_kron(zeros(vw_dim, vw_dim), Vi, rt2)
+    ViVi = symm_kron(zeros(T, vw_dim, vw_dim), Vi, rt2)
     Hvv = dz_dV_sqr - dz_sqr_dV_sqr / z + ViVi
 
     dz_sqr_dW_sqr = zeros(T, vw_dim, vw_dim)
     grad_logm!(dz_sqr_dW_sqr, W_vecs, diff_mat_W, cone.rt2)
     dz_dW = cone.dzdW
-    dz_dW_vec = smat_to_svec!(zeros(vw_dim), dz_dW, rt2)
+    dz_dW_vec = smat_to_svec!(zeros(T, vw_dim), dz_dW, rt2)
     dz_dW_sqr = dz_dW_vec * dz_dW_vec'
-    WiWi = symm_kron(zeros(vw_dim, vw_dim), Wi, rt2)
+    WiWi = symm_kron(zeros(T, vw_dim, vw_dim), Wi, rt2)
     Hww = dz_dW_sqr + dz_sqr_dW_sqr / z + WiWi
 
     dz_sqr_dW_dV = zeros(T, vw_dim, vw_dim)
