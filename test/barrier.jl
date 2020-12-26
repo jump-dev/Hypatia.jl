@@ -328,7 +328,6 @@ end
 function test_epitracerelentropytri_barrier(T::Type{<:Real})
     rt2 = sqrt(T(2))
     for side in [1, 2, 3, 8, 12]
-        @show side
         svec_dim = Cones.svec_length(side)
         function barrier(s)
             u = s[1]
