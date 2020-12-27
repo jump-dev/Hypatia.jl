@@ -270,7 +270,7 @@ end
 function grad_logm!(mat::Matrix{T}, vecs::Matrix{T}, diff_mat::Hermitian{T, Matrix{T}}, rt2::T) where T
     A = symm_kron(similar(mat), vecs, rt2, upper_only = false)
     l = smat_to_svec!(zeros(T, size(mat, 1)), diff_mat, one(T))
-    mat .= A' * Diagonal(l) * A
+    mat .= A * Diagonal(l) * A'
     return mat
 end
 

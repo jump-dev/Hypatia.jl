@@ -340,83 +340,84 @@ vec_copy_to!(v1::AbstractVecOrMat{Complex{T}}, v2::AbstractVecOrMat{T}) where {T
 # TODO parallelize
 function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T; upper_only::Bool = true) where {T <: Real}
     side = size(mat, 1)
-    k = 1
-    @inbounds for j in 1:side
-        for i in 1:(j - 1)
-            k2 = 1
-            for j2 in 1:side
-                upper_only && k2 > k && continue
-                for i2 in 1:(j2 - 1)
-                    scal = (i == j ? 1 : rt2) * (i2 == j2 ? 1 : rt2) / 2
-                    H[k2, k] = scal * (mat[i, i2] * mat[j, j2] + mat[i, j2] * mat[j, i2])
-                    k2 += 1
+    col_idx = 1
+    @inbounds for l in 1:side
+        for k in 1:(l - 1)
+            row_idx = 1
+            for j in 1:side
+                upper_only && row_idx > col_idx && continue
+                for i in 1:(j - 1)
+                    scal = (i == j ? 1 : rt2) * (k == l ? 1 : rt2) / 2
+                    H[row_idx, col_idx] = scal * (mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k])
+                    row_idx += 1
                 end
-                H[k2, k] = rt2 * mat[i, j2] * mat[j, j2]
-                k2 += 1
+                H[row_idx, col_idx] = rt2 * mat[j, k] * mat[j, l]
+                row_idx += 1
             end
-            k += 1
+            col_idx += 1
         end
-        k2 = 1
-        for j2 in 1:side
-            upper_only && k2 > k && continue
-            for i2 in 1:(j2 - 1)
-                H[k2, k] = rt2 * mat[j, j2] * mat[j, i2]
-                k2 += 1
+        row_idx = 1
+        for j in 1:side
+            upper_only && row_idx > col_idx && continue
+            for i in 1:(j - 1)
+                H[row_idx, col_idx] = rt2 * mat[i, l] * mat[j, l]
+                row_idx += 1
             end
-            H[k2, k] = abs2(mat[j, j2])
-            k2 += 1
+            H[row_idx, col_idx] = abs2(mat[j, l])
+            row_idx += 1
         end
-        k += 1
+        col_idx += 1
     end
     return H
 end
 
+# TODO test output for non-Hermitian mat, the result may need transposing
 function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{Complex{T}}, rt2::T) where {T <: Real}
     side = size(mat, 1)
-    k = 1
+    col_idx = 1
     for i in 1:side, j in 1:i
-        k2 = 1
+        row_idx = 1
         if i == j
             @inbounds for i2 in 1:side, j2 in 1:i2
                 if i2 == j2
-                    H[k2, k] = abs2(mat[i2, i])
-                    k2 += 1
+                    H[row_idx, col_idx] = abs2(mat[i2, i])
+                    row_idx += 1
                 else
                     c = rt2 * mat[i, i2] * mat[j2, j]
-                    H[k2, k] = real(c)
-                    k2 += 1
-                    H[k2, k] = -imag(c)
-                    k2 += 1
+                    H[row_idx, col_idx] = real(c)
+                    row_idx += 1
+                    H[row_idx, col_idx] = -imag(c)
+                    row_idx += 1
                 end
-                if k2 > k
+                if row_idx > col_idx
                     break
                 end
             end
-            k += 1
+            col_idx += 1
         else
             @inbounds for i2 in 1:side, j2 in 1:i2
                 if i2 == j2
                     c = rt2 * mat[i2, i] * mat[j, j2]
-                    H[k2, k] = real(c)
-                    H[k2, k + 1] = -imag(c)
-                    k2 += 1
+                    H[row_idx, col_idx] = real(c)
+                    H[row_idx, col_idx + 1] = -imag(c)
+                    row_idx += 1
                 else
                     b1 = mat[i2, i] * mat[j, j2]
                     b2 = mat[j2, i] * mat[j, i2]
                     c1 = b1 + b2
-                    H[k2, k] = real(c1)
-                    H[k2, k + 1] = -imag(c1)
-                    k2 += 1
+                    H[row_idx, col_idx] = real(c1)
+                    H[row_idx, col_idx + 1] = -imag(c1)
+                    row_idx += 1
                     c2 = b1 - b2
-                    H[k2, k] = imag(c2)
-                    H[k2, k + 1] = real(c2)
-                    k2 += 1
+                    H[row_idx, col_idx] = imag(c2)
+                    H[row_idx, col_idx + 1] = real(c2)
+                    row_idx += 1
                 end
-                if k2 > k
+                if row_idx > col_idx
                     break
                 end
             end
-            k += 2
+            col_idx += 2
         end
     end
     return H
