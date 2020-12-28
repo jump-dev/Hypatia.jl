@@ -33,6 +33,7 @@ mutable struct EpiPerEntropy{T <: Real} <: Cone{T}
     lwv::Vector{T}
     tau::Vector{T}
     wi::Vector{T}
+    temp1::Vector{T}
     sigma::T
 
     function EpiPerEntropy{T}(
@@ -60,6 +61,7 @@ function setup_extra_data(cone::EpiPerEntropy{T}) where T
     cone.lwv = zeros(T, cone.w_dim)
     cone.tau = zeros(T, cone.w_dim)
     cone.wi = zeros(T, cone.w_dim)
+    cone.temp1 = zeros(T, cone.w_dim)
     return cone
 end
 
@@ -93,10 +95,11 @@ end
 
 function is_dual_feas(cone::EpiPerEntropy{T}) where T
     u = cone.dual_point[1]
-    v = cone.dual_point[2]
-    @views w = cone.dual_point[3:cone.dim]
     if u > eps(T)
-        return v - u * sum(exp(-wi ./ u - 1) for wi in w) > eps(T)
+        v = cone.dual_point[2]
+        @views w = cone.dual_point[3:cone.dim]
+        @. cone.temp1 = -w / u - 1
+        return v - u * sum(exp, cone.temp1) > eps(T)
     end
 
     return false

@@ -31,12 +31,15 @@ mutable struct EpiPerTraceEntropyTri{T <: Real} <: Cone{T}
 
     W::Matrix{T}
     Wi::Matrix{T}
+    dual_W::Matrix{T}
     fact_W
     z::T
     lwv::Matrix{T}
     tau::Matrix{T}
     sigma::T
     w_vals_log::Vector{T}
+    diff_mat::Matrix{T}
+    temp1::Vector{T}
 
     function EpiPerTraceEntropyTri{T}(
         dim::Int;
@@ -66,7 +69,10 @@ function setup_extra_data(cone::EpiPerTraceEntropyTri{T}) where T
     cone.lwv = zeros(T, cone.d, cone.d)
     cone.tau = zeros(T, cone.d, cone.d)
     cone.W = zeros(T, cone.d, cone.d)
+    cone.dual_W = zeros(T, cone.d, cone.d)
+    cone.diff_mat = zeros(T, cone.d, cone.d)
     cone.w_vals_log = zeros(T, cone.d)
+    cone.temp1 = zeros(T, cone.d)
     return cone
 end
 
@@ -97,7 +103,7 @@ function update_feas(cone::EpiPerTraceEntropyTri{T}) where T
         for i in 1:cone.d
             cone.lwv[i, i] -= lv
         end
-        cone.z = u - dot(W, Symmetric(cone.lwv))
+        cone.z = u - dot(W, Symmetric(cone.lwv, :U))
         cone.is_feas = (cone.z > eps(T))
     else
         cone.is_feas = false
@@ -109,10 +115,13 @@ end
 
 function is_dual_feas(cone::EpiPerTraceEntropyTri{T}) where T
     u = cone.dual_point[1]
-    v = cone.dual_point[2]
-    @views W = Hermitian(svec_to_smat!(similar(cone.point, cone.d, cone.d), cone.dual_point[3:cone.dim], cone.rt2), :U)
     if u > eps(T)
-        return v - u * tr(exp.(-W ./ u - I)) > eps(T)
+        v = cone.dual_point[2]
+        @views W = Hermitian(svec_to_smat!(cone.dual_W, cone.dual_point[3:cone.dim], cone.rt2), :U)
+        w_vals = eigvals!(W)
+        @. w_vals /= -u
+        @. w_vals -= 1
+        return v - u * sum(exp, w_vals) > eps(T)
     end
 
     return false
@@ -127,8 +136,12 @@ function update_grad(cone::EpiPerTraceEntropyTri)
     Wi = cone.Wi = inv(cone.fact_W)
     z = cone.z
     cone.sigma = tr(W) / v / z
-    cone.tau = (cone.lwv + I) / z
     tau = cone.tau
+    tau .= cone.lwv
+    for i in 1:cone.d
+        tau[i, i] += 1
+    end
+    @. tau /= z
     sigma = cone.sigma
 
     cone.grad[1] = -inv(z)
@@ -141,25 +154,25 @@ end
 
 function update_hess(cone::EpiPerTraceEntropyTri{T}) where T
     @assert cone.grad_updated
+    d = cone.d
     u = cone.point[1]
     v = cone.point[2]
     W = Hermitian(cone.W, :U)
     Wi = Hermitian(cone.Wi, :U)
+    diff_mat = cone.diff_mat
     z = cone.z
     tau = cone.tau
     sigma = cone.sigma
     H = cone.hess.data
 
     (w_vals, w_vecs) = cone.fact_W
-    d = cone.d
-    diff_mat = zeros(T, d, d)
     diff_mat!(diff_mat, w_vals, cone.w_vals_log)
-    diff_mat = Hermitian(diff_mat, :U)
 
     H[1, 1] = abs2(inv(z))
     H[1, 2] = sigma / z
-    @views smat_to_svec!(H[1, 3:end], -tau / z, cone.rt2)
-    H[2, 2] = abs2(sigma) + sigma / v + inv(v) / v
+    Huw = @views smat_to_svec!(H[1, 3:end], tau, cone.rt2)
+    @. Huw /= -z
+    H[2, 2] = abs2(sigma) - cone.grad[2] / v
     @views smat_to_svec!(H[2, 3:end], -sigma * tau - I / v / z, cone.rt2)
     @views symm_kron(H[3:end, 3:end], Wi, cone.rt2)
     tau_vec = smat_to_svec!(zeros(T, cone.dim - 2), tau, cone.rt2)
@@ -175,9 +188,54 @@ function update_hess(cone::EpiPerTraceEntropyTri{T}) where T
     return cone.hess
 end
 
+function correction(cone::EpiPerTraceEntropyTri{T}, primal_dir::AbstractVector{T}) where T
+    @assert cone.hess_updated
+    d = cone.d
+    sdim = cone.dim - 2
+    z = cone.z
+    sigma = cone.sigma
+    tau = cone.tau
+    (w_vals, w_vecs) = cone.fact_W
+    diff_mat = Symmetric(cone.diff_mat, :U)
 
-function correction(cone::EpiPerTraceEntropyTri , primal_dir::AbstractVector)
-    @assert cone.grad_updated
+    u = cone.point[1]
+    v = cone.point[2]
+    W = cone.W
+    u_dir = primal_dir[1]
+    v_dir = primal_dir[2]
+    @views W_dir = Symmetric(svec_to_smat!(zeros(T, d, d), primal_dir[3:cone.dim], cone.rt2), :U)
+    corr = cone.correction
+    @views w_corr = corr[3:cone.dim]
+    corr .= 0
+
+    Tuuu = -2 / z / z / z
+    Tuuv = -2 * sigma / z / z
+    Tuuw = 2 * tau / z / z
+    Tuvv = -2 * sigma ^ 2 / z - sigma / v / z
+    Tuvw = 2 * sigma * tau / z + I / v / z / z
+    Tvvv = -2 * sigma ^ 3 - 3 * sigma ^ 2 / v - 2 * sigma / v ^ 2 - 2 / v ^ 3
+    Tvvw = tau * (2 * sigma ^ 2 + sigma / v) + I * (1 / v / v / z + 2 * sigma / v / z)
+
+    corr[1] = Tuuu * u_dir ^ 2 + 2 * Tuuv * u_dir * v_dir + 2 * dot(Tuuw, W_dir) * u_dir +
+        Tuvv * v_dir ^ 2 + 2 * dot(Tuvw, W_dir) * v_dir
+
+    temp1 = w_vecs' * W_dir * w_vecs
+    temp2 = diff_mat .* temp1
+    temp3 = dot(temp1', temp2)
+
+    corr[1] += -2 * dot(tau, W_dir)^2 / z - temp3 / z ^ 2
+
+    corr[2] = Tuuv * u_dir ^ 2 + 2 * Tuvv * u_dir * v_dir + 2 * dot(Tuvw, W_dir) * u_dir +
+        Tvvv * v_dir ^ 2 + 2 * dot(Tvvw, W_dir) * v_dir
+
+
+    corr[2] -= dot(W_dir, tau * W_dir + W_dir * tau) / v / z + 2 * sigma * dot(tau, W_dir)^2 + sigma * temp3 / z
+
+    # W_corr = Tuuw * u_dir ^ 2 + 2 * Tuvw * u_dir * v_dir + Tvvw * v_dir ^ 2 + 
+    #     2 * u_dir * (-2 * tau * dot(tau, W_dir) / z - temp2 / z ^ 2) +
+    #     2 * v_dir * ()
+
+    corr ./= -2
 
     return corr
 end

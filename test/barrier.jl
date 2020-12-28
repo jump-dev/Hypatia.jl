@@ -65,6 +65,13 @@ function test_barrier_oracles(
     # end
 
     if Cones.use_correction(cone)
+        (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
+        Cones.grad(cone)
+        Cones.hess(cone)
+        corr = Cones.correction(cone, primal_dir)
+        barrier_dir(point, t) = barrier(point + t * primal_dir)
+        @test -2 * corr ≈ ForwardDiff.gradient(x -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(x, t), s), 0), point) atol=tol rtol=tol
+
         # check correction satisfies log-homog property F'''(s)[s, s] = -2F''(s) * s = 2F'(s)
         @test -Cones.correction(cone, point) ≈ grad atol=tol rtol=tol
         # check correction term agrees with directional 3rd derivative
@@ -214,7 +221,7 @@ function test_epiperentropy_barrier(T::Type{<:Real})
 end
 
 function test_epipertraceentropytri_barrier(T::Type{<:Real})
-    for side in [1, 2, 3, 15, 65, 75, 100]
+    for side in [1, 2, 3, 12, 20]
         dim = 2 + Cones.svec_length(side)
         function barrier(s)
             (u, v, w) = (s[1], s[2], s[3:end])
