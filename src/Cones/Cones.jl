@@ -505,7 +505,7 @@ function arrow_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, uu::T, 
     return prod
 end
 
-sqrt_pos(x::T) where {T <: Real} = sqrt(max(x, eps(T)))
+sqrt_pos(x::T) where {T <: Real} = sqrt(max(x, eps(T))) # TODO don't use - just turn off sqrt oracles if need to sqrt negative
 
 # factorize arrow matrix
 function arrow_sqrt(uu::T, uw::Vector{T}, ww::Vector{T}, rtuw::Vector{T}, rtww::Vector{T}) where {T <: Real}

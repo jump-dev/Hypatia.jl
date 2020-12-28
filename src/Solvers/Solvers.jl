@@ -209,7 +209,7 @@ mutable struct Solver{T <: Real}
     end
 end
 
-default_stepper(T) = HeurCombStepper{T}()
+default_stepper(T) = CombinedStepper{T}()
 default_system_solver(T) = QRCholDenseSystemSolver{T}()
 
 function solve(solver::Solver{T}) where {T <: Real}
@@ -428,6 +428,13 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         solver.status = IllPosed
         return true
     end
+
+
+
+
+
+# TODO use a counter instead of prev_is_slow and prev2_is_slow
+
 
     if expect_improvement(solver.stepper)
         max_improve = zero(T)

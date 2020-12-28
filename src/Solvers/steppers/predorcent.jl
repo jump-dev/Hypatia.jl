@@ -23,7 +23,6 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     end
 end
 
-# create the stepper cache
 function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
     if stepper.use_correction && !any(Cones.use_correction, model.cones)
@@ -36,8 +35,8 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     stepper.rhs = Point(model)
     stepper.dir = Point(model)
     stepper.res = Point(model)
+    stepper.dir_nocorr = Point(model, cones_only = true) # TODO probably don't need this AND dir
     if stepper.use_correction
-        stepper.dir_nocorr = Point(model, cones_only = true)
         stepper.dir_corr = Point(model, cones_only = true)
     end
     stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
@@ -51,26 +50,26 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     model = solver.model
     rhs = stepper.rhs
     dir = stepper.dir
+    dir_nocorr = stepper.dir_nocorr
 
     # update linear system solver factorization
     update_lhs(solver.system_solver, solver)
 
     # decide whether to predict or center
-    is_pred = (stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05))) # TODO tune, make option
+    is_pred = (stepper.prev_alpha > T(0.1)) && ((stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))) # TODO tune, make option
     stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
     rhs_fun_nocorr = (is_pred ? update_rhs_pred : update_rhs_cent)
 
     # get uncorrected direction
     rhs_fun_nocorr(solver, rhs)
     get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
+    copyto!(dir_nocorr.vec, dir.vec) # TODO maybe instead of copying, pass in the dir point we want into the directions function
     alpha = zero(T)
 
     if stepper.use_correction
         # get correction direction
         rhs_fun_corr = (is_pred ? update_rhs_predcorr : update_rhs_centcorr)
-        dir_nocorr = stepper.dir_nocorr
         dir_corr = stepper.dir_corr
-        copyto!(dir_nocorr.vec, dir.vec) # TODO maybe instead of copying, pass in the dir point we want into the directions function
         rhs_fun_corr(solver, rhs, dir)
         get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
         copyto!(dir_corr.vec, dir.vec)
@@ -80,7 +79,6 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         if iszero(alpha)
             # try not using correction
             @warn("very small alpha in curve search; trying without correction")
-            # copyto!(dir.vec, dir_nocorr.vec)
         else
             # step
             @. point.vec += alpha * dir_nocorr.vec + abs2(alpha) * dir_corr.vec
@@ -89,12 +87,24 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
 
     if iszero(alpha)
         # do line search in uncorrected direction
-        alpha = search_alpha(false, point, model, stepper)
+        alpha = search_alpha(false, point, model, stepper, min_alpha = T(1e-2))
+        if iszero(alpha) && is_pred
+            # do centering step instead
+            @warn("very small alpha in line search; trying centering")
+            update_rhs_cent(solver, rhs)
+            get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
+            copyto!(dir_nocorr.vec, dir.vec)
+            stepper.cent_count = 1
+
+            alpha = search_alpha(false, point, model, stepper)
+        end
+
         if iszero(alpha)
             @warn("very small alpha in line search; terminating")
             solver.status = NumericalFailure
             return false
         end
+
         # step
         @. point.vec += alpha * dir_nocorr.vec
     end

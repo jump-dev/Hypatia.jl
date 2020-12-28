@@ -60,6 +60,39 @@ function get_directions(
         norm_2 = norm_2_new
     end
 
+    # if norm_inf > solver.mu
+    #     @warn("bad residual on direction: $norm_inf")
+    #     for (k, cone_k) in enumerate(solver.model.cones)
+    #         # if norm(Cones.hess(cone_k) * Cones.inv_hess(cone_k) - I, Inf) > 1e-10
+    #         #     @show k
+    #         #     # @show cone_k.point
+    #         #     @show cone_k.z
+    #         #     @show cone_k.lwv
+    #         #     @show cone_k.grad
+    #         #     # @show cone_k.point[cone_k.v_idxs]
+    #         #     # @show cone_k.point[cone_k.w_idxs]
+    #         #     @show Cones.hess(cone_k) * cone_k.point + Cones.grad(cone_k)
+    #         @show dot(Cones.grad(cone_k), cone_k.point) + Cones.get_nu(cone_k)
+    #         # @show norm(Cones.hess(cone_k) * cone_k.point + Cones.grad(cone_k), Inf)
+    #         # @show norm(Cones.inv_hess(cone_k) * Cones.grad(cone_k) + cone_k.point, Inf)
+    #         temp = similar(cone_k.point)
+    #         @show cone_k.grad_updated
+    #         @show norm(Cones.hess_prod!(temp, cone_k.point, cone_k) + cone_k.grad, Inf)
+    #         @show norm(Cones.inv_hess_prod!(temp, cone_k.grad, cone_k) + cone_k.point, Inf)
+    #         @show norm(Cones.hess(cone_k) * Cones.inv_hess(cone_k) - I)
+    #         # end
+    #         if norm(Cones.hess(cone_k) * Cones.inv_hess(cone_k) - I, Inf) > 1e-10
+    #             @show Cones.hess(cone_k) * Cones.inv_hess(cone_k)
+    #         end
+    #     end
+    #     @show norm(res.x, Inf)
+    #     # @show norm(res.y, Inf)
+    #     # @show norm(res.z, Inf)
+    #     # @show norm(res.tau[1], Inf)
+    #     # @show norm(res.s, Inf)
+    #     # @show norm(res.kap[1], Inf)
+    # end
+    # println()
     @assert !isnan(norm_inf) # TODO error
 
     return dir

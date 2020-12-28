@@ -45,7 +45,7 @@ function update_rhs_predcorr(
         dot1 = dot(corr_k, cone_k.point)
         dot2 = irtrtmu * dot(prim_k_scal, H_prim_dir_k)
         corr_viol = abs(dot1 - dot2) / (rteps + abs(dot2))
-        if corr_viol < T(1e-3) # TODO tune
+        if corr_viol < T(1e-4) # TODO tune
             @. rhs.s_views[k] = H_prim_dir_k + corr_k
         # else
         #     @warn("pred corr viol: $corr_viol")
@@ -108,7 +108,7 @@ function update_rhs_centcorr(
         dot1 = dot(corr_k, cone_k.point)
         dot2 = dot(prim_k_scal, H_prim_dir_k_scal)
         corr_viol = abs(dot1 - dot2) / (rteps + abs(dot2))
-        if corr_viol < T(1e-3) # TODO tune
+        if corr_viol < T(1e-4) # TODO tune
             rhs.s_views[k] .= corr_k
         # else
         #     @warn("cent corr viol: $corr_viol")
@@ -124,5 +124,5 @@ function update_rhs_centcorr(
     return rhs
 end
 
-include("heurcomb.jl")
 include("predorcent.jl")
+include("combined.jl")
