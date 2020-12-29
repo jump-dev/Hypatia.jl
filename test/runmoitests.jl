@@ -24,21 +24,21 @@ include(joinpath(@__DIR__, "moi.jl"))
     end
 end
 
-default_options = (
-    # verbose = true,
-    verbose = false,
-    default_tol_relax = 2,
-    )
-
 @testset "MOI.Test tests" begin
     println("\nstarting MOI.Test tests")
     options = [
-        (Float64, false),
-        (Float64, true),
-        (Float32, true),
-        (BigFloat, true),
+        # (Float64, Solvers.PredOrCentStepper, false), # TODO
+        (Float64, Solvers.CombinedStepper, true),
+        (Float32, Solvers.CombinedStepper, true),
+        (BigFloat, Solvers.PredOrCentStepper, true),
         ]
-    for (T, use_dense_model) in options
+    for (T, stepper, use_dense_model) in options
+        default_options = (
+            # verbose = true,
+            verbose = false,
+            default_tol_relax = 2,
+            stepper = stepper{T}(),
+            )
         test_info = "$T, $use_dense_model"
         @testset "$test_info" begin
             println(test_info, " ...")

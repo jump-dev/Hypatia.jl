@@ -36,8 +36,7 @@ include("nonnegative.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")
 include("epipersquare.jl")
-include("episumperentropy.jl")
-include("epitracerelentropytri.jl")
+include("epirelentropy.jl")
 include("hypoperlog.jl")
 include("power.jl")
 include("hypopowermean.jl")
@@ -50,6 +49,7 @@ include("doublynonnegativetri.jl")
 include("matrixepipersquare.jl")
 include("hypoperlogdettri.jl")
 include("hyporootdettri.jl")
+include("epitracerelentropytri.jl")
 include("wsosinterpnonnegative.jl")
 include("wsosinterpepinormone.jl")
 include("wsosinterpepinormeucl.jl")
@@ -190,9 +190,6 @@ function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
     if use_heuristic_neighborhood(cone)
         nbhd = norm(vec1, Inf) / norm(g, Inf)
         # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(vec1, g)) # TODO try this neighborhood
-    # elseif Cones.use_sqrt_oracles(cone) # NOTE can force factorization when we don't need it - better to use inv hess prod
-    #     inv_hess_sqrt_prod!(vec2, vec1, cone)
-    #     nbhd = norm(vec2)
     else
         inv_hess_prod!(vec2, vec1, cone)
         nbhd_sqr = dot(vec2, vec1)
@@ -506,23 +503,31 @@ function arrow_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, uu::T, 
     return prod
 end
 
-sqrt_pos(x::T) where {T <: Real} = sqrt(max(x, eps(T)))
-
 # factorize arrow matrix
 function arrow_sqrt(uu::T, uw::Vector{T}, ww::Vector{T}, rtuw::Vector{T}, rtww::Vector{T}) where {T <: Real}
-    @. rtww = sqrt_pos(ww)
+    tol = sqrt(eps(T))
+    any(<(tol), ww) && return zero(T)
+    @. rtww = sqrt(ww)
     @. rtuw = uw / rtww
-    return sqrt_pos(uu - sum(abs2, rtuw))
+    diff = uu - sum(abs2, rtuw)
+    (diff < tol) && return zero(T)
+    return sqrt(diff)
 end
 
 # 2x2 block case
 function arrow_sqrt(uu::T, uv::Vector{T}, uw::Vector{T}, vv::Vector{T}, vw::Vector{T}, ww::Vector{T}, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
-    @. rtww = sqrt_pos(ww)
+    tol = sqrt(eps(T))
+    any(<(tol), ww) && return zero(T)
+    @. rtww = sqrt(ww)
     @. rtvw = vw / rtww
     @. rtuw = uw / rtww
-    @. rtvv = sqrt_pos(vv - abs2(rtvw))
+    @. rtuv = vv - abs2(rtvw)
+    any(<(tol), rtuv) && return zero(T)
+    @. rtvv = sqrt(rtuv)
     @. rtuv = (uv - rtvw * rtuw) / rtvv
-    return sqrt_pos(uu - sum(abs2, rtuv) - sum(abs2, rtuw))
+    diff = uu - sum(abs2, rtuv) - sum(abs2, rtuw)
+    (diff < tol) && return zero(T)
+    return sqrt(diff)
 end
 
 # lmul with lower Cholesky factor of arrow matrix

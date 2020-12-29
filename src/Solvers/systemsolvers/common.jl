@@ -21,11 +21,11 @@ function get_directions(
     rhs = stepper.rhs
     dir = stepper.dir
     dir_temp = stepper.dir_temp
-    res = stepper.res
+    res = stepper.temp
     system_solver = solver.system_solver
 
-    tau = solver.point.tau[1]
-    tau_scal = (use_nt ? solver.point.kap[1] : solver.mu / tau) / tau
+    tau = solver.point.tau[]
+    tau_scal = (use_nt ? solver.point.kap[] : solver.mu / tau) / tau
 
     solve_system(system_solver, solver, dir, rhs, tau_scal)
 
@@ -73,9 +73,9 @@ function apply_lhs(
     ) where {T <: Real}
     model = solver.model
     dir = stepper.dir
-    res = stepper.res
-    tau_dir = dir.tau[1]
-    kap_dir = dir.kap[1]
+    res = stepper.temp
+    tau_dir = dir.tau[]
+    kap_dir = dir.kap[]
 
     # A'*y + G'*z + c*tau
     copyto!(res.x, model.c)
@@ -84,7 +84,7 @@ function apply_lhs(
     @. res.z = model.h * tau_dir - dir.s
     mul!(res.z, model.G, dir.x, -1, true)
     # -c'*x - b'*y - h'*z - kap
-    res.tau[1] = -dot(model.c, dir.x) - dot(model.h, dir.z) - kap_dir
+    res.tau[] = -dot(model.c, dir.x) - dot(model.h, dir.z) - kap_dir
     # if p = 0, ignore A, b, y
     if !iszero(model.p)
         # A'*y + G'*z + c*tau
@@ -93,7 +93,7 @@ function apply_lhs(
         copyto!(res.y, model.b)
         mul!(res.y, model.A, dir.x, -1, tau_dir)
         # -c'*x - b'*y - h'*z - kap
-        res.tau[1] -= dot(model.b, dir.y)
+        res.tau[] -= dot(model.b, dir.y)
     end
 
     # s
@@ -105,9 +105,9 @@ function apply_lhs(
         @. s_res_k += dir.dual_views[k]
     end
 
-    res.kap[1] = tau_scal * tau_dir + kap_dir
+    res.kap[] = tau_scal * tau_dir + kap_dir
 
-    return stepper.res
+    return res
 end
 
 include("naive.jl")
@@ -145,7 +145,7 @@ function solve_system(
     model = solver.model
 
     solve_subsystem4(system_solver, solver, sol, rhs, tau_scal)
-    tau = sol.tau[1]
+    tau = sol.tau[]
 
     # lift to get s and kap
     # s = -G*x + h*tau - zrhs
@@ -153,7 +153,7 @@ function solve_system(
     mul!(sol.s, model.G, sol.x, -1, true)
 
     # kap = -kapbar/taubar*tau + kaprhs
-    sol.kap[1] = -tau_scal * tau + rhs.kap[1]
+    sol.kap[] = -tau_scal * tau + rhs.kap[]
 
     return sol
 end
@@ -178,13 +178,13 @@ function solve_subsystem4(
 
     # lift to get tau
     sol_const = system_solver.sol_const
-    tau_num = rhs.tau[1] + rhs.kap[1] + dot_obj(model, sol_sub)
+    tau_num = rhs.tau[] + rhs.kap[] + dot_obj(model, sol_sub)
     tau_denom = tau_scal - dot_obj(model, sol_const)
     sol_tau = tau_num / tau_denom
 
     dim3 = length(sol_sub.vec)
     @. @views sol.vec[1:dim3] = sol_sub.vec + sol_tau * sol_const.vec
-    sol.tau[1] = sol_tau
+    sol.tau[] = sol_tau
 
     return sol
 end
@@ -193,6 +193,7 @@ function setup_point_sub(system_solver::Union{QRCholSystemSolver{T}, SymIndefSys
     (n, p, q) = (model.n, model.p, model.q)
     dim_sub = n + p + q
     z_start = model.n + model.p
+
     sol_sub = system_solver.sol_sub = Point{T}()
     rhs_sub = system_solver.rhs_sub = Point{T}()
     rhs_const = system_solver.rhs_const = Point{T}()
@@ -207,6 +208,7 @@ function setup_point_sub(system_solver::Union{QRCholSystemSolver{T}, SymIndefSys
     @. rhs_const.x = -model.c
     @. rhs_const.y = model.b
     @. rhs_const.z = model.h
+
     return nothing
 end
 

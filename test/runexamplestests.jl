@@ -19,8 +19,9 @@ default_options = (
     verbose = false,
     # verbose = true,
     default_tol_relax = 10,
-    # stepper = Solvers.HeurCombStepper{Float64}()
-    # stepper = Solvers.PredOrCentStepper{Float64}()
+    stepper = Solvers.CombinedStepper{Float64}(),
+    # stepper = Solvers.PredOrCentStepper{Float64}(),
+    iter_limit = 250,
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)

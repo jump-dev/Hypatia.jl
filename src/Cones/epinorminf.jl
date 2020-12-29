@@ -25,6 +25,7 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_hess_updated::Bool
     hess_aux_updated::Bool
     hess_sqrt_aux_updated::Bool
+    use_hess_sqrt::Bool
     inv_hess_aux_updated::Bool
     is_feas::Bool
     hess::Symmetric{T, SparseMatrixCSC{T, Int}}
@@ -69,7 +70,12 @@ use_heuristic_neighborhood(cone::EpiNormInf) = false
 
 reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.hess_sqrt_aux_updated = cone.inv_hess_aux_updated = false)
 
-use_sqrt_oracles(cone::EpiNormInf) = true
+function use_sqrt_oracles(cone::EpiNormInf)
+    cone.use_hess_sqrt || return false
+    cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
+    !cone.use_hess_sqrt
+    return cone.use_hess_sqrt
+end
 
 # TODO only allocate the fields we use
 function setup_extra_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -93,6 +99,7 @@ function setup_extra_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} 
         cone.Hiuim = zeros(T, n)
         cone.idet = zeros(T, n)
     end
+    cone.use_hess_sqrt = true
     return cone
 end
 
@@ -109,7 +116,7 @@ function update_feas(cone::EpiNormInf{T}) where T
     u = cone.point[1]
     @views vec_copy_to!(cone.w, cone.point[2:end])
 
-    cone.is_feas = (u > eps(T) && abs2(u) - maximum(abs2, cone.w) > eps(T))
+    cone.is_feas = (u > eps(T) && u - norm(cone.w, Inf) > eps(T))
 
     cone.feas_updated = true
     return cone.is_feas
@@ -137,10 +144,9 @@ function update_grad(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where
     w = cone.w
     den = cone.den
 
-    @inbounds for (j, wj) in enumerate(w)
-        absw = abs(wj)
-        den[j] = T(0.5) * (u - absw) * (u + absw)
-    end
+    usqr = abs2(u)
+    @. den = usqr - abs2(w)
+    den .*= T(0.5)
     @. cone.uden = u / den
     @. cone.wden = w / den
     cone.grad[1] = (cone.n - 1) / u - sum(cone.uden)
@@ -236,6 +242,9 @@ function update_inv_hess_aux(cone::EpiNormInf{T}) where {T <: Real}
         schur += inv(u2pwj2)
     end
     cone.schur = schur
+    if schur < zero(T)
+        @warn("bad schur $schur")
+    end
 
     if cone.is_complex
         @. cone.idet = cone.Hrere * cone.Himim - abs2(cone.Hreim)
@@ -253,23 +262,22 @@ function update_inv_hess(cone::EpiNormInf{T}) where {T <: Real}
     Hi = cone.inv_hess.data
     wden = cone.wden
     u = cone.point[1]
+    schur = cone.schur
 
-    Hi[1, 1] = 1
+    Hi[1, 1] = inv(schur)
     @inbounds for j in 1:cone.n
         if cone.is_complex
-            Hi[1, 2j] = cone.Hiure[j]
-            Hi[1, 2j + 1] = cone.Hiuim[j]
+            Hi[2j, 1] = cone.Hiure[j]
+            Hi[2j + 1, 1] = cone.Hiuim[j]
         else
-            Hi[1, j + 1] = cone.Hiure[j]
+            Hi[j + 1, 1] = cone.Hiure[j]
         end
     end
+    @. Hi[1, 2:end] = Hi[2:end, 1] / schur
 
-    rtschur = sqrt_pos(cone.schur)
-    Hi[1, :] ./= rtschur
     @inbounds for j in 2:cone.dim, i in 2:j
-        Hi[i, j] = Hi[1, j] * Hi[1, i]
+        Hi[i, j] = Hi[j, 1] * Hi[1, i]
     end
-    Hi[1, :] ./= rtschur
 
     if cone.is_complex
         @inbounds for j in 1:cone.n
@@ -330,12 +338,13 @@ function update_hess_sqrt_aux(cone::EpiNormInf)
     else
         cone.rtuu = arrow_sqrt(cone.Huu, cone.Hure, cone.Hrere, cone.rture, cone.rtrere)
     end
+    cone.use_hess_sqrt = !iszero(cone.rtuu)
     cone.hess_sqrt_aux_updated = true
     return
 end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
+    @assert cone.hess_sqrt_aux_updated && cone.use_hess_sqrt
     if cone.is_complex
         return arrow_sqrt_prod(prod, arr, cone.rtuu, cone.rture, cone.rtuim, cone.rtrere, cone.rtreim, cone.rtimim)
     else
@@ -344,7 +353,7 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Ep
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
-    cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
+    @assert cone.hess_sqrt_aux_updated && cone.use_hess_sqrt
     if cone.is_complex
         return inv_arrow_sqrt_prod(prod, arr, cone.rtuu, cone.rture, cone.rtuim, cone.rtrere, cone.rtreim, cone.rtimim)
     else
