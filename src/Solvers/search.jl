@@ -36,8 +36,8 @@ function search_alpha(
     step_searcher = stepper.step_searcher
     for alpha in step_searcher.alpha_sched
         (alpha < min_alpha) && break # alpha is very small so finish
-        update_cone_points(alpha, point, stepper) || continue
-        check_cone_points(stepper.res, step_searcher, model) && return alpha
+        update_cone_points(alpha, point, stepper)
+        check_cone_points(stepper.temp, step_searcher, model) && return alpha
     end
     return zero(T)
 end
@@ -52,11 +52,13 @@ function check_cone_points(
     cones = model.cones
     max_nbhd = step_searcher.max_nbhd
 
+    taukap_cand = cand.tau[] * cand.kap[]
+    (min(cand.tau[], cand.kap[], taukap_cand) < eps(T)) && return false
+
     for k in cone_order
         skzk[k] = dot(cand.primal_views[k], cand.dual_views[k])
         (skzk[k] < eps(T)) && return false
     end
-    taukap_cand = cand.tau[1] * cand.kap[1]
     mu_cand = (sum(skzk) + taukap_cand) / step_searcher.nup1
     (mu_cand < eps(T)) && return false
 
@@ -124,8 +126,8 @@ end
 #     ) where {T <: Real}
 #     cones = model.cones
 #     cone_order = line_searcher.cone_order
-#     (tau, kap) = (point.tau[1], point.kap[1])
-#     (tau_dir, kap_dir) = (dir.tau[1], dir.kap[1])
+#     (tau, kap) = (point.tau[], point.kap[])
+#     (tau_dir, kap_dir) = (dir.tau[], dir.kap[])
 #     skzk = line_searcher.skzk
 #
 #     alpha_reduce = T(0.95) # TODO tune, maybe try smaller for pred_alpha since heuristic
@@ -226,8 +228,8 @@ end
 #
 #         @. cand.vec = point.vec + alpha * (dir_nocorr + alpha * dir_corr)
 #
-#         min(cand.tau[1], cand.kap[1]) < eps(T) && continue
-#         taukap_c = cand.tau[1] * cand.kap[1]
+#         min(cand.tau[], cand.kap[]) < eps(T) && continue
+#         taukap_c = cand.tau[] * cand.kap[]
 #         (taukap_c < eps(T)) && continue
 #         for k in eachindex(cones)
 #             skzk[k] = dot(cand.primal_views[k], cand.dual_views[k])

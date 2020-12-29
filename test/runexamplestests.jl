@@ -21,7 +21,6 @@ default_options = (
     default_tol_relax = 10,
     stepper = Solvers.CombinedStepper{Float64}(),
     # stepper = Solvers.PredOrCentStepper{Float64}(),
-    # system_solver = Solvers.SymIndefDenseSystemSolver{Float64}(),
     iter_limit = 250,
     )
 

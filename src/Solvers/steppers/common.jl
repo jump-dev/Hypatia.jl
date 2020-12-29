@@ -10,13 +10,13 @@ function update_rhs_pred(
     rhs.x .= solver.x_residual
     rhs.y .= solver.y_residual
     rhs.z .= solver.z_residual
-    rhs.tau[1] = solver.point.kap[1] + solver.primal_obj_t - solver.dual_obj_t
+    rhs.tau[] = solver.point.kap[] + solver.primal_obj_t - solver.dual_obj_t
 
     for (s_k, d_k) in zip(rhs.s_views, solver.point.dual_views)
         @. s_k = -d_k
     end
 
-    rhs.kap[1] = -solver.point.kap[1]
+    rhs.kap[] = -solver.point.kap[]
 
     return rhs
 end
@@ -53,7 +53,7 @@ function update_rhs_predcorr(
     end
 
     # TODO NT way:
-    rhs.kap[1] = dir.tau[1] * dir.kap[1] / solver.point.tau[1]
+    rhs.kap[] = dir.tau[] * dir.kap[] / solver.point.tau[]
     # TODO SY way:
     # tau_dir_tau = dir.tau / solver.point.tau
     # rhs[end] = tau_dir_tau * solver.mu / solver.point.tau * (1 + tau_dir_tau)
@@ -69,7 +69,7 @@ function update_rhs_cent(
     rhs.x .= 0
     rhs.y .= 0
     rhs.z .= 0
-    rhs.tau[1] = 0
+    rhs.tau[] = 0
 
     rtmu = sqrt(solver.mu)
     for (k, cone_k) in enumerate(solver.model.cones)
@@ -79,7 +79,7 @@ function update_rhs_cent(
     end
 
     # kap
-    rhs.kap[1] = -solver.point.kap[1] + solver.mu / solver.point.tau[1]
+    rhs.kap[] = -solver.point.kap[] + solver.mu / solver.point.tau[]
 
     return rhs
 end
@@ -118,8 +118,8 @@ function update_rhs_centcorr(
     # TODO NT way:
     # rhs.kap = dir.tau * dir.kap / solver.point.tau
     # TODO SY way:
-    tau_dir_tau = dir.tau[1] / solver.point.tau[1]
-    rhs.kap[1] = tau_dir_tau * solver.mu / solver.point.tau[1] * tau_dir_tau
+    tau_dir_tau = dir.tau[] / solver.point.tau[]
+    rhs.kap[] = tau_dir_tau * solver.mu / solver.point.tau[] * tau_dir_tau
 
     return rhs
 end

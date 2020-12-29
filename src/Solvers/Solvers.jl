@@ -256,8 +256,8 @@ function solve(solver::Solver{T}) where {T <: Real}
         point.y .= init_y
         point.z .= init_z
         point.s .= init_s
-        point.tau[1] = one(T)
-        point.kap[1] = one(T)
+        point.tau[] = one(T)
+        point.kap[] = one(T)
         calc_mu(solver)
         if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
             @warn("initial mu is $(solver.mu) but should be 1 (this could indicate a problem with cone barrier oracles)")
@@ -307,8 +307,8 @@ function solve(solver::Solver{T}) where {T <: Real}
 
             step(stepper, solver) || break
 
-            if point.tau[1] <= zero(T) || point.kap[1] <= zero(T) || solver.mu <= zero(T)
-                @warn("numerical failure: tau is $(point.tau[1]), kappa is $(point.kap[1]), mu is $(solver.mu); terminating")
+            if point.tau[] <= zero(T) || point.kap[] <= zero(T) || solver.mu <= zero(T)
+                @warn("numerical failure: tau is $(point.tau[]), kappa is $(point.kap[]), mu is $(solver.mu); terminating")
                 solver.status = NumericalFailure
                 break
             end
@@ -332,14 +332,14 @@ end
 
 function calc_mu(solver::Solver{T}) where {T <: Real}
     point = solver.point
-    solver.mu = (dot(point.z, point.s) + point.tau[1] * point.kap[1]) / (solver.model.nu + 1)
+    solver.mu = (dot(point.z, point.s) + point.tau[] * point.kap[]) / (solver.model.nu + 1)
     return solver.mu
 end
 
 function calc_residual(solver::Solver{T}) where {T <: Real}
     model = solver.model
     point = solver.point
-    tau = point.tau[1]
+    tau = point.tau[]
 
     # x_residual = -A'*y - G'*z - c*tau
     x_residual = solver.x_residual
@@ -379,8 +379,8 @@ function calc_convergence_params(solver::Solver{T}) where {T <: Real}
 
     solver.primal_obj_t = dot(model.c, point.x)
     solver.dual_obj_t = -dot(model.b, point.y) - dot(model.h, point.z)
-    solver.primal_obj = solver.primal_obj_t / solver.point.tau[1] + model.obj_offset
-    solver.dual_obj = solver.dual_obj_t / solver.point.tau[1] + model.obj_offset
+    solver.primal_obj = solver.primal_obj_t / solver.point.tau[] + model.obj_offset
+    solver.dual_obj = solver.dual_obj_t / solver.point.tau[] + model.obj_offset
     solver.gap = dot(point.z, point.s)
 
     solver.x_feas = solver.x_norm_res * solver.x_conv_tol
@@ -393,7 +393,7 @@ end
 function check_convergence(solver::Solver{T}) where {T <: Real}
     # check convergence criteria
     # TODO nearly primal or dual infeasible or nearly optimal cases?
-    tau = solver.point.tau[1]
+    tau = solver.point.tau[]
     primal_obj_t = solver.primal_obj_t
     dual_obj_t = solver.dual_obj_t
 
@@ -423,7 +423,7 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
     end
 
     # TODO experiment with ill-posedness check
-    if solver.mu <= solver.tol_infeas && tau <= solver.tol_infeas * min(one(T), solver.point.kap[1])
+    if solver.mu <= solver.tol_infeas && tau <= solver.tol_infeas * min(one(T), solver.point.kap[])
         solver.verbose && println("ill-posedness detected; terminating")
         solver.status = IllPosed
         return true
@@ -494,8 +494,8 @@ get_z(solver::Solver) = copy(solver.result.z)
 get_x(solver::Solver) = copy(solver.result.x)
 get_y(solver::Solver) = copy(solver.result.y)
 
-get_tau(solver::Solver) = solver.point.tau[1]
-get_kappa(solver::Solver) = solver.point.kap[1]
+get_tau(solver::Solver) = solver.point.tau[]
+get_kappa(solver::Solver) = solver.point.kap[]
 get_mu(solver::Solver) = solver.mu
 
 function load(solver::Solver{T}, model::Models.Model{T}) where {T <: Real}

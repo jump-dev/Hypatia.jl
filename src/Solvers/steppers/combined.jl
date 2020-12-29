@@ -7,7 +7,7 @@ mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     prev_alpha::T
     rhs::Point{T}
     dir::Point{T}
-    res::Point{T} # TODO rename if used for cand and res
+    temp::Point{T}
     dir_cent::Point{T}
     dir_centcorr::Point{T}
     dir_pred::Point{T}
@@ -36,12 +36,12 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.prev_alpha = one(T)
     stepper.rhs = Point(model)
     stepper.dir = Point(model)
-    stepper.res = Point(model)
-    stepper.dir_cent = Point(model, cones_only = true)
-    stepper.dir_pred = Point(model, cones_only = true)
+    stepper.temp = Point(model)
+    stepper.dir_cent = Point(model, ztsk_only = true)
+    stepper.dir_pred = Point(model, ztsk_only = true)
     if stepper.use_correction
-        stepper.dir_centcorr = Point(model, cones_only = true)
-        stepper.dir_predcorr = Point(model, cones_only = true)
+        stepper.dir_centcorr = Point(model, ztsk_only = true)
+        stepper.dir_predcorr = Point(model, ztsk_only = true)
     end
     stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
     stepper.step_searcher = StepSearcher{T}(model)
@@ -106,12 +106,15 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
             @. point.vec += alpha * dir_cent.vec
         else
             # step
-            @. point.vec += alpha * dir_pred.vec + (1 - alpha) * dir_cent.vec
+            alpha_m1 = 1 - alpha
+            @. point.vec += alpha * dir_pred.vec + alpha_m1 * dir_cent.vec
         end
     else
         # step
-        cent = 1 - alpha
-        @. point.vec += alpha * (dir_pred.vec + alpha * dir_predcorr.vec) + cent * (dir_cent.vec + cent * dir_centcorr.vec)
+        alpha_sqr = abs2(alpha)
+        alpha_m1 = 1 - alpha
+        alpha_m1sqr = abs2(alpha_m1)
+        @. point.vec += alpha * dir_pred.vec + alpha_sqr * dir_predcorr.vec + alpha_m1 * dir_cent.vec + alpha_m1sqr * dir_centcorr.vec
     end
 
     stepper.prev_alpha = alpha
@@ -127,29 +130,26 @@ function update_cone_points(
     point::Point{T},
     stepper::CombinedStepper{T}
     ) where {T <: Real}
-    cand = stepper.res # TODO rename
+    cand = stepper.temp # TODO rename
     dir_cent = stepper.dir_cent
-    dir_centcorr = stepper.dir_centcorr
     dir_pred = stepper.dir_pred
-    dir_predcorr = stepper.dir_predcorr
 
-    # TODO check tau, kap, then update in one line entire z,t,s,k with a view in point
-    # TODO only s,z,t,k
     if stepper.cent_only
-        @assert stepper.uncorr_only # TODO
-        @. cand.vec = point.vec + alpha * dir_cent.vec
+        @assert stepper.uncorr_only
+        @. cand.ztsk = point.ztsk + alpha * dir_cent.ztsk
     elseif stepper.uncorr_only
-        @. cand.vec = point.vec + alpha * dir_pred.vec + (1 - alpha) * dir_cent.vec
+        alpha_m1 = 1 - alpha
+        @. cand.ztsk = point.ztsk + alpha * dir_pred.ztsk + alpha_m1 * dir_cent.ztsk
     else
-        cent = 1 - alpha
-        @. cand.vec = point.vec + alpha * (dir_pred.vec + alpha * dir_predcorr.vec) + cent * (dir_cent.vec + cent * dir_centcorr.vec)
+        dir_centcorr = stepper.dir_centcorr
+        dir_predcorr = stepper.dir_predcorr
+        alpha_sqr = abs2(alpha)
+        alpha_m1 = 1 - alpha
+        alpha_m1sqr = abs2(alpha_m1)
+        @. cand.ztsk = point.ztsk + alpha * dir_pred.ztsk + alpha_sqr * dir_predcorr.ztsk + alpha_m1 * dir_cent.ztsk + alpha_m1sqr * dir_centcorr.ztsk
     end
 
-    tau_c = cand.tau[1]
-    kap_c = cand.kap[1]
-    (min(tau_c, kap_c, tau_c * kap_c) < eps(T)) && return false
-
-    return true
+    return
 end
 
 # TODO refac
@@ -163,7 +163,7 @@ function print_iteration_stats(stepper::CombinedStepper{T}, solver::Solver{T}) w
                 )
             @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
                 solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
-                solver.x_feas, solver.z_feas, solver.point.tau[1], solver.point.kap[1], solver.mu
+                solver.x_feas, solver.z_feas, solver.point.tau[], solver.point.kap[], solver.mu
                 )
         else
             @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %5s %9s\n",
@@ -173,7 +173,7 @@ function print_iteration_stats(stepper::CombinedStepper{T}, solver::Solver{T}) w
                 )
             @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
                 solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
-                solver.x_feas, solver.y_feas, solver.z_feas, solver.point.tau[1], solver.point.kap[1], solver.mu
+                solver.x_feas, solver.y_feas, solver.z_feas, solver.point.tau[], solver.point.kap[], solver.mu
                 )
         end
     else
@@ -181,13 +181,13 @@ function print_iteration_stats(stepper::CombinedStepper{T}, solver::Solver{T}) w
         if iszero(solver.model.p)
             @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %5s %9.2e\n",
                 solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
-                solver.x_feas, solver.z_feas, solver.point.tau[1], solver.point.kap[1], solver.mu,
+                solver.x_feas, solver.z_feas, solver.point.tau[], solver.point.kap[], solver.mu,
                 step, stepper.prev_alpha,
                 )
         else
             @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %5s %9.2e\n",
                 solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
-                solver.x_feas, solver.y_feas, solver.z_feas, solver.point.tau[1], solver.point.kap[1], solver.mu,
+                solver.x_feas, solver.y_feas, solver.z_feas, solver.point.tau[], solver.point.kap[], solver.mu,
                 step, stepper.prev_alpha,
                 )
         end
