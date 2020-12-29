@@ -106,10 +106,12 @@ function test_grad_hess(cone::Cones.Cone{T}, point::Vector{T}, dual_point::Vecto
     @test Cones.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
     @test Cones.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
 
-    prod_mat2 = Matrix(Cones.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
-    @test Cones.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
-    Cones.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
-    @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+    if Cones.use_sqrt_oracles(cone)
+        prod_mat2 = Matrix(Cones.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
+        @test Cones.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+        Cones.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+        @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+    end
 
     return
 end
@@ -237,16 +239,16 @@ function test_epipertraceentropytri_barrier(T::Type{<:Real})
     return
 end
 
-function test_episumperentropy_barrier(T::Type{<:Real})
+function test_epirelentropy_barrier(T::Type{<:Real})
     function barrier(s)
         (u, v, w) = (s[1], s[2:2:(end - 1)], s[3:2:end])
         return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) - sum(log(vi) + log(wi) for (vi, wi) in zip(v, w))
     end
     for w_dim in [1, 2, 3]
-        test_barrier_oracles(Cones.EpiSumPerEntropy{T}(1 + 2 * w_dim), barrier, init_tol = 1e-5)
+        test_barrier_oracles(Cones.EpiRelEntropy{T}(1 + 2 * w_dim), barrier, init_tol = 1e-5)
     end
     for w_dim in [15, 65, 75, 100]
-        test_barrier_oracles(Cones.EpiSumPerEntropy{T}(1 + 2 * w_dim), barrier, init_tol = 1e-1, init_only = true)
+        test_barrier_oracles(Cones.EpiRelEntropy{T}(1 + 2 * w_dim), barrier, init_tol = 1e-1, init_only = true)
     end
     return
 end
@@ -319,6 +321,7 @@ function test_epitracerelentropytri_barrier(T::Type{<:Real})
     rt2 = sqrt(T(2))
     for side in [1, 2, 3, 8, 12]
         svec_dim = Cones.svec_length(side)
+        cone = Cones.EpiTraceRelEntropyTri{T}(2 * svec_dim + 1)
         function barrier(s)
             u = s[1]
             u = s[1]
@@ -327,9 +330,9 @@ function test_epitracerelentropytri_barrier(T::Type{<:Real})
             return -log(u - tr(W * logm(W) - W * logm(V))) - logdet(V) - logdet(W)
         end
         if side <= 3
-            test_barrier_oracles(Cones.EpiTraceRelEntropyTri{T}(2 * svec_dim + 1), barrier, init_tol = 1e-5)
+            test_barrier_oracles(cone, barrier, init_tol = 1e-5)
         else
-            test_barrier_oracles(Cones.EpiTraceRelEntropyTri{T}(2 * svec_dim + 1), barrier, init_tol = 1e-1, init_only = true)
+            test_barrier_oracles(cone, barrier, init_tol = 1e-1, init_only = true)
         end
     end
     return

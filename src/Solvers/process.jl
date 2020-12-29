@@ -350,7 +350,7 @@ function postprocess(solver::Solver{T}) where {T <: Real}
     if in(solver.status, (PrimalInfeasible, DualInfeasible))
         tau = true
     else
-        tau = point.tau[1]
+        tau = point.tau[]
         if tau <= 0
             result.vec .= NaN
             return nothing

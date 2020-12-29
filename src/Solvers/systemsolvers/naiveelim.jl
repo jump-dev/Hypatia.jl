@@ -61,7 +61,7 @@ function solve_subsystem4(
         end
     end
     # -c'x - b'y - h'z + kapbar/taubar*tau = taurhs + kaprhs
-    rhs_sub.vec[end] += rhs.kap[1]
+    rhs_sub.vec[end] += rhs.kap[]
 
     sol_sub = system_solver.sol_sub
     solve_inner_system(system_solver, sol_sub, rhs_sub)
@@ -187,7 +187,7 @@ function update_lhs(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
             @views copyto!(system_solver.lhs_sub.nzval[system_solver.hess_idxs[k][j]], H_k[nz_rows, j])
         end
     end
-    tau = solver.point.tau[1]
+    tau = solver.point.tau[]
     system_solver.lhs_sub.nzval[end] = solver.mu / tau / tau # NOTE: mismatch when using NT for kaptau
 
     update_fact(system_solver.fact_cache, system_solver.lhs_sub)
@@ -254,7 +254,7 @@ function update_lhs(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver
             @views Cones.hess_prod!(lhs_sub[z_rows_k, end], model.h[idxs_k], cone_k)
         end
     end
-    tau = solver.point.tau[1]
+    tau = solver.point.tau[]
     lhs_sub[end, end] = solver.mu / tau / tau # NOTE: mismatch when using NT for kaptau
 
     update_fact(system_solver.fact_cache, system_solver.lhs_sub)

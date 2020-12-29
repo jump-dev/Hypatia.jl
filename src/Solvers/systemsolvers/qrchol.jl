@@ -248,7 +248,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
             load_matrix(system_solver.fact_cache, system_solver.lhs1)
         else
             # attempt recovery
-            increase_diag!(system_solver.lhs1)
+            increase_diag!(system_solver.lhs1.data)
         end
         if !update_fact(system_solver.fact_cache, system_solver.lhs1)
             # attempt recovery # TODO make more efficient
