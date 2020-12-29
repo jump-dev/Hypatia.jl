@@ -438,13 +438,6 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         return true
     end
 
-
-
-
-
-# TODO use a counter instead of prev_is_slow and prev2_is_slow
-
-
     if expect_improvement(solver.stepper)
         max_improve = zero(T)
         for (curr, prev) in ((solver.gap, solver.prev_gap), (solver.x_feas, solver.prev_x_feas), (solver.y_feas, solver.prev_y_feas), (solver.z_feas, solver.prev_z_feas))
