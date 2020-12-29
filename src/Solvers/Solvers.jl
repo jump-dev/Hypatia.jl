@@ -284,13 +284,19 @@ function solve(solver::Solver{T}) where {T <: Real}
         load(stepper, solver)
         load(solver.system_solver, solver)
 
+        print_header(stepper, solver)
+        flush(stdout)
+
         # iterate from initial point
         while true
             calc_residual(solver)
 
             calc_convergence_params(solver)
 
-            solver.verbose && print_iteration_stats(stepper, solver)
+            if solver.verbose
+                print_iteration(stepper, solver)
+                flush(stdout)
+            end
 
             check_convergence(solver) && break
 
@@ -306,6 +312,7 @@ function solve(solver::Solver{T}) where {T <: Real}
             end
 
             step(stepper, solver) || break
+            flush(stdout)
 
             if point.tau[] <= zero(T) || point.kap[] <= zero(T) || solver.mu <= zero(T)
                 @warn("numerical failure: tau is $(point.tau[]), kappa is $(point.kap[]), mu is $(solver.mu); terminating")
@@ -313,6 +320,7 @@ function solve(solver::Solver{T}) where {T <: Real}
                 break
             end
 
+            flush(stdout)
             solver.num_iters += 1
         end
 
@@ -326,6 +334,7 @@ function solve(solver::Solver{T}) where {T <: Real}
     free_memory(solver.system_solver)
 
     solver.verbose && println("\nstatus is $(solver.status) after $(solver.num_iters) iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
+    flush(stdout)
 
     return solver
 end

@@ -124,5 +124,33 @@ function update_rhs_centcorr(
     return rhs
 end
 
+function print_header(stepper::Stepper, solver::Solver)
+    @printf("\n%5s %12s %12s %9s %9s ", "iter", "p_obj", "d_obj", "abs_gap", "x_feas")
+    if !iszero(solver.model.p)
+        @printf("%9s ", "y_feas")
+    end
+    @printf("%9s %9s %9s %9s ", "z_feas", "tau", "kap", "mu")
+    print_header_more(stepper, solver)
+    println()
+    return
+end
+print_header_more(stepper::Stepper, solver::Solver) = nothing
+
+function print_iteration(stepper::Stepper, solver::Solver)
+    @printf("%5d %12.4e %12.4e %9.2e %9.2e ",
+        solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap, solver.x_feas
+        )
+    if !iszero(solver.model.p)
+        @printf("%9.2e ", solver.y_feas)
+    end
+    @printf("%9.2e %9.2e %9.2e %9.2e ",
+        solver.z_feas, solver.point.tau[], solver.point.kap[], solver.mu
+        )
+    print_iteration_more(stepper, solver)
+    println()
+    return
+end
+print_iteration_more(stepper::Stepper, solver::Solver) = nothing
+
 include("predorcent.jl")
 include("combined.jl")

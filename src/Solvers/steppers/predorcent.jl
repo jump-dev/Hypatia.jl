@@ -126,7 +126,7 @@ function update_cone_points(
     point::Point{T},
     stepper::PredOrCentStepper{T}
     ) where {T <: Real}
-    cand = stepper.temp # TODO rename
+    cand = stepper.temp
     dir_nocorr = stepper.dir_nocorr
 
     if stepper.uncorr_only
@@ -140,45 +140,10 @@ function update_cone_points(
     return
 end
 
-function print_iteration_stats(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
-    if iszero(solver.num_iters)
-        if iszero(solver.model.p)
-            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %5s %9s\n",
-                "iter", "p_obj", "d_obj", "abs_gap",
-                "x_feas", "z_feas", "tau", "kap", "mu",
-                "step", "alpha",
-                )
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
-                solver.x_feas, solver.z_feas, solver.point.tau[], solver.point.kap[], solver.mu
-                )
-        else
-            @printf("\n%5s %12s %12s %9s %9s %9s %9s %9s %9s %9s %5s %9s\n",
-                "iter", "p_obj", "d_obj", "abs_gap",
-                "x_feas", "y_feas", "z_feas", "tau", "kap", "mu",
-                "step", "alpha",
-                )
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e\n",
-                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
-                solver.x_feas, solver.y_feas, solver.z_feas, solver.point.tau[], solver.point.kap[], solver.mu
-                )
-        end
-    else
-        step = (iszero(stepper.cent_count) ? "pred" : "cent")
-        if iszero(solver.model.p)
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %5s %9.2e\n",
-                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
-                solver.x_feas, solver.z_feas, solver.point.tau[], solver.point.kap[], solver.mu,
-                step, stepper.prev_alpha,
-                )
-        else
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %5s %9.2e %9.2e\n",
-                solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
-                solver.x_feas, solver.y_feas, solver.z_feas, solver.point.tau[], solver.point.kap[], solver.mu,
-                step, stepper.prev_alpha,
-                )
-        end
-    end
-    flush(stdout)
+print_header_more(stepper::PredOrCentStepper, solver::Solver) = @printf("%5s %9s", "step", "alpha")
+
+function print_iteration_more(stepper::PredOrCentStepper, solver::Solver)
+    step = (iszero(stepper.cent_count) ? "pred" : "cent")
+    @printf("%5s %9.2e", step, stepper.prev_alpha)
     return
 end
