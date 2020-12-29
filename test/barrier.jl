@@ -99,11 +99,12 @@ function test_grad_hess(cone::Cones.Cone{T}, point::Vector{T}, dual_point::Vecto
     @test Cones.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
     @test Cones.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
 
-    @test Cones.use_sqrt_oracles(cone)
-    prod_mat2 = Matrix(Cones.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
-    @test Cones.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
-    Cones.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
-    @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+    if Cones.use_sqrt_oracles(cone)
+        prod_mat2 = Matrix(Cones.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
+        @test Cones.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+        Cones.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+        @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+    end
 
     return
 end

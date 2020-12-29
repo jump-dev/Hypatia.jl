@@ -135,7 +135,7 @@ reset_data(cone::WSOSInterpEpiNormOne) = (cone.feas_updated = cone.grad_updated 
 
 get_nu(cone::WSOSInterpEpiNormOne) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
 
-use_sqrt_oracles(::WSOSInterpEpiNormOne) = false
+use_sqrt_oracles(::WSOSInterpEpiNormOne) = false # Hessian is block sparse
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormOne)
     @views arr[1:cone.U] .= 1
