@@ -28,10 +28,12 @@ end
 
 function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
-    if stepper.use_correction && !any(Cones.use_correction, model.cones)
-        # model has no cones that use correction
-        stepper.use_correction = false
-    end
+    # TODO allow no correction
+    # if stepper.use_correction && !any(Cones.use_correction, model.cones)
+    #     # model has no cones that use correction
+    #     stepper.use_correction = false
+    # end
+    @assert stepper.use_correction
 
     stepper.prev_alpha = one(T)
     stepper.rhs = Point(model)

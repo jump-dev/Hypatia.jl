@@ -9,17 +9,18 @@ by L. Faybusovich and C. Zhou
 uses the log-homogeneous but not self-concordant barrier
 -log(u - tr(W * log(W) - W * log(V))) - logdet(W) - logdet(V)
 
-TODO allocations
+TODO reduce allocations
 =#
 
 mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
+    use_heuristic_neighborhood::Bool
     dim::Int
-    rt2::T
     d::Int
+    rt2::T
+
     point::Vector{T}
     dual_point::Vector{T}
-
     grad::Vector{T}
     correction::Vector{T}
     vec1::Vector{T}
@@ -34,6 +35,7 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
 
+    # TODO type fields
     V
     W
     Vi
@@ -59,11 +61,13 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     function EpiTraceRelEntropyTri{T}(
         dim::Int;
         use_dual::Bool = false,
+        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim > 2
         cone = new{T}()
         cone.use_dual_barrier = use_dual
+        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim
         cone.vw_dim = div(dim - 1, 2)
         cone.d = round(Int, sqrt(0.25 + 2 * cone.vw_dim) - 0.5)
@@ -72,9 +76,7 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     end
 end
 
-use_correction(::EpiTraceRelEntropyTri) = false
-
-use_heuristic_neighborhood(::EpiTraceRelEntropyTri) = false
+use_correction(::EpiTraceRelEntropyTri) = false # TODO
 
 # TODO only allocate the fields we use
 function setup_extra_data(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
@@ -130,38 +132,29 @@ function update_feas(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     vw_dim = cone.vw_dim
     @views V = Hermitian(svec_to_smat!(cone.V, point[cone.V_idxs], cone.rt2), :U)
     @views W = Hermitian(svec_to_smat!(cone.W, point[cone.W_idxs], cone.rt2), :U)
+
+    cone.is_feas = false
     (V_vals, V_vecs) = cone.V_fact = eigen(V)
-    (W_vals, W_vecs) = cone.W_fact = eigen(W)
-    if isposdef(cone.V_fact) && isposdef(cone.W_fact)
-        @. cone.V_vals_log = log(V_vals)
-        @. cone.W_vals_log = log(W_vals)
-        mul!(cone.tmp, V_vecs, Diagonal(cone.V_vals_log))
-        V_log = mul!(cone.V_log, cone.tmp, V_vecs')
-        mul!(cone.tmp, W_vecs, Diagonal(cone.W_vals_log))
-        W_log = mul!(cone.W_log, cone.tmp, W_vecs')
-        @. cone.WV_log = W_log - V_log
-        cone.z = point[1] - dot(W, Hermitian(cone.WV_log, :U))
-        cone.is_feas = (cone.z > 0)
-    else
-        cone.is_feas = false
+    if isposdef(cone.V_fact)
+        (W_vals, W_vecs) = cone.W_fact = eigen(W)
+        if isposdef(cone.W_fact)
+            @. cone.V_vals_log = log(V_vals)
+            @. cone.W_vals_log = log(W_vals)
+            mul!(cone.tmp, V_vecs, Diagonal(cone.V_vals_log))
+            V_log = mul!(cone.V_log, cone.tmp, V_vecs')
+            mul!(cone.tmp, W_vecs, Diagonal(cone.W_vals_log))
+            W_log = mul!(cone.W_log, cone.tmp, W_vecs')
+            @. cone.WV_log = W_log - V_log
+            cone.z = point[1] - dot(W, Hermitian(cone.WV_log, :U))
+            cone.is_feas = (cone.z > 0)
+        end
     end
+
     cone.feas_updated = true
     return cone.is_feas
 end
 
 is_dual_feas(::EpiTraceRelEntropyTri) = true
-
-function diff_mat!(mat::Matrix{T}, vals::Vector{T}, log_vals::Vector{T}) where T
-    rteps = sqrt(eps(T))
-    for j in eachindex(vals)
-        (vj, lvj) = (vals[j], log_vals[j])
-        for i in 1:j
-            (vi, lvi) = (vals[i], log_vals[i])
-            mat[i, j] = (abs(vi - vj) < rteps ? inv(vi) : (lvi - lvj) / (vi - vj))
-        end
-    end
-    return mat
-end
 
 function update_grad(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     @assert cone.is_feas
@@ -265,15 +258,27 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     return cone.hess
 end
 
+function diff_mat!(mat::Matrix{T}, vals::Vector{T}, log_vals::Vector{T}) where {T <: Real}
+    rteps = sqrt(eps(T))
+    for j in eachindex(vals)
+        (vj, lvj) = (vals[j], log_vals[j])
+        for i in 1:j
+            (vi, lvi) = (vals[i], log_vals[i])
+            mat[i, j] = (abs(vi - vj) < rteps ? inv(vi) : (lvi - lvj) / (vi - vj))
+        end
+    end
+    return mat
+end
+
 # TODO optimize
-function grad_logm!(mat::Matrix{T}, vecs::Matrix{T}, diff_mat::Hermitian{T, Matrix{T}}, rt2::T) where T
+function grad_logm!(mat::Matrix{T}, vecs::Matrix{T}, diff_mat::Hermitian{T, Matrix{T}}, rt2::T) where {T <: Real}
     A = symm_kron(similar(mat), vecs, rt2, upper_only = false)
     l = smat_to_svec!(zeros(T, size(mat, 1)), diff_mat, one(T))
     mat .= A' * Diagonal(l) * A
     return mat
 end
 
-function hess_tr_logm!(mat, vecs, mat_inner, diff_tensor, rt2)
+function hess_tr_logm!(mat, vecs, mat_inner, diff_tensor, rt2) # TODO type fields
     d = size(vecs, 1)
     row_idx = 1
     for j in 1:d, i in 1:j

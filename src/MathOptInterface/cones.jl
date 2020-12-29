@@ -244,6 +244,15 @@ MOI.dimension(cone::PosSemidefTriSparseCone{T, T} where {T <: Real}) = length(co
 MOI.dimension(cone::PosSemidefTriSparseCone{T, Complex{T}} where {T <: Real}) = (2 * length(cone.row_idxs) - cone.side)
 cone_from_moi(::Type{T}, cone::PosSemidefTriSparseCone{T, R}) where {R <: RealOrComplex{T}} where {T <: Real} = Cones.PosSemidefTriSparse{T, R}(cone.side, cone.row_idxs, cone.col_idxs, use_dual = cone.use_dual)
 
+export DoublyNonnegativeTriCone
+struct DoublyNonnegativeTriCone{T <: Real} <: MOI.AbstractVectorSet
+    dim::Int
+    use_dual::Bool
+end
+DoublyNonnegativeTriCone{T}(dim::Int) where {T <: Real} = DoublyNonnegativeTriCone{T}(dim, false)
+MOI.dimension(cone::DoublyNonnegativeTriCone where {T <: Real}) = cone.dim
+cone_from_moi(::Type{T}, cone::DoublyNonnegativeTriCone{T}) where {T <: Real} = Cones.DoublyNonnegativeTri{T}(cone.dim, use_dual = cone.use_dual)
+
 export HypoPerLogdetTriCone
 struct HypoPerLogdetTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     dim::Int
@@ -261,15 +270,6 @@ end
 HypoRootdetTriCone{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real} = HypoRootdetTriCone{T, R}(dim, false)
 MOI.dimension(cone::HypoRootdetTriCone where {T <: Real}) = cone.dim
 cone_from_moi(::Type{T}, cone::HypoRootdetTriCone{T, R}) where {R <: RealOrComplex{T}} where {T <: Real} = Cones.HypoRootdetTri{T, R}(cone.dim, use_dual = cone.use_dual)
-
-export DoublyNonnegativeTriCone
-struct DoublyNonnegativeTriCone{T <: Real} <: MOI.AbstractVectorSet
-    dim::Int
-    use_dual::Bool
-end
-DoublyNonnegativeTriCone{T}(dim::Int) where {T <: Real} = DoublyNonnegativeTriCone{T}(dim, false)
-MOI.dimension(cone::DoublyNonnegativeTriCone where {T <: Real}) = cone.dim
-cone_from_moi(::Type{T}, cone::DoublyNonnegativeTriCone{T}) where {T <: Real} = Cones.DoublyNonnegativeTri{T}(cone.dim, use_dual = cone.use_dual)
 
 export EpiTraceRelEntropyTriCone
 struct EpiTraceRelEntropyTriCone{T <: Real} <: MOI.AbstractVectorSet
@@ -345,11 +345,11 @@ const HypatiaCones{T <: Real} = Union{
     PosSemidefTriCone{T, Complex{T}},
     PosSemidefTriSparseCone{T, T},
     PosSemidefTriSparseCone{T, Complex{T}},
+    DoublyNonnegativeTriCone{T},
     HypoPerLogdetTriCone{T, T},
     HypoPerLogdetTriCone{T, Complex{T}},
     HypoRootdetTriCone{T, T},
     HypoRootdetTriCone{T, Complex{T}},
-    DoublyNonnegativeTriCone{T},
     EpiTraceRelEntropyTriCone{T},
     WSOSInterpNonnegativeCone{T, T},
     WSOSInterpNonnegativeCone{T, Complex{T}},

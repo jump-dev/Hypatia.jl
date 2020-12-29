@@ -281,8 +281,8 @@ end
 function test_epitracerelentropytri_barrier(T::Type{<:Real})
     rt2 = sqrt(T(2))
     for side in [1, 2, 3, 8, 12]
-        @show side
         svec_dim = Cones.svec_length(side)
+        cone = Cones.EpiTraceRelEntropyTri{T}(2 * svec_dim + 1)
         function barrier(s)
             u = s[1]
             u = s[1]
@@ -291,9 +291,9 @@ function test_epitracerelentropytri_barrier(T::Type{<:Real})
             return -log(u - tr(W * logm(W) - W * logm(V))) - logdet(V) - logdet(W)
         end
         if side <= 3
-            test_barrier_oracles(Cones.EpiTraceRelEntropyTri{T}(2 * svec_dim + 1), barrier, init_tol = 1e-5)
+            test_barrier_oracles(cone, barrier, init_tol = 1e-5)
         else
-            test_barrier_oracles(Cones.EpiTraceRelEntropyTri{T}(2 * svec_dim + 1), barrier, init_tol = 1e-1, init_only = true)
+            test_barrier_oracles(cone, barrier, init_tol = 1e-1, init_only = true)
         end
     end
     return
