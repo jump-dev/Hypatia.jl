@@ -200,16 +200,16 @@ function test_hypoperlog_barrier(T::Type{<:Real})
     return
 end
 
-function test_episumperentropy_barrier(T::Type{<:Real})
+function test_epirelentropy_barrier(T::Type{<:Real})
     function barrier(s)
         (u, v, w) = (s[1], s[2:2:(end - 1)], s[3:2:end])
         return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) - sum(log(vi) + log(wi) for (vi, wi) in zip(v, w))
     end
     for w_dim in [1, 2, 3]
-        test_barrier_oracles(Cones.EpiSumPerEntropy{T}(1 + 2 * w_dim), barrier, init_tol = 1e-5)
+        test_barrier_oracles(Cones.EpiRelEntropy{T}(1 + 2 * w_dim), barrier, init_tol = 1e-5)
     end
     for w_dim in [15, 65, 75, 100]
-        test_barrier_oracles(Cones.EpiSumPerEntropy{T}(1 + 2 * w_dim), barrier, init_tol = 1e-1, init_only = true)
+        test_barrier_oracles(Cones.EpiRelEntropy{T}(1 + 2 * w_dim), barrier, init_tol = 1e-1, init_only = true)
     end
     return
 end

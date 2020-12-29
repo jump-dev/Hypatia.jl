@@ -11,7 +11,7 @@ barrier_test_names = [
     "epinorminf",
     "epinormeucl",
     "epipersquare",
-    "episumperentropy",
+    "epirelentropy",
     "epitracerelentropytri",
     "hypoperlog",
     "power",

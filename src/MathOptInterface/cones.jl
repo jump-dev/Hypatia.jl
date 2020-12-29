@@ -16,7 +16,7 @@ cone_from_moi(::Type{T}, cone::MOI.DualExponentialCone) where {T <: Real} = Cone
 cone_from_moi(::Type{T}, cone::MOI.PowerCone{T}) where {T <: Real} = Cones.Power{T}(T[cone.exponent, 1 - cone.exponent], 1)
 cone_from_moi(::Type{T}, cone::MOI.DualPowerCone{T}) where {T <: Real} = Cones.Power{T}(T[cone.exponent, 1 - cone.exponent], 1, use_dual = true)
 cone_from_moi(::Type{T}, cone::MOI.GeometricMeanCone) where {T <: Real} = (l = MOI.dimension(cone) - 1; Cones.HypoGeoMean{T}(1 + l))
-cone_from_moi(::Type{T}, cone::MOI.RelativeEntropyCone) where {T <: Real} = Cones.EpiSumPerEntropy{T}(MOI.dimension(cone))
+cone_from_moi(::Type{T}, cone::MOI.RelativeEntropyCone) where {T <: Real} = Cones.EpiRelEntropy{T}(MOI.dimension(cone))
 cone_from_moi(::Type{T}, cone::MOI.NormSpectralCone) where {T <: Real} = Cones.EpiNormSpectral{T, T}(extrema((cone.row_dim, cone.column_dim))...)
 cone_from_moi(::Type{T}, cone::MOI.NormNuclearCone) where {T <: Real} = Cones.EpiNormSpectral{T, T}(extrema((cone.row_dim, cone.column_dim))..., use_dual = true)
 cone_from_moi(::Type{T}, cone::MOI.PositiveSemidefiniteConeTriangle) where {T <: Real} = Cones.PosSemidefTri{T, T}(MOI.dimension(cone))
@@ -167,14 +167,14 @@ HypoPerLogCone{T}(dim::Int) where {T <: Real} = HypoPerLogCone{T}(dim, false)
 MOI.dimension(cone::HypoPerLogCone) = cone.dim
 cone_from_moi(::Type{T}, cone::HypoPerLogCone{T}) where {T <: Real} = Cones.HypoPerLog{T}(cone.dim, use_dual = cone.use_dual)
 
-export EpiSumPerEntropyCone
-struct EpiSumPerEntropyCone{T <: Real} <: MOI.AbstractVectorSet
+export EpiRelEntropyCone
+struct EpiRelEntropyCone{T <: Real} <: MOI.AbstractVectorSet
     dim::Int
     use_dual::Bool
 end
-EpiSumPerEntropyCone{T}(dim::Int) where {T <: Real} = EpiSumPerEntropyCone{T}(dim, false)
-MOI.dimension(cone::EpiSumPerEntropyCone) = cone.dim
-cone_from_moi(::Type{T}, cone::EpiSumPerEntropyCone{T}) where {T <: Real} = Cones.EpiSumPerEntropy{T}(cone.dim, use_dual = cone.use_dual)
+EpiRelEntropyCone{T}(dim::Int) where {T <: Real} = EpiRelEntropyCone{T}(dim, false)
+MOI.dimension(cone::EpiRelEntropyCone) = cone.dim
+cone_from_moi(::Type{T}, cone::EpiRelEntropyCone{T}) where {T <: Real} = Cones.EpiRelEntropy{T}(cone.dim, use_dual = cone.use_dual)
 
 export HypoGeoMeanCone
 struct HypoGeoMeanCone{T <: Real} <: MOI.AbstractVectorSet
@@ -333,7 +333,7 @@ const HypatiaCones{T <: Real} = Union{
     EpiPerSquareCone{T},
     PowerCone{T},
     HypoPerLogCone{T},
-    EpiSumPerEntropyCone{T},
+    EpiRelEntropyCone{T},
     HypoGeoMeanCone{T},
     HypoPowerMeanCone{T},
     EpiNormSpectralCone{T, T},

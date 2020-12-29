@@ -126,7 +126,7 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
                 G_likl[row_offset + 1, 2:(1 + U)] = -X_pts_polys[i, :]
                 G_likl[row_offset + 2, ext_offset] = -1
                 row_offset += 3
-                push!(cones, Cones.EpiSumPerEntropy{T}(3))
+                push!(cones, Cones.EpiRelEntropy{T}(3))
             end
         end
     else

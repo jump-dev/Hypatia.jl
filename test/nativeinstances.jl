@@ -480,7 +480,7 @@ function epipersquare4(T; options...)
 end
 
 # TODO add use_dual = true tests
-function episumperentropy1(T; options...)
+function epirelentropy1(T; options...)
     tol = test_tol(T)
     Random.seed!(1)
     for w_dim in [1, 2, 3]
@@ -494,7 +494,7 @@ function episumperentropy1(T; options...)
         h[2:2:(end - 1)] .= 1
         w = rand(T, w_dim) .+ 1
         h[3:2:end] .= w
-        cones = Cone{T}[Cones.EpiSumPerEntropy{T}(dim)]
+        cones = Cone{T}[Cones.EpiRelEntropy{T}(dim)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
@@ -502,7 +502,7 @@ function episumperentropy1(T; options...)
     end
 end
 
-function episumperentropy2(T; options...)
+function epirelentropy2(T; options...)
     tol = test_tol(T)
     for w_dim in [1, 2, 4]
         dim = 1 + 2 * w_dim
@@ -515,7 +515,7 @@ function episumperentropy2(T; options...)
         end
         h = zeros(T, dim)
         h[2:2:(dim - 1)] .= 1
-        cones = Cone{T}[Cones.EpiSumPerEntropy{T}(dim)]
+        cones = Cone{T}[Cones.EpiRelEntropy{T}(dim)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
@@ -524,7 +524,7 @@ function episumperentropy2(T; options...)
     end
 end
 
-function episumperentropy3(T; options...)
+function epirelentropy3(T; options...)
     tol = test_tol(T)
     for w_dim in [2, 4]
         dim = 1 + 2 * w_dim
@@ -537,7 +537,7 @@ function episumperentropy3(T; options...)
         end
         h = zeros(T, dim)
         h[3:2:end] .= 1
-        cones = Cone{T}[Cones.EpiSumPerEntropy{T}(dim)]
+        cones = Cone{T}[Cones.EpiRelEntropy{T}(dim)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
@@ -546,14 +546,14 @@ function episumperentropy3(T; options...)
     end
 end
 
-function episumperentropy4(T; options...)
+function epirelentropy4(T; options...)
     tol = test_tol(T)
     c = T[1]
     A = zeros(T, 0, 1)
     b = zeros(T, 0)
     G = Matrix{T}(-I, 5, 1)
     h = T[0, 1, 2, 5, 3]
-    cones = Cone{T}[Cones.EpiSumPerEntropy{T}(5)]
+    cones = Cone{T}[Cones.EpiRelEntropy{T}(5)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
@@ -563,14 +563,14 @@ function episumperentropy4(T; options...)
     @test r.z ≈ [1, 2, log(inv(T(2))) - 1, 3 / T(5), log(5 / T(3)) - 1] atol=tol rtol=tol
 end
 
-function episumperentropy5(T; options...)
+function epirelentropy5(T; options...)
     tol = test_tol(T)
     c = T[0, -1]
     A = zeros(T, 0, 2)
     b = zeros(T, 0)
     G = vcat(zeros(T, 1, 2), repeat(T[0 0; -1 -1], 3), [-1, 0]')
     h = T[0, 1, 0, 1, 0, 1, 0, 0]
-    cones = Cone{T}[Cones.EpiSumPerEntropy{T}(7), Cones.Nonnegative{T}(1)]
+    cones = Cone{T}[Cones.EpiRelEntropy{T}(7), Cones.Nonnegative{T}(1)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal

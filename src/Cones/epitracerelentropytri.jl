@@ -113,8 +113,8 @@ get_nu(cone::EpiTraceRelEntropyTri) = 2 * cone.d + 1
 
 function set_initial_point(arr::AbstractVector, cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     arr .= 0
-    # at the initial point V and W are diagonal, equivalent to episumperentropy
-    (arr[1], v, w) = get_central_ray_episumperentropy(cone.d)
+    # at the initial point V and W are diagonal, equivalent to epirelentropy
+    (arr[1], v, w) = get_central_ray_epirelentropy(cone.d)
     k = 1
     for i in 1:cone.d
         arr[1 + k] = v

@@ -93,7 +93,7 @@ function test_moi_cones(T::Type{<:Real})
     @testset "RelativeEntropyCone" begin
         moi_cone = MOI.RelativeEntropyCone(3)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa Cones.EpiSumPerEntropy{T}
+        @test hyp_cone isa Cones.EpiRelEntropy{T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
         @test !Cones.use_dual_barrier(hyp_cone)
     end
@@ -180,10 +180,10 @@ function test_moi_cones(T::Type{<:Real})
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 4
     end
 
-    @testset "EpiSumPerEntropy" begin
-        moi_cone = Hypatia.EpiSumPerEntropyCone{T}(5)
+    @testset "EpiRelEntropy" begin
+        moi_cone = Hypatia.EpiRelEntropyCone{T}(5)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa Cones.EpiSumPerEntropy{T}
+        @test hyp_cone isa Cones.EpiRelEntropy{T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 5
     end
 

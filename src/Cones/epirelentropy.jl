@@ -6,7 +6,7 @@ barrier from "Primal-Dual Interior-Point Methods for Domain-Driven Formulations"
 -log(u - sum_i w_i*log(w_i/v_i)) - sum_i (log(v_i) + log(w_i))
 =#
 
-mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
+mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
     w_dim::Int
@@ -48,7 +48,7 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     temp1::Vector{T}
     temp2::Vector{T}
 
-    function EpiSumPerEntropy{T}(
+    function EpiRelEntropy{T}(
         dim::Int;
         use_dual::Bool = false,
         ) where {T <: Real}
@@ -64,11 +64,11 @@ mutable struct EpiSumPerEntropy{T <: Real} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::EpiSumPerEntropy) = false
+use_heuristic_neighborhood(cone::EpiRelEntropy) = false
 
-reset_data(cone::EpiSumPerEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_aux_updated = cone.inv_hess_sqrt_aux_updated = false)
+reset_data(cone::EpiRelEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_aux_updated = cone.inv_hess_sqrt_aux_updated = false)
 
-function use_sqrt_oracles(cone::EpiSumPerEntropy)
+function use_sqrt_oracles(cone::EpiRelEntropy)
     cone.use_inv_hess_sqrt || return false
     cone.inv_hess_sqrt_aux_updated || update_inv_hess_sqrt_aux(cone)
     !cone.use_inv_hess_sqrt
@@ -76,7 +76,7 @@ function use_sqrt_oracles(cone::EpiSumPerEntropy)
 end
 
 # TODO only allocate the fields we use
-function setup_extra_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
+function setup_extra_data(cone::EpiRelEntropy{T}) where {T <: Real}
     w_dim = cone.w_dim
     cone.lwv = zeros(T, w_dim)
     cone.tau = zeros(T, w_dim)
@@ -96,16 +96,16 @@ function setup_extra_data(cone::EpiSumPerEntropy{T}) where {T <: Real}
     return cone
 end
 
-get_nu(cone::EpiSumPerEntropy) = cone.dim
+get_nu(cone::EpiRelEntropy) = cone.dim
 
-function set_initial_point(arr::AbstractVector, cone::EpiSumPerEntropy)
-    (arr[1], v, w) = get_central_ray_episumperentropy(cone.w_dim)
+function set_initial_point(arr::AbstractVector, cone::EpiRelEntropy)
+    (arr[1], v, w) = get_central_ray_epirelentropy(cone.w_dim)
     @views arr[cone.v_idxs] .= v
     @views arr[cone.w_idxs] .= w
     return arr
 end
 
-function update_feas(cone::EpiSumPerEntropy{T}) where T
+function update_feas(cone::EpiRelEntropy{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
     @views v = cone.point[cone.v_idxs]
@@ -123,7 +123,7 @@ function update_feas(cone::EpiSumPerEntropy{T}) where T
     return cone.is_feas
 end
 
-function is_dual_feas(cone::EpiSumPerEntropy{T}) where T
+function is_dual_feas(cone::EpiRelEntropy{T}) where T
     u = cone.dual_point[1]
     @views v = cone.dual_point[cone.v_idxs]
     @views w = cone.dual_point[cone.w_idxs]
@@ -135,7 +135,7 @@ function is_dual_feas(cone::EpiSumPerEntropy{T}) where T
     return false
 end
 
-function update_grad(cone::EpiSumPerEntropy)
+function update_grad(cone::EpiRelEntropy)
     @assert cone.is_feas
     u = cone.point[1]
     @views v = cone.point[cone.v_idxs]
@@ -153,7 +153,7 @@ function update_grad(cone::EpiSumPerEntropy)
     return cone.grad
 end
 
-function update_hess(cone::EpiSumPerEntropy{T}) where T
+function update_hess(cone::EpiRelEntropy{T}) where T
     @assert cone.grad_updated
     if !isdefined(cone, :hess)
         cone.hess = Symmetric(zeros(T, cone.dim, cone.dim), :U)
@@ -202,7 +202,7 @@ function update_hess(cone::EpiSumPerEntropy{T}) where T
 end
 
 # auxiliary calculations for inverse Hessian
-function update_inv_hess_aux(cone::EpiSumPerEntropy{T}) where T
+function update_inv_hess_aux(cone::EpiRelEntropy{T}) where T
     @assert !cone.inv_hess_aux_updated
     point = cone.point
     @views v = point[cone.v_idxs]
@@ -237,7 +237,7 @@ function update_inv_hess_aux(cone::EpiSumPerEntropy{T}) where T
 end
 
 # updates for nonzero values in the inverse Hessian
-function update_inv_hess(cone::EpiSumPerEntropy{T}) where T
+function update_inv_hess(cone::EpiRelEntropy{T}) where T
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
 
     if !isdefined(cone, :inv_hess)
@@ -258,7 +258,7 @@ function update_inv_hess(cone::EpiSumPerEntropy{T}) where T
     return cone.inv_hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelEntropy)
     @assert cone.grad_updated
     v_idxs = cone.v_idxs
     w_idxs = cone.w_idxs
@@ -290,12 +290,12 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumP
     return prod
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelEntropy)
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     return arrow_prod(prod, arr, cone.Hiuu, cone.Hiuv, cone.Hiuw, cone.Hivv, cone.Hivw, cone.Hiww)
 end
 
-function update_inv_hess_sqrt_aux(cone::EpiSumPerEntropy)
+function update_inv_hess_sqrt_aux(cone::EpiRelEntropy)
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     @assert !cone.inv_hess_sqrt_aux_updated
     cone.rtiuu = arrow_sqrt(cone.Hiuu, cone.Hiuv, cone.Hiuw, cone.Hivv, cone.Hivw, cone.Hiww, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww)
@@ -304,17 +304,17 @@ function update_inv_hess_sqrt_aux(cone::EpiSumPerEntropy)
     return
 end
 
-function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelEntropy)
     @assert cone.inv_hess_sqrt_aux_updated && cone.use_inv_hess_sqrt
     return inv_arrow_sqrt_prod(prod, arr, cone.rtiuu, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww)
 end
 
-function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiSumPerEntropy)
+function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelEntropy)
     @assert cone.inv_hess_sqrt_aux_updated && cone.use_inv_hess_sqrt
     return arrow_sqrt_prod(prod, arr, cone.rtiuu, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww)
 end
 
-function correction(cone::EpiSumPerEntropy, primal_dir::AbstractVector)
+function correction(cone::EpiRelEntropy, primal_dir::AbstractVector)
     @assert cone.grad_updated
     tau = cone.tau
     z = cone.z
@@ -355,15 +355,15 @@ function correction(cone::EpiSumPerEntropy, primal_dir::AbstractVector)
 end
 
 # TODO remove this in favor of new hess_nz_count etc functions that directly use uu, uw, ww etc
-inv_hess_nz_count(cone::EpiSumPerEntropy) = 3 * cone.dim - 2 + 2 * cone.w_dim
-inv_hess_nz_count_tril(cone::EpiSumPerEntropy) = 2 * cone.dim - 1 + cone.w_dim
-inv_hess_nz_idxs_col(cone::EpiSumPerEntropy, j::Int) = (j == 1 ? (1:cone.dim) : (iseven(j) ? [1, j, j + 1] : [1, j - 1, j]))
-inv_hess_nz_idxs_col_tril(cone::EpiSumPerEntropy, j::Int) = (j == 1 ? (1:cone.dim) : (iseven(j) ? [j, j + 1] : [j]))
+inv_hess_nz_count(cone::EpiRelEntropy) = 3 * cone.dim - 2 + 2 * cone.w_dim
+inv_hess_nz_count_tril(cone::EpiRelEntropy) = 2 * cone.dim - 1 + cone.w_dim
+inv_hess_nz_idxs_col(cone::EpiRelEntropy, j::Int) = (j == 1 ? (1:cone.dim) : (iseven(j) ? [1, j, j + 1] : [1, j - 1, j]))
+inv_hess_nz_idxs_col_tril(cone::EpiRelEntropy, j::Int) = (j == 1 ? (1:cone.dim) : (iseven(j) ? [j, j + 1] : [j]))
 
 # see analysis in https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
-function get_central_ray_episumperentropy(w_dim::Int)
+function get_central_ray_epirelentropy(w_dim::Int)
     if w_dim <= 10
-        return central_rays_episumperentropy[w_dim, :]
+        return central_rays_epirelentropy[w_dim, :]
     end
     # use nonlinear fit for higher dimensions
     rtwdim = sqrt(w_dim)
@@ -379,7 +379,7 @@ function get_central_ray_episumperentropy(w_dim::Int)
     return [u, v, w]
 end
 
-const central_rays_episumperentropy = [
+const central_rays_epirelentropy = [
     0.827838399	1.290927714	0.805102005;
     0.708612491	1.256859155	0.818070438;
     0.622618845	1.231401008	0.829317079;
