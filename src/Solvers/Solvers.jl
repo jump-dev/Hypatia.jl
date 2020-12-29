@@ -284,7 +284,7 @@ function solve(solver::Solver{T}) where {T <: Real}
         load(stepper, solver)
         load(solver.system_solver, solver)
 
-        print_header(stepper, solver)
+        solver.verbose && print_header(stepper, solver)
         flush(stdout)
 
         # iterate from initial point
