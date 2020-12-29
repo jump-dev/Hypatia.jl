@@ -274,25 +274,30 @@ function grad_logm!(mat::Matrix{T}, vecs::Matrix{T}, diff_mat::AbstractMatrix{T}
     return mat
 end
 
-function hess_tr_logm!(mat, vecs, mat_inner, diff_tensor, rt2)
+function hess_tr_logm!(mat, vecs, mat_inner, diff_tensor, rt2::T) where T
     d = size(vecs, 1)
+    X = zeros(T, d, d, d)
+    for i in 1:d
+        X[i, :, :] = vecs * (diff_tensor[i, :, :] .* mat_inner) * vecs'
+    end
     row_idx = 1
     for j in 1:d, i in 1:j
         col_idx = 1
         for l in 1:d, k in 1:l
             mat[row_idx, col_idx] += sum(
                 (
-                vecs[i, m] * vecs[j, n] * (vecs[k, m] * dot(vecs[l, :], mat_inner[:, n] .* diff_tensor[m, n, :]) + vecs[l, n] * dot(vecs[k, :], mat_inner[:, m] .* diff_tensor[m, n, :])) +
-                vecs[j, m] * vecs[i, n] * (vecs[k, m] * dot(vecs[l, :], mat_inner[:, n] .* diff_tensor[m, n, :]) + vecs[l, n] * dot(vecs[k, :], mat_inner[:, m] .* diff_tensor[m, n, :])) +
-                vecs[i, m] * vecs[j, n] * (vecs[l, m] * dot(vecs[k, :], mat_inner[:, n] .* diff_tensor[m, n, :]) + vecs[k, n] * dot(vecs[l, :], mat_inner[:, m] .* diff_tensor[m, n, :])) +
-                vecs[j, m] * vecs[i, n] * (vecs[l, m] * dot(vecs[k, :], mat_inner[:, n] .* diff_tensor[m, n, :]) + vecs[k, n] * dot(vecs[l, :], mat_inner[:, m] .* diff_tensor[m, n, :]))
+                vecs[i, m] * vecs[k, m] * X[m, j, l] +
+                vecs[j, m] * vecs[k, m] * X[m, i, l] +
+                vecs[i, m] * vecs[l, m] * X[m, j, k] +
+                vecs[j, m] * vecs[l, m] * X[m, i, k]
                 ) *
-                (m == n ? 1 : 2) * (i == j ? 1 : rt2) * (k == l ? 1 : rt2)
-                for m in 1:d for n in 1:m)
+                (i == j ? 1 : rt2) * (k == l ? 1 : rt2)
+                for m in 1:d)
             col_idx += 1
         end
         row_idx += 1
     end
-    mat ./= 4
+    mat ./= 2
+
     return mat
 end

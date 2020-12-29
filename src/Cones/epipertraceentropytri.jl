@@ -59,7 +59,7 @@ end
 
 use_heuristic_neighborhood(::EpiPerTraceEntropyTri) = false
 
-use_correction(::EpiPerTraceEntropyTri) = false
+# use_correction(::EpiPerTraceEntropyTri) = false
 
 function setup_extra_data(cone::EpiPerTraceEntropyTri{T}) where T
     dim = cone.dim
@@ -72,7 +72,7 @@ function setup_extra_data(cone::EpiPerTraceEntropyTri{T}) where T
     cone.dual_W = zeros(T, cone.d, cone.d)
     cone.diff_mat = zeros(T, cone.d, cone.d)
     cone.w_vals_log = zeros(T, cone.d)
-    cone.temp1 = zeros(T, cone.d)
+    cone.temp1 = zeros(T, cone.dim - 2)
     return cone
 end
 
@@ -175,7 +175,7 @@ function update_hess(cone::EpiPerTraceEntropyTri{T}) where T
     H[2, 2] = abs2(sigma) - cone.grad[2] / v
     @views smat_to_svec!(H[2, 3:end], -sigma * tau - I / v / z, cone.rt2)
     @views symm_kron(H[3:end, 3:end], Wi, cone.rt2)
-    tau_vec = smat_to_svec!(zeros(T, cone.dim - 2), tau, cone.rt2)
+    tau_vec = smat_to_svec!(cone.temp1, tau, cone.rt2)
     @views mul!(H[3:end, 3:end], tau_vec, tau_vec', true, true)
 
     sdim = cone.dim - 2
@@ -201,6 +201,7 @@ function correction(cone::EpiPerTraceEntropyTri{T}, primal_dir::AbstractVector{T
     u = cone.point[1]
     v = cone.point[2]
     W = cone.W
+    Wi = Symmetric(cone.Wi, :U)
     u_dir = primal_dir[1]
     v_dir = primal_dir[2]
     @views W_dir = Symmetric(svec_to_smat!(zeros(T, d, d), primal_dir[3:cone.dim], cone.rt2), :U)
@@ -216,26 +217,55 @@ function correction(cone::EpiPerTraceEntropyTri{T}, primal_dir::AbstractVector{T
     Tvvv = -2 * sigma ^ 3 - 3 * sigma ^ 2 / v - 2 * sigma / v ^ 2 - 2 / v ^ 3
     Tvvw = tau * (2 * sigma ^ 2 + sigma / v) + I * (1 / v / v / z + 2 * sigma / v / z)
 
-    corr[1] = Tuuu * u_dir ^ 2 + 2 * Tuuv * u_dir * v_dir + 2 * dot(Tuuw, W_dir) * u_dir +
-        Tuvv * v_dir ^ 2 + 2 * dot(Tuvw, W_dir) * v_dir
 
     temp1 = w_vecs' * W_dir * w_vecs
     temp2 = diff_mat .* temp1
     temp3 = dot(temp1', temp2)
 
+    corr[1] = Tuuu * u_dir ^ 2 + 2 * Tuuv * u_dir * v_dir + 2 * dot(Tuuw, W_dir) * u_dir +
+        Tuvv * v_dir ^ 2 + 2 * dot(Tuvw, W_dir) * v_dir
     corr[1] += -2 * dot(tau, W_dir)^2 / z - temp3 / z ^ 2
 
     corr[2] = Tuuv * u_dir ^ 2 + 2 * Tuvv * u_dir * v_dir + 2 * dot(Tuvw, W_dir) * u_dir +
         Tvvv * v_dir ^ 2 + 2 * dot(Tvvw, W_dir) * v_dir
+    # corr[2] -= dot(W_dir, tau * W_dir + W_dir * tau) / v / z + 2 * sigma * dot(tau, W_dir)^2 + sigma * temp3 / z
+    corr[2] -= 2 * dot(W_dir, tau * W_dir) / v / z + 2 * sigma * dot(tau, W_dir)^2 + sigma * temp3 / z
 
+    X = w_vecs' * W_dir * w_vecs
+    diff_tensor = zeros(T, d, d, d) # TODO reshape into a matrix
+    diff_tensor!(diff_tensor, diff_mat, w_vals)
+    diff_dot = [X[:, q]' * Diagonal(diff_tensor[:, p, q]) * X[:, p] for p in 1:d, q in 1:d]
+    www_part = w_vecs * diff_dot * w_vecs'
 
-    corr[2] -= dot(W_dir, tau * W_dir + W_dir * tau) / v / z + 2 * sigma * dot(tau, W_dir)^2 + sigma * temp3 / z
+    W_corr = Tuuw * u_dir ^ 2 + 2 * Tuvw * u_dir * v_dir + Tvvw * v_dir ^ 2 +
+        2 * u_dir * (-2 * tau * dot(tau, W_dir) / z - w_vecs * temp2 * w_vecs' / z ^ 2) +
+        2 * v_dir * (-(tau * W_dir + W_dir * tau) / v / z - 2 * sigma * tau * dot(tau, W_dir) - sigma / z * w_vecs * temp2 * w_vecs') +
+        2 * tau * W_dir * tau * W_dir * tau + 3 * tau * W_dir * w_vecs * temp2 * w_vecs' / z + 2 * www_part / z - 2 * Wi * W_dir * Wi * W_dir * Wi
 
-    # W_corr = Tuuw * u_dir ^ 2 + 2 * Tuvw * u_dir * v_dir + Tvvw * v_dir ^ 2 + 
-    #     2 * u_dir * (-2 * tau * dot(tau, W_dir) / z - temp2 / z ^ 2) +
-    #     2 * v_dir * ()
+    @views smat_to_svec!(w_corr, W_corr, cone.rt2)
 
     corr ./= -2
 
     return corr
+end
+
+# TODO reshape and pull into Cones.jl, also don't fill up entirely
+function diff_tensor!(diff_tensor, diff_mat::AbstractMatrix{T}, w_vals) where T
+    d = size(diff_mat, 1)
+    for k in 1:d, j in 1:k, i in 1:j
+        (vi, vj, vk) = (w_vals[i], w_vals[j], w_vals[k])
+        if abs(vj - vk) < sqrt(eps(T))
+            if abs(vi - vj) < sqrt(eps(T))
+                diff_tensor[i, i, i] = -inv(vi) / vi / 2
+            else
+                diff_tensor[i, j, j] = diff_tensor[j, i, j] = diff_tensor[j, j, i] = -(inv(vj) - diff_mat[i, j]) / (vi - vj)
+            end
+        elseif abs(vi - vj) < sqrt(eps(T))
+            diff_tensor[k, j, j] = diff_tensor[j, k, j] = diff_tensor[j, j, k] = (inv(vi) - diff_mat[k, i]) / (vi - vk)
+        else
+            diff_tensor[i, j, k] = diff_tensor[i, k, j] = diff_tensor[j, i, k] =
+                diff_tensor[j, k, i] = diff_tensor[k, i, j] = diff_tensor[k, j, i] = (diff_mat[i, j] - diff_mat[k, i]) / (vj - vk)
+        end
+    end
+    return diff_tensor
 end
