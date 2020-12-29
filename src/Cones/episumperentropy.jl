@@ -360,7 +360,7 @@ inv_hess_nz_count_tril(cone::EpiSumPerEntropy) = 2 * cone.dim - 1 + cone.w_dim
 inv_hess_nz_idxs_col(cone::EpiSumPerEntropy, j::Int) = (j == 1 ? (1:cone.dim) : (iseven(j) ? [1, j, j + 1] : [1, j - 1, j]))
 inv_hess_nz_idxs_col_tril(cone::EpiSumPerEntropy, j::Int) = (j == 1 ? (1:cone.dim) : (iseven(j) ? [j, j + 1] : [j]))
 
-# see analysis in https://github.com/lkapelevich/HypatiaBenchmarks.jl/tree/master/centralpoints
+# see analysis in https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
 function get_central_ray_episumperentropy(w_dim::Int)
     if w_dim <= 10
         return central_rays_episumperentropy[w_dim, :]
