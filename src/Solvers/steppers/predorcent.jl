@@ -13,6 +13,7 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     dir_corr::Point{T}
     dir_temp::Vector{T}
     step_searcher::StepSearcher{T}
+    uncorr_only::Bool
 
     function PredOrCentStepper{T}(;
         use_correction::Bool = true,
@@ -41,6 +42,7 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     end
     stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
     stepper.step_searcher = StepSearcher{T}(model)
+    stepper.uncorr_only = false
 
     return stepper
 end
@@ -75,7 +77,8 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         copyto!(dir_corr.vec, dir.vec)
 
         # do curve search with correction
-        alpha = search_alpha(true, point, model, stepper, min_alpha = T(1e-2)) # TODO tune min_alpha
+        stepper.uncorr_only = false
+        alpha = search_alpha(point, model, stepper, min_alpha = T(1e-2)) # TODO tune min_alpha
         if iszero(alpha)
             # try not using correction
             @warn("very small alpha in curve search; trying without correction")
@@ -87,7 +90,8 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
 
     if iszero(alpha)
         # do line search in uncorrected direction
-        alpha = search_alpha(false, point, model, stepper, min_alpha = T(1e-2))
+        stepper.uncorr_only = true
+        alpha = search_alpha(point, model, stepper, min_alpha = T(1e-2))
         if iszero(alpha) && is_pred
             # do centering step instead
             @warn("very small alpha in line search; trying centering")
@@ -96,7 +100,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             copyto!(dir_nocorr.vec, dir.vec)
             stepper.cent_count = 1
 
-            alpha = search_alpha(false, point, model, stepper)
+            alpha = search_alpha(point, model, stepper)
         end
 
         if iszero(alpha)
@@ -118,7 +122,6 @@ end
 expect_improvement(stepper::PredOrCentStepper) = iszero(stepper.cent_count)
 
 function update_cone_points(
-    add_correction::Bool,
     alpha::T,
     point::Point{T},
     stepper::PredOrCentStepper{T}
@@ -128,9 +131,14 @@ function update_cone_points(
 
     # TODO check tau, kap, then update in one line entire z,t,s,k with a view in point
 
+    if stepper.uncorr_only
+        tau_c = cand.tau[1] = point.tau[1] + alpha * dir_nocorr.tau[1]
+        kap_c = cand.kap[1] = point.kap[1] + alpha * dir_nocorr.kap[1]
+        (min(tau_c, kap_c, tau_c * kap_c) < eps(T)) && return false
 
-
-    if add_correction
+        @. cand.z = point.z + alpha * dir_nocorr.z
+        @. cand.s = point.s + alpha * dir_nocorr.s
+    else
         dir_corr = stepper.dir_corr
         alpha_sqr = abs2(alpha)
 
@@ -140,13 +148,6 @@ function update_cone_points(
 
         @. cand.z = point.z + alpha * dir_nocorr.z + alpha_sqr * dir_corr.z
         @. cand.s = point.s + alpha * dir_nocorr.s + alpha_sqr * dir_corr.s
-    else
-        tau_c = cand.tau[1] = point.tau[1] + alpha * dir_nocorr.tau[1]
-        kap_c = cand.kap[1] = point.kap[1] + alpha * dir_nocorr.kap[1]
-        (min(tau_c, kap_c, tau_c * kap_c) < eps(T)) && return false
-
-        @. cand.z = point.z + alpha * dir_nocorr.z
-        @. cand.s = point.s + alpha * dir_nocorr.s
     end
 
     return true

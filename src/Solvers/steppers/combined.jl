@@ -185,7 +185,7 @@ function print_iteration_stats(stepper::CombinedStepper{T}, solver::Solver{T}) w
                 step, stepper.prev_alpha,
                 )
         else
-            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %5s %9.2e %9.2e\n",
+            @printf("%5d %12.4e %12.4e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %5s %9.2e\n",
                 solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap,
                 solver.x_feas, solver.y_feas, solver.z_feas, solver.point.tau[1], solver.point.kap[1], solver.mu,
                 step, stepper.prev_alpha,

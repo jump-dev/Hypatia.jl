@@ -186,11 +186,11 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
 
         # update hessian factorizations and partition of cones
         for (k, cone_k) in enumerate(model.cones)
-            # if Cones.use_sqrt_oracles(cone_k)
-            #     cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_sqrt_cones : hess_sqrt_cones
-            # else
+            if Cones.use_sqrt_oracles(cone_k)
+                cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_sqrt_cones : hess_sqrt_cones
+            else
                 cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_cones : hess_cones
-            # end
+            end
             push!(cones_list, k)
         end
 

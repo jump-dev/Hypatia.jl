@@ -110,7 +110,7 @@ perf = DataFrames.DataFrame(
     println("\nstarting steppers tests (with printing)")
     steppers = [
         (Solvers.CombinedStepper, diff_reals),
-        # (Solvers.PredOrCentStepper, diff_reals),
+        (Solvers.PredOrCentStepper, diff_reals),
         ]
     inst_defaults = vcat(
         # inst_preproc,
