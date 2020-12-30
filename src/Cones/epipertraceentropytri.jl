@@ -188,11 +188,6 @@ function update_hess(cone::EpiPerTraceEntropyTri{T}) where T
     return cone.hess
 end
 
-using ForwardDiff
-function logm(A)
-    (vals, vecs) = eigen(Hermitian(A, :U))
-    return vecs * Diagonal(log.(vals)) * vecs'
-end
 function correction(cone::EpiPerTraceEntropyTri{T}, primal_dir::AbstractVector{T}) where T
     @assert cone.hess_updated
     d = cone.d
