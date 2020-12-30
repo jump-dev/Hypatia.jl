@@ -285,19 +285,22 @@ function hess_tr_logm!(mat, vecs, mat_inner, diff_tensor, rt2::T) where T
     for i in 1:d
         X[i, :, :] = vecs * (diff_tensor[i, :, :] .* mat_inner) * vecs'
     end
+    temp = Symmetric(zeros(T, d^2, d^2), :U)
+    for j in 1:d, i in 1:j
+        temp.data[block_idxs(d, i), block_idxs(d, j)] = vecs * Diagonal(X[:, i, j]) * vecs'
+    end
+
     row_idx = 1
     for j in 1:d, i in 1:j
         col_idx = 1
         for l in 1:d, k in 1:l
-            mat[row_idx, col_idx] += sum(
+            mat[row_idx, col_idx] +=
                 (
-                vecs[i, m] * vecs[k, m] * X[m, j, l] +
-                vecs[j, m] * vecs[k, m] * X[m, i, l] +
-                vecs[i, m] * vecs[l, m] * X[m, j, k] +
-                vecs[j, m] * vecs[l, m] * X[m, i, k]
-                ) *
-                (i == j ? 1 : rt2) * (k == l ? 1 : rt2)
-                for m in 1:d)
+                temp[block_idxs(d, j), block_idxs(d, l)][i, k] +
+                temp[block_idxs(d, i), block_idxs(d, l)][j, k] +
+                temp[block_idxs(d, j), block_idxs(d, k)][i, l] +
+                temp[block_idxs(d, i), block_idxs(d, k)][j, l]
+                ) * (i == j ? 1 : rt2) * (k == l ? 1 : rt2)
             col_idx += 1
         end
         row_idx += 1

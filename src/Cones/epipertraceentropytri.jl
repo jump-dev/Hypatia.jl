@@ -188,10 +188,14 @@ function update_hess(cone::EpiPerTraceEntropyTri{T}) where T
     return cone.hess
 end
 
+using ForwardDiff
+function logm(A)
+    (vals, vecs) = eigen(Hermitian(A, :U))
+    return vecs * Diagonal(log.(vals)) * vecs'
+end
 function correction(cone::EpiPerTraceEntropyTri{T}, primal_dir::AbstractVector{T}) where T
     @assert cone.hess_updated
     d = cone.d
-    sdim = cone.dim - 2
     z = cone.z
     sigma = cone.sigma
     tau = cone.tau
@@ -217,7 +221,6 @@ function correction(cone::EpiPerTraceEntropyTri{T}, primal_dir::AbstractVector{T
     Tvvv = -2 * sigma ^ 3 - 3 * sigma ^ 2 / v - 2 * sigma / v ^ 2 - 2 / v ^ 3
     Tvvw = tau * (2 * sigma ^ 2 + sigma / v) + I * (1 / v / v / z + 2 * sigma / v / z)
 
-
     temp1 = w_vecs' * W_dir * w_vecs
     temp2 = diff_mat .* temp1
     temp3 = dot(temp1', temp2)
@@ -225,11 +228,9 @@ function correction(cone::EpiPerTraceEntropyTri{T}, primal_dir::AbstractVector{T
     corr[1] = Tuuu * u_dir ^ 2 + 2 * Tuuv * u_dir * v_dir + 2 * dot(Tuuw, W_dir) * u_dir +
         Tuvv * v_dir ^ 2 + 2 * dot(Tuvw, W_dir) * v_dir
     corr[1] += -2 * dot(tau, W_dir)^2 / z - temp3 / z ^ 2
-
     corr[2] = Tuuv * u_dir ^ 2 + 2 * Tuvv * u_dir * v_dir + 2 * dot(Tuvw, W_dir) * u_dir +
         Tvvv * v_dir ^ 2 + 2 * dot(Tvvw, W_dir) * v_dir
-    # corr[2] -= dot(W_dir, tau * W_dir + W_dir * tau) / v / z + 2 * sigma * dot(tau, W_dir)^2 + sigma * temp3 / z
-    corr[2] -= 2 * dot(W_dir, tau * W_dir) / v / z + 2 * sigma * dot(tau, W_dir)^2 + sigma * temp3 / z
+    corr[2] -= 2 * tr(W_dir) * dot(tau, W_dir) / v / z + 2 * sigma * dot(tau, W_dir)^2 + sigma * temp3 / z
 
     X = w_vecs' * W_dir * w_vecs
     diff_tensor = zeros(T, d, d, d) # TODO reshape into a matrix
@@ -239,8 +240,11 @@ function correction(cone::EpiPerTraceEntropyTri{T}, primal_dir::AbstractVector{T
 
     W_corr = Tuuw * u_dir ^ 2 + 2 * Tuvw * u_dir * v_dir + Tvvw * v_dir ^ 2 +
         2 * u_dir * (-2 * tau * dot(tau, W_dir) / z - w_vecs * temp2 * w_vecs' / z ^ 2) +
-        2 * v_dir * (-(tau * W_dir + W_dir * tau) / v / z - 2 * sigma * tau * dot(tau, W_dir) - sigma / z * w_vecs * temp2 * w_vecs') +
-        2 * tau * W_dir * tau * W_dir * tau + 3 * tau * W_dir * w_vecs * temp2 * w_vecs' / z + 2 * www_part / z - 2 * Wi * W_dir * Wi * W_dir * Wi
+        2 * v_dir * (-(tau * tr(W_dir) + dot(W_dir, tau) * I) / v / z - 2 * sigma * tau * dot(tau, W_dir) - sigma / z * w_vecs * temp2 * w_vecs') +
+        2 * tau * dot(W_dir, tau) ^ 2 +
+        (tau * temp3 + dot(tau, W_dir) * w_vecs * temp2 * w_vecs' * 2) / z +
+        2 * www_part / z -
+        2 * Wi * W_dir * Wi * W_dir * Wi
 
     @views smat_to_svec!(w_corr, W_corr, cone.rt2)
 
