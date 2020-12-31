@@ -221,22 +221,8 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     diff_mat_V = Hermitian(cone.diff_mat_V, :U)
     diff_mat_W = Hermitian(cone.diff_mat_W, :U)
 
-    diff_tensor_V = zeros(T, d, d, d)
-    for k in 1:d, j in 1:k, i in 1:j
-        (vi, vj, vk) = (V_vals[i], V_vals[j], V_vals[k])
-        if abs(vj - vk) < rteps
-            if abs(vi - vj) < rteps
-                diff_tensor_V[i, i, i] = -inv(vi) / vi / 2
-            else
-                diff_tensor_V[i, j, j] = diff_tensor_V[j, i, j] = diff_tensor_V[j, j, i] = -(inv(vj) - diff_mat_V[i, j]) / (vi - vj)
-            end
-        elseif abs(vi - vj) < rteps
-            diff_tensor_V[k, j, j] = diff_tensor_V[j, k, j] = diff_tensor_V[j, j, k] = (inv(vi) - diff_mat_V[k, i]) / (vi - vk)
-        else
-            diff_tensor_V[i, j, k] = diff_tensor_V[i, k, j] = diff_tensor_V[j, i, k] =
-                diff_tensor_V[j, k, i] = diff_tensor_V[k, i, j] = diff_tensor_V[k, j, i] = (diff_mat_V[i, j] - diff_mat_V[k, i]) / (vj - vk)
-        end
-    end
+    diff_tensor_V = zeros(T, d, d, d) # TODO reshape into a matrix
+    diff_tensor!(diff_tensor_V, diff_mat_V, V_vals)
 
     W_similar = cone.W_similar
     dz_sqr_dV_sqr = zeros(T, vw_dim, vw_dim)

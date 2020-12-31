@@ -162,36 +162,25 @@ function correction(cone::EpiPerEntropy{T}, primal_dir::AbstractVector{T}) where
     @views w_corr = corr[3:cone.dim]
     wdw = similar(w)
 
-    i2z = inv(2 * z)
     @. wdw = w_dir / w
     vdv = v_dir / v
-    const0 = (u_dir + sum(w) * vdv) / z + dot(tau, w_dir)
-    const1 = abs2(const0) + sum(w[i] * abs2(vdv) + w_dir[i] * (wdw[i] - 2 * vdv) for i in eachindex(w)) / (2 * z)
+    sw = sum(w)
+    swd = sum(w_dir)
+    const0 = (u_dir + sw * vdv) / z + dot(tau, w_dir)
+    const1 = abs2(const0) + sw * abs2(vdv) / (2 * z) - swd * vdv / z + sum(w_dir[i] * wdw[i] for i in eachindex(w)) / (2 * z)
     corr[1] = const1 / z
 
     # v
-    # corr[2] = const1
-    # corr[2] += (const0 + vdv) * vdv - i2z * sum(wdw) * sum(w_dir)
-    # corr[2] *= sum(w)
-    # # corr[2] += (z * vdv - sum(w_dir)) * vdv + (-const0 + i2z * sum(w_dir)) * sum(w_dir)
-    # corr[2] += (z * vdv - sum(w_dir)) * vdv + (-const0) * sum(w_dir)
-    # corr[2] /= v
-    # corr[2] /= z
-
-    sigma = sum(w) / v / z
-    Tuuv = -2 * sigma / z^2
-    Tuvv = -2 * sigma^2 / z - sigma / v / z
-    Tuvw = 2 * sigma * -tau / z .+ inv(v) / abs2(z)
-    Tvvv = -2 * sigma^3 - 3 * (sigma^2 / v) - 2 * sigma / abs2(v) - 2 / v ^ 3
-    Tvvw = 2 * sigma^2 * -tau + (sigma * -tau / v) .+ 2 * sigma / v / z .+ inv(abs2(v)) / z
-    Tvww = Diagonal(-sigma ./ w ./ z) + -2 * tau * tau' * sigma .+ tau / z / v .+ tau' / z / v
-
-    corr[2] = Tuuv * u_dir^2 + 2 * (Tuvv * u_dir * v_dir + dot(Tuvw, w_dir) * u_dir + dot(Tvvw, w_dir) * v_dir) + Tvvv * v_dir^2 + w_dir' * Tvww * w_dir
-    corr[2] /= -2
+    corr[2] = const1
+    corr[2] += vdv * (const0 + vdv)
+    corr[2] *= sw
+    corr[2] += vdv * (z * vdv - swd) + (-const0) * swd
+    corr[2] /= v
+    corr[2] /= z
 
     # w
     @. w_corr = const1 * tau
-    @. w_corr += ((const0 - w * vdv / z) / z + (inv(w) + i2z) * wdw) * wdw
+    @. w_corr += ((const0 - w * vdv / z) / z + (inv(w) + inv(2 * z)) * wdw) * wdw
     @. w_corr += (-const0 + w_dir / z - vdv / 2) / z * vdv
 
     return corr
