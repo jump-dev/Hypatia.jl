@@ -470,7 +470,7 @@ function update_goals(solver::Solver{T}) where {T <: Real}
     end
 
     # ill-posed conditions # TODO experiment with these
-    goal_ip = max(solver.mu / solver.tol_infeas, tau / (solver.tol_infeas * min(one(T), solver.point.kap[])))
+    goal_ip = 10 * max(solver.mu / solver.tol_infeas, tau / (solver.tol_infeas * min(one(T), solver.point.kap[])))
 
     # summarize goals
     solver.goal = min(goal_opt, goal_prinf, goal_duinf, goal_ip)
