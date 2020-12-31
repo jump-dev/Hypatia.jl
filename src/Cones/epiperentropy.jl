@@ -150,7 +150,7 @@ end
 
 function correction(cone::EpiPerEntropy{T}, primal_dir::AbstractVector{T}) where T
     @assert cone.grad_updated
-    tau = -cone.tau
+    tau = cone.tau
     z = cone.z
     u = cone.point[1]
     v = cone.point[2]
@@ -166,7 +166,7 @@ function correction(cone::EpiPerEntropy{T}, primal_dir::AbstractVector{T}) where
     vdv = v_dir / v
     sw = sum(w)
     swd = sum(w_dir)
-    const0 = (u_dir + sw * vdv) / z + dot(tau, w_dir)
+    const0 = (u_dir + sw * vdv) / z - dot(tau, w_dir)
     const1 = abs2(const0) + sw * abs2(vdv) / (2 * z) - swd * vdv / z + sum(w_dir[i] * wdw[i] for i in eachindex(w)) / (2 * z)
     corr[1] = const1 / z
 
@@ -179,7 +179,7 @@ function correction(cone::EpiPerEntropy{T}, primal_dir::AbstractVector{T}) where
     corr[2] /= z
 
     # w
-    @. w_corr = const1 * tau
+    @. w_corr = -const1 * tau
     @. w_corr += ((const0 - w * vdv / z) / z + (inv(w) + inv(2 * z)) * wdw) * wdw
     @. w_corr += (-const0 + w_dir / z - vdv / 2) / z * vdv
 
