@@ -343,9 +343,9 @@ function get_rank_est(qr_fact::QRPivoted, init_tol_qr::Real)
     return rank_est
 end
 
-# postprocess the interior point and save in result point
+# postprocess the best interior point and save in result point
 function postprocess(solver::Solver{T}) where {T <: Real}
-    point = solver.point
+    point = solver.best_point
     result = solver.result
     if in(solver.status, (PrimalInfeasible, DualInfeasible))
         tau = true

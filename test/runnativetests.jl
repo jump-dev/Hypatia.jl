@@ -12,8 +12,8 @@ include(joinpath(@__DIR__, "nativesets.jl"))
 
 # default options to solvers
 default_options = (
-    # verbose = true,
-    verbose = false,
+    verbose = true,
+    # verbose = false,
     default_tol_relax = 10,
     )
 
@@ -24,7 +24,7 @@ all_reals = [
     ]
 diff_reals = [
     Float64,
-    BigFloat,
+    # BigFloat,
     ]
 
 string_nameof(T) = string(nameof(T))
@@ -61,17 +61,17 @@ perf = DataFrames.DataFrame(
 
 @testset "native tests" begin
 
-# @testset "default options tests" begin
-#     println("starting default options tests")
-#     inst_defaults = vcat(
-#         inst_preproc,
-#         inst_infeas,
-#         inst_cones_many,
-#         )
-#     for inst_name in inst_defaults
-#         test_instance_solver(inst_name, Float64, default_options)
-#     end
-# end
+@testset "default options tests" begin
+    println("starting default options tests")
+    inst_defaults = vcat(
+        # inst_preproc,
+        inst_infeas,
+        # inst_cones_many,
+        )
+    for inst_name in inst_defaults
+        test_instance_solver(inst_name, Float64, default_options)
+    end
+end
 #
 # @testset "no preprocess tests" begin
 #     println("\nstarting no preprocess tests")
@@ -106,17 +106,17 @@ perf = DataFrames.DataFrame(
 #     end
 # end
 
-@testset "steppers tests" begin
-    println("\nstarting steppers tests (with printing)")
-    steppers = [
-        (Solvers.PredOrCentStepper, diff_reals),
-        (Solvers.CombinedStepper, diff_reals),
-        ]
-    for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in diff_reals
-        options = (; default_options..., verbose = true, stepper = stepper{T}())
-        test_instance_solver(inst_name, T, options, string_nameof(stepper))
-    end
-end
+# @testset "steppers tests" begin
+#     println("\nstarting steppers tests (with printing)")
+#     steppers = [
+#         (Solvers.PredOrCentStepper, diff_reals),
+#         (Solvers.CombinedStepper, diff_reals),
+#         ]
+#     for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in diff_reals
+#         options = (; default_options..., verbose = true, stepper = stepper{T}())
+#         test_instance_solver(inst_name, T, options, string_nameof(stepper))
+#     end
+# end
 
 # println("\n")
 # DataFrames.show(perf, allrows = true, allcols = true)

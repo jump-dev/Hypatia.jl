@@ -114,7 +114,6 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     end
 
     stepper.prev_alpha = alpha
-    calc_mu(solver)
 
     return true
 end
