@@ -16,8 +16,8 @@ results_path = nothing
 
 # default options to solvers
 default_options = (
-    # verbose = false,
-    verbose = true,
+    verbose = false,
+    # verbose = true,
     default_tol_relax = 10,
     stepper = Solvers.CombinedStepper{Float64}(),
     # stepper = Solvers.PredOrCentStepper{Float64}(),
@@ -26,10 +26,10 @@ default_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    # ("minimal", Float64, 60),
+    ("minimal", Float64, 60),
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
-    ("fast", Float64, 60),
+    # ("fast", Float64, 60),
     # ("slow", Float64, 120),
     ]
 
@@ -144,8 +144,8 @@ end
 
 # println("\n")
 # DataFrames.show(perf, allrows = true, allcols = true)
-println("\n")
-@show sum(perf[!, :iters])
-@show sum(perf[!, :solve_time])
+# println("\n")
+# @show sum(perf[!, :iters])
+# @show sum(perf[!, :solve_time])
 end
 ;
