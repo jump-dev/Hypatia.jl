@@ -7,15 +7,15 @@ using Printf
 using Hypatia
 
 test_files = [
-    # "modelutilities",
-    # "barrier",
-    # "native",
+    "modelutilities",
+    "barrier",
+    "native",
     "moi",
-    # # "cblib",
-    # "examples",
-    # # NOTE require optional dependencies:
-    # # "pardiso",
-    # # "hsl",
+    # "cblib",
+    "examples",
+    # NOTE require optional dependencies:
+    # "pardiso",
+    # "hsl",
     ]
 
 println()

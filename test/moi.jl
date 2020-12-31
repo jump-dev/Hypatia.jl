@@ -62,15 +62,15 @@ function test_moi(T::Type{<:Real}; solver_options...)
         MOIT.contlineartest(optimizer, config)
     end
 
-    # if T == Float64
-    #     # NOTE test other real types, waiting for https://github.com/jump-dev/MathOptInterface.jl/issues/841
-    #     @testset "unit tests" begin
-    #         MOIT.unittest(optimizer, config, unit_exclude)
-    #     end
-    #     @testset "conic tests" begin
-    #         MOIT.contconictest(MOI.Bridges.Constraint.Square{T}(optimizer), config, conic_exclude)
-    #     end
-    # end
+    if T == Float64
+        # NOTE test other real types, waiting for https://github.com/jump-dev/MathOptInterface.jl/issues/841
+        @testset "unit tests" begin
+            MOIT.unittest(optimizer, config, unit_exclude)
+        end
+        @testset "conic tests" begin
+            MOIT.contconictest(MOI.Bridges.Constraint.Square{T}(optimizer), config, conic_exclude)
+        end
+    end
 
     return
 end

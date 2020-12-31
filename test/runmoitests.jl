@@ -11,31 +11,31 @@ include(joinpath(@__DIR__, "moi.jl"))
 
 @testset "MOI tests" begin
 
-# @testset "MOI wrapper cone tests" begin
-#     println("starting MOI wrapper cone tests")
-#     real_types = [
-#         Float64,
-#         Float32,
-#         BigFloat,
-#         ]
-#     for T in real_types
-#         println(T, " ...")
-#         test_moi_cones(T)
-#     end
-# end
+@testset "MOI wrapper cone tests" begin
+    println("starting MOI wrapper cone tests")
+    real_types = [
+        Float64,
+        Float32,
+        BigFloat,
+        ]
+    for T in real_types
+        println(T, " ...")
+        test_moi_cones(T)
+    end
+end
 
 @testset "MOI.Test tests" begin
     println("\nstarting MOI.Test tests")
     options = [
         # # (Float64, Solvers.PredOrCentStepper, false), # TODO
-        # (Float64, Solvers.CombinedStepper, true),
+        (Float64, Solvers.CombinedStepper, true),
         (Float32, Solvers.PredOrCentStepper, true),
-        # (BigFloat, Solvers.PredOrCentStepper, true),
+        (BigFloat, Solvers.PredOrCentStepper, true),
         ]
     for (T, stepper, use_dense_model) in options
         default_options = (
-            verbose = true,
-            # verbose = false,
+            # verbose = true,
+            verbose = false,
             default_tol_relax = 2,
             stepper = stepper{T}(),
             )
