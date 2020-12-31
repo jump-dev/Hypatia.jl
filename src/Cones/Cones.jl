@@ -577,4 +577,40 @@ function inv_arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}
     return prod
 end
 
+function grad_logm!(
+        mat::Matrix{T},
+        vecs::Matrix{T},
+        tempmat1::Matrix{T},
+        tempmat2::Matrix{T},
+        tempvec::Vector{T},
+        diff_mat::AbstractMatrix{T},
+        rt2::T,
+        ) where T
+    veckron = symm_kron(tempmat1, vecs, rt2, upper_only = false)
+    smat_to_svec!(tempvec, diff_mat, one(T))
+    mul!(tempmat2, veckron, Diagonal(tempvec))
+    return mul!(mat, tempmat2, veckron')
+end
+
+function diff_tensor!(diff_tensor::Array{T, 3}, diff_mat::AbstractMatrix{T}, vals::Vector{T}) where T
+    d = size(diff_mat, 1)
+    for k in 1:d, j in 1:k, i in 1:j
+        (vi, vj, vk) = (vals[i], vals[j], vals[k])
+        if abs(vj - vk) < sqrt(eps(T))
+            if abs(vi - vj) < sqrt(eps(T))
+                t = -inv(vi) / vi / 2
+            else
+                t = (inv(vj) - diff_mat[i, j]) / (vj - vi)
+            end
+        elseif abs(vi - vj) < sqrt(eps(T))
+            t = (inv(vi) - diff_mat[k, i]) / (vi - vk)
+        else
+            t = (diff_mat[i, j] - diff_mat[k, i]) / (vj - vk)
+        end
+        diff_tensor[i, j, k] = diff_tensor[i, k, j] = diff_tensor[j, i, k] =
+            diff_tensor[j, k, i] = diff_tensor[k, i, j] = diff_tensor[k, j, i] = t
+    end
+    return diff_tensor
+end
+
 end

@@ -41,6 +41,8 @@ mutable struct EpiPerTraceEntropyTri{T <: Real} <: Cone{T}
     diff_mat::Matrix{T}
     temp1::Vector{T}
     mat::Matrix{T}
+    matsdim1::Matrix{T}
+    matsdim2::Matrix{T}
     grad_logW::Matrix{T}
 
     function EpiPerTraceEntropyTri{T}(
@@ -76,6 +78,8 @@ function setup_extra_data(cone::EpiPerTraceEntropyTri{T}) where T
     cone.W_vals_log = zeros(T, cone.d)
     cone.temp1 = zeros(T, sdim)
     cone.mat = zeros(T, cone.d, cone.d)
+    cone.matsdim1 = zeros(T, sdim, sdim)
+    cone.matsdim2 = zeros(T, sdim, sdim)
     cone.grad_logW = zeros(T, sdim, sdim)
     return cone
 end
@@ -191,8 +195,8 @@ function update_hess(cone::EpiPerTraceEntropyTri{T}) where T
     @views mul!(H[3:end, 3:end], tau_vec, tau_vec', true, true)
 
     grad_logW = cone.grad_logW
-    grad_logm!(grad_logW, W_vecs, diff_mat, cone.rt2)
-    grad_logW ./= z
+    grad_logm!(grad_logW, W_vecs, cone.matsdim1, cone.matsdim2, cone.temp1, diff_mat, cone.rt2)
+    @. grad_logW /= z
     @. @views H[3:end, 3:end] += grad_logW
 
     cone.hess_updated = true
@@ -254,25 +258,4 @@ function correction(cone::EpiPerTraceEntropyTri{T}, primal_dir::AbstractVector{T
     @views smat_to_svec!(w_corr, W_corr, cone.rt2)
 
     return corr
-end
-
-# TODO reshape and pull into Cones.jl, also don't fill up entirely
-function diff_tensor!(diff_tensor, diff_mat::AbstractMatrix{T}, W_vals) where T
-    d = size(diff_mat, 1)
-    for k in 1:d, j in 1:k, i in 1:j
-        (vi, vj, vk) = (W_vals[i], W_vals[j], W_vals[k])
-        if abs(vj - vk) < sqrt(eps(T))
-            if abs(vi - vj) < sqrt(eps(T))
-                diff_tensor[i, i, i] = -inv(vi) / vi / 2
-            else
-                diff_tensor[i, j, j] = diff_tensor[j, i, j] = diff_tensor[j, j, i] = -(inv(vj) - diff_mat[i, j]) / (vi - vj)
-            end
-        elseif abs(vi - vj) < sqrt(eps(T))
-            diff_tensor[k, j, j] = diff_tensor[j, k, j] = diff_tensor[j, j, k] = (inv(vi) - diff_mat[k, i]) / (vi - vk)
-        else
-            diff_tensor[i, j, k] = diff_tensor[i, k, j] = diff_tensor[j, i, k] =
-                diff_tensor[j, k, i] = diff_tensor[k, i, j] = diff_tensor[k, j, i] = (diff_mat[i, j] - diff_mat[k, i]) / (vj - vk)
-        end
-    end
-    return diff_tensor
 end

@@ -47,7 +47,10 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     dzdV
     dzdW
     W_similar
-    tmp
+    mat
+    matsdim1
+    matsdim2
+    tempsdim
     diff_mat_V
     diff_mat_W
     V_fact
@@ -100,7 +103,10 @@ function setup_extra_data(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     cone.dzdV = zeros(T, cone.vw_dim)
     cone.dzdW = zeros(T, cone.vw_dim)
     cone.W_similar = zeros(T, d, d)
-    cone.tmp = zeros(T, d, d)
+    cone.mat = zeros(T, d, d)
+    cone.matsdim1 = zeros(T, cone.vw_dim, cone.vw_dim)
+    cone.matsdim2 = zeros(T, cone.vw_dim, cone.vw_dim)
+    cone.tempsdim = zeros(T, cone.vw_dim)
     cone.diff_mat_V = zeros(T, d, d)
     cone.diff_mat_W = zeros(T, d, d)
     cone.V_vals_log = zeros(T, d)
@@ -140,10 +146,10 @@ function update_feas(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
         if isposdef(cone.W_fact)
             @. cone.V_vals_log = log(V_vals)
             @. cone.W_vals_log = log(W_vals)
-            mul!(cone.tmp, V_vecs, Diagonal(cone.V_vals_log))
-            V_log = mul!(cone.V_log, cone.tmp, V_vecs')
-            mul!(cone.tmp, W_vecs, Diagonal(cone.W_vals_log))
-            W_log = mul!(cone.W_log, cone.tmp, W_vecs')
+            mul!(cone.mat, V_vecs, Diagonal(cone.V_vals_log))
+            V_log = mul!(cone.V_log, cone.mat, V_vecs')
+            mul!(cone.mat, W_vecs, Diagonal(cone.W_vals_log))
+            W_log = mul!(cone.W_log, cone.mat, W_vecs')
             @. cone.WV_log = W_log - V_log
             cone.z = point[1] - dot(W, Hermitian(cone.WV_log, :U))
             cone.is_feas = (cone.z > 0)
@@ -179,10 +185,10 @@ function update_grad(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     z = cone.z
     (V_vals, V_vecs) = cone.V_fact
     (W_vals, W_vecs) = cone.W_fact
-    ldiv!(cone.tmp, Diagonal(V_vals), V_vecs')
-    Vi = mul!(cone.Vi, V_vecs, cone.tmp)
-    ldiv!(cone.tmp, Diagonal(W_vals), W_vecs')
-    Wi = mul!(cone.Wi, W_vecs, cone.tmp)
+    ldiv!(cone.mat, Diagonal(V_vals), V_vecs')
+    Vi = mul!(cone.Vi, V_vecs, cone.mat)
+    ldiv!(cone.mat, Diagonal(W_vals), W_vecs')
+    Wi = mul!(cone.Wi, W_vecs, cone.mat)
 
     cone.grad[1] = -inv(z)
 
@@ -193,9 +199,9 @@ function update_grad(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     diff_mat_V = cone.diff_mat_V
     diff_mat!(diff_mat_V, V_vals, cone.V_vals_log)
     W_similar = cone.W_similar = V_vecs' * W * V_vecs
-    tmp = -V_vecs * (W_similar .* Hermitian(diff_mat_V, :U)) * V_vecs' / z
-    dzdV = @views smat_to_svec!(cone.dzdV, tmp, rt2)
-    grad_V = tmp - Vi
+    temp = -V_vecs * (W_similar .* Hermitian(diff_mat_V, :U)) * V_vecs' / z
+    dzdV = @views smat_to_svec!(cone.dzdV, temp, rt2)
+    grad_V = temp - Vi
     @views smat_to_svec!(cone.grad[V_idxs], grad_V, rt2)
 
     cone.grad_updated = true
@@ -233,7 +239,7 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     Hvv = dz_dV_sqr - dz_sqr_dV_sqr / z + ViVi
 
     dz_sqr_dW_sqr = zeros(T, vw_dim, vw_dim)
-    grad_logm!(dz_sqr_dW_sqr, W_vecs, diff_mat_W, cone.rt2)
+    grad_logm!(dz_sqr_dW_sqr, W_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_W, cone.rt2)
     dz_dW = cone.dzdW
     dz_dW_vec = smat_to_svec!(zeros(T, vw_dim), dz_dW, rt2)
     dz_dW_sqr = dz_dW_vec * dz_dW_vec'
@@ -241,7 +247,7 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     Hww = dz_dW_sqr + dz_sqr_dW_sqr / z + WiWi
 
     dz_sqr_dW_dV = zeros(T, vw_dim, vw_dim)
-    grad_logm!(dz_sqr_dW_dV, V_vecs, diff_mat_V, cone.rt2)
+    grad_logm!(dz_sqr_dW_dV, V_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_V, cone.rt2)
     dz_dW_dz_dV = dz_dW_vec * dzdV'
     Hwv = -dz_sqr_dW_dV / z - dz_dW_dz_dV
 
@@ -255,14 +261,6 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
 
     cone.hess_updated = true
     return cone.hess
-end
-
-# TODO optimize and move out
-function grad_logm!(mat::Matrix{T}, vecs::Matrix{T}, diff_mat::AbstractMatrix{T}, rt2::T) where T
-    A = symm_kron(similar(mat), vecs, rt2, upper_only = false)
-    l = smat_to_svec!(zeros(T, size(mat, 1)), diff_mat, one(T))
-    mat .= A * Diagonal(l) * A'
-    return mat
 end
 
 function hess_tr_logm!(mat, vecs, mat_inner, diff_tensor, rt2::T) where T
