@@ -3,8 +3,6 @@
 (u in R, v in R_+, W in S_+^d) : u >= tr(W * log(W / v))
 
 barrier -log(u - tr(W * log(W / v))) - log(v) - logdet(W) where log() is the matrix logarithm
-
-TODO corrector
 =#
 
 mutable struct EpiPerTraceEntropyTri{T <: Real} <: Cone{T}
@@ -41,6 +39,7 @@ mutable struct EpiPerTraceEntropyTri{T <: Real} <: Cone{T}
     diff_mat::Matrix{T}
     temp1::Vector{T}
     mat::Matrix{T}
+    mat2::Matrix{T}
     matsdim1::Matrix{T}
     matsdim2::Matrix{T}
     grad_logW::Matrix{T}
@@ -63,8 +62,6 @@ end
 
 use_heuristic_neighborhood(::EpiPerTraceEntropyTri) = false
 
-# use_correction(::EpiPerTraceEntropyTri) = false
-
 function setup_extra_data(cone::EpiPerTraceEntropyTri{T}) where T
     dim = cone.dim
     sdim = cone.dim - 2
@@ -78,6 +75,7 @@ function setup_extra_data(cone::EpiPerTraceEntropyTri{T}) where T
     cone.W_vals_log = zeros(T, cone.d)
     cone.temp1 = zeros(T, sdim)
     cone.mat = zeros(T, cone.d, cone.d)
+    cone.mat2 = zeros(T, cone.d, cone.d)
     cone.matsdim1 = zeros(T, sdim, sdim)
     cone.matsdim2 = zeros(T, sdim, sdim)
     cone.grad_logW = zeros(T, sdim, sdim)
@@ -101,17 +99,19 @@ function update_feas(cone::EpiPerTraceEntropyTri{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
-    @views W = Hermitian(svec_to_smat!(cone.W, cone.point[3:cone.dim], cone.rt2), :U)
-    (W_vals, W_vecs) = cone.fact_W = eigen(W)
+    @views W = svec_to_smat!(cone.W, cone.point[3:cone.dim], cone.rt2)
+    copyto!(cone.mat2, W)
+    (W_vals, W_vecs) = cone.fact_W = eigen!(Hermitian(cone.mat2, :U))
 
     if (v > eps(T)) && all(wi -> wi > eps(T), W_vals)
         @. cone.W_vals_log = log(W_vals)
-        cone.lwv = W_vecs * Diagonal(cone.W_vals_log) * W_vecs'
+        mul!(cone.mat, W_vecs, Diagonal(cone.W_vals_log))
+        mul!(cone.lwv, cone.mat, W_vecs')
         lv = log(v)
-        for i in 1:cone.d
+        @inbounds for i in 1:cone.d
             cone.lwv[i, i] -= lv
         end
-        cone.z = u - dot(W, Symmetric(cone.lwv, :U))
+        cone.z = u - dot(Hermitian(W, :U), Hermitian(cone.lwv, :U))
         cone.is_feas = (cone.z > eps(T))
     else
         cone.is_feas = false
@@ -139,15 +139,14 @@ function update_grad(cone::EpiPerTraceEntropyTri)
     @assert cone.is_feas
     u = cone.point[1]
     v = cone.point[2]
-    W = Symmetric(cone.W, :U)
-    # TODO use a different factorization?
+    W = Hermitian(cone.W, :U)
     Wi = cone.Wi = inv(cone.fact_W)
     z = cone.z
     cone.trW = tr(W)
     cone.sigma = cone.trW / v / z
     tau = cone.tau
-    tau .= cone.lwv
-    for i in 1:cone.d
+    copyto!(tau, cone.lwv)
+    @inbounds for i in 1:cone.d
         tau[i, i] += 1
     end
     @. tau /= z
@@ -155,7 +154,8 @@ function update_grad(cone::EpiPerTraceEntropyTri)
 
     cone.grad[1] = -inv(z)
     cone.grad[2] = -sigma - inv(v)
-    @views smat_to_svec!(cone.grad[3:end], tau - Wi, cone.rt2)
+    @. cone.mat = tau - Wi
+    @views smat_to_svec!(cone.grad[3:end], cone.mat, cone.rt2)
 
     cone.grad_updated = true
     return cone.grad
@@ -243,7 +243,7 @@ function correction(cone::EpiPerTraceEntropyTri{T}, primal_dir::AbstractVector{T
     corr[2] /= z
 
     # W
-    diff_tensor = zeros(T, d, d, d) # TODO reshape into a matrix
+    diff_tensor = zeros(T, d, d, d)
     diff_tensor!(diff_tensor, diff_mat, W_vals)
     diff_dot = [temp1[:, q]' * Diagonal(diff_tensor[:, p, q]) * temp1[:, p] for p in 1:d, q in 1:d]
     www_part_1 = W_vecs * diff_dot * W_vecs'

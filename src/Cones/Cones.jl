@@ -592,17 +592,30 @@ function grad_logm!(
     return mul!(mat, tempmat2, veckron')
 end
 
+function diff_mat!(mat::Matrix{T}, vals::Vector{T}, log_vals::Vector{T}) where T
+    rteps = sqrt(eps(T))
+    @inbounds for j in eachindex(vals)
+        (vj, lvj) = (vals[j], log_vals[j])
+        for i in 1:j
+            (vi, lvi) = (vals[i], log_vals[i])
+            mat[i, j] = (abs(vi - vj) < rteps ? inv(vi) : (lvi - lvj) / (vi - vj))
+        end
+    end
+    return mat
+end
+
 function diff_tensor!(diff_tensor::Array{T, 3}, diff_mat::AbstractMatrix{T}, vals::Vector{T}) where T
+    rteps = sqrt(eps(T))
     d = size(diff_mat, 1)
-    for k in 1:d, j in 1:k, i in 1:j
+    @inbounds for k in 1:d, j in 1:k, i in 1:j
         (vi, vj, vk) = (vals[i], vals[j], vals[k])
-        if abs(vj - vk) < sqrt(eps(T))
-            if abs(vi - vj) < sqrt(eps(T))
+        if abs(vj - vk) < rteps
+            if abs(vi - vj) < rteps
                 t = -inv(vi) / vi / 2
             else
                 t = (inv(vj) - diff_mat[i, j]) / (vj - vi)
             end
-        elseif abs(vi - vj) < sqrt(eps(T))
+        elseif abs(vi - vj) < rteps
             t = (inv(vi) - diff_mat[k, i]) / (vi - vk)
         else
             t = (diff_mat[i, j] - diff_mat[k, i]) / (vj - vk)

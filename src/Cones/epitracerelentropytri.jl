@@ -162,19 +162,6 @@ end
 
 is_dual_feas(::EpiTraceRelEntropyTri) = true
 
-# TODO move out
-function diff_mat!(mat::Matrix{T}, vals::Vector{T}, log_vals::Vector{T}) where T
-    rteps = sqrt(eps(T))
-    for j in eachindex(vals)
-        (vj, lvj) = (vals[j], log_vals[j])
-        for i in 1:j
-            (vi, lvi) = (vals[i], log_vals[i])
-            mat[i, j] = (abs(vi - vj) < rteps ? inv(vi) : (lvi - lvj) / (vi - vj))
-        end
-    end
-    return mat
-end
-
 function update_grad(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     @assert cone.is_feas
     d = cone.d
@@ -227,7 +214,7 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     diff_mat_V = Hermitian(cone.diff_mat_V, :U)
     diff_mat_W = Hermitian(cone.diff_mat_W, :U)
 
-    diff_tensor_V = zeros(T, d, d, d) # TODO reshape into a matrix
+    diff_tensor_V = zeros(T, d, d, d)
     diff_tensor!(diff_tensor_V, diff_mat_V, V_vals)
 
     W_similar = cone.W_similar

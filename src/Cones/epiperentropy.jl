@@ -3,9 +3,6 @@
 (u in R, v in R_+, w in R_+^d) : u >= sum_i w_i*log(w_i / v)
 
 barrier -log(u - sum_i w_i*log(w_i / v)) - log(v) - sum_i log(w_i)
-
-TODO
-simplify corrector
 =#
 
 mutable struct EpiPerEntropy{T <: Real} <: Cone{T}
@@ -123,7 +120,7 @@ function update_grad(cone::EpiPerEntropy)
     return cone.grad
 end
 
-function update_hess(cone::EpiPerEntropy{T}) where T
+function update_hess(cone::EpiPerEntropy)
     @assert cone.grad_updated
     u = cone.point[1]
     v = cone.point[2]
