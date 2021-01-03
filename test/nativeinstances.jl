@@ -695,12 +695,7 @@ function epitracerelentropytri1(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    # TODO need https://github.com/JuliaLinearAlgebra/GenericLinearAlgebra.jl/issues/51 to use log with BF
-    (vals_V, vecs_V) = eigen(Hermitian(V, :U))
-    (vals_W, vecs_W) = eigen(Hermitian(W, :U))
-    log_V = vecs_V * Diagonal(log.(vals_V)) * vecs_V'
-    log_W = vecs_W * Diagonal(log.(vals_W)) * vecs_W'
-    @test r.primal_obj ≈ tr(W * log_W - W * log_V) atol=tol rtol=tol
+    @test r.primal_obj ≈ tr(W * log(W) - W * log(V)) atol=tol rtol=tol
 end
 
 function epitracerelentropytri2(T; options...)
@@ -711,8 +706,8 @@ function epitracerelentropytri2(T; options...)
     cone_dim = 2 * svec_dim + 1
     c = vcat(zeros(T, svec_dim), -ones(T, svec_dim))
     A = hcat(Matrix{T}(I, svec_dim, svec_dim), zeros(T, svec_dim, svec_dim))
-    svec_I = Cones.smat_to_svec!(zeros(T, svec_dim), Matrix{T}(I, side, side), rt2)
-    b = svec_I
+    b = zeros(T, svec_dim)
+    b[[sum(1:i) for i in 1:side]] .= 1
     h = vcat(T(5), zeros(T, 2 * svec_dim))
     G = vcat(zeros(T, 1, 2 * svec_dim), ModelUtilities.vec_to_svec!(Diagonal(-one(T) * I, 2 * svec_dim)))
     cones = Cone{T}[Cones.EpiTraceRelEntropyTri{T}(cone_dim)]
@@ -1971,7 +1966,7 @@ function hypoperlogdettri2(T; options...)
     tol = test_tol(T)
     rt2 = sqrt(T(2))
     Random.seed!(1)
-    side = 2
+    side = 3
     for is_complex in (false, true)
         dim = (is_complex ? 2 + side^2 : 2 + Cones.svec_length(side))
         R = (is_complex ? Complex{T} : T)
@@ -2149,7 +2144,7 @@ function hyporootdettri4(T; options...)
 end
 
 function epitracerelentropytri1(T; options...)
-    tol = test_tol(T)
+    tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     rt2 = sqrt(T(2))
     side = 4
@@ -2178,7 +2173,7 @@ function epitracerelentropytri1(T; options...)
 end
 
 function epitracerelentropytri2(T; options...)
-    tol = test_tol(T)
+    tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     rt2 = sqrt(T(2))
     side = 3
@@ -2199,7 +2194,7 @@ function epitracerelentropytri2(T; options...)
 end
 
 function epitracerelentropytri3(T; options...)
-    tol = test_tol(T)
+    tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     rt2 = sqrt(T(2))
     side = 3
@@ -2220,7 +2215,7 @@ function epitracerelentropytri3(T; options...)
 end
 
 function epitracerelentropytri4(T; options...)
-    tol = test_tol(T)
+    tol = sqrt(sqrt(eps(T)))
     Random.seed!(1)
     rt2 = sqrt(T(2))
     side = 3
@@ -2295,71 +2290,72 @@ function wsosinterpnonnegative3(T; options...)
     @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
 end
 
-function wsosinterpepinormone1(T; options...)
-    # min t(x) : t(x) >= abs(x ^ 2) on [-1, 1] where t(x) a constant
-    tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1)
-    @assert U == 3
-    DynamicPolynomials.@polyvar x
-    fn = x ^ 2
-
-    c = ones(T, U)
-    A = T[1 -1 0; 1 0 -1]
-    b = zeros(T, 2)
-    G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U))
-    h = vcat(zeros(T, U), T[fn(pts[u, :]...) for u in 1:U])
-    cones = Cone{T}[Cones.WSOSInterpEpiNormOne{T}(2, U, Ps)]
-
-    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
-    @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ T(U) atol=tol rtol=tol
-    @test r.x ≈ ones(T, U) atol=tol rtol=tol
-end
-
-function wsosinterpepinormone2(T; options...)
-    # min t(x) : t(x) >= abs(x ^ 2) + abs(x - 1) on [-1, 1] where t(x) a constant
+function wsosinterppossemideftri1(T; options...)
+    # convexity parameter for (x + 1) ^ 2 * (x - 1) ^ 2
     tol = test_tol(T)
     (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
-    fn1 = x ^ 2
-    fn2 = (x - 1)
+    fn = (x + 1) ^ 2 * (x - 1) ^ 2
+    H = DynamicPolynomials.differentiate(fn, x, 2)
 
-    c = ones(T, U)
-    A = T[1 -1 0; 1 0 -1]
-    b = zeros(T, 2)
-    G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U), zeros(T, U, U))
-    h = vcat(zeros(T, U), T[fn1(pts[u, :]...) for u in 1:U], T[fn2(pts[u, :]...) for u in 1:U])
-    cones = Cone{T}[Cones.WSOSInterpEpiNormOne{T}(3, U, Ps)]
-
-    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
-    @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ T(3) * U atol=tol rtol=tol
-    @test r.x ≈ fill(T(3), U) atol=tol rtol=tol
-end
-
-function wsosinterpepinormone3(T; options...)
-    if !(T <: LinearAlgebra.BlasReal)
-        return # calc_w only works with BlasReal
-    end
-    # max: w'f: 5x^2 >= abs(f(x)) + abs(3x^2) on [-1, 1], soln is +/- 2x^2
-    tol = test_tol(T)
-    (U, pts, Ps, _, w) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1, calc_w = true)
-    DynamicPolynomials.@polyvar x
-    fn1 = 5x^2
-    fn2 = 3x^2
-
-    c = -T.(w)
-    A = zeros(T, 0, U)
+    c = T[-1]
+    A = zeros(T, 0, 1)
     b = T[]
-    G = vcat(spzeros(T, U, U), Diagonal(-one(T) * I, U), spzeros(T, U, U))
-    h = vcat(T[fn1(pts[u, :]...) for u in 1:U], zeros(T, U), T[fn2(pts[u, :]...) for u in 1:U])
-    cones = Cone{T}[Cones.WSOSInterpEpiNormOne{T}(3, U, Ps)]
+    G = ones(T, U, 1)
+    h = T[H(pts[u, :]...) for u in 1:U]
+    cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(1, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -4 / 3 atol=tol rtol=tol
-    fn_sol = 2x^2
-    @test abs.(r.x) ≈ abs.([fn_sol(pts[u, :]...) for u in 1:U]) atol=tol rtol=tol
+    @test r.primal_obj ≈ T(4) atol=tol rtol=tol
+    @test r.x[1] ≈ -T(4) atol=tol rtol=tol
+end
+
+function wsosinterppossemideftri2(T; options...)
+    # convexity parameter for x[1] ^ 4 - 3 * x[2] ^ 2
+    tol = test_tol(T)
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(2), 1)
+    DynamicPolynomials.@polyvar x[1:2]
+    fn = x[1] ^ 4 - 3 * x[2] ^ 2
+    H = DynamicPolynomials.differentiate(fn, x, 2)
+
+    c = T[-1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
+    h = T[H[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
+    ModelUtilities.vec_to_svec!(h, incr = U)
+    cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ T(6) atol=tol rtol=tol
+    @test r.x[1] ≈ -T(6) atol=tol rtol=tol
+end
+
+function wsosinterppossemideftri3(T; options...)
+    if !(T <: LinearAlgebra.BlasReal)
+        return # too slow with BigFloat real types
+    end
+    # convexity parameter for sum(x .^ 6) - sum(x .^ 2)
+    tol = test_tol(T)
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(3), 2)
+    DynamicPolynomials.@polyvar x[1:3]
+    fn = sum(x .^ 4) - sum(x .^ 2)
+    H = DynamicPolynomials.differentiate(fn, x, 2)
+
+    c = T[-1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1), zeros(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
+    h = T[H[i, j](pts[u, :]...) for i in 1:3 for j in 1:i for u in 1:U]
+    ModelUtilities.vec_to_svec!(h, incr = U)
+    cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(3, U, Ps)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ T(2) atol=tol rtol=tol
+    @test r.x[1] ≈ -T(2) atol=tol rtol=tol
 end
 
 function wsosinterpepinormeucl1(T; options...)
@@ -2429,70 +2425,71 @@ function wsosinterpepinormeucl3(T; options...)
     @test abs2.(r.x) ≈ abs2.([fn_sol(pts[u, :]...) for u in 1:U]) atol=tol rtol=tol
 end
 
-function wsosinterppossemideftri1(T; options...)
-    # convexity parameter for (x + 1) ^ 2 * (x - 1) ^ 2
+function wsosinterpepinormone1(T; options...)
+    # min t(x) : t(x) >= abs(x ^ 2) on [-1, 1] where t(x) a constant
+    tol = test_tol(T)
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1)
+    @assert U == 3
+    DynamicPolynomials.@polyvar x
+    fn = x ^ 2
+
+    c = ones(T, U)
+    A = T[1 -1 0; 1 0 -1]
+    b = zeros(T, 2)
+    G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U))
+    h = vcat(zeros(T, U), T[fn(pts[u, :]...) for u in 1:U])
+    cones = Cone{T}[Cones.WSOSInterpEpiNormOne{T}(2, U, Ps)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ T(U) atol=tol rtol=tol
+    @test r.x ≈ ones(T, U) atol=tol rtol=tol
+end
+
+function wsosinterpepinormone2(T; options...)
+    # min t(x) : t(x) >= abs(x ^ 2) + abs(x - 1) on [-1, 1] where t(x) a constant
     tol = test_tol(T)
     (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
-    fn = (x + 1) ^ 2 * (x - 1) ^ 2
-    H = DynamicPolynomials.differentiate(fn, x, 2)
+    fn1 = x ^ 2
+    fn2 = (x - 1)
 
-    c = T[-1]
-    A = zeros(T, 0, 1)
-    b = T[]
-    G = ones(T, U, 1)
-    h = T[H(pts[u, :]...) for u in 1:U]
-    cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(1, U, Ps)]
-
-    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
-    @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ T(4) atol=tol rtol=tol
-    @test r.x[1] ≈ -T(4) atol=tol rtol=tol
-end
-
-function wsosinterppossemideftri2(T; options...)
-    # convexity parameter for x[1] ^ 4 - 3 * x[2] ^ 2
-    tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(2), 1)
-    DynamicPolynomials.@polyvar x[1:2]
-    fn = x[1] ^ 4 - 3 * x[2] ^ 2
-    H = DynamicPolynomials.differentiate(fn, x, 2)
-
-    c = T[-1]
-    A = zeros(T, 0, 1)
-    b = T[]
-    G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
-    h = T[H[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
-    ModelUtilities.vec_to_svec!(h, incr = U)
-    cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
+    c = ones(T, U)
+    A = T[1 -1 0; 1 0 -1]
+    b = zeros(T, 2)
+    G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U), zeros(T, U, U))
+    h = vcat(zeros(T, U), T[fn1(pts[u, :]...) for u in 1:U], T[fn2(pts[u, :]...) for u in 1:U])
+    cones = Cone{T}[Cones.WSOSInterpEpiNormOne{T}(3, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ T(6) atol=tol rtol=tol
-    @test r.x[1] ≈ -T(6) atol=tol rtol=tol
+    @test r.primal_obj ≈ T(3) * U atol=tol rtol=tol
+    @test r.x ≈ fill(T(3), U) atol=tol rtol=tol
 end
 
-function wsosinterppossemideftri3(T; options...)
+function wsosinterpepinormone3(T; options...)
+    if !(T <: LinearAlgebra.BlasReal)
+        return # calc_w only works with BlasReal
+    end
+    # max: w'f: 5x^2 >= abs(f(x)) + abs(3x^2) on [-1, 1], soln is +/- 2x^2
     tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(1), 3)
+    (U, pts, Ps, _, w) = ModelUtilities.interpolate(ModelUtilities.Box{T}([-one(T)], [one(T)]), 1, calc_w = true)
     DynamicPolynomials.@polyvar x
-    M = [
-        (x + 2x^3)  1;
-        (-x^2 + 2)  (3x^2 - x + 1);
-        ]
-    M = M' * M / 10
+    fn1 = 5x^2
+    fn2 = 3x^2
 
-    c = T[]
-    A = zeros(T, 0, 0)
+    c = -T.(w)
+    A = zeros(T, 0, U)
     b = T[]
-    h = T[M[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
-    G = zeros(T, length(h), 0)
-    ModelUtilities.vec_to_svec!(h, incr = U)
-    cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
+    G = vcat(spzeros(T, U, U), Diagonal(-one(T) * I, U), spzeros(T, U, U))
+    h = vcat(T[fn1(pts[u, :]...) for u in 1:U], zeros(T, U), T[fn2(pts[u, :]...) for u in 1:U])
+    cones = Cone{T}[Cones.WSOSInterpEpiNormOne{T}(3, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
+    @test r.primal_obj ≈ -4 / 3 atol=tol rtol=tol
+    fn_sol = 2x^2
+    @test abs.(r.x) ≈ abs.([fn_sol(pts[u, :]...) for u in 1:U]) atol=tol rtol=tol
 end
 
 function primalinfeas1(T; options...)
