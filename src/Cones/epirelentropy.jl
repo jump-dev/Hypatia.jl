@@ -33,18 +33,18 @@ mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
     lwv::Vector{T}
     tau::Vector{T}
     z::T
-    Hiuu::T
-    Hiuv::Vector{T}
-    Hiuw::Vector{T}
-    Hivv::Vector{T}
-    Hivw::Vector{T}
-    Hiww::Vector{T}
-    rtiuu::T
-    rtiuv::Vector{T}
-    rtiuw::Vector{T}
-    rtivv::Vector{T}
-    rtivw::Vector{T}
-    rtiww::Vector{T}
+    Hiuu::BigFloat
+    Hiuv::Vector{BigFloat}
+    Hiuw::Vector{BigFloat}
+    Hivv::Vector{BigFloat}
+    Hivw::Vector{BigFloat}
+    Hiww::Vector{BigFloat}
+    rtiuu::BigFloat
+    rtiuv::Vector{BigFloat}
+    rtiuw::Vector{BigFloat}
+    rtivv::Vector{BigFloat}
+    rtivw::Vector{BigFloat}
+    rtiww::Vector{BigFloat}
     temp1::Vector{T}
     temp2::Vector{T}
 
@@ -80,16 +80,16 @@ function setup_extra_data(cone::EpiRelEntropy{T}) where {T <: Real}
     w_dim = cone.w_dim
     cone.lwv = zeros(T, w_dim)
     cone.tau = zeros(T, w_dim)
-    cone.Hiuv = zeros(T, w_dim)
-    cone.Hiuw = zeros(T, w_dim)
-    cone.Hivv = zeros(T, w_dim)
-    cone.Hivw = zeros(T, w_dim)
-    cone.Hiww = zeros(T, w_dim)
-    cone.rtiuv = zeros(T, w_dim)
-    cone.rtiuw = zeros(T, w_dim)
-    cone.rtivv = zeros(T, w_dim)
-    cone.rtivw = zeros(T, w_dim)
-    cone.rtiww = zeros(T, w_dim)
+    cone.Hiuv = zeros(BigFloat, w_dim)
+    cone.Hiuw = zeros(BigFloat, w_dim)
+    cone.Hivv = zeros(BigFloat, w_dim)
+    cone.Hivw = zeros(BigFloat, w_dim)
+    cone.Hiww = zeros(BigFloat, w_dim)
+    cone.rtiuv = zeros(BigFloat, w_dim)
+    cone.rtiuw = zeros(BigFloat, w_dim)
+    cone.rtivv = zeros(BigFloat, w_dim)
+    cone.rtivw = zeros(BigFloat, w_dim)
+    cone.rtiww = zeros(BigFloat, w_dim)
     cone.temp1 = zeros(T, w_dim)
     cone.temp2 = zeros(T, w_dim)
     cone.use_inv_hess_sqrt = true
@@ -107,9 +107,18 @@ end
 
 function update_feas(cone::EpiRelEntropy{T}) where T
     @assert !cone.feas_updated
-    u = cone.point[1]
-    @views v = cone.point[cone.v_idxs]
-    @views w = cone.point[cone.w_idxs]
+
+    point = BigFloat.(cone.point)
+    u = point[1]
+    @views v = point[cone.v_idxs]
+    @views w = point[cone.w_idxs]
+    # z = cone.z
+    # lwv = log.(w ./ v)
+    # z = point[1] - dot(w, lwv)
+
+    # u = cone.point[1]
+    # @views v = cone.point[cone.v_idxs]
+    # @views w = cone.point[cone.w_idxs]
 
     if all(vi -> vi > eps(T), v) && all(wi -> wi > eps(T), w)
         @. cone.lwv = log(w / v)
@@ -137,11 +146,15 @@ end
 
 function update_grad(cone::EpiRelEntropy)
     @assert cone.is_feas
-    u = cone.point[1]
-    @views v = cone.point[cone.v_idxs]
-    @views w = cone.point[cone.w_idxs]
-    z = cone.z
+    # u = cone.point[1]
+    # @views v = cone.point[cone.v_idxs]
+    # @views w = cone.point[cone.w_idxs]
+    point = BigFloat.(cone.point)
+    u = point[1]
+    @views v = point[cone.v_idxs]
+    @views w = point[cone.w_idxs]
     g = cone.grad
+    z = cone.z
     tau = cone.tau
 
     @. tau = (cone.lwv + 1) / -z
@@ -158,44 +171,51 @@ function update_hess(cone::EpiRelEntropy{T}) where T
     if !isdefined(cone, :hess)
         cone.hess = Symmetric(zeros(T, cone.dim, cone.dim), :U)
     end
-    u = cone.point[1]
+    # u = cone.point[1]
     v_idxs = cone.v_idxs
     w_idxs = cone.w_idxs
-    point = cone.point
-    @views v = point[v_idxs]
-    @views w = point[w_idxs]
+    # point = cone.point
+    # @views v = point[v_idxs]
+    # @views w = point[w_idxs]
+    point = BigFloat.(cone.point)
+    u = point[1]
+    @views v = point[cone.v_idxs]
+    @views w = point[cone.w_idxs]
+
     tau = cone.tau
     z = cone.z
-    sigma = cone.temp1
-    g = cone.grad
+    # sigma = cone.temp1
     H = cone.hess.data
 
     # H_u_u, H_u_v, H_u_w parts
-    H[1, 1] = abs2(cone.grad[1])
-    @. sigma = w / v / z
+    H[1, 1] = abs2(inv(z))
+    sigma = w ./ v ./ z
     @. @views H[1, v_idxs] = sigma / z
     @. @views H[1, w_idxs] = tau / z
 
     # H_v_v, H_v_w, H_w_w parts
-    zi = inv(z)
+    zinv = inv(z)
     @inbounds for (i, v_idx, w_idx) in zip(1:cone.w_dim, v_idxs, w_idxs)
-        vi = point[v_idx]
-        wi = point[w_idx]
+        vi = v[i]
+        wi = w[i]
         taui = tau[i]
         sigmai = sigma[i]
 
-        H[v_idx, v_idx] = abs2(sigmai) - g[v_idx] / vi
-        H[w_idx, w_idx] = abs2(taui) + (zi + inv(wi)) / wi
+        H[v_idx, v_idx] = abs2(sigmai) + (wi / z + 1) / vi / vi
+        H[w_idx, w_idx] = abs2(taui) + (zinv + inv(wi)) / wi
 
         @. H[v_idx, w_idxs] = sigmai * tau
         @. H[w_idx, v_idxs] = sigma * taui
-        H[v_idx, w_idx] -= zi / vi
+        H[v_idx, w_idx] -= zinv / vi
 
         @inbounds for j in (i + 1):cone.w_dim
             H[v_idx, v_idxs[j]] = sigmai * sigma[j]
             H[w_idx, w_idxs[j]] = taui * tau[j]
         end
     end
+
+    # @show norm(cone.hess * cone.point + cone.grad, Inf)
+
 
     cone.hess_updated = true
     return cone.hess
@@ -204,16 +224,19 @@ end
 # auxiliary calculations for inverse Hessian
 function update_inv_hess_aux(cone::EpiRelEntropy{T}) where T
     @assert !cone.inv_hess_aux_updated
-    point = cone.point
+    point = BigFloat.(cone.point)
     @views v = point[cone.v_idxs]
     @views w = point[cone.w_idxs]
-    z = cone.z
+    # z = cone.z
+    lwv = log.(w ./ v)
+    z = point[1] - dot(w, lwv)
 
     HiuHu = zero(T)
     @inbounds for i in 1:cone.w_dim
         wi = w[i]
         vi = v[i]
-        lwvi = cone.lwv[i]
+        # lwvi = cone.lwv[i]
+        lwvi = lwv[i]
         zwi = z + wi
         z2wi = zwi + wi
         wz2wi = wi / z2wi
@@ -262,29 +285,36 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelE
     @assert cone.grad_updated
     v_idxs = cone.v_idxs
     w_idxs = cone.w_idxs
-    @views v = cone.point[v_idxs]
-    @views w = cone.point[w_idxs]
-    z = cone.z
-    sigma = cone.temp1
-    tau = cone.tau
-    @. sigma = w / v / z # TODO update/cache
+    # @views v = cone.point[v_idxs]
+    # @views w = cone.point[w_idxs]
+    # z = cone.z
+    # sigma = cone.temp1
+    # tau = cone.tau
+    # @. sigma = w / v / z # TODO update/cache
+    # # g = cone.grad
+
+    point = BigFloat.(cone.point)
+    @views v = point[cone.v_idxs]
+    @views w = point[cone.w_idxs]
+    # z = cone.z
+    lwv = log.(w ./ v)
+    z = point[1] - dot(w, lwv)
+    sigma = w ./ v ./ z
+    tau = (lwv .+ 1) ./ -z
 
     @inbounds @views begin
         u_arr = arr[1, :]
-        mul!(prod[1, :], arr[v_idxs, :]', sigma)
-        mul!(prod[1, :], arr[w_idxs, :]', tau, true, true)
-        @. prod[1, :] += u_arr / z
-        mul!(prod[v_idxs, :], sigma, u_arr')
-        mul!(prod[w_idxs, :], tau, u_arr')
-        @. prod /= z
-    end
-
-    @inbounds @views for j in 1:size(prod, 2)
-        vj = arr[v_idxs, j]
-        wj = arr[w_idxs, j]
-        dotprods = dot(sigma, vj) + dot(tau, wj)
-        @. prod[v_idxs, j] += sigma * dotprods + (vj * sigma + vj / v) / v - wj / v / z
-        @. prod[w_idxs, j] += tau * dotprods + (wj / z + wj / w) / w - vj / v / z
+        u_prod = prod[1, :]
+        v_arr = arr[v_idxs, :]
+        v_prod = prod[v_idxs, :]
+        w_arr = arr[w_idxs, :]
+        w_prod = prod[w_idxs, :]
+        mul!(u_prod, v_arr', sigma)
+        mul!(u_prod, w_arr', tau, true, true)
+        @. u_prod += u_arr / z
+        @. v_prod = sigma * u_prod' + (sigma * v_arr + v_arr / v - w_arr / z) / v
+        @. w_prod = tau * u_prod' + (w_arr / z + w_arr / w) / w - v_arr / v / z
+        @. u_prod /= z
     end
 
     return prod
@@ -299,6 +329,7 @@ function update_inv_hess_sqrt_aux(cone::EpiRelEntropy)
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     @assert !cone.inv_hess_sqrt_aux_updated
     cone.rtiuu = arrow_sqrt(cone.Hiuu, cone.Hiuv, cone.Hiuw, cone.Hivv, cone.Hivw, cone.Hiww, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww)
+    # @show cone.rtiuu
     cone.use_inv_hess_sqrt = !iszero(cone.rtiuu)
     cone.inv_hess_sqrt_aux_updated = true
     return
@@ -306,11 +337,45 @@ end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelEntropy)
     @assert cone.inv_hess_sqrt_aux_updated && cone.use_inv_hess_sqrt
+
+    # inv_hess_sqrt_prod!(prod, arr, cone)
+
+# println("hrt")
+    a = Matrix(one(BigFloat) * I, cone.dim, cone.dim)
+    b = similar(a)
+    inv_arrow_sqrt_prod(b, a, cone.rtiuu, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww)
+        # c = similar(a)
+        # arrow_sqrt_prod(c, a, cone.rtiuu, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww)
+        # @show norm(b * c - I)
+
+    H = hess(cone)
+    normdiff = norm(b' * b - H)
+    if normdiff > 1e-5
+        @show normdiff
+        # m = b' * b - H
+        # @show m
+        # c = similar(a)
+        # arrow_sqrt_prod(c, a, cone.rtiuu, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww)
+        # @show norm(b * c)
+        # @show cone.rtiuu, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww
+    end
+
     return inv_arrow_sqrt_prod(prod, arr, cone.rtiuu, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww)
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelEntropy)
     @assert cone.inv_hess_sqrt_aux_updated && cone.use_inv_hess_sqrt
+
+# println("invhrt")
+#     a = Matrix(1.0I, cone.dim, cone.dim)
+#     b = similar(a)
+#     arrow_sqrt_prod(b, a, cone.rtiuu, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww)
+#     H = inv_hess(cone)
+#     if norm(b' * b - H) > 1e-6
+#         m = b' * b - H
+#         @show m
+#     end
+
     return arrow_sqrt_prod(prod, arr, cone.rtiuu, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww)
 end
 

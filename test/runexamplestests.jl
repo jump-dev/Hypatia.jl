@@ -16,26 +16,26 @@ results_path = nothing
 
 # default options to solvers
 default_options = (
-    verbose = false,
-    # verbose = true,
+    # verbose = false,
+    verbose = true,
     default_tol_relax = 10,
     stepper = Solvers.CombinedStepper{Float64}(),
     # stepper = Solvers.PredOrCentStepper{Float64}(),
-    iter_limit = 250,
+    # iter_limit = 23,
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    ("minimal", Float64, 60),
+    # ("minimal", Float64, 60),
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
-    # ("fast", Float64, 60),
+    ("fast", Float64, 60),
     # ("slow", Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
@@ -74,11 +74,11 @@ JuMP_example_names = [
     "portfolio",
     "randompolymat",
     "regionofattr",
-    "robustgeomprog",
+    # "robustgeomprog",
     "secondorderpoly",
     "semidefinitepoly",
     "shapeconregr",
-    "signomialmin",
+    # "signomialmin",
     "stabilitynumber",
     ]
 

@@ -16,7 +16,7 @@ function get_directions(
     stepper::Stepper{T},
     solver::Solver{T},
     use_nt::Bool;
-    iter_ref_steps::Int = 0,
+    iter_ref_steps::Int = 5, # maximum number of iterative refinement steps TODO tune
     ) where {T <: Real}
     rhs = stepper.rhs
     dir = stepper.dir
@@ -29,7 +29,10 @@ function get_directions(
 
     solve_system(system_solver, solver, dir, rhs, tau_scal)
 
+    iszero(iter_ref_steps) && return dir
+
     # use iterative refinement
+    res_tol = 100 * eps(T)
     copyto!(dir_temp, dir.vec)
     apply_lhs(stepper, solver, tau_scal) # modifies res
     res.vec .-= rhs.vec
@@ -38,7 +41,7 @@ function get_directions(
 
     for i in 1:iter_ref_steps
         # @show norm_inf
-        if norm_inf < 100 * eps(T) # TODO change tolerance dynamically
+        if norm_inf < res_tol
             break
         end
         solve_system(system_solver, solver, dir, res, tau_scal)
@@ -59,8 +62,9 @@ function get_directions(
         norm_inf = norm_inf_new
         norm_2 = norm_2_new
     end
-
     @assert !isnan(norm_inf) # TODO error
+    # @show norm_inf
+    solver.worst_iterref_res = max(solver.worst_iterref_res, norm_inf)
 
     return dir
 end

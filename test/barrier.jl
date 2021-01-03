@@ -49,32 +49,32 @@ function test_barrier_oracles(
     # test gradient and Hessian oracles
     test_grad_hess(cone, point, dual_point, tol = tol)
 
-    # check gradient and Hessian agree with ForwardDiff
-    Cones.reset_data(cone)
-    @test Cones.is_feas(cone)
-    @test Cones.is_dual_feas(cone)
-    grad = Cones.grad(cone)
-    hess = Cones.hess(cone)
-    # if dim < 8
-    #     grad = Cones.grad(cone)
-    #     fd_grad = ForwardDiff.gradient(barrier, point)
-    #     @test grad ≈ fd_grad atol=tol rtol=tol
-    #     hess = Cones.hess(cone)
-    #     fd_hess = ForwardDiff.hessian(barrier, point)
-    #     @test hess ≈ fd_hess atol=tol rtol=tol
+    # # check gradient and Hessian agree with ForwardDiff
+    # Cones.reset_data(cone)
+    # @test Cones.is_feas(cone)
+    # @test Cones.is_dual_feas(cone)
+    # grad = Cones.grad(cone)
+    # hess = Cones.hess(cone)
+    # # if dim < 8
+    # #     grad = Cones.grad(cone)
+    # #     fd_grad = ForwardDiff.gradient(barrier, point)
+    # #     @test grad ≈ fd_grad atol=tol rtol=tol
+    # #     hess = Cones.hess(cone)
+    # #     fd_hess = ForwardDiff.hessian(barrier, point)
+    # #     @test hess ≈ fd_hess atol=tol rtol=tol
+    # # end
+
+    # if Cones.use_correction(cone)
+    #     # check correction satisfies log-homog property F'''(s)[s, s] = -2F''(s) * s = 2F'(s)
+    #     @test -Cones.correction(cone, point) ≈ grad atol=tol rtol=tol
+    #     # check correction term agrees with directional 3rd derivative
+    #     (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
+    #     corr = Cones.correction(cone, primal_dir)
+    #     @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
+    #
+    #     # barrier_dir(point, t) = barrier(point + t * primal_dir)
+    #     # @test -2 * corr ≈ ForwardDiff.gradient(x -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(x, t), s), 0), point) atol=tol rtol=tol
     # end
-
-    if Cones.use_correction(cone)
-        # check correction satisfies log-homog property F'''(s)[s, s] = -2F''(s) * s = 2F'(s)
-        @test -Cones.correction(cone, point) ≈ grad atol=tol rtol=tol
-        # check correction term agrees with directional 3rd derivative
-        (primal_dir, dual_dir) = perturb_scale(zeros(T, dim), zeros(T, dim), noise, one(T))
-        corr = Cones.correction(cone, primal_dir)
-        @test dot(corr, point) ≈ dot(primal_dir, hess * primal_dir) atol=tol rtol=tol
-
-        # barrier_dir(point, t) = barrier(point + t * primal_dir)
-        # @test -2 * corr ≈ ForwardDiff.gradient(x -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(x, t), s), 0), point) atol=tol rtol=tol
-    end
 
     return
 end
@@ -99,6 +99,7 @@ function test_grad_hess(cone::Cones.Cone{T}, point::Vector{T}, dual_point::Vecto
     @test Cones.hess_prod!(prod, point, cone) ≈ -grad atol=tol rtol=tol
     @test Cones.inv_hess_prod!(prod, grad, cone) ≈ -point atol=tol rtol=tol
 
+    @show Cones.use_sqrt_oracles(cone)
     if Cones.use_sqrt_oracles(cone)
         prod_mat2 = Matrix(Cones.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
         @test Cones.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol

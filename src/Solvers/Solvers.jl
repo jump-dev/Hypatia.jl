@@ -40,11 +40,16 @@ include("point.jl")
     PrimalInfeasible
     DualInfeasible
     IllPosed
+    NearOptimal
+    NearPrimalInfeasible
+    NearDualInfeasible
+    NearIllPosed
     PrimalInconsistent
     DualInconsistent
     SlowProgress
     IterationLimit
     TimeLimit
+    CannotStep
     NumericalFailure
     UnknownStatus
 end
@@ -62,6 +67,7 @@ mutable struct Solver{T <: Real}
     tol_abs_opt::T
     tol_feas::T
     tol_infeas::T
+    near_tol_factor::T
     tol_slow::T
     preprocess::Bool
     reduce::Bool
@@ -131,8 +137,8 @@ mutable struct Solver{T <: Real}
     x_feas::T
     y_feas::T
     z_feas::T
-    worst_feas::T
     slow_count::Int
+    worst_iterref_res::T
 
     # termination condition helpers
     x_conv_tol::T
@@ -149,6 +155,7 @@ mutable struct Solver{T <: Real}
         tol_infeas::RealOrNothing = nothing,
         default_tol_power::RealOrNothing = nothing,
         default_tol_relax::RealOrNothing = nothing,
+        near_tol_factor::Real = 100,
         tol_slow::Real = 0.01,
         preprocess::Bool = true,
         reduce::Bool = true,
@@ -199,6 +206,7 @@ mutable struct Solver{T <: Real}
         solver.tol_abs_opt = tol_abs_opt
         solver.tol_feas = tol_feas
         solver.tol_infeas = tol_infeas
+        solver.near_tol_factor = near_tol_factor
         solver.tol_slow = tol_slow
         solver.preprocess = preprocess
         solver.reduce = reduce
@@ -241,8 +249,8 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.x_feas = NaN
     solver.y_feas = NaN
     solver.z_feas = NaN
-    solver.worst_feas = NaN
     solver.slow_count = 0
+    solver.worst_iterref_res = 0
 
     solver.goal_opt = NaN
     solver.goal_prinf = NaN
@@ -362,7 +370,10 @@ function solve(solver::Solver{T}) where {T <: Real}
                 break
             end
 
-            step(stepper, solver) || break
+            solver.worst_iterref_res = 0
+            if !step(stepper, solver)
+                solver.status = CannotStep
+            end
             flush(stdout)
             calc_mu(solver)
 
@@ -375,6 +386,35 @@ function solve(solver::Solver{T}) where {T <: Real}
             flush(stdout)
             solver.num_iters += 1
         end
+
+        # copyto!(point.vec, solver.best_point.vec)
+        # calc_residuals(solver)
+        # update_goals(solver)
+        # if verbose
+        #     print_iteration(stepper, solver)
+        #     flush(stdout)
+        # end
+        #
+        # # check if got a near certificate
+        # if solver.status in (CannotStep, SlowProgress)
+        #     if solver.goal_opt < near_tol_factor
+        #         verbose && println("near optimal solution found")
+        #         solver.status = NearOptimal
+        #     elseif solver.goal_prinf < near_tol_factor
+        #         verbose && println("near primal infeasibility detected")
+        #         solver.status = NearPrimalInfeasible
+        #         solver.primal_obj = solver.primal_obj_t
+        #         solver.dual_obj = solver.dual_obj_t
+        #     elseif solver.goal_duinf < near_tol_factor
+        #         verbose && println("near dual infeasibility detected")
+        #         solver.status = NearDualInfeasible
+        #         solver.primal_obj = solver.primal_obj_t
+        #         solver.dual_obj = solver.dual_obj_t
+        #     elseif solver.goal_ip < near_tol_factor
+        #         verbose && println("near ill-posedness detected")
+        #         solver.status = NearIllPosed
+        #     end
+        # end
 
         # finalize result point
         postprocess(solver)
@@ -431,14 +471,13 @@ function calc_residuals(solver::Solver{T}) where {T <: Real}
     solver.dual_obj_t = -dot(model.b, point.y) - dot(model.h, point.z)
     solver.tau_residual = solver.primal_obj_t - solver.dual_obj_t + point.kap[]
 
-    # auxiliary constraint and objective measures for printing and progress checks
+    # auxiliary constraint and objective measures
     solver.primal_obj = solver.primal_obj_t / tau + model.obj_offset
     solver.dual_obj = solver.dual_obj_t / tau + model.obj_offset
     solver.gap = dot(point.z, point.s)
     solver.x_feas = solver.x_norm_res * solver.x_conv_tol
     solver.y_feas = solver.y_norm_res * solver.y_conv_tol
     solver.z_feas = solver.z_norm_res * solver.z_conv_tol
-    solver.worst_feas = max(solver.x_feas, solver.y_feas, solver.z_feas, abs(solver.tau_residual))
 
     return nothing
 end
@@ -548,20 +587,15 @@ include("systemsolvers/common.jl")
 free_memory(::SystemSolver) = nothing
 free_memory(system_solver::Union{NaiveSparseSystemSolver, SymIndefSparseSystemSolver}) = free_memory(system_solver.fact_cache)
 
-# function print_header(stepper::Stepper, solver::Solver)
-#     @printf("\n%5s %9s %12s %12s %9s %9s ", "iter", "goal", "p_obj", "d_obj", "abs_gap", "x_feas")
-#     if !iszero(solver.model.p)
-#         @printf("%9s ", "y_feas")
-#     end
-#     @printf("%9s %9s %9s %9s ", "z_feas", "tau", "kap", "mu")
-#     print_header_more(stepper, solver)
-#     println()
-#     return
-# end
 function print_header(stepper::Stepper, solver::Solver)
     println()
     @printf("%5s %12s %12s %9s ", "iter", "p_obj", "d_obj", "abs_gap")
-    @printf("%9s %9s %9s %9s ", "feas", "tau", "kap", "mu")
+    if iszero(solver.model.p)
+        @printf("%9s %9s ", "x_feas", "z_feas")
+    else
+        @printf("%9s %9s %9s ", "x_feas", "y_feas", "z_feas")
+    end
+    @printf("%9s %9s %9s %9s ", "ir_res", "tau", "kap", "mu")
     @printf("%9s %9s %9s %9s ", "opt", "p_inf", "d_inf", "ill_p")
     print_header_more(stepper, solver)
     println()
@@ -569,27 +603,15 @@ function print_header(stepper::Stepper, solver::Solver)
 end
 print_header_more(stepper::Stepper, solver::Solver) = nothing
 
-# function print_iteration(stepper::Stepper, solver::Solver)
-#     @printf("%5d %9.2e %12.4e %12.4e %9.2e %9.2e ",
-#         solver.num_iters, solver.goal, solver.primal_obj, solver.dual_obj, solver.gap, solver.x_feas
-#         )
-#     if !iszero(solver.model.p)
-#         @printf("%9.2e ", solver.y_feas)
-#     end
-#     @printf("%9.2e %9.2e %9.2e %9.2e ",
-#         solver.z_feas, solver.point.tau[], solver.point.kap[], solver.mu
-#         )
-#     print_iteration_more(stepper, solver)
-#     println()
-#     return
-# end
 function print_iteration(stepper::Stepper, solver::Solver)
-    @printf("%5d %12.4e %12.4e %9.2e ",
-        solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap)
-    @printf("%9.2e %9.2e %9.2e %9.2e ",
-        solver.worst_feas, solver.point.tau[], solver.point.kap[], solver.mu)
-    @printf("%9.2e %9.2e %9.2e %9.2e ",
-        solver.goal_opt, solver.goal_prinf, solver.goal_duinf, solver.goal_ip)
+    @printf("%5d %12.4e %12.4e %9.2e ", solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap)
+    if iszero(solver.model.p)
+        @printf("%9.2e %9.2e ", solver.x_feas, solver.z_feas)
+    else
+        @printf("%9.2e %9.2e %9.2e ", solver.x_feas, solver.y_feas, solver.z_feas)
+    end
+    @printf("%9.2e %9.2e %9.2e %9.2e ", solver.worst_iterref_res, solver.point.tau[], solver.point.kap[], solver.mu)
+    @printf("%9.2e %9.2e %9.2e %9.2e ", solver.goal_opt, solver.goal_prinf, solver.goal_duinf, solver.goal_ip)
     print_iteration_more(stepper, solver)
     println()
     return

@@ -181,16 +181,36 @@ inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
 use_heuristic_neighborhood(cone::Cone) = cone.use_heuristic_neighborhood
 
-function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
-    vec1 = cone.vec1
-    vec2 = cone.vec2
+function in_neighborhood(
+    cone::Cone{T},
+    rtmu::T,
+    max_nbhd::T,
+    ) where {T <: Real}
     g = grad(cone)
-    @. vec1 = cone.dual_point + rtmu * g
 
+    # check numerics
+    # TODO tune
+    gtol = sqrt(sqrt(eps(T)))
+    Htol = 10sqrt(gtol)
+    # grad check
+    if abs(1 + dot(g, cone.point) / get_nu(cone)) > gtol # TODO tune
+        @show abs(1 + dot(g, cone.point) / get_nu(cone))
+        return false
+    end
+    # hess check
+    vec1 = cone.vec1
+    hess_prod!(vec1, cone.point, cone)
+    if abs(1 - dot(vec1, cone.point) / get_nu(cone)) > Htol # TODO tune
+        @show abs(1 - dot(vec1, cone.point) / get_nu(cone))
+        return false
+    end
+
+    @. vec1 = cone.dual_point + rtmu * g
     if use_heuristic_neighborhood(cone)
         nbhd = norm(vec1, Inf) / norm(g, Inf)
         # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(vec1, g)) # TODO try this neighborhood
     else
+        vec2 = cone.vec2
         inv_hess_prod!(vec2, vec1, cone)
         nbhd_sqr = dot(vec2, vec1)
         if nbhd_sqr < -100eps(T) # TODO possibly loosen
@@ -484,7 +504,7 @@ function arrow_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, uu::T, 
 end
 
 # 2x2 block case
-function arrow_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, uu::T, uv::Vector{T}, uw::Vector{T}, vv::Vector{T}, vw::Vector{T}, ww::Vector{T}) where {T <: Real}
+function arrow_prod(prod::AbstractVecOrMat, arr::AbstractVecOrMat, uu::T, uv::Vector{T}, uw::Vector{T}, vv::Vector{T}, vw::Vector{T}, ww::Vector{T}) where {T <: Real}
     @inbounds @views begin
         arru = arr[1, :]
         arrv = arr[2:2:end, :]
@@ -541,7 +561,7 @@ function arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rt
 end
 
 # 2x2 block case
-function arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+function arrow_sqrt_prod(prod::AbstractVecOrMat, arr::AbstractVecOrMat, rtuu::T, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
     @inbounds @views begin
         arr1 = arr[1, :]
         arrv = arr[2:2:end, :]
@@ -560,9 +580,26 @@ function inv_arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}
     end
     return prod
 end
+# # ldiv with upper Cholesky factor of arrow matrix
+# function inv_arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+#     irtuu = inv(rtuu)
+#     irtuw = -rtuw ./ (rtuu .* rtww)
+#     irtww = inv.(rtww)
+#     # arrow_sqrt_prod(prod, arr, irtuu, irtuw, irtww)
+#     # copy_prod = copy(prod)
+#     #
+#     @inbounds @. @views prod[2:end, :] = irtww * arr[2:end, :]
+#     @inbounds @views for j in 1:size(arr, 2)
+#         prod[1, j] = irtuu * arr[1, j] + dot(arr[2:end, j], irtuw)
+#     end
+#     #
+#     # @show prod - copy_prod
+#
+#     return prod
+# end
 
 # 2x2 block case
-function inv_arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
+function inv_arrow_sqrt_prod(prod::AbstractVecOrMat, arr::AbstractVecOrMat, rtuu::T, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
     @inbounds @views begin
         prodw = prod[3:2:end, :]
         @. prodw = arr[3:2:end, :] / rtww
