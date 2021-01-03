@@ -579,6 +579,270 @@ function epirelentropy5(T; options...)
     @test r.z ≈ inv(T(3)) * [1, 1, -1, 1, -1, 1, -1, 3] atol=tol rtol=tol
 end
 
+# TODO add use_dual = true tests
+function epiperentropy1(T; options...)
+    tol = test_tol(T)
+    Random.seed!(1)
+    for w_dim in [1, 2, 3]
+        dim = 2 + w_dim
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = zeros(T, 0)
+        G = zeros(T, dim, 1)
+        G[1, 1] = -1
+        h = zeros(T, dim)
+        h[2] = 1
+        w = rand(T, w_dim) .+ 1
+        h[3:end] .= w
+        cones = Cone{T}[Cones.EpiPerEntropy{T}(dim)]
+
+        r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+        @test r.status == Solvers.Optimal
+        @test r.primal_obj ≈ sum(wi * log(wi) for wi in w) atol=tol rtol=tol
+    end
+end
+
+function epiperentropy2(T; options...)
+    tol = test_tol(T)
+    for w_dim in [1, 2, 4]
+        dim = 2 + w_dim
+        c = fill(-one(T), w_dim)
+        A = zeros(T, 0, w_dim)
+        b = zeros(T, 0)
+        G = vcat(zeros(T, 2, w_dim), Matrix{T}(-I, w_dim, w_dim))
+        h = zeros(T, dim)
+        h[2] = 1
+        cones = Cone{T}[Cones.EpiPerEntropy{T}(dim)]
+
+        r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+        @test r.status == Solvers.Optimal
+        @test r.primal_obj ≈ -w_dim atol=tol rtol=tol
+        @test r.x ≈ fill(1, w_dim) atol=tol rtol=tol
+    end
+end
+
+function epiperentropy3(T; options...)
+    tol = test_tol(T)
+    for w_dim in [2, 4]
+        dim = 2 + w_dim
+        c = T[-1]
+        A = ones(T, 1, 1)
+        b = T[dim]
+        G = zeros(T, dim, 1)
+        G[2, 1] = -1
+        h = zeros(T, dim)
+        h[3:end] .= 1
+        cones = Cone{T}[Cones.EpiPerEntropy{T}(dim)]
+
+        r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+        @test r.status == Solvers.Optimal
+        @test r.primal_obj ≈ -dim atol=tol rtol=tol
+        @test r.x ≈ [dim] atol=tol rtol=tol
+    end
+end
+
+function epiperentropy4(T; options...)
+    tol = test_tol(T)
+    c = T[1]
+    A = zeros(T, 0, 1)
+    b = zeros(T, 0)
+    G = Matrix{T}(-I, 4, 1)
+    h = T[0, 5, 2, 3]
+    cones = Cone{T}[Cones.EpiPerEntropy{T}(4)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    entr = 2 * log(2 / T(5)) + 3 * log(3 / T(5))
+    @test r.primal_obj ≈ entr atol=tol rtol=tol
+    @test r.s ≈ [entr, 5, 2, 3] atol=tol rtol=tol
+    @test r.z ≈ [1, 1, log(5 / T(2)) - 1, log(5 / T(3)) - 1] atol=tol rtol=tol
+end
+
+function epiperentropy5(T; options...)
+    tol = test_tol(T)
+    c = T[0, -1]
+    A = zeros(T, 0, 2)
+    b = zeros(T, 0)
+    G = vcat(zeros(T, 2, 2), fill(-1, 3, 2), [-1, 0]')
+    h = T[0, 1, 0, 0, 0, 0]
+    cones = Cone{T}[Cones.EpiPerEntropy{T}(5), Cones.Nonnegative{T}(1)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    @test r.s ≈ [0, 1, 1, 1, 1, 0] atol=tol rtol=tol
+    @test r.z ≈ inv(T(3)) * [1, 3, -1, -1, -1, 3] atol=tol rtol=tol
+end
+
+function epitracerelentropytri1(T; options...)
+    tol = test_tol(T)
+    Random.seed!(1)
+    rt2 = sqrt(T(2))
+    side = 4
+    svec_dim = Cones.svec_length(side)
+    cone_dim = 2 * svec_dim + 1
+    c = T[1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    W = rand(T, side, side)
+    W = W * W'
+    V = rand(T, side, side)
+    V = V * V'
+    h = vcat(zero(T), Cones.smat_to_svec!(zeros(T, svec_dim), V, rt2), Cones.smat_to_svec!(zeros(T, svec_dim), W, rt2))
+    G = zeros(T, cone_dim, 1)
+    G[1, 1] = -1
+    cones = Cone{T}[Cones.EpiTraceRelEntropyTri{T}(cone_dim)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ tr(W * log(W) - W * log(V)) atol=tol rtol=tol
+end
+
+function epitracerelentropytri2(T; options...)
+    tol = test_tol(T)
+    rt2 = sqrt(T(2))
+    side = 3
+    svec_dim = Cones.svec_length(side)
+    cone_dim = 2 * svec_dim + 1
+    c = vcat(zeros(T, svec_dim), -ones(T, svec_dim))
+    A = hcat(Matrix{T}(I, svec_dim, svec_dim), zeros(T, svec_dim, svec_dim))
+    b = zeros(T, svec_dim)
+    b[[sum(1:i) for i in 1:side]] .= 1
+    h = vcat(T(5), zeros(T, 2 * svec_dim))
+    G = vcat(zeros(T, 1, 2 * svec_dim), ModelUtilities.vec_to_svec!(Diagonal(-one(T) * I, 2 * svec_dim)))
+    cones = Cone{T}[Cones.EpiTraceRelEntropyTri{T}(cone_dim)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    W = Hermitian(Cones.svec_to_smat!(zeros(T, side, side), r.s[(svec_dim + 2):end], rt2), :U)
+    @test tr(W * log(W)) ≈ T(5) atol=tol rtol=tol
+end
+
+function epitracerelentropytri3(T; options...)
+    tol = test_tol(T)
+    rt2 = sqrt(T(2))
+    side = 3
+    svec_dim = Cones.svec_length(side)
+    cone_dim = 2 * svec_dim + 1
+    c = vcat(zeros(T, svec_dim + 1), ones(T, svec_dim))
+    A = hcat(one(T), zeros(T, 1, 2 * svec_dim))
+    b = [zero(T)]
+    h = zeros(T, cone_dim)
+    G = Diagonal(-one(T) * I, cone_dim)
+    cones = Cone{T}[Cones.EpiTraceRelEntropyTri{T}(cone_dim)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
+    @test r.s[1] ≈ zero(T) atol=tol rtol=tol
+    @test r.s[(svec_dim + 2):end] ≈ zeros(T, svec_dim) atol=tol rtol=tol
+end
+
+function epitracerelentropytri4(T; options...)
+    tol = test_tol(T)
+    Random.seed!(1)
+    rt2 = sqrt(T(2))
+    side = 3
+    svec_dim = Cones.svec_length(side)
+    cone_dim = 2 * svec_dim + 1
+    c = vcat(zero(T), ones(T, svec_dim), zeros(T, svec_dim))
+    A = hcat(one(T), zeros(T, 1, 2 * svec_dim))
+    b = [zero(T)]
+    h = zeros(T, cone_dim)
+    G = Diagonal(-one(T) * I, cone_dim)
+    cones = Cone{T}[Cones.EpiTraceRelEntropyTri{T}(cone_dim)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
+    @test r.s ≈ zeros(T, cone_dim) atol=tol rtol=tol
+end
+
+function epipertraceentropytri1(T; options...)
+    tol = test_tol(T)
+    Random.seed!(1)
+    rt2 = sqrt(T(2))
+    side = 4
+    svec_dim = Cones.svec_length(side)
+    cone_dim = svec_dim + 2
+    c = T[1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    W = rand(T, side, side)
+    W = W * W'
+    v = rand(T)
+    h = vcat(zero(T), v, Cones.smat_to_svec!(zeros(T, svec_dim), W, rt2))
+    G = zeros(T, cone_dim, 1)
+    G[1, 1] = -1
+    cones = Cone{T}[Cones.EpiPerTraceEntropyTri{T}(cone_dim)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    # TODO need https://github.com/JuliaLinearAlgebra/GenericLinearAlgebra.jl/issues/51 to use log with BF
+    (vals_W, vecs_W) = eigen(Hermitian(W, :U))
+    log_W = vecs_W * Diagonal(log.(vals_W)) * vecs_W'
+    @test r.primal_obj ≈ tr(W * log_W - W * log(v)) atol=tol rtol=tol
+end
+
+function epipertraceentropytri2(T; options...)
+    tol = test_tol(T)
+    rt2 = sqrt(T(2))
+    side = 3
+    svec_dim = Cones.svec_length(side)
+    cone_dim = svec_dim + 2
+    c = vcat(zero(T), -ones(T, svec_dim))
+    A = hcat(one(T), zeros(T, 1, svec_dim))
+    b = T[1]
+    h = vcat(T(5), zeros(T, svec_dim + 1))
+    G = vcat(zeros(T, 1, svec_dim + 1), ModelUtilities.vec_to_svec!(Diagonal(-one(T) * I, svec_dim + 1)))
+    cones = Cone{T}[Cones.EpiPerTraceEntropyTri{T}(cone_dim)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    W = Hermitian(Cones.svec_to_smat!(zeros(T, side, side), r.s[3:end], rt2), :U)
+    @test r.s[2] ≈ 1 atol=tol rtol=tol
+    @test tr(W * log(W)) ≈ T(5) atol=tol rtol=tol
+end
+
+function epipertraceentropytri3(T; options...)
+    tol = test_tol(T)
+    rt2 = sqrt(T(2))
+    side = 3
+    svec_dim = Cones.svec_length(side)
+    cone_dim = svec_dim + 2
+    c = vcat(zeros(T, 2), ones(T, svec_dim))
+    A = hcat(one(T), zeros(T, 1, svec_dim + 1))
+    b = [zero(T)]
+    h = zeros(T, cone_dim)
+    G = Diagonal(-one(T) * I, cone_dim)
+    cones = Cone{T}[Cones.EpiPerTraceEntropyTri{T}(cone_dim)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
+    @test r.s[1] ≈ zero(T) atol=tol rtol=tol
+    @test r.s[3:end] ≈ zeros(T, svec_dim) atol=tol rtol=tol
+end
+
+function epipertraceentropytri4(T; options...)
+    tol = test_tol(T)
+    rt2 = sqrt(T(2))
+    side = 3
+    svec_dim = Cones.svec_length(side)
+    cone_dim = svec_dim + 2
+    c = vcat(zero(T), one(T), zeros(T, svec_dim))
+    A = hcat(one(T), zeros(T, 1, svec_dim + 1))
+    b = [zero(T)]
+    h = zeros(T, cone_dim)
+    G = Diagonal(-one(T) * I, cone_dim)
+    cones = Cone{T}[Cones.EpiPerTraceEntropyTri{T}(cone_dim)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
+    @test r.s ≈ zeros(T, cone_dim) atol=tol rtol=tol
+end
+
 function hypoperlog1(T; options...)
     tol = test_tol(T)
     Texph = exp(T(0.5))
