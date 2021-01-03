@@ -87,7 +87,9 @@ inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 function use_sqrt_oracles(cone::Cone)
-    cone.hess_fact_updated || update_hess_fact(cone; recover = true)
+    if !cone.hess_fact_updated
+        update_hess_fact(cone) || return false
+    end
     return (cone.hess_fact_cache isa DensePosDefCache)
 end
 
@@ -103,27 +105,22 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     return prod
 end
 
-function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
+function update_hess_fact(cone::Cone{T}) where {T <: Real}
     cone.hess_fact_updated && return true
     if !cone.hess_updated
         update_hess(cone)
     end
 
-    fact_success = update_fact(cone.hess_fact_cache, cone.hess)
-
-    if !fact_success
-        recover || return false
+    if !update_fact(cone.hess_fact_cache, cone.hess)
         if T <: BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
             # @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
             cone.hess_fact_cache = DenseSymCache{T}()
             load_matrix(cone.hess_fact_cache, cone.hess)
+            if !update_fact(cone.hess_fact_cache, cone.hess)
+                @warn("Hessian Bunch-Kaufman factorization failed after recovery")
+                return false
+            end
         else
-            # attempt recovery
-            # TODO safer to only change the copy of the hessian that is getting factorized, not the hessian itself
-            increase_diag!(cone.hess.data)
-        end
-        if !update_fact(cone.hess_fact_cache, cone.hess)
-            @warn("Hessian Bunch-Kaufman factorization failed after recovery")
             return false
         end
     end
@@ -133,36 +130,28 @@ function update_hess_fact(cone::Cone{T}; recover::Bool = true) where {T <: Real}
 end
 
 function update_inv_hess(cone::Cone)
-    if !cone.hess_fact_updated
-        update_hess_fact(cone)
-    end
+    update_hess_fact(cone)
     invert(cone.hess_fact_cache, cone.inv_hess)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    if !cone.hess_fact_updated
-        update_hess_fact(cone)
-    end
+    update_hess_fact(cone)
     copyto!(prod, arr)
     inv_prod(cone.hess_fact_cache, prod)
     return prod
 end
 
 function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    if !cone.hess_fact_updated
-        update_hess_fact(cone)
-    end
+    update_hess_fact(cone)
     copyto!(prod, arr)
     sqrt_prod(cone.hess_fact_cache, prod)
     return prod
 end
 
 function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    if !cone.hess_fact_updated
-        update_hess_fact(cone)
-    end
+    update_hess_fact(cone)
     copyto!(prod, arr)
     inv_sqrt_prod(cone.hess_fact_cache, prod)
     return prod
@@ -181,52 +170,37 @@ inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
 use_heuristic_neighborhood(cone::Cone) = cone.use_heuristic_neighborhood
 
-# function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
-#     vec1 = cone.vec1
-#     vec2 = cone.vec2
-#     g = grad(cone)
-#     @. vec1 = cone.dual_point + rtmu * g
-#
-#     if use_heuristic_neighborhood(cone)
-#         nbhd = norm(vec1, Inf) / norm(g, Inf)
-#         # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(vec1, g)) # TODO try this neighborhood
-#     else
-#         inv_hess_prod!(vec2, vec1, cone)
-#         nbhd_sqr = dot(vec2, vec1)
-#         if nbhd_sqr < -100eps(T) # TODO possibly loosen
-#             # @warn("numerical failure: cone neighborhood is $nbhd_sqr")
-#             return false
-#         end
-#         nbhd = sqrt(abs(nbhd_sqr))
-#     end
-#
-#     return (nbhd < rtmu * max_nbhd)
-# end
-
 function in_neighborhood(
     cone::Cone{T},
     rtmu::T,
     max_nbhd::T,
     ) where {T <: Real}
     g = grad(cone)
+    vec1 = cone.vec1
 
-    # check numerics
+    # check numerics of barrier oracles
     # TODO tune
-    gtol = sqrt(sqrt(eps(T)))
-    Htol = 100sqrt(gtol)
+    tol = sqrt(eps(T))
+    gtol = sqrt(tol)
+    Htol = 10sqrt(gtol)
+    dim = dimension(cone)
+    nu = get_nu(cone)
     # grad check
-    if abs(1 + dot(g, cone.point) / get_nu(cone)) > gtol # TODO tune
-        @show abs(1 + dot(g, cone.point) / get_nu(cone))
+    if abs(1 + dot(g, cone.point) / nu) > gtol * dim
         return false
     end
     # hess check
-    vec1 = cone.vec1
     hess_prod!(vec1, cone.point, cone)
-    if abs(1 - dot(vec1, cone.point) / get_nu(cone)) > Htol # TODO tune
-        @show abs(1 - dot(vec1, cone.point) / get_nu(cone))
+    if abs(1 - dot(vec1, cone.point) / nu) > Htol * dim
+        return false
+    end
+    # inv hess check
+    inv_hess_prod!(vec1, g, cone)
+    if abs(1 - dot(vec1, g) / nu) > Htol * dim
         return false
     end
 
+    # check neighborhood condition
     @. vec1 = cone.dual_point + rtmu * g
     if use_heuristic_neighborhood(cone)
         nbhd = norm(vec1, Inf) / norm(g, Inf)
@@ -235,8 +209,7 @@ function in_neighborhood(
         vec2 = cone.vec2
         inv_hess_prod!(vec2, vec1, cone)
         nbhd_sqr = dot(vec2, vec1)
-        if nbhd_sqr < -100eps(T) # TODO possibly loosen
-            # @warn("numerical failure: cone neighborhood is $nbhd_sqr")
+        if nbhd_sqr < -tol * dim
             return false
         end
         nbhd = sqrt(abs(nbhd_sqr))

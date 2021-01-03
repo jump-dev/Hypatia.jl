@@ -281,7 +281,7 @@ function solve(solver::Solver{T}) where {T <: Real}
         solver.prev_x_feas = NaN
         solver.prev_y_feas = NaN
         solver.prev_z_feas = NaN
-        solver.worst_dir_res = NaN
+        solver.worst_dir_res = 0
 
         stepper = solver.stepper
         load(stepper, solver)
@@ -477,11 +477,11 @@ function initialize_cone_point(model::Models.Model{T}) where {T <: Real}
         dual_k = view(Cones.use_dual_barrier(cone) ? init_s : init_z, idxs)
         Cones.set_initial_point(primal_k, cone)
         Cones.load_point(cone, primal_k)
-        @assert Cones.is_feas(cone) # TODO error?
+        @assert Cones.is_feas(cone)
         g = Cones.grad(cone)
         @. dual_k = -g
         Cones.load_dual_point(cone, dual_k)
-        hasfield(typeof(cone), :hess_fact_cache) && @assert Cones.update_hess_fact(cone) # TODO error?
+        @assert Cones.is_dual_feas(cone)
     end
 
     return (init_z, init_s)
