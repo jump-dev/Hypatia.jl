@@ -32,6 +32,7 @@ mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
 
     lwv::Vector{T}
     tau::Vector{T}
+    sigma::Vector{T}
     z::T
     Hiuu::T
     Hiuv::Vector{T}
@@ -88,6 +89,7 @@ function setup_extra_data(cone::EpiRelEntropy{T}) where {T <: Real}
     w_dim = cone.w_dim
     cone.lwv = zeros(T, w_dim)
     cone.tau = zeros(T, w_dim)
+    cone.sigma = zeros(T, w_dim)
     cone.Hiuv = zeros(T, w_dim)
     cone.Hiuw = zeros(T, w_dim)
     cone.Hivv = zeros(T, w_dim)
@@ -145,17 +147,18 @@ end
 
 function update_grad(cone::EpiRelEntropy)
     @assert cone.is_feas
-    u = cone.point[1]
     @views v = cone.point[cone.v_idxs]
     @views w = cone.point[cone.w_idxs]
     z = cone.z
-    g = cone.grad
+    sigma = cone.sigma
     tau = cone.tau
+    g = cone.grad
 
+    @. sigma = w / v / z
     @. tau = (cone.lwv + 1) / -z
     g[1] = -inv(z)
-    @. @views g[cone.v_idxs] = -(w / z + 1) / v
-    @. @views g[cone.w_idxs] = -inv(w) - tau
+    @. @views g[cone.v_idxs] = -sigma - inv(v)
+    @. @views g[cone.w_idxs] = -tau - inv(w)
 
     cone.grad_updated = true
     return cone.grad
@@ -172,20 +175,19 @@ function update_hess(cone::EpiRelEntropy{T}) where T
     point = cone.point
     @views v = point[v_idxs]
     @views w = point[w_idxs]
-    tau = cone.tau
     z = cone.z
-    sigma = cone.temp1
+    sigma = cone.sigma
+    tau = cone.tau
     g = cone.grad
     H = cone.hess.data
 
     # H_u_u, H_u_v, H_u_w parts
-    H[1, 1] = abs2(cone.grad[1])
-    @. sigma = w / v / z
+    H[1, 1] = abs2(g[1])
     @. @views H[1, v_idxs] = sigma / z
     @. @views H[1, w_idxs] = tau / z
 
     # H_v_v, H_v_w, H_w_w parts
-    zi = inv(z)
+    zinv = inv(z)
     @inbounds for (i, v_idx, w_idx) in zip(1:cone.w_dim, v_idxs, w_idxs)
         vi = point[v_idx]
         wi = point[w_idx]
@@ -193,11 +195,11 @@ function update_hess(cone::EpiRelEntropy{T}) where T
         sigmai = sigma[i]
 
         H[v_idx, v_idx] = abs2(sigmai) - g[v_idx] / vi
-        H[w_idx, w_idx] = abs2(taui) + (zi + inv(wi)) / wi
+        H[w_idx, w_idx] = abs2(taui) + (zinv + inv(wi)) / wi
 
         @. H[v_idx, w_idxs] = sigmai * tau
         @. H[w_idx, v_idxs] = sigma * taui
-        H[v_idx, w_idx] -= zi / vi
+        H[v_idx, w_idx] -= zinv / vi
 
         @inbounds for j in (i + 1):cone.w_dim
             H[v_idx, v_idxs[j]] = sigmai * sigma[j]
@@ -273,26 +275,22 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelE
     @views v = cone.point[v_idxs]
     @views w = cone.point[w_idxs]
     z = cone.z
-    sigma = cone.temp1
+    sigma = cone.sigma
     tau = cone.tau
-    @. sigma = w / v / z # TODO update/cache
 
     @inbounds @views begin
         u_arr = arr[1, :]
-        mul!(prod[1, :], arr[v_idxs, :]', sigma)
-        mul!(prod[1, :], arr[w_idxs, :]', tau, true, true)
-        @. prod[1, :] += u_arr / z
-        mul!(prod[v_idxs, :], sigma, u_arr')
-        mul!(prod[w_idxs, :], tau, u_arr')
-        @. prod /= z
-    end
-
-    @inbounds @views for j in 1:size(prod, 2)
-        vj = arr[v_idxs, j]
-        wj = arr[w_idxs, j]
-        dotprods = dot(sigma, vj) + dot(tau, wj)
-        @. prod[v_idxs, j] += sigma * dotprods + (vj * sigma + vj / v) / v - wj / v / z
-        @. prod[w_idxs, j] += tau * dotprods + (wj / z + wj / w) / w - vj / v / z
+        u_prod = prod[1, :]
+        v_arr = arr[v_idxs, :]
+        v_prod = prod[v_idxs, :]
+        w_arr = arr[w_idxs, :]
+        w_prod = prod[w_idxs, :]
+        mul!(u_prod, v_arr', sigma)
+        mul!(u_prod, w_arr', tau, true, true)
+        @. u_prod += u_arr / z
+        @. v_prod = sigma * u_prod' + (sigma * v_arr + v_arr / v - w_arr / z) / v
+        @. w_prod = tau * u_prod' + (w_arr / z + w_arr / w) / w - v_arr / v / z
+        @. u_prod /= z
     end
 
     return prod
