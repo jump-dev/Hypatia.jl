@@ -1,14 +1,14 @@
 
 insts = Dict()
 insts["minimal"] = [
-    ((2, 3, true, true),),
-    ((2, 3, true, false),),
+    ((2, 4, true, true),),
+    ((2, 4, true, false),),
     ((2, 2, false, true),),
     ((2, 2, false, false),),
     ]
 insts["fast"] = [
-    ((5, 6, true, true),),
-    ((5, 6, true, false),),
+    ((3, 6, true, true),),
+    ((3, 6, true, false),),
     ((5, 5, false, true),),
     ((5, 5, false, false),),
     ((10, 20, true, true),),

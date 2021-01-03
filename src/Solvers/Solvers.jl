@@ -129,6 +129,7 @@ mutable struct Solver{T <: Real}
     prev_x_feas::T
     prev_y_feas::T
     prev_z_feas::T
+    worst_dir_res::T
 
     # data scaling
     used_rescaling::Bool
@@ -185,6 +186,7 @@ mutable struct Solver{T <: Real}
         if isnothing(tol_infeas)
             tol_infeas = default_tol_tight
         end
+        @assert min(tol_rel_opt, tol_abs_opt, tol_feas, tol_infeas, tol_slow) > 0
 
         solver = new{T}()
 
@@ -279,6 +281,7 @@ function solve(solver::Solver{T}) where {T <: Real}
         solver.prev_x_feas = NaN
         solver.prev_y_feas = NaN
         solver.prev_z_feas = NaN
+        solver.worst_dir_res = 0
 
         stepper = solver.stepper
         load(stepper, solver)
@@ -474,11 +477,11 @@ function initialize_cone_point(model::Models.Model{T}) where {T <: Real}
         dual_k = view(Cones.use_dual_barrier(cone) ? init_s : init_z, idxs)
         Cones.set_initial_point(primal_k, cone)
         Cones.load_point(cone, primal_k)
-        @assert Cones.is_feas(cone) # TODO error?
+        @assert Cones.is_feas(cone)
         g = Cones.grad(cone)
         @. dual_k = -g
         Cones.load_dual_point(cone, dual_k)
-        hasfield(typeof(cone), :hess_fact_cache) && @assert Cones.update_hess_fact(cone) # TODO error?
+        @assert Cones.is_dual_feas(cone)
     end
 
     return (init_z, init_s)
@@ -518,5 +521,35 @@ include("systemsolvers/common.jl")
 # release memory used by sparse system solvers
 free_memory(::SystemSolver) = nothing
 free_memory(system_solver::Union{NaiveSparseSystemSolver, SymIndefSparseSystemSolver}) = free_memory(system_solver.fact_cache)
+
+# verbose helpers
+function print_header(stepper::Stepper, solver::Solver)
+    println()
+    @printf("%5s %12s %12s %9s ", "iter", "p_obj", "d_obj", "abs_gap")
+    if iszero(solver.model.p)
+        @printf("%9s %9s ", "x_feas", "z_feas")
+    else
+        @printf("%9s %9s %9s ", "x_feas", "y_feas", "z_feas")
+    end
+    @printf("%9s %9s %9s %9s ", "tau", "kap", "mu", "ir_res")
+    print_header_more(stepper, solver)
+    println()
+    return
+end
+print_header_more(stepper::Stepper, solver::Solver) = nothing
+
+function print_iteration(stepper::Stepper, solver::Solver)
+    @printf("%5d %12.4e %12.4e %9.2e ", solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap)
+    if iszero(solver.model.p)
+        @printf("%9.2e %9.2e ", solver.x_feas, solver.z_feas)
+    else
+        @printf("%9.2e %9.2e %9.2e ", solver.x_feas, solver.y_feas, solver.z_feas)
+    end
+    @printf("%9.2e %9.2e %9.2e %9.2e ", solver.point.tau[], solver.point.kap[], solver.mu, solver.worst_dir_res)
+    print_iteration_more(stepper, solver)
+    println()
+    return
+end
+print_iteration_more(stepper::Stepper, solver::Solver) = nothing
 
 end

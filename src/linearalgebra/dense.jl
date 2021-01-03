@@ -65,7 +65,7 @@ for (getrf, elty) in [(:dgetrf_, :Float64), (:sgetrf_, :Float32)]
             if cache.info[] < 0
                 throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK call"))
             elseif 0 < cache.info[] <= n
-                @warn("factorization failed: #$(cache.info[])")
+                # @warn("factorization failed: #$(cache.info[])")
                 return false
             elseif cache.info[] > n
                 @warn("condition number is small: $(cache.rcond[])")

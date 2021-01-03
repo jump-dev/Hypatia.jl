@@ -263,7 +263,8 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
     # update solution for fixed c,b,h part
     rhs_const = system_solver.rhs_const
     for (k, cone_k) in enumerate(model.cones)
-        block_hess_prod(cone_k, rhs_const.z_views[k], model.h[model.cone_idxs[k]])
+        @inbounds @views h_k = model.h[model.cone_idxs[k]]
+        block_hess_prod(cone_k, rhs_const.z_views[k], h_k)
     end
     solve_subsystem3(system_solver, solver, system_solver.sol_const, rhs_const)
 

@@ -17,7 +17,6 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     use_heuristic_neighborhood::Bool
     dim::Int
     d::Int
-    rt2::T
 
     point::Vector{T}
     dual_point::Vector{T}
@@ -36,6 +35,7 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     hess_fact_cache
 
     # TODO type fields
+    rt2::T
     V
     W
     Vi
@@ -81,19 +81,13 @@ end
 
 use_correction(::EpiTraceRelEntropyTri) = false # TODO
 
-# TODO only allocate the fields we use
 function setup_extra_data(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
-    reset_data(cone)
     dim = cone.dim
-    cone.rt2 = sqrt(T(2))
-    cone.point = zeros(T, dim)
-    cone.dual_point = zeros(T, dim)
-    cone.grad = zeros(T, dim)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.correction = zeros(T, dim)
     d = cone.d
+    cone.rt2 = sqrt(T(2))
     cone.V = zeros(T, d, d)
     cone.W = zeros(T, d, d)
     cone.Vi = zeros(T, d, d)
