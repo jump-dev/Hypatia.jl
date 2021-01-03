@@ -10,7 +10,7 @@ function update_rhs_pred(
     rhs.x .= solver.x_residual
     rhs.y .= solver.y_residual
     rhs.z .= solver.z_residual
-    rhs.tau[] = solver.point.kap[] + solver.primal_obj_t - solver.dual_obj_t
+    rhs.tau[] = solver.tau_residual
 
     for (s_k, d_k) in zip(rhs.s_views, solver.point.dual_views)
         @. s_k = -d_k

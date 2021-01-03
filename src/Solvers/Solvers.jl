@@ -102,6 +102,7 @@ mutable struct Solver{T <: Real}
     x_residual::Vector{T}
     y_residual::Vector{T}
     z_residual::Vector{T}
+    tau_residual::T
     x_norm_res_t::T
     y_norm_res_t::T
     z_norm_res_t::T
@@ -271,6 +272,7 @@ function solve(solver::Solver{T}) where {T <: Real}
         solver.x_residual = zero(model.c)
         solver.y_residual = zero(model.b)
         solver.z_residual = zero(model.h)
+        solver.tau_residual = 0
 
         solver.x_conv_tol = inv(1 + norm(model.c, Inf))
         solver.y_conv_tol = inv(1 + norm(model.b, Inf))
@@ -292,8 +294,6 @@ function solve(solver::Solver{T}) where {T <: Real}
 
         # iterate from initial point
         while true
-            calc_residual(solver)
-
             calc_convergence_params(solver)
 
             if solver.verbose
@@ -348,7 +348,7 @@ function calc_mu(solver::Solver{T}) where {T <: Real}
     return solver.mu
 end
 
-function calc_residual(solver::Solver{T}) where {T <: Real}
+function calc_convergence_params(solver::Solver{T}) where {T <: Real}
     model = solver.model
     point = solver.point
     tau = point.tau[]
@@ -377,29 +377,26 @@ function calc_residual(solver::Solver{T}) where {T <: Real}
     @. z_residual -= model.h * tau
     solver.z_norm_res = norm(z_residual, Inf) / tau
 
-    return nothing
-end
+    # tau_residual = c'*x + b'*y + h'*z + kap
+    solver.primal_obj_t = dot(model.c, point.x)
+    solver.dual_obj_t = -dot(model.b, point.y) - dot(model.h, point.z)
+    solver.tau_residual = solver.primal_obj_t - solver.dual_obj_t + point.kap[]
 
-function calc_convergence_params(solver::Solver{T}) where {T <: Real}
-    model = solver.model
-    point = solver.point
-
+    # gap
+    solver.primal_obj = solver.primal_obj_t / tau + model.obj_offset
+    solver.dual_obj = solver.dual_obj_t / tau + model.obj_offset
     solver.prev_gap = solver.gap
+    solver.gap = dot(point.z, point.s)
+
+    # feas
     solver.prev_x_feas = solver.x_feas
     solver.prev_y_feas = solver.y_feas
     solver.prev_z_feas = solver.z_feas
-
-    solver.primal_obj_t = dot(model.c, point.x)
-    solver.dual_obj_t = -dot(model.b, point.y) - dot(model.h, point.z)
-    solver.primal_obj = solver.primal_obj_t / solver.point.tau[] + model.obj_offset
-    solver.dual_obj = solver.dual_obj_t / solver.point.tau[] + model.obj_offset
-    solver.gap = dot(point.z, point.s)
-
     solver.x_feas = solver.x_norm_res * solver.x_conv_tol
     solver.y_feas = solver.y_norm_res * solver.y_conv_tol
     solver.z_feas = solver.z_norm_res * solver.z_conv_tol
 
-    return
+    return nothing
 end
 
 function check_convergence(solver::Solver{T}) where {T <: Real}
