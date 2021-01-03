@@ -213,7 +213,7 @@ function in_neighborhood(
     # check numerics
     # TODO tune
     gtol = sqrt(sqrt(eps(T)))
-    Htol = 10sqrt(gtol)
+    Htol = 100sqrt(gtol)
     # grad check
     if abs(1 + dot(g, cone.point) / get_nu(cone)) > gtol # TODO tune
         @show abs(1 + dot(g, cone.point) / get_nu(cone))
