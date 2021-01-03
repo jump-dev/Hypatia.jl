@@ -235,6 +235,7 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.x_feas = NaN
     solver.y_feas = NaN
     solver.z_feas = NaN
+    solver.tau_feas = NaN
 
     # preprocess and find initial point
     orig_model = solver.orig_model
