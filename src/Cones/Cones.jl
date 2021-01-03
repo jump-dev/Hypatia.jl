@@ -181,16 +181,58 @@ inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
 use_heuristic_neighborhood(cone::Cone) = cone.use_heuristic_neighborhood
 
-function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
-    vec1 = cone.vec1
-    vec2 = cone.vec2
-    g = grad(cone)
-    @. vec1 = cone.dual_point + rtmu * g
+# function in_neighborhood(cone::Cone{T}, rtmu::T, max_nbhd::T) where {T <: Real}
+#     vec1 = cone.vec1
+#     vec2 = cone.vec2
+#     g = grad(cone)
+#     @. vec1 = cone.dual_point + rtmu * g
+#
+#     if use_heuristic_neighborhood(cone)
+#         nbhd = norm(vec1, Inf) / norm(g, Inf)
+#         # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(vec1, g)) # TODO try this neighborhood
+#     else
+#         inv_hess_prod!(vec2, vec1, cone)
+#         nbhd_sqr = dot(vec2, vec1)
+#         if nbhd_sqr < -100eps(T) # TODO possibly loosen
+#             # @warn("numerical failure: cone neighborhood is $nbhd_sqr")
+#             return false
+#         end
+#         nbhd = sqrt(abs(nbhd_sqr))
+#     end
+#
+#     return (nbhd < rtmu * max_nbhd)
+# end
 
+function in_neighborhood(
+    cone::Cone{T},
+    rtmu::T,
+    max_nbhd::T,
+    ) where {T <: Real}
+    g = grad(cone)
+
+    # check numerics
+    # TODO tune
+    gtol = sqrt(sqrt(eps(T)))
+    Htol = 10sqrt(gtol)
+    # grad check
+    if abs(1 + dot(g, cone.point) / get_nu(cone)) > gtol # TODO tune
+        @show abs(1 + dot(g, cone.point) / get_nu(cone))
+        return false
+    end
+    # hess check
+    vec1 = cone.vec1
+    hess_prod!(vec1, cone.point, cone)
+    if abs(1 - dot(vec1, cone.point) / get_nu(cone)) > Htol # TODO tune
+        @show abs(1 - dot(vec1, cone.point) / get_nu(cone))
+        return false
+    end
+
+    @. vec1 = cone.dual_point + rtmu * g
     if use_heuristic_neighborhood(cone)
         nbhd = norm(vec1, Inf) / norm(g, Inf)
         # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(vec1, g)) # TODO try this neighborhood
     else
+        vec2 = cone.vec2
         inv_hess_prod!(vec2, vec1, cone)
         nbhd_sqr = dot(vec2, vec1)
         if nbhd_sqr < -100eps(T) # TODO possibly loosen
