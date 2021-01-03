@@ -68,11 +68,19 @@ use_heuristic_neighborhood(cone::EpiRelEntropy) = false
 
 reset_data(cone::EpiRelEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_aux_updated = cone.inv_hess_sqrt_aux_updated = false)
 
-function use_sqrt_oracles(cone::EpiRelEntropy)
-    cone.use_inv_hess_sqrt || return false
+function use_sqrt_oracles(cone::EpiRelEntropy{T}) where T
     cone.inv_hess_sqrt_aux_updated || update_inv_hess_sqrt_aux(cone)
-    !cone.use_inv_hess_sqrt
-    return cone.use_inv_hess_sqrt
+    cone.use_inv_hess_sqrt || return false
+    # check numerics
+    # TODO tune
+    tol = sqrt(sqrt(eps(T))) * dimension(cone)
+    nu = get_nu(cone)
+    vec1 = cone.vec1
+    hess_sqrt_prod!(vec1, cone.point, cone)
+    hess_viol = abs(1 - sum(abs2, vec1) / nu)
+    inv_hess_sqrt_prod!(vec1, grad(cone), cone)
+    inv_hess_viol = abs(1 - sum(abs2, vec1) / nu)
+    return (max(hess_viol, inv_hess_viol) < tol)
 end
 
 # TODO only allocate the fields we use
