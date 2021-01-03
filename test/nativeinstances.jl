@@ -2070,28 +2070,26 @@ function wsosinterppossemideftri2(T; options...)
 end
 
 function wsosinterppossemideftri3(T; options...)
-    if !(T <: LinearAlgebra.BlasReal)
-        return # too slow with BigFloat real types
-    end
-    # convexity parameter for sum(x .^ 6) - sum(x .^ 2)
     tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(3), 2)
-    DynamicPolynomials.@polyvar x[1:3]
-    fn = sum(x .^ 4) - sum(x .^ 2)
-    H = DynamicPolynomials.differentiate(fn, x, 2)
+    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(1), 3)
+    DynamicPolynomials.@polyvar x
+    M = [
+        (x + 2x^3)  1;
+        (-x^2 + 2)  (3x^2 - x + 1);
+        ]
+    M = M' * M
 
-    c = T[-1]
-    A = zeros(T, 0, 1)
+    c = T[]
+    A = zeros(T, 0, 0)
     b = T[]
-    G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1), zeros(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
-    h = T[H[i, j](pts[u, :]...) for i in 1:3 for j in 1:i for u in 1:U]
+    h = T[M[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
+    G = zeros(T, length(h), 0)
     ModelUtilities.vec_to_svec!(h, incr = U)
-    cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(3, U, Ps)]
+    cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ T(2) atol=tol rtol=tol
-    @test r.x[1] ≈ -T(2) atol=tol rtol=tol
+    @test r.primal_obj ≈ 0 atol=tol rtol=tol
 end
 
 function wsosinterpepinormeucl1(T; options...)
