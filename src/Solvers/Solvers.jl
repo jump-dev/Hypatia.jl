@@ -185,6 +185,7 @@ mutable struct Solver{T <: Real}
         if isnothing(tol_infeas)
             tol_infeas = default_tol_tight
         end
+        @assert min(tol_rel_opt, tol_abs_opt, tol_feas, tol_infeas, tol_slow) > 0
 
         solver = new{T}()
 
