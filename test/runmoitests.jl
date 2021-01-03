@@ -27,9 +27,9 @@ end
 @testset "MOI.Test tests" begin
     println("\nstarting MOI.Test tests")
     options = [
-        # (Float64, Solvers.PredOrCentStepper, false), # TODO
-        (Float64, Solvers.CombinedStepper, true),
-        (Float32, Solvers.CombinedStepper, true),
+        (Float64, Solvers.CombinedStepper, false),
+        # (Float64, Solvers.CombinedStepper, true),
+        # (Float32, Solvers.CombinedStepper, true),
         (BigFloat, Solvers.PredOrCentStepper, true),
         ]
     for (T, stepper, use_dense_model) in options

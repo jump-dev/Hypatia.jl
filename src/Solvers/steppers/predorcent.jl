@@ -64,7 +64,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
 
     # get uncorrected direction
     rhs_fun_nocorr(solver, rhs)
-    get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
+    get_directions(stepper, solver, is_pred)
     copyto!(dir_nocorr.vec, dir.vec) # TODO maybe instead of copying, pass in the dir point we want into the directions function
     alpha = zero(T)
 
@@ -73,7 +73,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         rhs_fun_corr = (is_pred ? update_rhs_predcorr : update_rhs_centcorr)
         dir_corr = stepper.dir_corr
         rhs_fun_corr(solver, rhs, dir)
-        get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
+        get_directions(stepper, solver, is_pred)
         copyto!(dir_corr.vec, dir.vec)
 
         # do curve search with correction
@@ -96,7 +96,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             # do centering step instead
             @warn("very small alpha in line search; trying centering")
             update_rhs_cent(solver, rhs)
-            get_directions(stepper, solver, is_pred, iter_ref_steps = 3)
+            get_directions(stepper, solver, is_pred)
             copyto!(dir_nocorr.vec, dir.vec)
             stepper.cent_count = 1
 

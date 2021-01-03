@@ -63,10 +63,10 @@ function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64}
         M * integrate_ball(rho_T, n))
 
     JuMP.@constraint(model, rho <= 0, domain = delta_X)
-    # JuMP.@constraint(model, rho_T + brho * rho +
-    #     sum(DP.differentiate(rho * f[i], x_h[i]) / Q for i in 1:n) +
-    #     sum(sum(DP.differentiate(sigma[j] * f_u[i, j], x_h[i]) / Q for i in 1:n) for j in 1:m)
-    #     >= 1, domain = X)
+    JuMP.@constraint(model, rho_T + brho * rho +
+        sum(DP.differentiate(rho * f[i], x_h[i]) / Q for i in 1:n) +
+        sum(sum(DP.differentiate(sigma[j] * f_u[i, j], x_h[i]) / Q for i in 1:n) for j in 1:m)
+        >= 1, domain = X)
     JuMP.@constraint(model, [i in 1:m], u_bar * rho >= sigma[i], domain = X)
     JuMP.@constraint(model, rho_T >= 0, domain = X)
     JuMP.@constraint(model, [i in 1:m], sigma[i] >= 0, domain = X)
