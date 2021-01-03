@@ -15,9 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.5' # minimum Julia version supported
-#           - '1'
-          - 'nightly'
+#           - '1.5' # minimum Julia version supported
+          - '1'
+#           - 'nightly'
         os:
           - ubuntu-latest
         arch:
