@@ -92,19 +92,29 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
         alpha = search_alpha(point, model, stepper)
 
         if iszero(alpha)
-            # try centering direction
-            println("trying centering without correction")
+            println("trying centering with correction")
             stepper.cent_only = true
+            stepper.uncorr_only = false
             alpha = search_alpha(point, model, stepper)
 
             if iszero(alpha)
-                @warn("cannot step in centering direction")
-                solver.status = NumericalFailure
-                return false
-            end
+                println("trying centering without correction")
+                stepper.uncorr_only = true
+                alpha = search_alpha(point, model, stepper)
 
-            # step
-            @. point.vec += alpha * dir_cent.vec
+                if iszero(alpha)
+                    @warn("cannot step in centering direction")
+                    solver.status = NumericalFailure
+                    return false
+                else
+                    # step
+                    @. point.vec += alpha * dir_cent.vec
+                end
+            else
+                # step
+                alpha_sqr = abs2(alpha)
+                @. point.vec += alpha * dir_cent.vec + alpha_sqr * dir_centcorr.vec
+            end
         else
             # step
             alpha_m1 = 1 - alpha
@@ -133,21 +143,33 @@ function update_cone_points(
     ) where {T <: Real}
     cand = stepper.temp
     dir_cent = stepper.dir_cent
-    dir_pred = stepper.dir_pred
 
-    if stepper.cent_only
-        @assert stepper.uncorr_only
-        @. cand.ztsk = point.ztsk + alpha * dir_cent.ztsk
-    elseif stepper.uncorr_only
-        alpha_m1 = 1 - alpha
-        @. cand.ztsk = point.ztsk + alpha * dir_pred.ztsk + alpha_m1 * dir_cent.ztsk
+    if stepper.uncorr_only
+        # no correction
+        if stepper.cent_only
+            # centering
+            @. cand.ztsk = point.ztsk + alpha * dir_cent.ztsk
+        else
+            # combined
+            dir_pred = stepper.dir_pred
+            alpha_m1 = 1 - alpha
+            @. cand.ztsk = point.ztsk + alpha * dir_pred.ztsk + alpha_m1 * dir_cent.ztsk
+        end
     else
+        # correction
         dir_centcorr = stepper.dir_centcorr
-        dir_predcorr = stepper.dir_predcorr
         alpha_sqr = abs2(alpha)
-        alpha_m1 = 1 - alpha
-        alpha_m1sqr = abs2(alpha_m1)
-        @. cand.ztsk = point.ztsk + alpha * dir_pred.ztsk + alpha_sqr * dir_predcorr.ztsk + alpha_m1 * dir_cent.ztsk + alpha_m1sqr * dir_centcorr.ztsk
+        if stepper.cent_only
+            # centering
+            @. cand.ztsk = point.ztsk + alpha * dir_cent.ztsk + alpha_sqr * dir_centcorr.ztsk
+        else
+            # combined
+            dir_pred = stepper.dir_pred
+            dir_predcorr = stepper.dir_predcorr
+            alpha_m1 = 1 - alpha
+            alpha_m1sqr = abs2(alpha_m1)
+            @. cand.ztsk = point.ztsk + alpha * dir_pred.ztsk + alpha_sqr * dir_predcorr.ztsk + alpha_m1 * dir_cent.ztsk + alpha_m1sqr * dir_centcorr.ztsk
+        end
     end
 
     return
@@ -156,7 +178,11 @@ end
 print_header_more(stepper::CombinedStepper, solver::Solver) = @printf("%5s %9s", "step", "alpha")
 
 function print_iteration_more(stepper::CombinedStepper, solver::Solver)
-    step = (stepper.cent_only ? "cent" : (stepper.uncorr_only ? "comb" : "corr"))
+    if stepper.cent_only
+        step = (stepper.uncorr_only ? "cent" : "ce-c")
+    else
+        step = (stepper.uncorr_only ? "comb" : "co-c")
+    end
     @printf("%5s %9.2e", step, stepper.prev_alpha)
     return
 end
