@@ -129,12 +129,6 @@ function perturb_scale(point::Vector{T}, dual_point::Vector{T}, noise::T, scale:
     return (point, dual_point)
 end
 
-# TODO hack around https://github.com/JuliaLinearAlgebra/GenericLinearAlgebra.jl/issues/51 while using AD
-function logm(A)
-    (vals, vecs) = eigen(Hermitian(A, :U))
-    return vecs * Diagonal(log.(vals)) * vecs'
-end
-
 # primitive cone barrier tests
 
 function test_nonnegative_barrier(T::Type{<:Real})
@@ -197,6 +191,37 @@ function test_hypoperlog_barrier(T::Type{<:Real})
     end
     for dim in [15, 65, 75, 100]
         test_barrier_oracles(Cones.HypoPerLog{T}(dim), barrier, init_tol = 1e-1, init_only = true)
+    end
+    return
+end
+
+function test_epiperentropy_barrier(T::Type{<:Real})
+    function barrier(s)
+        (u, v, w) = (s[1], s[2], s[3:end])
+        return -log(u - sum(wi * log(wi / v) for wi in w)) - log(v) - sum(log(wi) for wi in w)
+    end
+    for w_dim in [1, 2, 3]
+        test_barrier_oracles(Cones.EpiPerEntropy{T}(2 + w_dim), barrier, init_tol = 1e-5)
+    end
+    for w_dim in [15, 65, 75, 100]
+        test_barrier_oracles(Cones.EpiPerEntropy{T}(2 + w_dim), barrier, init_tol = 1e-1, init_only = true)
+    end
+    return
+end
+
+function test_epipertraceentropytri_barrier(T::Type{<:Real})
+    for side in [1, 2, 3, 12, 20]
+        dim = 2 + Cones.svec_length(side)
+        function barrier(s)
+            (u, v, w) = (s[1], s[2], s[3:end])
+            W = Hermitian(Cones.svec_to_smat!(zeros(eltype(s), side, side), w, sqrt(T(2))), :U)
+            return -log(u - dot(W, log(W / v))) - log(v) - logdet(W)
+        end
+        if side <= 3
+            test_barrier_oracles(Cones.EpiPerTraceEntropyTri{T}(dim), barrier, init_tol = 1e-5)
+        else
+            test_barrier_oracles(Cones.EpiPerTraceEntropyTri{T}(dim), barrier, init_tol = 1e-1, init_only = true)
+        end
     end
     return
 end
@@ -289,7 +314,7 @@ function test_epitracerelentropytri_barrier(T::Type{<:Real})
             u = s[1]
             V = Hermitian(Cones.svec_to_smat!(similar(s, side, side), s[2:(svec_dim + 1)], rt2), :U)
             W = Hermitian(Cones.svec_to_smat!(similar(s, side, side), s[(svec_dim + 2):end], rt2), :U)
-            return -log(u - tr(W * logm(W) - W * logm(V))) - logdet(V) - logdet(W)
+            return -log(u - tr(W * log(W) - W * log(V))) - logdet(V) - logdet(W)
         end
         if side <= 3
             test_barrier_oracles(cone, barrier, init_tol = 1e-5)

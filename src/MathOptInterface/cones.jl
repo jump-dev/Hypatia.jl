@@ -176,6 +176,15 @@ EpiRelEntropyCone{T}(dim::Int) where {T <: Real} = EpiRelEntropyCone{T}(dim, fal
 MOI.dimension(cone::EpiRelEntropyCone) = cone.dim
 cone_from_moi(::Type{T}, cone::EpiRelEntropyCone{T}) where {T <: Real} = Cones.EpiRelEntropy{T}(cone.dim, use_dual = cone.use_dual)
 
+export EpiPerEntropyCone
+struct EpiPerEntropyCone{T <: Real} <: MOI.AbstractVectorSet
+    dim::Int
+    use_dual::Bool
+end
+EpiPerEntropyCone{T}(dim::Int) where {T <: Real} = EpiPerEntropyCone{T}(dim, false)
+MOI.dimension(cone::EpiPerEntropyCone) = cone.dim
+cone_from_moi(::Type{T}, cone::EpiPerEntropyCone{T}) where {T <: Real} = Cones.EpiPerEntropy{T}(cone.dim, use_dual = cone.use_dual)
+
 export HypoGeoMeanCone
 struct HypoGeoMeanCone{T <: Real} <: MOI.AbstractVectorSet
     dim::Int
@@ -280,6 +289,15 @@ EpiTraceRelEntropyTriCone{T}(dim::Int) where {T <: Real} = EpiTraceRelEntropyTri
 MOI.dimension(cone::EpiTraceRelEntropyTriCone where {T <: Real}) = cone.dim
 cone_from_moi(::Type{T}, cone::EpiTraceRelEntropyTriCone{T}) where {T <: Real} = Cones.EpiTraceRelEntropyTri{T}(cone.dim, use_dual = cone.use_dual)
 
+export EpiPerTraceEntropyTriCone
+struct EpiPerTraceEntropyTriCone{T <: Real} <: MOI.AbstractVectorSet
+    dim::Int
+    use_dual::Bool
+end
+EpiPerTraceEntropyTriCone{T}(dim::Int) where {T <: Real} = EpiPerTraceEntropyTriCone{T}(dim, false)
+MOI.dimension(cone::EpiPerTraceEntropyTriCone where {T <: Real}) = cone.dim
+cone_from_moi(::Type{T}, cone::EpiPerTraceEntropyTriCone{T}) where {T <: Real} = Cones.EpiPerTraceEntropyTri{T}(cone.dim, use_dual = cone.use_dual)
+
 export WSOSInterpNonnegativeCone
 struct WSOSInterpNonnegativeCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     U::Int
@@ -333,6 +351,7 @@ const HypatiaCones{T <: Real} = Union{
     EpiPerSquareCone{T},
     PowerCone{T},
     HypoPerLogCone{T},
+    EpiPerEntropyCone{T},
     EpiRelEntropyCone{T},
     HypoGeoMeanCone{T},
     HypoPowerMeanCone{T},
@@ -351,6 +370,7 @@ const HypatiaCones{T <: Real} = Union{
     HypoRootdetTriCone{T, T},
     HypoRootdetTriCone{T, Complex{T}},
     EpiTraceRelEntropyTriCone{T},
+    EpiPerTraceEntropyTriCone{T},
     WSOSInterpNonnegativeCone{T, T},
     WSOSInterpNonnegativeCone{T, Complex{T}},
     WSOSInterpPosSemidefTriCone{T},

@@ -35,6 +35,8 @@ abstract type Cone{T <: Real} end
 include("nonnegative.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")
+include("epiperentropy.jl")
+include("epipertraceentropytri.jl")
 include("epipersquare.jl")
 include("epirelentropy.jl")
 include("hypoperlog.jl")
@@ -347,83 +349,84 @@ vec_copy_to!(v1::AbstractVecOrMat{Complex{T}}, v2::AbstractVecOrMat{T}) where {T
 # TODO parallelize
 function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T; upper_only::Bool = true) where {T <: Real}
     side = size(mat, 1)
-    k = 1
-    @inbounds for j in 1:side
-        for i in 1:(j - 1)
-            k2 = 1
-            for j2 in 1:side
-                upper_only && k2 > k && continue
-                for i2 in 1:(j2 - 1)
-                    scal = (i == j ? 1 : rt2) * (i2 == j2 ? 1 : rt2) / 2
-                    H[k2, k] = scal * (mat[i, i2] * mat[j, j2] + mat[i, j2] * mat[j, i2])
-                    k2 += 1
+    col_idx = 1
+    @inbounds for l in 1:side
+        for k in 1:(l - 1)
+            row_idx = 1
+            for j in 1:side
+                upper_only && row_idx > col_idx && continue
+                for i in 1:(j - 1)
+                    scal = (i == j ? 1 : rt2) * (k == l ? 1 : rt2) / 2
+                    H[row_idx, col_idx] = scal * (mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k])
+                    row_idx += 1
                 end
-                H[k2, k] = rt2 * mat[i, j2] * mat[j, j2]
-                k2 += 1
+                H[row_idx, col_idx] = rt2 * mat[j, k] * mat[j, l]
+                row_idx += 1
             end
-            k += 1
+            col_idx += 1
         end
-        k2 = 1
-        for j2 in 1:side
-            upper_only && k2 > k && continue
-            for i2 in 1:(j2 - 1)
-                H[k2, k] = rt2 * mat[j, j2] * mat[j, i2]
-                k2 += 1
+        row_idx = 1
+        for j in 1:side
+            upper_only && row_idx > col_idx && continue
+            for i in 1:(j - 1)
+                H[row_idx, col_idx] = rt2 * mat[i, l] * mat[j, l]
+                row_idx += 1
             end
-            H[k2, k] = abs2(mat[j, j2])
-            k2 += 1
+            H[row_idx, col_idx] = abs2(mat[j, l])
+            row_idx += 1
         end
-        k += 1
+        col_idx += 1
     end
     return H
 end
 
+# TODO test output for non-Hermitian mat, the result may need transposing
 function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{Complex{T}}, rt2::T) where {T <: Real}
     side = size(mat, 1)
-    k = 1
+    col_idx = 1
     for i in 1:side, j in 1:i
-        k2 = 1
+        row_idx = 1
         if i == j
             @inbounds for i2 in 1:side, j2 in 1:i2
                 if i2 == j2
-                    H[k2, k] = abs2(mat[i2, i])
-                    k2 += 1
+                    H[row_idx, col_idx] = abs2(mat[i2, i])
+                    row_idx += 1
                 else
                     c = rt2 * mat[i, i2] * mat[j2, j]
-                    H[k2, k] = real(c)
-                    k2 += 1
-                    H[k2, k] = -imag(c)
-                    k2 += 1
+                    H[row_idx, col_idx] = real(c)
+                    row_idx += 1
+                    H[row_idx, col_idx] = -imag(c)
+                    row_idx += 1
                 end
-                if k2 > k
+                if row_idx > col_idx
                     break
                 end
             end
-            k += 1
+            col_idx += 1
         else
             @inbounds for i2 in 1:side, j2 in 1:i2
                 if i2 == j2
                     c = rt2 * mat[i2, i] * mat[j, j2]
-                    H[k2, k] = real(c)
-                    H[k2, k + 1] = -imag(c)
-                    k2 += 1
+                    H[row_idx, col_idx] = real(c)
+                    H[row_idx, col_idx + 1] = -imag(c)
+                    row_idx += 1
                 else
                     b1 = mat[i2, i] * mat[j, j2]
                     b2 = mat[j2, i] * mat[j, i2]
                     c1 = b1 + b2
-                    H[k2, k] = real(c1)
-                    H[k2, k + 1] = -imag(c1)
-                    k2 += 1
+                    H[row_idx, col_idx] = real(c1)
+                    H[row_idx, col_idx + 1] = -imag(c1)
+                    row_idx += 1
                     c2 = b1 - b2
-                    H[k2, k] = imag(c2)
-                    H[k2, k + 1] = real(c2)
-                    k2 += 1
+                    H[row_idx, col_idx] = imag(c2)
+                    H[row_idx, col_idx + 1] = real(c2)
+                    row_idx += 1
                 end
-                if k2 > k
+                if row_idx > col_idx
                     break
                 end
             end
-            k += 2
+            col_idx += 2
         end
     end
     return H
@@ -584,6 +587,59 @@ function inv_arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}
         prod[1, j] = (arr[1, j] - dot(prod[2:2:end, j], rtuv) - dot(prod[3:2:end, j], rtuw)) / rtuu
     end
     return prod
+end
+
+function grad_logm!(
+        mat::Matrix{T},
+        vecs::Matrix{T},
+        tempmat1::Matrix{T},
+        tempmat2::Matrix{T},
+        tempvec::Vector{T},
+        diff_mat::AbstractMatrix{T},
+        rt2::T,
+        ) where T
+    veckron = symm_kron(tempmat1, vecs, rt2, upper_only = false)
+    smat_to_svec!(tempvec, diff_mat, one(T))
+    mul!(tempmat2, veckron, Diagonal(tempvec))
+    return mul!(mat, tempmat2, veckron')
+end
+
+function diff_mat!(mat::Matrix{T}, vals::Vector{T}, log_vals::Vector{T}) where T
+    rteps = sqrt(eps(T))
+    @inbounds for j in eachindex(vals)
+        (vj, lvj) = (vals[j], log_vals[j])
+        for i in 1:(j - 1)
+            (vi, lvi) = (vals[i], log_vals[i])
+            mat[i, j] = (abs(vi - vj) < rteps ? inv((vi + vj) / 2) : (lvi - lvj) / (vi - vj))
+        end
+        mat[j, j] = inv(vj)
+    end
+    return mat
+end
+
+function diff_tensor!(diff_tensor::Array{T, 3}, diff_mat::AbstractMatrix{T}, vals::Vector{T}) where T
+    rteps = sqrt(eps(T))
+    d = size(diff_mat, 1)
+    @inbounds for k in 1:d, j in 1:k, i in 1:j
+        (vi, vj, vk) = (vals[i], vals[j], vals[k])
+        if abs(vj - vk) < rteps
+            if abs(vi - vj) < rteps
+                vijk = (vi + vj + vk) / 3
+                t = -inv(vijk) / vijk / 2
+            else
+                vjk = (vj + vk) / 2
+                t = (inv(vjk) - diff_mat[i, j]) / (vj - vi)
+            end
+        elseif abs(vi - vj) < rteps
+            vij = (vi + vj) / 2
+            t = (inv(vij) - diff_mat[k, i]) / (vi - vk)
+        else
+            t = (diff_mat[i, j] - diff_mat[k, i]) / (vj - vk)
+        end
+        diff_tensor[i, j, k] = diff_tensor[i, k, j] = diff_tensor[j, i, k] =
+            diff_tensor[j, k, i] = diff_tensor[k, i, j] = diff_tensor[k, j, i] = t
+    end
+    return diff_tensor
 end
 
 end
