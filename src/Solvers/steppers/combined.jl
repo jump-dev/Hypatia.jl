@@ -178,7 +178,11 @@ end
 print_header_more(stepper::CombinedStepper, solver::Solver) = @printf("%5s %9s", "step", "alpha")
 
 function print_iteration_more(stepper::CombinedStepper, solver::Solver)
-    step = (stepper.cent_only ? "cent" : (stepper.uncorr_only ? "comb" : "corr"))
+    if stepper.cent_only
+        step = (stepper.uncorr_only ? "cent" : "ce-c")
+    else
+        step = (stepper.uncorr_only ? "comb" : "co-c")
+    end
     @printf("%5s %9.2e", step, stepper.prev_alpha)
     return
 end

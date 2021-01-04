@@ -12,8 +12,8 @@ include(joinpath(@__DIR__, "nativesets.jl"))
 
 # default options to solvers
 default_options = (
-    verbose = true,
-    # verbose = false,
+    # verbose = true,
+    verbose = false,
     default_tol_relax = 10,
     )
 
@@ -64,59 +64,59 @@ perf = DataFrames.DataFrame(
 @testset "default options tests" begin
     println("starting default options tests")
     inst_defaults = vcat(
-        # inst_preproc,
-        # inst_infeas,
+        inst_preproc,
+        inst_infeas,
         inst_cones_many,
         )
     for inst_name in inst_defaults
         test_instance_solver(inst_name, Float64, default_options)
     end
 end
-#
-# @testset "no preprocess tests" begin
-#     println("\nstarting no preprocess tests")
-#     for inst_name in inst_cones_few, T in diff_reals
-#         options = (; default_options..., preprocess = false, reduce = false, system_solver = Solvers.SymIndefDenseSystemSolver{T}())
-#         test_instance_solver(inst_name, T, options)
-#     end
-# end
-#
-# @testset "indirect solvers tests" begin
-#     println("\nstarting indirect solvers tests")
-#     for inst_name in inst_indirect, T in diff_reals
-#         options = (; default_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.SymIndefIndirectSystemSolver{T}(), tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_infeas = 1e-6)
-#         test_instance_solver(inst_name, T, options)
-#     end
-# end
-#
-# @testset "system solvers tests" begin
-#     println("\nstarting system solvers tests")
-#     system_solvers = [
-#         (Solvers.NaiveDenseSystemSolver, diff_reals),
-#         (Solvers.NaiveSparseSystemSolver, [Float64,]),
-#         (Solvers.NaiveElimDenseSystemSolver, diff_reals),
-#         (Solvers.NaiveElimSparseSystemSolver, [Float64,]),
-#         (Solvers.SymIndefDenseSystemSolver, all_reals),
-#         (Solvers.SymIndefSparseSystemSolver, [Float64,]),
-#         (Solvers.QRCholDenseSystemSolver, all_reals),
-#         ]
-#     for inst_name in inst_cones_few, (system_solver, real_types) in system_solvers, T in real_types
-#         options = (; default_options..., system_solver = system_solver{T}(), reduce = false)
-#         test_instance_solver(inst_name, T, options, string_nameof(system_solver))
-#     end
-# end
-#
-# @testset "steppers tests" begin
-#     println("\nstarting steppers tests (with printing)")
-#     steppers = [
-#         (Solvers.PredOrCentStepper, diff_reals),
-#         (Solvers.CombinedStepper, diff_reals),
-#         ]
-#     for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in diff_reals
-#         options = (; default_options..., verbose = true, stepper = stepper{T}())
-#         test_instance_solver(inst_name, T, options, string_nameof(stepper))
-#     end
-# end
+
+@testset "no preprocess tests" begin
+    println("\nstarting no preprocess tests")
+    for inst_name in inst_cones_few, T in diff_reals
+        options = (; default_options..., preprocess = false, reduce = false, system_solver = Solvers.SymIndefDenseSystemSolver{T}())
+        test_instance_solver(inst_name, T, options)
+    end
+end
+
+@testset "indirect solvers tests" begin
+    println("\nstarting indirect solvers tests")
+    for inst_name in inst_indirect, T in diff_reals
+        options = (; default_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.SymIndefIndirectSystemSolver{T}(), tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_infeas = 1e-6)
+        test_instance_solver(inst_name, T, options)
+    end
+end
+
+@testset "system solvers tests" begin
+    println("\nstarting system solvers tests")
+    system_solvers = [
+        (Solvers.NaiveDenseSystemSolver, diff_reals),
+        (Solvers.NaiveSparseSystemSolver, [Float64,]),
+        (Solvers.NaiveElimDenseSystemSolver, diff_reals),
+        (Solvers.NaiveElimSparseSystemSolver, [Float64,]),
+        (Solvers.SymIndefDenseSystemSolver, all_reals),
+        (Solvers.SymIndefSparseSystemSolver, [Float64,]),
+        (Solvers.QRCholDenseSystemSolver, all_reals),
+        ]
+    for inst_name in inst_cones_few, (system_solver, real_types) in system_solvers, T in real_types
+        options = (; default_options..., system_solver = system_solver{T}(), reduce = false)
+        test_instance_solver(inst_name, T, options, string_nameof(system_solver))
+    end
+end
+
+@testset "steppers tests" begin
+    println("\nstarting steppers tests (with printing)")
+    steppers = [
+        (Solvers.PredOrCentStepper, diff_reals),
+        (Solvers.CombinedStepper, diff_reals),
+        ]
+    for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in diff_reals
+        options = (; default_options..., verbose = true, stepper = stepper{T}())
+        test_instance_solver(inst_name, T, options, string_nameof(stepper))
+    end
+end
 
 # println("\n")
 # DataFrames.show(perf, allrows = true, allcols = true)
