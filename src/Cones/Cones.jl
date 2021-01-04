@@ -608,10 +608,11 @@ function diff_mat!(mat::Matrix{T}, vals::Vector{T}, log_vals::Vector{T}) where T
     rteps = sqrt(eps(T))
     @inbounds for j in eachindex(vals)
         (vj, lvj) = (vals[j], log_vals[j])
-        for i in 1:j
+        for i in 1:(j - 1)
             (vi, lvi) = (vals[i], log_vals[i])
-            mat[i, j] = (abs(vi - vj) < rteps ? inv(vi) : (lvi - lvj) / (vi - vj))
+            mat[i, j] = (abs(vi - vj) < rteps ? inv((vi + vj) / 2) : (lvi - lvj) / (vi - vj))
         end
+        mat[j, j] = inv(vj)
     end
     return mat
 end
@@ -623,12 +624,15 @@ function diff_tensor!(diff_tensor::Array{T, 3}, diff_mat::AbstractMatrix{T}, val
         (vi, vj, vk) = (vals[i], vals[j], vals[k])
         if abs(vj - vk) < rteps
             if abs(vi - vj) < rteps
-                t = -inv(vi) / vi / 2
+                vijk = (vi + vj + vk) / 3
+                t = -inv(vijk) / vijk / 2
             else
-                t = (inv(vj) - diff_mat[i, j]) / (vj - vi)
+                vjk = (vj + vk) / 2
+                t = (inv(vjk) - diff_mat[i, j]) / (vj - vi)
             end
         elseif abs(vi - vj) < rteps
-            t = (inv(vi) - diff_mat[k, i]) / (vi - vk)
+            vij = (vi + vj) / 2
+            t = (inv(vij) - diff_mat[k, i]) / (vi - vk)
         else
             t = (diff_mat[i, j] - diff_mat[k, i]) / (vj - vk)
         end

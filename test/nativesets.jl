@@ -147,10 +147,6 @@ inst_cones_many = [
     "hyporootdettri2",
     "hyporootdettri3",
     "hyporootdettri4",
-    "epitracerelentropytri1",
-    # "epitracerelentropytri2", TODO fix?
-    "epitracerelentropytri3",
-    "epitracerelentropytri4",
     "wsosinterpnonnegative1",
     "wsosinterpnonnegative2",
     "wsosinterpnonnegative3",
