@@ -1121,6 +1121,7 @@ function matrixepipersquare1(T; options...)
     tol = test_tol(T)
     Random.seed!(1)
     for is_complex in (false, true), (Xn, Xm) in [(1, 1), (1, 3), (2, 2), (2, 3)]
+        @show is_complex, (Xn, Xm)
         R = (is_complex ? Complex{T} : T)
         per_idx = (is_complex ? Xn ^ 2 + 1 : Cones.svec_length(Xn) + 1)
         dim = per_idx + (is_complex ? 2 : 1) * Xn * Xm
