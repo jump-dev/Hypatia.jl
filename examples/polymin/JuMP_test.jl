@@ -4,7 +4,7 @@ insts["minimal"] = [
     ((1, 2, true, true),),
     ((1, 2, false, true),),
     ((1, 2, false, false),),
-    ((:motzkin, 3, true, true),),
+    ((:lotkavolterra, 3, true, true),),
     ]
 insts["fast"] = [
     ((1, 3, true, true),),

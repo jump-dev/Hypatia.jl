@@ -118,10 +118,7 @@ function update_hess_fact(cone::Cone{T}) where {T <: Real}
             # @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
             cone.hess_fact_cache = DenseSymCache{T}()
             load_matrix(cone.hess_fact_cache, cone.hess)
-            if !update_fact(cone.hess_fact_cache, cone.hess)
-                @warn("Hessian Bunch-Kaufman factorization failed after recovery")
-                return false
-            end
+            update_fact(cone.hess_fact_cache, cone.hess) || return false
         else
             return false
         end
