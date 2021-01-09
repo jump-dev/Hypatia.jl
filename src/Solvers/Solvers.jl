@@ -326,6 +326,7 @@ function solve(solver::Solver{T}) where {T <: Real}
                 end
             end
 
+            solver.worst_dir_res = 0
             step(stepper, solver) || break
             flush(stdout)
 
