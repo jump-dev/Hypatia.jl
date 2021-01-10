@@ -319,43 +319,37 @@ function correction(cone::EpiTraceRelEntropyTri{T}, primal_dir::AbstractVector{T
     diff_dot_V_VV = [temp1[:, q]' * Diagonal(diff_tensor_V[:, p, q]) * temp1[:, p] for p in 1:d, q in 1:d]
     d2logV_dV2_VV = V_vecs * diff_dot_V_VV * V_vecs'
     diff_dot_V_VW = [temp1[:, q]' * Diagonal(diff_tensor_V[:, p, q]) * temp3[:, p] for p in 1:d, q in 1:d]
-    # diff_dot_V_VW = [sum(temp1[t, q] * diff_tensor_V[t, p, q] * temp3[t, p] for t in 1:d) for p in 1:d, q in 1:d]
     d2logV_dV2_VW = V_vecs * (diff_dot_V_VW + diff_dot_V_VW') * V_vecs'
     diff_dot_W_WW = [temp2[:, q]' * Diagonal(diff_tensor_W[:, p, q]) * temp2[:, p] for p in 1:d, q in 1:d]
     d2logW_dW2_WW = W_vecs * diff_dot_W_WW * W_vecs'
 
-    tau = dzdW[1]/z
-    sigma = dzdV[1]/z
-    w = cone.point[3]
-    v = cone.point[2]
+    sigmadv = dot(dzdV, V_dir)
+    taudw = dot(dzdW, W_dir)
 
-    # @assert cone.point[W_idxs][1] / cone.point[V_idxs][1]^2 / z / z ≈ dz_sqr_dV_sqr[1] / z / z
-    # @assert (-2 / z^3 * dot(dzdW, W_dir)^2 + inv(z) / z * dot(w_dir, -dlogW_dW, w_dir))[1] ≈ (-2*tau^2/z-inv(w)/z/z)*w_dir[1]^2 # uww
-    # @assert -2 / z^3 * (2 * dot(dzdV, v_dir) * dot(dzdW, W_dir)) + 2 / z / z * dot(v_dir, dlogV_dV, w_dir) ≈ # uvw
-    #     (-2*sigma*tau/z+1/v/z^2)*w_dir[1]*v_dir[1]*2
-    # @assert -2 / z^3 * dot(dzdV, v_dir)^2 + inv(z) / z * dot(v_dir, -dz_sqr_dV_sqr, v_dir) ≈
-    #     (-2*sigma^2/z-sigma/v/z)*v_dir[1]^2
+    const0 = (u_dir + sigmadv) / z + taudw / z
+    dz_sqr_dV_sqr_dvdv = dot(v_dir, dz_sqr_dV_sqr, v_dir)
+    dlogW_dW_dwdw = dot(w_dir, dlogW_dW, w_dir)
+    dlogV_dV_dw = Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * w_dir, cone.rt2), :U)
+    dz_sqr_dV_sqr_dv = Symmetric(svec_to_smat!(zeros(T, d, d), dz_sqr_dV_sqr * v_dir, cone.rt2), :U)
+    # const1 = abs2(const0) + trW * dz_sqr_dV_sqr_dvdv / (2 * z) - trWd * vdv / z + temp3 / (2 * z)
+    const1 = abs2(const0) + dz_sqr_dV_sqr_dvdv / (2 * z) + dlogW_dW_dwdw / (2 * z) - dot(v_dir, dlogV_dV, w_dir) / z
 
-    corr[1] =
-        -2 / z^3 * u_dir^2 +
-        -2 / z^3 * 2 * u_dir * dot(dzdV, V_dir) +
-        -2 / z^3 * 2 * u_dir * dot(dzdW, W_dir) +
-        -2 / z^3 * dot(dzdV, V_dir)^2 - inv(z) / z * dot(v_dir, dz_sqr_dV_sqr, v_dir) + # uvv
-        -2 / z^3 * (2 * dot(dzdV, V_dir) * dot(dzdW, W_dir)) + 2 / z / z * dot(v_dir, dlogV_dV, w_dir) + # uvw
-        -2 / z^3 * dot(dzdW, W_dir)^2 + inv(z) / z * dot(w_dir, -dlogW_dW, w_dir) # uww
+    # u
+    corr[1] = const1 / z
+
 
     W_corr =
     uuw =    -2 / z^3 * dzdW * u_dir^2  # uuw
-    uvw =    -2 / z^3 * (2 * dot(dzdV, V_dir) * dzdW * u_dir) + 2 / z / z * Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U) * u_dir  # uvw
-    uww =    -2 / z^3 * dot(dzdW, W_dir) * dzdW * u_dir * 2 + inv(z) / z * Symmetric(svec_to_smat!(zeros(T, d, d), -dlogW_dW * w_dir, cone.rt2), :U) * u_dir * 2  # uww
-    vvw =    -2 / z^3 * dot(dzdV, V_dir)^2 * dzdW - inv(z) / z * dot(v_dir, dz_sqr_dV_sqr, v_dir) * dzdW +  # vvw
-            inv(z) / z * dot(dzdV, V_dir) * Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U) * 2 +
+    uvw =    -2 / z^3 * (2 * sigmadv * dzdW * u_dir) + 2 / z / z * Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U) * u_dir  # uvw
+    uww =    -2 / z^3 * taudw * dzdW * u_dir * 2 + inv(z) / z * Symmetric(svec_to_smat!(zeros(T, d, d), -dlogW_dW * w_dir, cone.rt2), :U) * u_dir * 2  # uww
+    vvw =    -2 / z^3 * sigmadv^2 * dzdW - inv(z) / z * dot(v_dir, dz_sqr_dV_sqr, v_dir) * dzdW +  # vvw
+            inv(z) / z * sigmadv * Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U) * 2 +
             -inv(z) * d2logV_dV2_VV * 2
-    vww =    -2 / z^3 * dzdW * dot(dzdW, W_dir) * dot(dzdV, V_dir) * 2 + inv(z) / z * # vww
-            (dot(dzdW, W_dir) * Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U) + dzdW * dot(w_dir, dlogV_dV, v_dir)) * 2 +
-            -inv(z) / z * (dot(dzdV, V_dir) * Symmetric(svec_to_smat!(zeros(T, d, d), dlogW_dW * w_dir, cone.rt2), :U)) * 2
-    www =   -2 / z^3 * dzdW * dot(dzdW, W_dir)^2 +
-            -1 / z^2 * (dzdW * dot(w_dir, dlogW_dW, w_dir) + 2 * dot(dzdW, W_dir) * Symmetric(svec_to_smat!(zeros(T, d, d), dlogW_dW * w_dir, cone.rt2), :U)) + # www
+    vww =    -2 / z^3 * dzdW * taudw * sigmadv * 2 + inv(z) / z * # vww
+            (taudw * Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U) + dzdW * dot(w_dir, dlogV_dV, v_dir)) * 2 +
+            -inv(z) / z * (sigmadv * Symmetric(svec_to_smat!(zeros(T, d, d), dlogW_dW * w_dir, cone.rt2), :U)) * 2
+    www =   -2 / z^3 * dzdW * taudw^2 +
+            -1 / z^2 * (dzdW * dot(w_dir, dlogW_dW, w_dir) + 2 * taudw * Symmetric(svec_to_smat!(zeros(T, d, d), dlogW_dW * w_dir, cone.rt2), :U)) + # www
             2 * inv(z) * d2logW_dW2_WW - 2 * Wi * W_dir * Wi * W_dir * Wi
     W_corr = uuw + uvw + uww + vvw + vww + www
     @views smat_to_svec!(corr[W_idxs], W_corr, cone.rt2)
@@ -374,26 +368,16 @@ function correction(cone::EpiTraceRelEntropyTri{T}, primal_dir::AbstractVector{T
     end
     d3WlogVdV = 6 * V_vecs * d3WlogVdV * V_vecs'
 
+    # v
     V_corr =
-        -2 / z^3 * dzdV * u_dir^2 + # uuv
-        -2 / z^3 * dot(dzdV, V_dir) * dzdV * u_dir * 2 - inv(z) / z * Symmetric(svec_to_smat!(zeros(T, d, d), dz_sqr_dV_sqr * v_dir, cone.rt2), :U) * u_dir * 2 + # uvv
-        -2 / z^3 * (2 * dot(dzdW, W_dir) * dzdV * u_dir) + 2 / z / z * Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * w_dir, cone.rt2), :U) * u_dir + # uvw
-        -2 / z^3 * dzdV * dot(dzdV, V_dir) * dot(dzdW, W_dir) * 2 + # vvw
-            -inv(z) / z * Symmetric(svec_to_smat!(zeros(T, d, d), dz_sqr_dV_sqr * v_dir, cone.rt2), :U) * dot(dzdW, W_dir) * 2 +
-            # -inv(z) / z * dot(v_dir, dz_sqr_dV_sqr, w_dir) * dzdW +
-            inv(z) / z * dzdV * dot(w_dir, dlogV_dV, v_dir) * 2 +
-            inv(z) / z * dot(dzdV, V_dir) * Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * w_dir, cone.rt2)) * 2 +
-            -inv(z) * d2logV_dV2_VW * 2 +
-        -2 / z^3 * dot(dzdW, W_dir)^2 * dzdV + # vww
-            inv(z) / z * dot(dzdW, W_dir) * Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * w_dir, cone.rt2), :U) * 2 +
-            -inv(z) / z * dzdV * dot(w_dir, dlogW_dW, w_dir) +
-        -2 / z^3 * dot(dzdV, V_dir)^2 * dzdV - inv(z) / z * (1 * dot(v_dir, dz_sqr_dV_sqr, v_dir) * dzdV + # vvv borderline
-            2 * dot(dzdV, V_dir) * Symmetric(svec_to_smat!(zeros(T, d, d), dz_sqr_dV_sqr * v_dir, cone.rt2))
-            ) +
-            -inv(z) * d3WlogVdV - 2 * Vi * V_dir * Vi * V_dir * Vi
+        dzdV * const1 +
+        (dz_sqr_dV_sqr_dv - dlogV_dV_dw) * const0 +
+        d2logV_dV2_VW +
+        d3WlogVdV / 2 + Vi * V_dir * Vi * V_dir * Vi * z
+    V_corr ./= z
     @views smat_to_svec!(corr[V_idxs], V_corr, cone.rt2)
 
-    corr ./= -2
+    @views corr[W_idxs] ./= -2
 
     return corr
 end
