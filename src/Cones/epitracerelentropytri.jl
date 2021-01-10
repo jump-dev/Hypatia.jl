@@ -273,12 +273,9 @@ function hess_tr_logm!(mat, vecs, mat_inner, diff_tensor, rt2::T) where T
     return mat
 end
 
-# using ForwardDiff
 function correction(cone::EpiTraceRelEntropyTri{T}, primal_dir::AbstractVector{T}) where T
     @assert cone.hess_updated
     d = cone.d
-    rt2 = cone.rt2
-    rteps = sqrt(eps(T))
     V_idxs = cone.V_idxs
     W_idxs = cone.W_idxs
     z = cone.z
@@ -289,7 +286,6 @@ function correction(cone::EpiTraceRelEntropyTri{T}, primal_dir::AbstractVector{T
     Wi = Hermitian(cone.Wi)
     dzdV = Symmetric(svec_to_smat!(zeros(T, d, d), -cone.dzdV * z, cone.rt2), :U) # TODO save as a mat
     dzdW = cone.dzdW * z # actually divided by z, maybe rethink
-    dz_dW_vec = smat_to_svec!(zeros(T, vw_dim), dzdW, rt2) # make storage consistent
     diff_mat_V = Hermitian(cone.diff_mat_V, :U)
     diff_mat_W = Hermitian(cone.diff_mat_W, :U)
 
@@ -323,35 +319,22 @@ function correction(cone::EpiTraceRelEntropyTri{T}, primal_dir::AbstractVector{T
     diff_dot_W_WW = [temp2[:, q]' * Diagonal(diff_tensor_W[:, p, q]) * temp2[:, p] for p in 1:d, q in 1:d]
     d2logW_dW2_WW = W_vecs * diff_dot_W_WW * W_vecs'
 
-    sigmadv = dot(dzdV, V_dir)
-    taudw = dot(dzdW, W_dir)
 
-    const0 = (u_dir + sigmadv) / z + taudw / z
-    dz_sqr_dV_sqr_dvdv = dot(v_dir, dz_sqr_dV_sqr, v_dir)
-    dlogW_dW_dwdw = dot(w_dir, dlogW_dW, w_dir)
     dlogV_dV_dw = Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * w_dir, cone.rt2), :U)
+    dlogV_dV_dv = Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U)
+    dlogW_dW_dw = Symmetric(svec_to_smat!(zeros(T, d, d), dlogW_dW * w_dir, cone.rt2), :U)
     dz_sqr_dV_sqr_dv = Symmetric(svec_to_smat!(zeros(T, d, d), dz_sqr_dV_sqr * v_dir, cone.rt2), :U)
-    # const1 = abs2(const0) + trW * dz_sqr_dV_sqr_dvdv / (2 * z) - trWd * vdv / z + temp3 / (2 * z)
-    const1 = abs2(const0) + dz_sqr_dV_sqr_dvdv / (2 * z) + dlogW_dW_dwdw / (2 * z) - dot(v_dir, dlogV_dV, w_dir) / z
+    const0 = (u_dir + dot(dzdV, V_dir) + dot(dzdW, W_dir)) / z
+    const1 = abs2(const0) + (dot(v_dir, dz_sqr_dV_sqr, v_dir) / 2 + dot(w_dir, dlogW_dW, w_dir) / 2 - dot(v_dir, dlogV_dV, w_dir)) / z
 
     # u
     corr[1] = const1 / z
 
-
+    # w
     W_corr =
-    uuw =    -2 / z^3 * dzdW * u_dir^2  # uuw
-    uvw =    -2 / z^3 * (2 * sigmadv * dzdW * u_dir) + 2 / z / z * Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U) * u_dir  # uvw
-    uww =    -2 / z^3 * taudw * dzdW * u_dir * 2 + inv(z) / z * Symmetric(svec_to_smat!(zeros(T, d, d), -dlogW_dW * w_dir, cone.rt2), :U) * u_dir * 2  # uww
-    vvw =    -2 / z^3 * sigmadv^2 * dzdW - inv(z) / z * dot(v_dir, dz_sqr_dV_sqr, v_dir) * dzdW +  # vvw
-            inv(z) / z * sigmadv * Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U) * 2 +
-            -inv(z) * d2logV_dV2_VV * 2
-    vww =    -2 / z^3 * dzdW * taudw * sigmadv * 2 + inv(z) / z * # vww
-            (taudw * Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U) + dzdW * dot(w_dir, dlogV_dV, v_dir)) * 2 +
-            -inv(z) / z * (sigmadv * Symmetric(svec_to_smat!(zeros(T, d, d), dlogW_dW * w_dir, cone.rt2), :U)) * 2
-    www =   -2 / z^3 * dzdW * taudw^2 +
-            -1 / z^2 * (dzdW * dot(w_dir, dlogW_dW, w_dir) + 2 * taudw * Symmetric(svec_to_smat!(zeros(T, d, d), dlogW_dW * w_dir, cone.rt2), :U)) + # www
-            2 * inv(z) * d2logW_dW2_WW - 2 * Wi * W_dir * Wi * W_dir * Wi
-    W_corr = uuw + uvw + uww + vvw + vww + www
+    dzdW * const1 + const0 * (dlogW_dW_dw - dlogV_dV_dv) + d2logV_dV2_VV - d2logW_dW2_WW
+    W_corr ./= z
+    W_corr += Wi * W_dir * Wi * W_dir * Wi
     @views smat_to_svec!(corr[W_idxs], W_corr, cone.rt2)
 
     diff_quad = zeros(T, vw_dim^2, vw_dim^2)
@@ -376,8 +359,6 @@ function correction(cone::EpiTraceRelEntropyTri{T}, primal_dir::AbstractVector{T
         d3WlogVdV / 2 + Vi * V_dir * Vi * V_dir * Vi * z
     V_corr ./= z
     @views smat_to_svec!(corr[V_idxs], V_corr, cone.rt2)
-
-    @views corr[W_idxs] ./= -2
 
     return corr
 end
