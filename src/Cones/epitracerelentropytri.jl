@@ -34,25 +34,26 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
 
-    # TODO type fields
+    # TODO type remaining fields
     rt2::T
-    V
-    W
-    Vi
-    Wi
+    V::Matrix{T}
+    W::Matrix{T}
+    Vi::Matrix{T}
+    Wi::Matrix{T}
     V_idxs
     W_idxs
-    vw_dim
-    z
-    dzdV
-    dzdW
-    W_similar
-    mat
-    matsdim1
-    matsdim2
-    tempsdim
-    diff_mat_V
-    diff_mat_W
+    vw_dim::Int
+    z::T
+    dzdV::Vector{T} # divided by z
+    dzdW::Vector{T}
+    W_similar::Matrix{T}
+    mat::Matrix{T}
+    matsdim1::Matrix{T}
+    matsdim2::Matrix{T}
+    tempsdim::Vector{T}
+    diff_mat_V::Matrix{T}
+    diff_mat_W::Matrix{T}
+    diff_tensor_V::Array{T, 3}
     V_fact
     W_fact
     V_vals_log
@@ -60,6 +61,9 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     V_log
     W_log
     WV_log
+    dz_sqr_dV_sqr::Matrix{T}
+    dz_sqr_dW_sqr::Matrix{T}
+    dz_sqr_dW_dV::Matrix{T}
 
     function EpiTraceRelEntropyTri{T}(
         dim::Int;
@@ -81,6 +85,7 @@ end
 
 function setup_extra_data(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     dim = cone.dim
+    vw_dim = cone.vw_dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
@@ -90,22 +95,26 @@ function setup_extra_data(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     cone.W = zeros(T, d, d)
     cone.Vi = zeros(T, d, d)
     cone.Wi = zeros(T, d, d)
-    cone.V_idxs = 2:(cone.vw_dim + 1)
-    cone.W_idxs = (cone.vw_dim + 2):cone.dim
-    cone.dzdV = zeros(T, cone.vw_dim)
-    cone.dzdW = zeros(T, cone.vw_dim)
+    cone.V_idxs = 2:(vw_dim + 1)
+    cone.W_idxs = (vw_dim + 2):cone.dim
+    cone.dzdV = zeros(T, vw_dim)
+    cone.dzdW = zeros(T, vw_dim)
     cone.W_similar = zeros(T, d, d)
     cone.mat = zeros(T, d, d)
-    cone.matsdim1 = zeros(T, cone.vw_dim, cone.vw_dim)
-    cone.matsdim2 = zeros(T, cone.vw_dim, cone.vw_dim)
-    cone.tempsdim = zeros(T, cone.vw_dim)
+    cone.matsdim1 = zeros(T, vw_dim, vw_dim)
+    cone.matsdim2 = zeros(T, vw_dim, vw_dim)
+    cone.tempsdim = zeros(T, vw_dim)
     cone.diff_mat_V = zeros(T, d, d)
     cone.diff_mat_W = zeros(T, d, d)
+    cone.diff_tensor_V = zeros(T, d, d, d)
     cone.V_vals_log = zeros(T, d)
     cone.W_vals_log = zeros(T, d)
     cone.V_log = zeros(T, d, d)
     cone.W_log = zeros(T, d, d)
     cone.WV_log = zeros(T, d, d)
+    cone.dz_sqr_dV_sqr = zeros(T, vw_dim, vw_dim)
+    cone.dz_sqr_dW_sqr = zeros(T, vw_dim, vw_dim)
+    cone.dz_sqr_dW_dV = zeros(T, vw_dim, vw_dim)
     return
 end
 
@@ -164,31 +173,30 @@ function update_grad(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     z = cone.z
     (V_vals, V_vecs) = cone.V_fact
     (W_vals, W_vecs) = cone.W_fact
-    ldiv!(cone.mat, Diagonal(V_vals), V_vecs')
-    Vi = mul!(cone.Vi, V_vecs, cone.mat)
-    ldiv!(cone.mat, Diagonal(W_vals), W_vecs')
-    Wi = mul!(cone.Wi, W_vecs, cone.mat)
+    Vi = cone.Vi = inv(cone.V_fact)
+    Wi = cone.Wi = inv(cone.W_fact)
 
     cone.grad[1] = -inv(z)
 
-    dzdW = cone.dzdW = -(cone.WV_log + I) / z
-    grad_W = -dzdW - Wi
-    @views smat_to_svec!(cone.grad[W_idxs], grad_W, rt2)
+    @views smat_to_svec!(cone.grad[W_idxs], Wi, rt2)
+    dzdW = smat_to_svec!(cone.dzdW, -(cone.WV_log + I) / z, rt2)
+    @. @views cone.grad[W_idxs] += dzdW
+    @. @views cone.grad[W_idxs] *= -1
 
     diff_mat_V = cone.diff_mat_V
     diff_mat!(diff_mat_V, V_vals, cone.V_vals_log)
     W_similar = cone.W_similar = V_vecs' * W * V_vecs
-    temp = -V_vecs * (W_similar .* Hermitian(diff_mat_V, :U)) * V_vecs' / z
-    dzdV = @views smat_to_svec!(cone.dzdV, temp, rt2)
-    grad_V = temp - Vi
+    temp = V_vecs * (W_similar .* Hermitian(diff_mat_V, :U)) * V_vecs' / z
+    grad_V = -temp - Vi
     @views smat_to_svec!(cone.grad[V_idxs], grad_V, rt2)
+    @views smat_to_svec!(cone.dzdV, temp, rt2)
 
     cone.grad_updated = true
     return cone.grad
 end
 
 function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
-    @assert cone.is_feas
+    @assert cone.grad_updated
     d = cone.d
     rt2 = cone.rt2
     rteps = sqrt(eps(T))
@@ -205,34 +213,29 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     diff_mat!(cone.diff_mat_W, W_vals, cone.W_vals_log)
     diff_mat_V = Hermitian(cone.diff_mat_V, :U)
     diff_mat_W = Hermitian(cone.diff_mat_W, :U)
-
-    diff_tensor_V = zeros(T, d, d, d)
-    diff_tensor!(diff_tensor_V, diff_mat_V, V_vals)
+    diff_tensor_V = diff_tensor!(cone.diff_tensor_V, diff_mat_V, V_vals)
 
     W_similar = cone.W_similar
-    dz_sqr_dV_sqr = zeros(T, vw_dim, vw_dim)
-    hess_tr_logm!(dz_sqr_dV_sqr, V_vecs, W_similar, diff_tensor_V, cone.rt2)
+    dz_sqr_dV_sqr = hess_tr_logm!(cone.dz_sqr_dV_sqr, V_vecs, W_similar, diff_tensor_V, cone.rt2)
+    @. dz_sqr_dV_sqr *= -1
     dzdV = cone.dzdV
     dz_dV_sqr = dzdV * dzdV'
     ViVi = symm_kron(zeros(T, vw_dim, vw_dim), Vi, rt2)
-    Hvv = dz_dV_sqr - dz_sqr_dV_sqr / z + ViVi
+    Hvv = dz_dV_sqr + dz_sqr_dV_sqr / z + ViVi
 
-    dz_sqr_dW_sqr = zeros(T, vw_dim, vw_dim)
-    grad_logm!(dz_sqr_dW_sqr, W_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_W, cone.rt2)
-    dz_dW = cone.dzdW
-    dz_dW_vec = smat_to_svec!(zeros(T, vw_dim), dz_dW, rt2)
-    dz_dW_sqr = dz_dW_vec * dz_dW_vec'
+    dz_sqr_dW_sqr = grad_logm!(cone.dz_sqr_dW_sqr, W_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_W, cone.rt2)
+    dzdW = cone.dzdW
+    dzdW_sqr = dzdW * dzdW'
     WiWi = symm_kron(zeros(T, vw_dim, vw_dim), Wi, rt2)
-    Hww = dz_dW_sqr + dz_sqr_dW_sqr / z + WiWi
+    Hww = dzdW_sqr + dz_sqr_dW_sqr / z + WiWi
 
-    dz_sqr_dW_dV = zeros(T, vw_dim, vw_dim)
-    grad_logm!(dz_sqr_dW_dV, V_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_V, cone.rt2)
-    dz_dW_dz_dV = dz_dW_vec * dzdV'
-    Hwv = -dz_sqr_dW_dV / z - dz_dW_dz_dV
+    dz_sqr_dW_dV = grad_logm!(cone.dz_sqr_dW_dV, V_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_V, cone.rt2)
+    dzdW_dz_dV = -dzdW * dzdV'
+    Hwv = -dz_sqr_dW_dV / z - dzdW_dz_dV
 
     H[1, 1] = -cone.grad[1]
-    @views H[1, V_idxs] .= -dzdV
-    @views H[1, W_idxs] .= dz_dW_vec
+    @views H[1, V_idxs] .= dzdV
+    @views H[1, W_idxs] .= dzdW
     @views H[1, :] ./= z
     @views H[V_idxs, V_idxs] .= Hvv
     @views H[V_idxs, W_idxs] .= Hwv'
@@ -240,6 +243,93 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
 
     cone.hess_updated = true
     return cone.hess
+end
+
+function correction(cone::EpiTraceRelEntropyTri{T}, primal_dir::AbstractVector{T}) where T
+    @assert cone.hess_updated
+    d = cone.d
+    corr = cone.correction
+    V_idxs = cone.V_idxs
+    W_idxs = cone.W_idxs
+    z = cone.z
+    (V_vals, V_vecs) = cone.V_fact
+    (W_vals, W_vecs) = cone.W_fact
+    Vi = Hermitian(cone.Vi)
+    Wi = Hermitian(cone.Wi)
+    dzdV = cone.dzdV * z
+    dzdW = cone.dzdW * z
+    diff_mat_V = Hermitian(cone.diff_mat_V, :U)
+    diff_mat_W = Hermitian(cone.diff_mat_W, :U)
+    diff_tensor_V = cone.diff_tensor_V
+    W_similar = cone.W_similar
+    dz_sqr_dV_sqr = cone.dz_sqr_dV_sqr
+    dlogW_dW = cone.dz_sqr_dW_sqr
+    dlogV_dV = cone.dz_sqr_dW_dV
+
+    u_dir = primal_dir[1]
+    @views v_dir = primal_dir[V_idxs]
+    @views w_dir = primal_dir[W_idxs]
+    @views V_dir = Symmetric(svec_to_smat!(zeros(T, d, d), primal_dir[V_idxs], cone.rt2), :U)
+    @views W_dir = Symmetric(svec_to_smat!(zeros(T, d, d), primal_dir[W_idxs], cone.rt2), :U)
+    V_dir_similar = V_vecs' * V_dir * V_vecs
+    W_dir_similar = W_vecs' * W_dir * W_vecs
+
+    diff_tensor_W = zeros(T, d, d, d)
+    diff_tensor!(diff_tensor_W, diff_mat_W, W_vals)
+
+    VW_dir_similar = V_vecs' * W_dir * V_vecs
+    diff_dot_V_VV = [V_dir_similar[:, q]' * Diagonal(diff_tensor_V[:, p, q]) * V_dir_similar[:, p] for p in 1:d, q in 1:d]
+    d2logV_dV2_VV = V_vecs * diff_dot_V_VV * V_vecs'
+    diff_dot_V_VW = [V_dir_similar[:, q]' * Diagonal(diff_tensor_V[:, p, q]) * VW_dir_similar[:, p] for p in 1:d, q in 1:d]
+    diff_dot_W_WW = [W_dir_similar[:, q]' * Diagonal(diff_tensor_W[:, p, q]) * W_dir_similar[:, p] for p in 1:d, q in 1:d]
+
+    dlogV_dV_dw = Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * w_dir, cone.rt2), :U)
+    dlogV_dV_dv = Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U)
+    dlogW_dW_dw = Symmetric(svec_to_smat!(zeros(T, d, d), dlogW_dW * w_dir, cone.rt2), :U)
+    dz_sqr_dV_sqr_dv = Symmetric(svec_to_smat!(zeros(T, d, d), dz_sqr_dV_sqr * v_dir, cone.rt2), :U)
+    const0 = (u_dir + dot(dzdV, v_dir) + dot(dzdW, w_dir)) / z
+    const1 = abs2(const0) + (dot(v_dir, dz_sqr_dV_sqr, v_dir) / 2 + dot(w_dir, dlogW_dW, w_dir) / 2 - dot(v_dir, dlogV_dV, w_dir)) / z
+
+    # u
+    corr[1] = const1
+
+    # v
+    diff_quad = zeros(T, cone.vw_dim^2, cone.vw_dim^2)
+    diff_quad!(diff_quad, diff_tensor_V, V_vals)
+    d3WlogVdV = zeros(T, d, d)
+    for j in 1:d, i in 1:d
+        for l in 1:d, k in 1:d
+            d3WlogVdV[i, j] += diff_quad[block_idxs(d, l)[k], block_idxs(d, j)[i]] * (
+            V_dir_similar[k, l] * V_dir_similar[l, j] * W_similar[i, k] +
+            V_dir_similar[k, l] * V_dir_similar[l, i] * W_similar[j, k] +
+            V_dir_similar[k, i] * V_dir_similar[l, j] * W_similar[k, l]
+            )
+        end
+    end
+    V_part_1 = (dz_sqr_dV_sqr_dv - dlogV_dV_dw) * const0
+    sqrt_vals = sqrt.(V_vals)
+    rdiv!(V_dir_similar, Diagonal(sqrt_vals))
+    ldiv!(Diagonal(V_vals), V_dir_similar)
+    V_part_2a = V_dir_similar * V_dir_similar'
+    V_part_2 = V_vecs * (diff_dot_V_VW + diff_dot_V_VW' + d3WlogVdV + V_part_2a * z) * V_vecs'
+    V_corr = V_part_1 + V_part_2
+    @views smat_to_svec!(corr[V_idxs], V_corr, cone.rt2)
+    @. @views corr[V_idxs] += dzdV * const1
+
+    # w
+    W_part_1 = const0 * (dlogW_dW_dw - dlogV_dV_dv) + d2logV_dV2_VV
+    sqrt_vals = sqrt.(W_vals)
+    rdiv!(W_dir_similar, Diagonal(sqrt_vals))
+    ldiv!(Diagonal(W_vals), W_dir_similar)
+    W_part_2a = W_dir_similar * W_dir_similar'
+    W_part_2 = W_vecs * (W_part_2a * z - diff_dot_W_WW) * W_vecs'
+    W_corr = W_part_1 + W_part_2
+    @views smat_to_svec!(corr[W_idxs], W_corr, cone.rt2)
+    @. @views corr[W_idxs] += dzdW * const1
+
+    @. corr /= z
+
+    return corr
 end
 
 function hess_tr_logm!(mat, vecs, mat_inner, diff_tensor, rt2::T) where T
@@ -253,6 +343,7 @@ function hess_tr_logm!(mat, vecs, mat_inner, diff_tensor, rt2::T) where T
         temp.data[block_idxs(d, i), block_idxs(d, j)] = vecs * Diagonal(X[:, i, j]) * vecs'
     end
 
+    mat .= 0
     row_idx = 1
     for j in 1:d, i in 1:j
         col_idx = 1
@@ -273,113 +364,24 @@ function hess_tr_logm!(mat, vecs, mat_inner, diff_tensor, rt2::T) where T
     return mat
 end
 
-function correction(cone::EpiTraceRelEntropyTri{T}, primal_dir::AbstractVector{T}) where T
-    @assert cone.hess_updated
-    d = cone.d
-    V_idxs = cone.V_idxs
-    W_idxs = cone.W_idxs
-    z = cone.z
-    vw_dim = cone.vw_dim
-    (V_vals, V_vecs) = cone.V_fact
-    (W_vals, W_vecs) = cone.W_fact
-    Vi = Hermitian(cone.Vi)
-    Wi = Hermitian(cone.Wi)
-    dzdV = Symmetric(svec_to_smat!(zeros(T, d, d), -cone.dzdV * z, cone.rt2), :U) # TODO save as a mat
-    dzdW = cone.dzdW * z # actually divided by z, maybe rethink
-    diff_mat_V = Hermitian(cone.diff_mat_V, :U)
-    diff_mat_W = Hermitian(cone.diff_mat_W, :U)
-
-    u_dir = primal_dir[1]
-    @views v_dir = primal_dir[V_idxs]
-    @views w_dir = primal_dir[W_idxs]
-    @views V_dir = Symmetric(svec_to_smat!(zeros(T, d, d), primal_dir[V_idxs], cone.rt2), :U)
-    @views W_dir = Symmetric(svec_to_smat!(zeros(T, d, d), primal_dir[W_idxs], cone.rt2), :U)
-    V_dir_similar = V_vecs' * V_dir * V_vecs
-    corr = cone.correction
-
-    # TODO save
-    diff_tensor_V = zeros(T, d, d, d)
-    diff_tensor!(diff_tensor_V, diff_mat_V, V_vals)
-    W_similar = cone.W_similar
-    dz_sqr_dV_sqr = zeros(T, vw_dim, vw_dim)
-    hess_tr_logm!(dz_sqr_dV_sqr, V_vecs, W_similar, diff_tensor_V, cone.rt2)
-    dz_sqr_dV_sqr *= -1
-    dlogW_dW = grad_logm!(zeros(T, vw_dim, vw_dim), W_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_W, cone.rt2)
-    dlogV_dV = grad_logm!(zeros(T, vw_dim, vw_dim), V_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_V, cone.rt2)
-    diff_tensor_W = zeros(T, d, d, d)
-    diff_tensor!(diff_tensor_W, diff_mat_W, W_vals)
-
-    temp1 = V_vecs' * V_dir * V_vecs
-    temp2 = W_vecs' * W_dir * W_vecs
-    temp3 = V_vecs' * W_dir * V_vecs
-    diff_dot_V_VV = [temp1[:, q]' * Diagonal(diff_tensor_V[:, p, q]) * temp1[:, p] for p in 1:d, q in 1:d]
-    d2logV_dV2_VV = V_vecs * diff_dot_V_VV * V_vecs'
-    diff_dot_V_VW = [temp1[:, q]' * Diagonal(diff_tensor_V[:, p, q]) * temp3[:, p] for p in 1:d, q in 1:d]
-    d2logV_dV2_VW = V_vecs * (diff_dot_V_VW + diff_dot_V_VW') * V_vecs'
-    diff_dot_W_WW = [temp2[:, q]' * Diagonal(diff_tensor_W[:, p, q]) * temp2[:, p] for p in 1:d, q in 1:d]
-    d2logW_dW2_WW = W_vecs * diff_dot_W_WW * W_vecs'
-
-
-    dlogV_dV_dw = Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * w_dir, cone.rt2), :U)
-    dlogV_dV_dv = Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U)
-    dlogW_dW_dw = Symmetric(svec_to_smat!(zeros(T, d, d), dlogW_dW * w_dir, cone.rt2), :U)
-    dz_sqr_dV_sqr_dv = Symmetric(svec_to_smat!(zeros(T, d, d), dz_sqr_dV_sqr * v_dir, cone.rt2), :U)
-    const0 = (u_dir + dot(dzdV, V_dir) + dot(dzdW, W_dir)) / z
-    const1 = abs2(const0) + (dot(v_dir, dz_sqr_dV_sqr, v_dir) / 2 + dot(w_dir, dlogW_dW, w_dir) / 2 - dot(v_dir, dlogV_dV, w_dir)) / z
-
-    # u
-    corr[1] = const1 / z
-
-    # w
-    W_corr =
-    dzdW * const1 + const0 * (dlogW_dW_dw - dlogV_dV_dv) + d2logV_dV2_VV - d2logW_dW2_WW
-    W_corr ./= z
-    W_corr += Wi * W_dir * Wi * W_dir * Wi
-    @views smat_to_svec!(corr[W_idxs], W_corr, cone.rt2)
-
-    diff_quad = zeros(T, vw_dim^2, vw_dim^2)
-    diff_quad!(diff_quad, V_vals, diff_tensor_V)
-    d3WlogVdV = zeros(T, d, d)
-    for j in 1:d, i in 1:d
-        for l in 1:d, k in 1:d
-            d3WlogVdV[i, j] += diff_quad[block_idxs(d, l)[k], block_idxs(d, j)[i]] * (
-                V_dir_similar[k, l] * V_dir_similar[l, j] * W_similar[i, k] +
-                V_dir_similar[k, l] * V_dir_similar[l, i] * W_similar[j, k] +
-                V_dir_similar[k, i] * V_dir_similar[l, j] * W_similar[k, l]
-                ) / 3
-        end
-    end
-    d3WlogVdV = 6 * V_vecs * d3WlogVdV * V_vecs'
-
-    # v
-    V_corr =
-        dzdV * const1 +
-        (dz_sqr_dV_sqr_dv - dlogV_dV_dw) * const0 +
-        d2logV_dV2_VW +
-        d3WlogVdV / 2 + Vi * V_dir * Vi * V_dir * Vi * z
-    V_corr ./= z
-    @views smat_to_svec!(corr[V_idxs], V_corr, cone.rt2)
-
-    return corr
-end
-
-function diff_quad!(diff_quad, V_vals, diff_tensor::Array{T, 3}) where T
+function diff_quad!(diff_quad::Matrix{T}, diff_tensor::Array{T, 3}, V_vals::Vector{T}) where T
     rteps = sqrt(eps(T))
     d = length(V_vals)
     idx1 = 1
-    for j in 1:d, i in 1:d
+    @inbounds for j in 1:d, i in 1:d
         idx2 = 1
         for l in 1:d, k in 1:d
             (vi, vj, vk, vl) = (V_vals[i], V_vals[j], V_vals[k], V_vals[l])
-            if (abs(vi - vj) < rteps) && (abs(vi - vk) < rteps) && (abs(vi - vl) < rteps) # i = j = k = l
-                diff_quad[idx1, idx2] = inv(vi^3) / 3 # fourth derivative divided by 3!
-            elseif (abs(vi - vl) < rteps) && (abs(vi - vk) < rteps) # i = k = l and not j
-                diff_quad[idx1, idx2] = (diff_tensor[i, i, i] - diff_tensor[i, i, j]) / (vi - vj)
-            elseif (abs(vi - vl) < rteps) # i = l
-                diff_quad[idx1, idx2] = (diff_tensor[i, i, j] - diff_tensor[i, j, k]) / (vi - vk)
-            else # all different
-                diff_quad[idx1, idx2] = (diff_tensor[j, k, l] - diff_tensor[i, j, k]) / (vl - vi)
+            if (abs(vi - vj) < rteps) && (abs(vi - vk) < rteps) && (abs(vi - vl) < rteps)
+                t = inv(vi^3) / 3 # fourth derivative divided by 3!
+            elseif (abs(vi - vl) < rteps) && (abs(vi - vk) < rteps)
+                t = (diff_tensor[i, i, i] - diff_tensor[i, i, j]) / (vi - vj)
+            elseif (abs(vi - vl) < rteps)
+                t = (diff_tensor[i, i, j] - diff_tensor[i, j, k]) / (vi - vk)
+            else
+                t = (diff_tensor[j, k, l] - diff_tensor[i, j, k]) / (vl - vi)
             end
+            diff_quad[idx1, idx2] = t
             idx2 += 1
         end
         idx1 += 1
