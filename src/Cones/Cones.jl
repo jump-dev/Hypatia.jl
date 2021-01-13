@@ -627,14 +627,11 @@ function diff_tensor!(diff_tensor::Array{T, 3}, diff_mat::AbstractMatrix{T}, val
                 vijk = (vi + vj + vk) / 3
                 t = -inv(vijk) / vijk / 2
             else
-                vjk = (vj + vk) / 2
-                t = (inv(vjk) - diff_mat[i, j]) / (vj - vi)
+                # diff_mat[j, k] ≈ diff_mat[j, j]
+                t = (diff_mat[j, k] - diff_mat[i, j]) / (vj - vi)
             end
-        elseif abs(vi - vj) < rteps
-            vij = (vi + vj) / 2
-            t = (inv(vij) - diff_mat[k, i]) / (vi - vk)
         else
-            t = (diff_mat[i, j] - diff_mat[k, i]) / (vj - vk)
+            t = (diff_mat[i, j] - diff_mat[i, k]) / (vj - vk)
         end
         diff_tensor[i, j, k] = diff_tensor[i, k, j] = diff_tensor[j, i, k] =
             diff_tensor[j, k, i] = diff_tensor[k, i, j] = diff_tensor[k, j, i] = t

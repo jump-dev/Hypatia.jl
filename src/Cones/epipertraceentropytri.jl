@@ -218,7 +218,7 @@ function correction(cone::EpiPerTraceEntropyTri{T}, primal_dir::AbstractVector{T
     Wi = Symmetric(cone.Wi, :U)
     u_dir = primal_dir[1]
     v_dir = primal_dir[2]
-    @views W_dir = Symmetric(svec_to_smat!(zeros(T, d, d), primal_dir[3:cone.dim], cone.rt2), :U)
+    @views W_dir = Symmetric(svec_to_smat!(cone.mat, primal_dir[3:cone.dim], cone.rt2), :U)
     corr = cone.correction
     @views w_corr = corr[3:cone.dim]
 
