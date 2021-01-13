@@ -34,14 +34,13 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
 
-    # TODO type remaining fields
     rt2::T
     V::Matrix{T}
     W::Matrix{T}
     Vi::Matrix{T}
     Wi::Matrix{T}
-    V_idxs
-    W_idxs
+    V_idxs::UnitRange{Int}
+    W_idxs::UnitRange{Int}
     vw_dim::Int
     z::T
     dzdV::Vector{T} # divided by z
@@ -56,11 +55,11 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     diff_tensor_V::Array{T, 3}
     V_fact
     W_fact
-    V_vals_log
-    W_vals_log
-    V_log
-    W_log
-    WV_log
+    V_vals_log::Vector{T}
+    W_vals_log::Vector{T}
+    V_log::Matrix{T}
+    W_log::Matrix{T}
+    WV_log::Matrix{T}
     dz_sqr_dV_sqr::Matrix{T}
     dz_sqr_dW_sqr::Matrix{T}
     dz_sqr_dW_dV::Matrix{T}
@@ -199,11 +198,9 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     @assert cone.grad_updated
     d = cone.d
     rt2 = cone.rt2
-    rteps = sqrt(eps(T))
     V_idxs = cone.V_idxs
     W_idxs = cone.W_idxs
     z = cone.z
-    vw_dim = cone.vw_dim
     (V_vals, V_vecs) = cone.V_fact
     (W_vals, W_vecs) = cone.W_fact
     Vi = cone.Vi
@@ -216,30 +213,30 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     diff_tensor_V = diff_tensor!(cone.diff_tensor_V, diff_mat_V, V_vals)
 
     W_similar = cone.W_similar
-    dz_sqr_dV_sqr = hess_tr_logm!(cone.dz_sqr_dV_sqr, V_vecs, W_similar, diff_tensor_V, cone.rt2)
+    dz_sqr_dV_sqr = hess_tr_logm!(cone.dz_sqr_dV_sqr, V_vecs, W_similar, diff_tensor_V, rt2)
     @. dz_sqr_dV_sqr *= -1
+    @views Hvv = H[V_idxs, V_idxs]
+    symm_kron(Hvv, Vi, rt2)
     dzdV = cone.dzdV
-    dz_dV_sqr = dzdV * dzdV'
-    ViVi = symm_kron(zeros(T, vw_dim, vw_dim), Vi, rt2)
-    Hvv = dz_dV_sqr + dz_sqr_dV_sqr / z + ViVi
+    mul!(Hvv, dzdV, dzdV', true, true)
+    @. Hvv += dz_sqr_dV_sqr / z
 
-    dz_sqr_dW_sqr = grad_logm!(cone.dz_sqr_dW_sqr, W_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_W, cone.rt2)
+    dz_sqr_dW_sqr = grad_logm!(cone.dz_sqr_dW_sqr, W_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_W, rt2)
+    @views Hww = H[W_idxs, W_idxs]
+    symm_kron(Hww, Wi, rt2)
     dzdW = cone.dzdW
-    dzdW_sqr = dzdW * dzdW'
-    WiWi = symm_kron(zeros(T, vw_dim, vw_dim), Wi, rt2)
-    Hww = dzdW_sqr + dz_sqr_dW_sqr / z + WiWi
+    mul!(Hww, dzdW, dzdW', true, true)
+    @. Hww += dz_sqr_dW_sqr / z
 
-    dz_sqr_dW_dV = grad_logm!(cone.dz_sqr_dW_dV, V_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_V, cone.rt2)
-    dzdW_dz_dV = -dzdW * dzdV'
-    Hwv = -dz_sqr_dW_dV / z - dzdW_dz_dV
+    dz_sqr_dW_dV = grad_logm!(cone.dz_sqr_dW_dV, V_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_V, rt2)
+    @views Hvw = H[V_idxs, W_idxs]
+    @. Hvw = -dz_sqr_dW_dV / z
+    mul!(Hvw, dzdV, dzdW', true, true)
 
     H[1, 1] = -cone.grad[1]
     @views H[1, V_idxs] .= dzdV
     @views H[1, W_idxs] .= dzdW
     @views H[1, :] ./= z
-    @views H[V_idxs, V_idxs] .= Hvv
-    @views H[V_idxs, W_idxs] .= Hwv'
-    @views H[W_idxs, W_idxs] .= Hww
 
     cone.hess_updated = true
     return cone.hess
@@ -297,14 +294,12 @@ function correction(cone::EpiTraceRelEntropyTri{T}, primal_dir::AbstractVector{T
     diff_quad = zeros(T, cone.vw_dim^2, cone.vw_dim^2)
     diff_quad!(diff_quad, diff_tensor_V, V_vals)
     d3WlogVdV = zeros(T, d, d)
-    for j in 1:d, i in 1:d
-        for l in 1:d, k in 1:d
-            d3WlogVdV[i, j] += diff_quad[block_idxs(d, l)[k], block_idxs(d, j)[i]] * (
+    for j in 1:d, i in 1:d, l in 1:d, k in 1:d
+        d3WlogVdV[i, j] += diff_quad[block_idxs(d, l)[k], block_idxs(d, j)[i]] * (
             V_dir_similar[k, l] * V_dir_similar[l, j] * W_similar[i, k] +
             V_dir_similar[k, l] * V_dir_similar[l, i] * W_similar[j, k] +
             V_dir_similar[k, i] * V_dir_similar[l, j] * W_similar[k, l]
             )
-        end
     end
     V_part_1 = (dz_sqr_dV_sqr_dv - dlogV_dV_dw) * const0
     sqrt_vals = sqrt.(V_vals)
