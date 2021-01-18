@@ -37,3 +37,5 @@ termination_status(model)
 objective_value(model)
 value.(x)
 ```
+
+This work has been partially funded by the National Science Foundation under grant OAC-1835443 and the Office of Naval Research under grant N00014-18-1-2079.
