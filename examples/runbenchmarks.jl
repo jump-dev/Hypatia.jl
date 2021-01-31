@@ -170,7 +170,7 @@ for ex_name in JuMP_example_names
     (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_test.jl")) # TODO remove
     ex_insts = reformat_insts(ex_insts) # TODO remove
 
-    for (inst_set, solver) in instance_sets, stepper in steppers
+    for stepper in steppers, (inst_set, solver) in instance_sets
         haskey(ex_insts, inst_set) || continue
         (extender, inst_subsets) = ex_insts[inst_set]
         isempty(inst_subsets) && continue
