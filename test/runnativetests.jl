@@ -106,15 +106,20 @@ end
     end
 end
 
-@testset "steppers tests" begin
-    println("\nstarting steppers tests (with printing)")
-    steppers = [
-        (Solvers.PredOrCentStepper, diff_reals),
-        (Solvers.CombinedStepper, diff_reals),
-        ]
-    for inst_name in inst_cones_few, (stepper, real_types) in steppers, T in diff_reals
-        options = (; default_options..., verbose = true, stepper = stepper{T}())
-        test_instance_solver(inst_name, T, options, string_nameof(stepper))
+@testset "PredOrCentStepper tests" begin
+    println("\nstarting PredOrCentStepper tests (with printing)")
+    use_corr_curv = [(false, false), (true, false), (true, true)]
+    for inst_name in inst_cones_few, (corr, curv) in use_corr_curv, T in diff_reals
+        options = (; default_options..., verbose = true, stepper = Solvers.PredOrCentStepper{T}(use_correction = corr, use_curve_search = curv))
+        test_instance_solver(inst_name, T, options, "corr=$corr curv=$curv")
+    end
+end
+
+@testset "CombinedStepper tests" begin
+    println("\nstarting CombinedStepper tests (with printing)")
+    for inst_name in inst_cones_few, T in diff_reals
+        options = (; default_options..., verbose = true, stepper = Solvers.CombinedStepper{T}())
+        test_instance_solver(inst_name, T, options)
     end
 end
 

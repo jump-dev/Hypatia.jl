@@ -329,6 +329,7 @@ function solve(solver::Solver{T}) where {T <: Real}
             solver.worst_dir_res = 0
             step(stepper, solver) || break
             flush(stdout)
+            calc_mu(solver)
 
             if point.tau[] <= zero(T) || point.kap[] <= zero(T) || solver.mu <= zero(T)
                 @warn("numerical failure: tau is $(point.tau[]), kappa is $(point.kap[]), mu is $(solver.mu); terminating")

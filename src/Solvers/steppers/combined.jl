@@ -3,7 +3,7 @@ combined predict and center stepper
 =#
 
 mutable struct CombinedStepper{T <: Real} <: Stepper{T}
-    use_correction::Bool # TODO remove if unused
+    use_correction::Bool # TODO remove if unused (currently must be true)
     prev_alpha::T
     rhs::Point{T}
     dir::Point{T}
@@ -81,8 +81,6 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     get_directions(stepper, solver, true)
     copyto!(dir_predcorr.vec, dir.vec)
 
-    # if stepper.use_correction # TODO?
-
     stepper.uncorr_only = stepper.cent_only = false
     alpha = search_alpha(point, model, stepper)
 
@@ -105,31 +103,26 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
                 if iszero(alpha)
                     @warn("cannot step in centering direction")
                     solver.status = NumericalFailure
+                    stepper.prev_alpha = alpha
                     return false
                 else
                     # step
-                    @. point.vec += alpha * dir_cent.vec
+                    update_cone_points(alpha, point, stepper, false)
                 end
             else
                 # step
-                alpha_sqr = abs2(alpha)
-                @. point.vec += alpha * dir_cent.vec + alpha_sqr * dir_centcorr.vec
+                update_cone_points(alpha, point, stepper, false)
             end
         else
             # step
-            alpha_m1 = 1 - alpha
-            @. point.vec += alpha * dir_pred.vec + alpha_m1 * dir_cent.vec
+            update_cone_points(alpha, point, stepper, false)
         end
     else
         # step
-        alpha_sqr = abs2(alpha)
-        alpha_m1 = 1 - alpha
-        alpha_m1sqr = abs2(alpha_m1)
-        @. point.vec += alpha * dir_pred.vec + alpha_sqr * dir_predcorr.vec + alpha_m1 * dir_cent.vec + alpha_m1sqr * dir_centcorr.vec
+        update_cone_points(alpha, point, stepper, false)
     end
 
     stepper.prev_alpha = alpha
-    calc_mu(solver)
 
     return true
 end
@@ -139,36 +132,43 @@ expect_improvement(stepper::CombinedStepper) = true
 function update_cone_points(
     alpha::T,
     point::Point{T},
-    stepper::CombinedStepper{T}
+    stepper::CombinedStepper{T},
+    ztsk_only::Bool,
     ) where {T <: Real}
-    cand = stepper.temp
-    dir_cent = stepper.dir_cent
+    if ztsk_only
+        cand = stepper.temp.ztsk
+        copyto!(cand, point.ztsk)
+        dir_cent = stepper.dir_cent.ztsk
+        dir_pred = stepper.dir_pred.ztsk
+    else
+        cand = point.vec
+        dir_cent = stepper.dir_cent.vec
+        dir_pred = stepper.dir_pred.vec
+    end
 
     if stepper.uncorr_only
         # no correction
         if stepper.cent_only
             # centering
-            @. cand.ztsk = point.ztsk + alpha * dir_cent.ztsk
+            @. cand += alpha * dir_cent
         else
             # combined
-            dir_pred = stepper.dir_pred
             alpha_m1 = 1 - alpha
-            @. cand.ztsk = point.ztsk + alpha * dir_pred.ztsk + alpha_m1 * dir_cent.ztsk
+            @. cand += alpha * dir_pred + alpha_m1 * dir_cent
         end
     else
         # correction
-        dir_centcorr = stepper.dir_centcorr
+        dir_centcorr = (ztsk_only ? stepper.dir_centcorr.ztsk : stepper.dir_centcorr.vec)
         alpha_sqr = abs2(alpha)
         if stepper.cent_only
             # centering
-            @. cand.ztsk = point.ztsk + alpha * dir_cent.ztsk + alpha_sqr * dir_centcorr.ztsk
+            @. cand += alpha * dir_cent + alpha_sqr * dir_centcorr
         else
             # combined
-            dir_pred = stepper.dir_pred
-            dir_predcorr = stepper.dir_predcorr
+            dir_predcorr = (ztsk_only ? stepper.dir_predcorr.ztsk : stepper.dir_predcorr.vec)
             alpha_m1 = 1 - alpha
             alpha_m1sqr = abs2(alpha_m1)
-            @. cand.ztsk = point.ztsk + alpha * dir_pred.ztsk + alpha_sqr * dir_predcorr.ztsk + alpha_m1 * dir_cent.ztsk + alpha_m1sqr * dir_centcorr.ztsk
+            @. cand += alpha * dir_pred + alpha_sqr * dir_predcorr + alpha_m1 * dir_cent + alpha_m1sqr * dir_centcorr
         end
     end
 

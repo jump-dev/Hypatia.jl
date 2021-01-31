@@ -36,7 +36,7 @@ function search_alpha(
     step_searcher = stepper.step_searcher
     for alpha in step_searcher.alpha_sched
         (alpha < min_alpha) && break # alpha is very small so finish
-        update_cone_points(alpha, point, stepper)
+        update_cone_points(alpha, point, stepper, true) # update ztsk only
         check_cone_points(stepper.temp, step_searcher, model) && return alpha
     end
     return zero(T)
