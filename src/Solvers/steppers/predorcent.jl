@@ -95,7 +95,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
                 @warn("very small alpha in curve search; trying without correction")
             else
                 # step
-                @. point.vec += alpha * dir_nocorr.vec + abs2(alpha) * dir_corr.vec
+                update_cone_points(alpha, point, stepper, false)
                 stepper.prev_alpha = alpha
                 return true
             end
@@ -110,8 +110,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
                 alpha = search_alpha(point, model, stepper, min_alpha = T(1e-2))
 
                 # step
-                corr_factor = alpha * stepper.uncorr_alpha
-                @. point.vec += alpha * dir_nocorr.vec + corr_factor * dir_corr.vec
+                update_cone_points(alpha, point, stepper, false)
                 stepper.prev_alpha = alpha
                 return true
             end
@@ -143,8 +142,9 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     end
 
     # step
-    @. point.vec += alpha * dir_nocorr.vec
+    update_cone_points(alpha, point, stepper, false)
     stepper.prev_alpha = alpha
+
     return true
 end
 
@@ -153,14 +153,23 @@ expect_improvement(stepper::PredOrCentStepper) = iszero(stepper.cent_count)
 function update_cone_points(
     alpha::T,
     point::Point{T},
-    stepper::PredOrCentStepper{T}
+    stepper::PredOrCentStepper{T},
+    ztsk_only::Bool,
     ) where {T <: Real}
-    cand = stepper.temp
+    if ztsk_only
+        cand = stepper.temp.ztsk
+        copyto!(cand, point.ztsk)
+        dir_nocorr = stepper.dir_nocorr.ztsk
+    else
+        cand = point.vec
+        dir_nocorr = stepper.dir_nocorr.vec
+    end
 
-    @. cand.ztsk = point.ztsk + alpha * stepper.dir_nocorr.ztsk
+    @. cand += alpha * dir_nocorr
     if !stepper.uncorr_only
+        dir_corr = (ztsk_only ? stepper.dir_corr.ztsk : stepper.dir_corr.vec)
         corr_factor = (stepper.use_curve_search ? abs2(alpha) : alpha * stepper.uncorr_alpha)
-        @. cand.ztsk += corr_factor * stepper.dir_corr.ztsk
+        @. cand += corr_factor * dir_corr
     end
 
     return
