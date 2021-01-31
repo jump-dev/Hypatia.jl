@@ -41,10 +41,13 @@ tol_loose = 1e-7
 tol_tight = 1e-3 * tol_loose
 
 steppers = [
-    Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = true),
-    Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = false),
+    Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = true, use_curve_search = false),
+    Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = false, use_curve_search = false),
+    Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = true, use_curve_search = true),
     Hypatia.Solvers.CombinedStepper{Float64}(),
     ]
+use_curve_search(::Hypatia.Solvers.Stepper) = false
+use_curve_search(stepper::Hypatia.Solvers.PredOrCentStepper) = stepper.use_curve_search
 
 hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     verbose = verbose,
@@ -72,9 +75,10 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
 
 # instance sets and solvers to run
 instance_sets = [
-    ("nat", hyp_solver),
+    # ("nat", hyp_solver),
     # ("ext", hyp_solver),
     # ("ext", mosek_solver),
+    ("minimal", hyp_solver),
     ]
 
 # models to run
@@ -118,6 +122,14 @@ else
     end
 end
 
+# TODO remove
+function reformat_insts(insts)
+    for (k, v) in insts
+        insts[k] = (nothing, [[i[1] for i in v]])
+    end
+    return insts
+end
+
 perf = DataFrames.DataFrame(
     example = String[],
     inst_set = String[],
@@ -126,6 +138,8 @@ perf = DataFrames.DataFrame(
     extender = String[],
     solver = String[],
     stepper = String[],
+    use_corr = Bool[],
+    use_curve_search = Bool[],
     n = Int[],
     p = Int[],
     q = Int[],
@@ -152,7 +166,9 @@ time_all = time()
 
 @info("starting benchmark runs")
 for ex_name in JuMP_example_names
-    (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
+    # (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
+    (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_test.jl")) # TODO remove
+    ex_insts = reformat_insts(ex_insts) # TODO remove
 
     for (inst_set, solver) in instance_sets, stepper in steppers
         haskey(ex_insts, inst_set) || continue
@@ -170,7 +186,7 @@ for ex_name in JuMP_example_names
 
                 time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, compile_inst, inst, extender, solver, stepper, solve)
 
-                push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], string(stepper), p..., time_inst))
+                push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], string(typeof(stepper)), stepper.use_correction, use_curve_search(stepper), p..., time_inst))
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
                 @printf("... %8.2e seconds\n\n", time_inst)
                 flush(stdout); flush(stderr)
