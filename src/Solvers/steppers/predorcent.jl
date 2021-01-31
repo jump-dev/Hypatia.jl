@@ -4,6 +4,7 @@ predict or center stepper
 
 mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     use_correction::Bool
+    use_curve_search::Bool
     prev_alpha::T
     cent_count::Int
     rhs::Point{T}
@@ -14,12 +15,19 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     dir_temp::Vector{T}
     step_searcher::StepSearcher{T}
     uncorr_only::Bool
+    uncorr_alpha::T
 
     function PredOrCentStepper{T}(;
         use_correction::Bool = true,
+        use_curve_search::Bool = true,
         ) where {T <: Real}
         stepper = new{T}()
+        if use_curve_search
+            # can only use curve search if using correction
+            @assert use_correction
+        end
         stepper.use_correction = use_correction
+        stepper.use_curve_search = use_curve_search
         return stepper
     end
 end
@@ -43,6 +51,7 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
     stepper.step_searcher = StepSearcher{T}(model)
     stepper.uncorr_only = false
+    stepper.uncorr_alpha = 0
 
     return stepper
 end
@@ -62,11 +71,12 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
     rhs_fun_nocorr = (is_pred ? update_rhs_pred : update_rhs_cent)
 
+    # TODO tune min_alpha
     # get uncorrected direction
     rhs_fun_nocorr(solver, rhs)
     get_directions(stepper, solver, is_pred)
     copyto!(dir_nocorr.vec, dir.vec) # TODO maybe instead of copying, pass in the dir point we want into the directions function
-    alpha = zero(T)
+    try_nocorr = true
 
     if stepper.use_correction
         # get correction direction
@@ -76,46 +86,65 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         get_directions(stepper, solver, is_pred)
         copyto!(dir_corr.vec, dir.vec)
 
-        # do curve search with correction
-        stepper.uncorr_only = false
-        alpha = search_alpha(point, model, stepper, min_alpha = T(1e-2)) # TODO tune min_alpha
-        if iszero(alpha)
-            # try not using correction
-            @warn("very small alpha in curve search; trying without correction")
+        if stepper.use_curve_search
+            # do single curve search with correction
+            stepper.uncorr_only = false
+            alpha = search_alpha(point, model, stepper, min_alpha = T(1e-2))
+            if iszero(alpha)
+                # try not using correction
+                @warn("very small alpha in curve search; trying without correction")
+            else
+                # step
+                @. point.vec += alpha * dir_nocorr.vec + abs2(alpha) * dir_corr.vec
+                stepper.prev_alpha = alpha
+                return true
+            end
         else
-            # step
-            @. point.vec += alpha * dir_nocorr.vec + abs2(alpha) * dir_corr.vec
+            # do two line searches, first for uncorrected alpha, then for corrected alpha
+            try_nocorr = false
+            stepper.uncorr_only = true
+            alpha = search_alpha(point, model, stepper, min_alpha = T(1e-2))
+            stepper.uncorr_alpha = alpha
+            if !iszero(alpha)
+                stepper.uncorr_only = false
+                alpha = search_alpha(point, model, stepper, min_alpha = T(1e-2))
+
+                # step
+                corr_factor = alpha * stepper.uncorr_alpha
+                @. point.vec += alpha * dir_nocorr.vec + corr_factor * dir_corr.vec
+                stepper.prev_alpha = alpha
+                return true
+            end
         end
     end
 
-    if iszero(alpha)
+    if try_nocorr
         # do line search in uncorrected direction
         stepper.uncorr_only = true
         alpha = search_alpha(point, model, stepper, min_alpha = T(1e-2))
-        if iszero(alpha) && is_pred
-            # do centering step instead
-            @warn("very small alpha in line search; trying centering")
-            update_rhs_cent(solver, rhs)
-            get_directions(stepper, solver, is_pred)
-            copyto!(dir_nocorr.vec, dir.vec)
-            stepper.cent_count = 1
-
-            alpha = search_alpha(point, model, stepper)
-        end
-
-        if iszero(alpha)
-            @warn("very small alpha in line search; terminating")
-            solver.status = NumericalFailure
-            return false
-        end
-
-        # step
-        @. point.vec += alpha * dir_nocorr.vec
     end
 
-    stepper.prev_alpha = alpha
-    calc_mu(solver)
+    if iszero(alpha) && is_pred
+        # do centering step instead
+        @warn("very small alpha in line search; trying centering")
+        update_rhs_cent(solver, rhs)
+        get_directions(stepper, solver, is_pred)
+        copyto!(dir_nocorr.vec, dir.vec)
+        stepper.cent_count = 1
 
+        alpha = search_alpha(point, model, stepper)
+    end
+
+    if iszero(alpha)
+        @warn("very small alpha in line search; terminating")
+        solver.status = NumericalFailure
+        stepper.prev_alpha = alpha
+        return false
+    end
+
+    # step
+    @. point.vec += alpha * dir_nocorr.vec
+    stepper.prev_alpha = alpha
     return true
 end
 
@@ -127,14 +156,11 @@ function update_cone_points(
     stepper::PredOrCentStepper{T}
     ) where {T <: Real}
     cand = stepper.temp
-    dir_nocorr = stepper.dir_nocorr
 
-    if stepper.uncorr_only
-        @. cand.ztsk = point.ztsk + alpha * dir_nocorr.ztsk
-    else
-        dir_corr = stepper.dir_corr
-        alpha_sqr = abs2(alpha)
-        @. cand.ztsk = point.ztsk + alpha * dir_nocorr.ztsk + alpha_sqr * dir_corr.ztsk
+    @. cand.ztsk = point.ztsk + alpha * stepper.dir_nocorr.ztsk
+    if !stepper.uncorr_only
+        corr_factor = (stepper.use_curve_search ? abs2(alpha) : alpha * stepper.uncorr_alpha)
+        @. cand.ztsk += corr_factor * stepper.dir_corr.ztsk
     end
 
     return

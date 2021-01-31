@@ -105,6 +105,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
                 if iszero(alpha)
                     @warn("cannot step in centering direction")
                     solver.status = NumericalFailure
+                    stepper.prev_alpha = alpha
                     return false
                 else
                     # step
@@ -129,8 +130,6 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     end
 
     stepper.prev_alpha = alpha
-    calc_mu(solver)
-
     return true
 end
 
