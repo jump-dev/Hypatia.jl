@@ -98,7 +98,7 @@ function run_instance_check(
     println("\nsetup model")
     print_memory()
     setup_fun() = @eval begin
-        (model, model_stats) = setup_model($ex_type, $inst, $extender, $(merge(solver[3], stepper = stepper)), $(solver[2]))
+        (model, model_stats) = setup_model($ex_type, $inst, $extender, $(merge(solver[3], (stepper = stepper,))), $(solver[2]))
         GC.gc()
         return model_stats
     end
