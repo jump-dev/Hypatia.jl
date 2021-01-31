@@ -1,7 +1,7 @@
 #=
 run benchmarks from the examples folder
 to use the bench instance set and run on cmd line:
-killall julia; ~/julia/julia examples/runbenchmarks.jl &> ~/bench/bench.txt
+killall julia; ~/julia/julia examples/runbenchmarks.jl &> ~/bench2/bench.txt
 =#
 
 import DataFrames
@@ -59,7 +59,6 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     tol_infeas = tol_tight,
     init_use_indirect = true, # skips dual equalities preprocessing
     use_dense_model = true,
-    stepper = Hypatia.Solvers.default_stepper(Float64),
     ))
 mosek_solver = ("Mosek", Mosek.Optimizer, (
     QUIET = !verbose,
