@@ -20,11 +20,11 @@ examples_dir = @__DIR__
 include(joinpath(examples_dir, "common_JuMP.jl"))
 
 # path to write results DataFrame to CSV, if any
-results_path = joinpath(homedir(), "bench", "bench.csv")
+results_path = joinpath("bench2", "bench.csv")
 # results_path = nothing
 
-spawn_runs = true # spawn new process for each instance
-# spawn_runs = false
+# spawn_runs = true # spawn new process for each instance
+spawn_runs = false
 
 setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
 # setup_model_anyway = false
@@ -40,6 +40,12 @@ check_time_limit = 1.2 * optimizer_time_limit
 tol_loose = 1e-7
 tol_tight = 1e-3 * tol_loose
 
+steppers = [
+    Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = true),
+    Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = false),
+    Hypatia.Solvers.CombinedStepper{Float64}(),
+    ]
+
 hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     verbose = verbose,
     iter_limit = 250,
@@ -50,6 +56,7 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     tol_infeas = tol_tight,
     init_use_indirect = true, # skips dual equalities preprocessing
     use_dense_model = true,
+    stepper = Hypatia.Solvers.default_stepper(Float64),
     ))
 mosek_solver = ("Mosek", Mosek.Optimizer, (
     QUIET = !verbose,
@@ -66,8 +73,8 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
 # instance sets and solvers to run
 instance_sets = [
     ("nat", hyp_solver),
-    ("ext", hyp_solver),
-    ("ext", mosek_solver),
+    # ("ext", hyp_solver),
+    # ("ext", mosek_solver),
     ]
 
 # models to run
@@ -104,9 +111,10 @@ else
         inst_data::Tuple,
         extender,
         solver::Tuple,
+        stepper::Hypatia.Solvers.Stepper,
         ::Bool,
         )
-        return (false, false, run_instance(ex_type, inst_data, extender, NamedTuple(), solver[2], default_options = solver[3], test = false))
+        return (false, false, run_instance(ex_type, inst_data, extender, (stepper = stepper,), solver[2], default_options = solver[3], test = false))
     end
 end
 
@@ -117,6 +125,7 @@ perf = DataFrames.DataFrame(
     inst_data = Tuple[],
     extender = String[],
     solver = String[],
+    stepper = String[],
     n = Int[],
     p = Int[],
     q = Int[],
@@ -145,7 +154,7 @@ time_all = time()
 for ex_name in JuMP_example_names
     (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
 
-    for (inst_set, solver) in instance_sets
+    for (inst_set, solver) in instance_sets, stepper in steppers
         haskey(ex_insts, inst_set) || continue
         (extender, inst_subsets) = ex_insts[inst_set]
         isempty(inst_subsets) && continue
@@ -159,9 +168,9 @@ for ex_name in JuMP_example_names
                 @info("starting $ex_type $inst_set $(solver[1]) $inst_num: $inst ...")
                 flush(stdout); flush(stderr)
 
-                time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, compile_inst, inst, extender, solver, solve)
+                time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, compile_inst, inst, extender, solver, stepper, solve)
 
-                push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], p..., time_inst))
+                push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], string(stepper), p..., time_inst))
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
                 @printf("... %8.2e seconds\n\n", time_inst)
                 flush(stdout); flush(stderr)
