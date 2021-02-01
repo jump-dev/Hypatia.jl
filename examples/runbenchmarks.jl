@@ -186,7 +186,7 @@ for ex_name in JuMP_example_names
                 time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, compile_inst, inst, extender, solver, stepper, solve)
 
                 push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], string(typeof(stepper)), stepper.use_correction, use_curve_search(stepper), p..., time_inst))
-                isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
+                isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, Inf), append = true)
                 @printf("... %8.2e seconds\n\n", time_inst)
                 flush(stdout); flush(stderr)
 
