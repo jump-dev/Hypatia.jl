@@ -20,11 +20,11 @@ examples_dir = @__DIR__
 include(joinpath(examples_dir, "common_JuMP.jl"))
 
 # path to write results DataFrame to CSV, if any
-results_path = joinpath("bench2", "bench.csv")
+results_path = joinpath("bench2", "bench_nat.csv")
 # results_path = nothing
 
-# spawn_runs = true # spawn new process for each instance
-spawn_runs = false
+spawn_runs = true # spawn new process for each instance
+# spawn_runs = false
 
 setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
 # setup_model_anyway = false
@@ -74,10 +74,10 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
 
 # instance sets and solvers to run
 instance_sets = [
-    # ("nat", hyp_solver),
+    ("nat", hyp_solver),
     # ("ext", hyp_solver),
     # ("ext", mosek_solver),
-    ("minimal", hyp_solver),
+    # ("minimal", hyp_solver),
     ]
 
 # models to run
@@ -165,9 +165,9 @@ time_all = time()
 
 @info("starting benchmark runs")
 for ex_name in JuMP_example_names
-    # (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
-    (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_test.jl")) # TODO remove
-    ex_insts = reformat_insts(ex_insts) # TODO remove
+    (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
+    # (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_test.jl")) # TODO remove
+    # ex_insts = reformat_insts(ex_insts) # TODO remove
 
     for stepper in steppers, (inst_set, solver) in instance_sets
         haskey(ex_insts, inst_set) || continue
