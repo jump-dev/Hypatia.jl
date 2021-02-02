@@ -151,12 +151,12 @@ perf = DataFrames.DataFrame(
     dual_obj = Float64[],
     rel_obj_diff = Float64[],
     compl = Float64[],
-    x_viol = Float64[],
-    y_viol = Float64[],
-    z_viol = Float64[],
-    setup_time = Float64[],
-    check_time = Float64[],
-    total_time = Float64[],
+    x_viol = Union{Float64, Missing}[],
+    y_viol = Union{Float64, Missing}[],
+    z_viol = Union{Float64, Missing}[],
+    setup_time = Union{Float64, Missing}[],
+    check_time = Union{Float64, Missing}[],
+    total_time = Union{Float64, Missing}[],
     )
 DataFrames.allowmissing!(perf, 7:21)
 
@@ -186,7 +186,7 @@ for ex_name in JuMP_example_names
                 time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, compile_inst, inst, extender, solver, stepper, solve)
 
                 push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], string(typeof(stepper)), stepper.use_correction, use_curve_search(stepper), p..., time_inst))
-                isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, Inf), append = true)
+                isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
                 @printf("... %8.2e seconds\n\n", time_inst)
                 flush(stdout); flush(stderr)
 
