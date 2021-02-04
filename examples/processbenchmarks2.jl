@@ -2,10 +2,14 @@ using CSV
 using DataFrames
 using Plots
 
-bench_file = joinpath("bench2", "bench.csv")
+MAX_TIME = 1800
+MAX_ITER = 250
+
+bench_file = joinpath("bench2", "nat", "bench_nat_all.csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
-shifted_geomean(x; shift = 0) = exp(sum(log, x .- shift) / length(x))
+shifted_geomean_con(x; shift = 0) = exp(sum(log, skipmissing(x) .- shift) / length(x))
+shifted_geomean_all(x; shift = 0, cap = Inf) = exp(sum(log, coalesce.(x, cap) .- shift) / length(x))
 
 # aggregate stuff
 function post_process()
@@ -13,11 +17,21 @@ function post_process()
     select!(all_df, :stepper, :use_corr, :use_curve_search, :solve_time, :iters, :status)
 
     df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search]),
-        :solve_time => shifted_geomean => :solve_time_geomean,
-        :iters => shifted_geomean => :iters_geomean,
-        :status => (x -> count(isequal("Optimal"), x)) => :converged,
+        :solve_time => shifted_geomean_con => :solve_time_geomean_conv,
+        :iters => shifted_geomean_con => :iters_geomean_conv,
+        :solve_time => (x -> shifted_geomean_all(x, cap = MAX_TIME)) => :solve_time_geomean_all,
+        :iters => (x -> shifted_geomean_all(x, cap = MAX_ITER)) => :iters_geomean_all,
+        :status => (x -> count(isequal("Optimal"), x)) => :optimal,
+        :status => (x -> count(isequal("NumericalFailure"), x)) => :numerical,
+        :status => (x -> count(isequal("SlowProgress"), x)) => :slowprogress,
+        :status => (x -> count(startswith("SolveCheckKilled"), x)) => :killed,
+        :status => (x -> count(startswith("Setup"), x)) => :setup,
+        :status => (x -> count(isequal("TimeLimit"), x)) => :timelimit,
+        :status => (x -> count(isequal("IterationLimit"), x)) => :iterationlimit,
+        :status => (x -> count(startswith("Skipped"), x)) => :skip,
+        :status => length => :total,
         )
-    CSV.write(joinpath(output_folder, "df_agg.csv"), df_agg)
+    CSV.write(joinpath(output_folder, "df_agg_nat.csv"), df_agg)
 
     return
 end
@@ -36,7 +50,7 @@ function perf_prof()
     select!(all_df,
         :inst_data,
         feature,
-        :solve_time => ByRow(x -> (isnan(x) ? 1800 : min(x, 1800))) => :stime,
+        :solve_time => ByRow(x -> (ismissing(x) ? MAX_TIME : min(x, MAX_TIME))) => :stime,
         )
     transform!(all_df, :stime => (x -> x ./ minimum(x)) => :ratios)
     sort!(all_df, :ratios)
