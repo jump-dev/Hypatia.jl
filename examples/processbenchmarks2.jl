@@ -8,8 +8,12 @@ MAX_ITER = 250
 bench_file = joinpath("bench2", "nat", "bench_nat_all.csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
-shifted_geomean_con(x; shift = 0) = exp(sum(log, skipmissing(x) .- shift) / length(x))
-shifted_geomean_all(x; shift = 0, cap = Inf) = exp(sum(log, coalesce.(x, cap) .- shift) / length(x))
+shifted_geomean_notmissing(x; shift = 0) = exp(sum(log, skipmissing(x) .+ shift) / count(!ismissing, x))
+shifted_geomean_all(x; shift = 0, cap = Inf) = exp(sum(log, coalesce.(x, cap) .+ shift) / length(x))
+function shifted_geomean_opt(metric, status; shift = 0)
+    idxs = .!(ismissing.(status)) .& (status .== "Optimal")
+    return exp(sum(log, metric[idxs] .+ shift) / length(idxs))
+end
 
 # aggregate stuff
 function post_process()
@@ -17,8 +21,10 @@ function post_process()
     select!(all_df, :stepper, :use_corr, :use_curve_search, :solve_time, :iters, :status)
 
     df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search]),
-        :solve_time => shifted_geomean_con => :solve_time_geomean_conv,
-        :iters => shifted_geomean_con => :iters_geomean_conv,
+        :solve_time => shifted_geomean_notmissing => :solve_time_geomean_notmissing,
+        :iters => shifted_geomean_notmissing => :iters_geomean_notmissing,
+        [:solve_time, :status] => shifted_geomean_opt => :solve_time_geomean_opt,
+        [:iters, :status] => shifted_geomean_opt => :iters_geomean_opt,
         :solve_time => (x -> shifted_geomean_all(x, cap = MAX_TIME)) => :solve_time_geomean_all,
         :iters => (x -> shifted_geomean_all(x, cap = MAX_ITER)) => :iters_geomean_all,
         :status => (x -> count(isequal("Optimal"), x)) => :optimal,
@@ -37,22 +43,26 @@ function post_process()
 end
 post_process()
 
-# performance profiles
+# performance profiles, currently hardcoded for corrector vs no corrector
 function perf_prof()
     feature = :use_corr
-    metric = :solve_time
+    metric = :iters
+    # metric = :iters
     # s1 = "TRUE"
     # s2 = "FALSE"
     s1 = true
     s2 = false
 
     all_df = CSV.read(bench_file, DataFrame)
-    select!(all_df,
-        :inst_data,
-        feature,
-        :solve_time => ByRow(x -> (ismissing(x) ? MAX_TIME : min(x, MAX_TIME))) => :stime,
+    filter!(t -> t.stepper == "Hypatia.Solvers.PredOrCentStepper{Float64}" && t.use_curve_search == false,
+        all_df
         )
-    transform!(all_df, :stime => (x -> x ./ minimum(x)) => :ratios)
+    select!(all_df,
+        feature,
+        :solve_time => ByRow(x -> (ismissing(x) ? MAX_TIME : min(x, MAX_TIME))) => :solve_time,
+        :iters => ByRow(x -> (ismissing(x) ? MAX_TIME : min(x, MAX_ITER))) => :iters,
+        )
+    transform!(all_df, metric => (x -> x ./ minimum(x)) => :ratios)
     sort!(all_df, :ratios)
 
     nsolvers = 2

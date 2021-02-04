@@ -1,5 +1,5 @@
-stepper,use_corr,use_curve_search,solve_time_geomean_conv,iters_geomean_conv,solve_time_geomean_all,iters_geomean_all,optimal,numerical,slowprogress,killed,setup,timelimit,iterationlimit,skip,total
-Hypatia.Solvers.PredOrCentStepper{Float64},true,false,33.628185686053925,27.88953427190364,65.30263262426581,45.47355075529112,145,2,1,4,1,18,9,12,192
-Hypatia.Solvers.PredOrCentStepper{Float64},false,false,35.09921060699505,42.157868161756454,63.03989971642939,64.8959664624517,144,1,0,5,1,16,16,9,192
-Hypatia.Solvers.PredOrCentStepper{Float64},true,true,27.235901147162004,27.46336856232782,41.8448231287795,37.68215962078675,164,0,0,5,1,10,7,5,192
-Hypatia.Solvers.CombinedStepper{Float64},true,false,26.234350620755688,18.534947201390096,35.910116240288865,23.357622278762005,168,6,1,5,2,8,0,1,191
+stepper,use_corr,use_curve_search,solve_time_geomean_notmissing,iters_geomean_notmissing,solve_time_geomean_opt,iters_geomean_opt,solve_time_geomean_all,iters_geomean_all,optimal,numerical,slowprogress,killed,setup,timelimit,iterationlimit,skip,total
+Hypatia.Solvers.PredOrCentStepper{Float64},true,false,47.31640829438348,38.535017101404186,11.666263737846446,14.518771392229636,65.30263262426581,45.47355075529112,145,2,1,4,1,18,9,12,192
+Hypatia.Solvers.PredOrCentStepper{Float64},false,false,47.45202511804683,57.886890482570514,11.124058481372712,18.849100396477077,63.03989971642939,64.8959664624517,144,1,0,5,1,16,16,9,192
+Hypatia.Solvers.PredOrCentStepper{Float64},true,true,33.29356558713557,33.588598400807975,14.613692631954892,18.81783339026441,41.8448231287795,37.68215962078675,164,0,0,5,1,10,7,5,192
+Hypatia.Solvers.CombinedStepper{Float64},true,false,30.261986717957853,21.05826900618219,16.37281939256877,14.418127660639525,35.910116240288865,23.357622278762005,168,6,1,5,2,8,0,1,191
