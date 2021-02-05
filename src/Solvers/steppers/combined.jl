@@ -4,6 +4,7 @@ combined predict and center stepper
 
 mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     prev_alpha::T
+    shift_alpha_sched::Int
     rhs::Point{T}
     dir::Point{T}
     temp::Point{T}
@@ -16,8 +17,11 @@ mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     cent_only::Bool
     uncorr_only::Bool
 
-    function CombinedStepper{T}() where {T <: Real}
+    function CombinedStepper{T}(
+        shift_alpha_sched::Int = 3, # TODO tune, maybe use heuristic based on how fast alpha search is compared to a full IPM iteration
+        ) where {T <: Real}
         stepper = new{T}()
+        stepper.shift_alpha_sched = shift_alpha_sched
         return stepper
     end
 end
@@ -153,6 +157,11 @@ function update_cone_points(
     end
 
     return
+end
+
+function start_sched(stepper::CombinedStepper, step_searcher::StepSearcher)
+    (stepper.shift_alpha_sched <= 0) && return 1
+    return max(1, step_searcher.prev_sched - stepper.shift_alpha_sched)
 end
 
 print_header_more(stepper::CombinedStepper, solver::Solver) = @printf("%5s %9s", "step", "alpha")
