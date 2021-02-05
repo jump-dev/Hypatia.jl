@@ -121,7 +121,7 @@ else
     end
 end
 
-# TODO remove
+# TODO remove, for running non-benchmark format instances
 function reformat_insts(insts)
     for (k, v) in insts
         insts[k] = (nothing, [[i[1] for i in v]])
@@ -151,22 +151,25 @@ perf = DataFrames.DataFrame(
     dual_obj = Float64[],
     rel_obj_diff = Float64[],
     compl = Float64[],
-    x_viol = Union{Float64, Missing}[],
-    y_viol = Union{Float64, Missing}[],
-    z_viol = Union{Float64, Missing}[],
-    setup_time = Union{Float64, Missing}[],
-    check_time = Union{Float64, Missing}[],
-    total_time = Union{Float64, Missing}[],
+    x_viol = Float64[],
+    y_viol = Float64[],
+    z_viol = Float64[],
+    setup_time = Float64[],
+    check_time = Float64[],
+    total_time = Float64[],
     )
-DataFrames.allowmissing!(perf, 7:21)
+DataFrames.allowmissing!(perf, 10:ncol(df))
 
 isnothing(results_path) || CSV.write(results_path, perf)
 time_all = time()
 
+# using TimerOutputs
+# reset_timer!(Hypatia.TO)
+
 @info("starting benchmark runs")
 for ex_name in JuMP_example_names
     (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
-    # (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_test.jl")) # TODO remove
+    # (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_test.jl")) # TODO remove, for running non-benchmark format instances
     # ex_insts = reformat_insts(ex_insts) # TODO remove
 
     for stepper in steppers, (inst_set, solver) in instance_sets
@@ -202,6 +205,8 @@ for ex_name in JuMP_example_names
         end
     end
 end
+
+# print_timer(Hypatia.TO)
 
 @printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)
 DataFrames.show(perf, allrows = true, allcols = true)
