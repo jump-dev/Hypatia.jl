@@ -71,7 +71,6 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
     rhs_fun_nocorr = (is_pred ? update_rhs_pred : update_rhs_cent)
 
-    # TODO tune min_alpha
     # get uncorrected direction
     rhs_fun_nocorr(solver, rhs)
     get_directions(stepper, solver, is_pred)
@@ -89,7 +88,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         if stepper.use_curve_search
             # do single curve search with correction
             stepper.uncorr_only = false
-            alpha = search_alpha(point, model, stepper, min_alpha = T(1e-2))
+            alpha = search_alpha(point, model, stepper)
             if iszero(alpha)
                 # try not using correction
                 @warn("very small alpha in curve search; trying without correction")
@@ -103,11 +102,11 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             # do two line searches, first for uncorrected alpha, then for corrected alpha
             try_nocorr = false
             stepper.uncorr_only = true
-            alpha = search_alpha(point, model, stepper, min_alpha = T(1e-2))
+            alpha = search_alpha(point, model, stepper)
             stepper.uncorr_alpha = alpha
             if !iszero(alpha)
                 stepper.uncorr_only = false
-                alpha = search_alpha(point, model, stepper, min_alpha = T(1e-2))
+                alpha = search_alpha(point, model, stepper)
 
                 # step
                 update_cone_points(alpha, point, stepper, false)
@@ -120,7 +119,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     if try_nocorr
         # do line search in uncorrected direction
         stepper.uncorr_only = true
-        alpha = search_alpha(point, model, stepper, min_alpha = T(1e-2))
+        alpha = search_alpha(point, model, stepper)
     end
 
     if iszero(alpha) && is_pred

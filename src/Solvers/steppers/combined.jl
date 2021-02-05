@@ -3,7 +3,6 @@ combined predict and center stepper
 =#
 
 mutable struct CombinedStepper{T <: Real} <: Stepper{T}
-    use_correction::Bool # TODO remove if unused (currently must be true)
     prev_alpha::T
     rhs::Point{T}
     dir::Point{T}
@@ -17,23 +16,14 @@ mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     cent_only::Bool
     uncorr_only::Bool
 
-    function CombinedStepper{T}(;
-        use_correction::Bool = true,
-        ) where {T <: Real}
+    function CombinedStepper{T}() where {T <: Real}
         stepper = new{T}()
-        stepper.use_correction = use_correction
         return stepper
     end
 end
 
 function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
-    # TODO allow no correction
-    # if stepper.use_correction && !any(Cones.use_correction, model.cones)
-    #     # model has no cones that use correction
-    #     stepper.use_correction = false
-    # end
-    @assert stepper.use_correction
 
     stepper.prev_alpha = one(T)
     stepper.rhs = Point(model)
@@ -41,10 +31,8 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.temp = Point(model)
     stepper.dir_cent = Point(model, ztsk_only = true)
     stepper.dir_pred = Point(model, ztsk_only = true)
-    if stepper.use_correction
-        stepper.dir_centcorr = Point(model, ztsk_only = true)
-        stepper.dir_predcorr = Point(model, ztsk_only = true)
-    end
+    stepper.dir_centcorr = Point(model, ztsk_only = true)
+    stepper.dir_predcorr = Point(model, ztsk_only = true)
     stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
     stepper.step_searcher = StepSearcher{T}(model)
     stepper.uncorr_only = stepper.cent_only = false
@@ -81,10 +69,12 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     get_directions(stepper, solver, true)
     copyto!(dir_predcorr.vec, dir.vec)
 
+    # search with combined directions and corrections
     stepper.uncorr_only = stepper.cent_only = false
     alpha = search_alpha(point, model, stepper)
 
     if iszero(alpha)
+        # recover
         println("trying combined without correction")
         stepper.uncorr_only = true
         alpha = search_alpha(point, model, stepper)
@@ -105,23 +95,13 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
                     solver.status = NumericalFailure
                     stepper.prev_alpha = alpha
                     return false
-                else
-                    # step
-                    update_cone_points(alpha, point, stepper, false)
                 end
-            else
-                # step
-                update_cone_points(alpha, point, stepper, false)
             end
-        else
-            # step
-            update_cone_points(alpha, point, stepper, false)
         end
-    else
-        # step
-        update_cone_points(alpha, point, stepper, false)
     end
 
+    # step
+    update_cone_points(alpha, point, stepper, false)
     stepper.prev_alpha = alpha
 
     return true

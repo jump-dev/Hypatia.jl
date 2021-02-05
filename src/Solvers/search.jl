@@ -20,7 +20,7 @@ mutable struct StepSearcher{T <: Real}
         step_searcher.cone_order = collect(1:length(cones))
         step_searcher.min_nbhd = T(0.01) # TODO tune
         step_searcher.max_nbhd = T(0.99) # TODO tune, maybe should be different for cones without third order correction
-        step_searcher.alpha_sched = T[0.9999, 0.999, 0.99, 0.97, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5, 0.3, 0.1, 0.03, 0.01, 0.003, 0.001, 0.0001] # TODO tune
+        step_searcher.alpha_sched = T[0.9999, 0.999, 0.99, 0.97, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5, 0.3, 0.1] # TODO tune
         return step_searcher
     end
 end
@@ -30,12 +30,9 @@ function search_alpha(
     point::Point{T},
     model::Models.Model{T},
     stepper::Stepper{T};
-    # prev_alpha::T = one(T), # TODO so don't try largest alpha first always
-    min_alpha::T = zero(T),
     ) where {T <: Real}
     step_searcher = stepper.step_searcher
     for alpha in step_searcher.alpha_sched
-        (alpha < min_alpha) && break # alpha is very small so finish
         update_cone_points(alpha, point, stepper, true) # update ztsk only
         check_cone_points(stepper.temp, step_searcher, model) && return alpha
     end
