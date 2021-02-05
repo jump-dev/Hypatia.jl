@@ -18,7 +18,7 @@ mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     uncorr_only::Bool
 
     function CombinedStepper{T}(
-        shift_alpha_sched::Int = 4, # TODO tune, maybe use heuristic based on how fast alpha search is compared to a full IPM iteration
+        shift_alpha_sched::Int = 0, # TODO tune, maybe use heuristic based on how fast alpha search is compared to a full IPM iteration
         ) where {T <: Real}
         stepper = new{T}()
         stepper.shift_alpha_sched = shift_alpha_sched
