@@ -129,6 +129,8 @@ function reformat_insts(insts)
     return insts
 end
 
+inst_start = (spawn_runs ? 2 : 1) # if spawning, will run first instance to compile
+
 perf = DataFrames.DataFrame(
     example = String[],
     inst_set = String[],
@@ -181,7 +183,7 @@ for ex_name in JuMP_example_names
         for inst_subset in inst_subsets
             solve = true
             compile_inst = inst_subset[1]
-            for (inst_num, inst) in enumerate(inst_subset[2:end])
+            for (inst_num, inst) in enumerate(inst_subset[inst_start:end])
                 println()
                 @info("starting $ex_type $inst_set $(solver[1]) $inst_num: $inst ...")
                 flush(stdout); flush(stderr)
