@@ -3,7 +3,6 @@ insts = Dict()
 insts["minimal"] = [
     ((5, 2, 2, true, true, true),),
     ((5, 1, 2, false, true, true),),
-    ((5, 1, 2, false, true, false),),
     ((5, 1, 2, false, false, false),),
     ((5, 1, 2, true, false, false), ExpPSDOptimizer),
     ((5, 1, 2, true, false, false), SOCExpPSDOptimizer),
