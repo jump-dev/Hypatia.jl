@@ -5,17 +5,18 @@ using Plots
 MAX_TIME = 1800
 MAX_ITER = 250
 
-nickname = "fast_minimal"
+# nickname = "fast_minimal_shift_2"
+nickname = "nat"
 
 # bench_file = joinpath("bench2", "nat", "bench_nat_all.csv")
-bench_file = joinpath("bench2", "fast minimal", "bench_" * nickname * "_all.csv")
+bench_file = joinpath("bench2", "nat", "bench_" * nickname * "_all.csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 shifted_geomean_notmissing(x; shift = 0) = exp(sum(log, skipmissing(x) .+ shift) / count(!ismissing, x))
 shifted_geomean_all(x; shift = 0, cap = Inf) = exp(sum(log, coalesce.(x, cap) .+ shift) / length(x))
 function shifted_geomean_opt(metric, status; shift = 0)
     idxs = .!(ismissing.(status)) .& (status .== "Optimal")
-    return exp(sum(log, metric[idxs] .+ shift) / length(idxs))
+    return exp(sum(log, metric[idxs] .+ shift) / count(idxs))
 end
 shifted_geomean_all_opt(metric, all_opt; shift = 0) = exp(sum(log, metric[all_opt] .+ shift) / count(all_opt))
 
@@ -95,7 +96,7 @@ function perf_prof()
 
     return
 end
-perf_prof()
+# perf_prof()
 
 # anything else that can get plotted in latex
 function make_csv()
