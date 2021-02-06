@@ -5,7 +5,10 @@ using Plots
 MAX_TIME = 1800
 MAX_ITER = 250
 
-bench_file = joinpath("bench2", "nat", "bench_nat_all.csv")
+nickname = "fast_minimal"
+
+# bench_file = joinpath("bench2", "nat", "bench_nat_all.csv")
+bench_file = joinpath("bench2", "fast minimal", "bench_" * nickname * "_all.csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 shifted_geomean_notmissing(x; shift = 0) = exp(sum(log, skipmissing(x) .+ shift) / count(!ismissing, x))
@@ -49,7 +52,7 @@ function post_process()
         :status => (x -> count(startswith("Skipped"), x)) => :skip,
         :status => length => :total,
         )
-    CSV.write(joinpath(output_folder, "df_agg_nat.csv"), df_agg)
+    CSV.write(joinpath(output_folder, "df_agg_" * nickname * ".csv"), df_agg)
 
     return
 end

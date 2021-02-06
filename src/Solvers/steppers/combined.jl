@@ -44,6 +44,9 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     return stepper
 end
 
+import Hypatia.TO
+using TimerOutputs
+
 function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
     model = solver.model
@@ -55,27 +58,27 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     dir_predcorr = stepper.dir_predcorr
 
     # update linear system solver factorization
-    update_lhs(solver.system_solver, solver)
+    @timeit TO "update_lhs" update_lhs(solver.system_solver, solver)
 
     # calculate centering direction and correction
-    update_rhs_cent(solver, rhs)
-    get_directions(stepper, solver, false)
+    @timeit TO "update_rhs_cent" update_rhs_cent(solver, rhs)
+    @timeit TO "get_directions 1" get_directions(stepper, solver, false)
     copyto!(dir_cent.vec, dir.vec)
-    update_rhs_centcorr(solver, rhs, dir)
-    get_directions(stepper, solver, false)
+    @timeit TO "update_rhs_centcorr" update_rhs_centcorr(solver, rhs, dir)
+    @timeit TO "get_directions 2" get_directions(stepper, solver, false)
     copyto!(dir_centcorr.vec, dir.vec)
 
     # calculate affine/prediction direction and correction
-    update_rhs_pred(solver, rhs)
-    get_directions(stepper, solver, true)
+    @timeit TO "update_rhs_pred" update_rhs_pred(solver, rhs)
+    @timeit TO "get_directions 3" get_directions(stepper, solver, true)
     copyto!(dir_pred.vec, dir.vec)
-    update_rhs_predcorr(solver, rhs, dir)
-    get_directions(stepper, solver, true)
+    @timeit TO "update_rhs_predcorr" update_rhs_predcorr(solver, rhs, dir)
+    @timeit TO "get_directions 4" get_directions(stepper, solver, true)
     copyto!(dir_predcorr.vec, dir.vec)
 
     # search with combined directions and corrections
     stepper.uncorr_only = stepper.cent_only = false
-    alpha = search_alpha(point, model, stepper)
+    @timeit TO "alpha 1" alpha = search_alpha(point, model, stepper)
 
     if iszero(alpha)
         # recover
@@ -87,12 +90,12 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
             println("trying centering with correction")
             stepper.cent_only = true
             stepper.uncorr_only = false
-            alpha = search_alpha(point, model, stepper)
+            @timeit TO "alpha 2" alpha = search_alpha(point, model, stepper)
 
             if iszero(alpha)
                 println("trying centering without correction")
                 stepper.uncorr_only = true
-                alpha = search_alpha(point, model, stepper)
+                @timeit TO "alpha 3" alpha = search_alpha(point, model, stepper)
 
                 if iszero(alpha)
                     @warn("cannot step in centering direction")

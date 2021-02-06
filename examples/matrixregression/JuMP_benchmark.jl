@@ -5,6 +5,7 @@ matrixregression_insts = [
     ]
 
 insts = Dict()
-insts["nat"] = (nothing, matrixregression_insts)
+# insts["nat"] = (nothing, matrixregression_insts)
+insts["nat"] = (nothing, [[(4, 3), (1000, 15)]])
 insts["ext"] = (SOCExpPSDOptimizer, matrixregression_insts)
 return (MatrixRegressionJuMP, insts)
