@@ -90,3 +90,10 @@ function get_model_stats(model::Models.Model)
     string_cones = [string(nameof(c)) for c in unique(typeof.(model.cones))]
     return (model.n, model.p, model.q, model.nu, string_cones)
 end
+
+use_curve_search(::Solvers.Stepper) = true
+use_curve_search(stepper::Solvers.PredOrCentStepper) = stepper.use_curve_search
+use_correction(::Solvers.Stepper) = true
+use_correction(stepper::Solvers.PredOrCentStepper) = stepper.use_correction
+shift(::Solvers.Stepper) = 0
+shift(stepper::Solvers.CombinedStepper) = stepper.shift_alpha_sched

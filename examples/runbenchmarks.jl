@@ -44,17 +44,11 @@ steppers = [
     Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = true, use_curve_search = false),
     Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = false, use_curve_search = false),
     Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = true, use_curve_search = true),
-    Hypatia.Solvers.CombinedStepper{Float64}()
-    Hypatia.Solvers.CombinedStepper{Float64}(1)
-    Hypatia.Solvers.CombinedStepper{Float64}(2)
+    Hypatia.Solvers.CombinedStepper{Float64}(),
+    Hypatia.Solvers.CombinedStepper{Float64}(1),
+    Hypatia.Solvers.CombinedStepper{Float64}(2),
     Hypatia.Solvers.CombinedStepper{Float64}(3),
     ]
-use_curve_search(::Hypatia.Solvers.Stepper) = true
-use_curve_search(stepper::Hypatia.Solvers.PredOrCentStepper) = stepper.use_curve_search
-use_correction(::Hypatia.Solvers.Stepper) = true
-use_correction(stepper::Hypatia.Solvers.PredOrCentStepper) = stepper.use_correction
-shift(::Hypatia.Solvers.Stepper) = 0
-shift(stepper::Solvers.CombinedStepper) = stepper.shift_alpha_sched
 
 hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     verbose = verbose,
@@ -84,7 +78,6 @@ instance_sets = [
     ("nat", hyp_solver),
     # ("ext", hyp_solver),
     # ("ext", mosek_solver),
-    # ("minimal", hyp_solver),
     ]
 
 # models to run
@@ -126,14 +119,6 @@ else
         )
         return (false, false, run_instance(ex_type, inst_data, extender, (stepper = stepper,), solver[2], default_options = solver[3], test = false))
     end
-end
-
-# TODO remove, for running non-benchmark format instances
-function reformat_insts(insts)
-    for (k, v) in insts
-        insts[k] = (nothing, [[i[1] for i in v]])
-    end
-    return insts
 end
 
 inst_start = (spawn_runs ? 2 : 1) # if spawning, will run first instance to compile
@@ -179,8 +164,6 @@ time_all = time()
 @info("starting benchmark runs")
 for ex_name in JuMP_example_names
     (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
-    # (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_test.jl")) # TODO remove, for running non-benchmark format instances
-    # ex_insts = reformat_insts(ex_insts) # TODO remove
 
     for stepper in steppers, (inst_set, solver) in instance_sets
         haskey(ex_insts, inst_set) || continue
@@ -198,7 +181,7 @@ for ex_name in JuMP_example_names
 
                 time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, compile_inst, inst, extender, solver, stepper, solve)
 
-                if !spawn_runs || (inst_num > inst_start)
+                if spawn_runs || (inst_num > inst_start)
                     push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], string(typeof(stepper)),
                         use_correction(stepper), use_curve_search(stepper), shift(stepper), p..., time_inst))
                 end
