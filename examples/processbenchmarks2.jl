@@ -5,11 +5,10 @@ using Plots
 MAX_TIME = 1800
 MAX_ITER = 250
 
-# nickname = "fast_minimal_shift_2"
-nickname = "nat"
+nickname = "fast_minimal"
+# nickname = "nat"
 
-# bench_file = joinpath("bench2", "nat", "bench_nat_all.csv")
-bench_file = joinpath("bench2", "nat", "bench_" * nickname * "_all.csv")
+bench_file = joinpath("bench2", "bench_" * nickname * ".csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 shifted_geomean_notmissing(x; shift = 0) = exp(sum(log, skipmissing(x) .+ shift) / count(!ismissing, x))
@@ -32,9 +31,9 @@ shifted_geomean_all_opt(metric, all_opt; shift = 0) = exp(sum(log, metric[all_op
 function post_process()
     all_df = CSV.read(bench_file, DataFrame)
     all_df = combine(groupby(all_df, :inst_data), names(all_df), :status => (x -> all(isequal.("Optimal", x))) => :all_opt)
-    select!(all_df, :stepper, :use_corr, :use_curve_search, :solve_time, :iters, :status, :all_opt)
+    # select!(all_df, :stepper, :use_corr, :use_curve_search, :solve_time, :iters, :status, :all_opt)
 
-    df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search]),
+    df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search, :shift]),
         :solve_time => shifted_geomean_notmissing => :solve_time_geomean_notmissing,
         :iters => shifted_geomean_notmissing => :iters_geomean_notmissing,
         [:solve_time, :status] => shifted_geomean_opt => :solve_time_geomean_this_opt,
