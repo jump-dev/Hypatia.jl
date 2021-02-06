@@ -46,8 +46,10 @@ steppers = [
     Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = true, use_curve_search = true),
     Hypatia.Solvers.CombinedStepper{Float64}(),
     ]
-use_curve_search(::Hypatia.Solvers.Stepper) = false
+use_curve_search(::Hypatia.Solvers.Stepper) = true
 use_curve_search(stepper::Hypatia.Solvers.PredOrCentStepper) = stepper.use_curve_search
+use_correction(::Hypatia.Solvers.Stepper) = true
+use_correction(stepper::Hypatia.Solvers.PredOrCentStepper) = stepper.use_correction
 
 hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     verbose = verbose,
@@ -190,7 +192,7 @@ for ex_name in JuMP_example_names
 
                 time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, compile_inst, inst, extender, solver, stepper, solve)
 
-                push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], string(typeof(stepper)), stepper.use_correction, use_curve_search(stepper), p..., time_inst))
+                push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], string(typeof(stepper)), use_correction(stepper), use_curve_search(stepper), p..., time_inst))
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
                 @printf("... %8.2e seconds\n\n", time_inst)
                 flush(stdout); flush(stderr)
