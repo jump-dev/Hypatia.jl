@@ -35,6 +35,8 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     tempw::Vector{T}
     wgeozw::Vector{T}
     Hww_sqrt::Matrix{T}
+    temp1::Vector{T}
+    temp2::Vector{T}
 
     function HypoGeoMean{T}(
         dim::Int;
@@ -64,6 +66,8 @@ function setup_extra_data(cone::HypoGeoMean{T}) where {T <: Real}
     cone.iwdim = inv(T(wdim))
     cone.wgeozw = zeros(T, wdim)
     cone.Hww_sqrt = zeros(T, wdim, wdim)
+    cone.temp1 = zeros(T, wdim)
+    cone.temp2 = zeros(T, wdim)
     return cone
 end
 
@@ -163,18 +167,22 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hy
     @views w = cone.point[2:end]
     wgeo = cone.wgeo
     z = cone.z
-    tau = cone.iwdim / z ./ w
+    tau = cone.temp1
+    @. tau = cone.iwdim / w / z
 
-    Hww_diag_sqrt = sqrt.((wgeo * tau + inv.(w)) ./ w)
+    Hww_diag_sqrt = cone.temp2
+    @. Hww_diag_sqrt = sqrt((wgeo * tau + inv(w)) / w)
     Hww_sqrt = copyto!(cone.Hww_sqrt, Diagonal(Hww_diag_sqrt))
     c = Cholesky(Hww_sqrt,'U', 0)
     if u > 0
-        LinearAlgebra.lowrankupdate!(c, sqrt(wgeo * u) * tau)
+        @. tau *= sqrt(wgeo * u)
+        LinearAlgebra.lowrankupdate!(c, tau)
     else
-        LinearAlgebra.lowrankdowndate!(c, sqrt(wgeo * abs(u)) * tau)
+        @. tau *= sqrt(wgeo * abs(u))
+        LinearAlgebra.lowrankdowndate!(c, tau)
     end
 
-    H_sqrt_wu = c.L \ cone.wgeozw
+    H_sqrt_wu = ldiv!(cone.temp2, c.L, cone.wgeozw)
     @. H_sqrt_wu /= z
     H_sqrt_uu = sqrt(abs2(cone.grad[1]) - sum(abs2, H_sqrt_wu))
 
