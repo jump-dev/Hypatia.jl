@@ -34,6 +34,7 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     z::T
     tempw::Vector{T}
     wgeozw::Vector{T}
+    Hww_sqrt::Matrix{T}
 
     function HypoGeoMean{T}(
         dim::Int;
@@ -62,6 +63,7 @@ function setup_extra_data(cone::HypoGeoMean{T}) where {T <: Real}
     cone.tempw = zeros(T, wdim)
     cone.iwdim = inv(T(wdim))
     cone.wgeozw = zeros(T, wdim)
+    cone.Hww_sqrt = zeros(T, wdim, wdim)
     return cone
 end
 
@@ -163,8 +165,9 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hy
     z = cone.z
     tau = cone.iwdim / z ./ w
 
-    Hww_diag = (wgeo * tau + inv.(w)) ./ w
-    c = cholesky(Matrix(Diagonal(Hww_diag)))
+    Hww_diag_sqrt = sqrt.((wgeo * tau + inv.(w)) ./ w)
+    Hww_sqrt = copyto!(cone.Hww_sqrt, Diagonal(Hww_diag_sqrt))
+    c = Cholesky(Hww_sqrt,'U', 0)
     if u > 0
         LinearAlgebra.lowrankupdate!(c, sqrt(wgeo * u) * tau)
     else
@@ -172,12 +175,13 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hy
     end
 
     H_sqrt_wu = c.L \ cone.wgeozw
-    H_sqrt_wu /= z
+    @. H_sqrt_wu /= z
     H_sqrt_uu = sqrt(abs2(cone.grad[1]) - sum(abs2, H_sqrt_wu))
 
     @views arr_u = arr[1, :]
-    prod[1, :] = H_sqrt_uu * arr_u
-    prod[2:end, :] = H_sqrt_wu * arr_u' + c.U * arr[2:end, :]
+    @views mul!(prod[1, :], H_sqrt_uu, arr_u)
+    @views mul!(prod[2:end, :], c.U, arr[2:end, :])
+    @views mul!(prod[2:end, :], H_sqrt_wu, arr_u', true, true)
 
     return prod
 end
