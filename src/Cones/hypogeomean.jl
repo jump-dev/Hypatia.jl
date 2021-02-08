@@ -21,6 +21,7 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
+    hess_sqrt_aux_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     is_feas::Bool
@@ -32,6 +33,7 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     wgeo::T
     z::T
     tempw::Vector{T}
+    wgeozw::Vector{T}
 
     function HypoGeoMean{T}(
         dim::Int;
@@ -49,6 +51,8 @@ end
 
 use_heuristic_neighborhood(cone::HypoGeoMean) = false
 
+reset_data(cone::HypoGeoMean) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.hess_sqrt_aux_updated = false)
+
 function setup_extra_data(cone::HypoGeoMean{T}) where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -57,6 +61,7 @@ function setup_extra_data(cone::HypoGeoMean{T}) where {T <: Real}
     wdim = dim - 1
     cone.tempw = zeros(T, wdim)
     cone.iwdim = inv(T(wdim))
+    cone.wgeozw = zeros(T, wdim)
     return cone
 end
 
@@ -111,8 +116,18 @@ function update_grad(cone::HypoGeoMean)
     return cone.grad
 end
 
+function update_hess_sqrt_aux(cone::HypoGeoMean)
+    @views w = cone.point[2:end]
+    z = cone.z
+    iwdim = cone.iwdim
+    @. cone.wgeozw = -iwdim * cone.wgeo / w / z
+    cone.hess_sqrt_aux_updated = true
+    return
+end
+
 function update_hess(cone::HypoGeoMean)
     @assert cone.grad_updated
+    cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
     u = cone.point[1]
     @views w = cone.point[2:end]
     z = cone.z
@@ -121,14 +136,14 @@ function update_hess(cone::HypoGeoMean)
     wgeozm1 = wgeoz - iwdim
     constww = wgeoz * (1 + wgeozm1) + 1
     H = cone.hess.data
+    wgeozw = cone.wgeozw
 
     H[1, 1] = abs2(cone.grad[1])
     @inbounds for j in eachindex(w)
         j1 = j + 1
         wj = w[j]
-        wgeozwj = wgeoz / wj
-        H[1, j1] = -wgeozwj / z
-        wgeozwj2 = wgeozwj * wgeozm1
+        H[1, j1] = wgeozw[j] / z
+        wgeozwj2 = -wgeozw[j] * wgeozm1
         @inbounds for i in 1:(j - 1)
             H[i + 1, j1] = wgeozwj2 / w[i]
         end
@@ -137,6 +152,34 @@ function update_hess(cone::HypoGeoMean)
 
     cone.hess_updated = true
     return cone.hess
+end
+
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoGeoMean)
+    @assert cone.grad_updated
+    cone.hess_sqrt_aux_updated || update_hess_sqrt_aux(cone)
+    u = cone.point[1]
+    @views w = cone.point[2:end]
+    wgeo = cone.wgeo
+    z = cone.z
+    tau = cone.iwdim / z ./ w
+
+    Hww_diag = (wgeo * tau + inv.(w)) ./ w
+    c = cholesky(Matrix(Diagonal(Hww_diag)))
+    if u > 0
+        LinearAlgebra.lowrankupdate!(c, sqrt(wgeo * u) * tau)
+    else
+        LinearAlgebra.lowrankdowndate!(c, sqrt(wgeo * abs(u)) * tau)
+    end
+
+    H_sqrt_wu = c.L \ cone.wgeozw
+    H_sqrt_wu /= z
+    H_sqrt_uu = sqrt(abs2(cone.grad[1]) - sum(abs2, H_sqrt_wu))
+
+    @views arr_u = arr[1, :]
+    prod[1, :] = H_sqrt_uu * arr_u
+    prod[2:end, :] = H_sqrt_wu * arr_u' + c.U * arr[2:end, :]
+
+    return prod
 end
 
 function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where T
