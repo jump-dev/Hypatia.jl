@@ -1,0 +1,3 @@
+stepper,use_corr,use_curve_search,shift,solve_time_geomean_notmissing,iters_geomean_notmissing,solve_time_geomean_this_opt,iters_geomean_this_opt,solve_time_geomean_all_opt,iters_geomean_all_opt,solve_time_geomean_all,iters_geomean_all,optimal,numerical,slowprogress,killed,setup,timelimit,iterationlimit,skip,total
+Hypatia.Solvers.CombinedStepper{Float64},true,true,0,16.991436830379527,16.297545166001445,13.842889995847832,20.34755293800629,13.365839108602461,19.77676820850032,19.83163782739843,17.84148795701611,113,15,42,5,1,5,0,0,181
+Hypatia.Solvers.CombinedStepper{Float64},true,true,3,16.006111120154127,16.43978926292227,14.089827202419414,20.070672701922305,11.945862995440073,19.721349662461208,18.718641909188307,17.992023814793562,116,14,40,5,1,5,0,0,181
