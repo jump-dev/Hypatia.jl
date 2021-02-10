@@ -293,7 +293,6 @@ function correction(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}) wher
     dot_Wi_S = dot(Wi_vec, w_dir)
     ldiv!(cone.fact_W, S)
     dot_skron = real(dot(S, S'))
-    dot_wdwi = dot(Wi_vec, w_dir)
 
     rdiv!(S, cone.fact_W.U)
     mul!(cone.mat2, S, S')
@@ -313,7 +312,7 @@ function correction(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}) wher
     vec_skron2 = smat_to_svec!(cone.tempw, skron2, cone.rt2)
 
     @. w_corr += scal6 * vec_skron2
-    corr[1] = (sigma * (dot(vec_skron2, w_dir) - (scal2 + 4 * udz) * dot_wdwi) + 2 * abs2(udz)) / z
+    corr[1] = (sigma * (dot(vec_skron2, w_dir) - (scal2 + 4 * udz) * dot_Wi_S) + 2 * abs2(udz)) / z
     corr .*= cone.sc_const / -2
 
     return corr
