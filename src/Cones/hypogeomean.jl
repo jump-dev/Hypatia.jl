@@ -173,7 +173,7 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hy
     Hww_diag_sqrt = cone.temp2
     @. Hww_diag_sqrt = sqrt((wgeo * tau + inv(w)) / w)
     Hww_sqrt = copyto!(cone.Hww_sqrt, Diagonal(Hww_diag_sqrt))
-    c = Cholesky(Hww_sqrt,'U', 0)
+    c = Cholesky(Hww_sqrt, 'U', 0)
     if u > 0
         @. tau *= sqrt(wgeo * u)
         LinearAlgebra.lowrankupdate!(c, tau)

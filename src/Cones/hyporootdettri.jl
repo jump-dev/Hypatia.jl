@@ -216,6 +216,39 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
     return prod
 end
 
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
+    @assert cone.grad_updated
+
+    z = cone.z
+    sigma = cone.sigma
+    sc_const = cone.sc_const
+    Huwconst = -sc_const * sigma / z
+    sckron = sc_const * (sigma + 1)
+    scdot = sc_const * cone.dot_const
+    Wi_vec = cone.Wi_vec
+
+    Hww_kron_sqrt = symm_kron(zeros(eltype(arr), cone.dim - 1, cone.dim - 1), cholesky(Hermitian(cone.Wi)).U, cone.rt2, upper_only = false)
+    Hww_kron_sqrt .*= sqrt(sckron)
+    c = Cholesky(Hww_kron_sqrt, 'U', 0)
+
+    if scdot > 0
+        LinearAlgebra.lowrankupdate!(c, sqrt(scdot) * Wi_vec)
+    else
+        LinearAlgebra.lowrankdowndate!(c, sqrt(-scdot) * Wi_vec)
+    end
+
+    H_sqrt_wu = c.L \ (Huwconst * Wi_vec)
+
+    H_sqrt_uu = sqrt(cone.grad[1] / z - sum(abs2, H_sqrt_wu))
+
+    @views arr_u = arr[1, :]
+    @views mul!(prod[1, :], H_sqrt_uu, arr_u)
+    @views mul!(prod[2:end, :], c.U, arr[2:end, :])
+    @views mul!(prod[2:end, :], H_sqrt_wu, arr_u', true, true)
+
+    return prod
+end
+
 function update_inv_hess(cone::HypoRootdetTri)
     @views w = cone.point[2:end]
     svec_to_smat!(cone.W, w, cone.rt2)
