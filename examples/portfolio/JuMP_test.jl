@@ -33,4 +33,5 @@ insts["slow"] = [
     ((2000, true, true),),
     ((3000, false, true),),
     ]
+insts["various"] = insts["fast"]
 return (PortfolioJuMP, insts)

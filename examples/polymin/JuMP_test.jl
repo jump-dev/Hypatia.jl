@@ -55,4 +55,25 @@ insts["slow"] = [
     ((2, 30, false, true),),
     ((2, 30, false, false),),
     ]
+insts["various"] = [
+    ((2, 3, true, true),),
+    ((2, 3, true, false),),
+    ((2, 3, false, true),),
+    ((2, 3, false, false),),
+    ((4, 5, true, true),),
+    ((4, 5, true, false),),
+    ((4, 5, false, true),),
+    ((4, 5, false, false),),
+    ((:butcher, 2, true, true),),
+    ((:caprasse, 4, true, true),),
+    ((:goldsteinprice, 7, true, true),),
+    ((:heart, 2, true, true),),
+    ((:lotkavolterra, 3, true, true),),
+    ((:magnetism7, 2, true, true),),
+    ((:motzkin, 3, true, true),),
+    ((:reactiondiffusion, 4, true, true),),
+    ((:robinson, 8, true, true),),
+    ((:rosenbrock, 5, true, true),),
+    ((:schwefel, 2, true, true),),
+    ]
 return (PolyMinJuMP, insts)

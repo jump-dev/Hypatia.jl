@@ -15,4 +15,5 @@ insts["slow"] = [
     ((4, 5, 4, 6),),
     ((2, 30, 4, 30),),
     ]
+insts["various"] = insts["fast"]
 return (EnvelopeJuMP, insts)

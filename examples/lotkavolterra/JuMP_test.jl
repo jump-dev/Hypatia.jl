@@ -9,4 +9,5 @@ insts["fast"] = [
 insts["slow"] = [
     ((4,), SOCExpPSDOptimizer),
     ]
+insts["various"] = vcat(insts["fast"], insts["slow"])
 return (LotkaVolterraJuMP, insts)

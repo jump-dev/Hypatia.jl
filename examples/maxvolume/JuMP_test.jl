@@ -25,4 +25,24 @@ insts["slow"] = [
     ((2000, false, true), nothing, relaxed_tols),
     ((2000, true, true), nothing, relaxed_tols),
     ]
+insts["various"] = [
+    ((100, true, true),),
+    ((100, true, false),),
+    ((100, false, true),),
+    ((100, true, true), SOCExpPSDOptimizer),
+    ((100, true, false), SOCExpPSDOptimizer),
+    ((100, false, true), SOCExpPSDOptimizer),
+    ((1000, true, true),),
+    ((1000, true, false),),
+    ((1000, false, true),),
+    ((1000, true, true), SOCExpPSDOptimizer),
+    ((1000, true, false), SOCExpPSDOptimizer),
+    ((1000, false, true), SOCExpPSDOptimizer),
+    ((2000, true, true),),
+    ((2000, true, false),),
+    ((2000, false, true),),
+    ((2000, true, true), SOCExpPSDOptimizer),
+    ((2000, true, false), SOCExpPSDOptimizer),
+    ((2000, false, true), SOCExpPSDOptimizer),
+    ]
 return (MaxVolumeJuMP, insts)

@@ -17,4 +17,5 @@ insts["slow"] = [
     ((4, 2, 5, false, true, false),),
     ((4, 2, 5, true, false, false),),
     ]
+insts["various"] = insts["fast"]
 return (RandomPolyMatJuMP, insts)

@@ -21,4 +21,16 @@ insts["slow"] = [
     ((40, 80), SOCExpPSDOptimizer, relaxed_tols),
     ((100, 200), nothing, relaxed_tols),
     ]
+insts["various"] = [
+    ((5, 10),),
+    ((5, 10),),
+    ((10, 20),),
+    ((10, 20),),
+    ((20, 40),),
+    ((20, 40),),
+    ((40, 80),),
+    ((40, 80),),
+    ((100, 150),),
+    ((100, 150),),
+    ]
 return (RobustGeomProgJuMP, insts)

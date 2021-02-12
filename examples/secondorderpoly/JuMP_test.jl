@@ -14,4 +14,5 @@ insts["fast"] = [
     ((:polys9, 2, false),),
     ]
 insts["slow"] = Tuple[]
+insts["various"] = insts["fast"]
 return (SecondOrderPolyJuMP, insts)

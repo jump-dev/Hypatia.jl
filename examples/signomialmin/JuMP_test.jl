@@ -28,4 +28,19 @@ insts["slow"] = [
     ((20, 6),),
     ((40, 3),),
     ]
+insts["various"] = [
+    ((:motzkin2,),),
+    ((:motzkin3,),),
+    ((:CS16ex8_13,),),
+    ((:CS16ex8_14,),),
+    ((:CS16ex18,),),
+    ((:CS16ex12,),),
+    ((:CS16ex13,),),
+    ((:MCW19ex1_mod,),),
+    ((:MCW19ex8,),),
+    ((3, 2),),
+    ((3, 2), SOCExpPSDOptimizer),
+    ((20, 3),),
+    ((20, 3), SOCExpPSDOptimizer),
+    ]
 return (SignomialMinJuMP, insts)

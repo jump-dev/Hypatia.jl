@@ -17,4 +17,12 @@ insts["slow"] = [
     ((100, 10, true),),
     ((100, 40, true),),
     ]
+insts["various"] = [
+    ((3, 4, true),),
+    ((3, 4, false),),
+    ((10, 15, true),),
+    ((10, 15, false),),
+    ((100, 10, true),),
+    ((100, 10, false),),
+    ]
 return (ConditionNumJuMP, insts)

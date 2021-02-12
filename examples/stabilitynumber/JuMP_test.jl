@@ -14,4 +14,5 @@ insts["slow"] = [
     ((500, true),),
     ((500, false),),
     ]
+insts["various"] = vcat(insts["fast"], insts["slow"])
 return (StabilityNumber, insts)

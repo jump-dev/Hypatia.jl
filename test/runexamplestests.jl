@@ -12,7 +12,7 @@ include(joinpath(examples_dir, "common_native.jl"))
 
 # path to write results DataFrame to CSV, if any
 # results_path = joinpath(homedir(), "bench", "bench.csv")
-results_path = joinpath(pwd(), "bench2", "bench_fast_minimal.csv")
+results_path = joinpath(pwd(), "bench2", "bench_various.csv")
 # results_path = nothing
 
 # default options to solvers
@@ -35,11 +35,12 @@ steppers = [
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    ("minimal", Float64, 100),
+    # ("minimal", Float64, 100),
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
-    ("fast", Float64, 300),
+    # ("fast", Float64, 300),
     # ("slow", Float64, 120),
+    ("various", Float64, 3600),
     ]
 
 # types of models to run and corresponding options and example names

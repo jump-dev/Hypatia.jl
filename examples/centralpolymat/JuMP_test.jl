@@ -40,4 +40,18 @@ insts["slow"] = [
     ((6, 3, true),),
     ((6, 3, false),),
     ]
+insts["various"] = [
+    ((1, 10, true),),
+    ((1, 10, true), ExpPSDOptimizer),
+    ((1, 10, false),),
+    ((1, 10, false), SOCExpPSDOptimizer),
+    ((1, 10, false), ExpPSDOptimizer),
+    ((2, 5, true),),
+    ((2, 5, true), ExpPSDOptimizer),
+    ((2, 5, false),),
+    ((2, 5, false), SOCExpPSDOptimizer),
+    ((2, 5, false), ExpPSDOptimizer),
+    ((6, 3, true),),
+    ((6, 3, false),),
+    ]
 return (CentralPolyMatJuMP, insts)

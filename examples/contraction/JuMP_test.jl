@@ -13,4 +13,5 @@ insts["fast"] = [
     ((2.0, 6, 1e-3, false, false), SOCExpPSDOptimizer),
     ]
 insts["slow"] = Tuple[]
+insts["various"] = insts["minimal"]
 return (ContractionJuMP, insts)

@@ -27,4 +27,5 @@ insts["fast"] = [
     ((:matpoly7, false, false), SOCExpPSDOptimizer),
     ]
 insts["slow"] = Tuple[]
+insts["various"] = insts["fast"]
 return (SemidefinitePolyJuMP, insts)

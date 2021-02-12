@@ -36,4 +36,25 @@ insts["slow"] = [
     ((500, 6, 6, true, true, true),),
     ((500, 4, 6, true, false, true),),
     ]
+insts["various"] = [
+    ((50, 1, 8, true, false, false),),
+    ((50, 1, 8, true, false, false), ExpPSDOptimizer),
+    ((50, 1, 8, true, false, false), SOCExpPSDOptimizer),
+    ((50, 1, 8, false, false, false),),
+    ((50, 1, 8, false, false, true),),
+    ((50, 4, 4, true, false, false),),
+    ((50, 4, 4, true, false, false), ExpPSDOptimizer),
+    ((50, 4, 4, true, false, false), SOCExpPSDOptimizer),
+    ((50, 4, 4, false, false, false),),
+    ((50, 4, 4, false, false, true),),
+    ((50, 16, 2, true, false, false),),
+    ((50, 16, 2, true, false, false), ExpPSDOptimizer),
+    ((50, 16, 2, true, false, false), SOCExpPSDOptimizer),
+    ((50, 16, 2, false, false, false),),
+    ((50, 16, 2, false, false, true),),
+    ((:iris, 4, false, false, false),),
+    ((:iris, 5, true, false, false),),
+    ((:iris, 6, true, true, true),),
+    ((:cancer, 4, true, true, true),),
+    ]
 return (DensityEstJuMP, insts)
