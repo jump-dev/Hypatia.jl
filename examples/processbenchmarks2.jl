@@ -5,7 +5,7 @@ using Plots
 MAX_TIME = 1800
 MAX_ITER = 250
 
-nickname = "fast_minimal"
+nickname = "various"
 # nickname = "nat"
 
 bench_file = joinpath("bench2", "bench_" * nickname * ".csv")
