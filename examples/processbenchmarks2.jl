@@ -8,7 +8,7 @@ MAX_ITER = 250
 nickname = "various"
 # nickname = "nat"
 
-bench_file = joinpath("bench2", "bench_" * nickname * ".csv")
+bench_file = joinpath("bench2", "various", "bench_" * nickname * ".csv")
 output_folder = mkpath(joinpath(@__DIR__, "results"))
 
 shifted_geomean_notmissing(x; shift = 0) = exp(sum(log, skipmissing(x) .+ shift) / count(!ismissing, x))
@@ -34,13 +34,13 @@ function post_process()
     # select!(all_df, :stepper, :use_corr, :use_curve_search, :solve_time, :iters, :status, :all_opt)
 
     df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search, :shift]),
-        :solve_time => shifted_geomean_notmissing => :solve_time_geomean_notmissing,
+        :solve_time => shifted_geomean_notmissing => :time_geomean_notmissing,
         :iters => shifted_geomean_notmissing => :iters_geomean_notmissing,
-        [:solve_time, :status] => shifted_geomean_opt => :solve_time_geomean_this_opt,
-        [:iters, :status] => shifted_geomean_opt => :iters_geomean_this_opt,
-        [:solve_time, :all_opt] => shifted_geomean_all_opt => :solve_time_geomean_all_opt,
-        [:iters, :all_opt] => shifted_geomean_all_opt => :iters_geomean_all_opt,
-        :solve_time => (x -> shifted_geomean_all(x, cap = MAX_TIME)) => :solve_time_geomean_all,
+        [:solve_time, :status] => shifted_geomean_opt => :time_geomean_thisopt,
+        [:iters, :status] => shifted_geomean_opt => :iters_geomean_thisopt,
+        [:solve_time, :all_opt] => shifted_geomean_all_opt => :time_geomean_allopt,
+        [:iters, :all_opt] => shifted_geomean_all_opt => :iters_geomean_allopt,
+        :solve_time => (x -> shifted_geomean_all(x, cap = MAX_TIME)) => :time_geomean_all,
         :iters => (x -> shifted_geomean_all(x, cap = MAX_ITER)) => :iters_geomean_all,
         :status => (x -> count(isequal("Optimal"), x)) => :optimal,
         :status => (x -> count(isequal("NumericalFailure"), x)) => :numerical,
@@ -52,6 +52,7 @@ function post_process()
         :status => (x -> count(startswith("Skipped"), x)) => :skip,
         :status => length => :total,
         )
+    sort!(dff_agg, [stepper, :use_corr, :use_curve_search, :shift])
     CSV.write(joinpath(output_folder, "df_agg_" * nickname * ".csv"), df_agg)
 
     return
