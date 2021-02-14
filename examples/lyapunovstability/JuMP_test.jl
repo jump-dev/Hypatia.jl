@@ -23,17 +23,17 @@ insts["slow"] = [
     ((50, 50, false, true),),
     ]
 insts["various"] = [
-    ((3, 6, true, true),),
-    ((3, 6, true, false),),
-    ((3, 6, false, true),),
-    ((3, 6, false, false),),
+    ((6, 6, true, true),),
+    ((6, 6, true, false),),
+    ((6, 6, false, true),),
+    ((6, 6, false, false),),
     ((12, 12, true, true),),
     ((12, 12, true, false),),
     ((12, 12, false, true),),
     ((12, 12, false, false),),
-    ((48, 24, true, true),),
-    ((48, 24, true, false),),
-    ((48, 24, false, true),),
-    ((48, 24, false, false),),
+    ((24, 24, true, true),),
+    ((24, 24, true, false),),
+    ((24, 24, false, true),),
+    ((24, 24, false, false),),
     ]
 return (LyapunovStabilityJuMP, insts)
