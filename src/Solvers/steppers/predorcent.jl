@@ -110,6 +110,11 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             if !iszero(alpha)
                 stepper.uncorr_only = false
                 @timeit TO "alpha 3" alpha = search_alpha(point, model, stepper)
+                if iszero(alpha)
+                    # use uncorrected direction
+                    stepper.uncorr_only = true
+                    alpha = stepper.uncorr_alpha
+                end
 
                 # step
                 update_cone_points(alpha, point, stepper, false)
@@ -124,17 +129,6 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         stepper.uncorr_only = true
         @timeit TO "alpha 4" alpha = search_alpha(point, model, stepper)
     end
-
-    # if iszero(alpha) && is_pred
-    #     # do centering step instead
-    #     @warn("very small alpha in line search; trying centering")
-    #     update_rhs_cent(solver, rhs)
-    #     get_directions(stepper, solver, is_pred)
-    #     copyto!(dir_nocorr.vec, dir.vec)
-    #     stepper.cent_count = 1
-    #
-    #     alpha = search_alpha(point, model, stepper)
-    # end
 
     if iszero(alpha)
         @warn("very small alpha in line search; terminating")
