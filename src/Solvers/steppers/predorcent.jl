@@ -67,7 +67,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     update_lhs(solver.system_solver, solver)
 
     # decide whether to predict or center
-    is_pred = (stepper.prev_alpha > T(0.1)) && ((stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))) # TODO tune, make option
+    is_pred = ((stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))) # TODO tune, make option
     stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
     rhs_fun_nocorr = (is_pred ? update_rhs_pred : update_rhs_cent)
 
@@ -107,6 +107,11 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             if !iszero(alpha)
                 stepper.uncorr_only = false
                 alpha = search_alpha(point, model, stepper)
+                if iszero(alpha)
+                    # use uncorrected direction
+                    stepper.uncorr_only = true
+                    alpha = stepper.uncorr_alpha
+                end
 
                 # step
                 update_cone_points(alpha, point, stepper, false)
@@ -119,17 +124,6 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     if try_nocorr
         # do line search in uncorrected direction
         stepper.uncorr_only = true
-        alpha = search_alpha(point, model, stepper)
-    end
-
-    if iszero(alpha) && is_pred
-        # do centering step instead
-        @warn("very small alpha in line search; trying centering")
-        update_rhs_cent(solver, rhs)
-        get_directions(stepper, solver, is_pred)
-        copyto!(dir_nocorr.vec, dir.vec)
-        stepper.cent_count = 1
-
         alpha = search_alpha(point, model, stepper)
     end
 

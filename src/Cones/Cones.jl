@@ -174,6 +174,7 @@ function in_neighborhood(
     rtmu::T,
     max_nbhd::T,
     ) where {T <: Real}
+    is_feas(cone) || return false
     g = grad(cone)
     vec1 = cone.vec1
 
