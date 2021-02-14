@@ -27,10 +27,10 @@ steppers = [
     Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = true, use_curve_search = false),
     Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = false, use_curve_search = false),
     Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = true, use_curve_search = true),
-    Hypatia.Solvers.CombinedStepper{Float64}(),
-    Hypatia.Solvers.CombinedStepper{Float64}(1),
+    # Hypatia.Solvers.CombinedStepper{Float64}(),
+    # Hypatia.Solvers.CombinedStepper{Float64}(1),
     Hypatia.Solvers.CombinedStepper{Float64}(2),
-    Hypatia.Solvers.CombinedStepper{Float64}(3),
+    # Hypatia.Solvers.CombinedStepper{Float64}(3),
     ]
 
 # instance sets and real types to run and corresponding time limits (seconds)
