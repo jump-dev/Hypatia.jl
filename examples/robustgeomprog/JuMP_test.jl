@@ -23,14 +23,14 @@ insts["slow"] = [
     ]
 insts["various"] = [
     ((5, 10),),
-    ((5, 10),),
+    ((5, 10), SOCExpPSDOptimizer),
     ((10, 20),),
-    ((10, 20),),
+    ((10, 20), SOCExpPSDOptimizer),
     ((20, 40),),
-    ((20, 40),),
+    ((20, 40), SOCExpPSDOptimizer),
     ((40, 80),),
-    ((40, 80),),
+    ((40, 80), SOCExpPSDOptimizer),
     ((100, 150),),
-    ((100, 150),),
+    ((100, 150), SOCExpPSDOptimizer),
     ]
 return (RobustGeomProgJuMP, insts)
