@@ -17,9 +17,6 @@ insts["fast"] = [
     ((50, true, true),),
     ((400, true, false),),
     ((400, false, true),),
-    ((400, true, true),),
-    ((400, true, false),),
-    ((400, false, true),),
     ((400, false, true), SOCExpPSDOptimizer),
     ((400, true, true),),
     ]
