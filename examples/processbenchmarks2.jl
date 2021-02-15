@@ -35,12 +35,26 @@ shifted_geomean_all_conv(metric, all_conv; shift = 0) = exp(sum(log, metric[all_
 # insts2 = filter(t -> t.stepper == "Hypatia.Solvers.CombinedStepper{Float64}" && t.shift == 1, dropmissing(all_df))
 # @show setdiff(unique(insts2[!, :inst_data]), unique(insts1[!, :inst_data]))
 
+# boxplots
+# using StatsPlots
+# all_df = CSV.read(bench_file, DataFrame)
+# select!(all_df,
+#     [:inst_data, :extender] => ((x, y) -> x .* y) => :k,
+#     [:stepper, :use_corr, :use_curve_search] => ((a, b, c) -> a .* "_" .* string.(b) .* "_" .* string.(c)) => :stepper,
+#     :solve_time => ByRow(log10) => :log_time,
+#     )
+# timings = unstack(all_df, :stepper, :log_time)
+# boxplot(["pc_00" "pc_01" "pc_11" "comb"], Matrix(timings[:, 2:end]), leg = false)
+
+
 # aggregate stuff
 function post_process()
     all_df = CSV.read(bench_file, DataFrame)
-    all_df = combine(groupby(all_df, :inst_data), names(all_df), :status => (x -> all(isequal.("Optimal", x)) || all(isequal.("Infeasible", x))) => :all_conv)
-    transform!(all_df, :status => ByRow(x -> !ismissing(x) && x in ["Optimal", "Infeasible"]) => :conv)
-    # select!(all_df, :stepper, :use_corr, :use_curve_search, :solve_time, :iters, :status, :all_conv)
+    transform!(all_df,
+        :status => ByRow(x -> !ismissing(x) && x in ["Optimal", "Infeasible"]) => :conv,
+        [:inst_data, :extender] => ((x, y) -> x .* y) => :inst_key,
+        )
+    all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> all(isequal.("Optimal", x)) || all(isequal.("Infeasible", x))) => :all_conv)
 
     df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search, :shift]),
         # :solve_time => shifted_geomean_notmissing => :time_geomean_notmissing,
@@ -71,24 +85,37 @@ post_process()
 
 # performance profiles, currently hardcoded for corrector vs no corrector
 function perf_prof()
-    feature = :use_corr
-    metric = :iters
+    # feature = :use_corr
+    feature = :stepper
+    metric = :solve_time
     # metric = :iters
     # s1 = "TRUE"
     # s2 = "FALSE"
-    s1 = true
-    s2 = false
+    s1 = "Hypatia.Solvers.PredOrCentStepper{Float64}"
+    s2 = "Hypatia.Solvers.CombinedStepper{Float64}"
+    # s1 = true
+    # s2 = false
 
     all_df = CSV.read(bench_file, DataFrame)
-    filter!(t -> t.stepper == "Hypatia.Solvers.PredOrCentStepper{Float64}" && t.use_curve_search == false,
-        all_df
+    transform!(all_df,
+        [:inst_data, :extender] => ((x, y) -> x .* y) => :inst_key,
+        )
+    all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> all(isequal.("Optimal", x)) || all(isequal.("Infeasible", x))) => :all_conv)
+    filter!(t ->
+        # t -> t.stepper == "Hypatia.Solvers.PredOrCentStepper{Float64}" && t.use_curve_search == false,
+        t.use_corr == true &&
+        t.use_curve_search == true &&
+        t.all_conv == true, # only include instances where all steppers converged (currently includes steppers not in the plot)
+        all_df,
         )
     select!(all_df,
+        :inst_key,
         feature,
         :solve_time => ByRow(x -> (ismissing(x) ? MAX_TIME : min(x, MAX_TIME))) => :solve_time,
         :iters => ByRow(x -> (ismissing(x) ? MAX_TIME : min(x, MAX_ITER))) => :iters,
         )
-    transform!(all_df, metric => (x -> x ./ minimum(x)) => :ratios)
+    all_df = combine(groupby(all_df, :inst_key), names(all_df), metric => (x -> x ./ minimum(x)) => :ratios)
+    # transform!(all_df, metric => (x -> x ./ minimum(x)) => :ratios)
     sort!(all_df, :ratios)
 
     nsolvers = 2
@@ -100,7 +127,7 @@ function perf_prof()
     plot!(log10.(all_df[!, :ratios]), [sum(subdf[!, :ratios] .<= ti) ./ npts * nsolvers for ti in all_df[!, :ratios]], label = s1, t = :steppre)
 
     subdf = all_df[all_df[!, feature] .== s2, :]
-    plot!(log10.(all_df[!, :ratios]), [sum(subdf[!, :ratios] .<= ti) ./ npts * nsolvers for ti in all_df[!, :ratios]], label = s1, t = :steppre)
+    plot!(log10.(all_df[!, :ratios]), [sum(subdf[!, :ratios] .<= ti) ./ npts * nsolvers for ti in all_df[!, :ratios]], label = s2, t = :steppre)
     xaxis!("logratio")
     title!(string(feature) * " / " * string(metric) * " pp")
 
