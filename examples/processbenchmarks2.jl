@@ -6,13 +6,9 @@ MAX_TIME = 1800
 MAX_ITER = 250
 
 nickname = "various"
-# nickname = "nat"
 
 bench_file = joinpath("bench2", "various", "bench_" * nickname * ".csv")
-output_folder = mkpath(joinpath(@__DIR__, "results"))
 
-# shifted_geomean_notmissing(x; shift = 0) = exp(sum(log, skipmissing(x) .+ shift) / count(!ismissing, x))
-# shifted_geomean_all(x; shift = 0, cap = Inf) = exp(sum(log, coalesce.(x, cap) .+ shift) / length(x))
 function shifted_geomean_all(metric, conv; shift = 0, cap = Inf)
     x = copy(metric)
     x[.!conv] .= cap
@@ -38,16 +34,22 @@ shifted_geomean_all_conv(metric, all_conv; shift = 0) = exp(sum(log, metric[all_
 # boxplots
 # using StatsPlots
 # all_df = CSV.read(bench_file, DataFrame)
+# transform!(all_df, [:inst_data, :extender] => ((x, y) -> x .* y) => :inst_key)
+# all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> all(isequal.("Optimal", x)) || all(isequal.("Infeasible", x))) => :all_conv)
+# filter!(t -> t.all_conv == true, all_df)
+# all_df = combine(groupby(all_df, :inst_key), names(all_df), :solve_time => sum => :time_sum)
+# sort!(all_df, order(:time_sum, rev = true))
+# all_df = all_df[1:(4 * 20), :]
 # select!(all_df,
 #     [:inst_data, :extender] => ((x, y) -> x .* y) => :k,
 #     [:stepper, :use_corr, :use_curve_search] => ((a, b, c) -> a .* "_" .* string.(b) .* "_" .* string.(c)) => :stepper,
 #     :solve_time => ByRow(log10) => :log_time,
+#     # :solve_time,
 #     )
 # timings = unstack(all_df, :stepper, :log_time)
+# # timings = unstack(all_df, :stepper, :solve_time)
 # boxplot(["pc_00" "pc_01" "pc_11" "comb"], Matrix(timings[:, 2:end]), leg = false)
 
-
-# aggregate stuff
 function post_process()
     all_df = CSV.read(bench_file, DataFrame)
     transform!(all_df,
@@ -55,10 +57,18 @@ function post_process()
         [:inst_data, :extender] => ((x, y) -> x .* y) => :inst_key,
         )
     all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> all(isequal.("Optimal", x)) || all(isequal.("Infeasible", x))) => :all_conv)
+    filter!(t -> t.inst_set == "various", all_df)
+    return all_df
+end
+
+
+# aggregate stuff
+function agg_stats()
+    output_folder = mkpath(joinpath(@__DIR__, "results"))
+
+    all_df = post_process()
 
     df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search, :shift]),
-        # :solve_time => shifted_geomean_notmissing => :time_geomean_notmissing,
-        # :iters => shifted_geomean_notmissing => :iters_geomean_notmissing,
         [:solve_time, :conv] => shifted_geomean_conv => :time_geomean_thisconv,
         [:iters, :conv] => shifted_geomean_conv => :iters_geomean_thisconv,
         [:solve_time, :all_conv] => shifted_geomean_all_conv => :time_geomean_allconv,
@@ -69,11 +79,8 @@ function post_process()
         :status => (x -> count(isequal("Infeasible"), x)) => :infeasible,
         :status => (x -> count(isequal("NumericalFailure"), x)) => :numerical,
         :status => (x -> count(isequal("SlowProgress"), x)) => :slowprogress,
-        # :status => (x -> count(startswith("SolveCheckKilled"), x)) => :killed,
-        # :status => (x -> count(startswith("Setup"), x)) => :setup,
         :status => (x -> count(isequal("TimeLimit"), x)) => :timelimit,
         :status => (x -> count(isequal("IterationLimit"), x)) => :iterationlimit,
-        # :status => (x -> count(startswith("Skipped"), x)) => :skip,
         :status => length => :total,
         )
     sort!(df_agg, [order(:stepper, rev = true), :use_corr, :use_curve_search, :shift])
@@ -81,7 +88,7 @@ function post_process()
 
     return
 end
-post_process()
+agg_stats()
 
 # performance profiles, currently hardcoded for corrector vs no corrector
 function perf_prof()
@@ -96,11 +103,7 @@ function perf_prof()
     # s1 = true
     # s2 = false
 
-    all_df = CSV.read(bench_file, DataFrame)
-    transform!(all_df,
-        [:inst_data, :extender] => ((x, y) -> x .* y) => :inst_key,
-        )
-    all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> all(isequal.("Optimal", x)) || all(isequal.("Infeasible", x))) => :all_conv)
+    all_df = post_process()
     filter!(t ->
         # t -> t.stepper == "Hypatia.Solvers.PredOrCentStepper{Float64}" && t.use_curve_search == false,
         t.use_corr == true &&
