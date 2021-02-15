@@ -55,11 +55,11 @@ function post_process()
         :status => (x -> count(isequal("Infeasible"), x)) => :infeasible,
         :status => (x -> count(isequal("NumericalFailure"), x)) => :numerical,
         :status => (x -> count(isequal("SlowProgress"), x)) => :slowprogress,
-        :status => (x -> count(startswith("SolveCheckKilled"), x)) => :killed,
-        :status => (x -> count(startswith("Setup"), x)) => :setup,
+        # :status => (x -> count(startswith("SolveCheckKilled"), x)) => :killed,
+        # :status => (x -> count(startswith("Setup"), x)) => :setup,
         :status => (x -> count(isequal("TimeLimit"), x)) => :timelimit,
         :status => (x -> count(isequal("IterationLimit"), x)) => :iterationlimit,
-        :status => (x -> count(startswith("Skipped"), x)) => :skip,
+        # :status => (x -> count(startswith("Skipped"), x)) => :skip,
         :status => length => :total,
         )
     sort!(df_agg, [order(:stepper, rev = true), :use_corr, :use_curve_search, :shift])
