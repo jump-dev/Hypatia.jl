@@ -515,8 +515,8 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
 end
 
 MOI.supports(::Optimizer, ::MOI.Silent) = true
-MOI.set(opt::Optimizer, ::MOI.Silent, value::Bool) = (opt.solver.verbose = value)
-MOI.get(opt::Optimizer, ::MOI.Silent) = opt.solver.verbose
+MOI.set(opt::Optimizer, ::MOI.Silent, value::Bool) = (opt.solver.verbose = !value)
+MOI.get(opt::Optimizer, ::MOI.Silent) = !opt.solver.verbose
 
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
 MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Real) = (opt.solver.time_limit = value)
