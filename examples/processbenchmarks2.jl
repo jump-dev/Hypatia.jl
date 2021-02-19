@@ -20,12 +20,12 @@ shifted_geomean_all_conv(metric, all_conv; shift = 0) = exp(sum(log, metric[all_
 function post_process()
     all_df = CSV.read(bench_file, DataFrame)
     transform!(all_df,
-        :status => ByRow(x -> !ismissing(x) && x in ["Optimal", "Infeasible"]) => :conv,
+        :status => ByRow(x -> !ismissing(x) && x in ["Optimal", "PrimalInfeasible"]) => :conv,
         # each instance is identified by instance data + extender combination
         [:inst_data, :extender] => ((x, y) -> x .* y) => :inst_key,
         )
     # assumes that nothing returned incorrect status, which is checked manually
-    all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> all(isequal.("Optimal", x)) || all(isequal.("Infeasible", x))) => :all_conv)
+    all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> all(isequal.("Optimal", x)) || all(isequal.("PrimalInfeasible", x))) => :all_conv)
     # remove precompile instances
     filter!(t -> t.inst_set == "various", all_df)
     return all_df
@@ -46,7 +46,7 @@ function agg_stats()
         [:solve_time, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME)) => :time_geomean_all,
         [:iters, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_ITER)) => :iters_geomean_all,
         :status => (x -> count(isequal("Optimal"), x)) => :optimal,
-        :status => (x -> count(isequal("Infeasible"), x)) => :infeasible,
+        :status => (x -> count(isequal("PrimalInfeasible"), x)) => :infeasible,
         :status => (x -> count(isequal("NumericalFailure"), x)) => :numerical,
         :status => (x -> count(isequal("SlowProgress"), x)) => :slowprogress,
         :status => (x -> count(isequal("TimeLimit"), x)) => :timelimit,
@@ -92,7 +92,7 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
         )
 
     # remove instances where neither stepper being compared converged
-    all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> any(isequal.("Optimal", x)) || any(isequal.("Infeasible", x))) => :any_conv)
+    all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> any(isequal.("Optimal", x)) || any(isequal.("PrimalInfeasible", x))) => :any_conv)
     filter!(t -> t.any_conv, all_df)
 
     select!(all_df,
@@ -157,7 +157,7 @@ end
 # using StatsPlots
 # all_df = CSV.read(bench_file, DataFrame)
 # transform!(all_df, [:inst_data, :extender] => ((x, y) -> x .* y) => :inst_key)
-# all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> all(isequal.("Optimal", x)) || all(isequal.("Infeasible", x))) => :all_conv)
+# all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> all(isequal.("Optimal", x)) || all(isequal.("PrimalInfeasible", x))) => :all_conv)
 # filter!(t -> t.all_conv == true, all_df)
 # all_df = combine(groupby(all_df, :inst_key), names(all_df), :solve_time => sum => :time_sum)
 # sort!(all_df, order(:time_sum, rev = true))
@@ -171,3 +171,30 @@ end
 # timings = unstack(all_df, :stepper, :log_time)
 # # timings = unstack(all_df, :stepper, :solve_time)
 # boxplot(["pc_00" "pc_01" "pc_11" "comb"], Matrix(timings[:, 2:end]), leg = false)
+
+function is_nonsymm(cones, extender)
+    if extender != "nothing"
+        return false
+    else
+        for c in cones
+            if !(c in ["Nonnegative", "EpiNormEucl", "PosSemidefTri"])
+                return true
+            end
+        end
+        return false
+    end
+end
+
+all_df[!, :is_nonsymm] = is_nonsymm.(all_df[!, :cone_types], all_df[!, :extender])
+
+histogram(log10.(all_df[!, :solve_time]))
+title!("log10 solve time")
+png("solvehist")
+
+histogram(log10.(sum(eachcol(all_df[!, [:n, :p, :q]]))))
+title!("log10 n + p + q")
+png("npqhist")
+
+histogram(log10.(max.(0.01, all_df[!, :n] - all_df[!, :p])))
+title!("log10(n - p)")
+png("nphist")
