@@ -58,44 +58,44 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     dir_predcorr = stepper.dir_predcorr
 
     # update linear system solver factorization
-    @timeit TO "update_lhs" update_lhs(solver.system_solver, solver)
+    solver.time_uplhs += @elapsed update_lhs(solver.system_solver, solver)
 
     # calculate centering direction and correction
-    @timeit TO "update_rhs_cent" update_rhs_cent(solver, rhs)
-    @timeit TO "get_directions 1" get_directions(stepper, solver, false)
+    solver.time_uprhs += @elapsed update_rhs_cent(solver, rhs)
+    solver.time_getdir += @elapsed get_directions(stepper, solver, false)
     copyto!(dir_cent.vec, dir.vec)
-    @timeit TO "update_rhs_centcorr" update_rhs_centcorr(solver, rhs, dir)
-    @timeit TO "get_directions 2" get_directions(stepper, solver, false)
+    solver.time_uprhs += @elapsed update_rhs_centcorr(solver, rhs, dir)
+    solver.time_getdir += @elapsed get_directions(stepper, solver, false)
     copyto!(dir_centcorr.vec, dir.vec)
 
     # calculate affine/prediction direction and correction
-    @timeit TO "update_rhs_pred" update_rhs_pred(solver, rhs)
-    @timeit TO "get_directions 3" get_directions(stepper, solver, true)
+    solver.time_uprhs += @elapsed update_rhs_pred(solver, rhs)
+    solver.time_getdir += @elapsed get_directions(stepper, solver, true)
     copyto!(dir_pred.vec, dir.vec)
-    @timeit TO "update_rhs_predcorr" update_rhs_predcorr(solver, rhs, dir)
-    @timeit TO "get_directions 4" get_directions(stepper, solver, true)
+    solver.time_uprhs += @elapsed update_rhs_predcorr(solver, rhs, dir)
+    solver.time_getdir += @elapsed get_directions(stepper, solver, true)
     copyto!(dir_predcorr.vec, dir.vec)
 
     # search with combined directions and corrections
     stepper.uncorr_only = stepper.cent_only = false
-    @timeit TO "alpha 1" alpha = search_alpha(point, model, stepper)
+    solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
 
     if iszero(alpha)
         # recover
         println("trying combined without correction")
         stepper.uncorr_only = true
-        alpha = search_alpha(point, model, stepper)
+        solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
 
         if iszero(alpha)
             println("trying centering with correction")
             stepper.cent_only = true
             stepper.uncorr_only = false
-            @timeit TO "alpha 2" alpha = search_alpha(point, model, stepper)
+            solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
 
             if iszero(alpha)
                 println("trying centering without correction")
                 stepper.uncorr_only = true
-                @timeit TO "alpha 3" alpha = search_alpha(point, model, stepper)
+                solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
 
                 if iszero(alpha)
                     @warn("cannot step in centering direction")

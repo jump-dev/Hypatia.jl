@@ -19,8 +19,6 @@ function __init__()
 end
 
 # submodules
-import TimerOutputs
-const TO = TimerOutputs.TimerOutput()
 include("ModelUtilities/ModelUtilities.jl")
 include("Cones/Cones.jl")
 include("Models/Models.jl")
