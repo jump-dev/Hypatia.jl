@@ -55,7 +55,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     dir_predcorr = stepper.dir_predcorr
 
     # update linear system solver factorization
-    solver.time_uplhs += update_lhs(solver.system_solver, solver)
+    solver.time_uplhs += @elapsed update_lhs(solver.system_solver, solver)
 
     # calculate centering direction and correction
     solver.time_uprhs += @elapsed update_rhs_cent(solver, rhs)
