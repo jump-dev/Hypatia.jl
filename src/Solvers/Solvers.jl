@@ -76,6 +76,16 @@ mutable struct Solver{T <: Real}
     solve_time::Float64
     num_iters::Int
 
+    # helpful performance metrics for major subprocedures
+    time_rescale::Float64 # data rescaling
+    time_initx::Float64 # preprocess dual equalities and finding initial x point
+    time_inity::Float64 # preprocess primal equalities and finding initial y point
+    time_unproc::Float64 # unprocess final point
+    time_uplhs::Float64 # update LHS for directions
+    time_uprhs::Float64 # update RHSs for directions
+    time_getdir::Float64 # solve for directions
+    time_search::Float64 # time for alpha search
+
     # model and preprocessed model data
     orig_model::Models.Model{T}
     model::Models.Model{T}
@@ -220,6 +230,15 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.num_iters = 0
     solver.solve_time = NaN
 
+    solver.time_rescale = NaN
+    solver.time_initx = NaN
+    solver.time_inity = NaN
+    solver.time_unproc = NaN
+    solver.time_uplhs = 0
+    solver.time_uprhs = 0
+    solver.time_getdir = 0
+    solver.time_search = 0
+
     solver.x_norm_res_t = NaN
     solver.y_norm_res_t = NaN
     solver.z_norm_res_t = NaN
@@ -242,14 +261,16 @@ function solve(solver::Solver{T}) where {T <: Real}
     result = solver.result = Point(orig_model)
     model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
     (init_z, init_s) = initialize_cone_point(solver.orig_model)
-    solver.used_rescaling = rescale_data(solver)
+
+    solver.time_rescale = @elapsed solver.used_rescaling = rescale_data(solver)
+
     if solver.reduce
         # TODO don't find point / unnecessary stuff before reduce
-        init_y = find_initial_y(solver, init_z, true)
-        init_x = find_initial_x(solver, init_s)
+        solver.time_inity = @elapsed init_y = find_initial_y(solver, init_z, true)
+        solver.time_initx = @elapsed init_x = find_initial_x(solver, init_s)
     else
-        init_x = find_initial_x(solver, init_s)
-        init_y = find_initial_y(solver, init_z, false)
+        solver.time_initx = @elapsed init_x = find_initial_x(solver, init_s)
+        solver.time_inity = @elapsed init_y = find_initial_y(solver, init_z, false)
     end
 
     if solver.status == SolveCalled
@@ -342,7 +363,7 @@ function solve(solver::Solver{T}) where {T <: Real}
         end
 
         # finalize result point
-        postprocess(solver)
+        solver.time_unproc = @elapsed postprocess(solver)
     end
 
     solver.solve_time = time() - start_time
