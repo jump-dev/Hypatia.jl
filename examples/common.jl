@@ -81,7 +81,18 @@ function process_result(
     compl = dot(s, z)
     (x_viol, y_viol, z_viol) = certificate_violations(status, model, x, y, z, s)
 
-    solve_stats = (status, solve_time, num_iters, primal_obj, dual_obj, rel_obj_diff, compl, x_viol, y_viol, z_viol, x, y, z, s)
+    time_rescale = solver.time_rescale
+    time_initx = solver.time_initx
+    time_inity = solver.time_inity
+    time_unproc = solver.time_unproc
+    time_uplhs = solver.time_uplhs
+    time_uprhs = solver.time_uprhs
+    time_getdir = solver.time_getdir
+    time_search = solver.time_search
+
+    solve_stats = (status, solve_time, num_iters, primal_obj, dual_obj, rel_obj_diff, compl, x_viol, y_viol, z_viol,
+        time_rescale, time_initx, time_inity, time_unproc, time_uplhs, time_uprhs, time_getdir, time_search,
+        x, y, z, s)
     flush(stdout); flush(stderr)
     return solve_stats
 end
