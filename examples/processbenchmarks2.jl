@@ -20,12 +20,12 @@ shifted_geomean_all_conv(metric, all_conv; shift = 0) = exp(sum(log, metric[all_
 function post_process()
     all_df = CSV.read(bench_file, DataFrame)
     transform!(all_df,
-        :status => ByRow(x -> !ismissing(x) && x in ["Optimal", "PrimalInfeasible"]) => :conv,
+        :status => ByRow(x -> !ismissing(x) && x in ["Optimal", "PrimalInfeasible", "DualInfeasible"]) => :conv,
         # each instance is identified by instance data + extender combination
         [:inst_data, :extender] => ((x, y) -> x .* y) => :inst_key,
         )
     # assumes that nothing returned incorrect status, which is checked manually
-    all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> all(isequal.("Optimal", x)) || all(isequal.("PrimalInfeasible", x))) => :all_conv)
+    all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> all(in(["Optimal", "PrimalInfeasible", "DualInfeasible"]).(x))) => :all_conv)
     # remove precompile instances
     filter!(t -> t.inst_set == "various", all_df)
     return all_df
@@ -40,13 +40,14 @@ function agg_stats()
 
     df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search, :shift]),
         [:solve_time, :conv] => shifted_geomean_conv => :time_geomean_thisconv,
-        [:iters, :conv] => shifted_geomean_conv => :iters_geomean_thisconv,
+        [:iters, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = 1)) => :iters_geomean_thisconv,
         [:solve_time, :all_conv] => shifted_geomean_all_conv => :time_geomean_allconv,
-        [:iters, :all_conv] => shifted_geomean_all_conv => :iters_geomean_allconv,
+        [:iters, :all_conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = 1)) => :iters_geomean_allconv,
         [:solve_time, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME)) => :time_geomean_all,
-        [:iters, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_ITER)) => :iters_geomean_all,
+        [:iters, :conv] => ((x, y) -> shifted_geomean_all(x, y, shift = 1, cap = MAX_ITER)) => :iters_geomean_all,
         :status => (x -> count(isequal("Optimal"), x)) => :optimal,
-        :status => (x -> count(isequal("PrimalInfeasible"), x)) => :infeasible,
+        :status => (x -> count(isequal("PrimalInfeasible"), x)) => :priminfeas,
+        :status => (x -> count(isequal("DualInfeasible"), x)) => :dualinfeas,
         :status => (x -> count(isequal("NumericalFailure"), x)) => :numerical,
         :status => (x -> count(isequal("SlowProgress"), x)) => :slowprogress,
         :status => (x -> count(isequal("TimeLimit"), x)) => :timelimit,
@@ -68,12 +69,21 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
         use_corr = [true]
         use_curve_search = [true]
         stepper = [s1, s2]
+        shift = [0]
+    elseif feature == :shift
+        s1 = 0
+        s2 = 2
+        use_corr = [true]
+        use_curve_search = [true]
+        stepper = ["Hypatia.Solvers.CombinedStepper{Float64}"]
+        shift = [s1, s2]
     else
         # s1 = "FALSE"
         # s2 = "TRUE"
         s1 = false
         s2 = true
         stepper = ["Hypatia.Solvers.PredOrCentStepper{Float64}"]
+        shift = [0]
         if feature == :use_corr
             use_curve_search = [false]
             use_corr = [s1, s2]
@@ -87,12 +97,13 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
     filter!(t ->
         t.stepper in stepper &&
         t.use_corr in use_corr &&
-        t.use_curve_search in use_curve_search,
+        t.use_curve_search in use_curve_search &&
+        t.shift in shift,
         all_df,
         )
 
     # remove instances where neither stepper being compared converged
-    all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> any(isequal.("Optimal", x)) || any(isequal.("PrimalInfeasible", x))) => :any_conv)
+    all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> any(in(["Optimal", "PrimalInfeasible", "DualInfeasible"]).(x))) => :any_conv)
     filter!(t -> t.any_conv, all_df)
 
     select!(all_df,
@@ -126,7 +137,7 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
     return
 end
 
-for feature in [:stepper, :use_curve_search, :use_corr], metric in [:solve_time, :iters]
+for feature in [:stepper, :use_curve_search, :use_corr, :shift], metric in [:solve_time, :iters]
     perf_prof(feature = feature, metric = metric)
 end
 
