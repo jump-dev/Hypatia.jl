@@ -64,7 +64,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     dir_nocorr = stepper.dir_nocorr
 
     # update linear system solver factorization
-    update_lhs(solver.system_solver, solver)
+    solver.time_uplhs += @elapsed update_lhs(solver.system_solver, solver)
 
     # decide whether to predict or center
     is_pred = ((stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))) # TODO tune, make option
@@ -72,8 +72,8 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     rhs_fun_nocorr = (is_pred ? update_rhs_pred : update_rhs_cent)
 
     # get uncorrected direction
-    rhs_fun_nocorr(solver, rhs)
-    get_directions(stepper, solver, is_pred)
+    solver.time_uprhs += @elapsed rhs_fun_nocorr(solver, rhs)
+    solver.time_getdir += @elapsed get_directions(stepper, solver, is_pred)
     copyto!(dir_nocorr.vec, dir.vec) # TODO maybe instead of copying, pass in the dir point we want into the directions function
     try_nocorr = true
 
@@ -81,14 +81,14 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         # get correction direction
         rhs_fun_corr = (is_pred ? update_rhs_predcorr : update_rhs_centcorr)
         dir_corr = stepper.dir_corr
-        rhs_fun_corr(solver, rhs, dir)
-        get_directions(stepper, solver, is_pred)
+        solver.time_uprhs += @elapsed rhs_fun_corr(solver, rhs, dir)
+        solver.time_getdir += @elapsed get_directions(stepper, solver, is_pred)
         copyto!(dir_corr.vec, dir.vec)
 
         if stepper.use_curve_search
             # do single curve search with correction
             stepper.uncorr_only = false
-            alpha = search_alpha(point, model, stepper)
+            solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
             if iszero(alpha)
                 # try not using correction
                 @warn("very small alpha in curve search; trying without correction")
@@ -102,11 +102,11 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             # do two line searches, first for uncorrected alpha, then for corrected alpha
             try_nocorr = false
             stepper.uncorr_only = true
-            alpha = search_alpha(point, model, stepper)
+            solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
             stepper.uncorr_alpha = alpha
             if !iszero(alpha)
                 stepper.uncorr_only = false
-                alpha = search_alpha(point, model, stepper)
+                solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
                 if iszero(alpha)
                     # use uncorrected direction
                     stepper.uncorr_only = true
@@ -124,7 +124,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     if try_nocorr
         # do line search in uncorrected direction
         stepper.uncorr_only = true
-        alpha = search_alpha(point, model, stepper)
+        solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
     end
 
     if iszero(alpha)
