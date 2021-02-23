@@ -59,6 +59,7 @@ function check_cone_points(
     skzk = step_searcher.skzk
     cones = model.cones
     max_nbhd = step_searcher.max_nbhd
+    min_nbhd = step_searcher.min_nbhd
 
     taukap_cand = cand.tau[] * cand.kap[]
     (min(cand.tau[], cand.kap[], taukap_cand) < eps(T)) && return false
@@ -68,12 +69,18 @@ function check_cone_points(
         (skzk[k] < eps(T)) && return false
     end
     mu_cand = (sum(skzk) + taukap_cand) / step_searcher.nup1
-    (mu_cand < eps(T)) && return false
 
-    min_nbhd_mu = step_searcher.min_nbhd * mu_cand
-    (taukap_cand < min_nbhd_mu) && return false
-    any(skzk[k] < min_nbhd_mu * Cones.get_nu(cones[k]) for k in cone_order) && return false
-    isfinite(max_nbhd) && (abs(taukap_cand - mu_cand) > max_nbhd * mu_cand) && return false
+    if (mu_cand < eps(T)) || (taukap_cand < min_nbhd * mu_cand) || (abs(taukap_cand - mu_cand) > max_nbhd * mu_cand)
+        return false
+    end
+    max_nbhd_sqr = abs2(max_nbhd)
+    for k in cone_order
+        nu_k = Cones.get_nu(cones[k])
+        skzkmu = skzk[k] / mu_cand
+        if (skzkmu < min_nbhd * nu_k) || (abs2(skzkmu - nu_k) > max_nbhd_sqr * nu_k)
+            return false
+        end
+    end
 
     # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
     sortperm!(cone_order, step_searcher.cone_times, initialized = true) # NOTE stochastic
@@ -86,7 +93,7 @@ function check_cone_points(
         Cones.load_point(cone_k, cand.primal_views[k], irtmu)
         Cones.load_dual_point(cone_k, cand.dual_views[k])
         Cones.reset_data(cone_k)
-        in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && (isinf(max_nbhd) || Cones.in_neighborhood(cone_k, rtmu, max_nbhd)))
+        in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, rtmu, max_nbhd))
         step_searcher.cone_times[k] = time() - start_time
         in_nbhd_k || return false
     end
