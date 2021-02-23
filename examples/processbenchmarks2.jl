@@ -61,6 +61,47 @@ function agg_stats()
 end
 agg_stats()
 
+function bottlenecks()
+    output_folder = mkpath(joinpath(@__DIR__, "results"))
+
+    all_df = post_process()
+    shift = 1e-4
+
+    df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search, :shift]),
+        [:time_rescale, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :rescale_thisconv,
+        [:time_initx, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :initx_thisconv,
+        [:time_inity, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :inity_thisconv,
+        [:time_unproc, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :unproc_thisconv,
+        [:time_uplhs, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :uplhs_thisconv,
+        [:time_uprhs, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :uprhs_thisconv,
+        [:time_getdir, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :getdir_thisconv,
+        [:time_search, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :search_thisconv,
+        #
+        [:time_rescale, :all_conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :rescale_allconv,
+        [:time_initx, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :initx_allconv,
+        [:time_inity, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :inity_allconv,
+        [:time_unproc, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :unproc_allconv,
+        [:time_uplhs, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :uplhs_allconv,
+        [:time_uprhs, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :uprhs_allconv,
+        [:time_getdir, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :getdir_allconv,
+        [:time_search, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :search_allconv,
+        #
+        [:time_rescale, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :rescale_all,
+        [:time_initx, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :initx_all,
+        [:time_inity, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :inity_all,
+        [:time_unproc, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :unproc_all,
+        [:time_uplhs, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :uplhs_all,
+        [:time_uprhs, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :uprhs_all,
+        [:time_getdir, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :getdir_all,
+        [:time_search, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :search_all,
+        )
+    sort!(df_agg, [order(:stepper, rev = true), :use_corr, :use_curve_search, :shift])
+    CSV.write(joinpath(output_folder, "df_bottlenecks_" * nickname * ".csv"), df_agg)
+
+    return
+end
+bottlenecks()
+
 # performance profiles, currently hardcoded for corrector vs no corrector
 function perf_prof(; feature = :stepper, metric = :solve_time)
     if feature == :stepper
