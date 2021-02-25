@@ -1,4 +1,5 @@
 
+relaxed_tols = (default_tol_relax = 100,)
 insts = Dict()
 insts["minimal"] = [
     ((2, 4, true, true),),
@@ -31,9 +32,9 @@ insts["various"] = [
     ((12, 12, true, false),),
     ((12, 12, false, true),),
     ((12, 12, false, false),),
-    ((24, 24, true, true),),
-    ((24, 24, true, false),),
-    ((24, 24, false, true),),
-    ((24, 24, false, false),),
+    ((24, 24, true, true), nothing, relaxed_tols),
+    ((24, 24, true, false), nothing, relaxed_tols),
+    ((24, 24, false, true), nothing, relaxed_tols),
+    ((24, 24, false, false), nothing, relaxed_tols),
     ]
 return (LyapunovStabilityJuMP, insts)

@@ -16,5 +16,10 @@ insts["slow"] = [
     ((500, 1000, 0.05),),
     ((500, 1000, 1.0),),
     ]
-insts["various"] = insts["fast"]
+insts["various"] = [
+    ((100, 100, 1.0),),
+    ((100, 100, 0.15),),
+    ((1000, 200, 1.0),),
+    ((1000, 200, 0.15),),
+    ]
 return (LinearOptNative, insts)

@@ -98,8 +98,8 @@ function process_result(
 end
 
 function get_model_stats(model::Models.Model)
-    # string_cones = [string(nameof(c)) for c in unique(typeof.(model.cones))]
-    string_cones = [string(nameof(c)) for c in typeof.(model.cones)]
+    string_cones = [string(nameof(c)) for c in unique(typeof.(model.cones))]
+    # string_cones = [string(nameof(c)) for c in typeof.(model.cones)]
     return (model.n, model.p, model.q, model.nu, string_cones)
 end
 

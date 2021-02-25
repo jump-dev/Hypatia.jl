@@ -1,4 +1,5 @@
 
+relaxed_tols = (default_tol_relax = 100,)
 insts = Dict()
 insts["minimal"] = [
     ((2,), SOCExpPSDOptimizer),
@@ -9,5 +10,8 @@ insts["fast"] = [
 insts["slow"] = [
     ((4,), SOCExpPSDOptimizer),
     ]
-insts["various"] = vcat(insts["fast"], insts["slow"])
+insts["various"] = [
+    ((3,), SOCExpPSDOptimizer),
+    ((4,), SOCExpPSDOptimizer, relaxed_tols),
+    ]
 return (LotkaVolterraJuMP, insts)
