@@ -77,6 +77,15 @@ function bottlenecks()
         [:time_getdir, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :getdir_thisconv,
         [:time_search, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :search_thisconv,
         #
+        [:time_rescale, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :rescale_piter_thisconv,
+        [:time_initx, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :initx_piter_thisconv,
+        [:time_inity, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :inity_piter_thisconv,
+        [:time_unproc, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :unproc_piter_thisconv,
+        [:time_uplhs, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :uplhs_piter_thisconv,
+        [:time_uprhs, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :uprhs_piter_thisconv,
+        [:time_getdir, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :getdir_piter_thisconv,
+        [:time_search, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :search_piter_thisconv,
+        #
         [:time_rescale, :all_conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :rescale_allconv,
         [:time_initx, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :initx_allconv,
         [:time_inity, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :inity_allconv,
