@@ -38,5 +38,5 @@ insts["slow"] = [
     ((100, true, true, false),),
     ((100, true, false, false),),
     ]
-insts["various"] = insts["fast"]
+insts["various"] = vcat(insts["fast"], insts["slow"])
 return (NearestPSDJuMP, insts)
