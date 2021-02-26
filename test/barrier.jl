@@ -510,15 +510,15 @@ function test_hyporootdettri_barrier(T::Type{<:Real})
         test_barrier_oracles(cone, R_barrier_sc1)
 
         # complex rootdet barrier
-        dim = 1 + side^2
-        cone = Cones.HypoRootdetTri{T, Complex{T}}(dim)
-        function C_barrier(s)
-            (u, W) = (s[1], zeros(Complex{eltype(s)}, side, side))
-            Cones.svec_to_smat!(W, s[2:end], sqrt(T(2)))
-            fact_W = cholesky!(Hermitian(W, :U))
-            return cone.sc_const * (-log(exp(logdet(fact_W) / side) - u) - logdet(fact_W))
-        end
-        test_barrier_oracles(cone, C_barrier)
+        # dim = 1 + side^2
+        # cone = Cones.HypoRootdetTri{T, Complex{T}}(dim)
+        # function C_barrier(s)
+        #     (u, W) = (s[1], zeros(Complex{eltype(s)}, side, side))
+        #     Cones.svec_to_smat!(W, s[2:end], sqrt(T(2)))
+        #     fact_W = cholesky!(Hermitian(W, :U))
+        #     return cone.sc_const * (-log(exp(logdet(fact_W) / side) - u) - logdet(fact_W))
+        # end
+        # test_barrier_oracles(cone, C_barrier)
     end
     return
 end

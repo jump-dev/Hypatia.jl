@@ -28,6 +28,8 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
+    inv_hess_sqrt_aux_updated::Bool
+    inv_hess_sqrt_updated::Bool
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
@@ -45,6 +47,9 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     Wi::Matrix{R}
     Wi_vec::Vector{T}
     tempw::Vector{T}
+    inv_hess_U_sqrt
+    scdot::T
+    sckron::T
 
     function HypoRootdetTri{T, R}(
         dim::Int;
@@ -75,6 +80,9 @@ end
 
 use_heuristic_neighborhood(cone::HypoRootdetTri) = false
 
+reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated =
+    cone.hess_fact_updated = cone.inv_hess_sqrt_aux_updated = cone.inv_hess_sqrt_updated = false)
+
 function setup_extra_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -87,6 +95,7 @@ function setup_extra_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{
     cone.W = zeros(R, d, d)
     cone.Wi_vec = zeros(T, dim - 1)
     cone.tempw = zeros(T, dim - 1)
+    cone.inv_hess_U_sqrt = zeros(T, dim, dim)
     return cone
 end
 
@@ -216,22 +225,84 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
     return prod
 end
 
+function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
+    @assert cone.grad_updated
+    inv_hess_U_sqrt = update_inv_hess_sqrt(cone)
+    ldiv!(prod, UpperTriangular(inv_hess_U_sqrt)', arr)
+    return prod
+end
+
+function update_inv_hess_sqrt_aux(cone::HypoRootdetTri)
+    z = cone.z
+    d = cone.d
+    rtdet = cone.rtdet
+    sc_const = cone.sc_const
+    @views w = cone.point[2:end]
+
+    Hi = cone.inv_hess.data
+    Hi[1, 1] = (abs2(z) + abs2(rtdet) / d) / sc_const
+    Hi12const = rtdet / (d * sc_const)
+    @. @views Hi[1, 2:end] = Hi12const * w
+    den = sc_const * (d * z + rtdet)
+    cone.scdot = rtdet / (d * den)
+    cone.sckron = z * d / den
+    cone.inv_hess_sqrt_aux_updated = true
+    return
+end
+
+# only called from inv_hess_sqrt_prod and hess_sqrt_prod
+function update_inv_hess_sqrt(cone::HypoRootdetTri)
+    cone.inv_hess_sqrt_aux_updated || update_inv_hess_sqrt_aux(cone)
+    z = cone.z
+    d = cone.d
+    rtdet = cone.rtdet
+    sc_const = cone.sc_const
+    @views w = cone.point[2:end]
+    scdot = cone.scdot
+    sckron = cone.sckron
+    inv_hess_U_sqrt = cone.inv_hess_U_sqrt
+    @views Suw = inv_hess_U_sqrt[1, 2:end]
+    @views Sww = inv_hess_U_sqrt[2:end, 2:end]
+
+    inv_hess_U_sqrt[1, 1] = sqrt((abs2(z) + abs2(rtdet) / d) / sc_const)
+    @. @views Suw = cone.inv_hess[2:end, 1] / inv_hess_U_sqrt[1, 1]
+
+    @views symm_kron(Sww, cone.fact_W.U, cone.rt2)
+    @. Sww *= sqrt(sckron)
+    c = Cholesky(Sww, 'U', 0)
+    if scdot > 0
+        @. cone.tempw = sqrt(scdot) * w
+        LinearAlgebra.lowrankupdate!(c, cone.tempw)
+    else
+        @. cone.tempw = sqrt(-scdot) * w
+        LinearAlgebra.lowrankdowndate!(c, cone.tempw)
+    end
+    copyto!(cone.tempw, Suw)
+    LinearAlgebra.lowrankdowndate!(c, cone.tempw)
+
+    cone.inv_hess_sqrt_updated = true
+    return inv_hess_U_sqrt
+end
+
+function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
+    @assert cone.grad_updated
+    inv_hess_U_sqrt = update_inv_hess_sqrt(cone)
+    mul!(prod, UpperTriangular(inv_hess_U_sqrt), arr)
+    return prod
+end
+
 function update_inv_hess(cone::HypoRootdetTri)
+    @assert cone.grad_updated
+    cone.inv_hess_sqrt_aux_updated || update_inv_hess_sqrt_aux(cone)
     @views w = cone.point[2:end]
     svec_to_smat!(cone.W, w, cone.rt2)
     W = Hermitian(cone.W, :U)
     Hi = cone.inv_hess.data
     z = cone.z
     d = cone.d
-    rtdet = cone.rtdet
     sc_const = cone.sc_const
-    den = sc_const * (d * z + rtdet)
-    scdot = rtdet / (d * den)
-    sckron = z * d / den
-
-    Hi[1, 1] = (abs2(z) + abs2(rtdet) / d) / sc_const
-    Hi12const = rtdet / (d * sc_const)
-    @. @views Hi[1, 2:end] = Hi12const * w
+    scdot = cone.scdot
+    sckron = cone.sckron
 
     @inbounds @views symm_kron(Hi[2:end, 2:end], W, cone.rt2)
     @inbounds for j in eachindex(w)
@@ -247,6 +318,7 @@ function update_inv_hess(cone::HypoRootdetTri)
 end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
+    @assert cone.grad_updated
     @views w = cone.point[2:end]
     svec_to_smat!(cone.W, w, cone.rt2)
     W = Hermitian(cone.W, :U)
