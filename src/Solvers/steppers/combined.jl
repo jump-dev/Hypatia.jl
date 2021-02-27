@@ -44,9 +44,6 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     return stepper
 end
 
-import Hypatia.TO
-using TimerOutputs
-
 function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     point = solver.point
     model = solver.model

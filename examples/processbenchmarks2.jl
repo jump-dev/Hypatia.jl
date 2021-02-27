@@ -1,21 +1,25 @@
 using CSV
 using DataFrames
 using Plots
+using Printf
 
 MAX_TIME = 3600
 MAX_ITER = 250
 
 nickname = "various"
 
+enhancements = ["basic", "TOA", "curve", "comb", "shift"]
+process_entry(x::Float64) = @sprintf("%.2f", x)
+process_entry(x::Int) = string(x)
+
 bench_file = joinpath("bench2", "various", "bench_" * nickname * ".csv")
 
 function shifted_geomean_all(metric, conv; shift = 0, cap = Inf)
     x = copy(metric)
     x[.!conv] .= cap
-    return exp(sum(log, x .+ shift) / length(x))
+    return exp(sum(log, x .+ shift) / length(x)) - shift
 end
-shifted_geomean_conv(metric, conv; shift = 0) = exp(sum(log, metric[conv] .+ shift) / count(conv))
-shifted_geomean_all_conv(metric, all_conv; shift = 0) = exp(sum(log, metric[all_conv] .+ shift) / count(all_conv))
+shifted_geomean_conv(metric, conv; shift = 0) = exp(sum(log, metric[conv] .+ shift) / count(conv)) - shift
 
 function post_process()
     all_df = CSV.read(bench_file, DataFrame)
@@ -41,8 +45,8 @@ function agg_stats()
     df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search, :shift]),
         [:solve_time, :conv] => shifted_geomean_conv => :time_geomean_thisconv,
         [:iters, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = 1)) => :iters_geomean_thisconv,
-        [:solve_time, :all_conv] => shifted_geomean_all_conv => :time_geomean_allconv,
-        [:iters, :all_conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = 1)) => :iters_geomean_allconv,
+        [:solve_time, :all_conv] => shifted_geomean_conv => :time_geomean_allconv,
+        [:iters, :all_conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = 1)) => :iters_geomean_allconv,
         [:solve_time, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME)) => :time_geomean_all,
         [:iters, :conv] => ((x, y) -> shifted_geomean_all(x, y, shift = 1, cap = MAX_ITER)) => :iters_geomean_all,
         :status => (x -> count(isequal("Optimal"), x)) => :optimal,
@@ -55,7 +59,29 @@ function agg_stats()
         :status => length => :total,
         )
     sort!(df_agg, [order(:stepper, rev = true), :use_corr, :use_curve_search, :shift])
-    CSV.write(joinpath(output_folder, "df_agg_" * nickname * ".csv"), df_agg)
+    CSV.write(joinpath(output_folder, "agg_" * nickname * ".csv"), df_agg)
+
+    subdfs = ["status", "iter", "time"]
+    status = [:optimal, :priminfeas, :dualinfeas, :numerical, :slowprogress, :iterationlimit]
+    iter = [:iters_geomean_thisconv, :iters_geomean_allconv, :iters_geomean_all]
+    time = [:time_geomean_thisconv, :time_geomean_allconv, :time_geomean_all]
+    sep = " & "
+
+    for (k, subcols) in enumerate([status, iter, time])
+        metric = subdfs[k]
+        tex = open(joinpath(output_folder, metric * "_" * nickname * ".tex"), "w")
+        subdf = df_agg[!, subcols]
+        for i in 1:nrow(subdf)
+            row_str = enhancements[i]
+            for j in 1:ncol(subdf)
+                x = (metric == "time" ? subdf[i, j] * 1000 : subdf[i, j])
+                row_str *= sep * process_entry(x)
+            end
+            row_str *= " \\\\"
+            println(tex, row_str)
+        end
+        close(tex)
+    end
 
     return
 end
@@ -65,47 +91,55 @@ function bottlenecks()
     output_folder = mkpath(joinpath(@__DIR__, "results"))
 
     all_df = post_process()
-    shift = 1e-4
+    shift = 1e-4 # TODO use minimum values?
+
+    preproc_cols = [:time_rescale, :time_initx, :time_inity, :time_unproc]
 
     df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search, :shift]),
-        [:time_rescale, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :rescale_thisconv,
-        [:time_initx, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :initx_thisconv,
-        [:time_inity, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :inity_thisconv,
-        [:time_unproc, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :unproc_thisconv,
-        [:time_uplhs, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :uplhs_thisconv,
-        [:time_uprhs, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :uprhs_thisconv,
-        [:time_getdir, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :getdir_thisconv,
-        [:time_search, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :search_thisconv,
+        # vcat(:conv, preproc_cols) => ((y, x...) -> shifted_geomean_conv(sum(x), y, shift = shift)) => :preproc_thisconv,
+        # [:time_uplhs, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :uplhs_thisconv,
+        # [:time_uprhs, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :uprhs_thisconv,
+        # [:time_getdir, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :getdir_thisconv,
+        # [:time_search, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :search_thisconv,
+        # [:time_uplhs, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :uplhs_piter_thisconv,
+        # [:time_uprhs, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :uprhs_piter_thisconv,
+        # [:time_getdir, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :getdir_piter_thisconv,
+        # [:time_search, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :search_piter_thisconv,
         #
-        [:time_rescale, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :rescale_piter_thisconv,
-        [:time_initx, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :initx_piter_thisconv,
-        [:time_inity, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :inity_piter_thisconv,
-        [:time_unproc, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :unproc_piter_thisconv,
-        [:time_uplhs, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :uplhs_piter_thisconv,
-        [:time_uprhs, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :uprhs_piter_thisconv,
-        [:time_getdir, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :getdir_piter_thisconv,
-        [:time_search, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :search_piter_thisconv,
-        #
-        [:time_rescale, :all_conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :rescale_allconv,
-        [:time_initx, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :initx_allconv,
-        [:time_inity, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :inity_allconv,
-        [:time_unproc, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :unproc_allconv,
-        [:time_uplhs, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :uplhs_allconv,
-        [:time_uprhs, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :uprhs_allconv,
-        [:time_getdir, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :getdir_allconv,
-        [:time_search, :conv] => ((x, y) -> shifted_geomean_all_conv(x, y, shift = shift)) => :search_allconv,
-        #
-        [:time_rescale, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :rescale_all,
-        [:time_initx, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :initx_all,
-        [:time_inity, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :inity_all,
-        [:time_unproc, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :unproc_all,
+        # vcat(:conv, preproc_cols) => ((y, x...) -> shifted_geomean_conv(sum(x), y, shift = shift)) => :preproc_allconv,
+        # [:time_uplhs, :all_conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :uplhs_allconv,
+        # [:time_uprhs, :all_conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :uprhs_allconv,
+        # [:time_getdir, :all_conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :getdir_allconv,
+        # [:time_search, :all_conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :search_allconv,
+        # [:time_uplhs, :all_conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :uplhs_piter_allconv,
+        # [:time_uprhs, :all_conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :uprhs_piter_allconv,
+        # [:time_getdir, :all_conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :getdir_piter_allconv,
+        # [:time_search, :all_conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :search_piter_allconv,
+        # #
+        vcat(:conv, preproc_cols) => ((y, x...) -> shifted_geomean_all(sum(x), y, cap = MAX_TIME, shift = shift)) => :preproc_all,
         [:time_uplhs, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :uplhs_all,
         [:time_uprhs, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :uprhs_all,
         [:time_getdir, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :getdir_all,
         [:time_search, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME, shift = shift)) => :search_all,
+        [:time_uplhs, :conv, :iters] => ((x, y, z) -> shifted_geomean_all(x ./ (z .+ 1), y, cap = MAX_TIME, shift = shift)) => :uplhs_piter_all,
+        [:time_uprhs, :conv, :iters] => ((x, y, z) -> shifted_geomean_all(x ./ (z .+ 1), y, cap = MAX_TIME, shift = shift)) => :uprhs_piter_all,
+        [:time_getdir, :conv, :iters] => ((x, y, z) -> shifted_geomean_all(x ./ (z .+ 1), cap = MAX_TIME, y, shift = shift)) => :getdir_piter_all,
+        [:time_search, :conv, :iters] => ((x, y, z) -> shifted_geomean_all(x ./ (z .+ 1), cap = MAX_TIME, y, shift = shift)) => :search_piter_all,
         )
     sort!(df_agg, [order(:stepper, rev = true), :use_corr, :use_curve_search, :shift])
-    CSV.write(joinpath(output_folder, "df_bottlenecks_" * nickname * ".csv"), df_agg)
+    CSV.write(joinpath(output_folder, "bottlenecks_" * nickname * ".csv"), df_agg)
+
+    bottlenecks_tex = open(joinpath(output_folder, "bottlenecks_" * nickname * ".tex"), "w")
+    sep = " & "
+    for i in 1:nrow(df_agg)
+        row_str = enhancements[i]
+        for j in 5:ncol(df_agg)
+            row_str *= sep * process_entry(df_agg[i, j] * 1000)
+        end
+        row_str *= " \\\\"
+        println(bottlenecks_tex, row_str)
+    end
+    close(bottlenecks_tex)
 
     return
 end
@@ -232,21 +266,6 @@ end
 # timings = unstack(all_df, :stepper, :log_time)
 # # timings = unstack(all_df, :stepper, :solve_time)
 # boxplot(["pc_00" "pc_01" "pc_11" "comb"], Matrix(timings[:, 2:end]), leg = false)
-
-function is_nonsymm(cones, extender)
-    if extender != "nothing"
-        return false
-    else
-        for c in cones
-            if !(c in ["Nonnegative", "EpiNormEucl", "PosSemidefTri"])
-                return true
-            end
-        end
-        return false
-    end
-end
-
-all_df[!, :is_nonsymm] = is_nonsymm.(all_df[!, :cone_types], all_df[!, :extender])
 
 histogram(log10.(all_df[!, :solve_time]))
 title!("log10 solve time")
