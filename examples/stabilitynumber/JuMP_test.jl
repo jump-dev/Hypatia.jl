@@ -1,4 +1,5 @@
 
+relaxed_tols = (default_tol_relax = 100,)
 insts = Dict()
 insts["minimal"] = [
     ((2, true),),
@@ -11,8 +12,8 @@ insts["fast"] = [
     ((50, false),),
     ]
 insts["slow"] = [
-    ((100, true),),
-    ((100, false),),
+    ((100, true), nothing, relaxed_tols),
+    ((100, false), nothing, relaxed_tols),
     ]
 insts["various"] = vcat(insts["fast"], insts["slow"])
 return (StabilityNumber, insts)

@@ -30,5 +30,18 @@ insts["slow"] = [
     ((2000, true, true),),
     ((3000, false, true),),
     ]
-insts["various"] = insts["fast"]
+insts["various"] = [
+    ((50, true, false),),
+    ((50, false, true),),
+    ((50, false, true), SOCExpPSDOptimizer),
+    ((50, true, true),),
+    ((500, true, false),),
+    ((500, false, true),),
+    ((500, false, true), SOCExpPSDOptimizer),
+    ((500, true, true),),
+    ((5000, true, false),),
+    ((5000, false, true),),
+    ((5000, false, true), SOCExpPSDOptimizer),
+    ((5000, true, true),),
+    ]
 return (PortfolioJuMP, insts)
