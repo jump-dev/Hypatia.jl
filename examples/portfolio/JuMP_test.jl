@@ -39,9 +39,9 @@ insts["various"] = [
     ((500, false, true),),
     ((500, false, true), SOCExpPSDOptimizer),
     ((500, true, true),),
-    ((5000, true, false),),
-    ((5000, false, true),),
-    ((5000, false, true), SOCExpPSDOptimizer),
-    ((5000, true, true),),
+    ((4000, true, false),),
+    ((4000, false, true),),
+    ((4000, false, true), SOCExpPSDOptimizer),
+    ((4000, true, true),),
     ]
 return (PortfolioJuMP, insts)

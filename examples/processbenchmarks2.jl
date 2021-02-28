@@ -278,3 +278,7 @@ png("npqhist")
 histogram(log10.(max.(0.01, all_df[!, :n] - all_df[!, :p])))
 title!("log10(n - p)")
 png("nphist")
+
+histogram(all_df[!, :solve_time])
+title!("num cones")
+png("Khist")
