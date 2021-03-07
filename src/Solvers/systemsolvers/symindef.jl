@@ -156,7 +156,7 @@ function update_lhs(system_solver::SymIndefSparseSystemSolver, solver::Solver)
         end
     end
 
-    update_fact(system_solver.fact_cache, system_solver.lhs_sub)
+    solver.time_upfact += @elapsed update_fact(system_solver.fact_cache, system_solver.lhs_sub)
     solve_subsystem3(system_solver, solver, system_solver.sol_const, system_solver.rhs_const)
 
     return system_solver
@@ -221,7 +221,7 @@ function update_lhs(system_solver::SymIndefDenseSystemSolver, solver::Solver)
         @. @views lhs_sub[z_rows_k, z_rows_k] = -H_k
     end
 
-    update_fact(system_solver.fact_cache, system_solver.lhs_sub)
+    solver.time_upfact += @elapsed update_fact(system_solver.fact_cache, system_solver.lhs_sub)
     solve_subsystem3(system_solver, solver, system_solver.sol_const, system_solver.rhs_const)
 
     return system_solver

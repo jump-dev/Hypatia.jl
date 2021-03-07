@@ -113,7 +113,7 @@ function update_lhs(system_solver::NaiveSparseSystemSolver, solver::Solver)
     tau = solver.point.tau[]
     system_solver.lhs.nzval[system_solver.mtt_idx] = solver.mu / tau / tau # NOTE: mismatch when using NT for kaptau
 
-    update_fact(system_solver.fact_cache, system_solver.lhs)
+    solver.time_upfact += @elapsed update_fact(system_solver.fact_cache, system_solver.lhs)
 
     return system_solver
 end
@@ -180,7 +180,7 @@ function update_lhs(system_solver::NaiveDenseSystemSolver, solver::Solver)
     tau = solver.point.tau[]
     system_solver.lhs[end, system_solver.tau_row] = solver.mu / tau / tau # NOTE: mismatch when using NT for kaptau
 
-    update_fact(system_solver.fact_cache, system_solver.lhs)
+    solver.time_upfact += @elapsed update_fact(system_solver.fact_cache, system_solver.lhs)
 
     return system_solver
 end

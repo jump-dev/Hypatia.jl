@@ -239,6 +239,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
         end
     end
 
+    start_time = time()
     # TODO refactor below
     if !isempty(system_solver.lhs1) && !update_fact(system_solver.fact_cache, system_solver.lhs1)
         # @warn("QRChol factorization failed")
@@ -259,6 +260,7 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
             end
         end
     end
+    solver.time_upfact += time() - start_time
 
     # update solution for fixed c,b,h part
     rhs_const = system_solver.rhs_const
