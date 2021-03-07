@@ -77,14 +77,16 @@ mutable struct Solver{T <: Real}
     num_iters::Int
 
     # helpful performance metrics for major subprocedures
-    time_rescale::Float64 # data rescaling
+    time_rescale::Float64 # rescale affine data
     time_initx::Float64 # preprocess dual equalities and finding initial x point
     time_inity::Float64 # preprocess primal equalities and finding initial y point
     time_unproc::Float64 # unprocess final point
-    time_uplhs::Float64 # update LHS for directions
+    time_loadsys::Float64 # initialize/load system solver
+    time_upsys::Float64 # update LHS and factorization etc for directions solving
+    time_upfact::Float64 # update inner sparse/dense factorization for directions solving only
     time_uprhs::Float64 # update RHSs for directions
     time_getdir::Float64 # solve for directions
-    time_search::Float64 # time for alpha search
+    time_search::Float64 # searches for alpha parameters
 
     # model and preprocessed model data
     orig_model::Models.Model{T}
@@ -230,11 +232,13 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.num_iters = 0
     solver.solve_time = NaN
 
-    solver.time_rescale = NaN
-    solver.time_initx = NaN
-    solver.time_inity = NaN
-    solver.time_unproc = NaN
-    solver.time_uplhs = 0
+    solver.time_rescale = 0
+    solver.time_initx = 0
+    solver.time_inity = 0
+    solver.time_unproc = 0
+    solver.time_loadsys = 0
+    solver.time_upsys = 0
+    solver.time_upfact = 0
     solver.time_uprhs = 0
     solver.time_getdir = 0
     solver.time_search = 0
@@ -303,7 +307,7 @@ function solve(solver::Solver{T}) where {T <: Real}
 
         stepper = solver.stepper
         load(stepper, solver)
-        load(solver.system_solver, solver)
+        solver.time_loadsys = @elapsed load(solver.system_solver, solver)
 
         solver.verbose && print_header(stepper, solver)
         flush(stdout)
@@ -331,7 +335,7 @@ function solve(solver::Solver{T}) where {T <: Real}
                 break
             end
 
-            if expect_improvement(solver.stepper)
+            if expect_improvement(stepper)
                 if improv < solver.tol_slow
                     if solver.prev_is_slow && solver.prev2_is_slow
                         solver.verbose && println("slow progress in consecutive iterations; terminating")
