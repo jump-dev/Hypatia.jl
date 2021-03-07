@@ -267,6 +267,20 @@ end
 #     perf_prof(feature = feature, metric = metric)
 # end
 
+function modelstats()
+    all_df = post_process()
+    CSV.write("solvetimes.csv", DataFrame(hcat(log10.(all_df[!, :solve_time]))))
+
+    one_solver = filter!(t ->
+        t.stepper == "CombinedStepper" &&
+        t.system_solver == "QRCholDenseSystemSolver" &&
+        t.shift == 0,
+        all_df
+        )
+    CSV.write("numcones.csv", DataFrame(hcat(one_solver[!, :num_cones])))
+end
+modelstats()
+
 # comb_df = filter(:stepper => isequal("CombinedStepper"), dropmissing(all_df))
 # pc_df = filter(t -> t.stepper == "PredOrCentStepper" && t.use_curve_search == true, dropmissing(all_df))
 # comb_times = (comb_df[!, :solve_time])

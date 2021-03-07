@@ -33,7 +33,7 @@ stepper_solvers = [
     (predorcent(use_correction = true, use_curve_search = false), [qrchol]),
     (predorcent(use_correction = true, use_curve_search = true), [qrchol]),
     (combined(), [qrchol]),
-    (combined(2), [qrchol, Solvers.SymIndefSparseSystemSolver{Float64}(), Solvers.QRCholDenseSystemSolver{Float64}()]),
+    (combined(2), [qrchol, Solvers.SymIndefSparseSystemSolver{Float64}()]),
     ]
 
 # instance sets and real types to run and corresponding time limits (seconds)
@@ -151,7 +151,7 @@ for (stepper, system_solvers) in stepper_solvers, system_solver in system_solver
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue
     ex_type_T = ex_type{real_T}
-    new_default_options = (; default_options..., time_limit = time_limit, stepper = stepper)
+    new_default_options = (; default_options..., time_limit = time_limit, stepper = stepper, system_solver = system_solver)
 
     println("\nstarting $ex_type_T $inst_set tests")
     @testset "$ex_type_T $inst_set" begin

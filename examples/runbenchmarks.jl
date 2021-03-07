@@ -45,7 +45,7 @@ stepper_solvers = [
     (predorcent(use_correction = true, use_curve_search = false), [qrchol]),
     (predorcent(use_correction = true, use_curve_search = true), [qrchol]),
     (combined(), [qrchol]),
-    (combined(2), [qrchol, Solvers.SymIndefSparseSystemSolver{Float64}(), Solvers.QRCholDenseSystemSolver{Float64}()]),
+    (combined(2), [qrchol]),
     ]
 
 hyp_solver = ("Hypatia", Hypatia.Optimizer, (
@@ -174,7 +174,7 @@ time_all = time()
 for ex_name in JuMP_example_names
     (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
 
-    for (stepper, system_solvers) in stepper_solvers, system_solver in system_solvers, (inst_set, solver) in instance_sets
+    for (stepper, system_solvers) in stepper_solvers, system_solver in system_solvers, (inst_set, solver) in instance_sets # TODO don't ignore system_solver option
         haskey(ex_insts, inst_set) || continue
         (extender, inst_subsets) = ex_insts[inst_set]
         isempty(inst_subsets) && continue
