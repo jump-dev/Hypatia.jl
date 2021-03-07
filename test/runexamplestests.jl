@@ -2,6 +2,7 @@
 run examples tests from the examples folder
 =#
 
+import Hypatia.Solvers
 using Test
 using Printf
 import DataFrames
@@ -23,20 +24,16 @@ default_options = (
     iter_limit = 250,
     )
 
-steppers = [
-    Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = true, use_curve_search = false),
-    Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = false, use_curve_search = false),
-    Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = true, use_curve_search = true),
-    Hypatia.Solvers.CombinedStepper{Float64}(),
-    # Hypatia.Solvers.CombinedStepper{Float64}(1),
-    Hypatia.Solvers.CombinedStepper{Float64}(2),
-    # Hypatia.Solvers.CombinedStepper{Float64}(3),
-    ]
+predorcent = Solvers.PredOrCentStepper{Float64}
+combined = Solvers.CombinedStepper{Float64}
+qrchol = Solvers.QRCholDenseSystemSolver{Float64}()
 
-system_solvers = [
-    # Hypatia.Solvers.SymIndefSparseSystemSolver{Float64}(),
-    # Hypatia.Solvers.SymIndefDenseSystemSolver{Float64}(),
-    Hypatia.Solvers.QRCholDenseSystemSolver{Float64}(),
+stepper_solvers = [
+    (predorcent(use_correction = false, use_curve_search = false), [qrchol]),
+    (predorcent(use_correction = true, use_curve_search = false), [qrchol]),
+    (predorcent(use_correction = true, use_curve_search = true), [qrchol]),
+    (combined(), [qrchol]),
+    (combined(2), [qrchol, Solvers.SymIndefSparseSystemSolver{Float64}(), Solvers.QRCholDenseSystemSolver{Float64}()]),
     ]
 
 # instance sets and real types to run and corresponding time limits (seconds)
@@ -147,7 +144,7 @@ isnothing(results_path) || CSV.write(results_path, perf)
 include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
 (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, mod_type * "_test.jl"))
 
-for stepper in steppers, system_solver in system_solvers, (inst_set, real_T, time_limit) in instance_sets
+for (stepper, system_solvers) in stepper_solvers, system_solver in system_solvers, (inst_set, real_T, time_limit) in instance_sets
     haskey(ex_insts, inst_set) || continue
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue

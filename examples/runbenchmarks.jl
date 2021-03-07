@@ -40,14 +40,12 @@ check_time_limit = 1.2 * optimizer_time_limit
 tol_loose = 1e-7
 tol_tight = 1e-3 * tol_loose
 
-steppers = [
-    Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = true, use_curve_search = false),
-    Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = false, use_curve_search = false),
-    Hypatia.Solvers.PredOrCentStepper{Float64}(use_correction = true, use_curve_search = true),
-    Hypatia.Solvers.CombinedStepper{Float64}(),
-    Hypatia.Solvers.CombinedStepper{Float64}(1),
-    Hypatia.Solvers.CombinedStepper{Float64}(2),
-    Hypatia.Solvers.CombinedStepper{Float64}(3),
+stepper_solvers = [
+    (predorcent(use_correction = false, use_curve_search = false), [qrchol]),
+    (predorcent(use_correction = true, use_curve_search = false), [qrchol]),
+    (predorcent(use_correction = true, use_curve_search = true), [qrchol]),
+    (combined(), [qrchol]),
+    (combined(2), [qrchol, Solvers.SymIndefSparseSystemSolver{Float64}(), Solvers.QRCholDenseSystemSolver{Float64}()]),
     ]
 
 hyp_solver = ("Hypatia", Hypatia.Optimizer, (
@@ -174,7 +172,7 @@ time_all = time()
 for ex_name in JuMP_example_names
     (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
 
-    for stepper in steppers, (inst_set, solver) in instance_sets
+    for (stepper, system_solvers) in stepper_solvers, system_solver in system_solvers, (inst_set, solver) in instance_sets
         haskey(ex_insts, inst_set) || continue
         (extender, inst_subsets) = ex_insts[inst_set]
         isempty(inst_subsets) && continue
