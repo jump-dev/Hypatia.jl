@@ -12,7 +12,8 @@ enhancements = ["basic", "TOA", "curve", "comb", "shift"]
 process_entry(x::Float64) = @sprintf("%.2f", x)
 process_entry(x::Int) = string(x)
 
-bench_file = joinpath("bench2", "various", "bench_" * nickname * ".csv")
+bench_file = joinpath("bench2", "systemsolvers", "bench_" * nickname * ".csv")
+# bench_file = joinpath("bench2", "various", "bench_" * nickname * ".csv")
 
 function shifted_geomean_all(metric, conv; shift = 0, cap = Inf)
     x = copy(metric)
@@ -42,7 +43,7 @@ function agg_stats()
 
     all_df = post_process()
 
-    df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search, :shift]),
+    df_agg = combine(groupby(all_df, [:stepper, :system_solver, :use_corr, :use_curve_search, :shift]),
         [:solve_time, :conv] => shifted_geomean_conv => :time_geomean_thisconv,
         [:iters, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = 1)) => :iters_geomean_thisconv,
         [:solve_time, :all_conv] => shifted_geomean_conv => :time_geomean_allconv,
@@ -148,25 +149,36 @@ bottlenecks()
 # performance profiles, currently hardcoded for corrector vs no corrector
 function perf_prof(; feature = :stepper, metric = :solve_time)
     if feature == :stepper
-        s1 = "Hypatia.Solvers.PredOrCentStepper{Float64}"
-        s2 = "Hypatia.Solvers.CombinedStepper{Float64}"
+        s1 = "PredOrCentStepper"
+        s2 = "CombinedStepper"
         use_corr = [true]
         use_curve_search = [true]
         stepper = [s1, s2]
         shift = [0]
+        system_solver = ["QRCholDenseSystemSolver"]
     elseif feature == :shift
         s1 = 0
         s2 = 2
+        stepper = ["CombinedStepper"]
         use_corr = [true]
         use_curve_search = [true]
-        stepper = ["Hypatia.Solvers.CombinedStepper{Float64}"]
+        system_solver = ["QRCholDenseSystemSolver"]
         shift = [s1, s2]
+    elseif feature == :system_solver
+        s1 = "QRCholDenseSystemSolver"
+        s2 = "SymIndefSparseSystemSolver"
+        stepper = ["CombinedStepper"]
+        use_corr = [true]
+        use_curve_search = [true]
+        shift = [2]
+        system_solver = [s1, s2]
     else
         # s1 = "FALSE"
         # s2 = "TRUE"
         s1 = false
         s2 = true
-        stepper = ["Hypatia.Solvers.PredOrCentStepper{Float64}"]
+        stepper = ["PredOrCentStepper"]
+        system_solver = ["QRCholDenseSystemSolver"]
         shift = [0]
         if feature == :use_corr
             use_curve_search = [false]
@@ -182,7 +194,8 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
         t.stepper in stepper &&
         t.use_corr in use_corr &&
         t.use_curve_search in use_curve_search &&
-        t.shift in shift,
+        t.shift in shift &&
+        t.system_solver in system_solver,
         all_df,
         )
 
@@ -218,8 +231,8 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
     end
 
     plot(xlim = (0, log10(maximum(all_df[!, :ratios]))), ylim = (0, 1))
-    plot!(log10.(all_df[!, :ratios]), plot_y1, label = string(s1), t = :steppre)
-    plot!(log10.(all_df[!, :ratios]), plot_y2, label = string(s2), t = :steppre)
+    plot!(log10.(unique_ratios), plot_y1, label = string(s1), t = :steppre)
+    plot!(log10.(unique_ratios), plot_y2, label = string(s2), t = :steppre)
     xaxis!("logratio")
     plot_name = string(feature) * "_" * string(metric) * "_pp"
     title!(plot_name)
@@ -231,7 +244,10 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
     return
 end
 
-for feature in [:stepper, :use_curve_search, :use_corr, :shift], metric in [:solve_time, :iters]
+# for feature in [:stepper, :use_curve_search, :use_corr, :shift], metric in [:solve_time, :iters]
+#     perf_prof(feature = feature, metric = metric)
+# end
+for feature in [:system_solver], metric in [:solve_time, :iters]
     perf_prof(feature = feature, metric = metric)
 end
 
@@ -244,8 +260,8 @@ function make_csv()
 end
 
 
-# comb_df = filter(:stepper => isequal("Hypatia.Solvers.CombinedStepper{Float64}"), dropmissing(all_df))
-# pc_df = filter(t -> t.stepper == "Hypatia.Solvers.PredOrCentStepper{Float64}" && t.use_curve_search == true, dropmissing(all_df))
+# comb_df = filter(:stepper => isequal("CombinedStepper"), dropmissing(all_df))
+# pc_df = filter(t -> t.stepper == "PredOrCentStepper" && t.use_curve_search == true, dropmissing(all_df))
 # comb_times = (comb_df[!, :solve_time])
 # pc_times = (pc_df[!, :solve_time])
 #
@@ -254,8 +270,8 @@ end
 
 # missig instances
 # all_df = CSV.read(bench_file, DataFrame)
-# insts1 = filter(t -> t.stepper == "Hypatia.Solvers.PredOrCentStepper{Float64}" && t.use_curve_search == true, dropmissing(all_df))
-# insts2 = filter(t -> t.stepper == "Hypatia.Solvers.CombinedStepper{Float64}" && t.shift == 1, dropmissing(all_df))
+# insts1 = filter(t -> t.stepper == "PredOrCentStepper" && t.use_curve_search == true, dropmissing(all_df))
+# insts2 = filter(t -> t.stepper == "CombinedStepper" && t.shift == 1, dropmissing(all_df))
 # @show setdiff(unique(insts2[!, :inst_data]), unique(insts1[!, :inst_data]))
 
 # boxplots

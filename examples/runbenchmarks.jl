@@ -130,7 +130,8 @@ perf = DataFrames.DataFrame(
     inst_data = Tuple[],
     extender = String[],
     solver = String[],
-    stepper = String[],
+    stepper = Symbol[],
+    system_solver = Symbol[],
     use_corr = Bool[],
     use_curve_search = Bool[],
     shift = Int[],
@@ -161,7 +162,7 @@ perf = DataFrames.DataFrame(
     check_time = Float64[],
     total_time = Float64[],
     )
-DataFrames.allowmissing!(perf, 11:DataFrames.ncol(perf))
+DataFrames.allowmissing!(perf, 12:DataFrames.ncol(perf))
 
 isnothing(results_path) || CSV.write(results_path, perf)
 time_all = time()
@@ -190,7 +191,7 @@ for ex_name in JuMP_example_names
                 time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, compile_inst, inst, extender, solver, stepper, solve)
 
                 if spawn_runs || (inst_num > inst_start)
-                    push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], string(typeof(stepper)),
+                    push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], nameof(typeof(stepper)), nameof(typeof(system_solver)),
                         use_correction(stepper), use_curve_search(stepper), shift(stepper), p..., time_inst))
                 end
                 isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)

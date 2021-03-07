@@ -33,6 +33,12 @@ steppers = [
     # Hypatia.Solvers.CombinedStepper{Float64}(3),
     ]
 
+system_solvers = [
+    # Hypatia.Solvers.SymIndefSparseSystemSolver{Float64}(),
+    # Hypatia.Solvers.SymIndefDenseSystemSolver{Float64}(),
+    Hypatia.Solvers.QRCholDenseSystemSolver{Float64}(),
+    ]
+
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
     ("minimal", Float64, 100),
@@ -99,7 +105,8 @@ perf = DataFrames.DataFrame(
     count = Int[],
     inst_data = Tuple[],
     extender = String[],
-    stepper = String[],
+    stepper = Symbol[],
+    system_solver = Symbol[],
     use_corr = Bool[],
     use_curve_search = Bool[],
     shift = Int[],
@@ -140,7 +147,7 @@ isnothing(results_path) || CSV.write(results_path, perf)
 include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
 (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, mod_type * "_test.jl"))
 
-for stepper in steppers, (inst_set, real_T, time_limit) in instance_sets
+for stepper in steppers, system_solver in system_solvers, (inst_set, real_T, time_limit) in instance_sets
     haskey(ex_insts, inst_set) || continue
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue
@@ -155,7 +162,7 @@ for stepper in steppers, (inst_set, real_T, time_limit) in instance_sets
             println(test_info, " ...")
             test_time = @elapsed p = run_instance(ex_type_T, inst..., default_options = new_default_options, verbose = false)
             extender = (length(inst) > 1 && mod_type == "JuMP") ? inst[2] : nothing
-            push!(perf, (string(ex_type), inst_set, real_T, inst_num, inst[1], string(extender), string(typeof(stepper)),
+            push!(perf, (string(ex_type), inst_set, real_T, inst_num, inst[1], string(extender), nameof(typeof(stepper)), nameof(typeof(system_solver)),
                 use_correction(stepper), use_curve_search(stepper), shift(stepper), p..., test_time))
             isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
             @printf("%8.2e seconds\n", test_time)
