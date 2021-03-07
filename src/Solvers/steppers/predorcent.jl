@@ -64,7 +64,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     dir_nocorr = stepper.dir_nocorr
 
     # update linear system solver factorization
-    solver.time_uplhs += @elapsed update_lhs(solver.system_solver, solver)
+    solver.time_upsys += @elapsed update_lhs(solver.system_solver, solver)
 
     # decide whether to predict or center
     is_pred = ((stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))) # TODO tune, make option
