@@ -43,7 +43,7 @@ function run_instance(
 
         if test
             named_result = NamedTuple{(:status, :solve_time, :num_iters, :primal_obj, :dual_obj, :rel_obj_diff, :compl, :x_viol, :y_viol, :z_viol,
-                :time_rescale, :time_initx, :time_inity, :time_unproc, :time_uplhs, :time_uprhs, :time_getdir, :time_search, :x, :y, :z, :s)}(solve_stats)
+                :time_rescale, :time_initx, :time_inity, :time_unproc, :time_loadsys, :time_upsys, :time_upfact, :time_uprhs, :time_getdir, :time_search, :x, :y, :z, :s)}(solve_stats)
             test_extra(inst, named_result)
         end
     end
