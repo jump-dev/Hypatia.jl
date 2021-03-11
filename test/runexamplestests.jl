@@ -16,6 +16,8 @@ include(joinpath(examples_dir, "common_native.jl"))
 results_path = joinpath(pwd(), "bench2", "bench_various.csv")
 # results_path = nothing
 
+print_memory() = println("free memory (GB): ", Float64(Sys.free_memory()) / 2^30)
+
 # default options to solvers
 default_options = (
     # verbose = false,
@@ -147,6 +149,7 @@ include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
 (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, mod_type * "_test.jl"))
 
 for (stepper, system_solvers) in stepper_solvers, system_solver in system_solvers, (inst_set, real_T, time_limit) in instance_sets
+    print_memory()
     haskey(ex_insts, inst_set) || continue
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue
