@@ -15,7 +15,6 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     d::Int
     is_complex::Bool
     rt2::T
-    sc_const::T
 
     point::Vector{T}
     dual_point::Vector{T}
@@ -49,7 +48,6 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     function HypoRootdetTri{T, R}(
         dim::Int;
         use_dual::Bool = false,
-        sc_const::Real = 25 / T(9),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 2
@@ -67,7 +65,6 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
             cone.is_complex = false
         end
         cone.d = d
-        cone.sc_const = sc_const
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
@@ -90,13 +87,13 @@ function setup_extra_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{
     return cone
 end
 
-get_nu(cone::HypoRootdetTri) = (cone.d + 1) * cone.sc_const
+get_nu(cone::HypoRootdetTri) = (cone.d + 1)
 
 function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
     d = cone.d
     const1 = sqrt(T(5d^2 + 2d + 1))
-    const2 = arr[1] = -sqrt(cone.sc_const * (3d + 1 - const1) / T(2d + 2))
+    const2 = arr[1] = -sqrt((3d + 1 - const1) / T(2d + 2))
     const3 = -const2 * (d + 1 + const1) / 2d
     incr = (cone.is_complex ? 2 : 1)
     k = 2
@@ -139,14 +136,14 @@ function update_grad(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} w
     u = cone.point[1]
     g = cone.grad
 
-    g[1] = cone.sc_const / cone.z
+    g[1] = inv(cone.z)
     # TODO in-place
     # copyto!(cone.Wi, cone.fact_W.factors)
     # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0)) # TODO inplace for bigfloat
     cone.Wi = inv(cone.fact_W)
     smat_to_svec!(cone.Wi_vec, cone.Wi, cone.rt2)
     sigma = cone.sigma = cone.rtdet / (cone.z * cone.d)
-    g2const = -cone.sc_const * (sigma + 1)
+    g2const = -(sigma + 1)
     @. @views g[2:end] = g2const * cone.Wi_vec
     cone.dot_const = sigma * (sigma - inv(T(cone.d)))
 
@@ -160,20 +157,19 @@ function update_hess(cone::HypoRootdetTri)
     Wi_vec = cone.Wi_vec
     z = cone.z
     sigma = cone.sigma
-    sc_const = cone.sc_const
-    Huwconst = -sc_const * sigma / z
-    sckron = sc_const * (sigma + 1)
-    scdot = sc_const * cone.dot_const
+    Huwconst = -sigma / z
+    sckron = sigma + 1
+    dot_const = cone.dot_const
 
     @inbounds begin
-        H[1, 1] = sc_const / z / z
+        H[1, 1] = inv(z) / z
         @. @views H[1, 2:end] = Huwconst * Wi_vec
     end
 
     @inbounds @views symm_kron(H[2:end, 2:end], cone.Wi, cone.rt2)
     @inbounds for j in eachindex(Wi_vec)
         j1 = 1 + j
-        Wi_vecj = scdot * Wi_vec[j]
+        Wi_vecj = dot_const * Wi_vec[j]
         for i in 1:j
             H[1 + i, j1] = sckron * H[1 + i, j1] + Wi_vec[i] * Wi_vecj
         end
@@ -188,17 +184,15 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
     Wi_vec = cone.Wi_vec
     z = cone.z
     sigma = cone.sigma
-    sc_const = cone.sc_const
     sigmap1 = sigma + 1
     const_diag = cone.dot_const / sigmap1
-    sckron = sc_const * sigmap1
-    Huwconst = -sc_const * sigma / z
+    Huwconst = -sigma / z
 
     @inbounds for i in 1:size(arr, 2)
         arr_u = arr[1, i]
         @views arr_w = arr[2:end, i]
         @views prod_w = prod[2:end, i]
-        prod[1, i] = sc_const * (arr_u / z - sigma * dot(Wi_vec, arr_w)) / z
+        prod[1, i] = (arr_u / z - sigma * dot(Wi_vec, arr_w)) / z
         svec_to_smat!(cone.mat2, arr_w, cone.rt2)
         copytri!(cone.mat2, 'U', cone.is_complex)
         rdiv!(cone.mat2, cone.fact_W)
@@ -208,7 +202,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRoo
         end
         ldiv!(cone.fact_W, cone.mat2)
         smat_to_svec!(prod_w, cone.mat2, cone.rt2)
-        @. prod_w *= sckron
+        @. prod_w *= sigmap1
         const_i = arr_u * Huwconst
         @. prod_w += const_i * Wi_vec
     end
@@ -224,13 +218,12 @@ function update_inv_hess(cone::HypoRootdetTri)
     z = cone.z
     d = cone.d
     rtdet = cone.rtdet
-    sc_const = cone.sc_const
-    den = sc_const * (d * z + rtdet)
+    den = d * z + rtdet
     scdot = rtdet / (d * den)
     sckron = z * d / den
 
-    Hi[1, 1] = (abs2(z) + abs2(rtdet) / d) / sc_const
-    Hi12const = rtdet / (d * sc_const)
+    Hi[1, 1] = abs2(z) + abs2(rtdet) / d
+    Hi12const = rtdet / d
     @. @views Hi[1, 2:end] = Hi12const * w
 
     @inbounds @views symm_kron(Hi[2:end, 2:end], W, cone.rt2)
@@ -252,13 +245,12 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hyp
     W = Hermitian(cone.W, :U)
     z = cone.z
     d = cone.d
-    sc_const = cone.sc_const
     rtdet = cone.rtdet
     const0 = d * z + rtdet
-    const1 = rtdet / (d * sc_const)
+    const1 = rtdet / d
     const2 = const1 / const0
-    const3 = d * z / (const0 * sc_const)
-    const4 = abs2(z) / sc_const + const1 * rtdet
+    const3 = d * z / const0
+    const4 = abs2(z) + const1 * rtdet
 
     @inbounds for i in 1:size(arr, 2)
         arr_u = arr[1, i]
@@ -313,7 +305,7 @@ function correction(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}) wher
 
     @. w_corr += scal6 * vec_skron2
     corr[1] = (sigma * (dot(vec_skron2, w_dir) - (scal2 + 4 * udz) * dot_Wi_S) + 2 * abs2(udz)) / z
-    corr .*= cone.sc_const / -2
+    corr ./= -2
 
     return corr
 end
