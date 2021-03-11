@@ -73,7 +73,7 @@ instance_sets = [
 # models to run
 JuMP_example_names = [
     # "densityest",
-    # "expdesign",
+    "expdesign",
     # "matrixcompletion",
     # "matrixquadratic",
     # "matrixregression",
