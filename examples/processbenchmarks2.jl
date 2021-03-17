@@ -267,7 +267,7 @@ end
 #     perf_prof(feature = feature, metric = metric)
 # end
 
-function modelstats()
+function instancestats()
     all_df = post_process()
     CSV.write("solvetimes.csv", DataFrame(hcat(log10.(all_df[!, :solve_time]))))
 
@@ -279,7 +279,16 @@ function modelstats()
         )
     CSV.write("numcones.csv", DataFrame(hcat(one_solver[!, :num_cones])))
 end
-modelstats()
+instancestats()
+
+function examplesats()
+    all_df = post_process()
+    ex_df = combine(groupby(all_df, :example),
+        :cone_types => (x -> unique(union(x))) => :cones,
+        :cone_types => length => :num_instances,
+        )
+end
+examplesats()
 
 # comb_df = filter(:stepper => isequal("CombinedStepper"), dropmissing(all_df))
 # pc_df = filter(t -> t.stepper == "PredOrCentStepper" && t.use_curve_search == true, dropmissing(all_df))
