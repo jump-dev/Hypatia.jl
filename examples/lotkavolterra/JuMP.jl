@@ -1,6 +1,8 @@
 #=
+control of Lotka-Volterra population dynamics
+adapted from "Moment-sum-of-squares hierarchies for set approximation and optimal control" by Milan Korda (2016)
+
 TODO
-- reference paper for model
 - add options to use standard PSD cone formulation vs interpolation-based WSOS cone formulation
 - add random data generation
 =#
