@@ -35,7 +35,7 @@ stepper_solvers = [
     (predorcent(use_correction = true, use_curve_search = false), [qrchol]),
     (predorcent(use_correction = true, use_curve_search = true), [qrchol]),
     (combined(), [qrchol]),
-    # (combined(2), [qrchol, Solvers.SymIndefSparseSystemSolver{Float64}()]),
+    (combined(2), [qrchol]),
     ]
 
 # instance sets and real types to run and corresponding time limits (seconds)

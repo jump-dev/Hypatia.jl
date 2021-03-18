@@ -61,8 +61,11 @@ function agg_stats()
     sort!(df_agg, [order(:stepper, rev = true), :use_corr, :use_curve_search, :shift, :system_solver])
     CSV.write(joinpath(output_folder, "agg_" * nickname * ".csv"), df_agg)
 
+    # combine feasible and infeasible statuses
+    transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] => ((x, y, z) -> x .+ y .+ z) => :converged)
+    select!(df_agg, Not(:optimal), Not(:priminfeas), Not(:dualinfeas))
     subdfs = ["status", "iter", "time"]
-    status = [:optimal, :priminfeas, :dualinfeas, :numerical, :slowprogress, :iterationlimit]
+    status = [:converged, :numerical, :slowprogress, :iterationlimit]
     iter = [:iters_geomean_thisconv, :iters_geomean_allconv, :iters_geomean_all]
     time = [:time_geomean_thisconv, :time_geomean_allconv, :time_geomean_all]
     sep = " & "
@@ -277,16 +280,23 @@ function instancestats()
         t.shift == 0,
         all_df
         )
-    CSV.write("numcones.csv", DataFrame(hcat(one_solver[!, :num_cones])))
+    CSV.write("numcones.csv", DataFrame(hcat(log10.(one_solver[!, :num_cones]))))
 end
 instancestats()
 
 function examplesats()
     all_df = post_process()
-    ex_df = combine(groupby(all_df, :example),
-        :cone_types => (x -> unique(union(x))) => :cones,
+    one_solver = filter!(t ->
+        t.stepper == "CombinedStepper" &&
+        t.system_solver == "QRCholDenseSystemSolver" &&
+        t.shift == 0,
+        all_df
+        )
+    ex_df = combine(groupby(one_solver, :example),
+        :cone_types => (x -> union(eval.(Meta.parse.(x)))) => :cones,
         :cone_types => length => :num_instances,
         )
+    CSV.write("examplestats.csv", ex_df)
 end
 examplesats()
 
