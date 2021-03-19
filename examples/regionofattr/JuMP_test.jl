@@ -12,6 +12,8 @@ insts["fast"] = [
     ]
 insts["slow"] = [
     ((8, false), SOCExpPSDOptimizer),
+    ((10, true),),
+    ((10, false), SOCExpPSDOptimizer),
     ]
 insts["various"] = vcat(insts["fast"], insts["slow"])
 return (RegionOfAttrJuMP, insts)

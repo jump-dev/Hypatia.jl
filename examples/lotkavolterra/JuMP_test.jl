@@ -13,5 +13,6 @@ insts["slow"] = [
 insts["various"] = [
     ((3,), SOCExpPSDOptimizer),
     ((4,), SOCExpPSDOptimizer, relaxed_tols),
+    ((5,), SOCExpPSDOptimizer, relaxed_tols),
     ]
 return (LotkaVolterraJuMP, insts)

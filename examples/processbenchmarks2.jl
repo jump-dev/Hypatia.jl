@@ -12,6 +12,8 @@ enhancements = ["basic", "TOA", "curve", "comb", "shift"]
 process_entry(x::Float64) = @sprintf("%.2f", x)
 process_entry(x::Int) = string(x)
 
+tuple_sum(x...) = sum([x...])
+
 bench_file = joinpath("bench2", "various", "bench_" * nickname * ".csv")
 
 function shifted_geomean_all(metric, conv; shift = 0, cap = Inf)
@@ -62,7 +64,7 @@ function agg_stats()
     CSV.write(joinpath(output_folder, "agg_" * nickname * ".csv"), df_agg)
 
     # combine feasible and infeasible statuses
-    transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] => ((x, y, z) -> x .+ y .+ z) => :converged)
+    transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] => tuple_sum => :converged)
     select!(df_agg, Not(:optimal), Not(:priminfeas), Not(:dualinfeas))
     subdfs = ["status", "iter", "time"]
     status = [:converged, :numerical, :slowprogress, :iterationlimit]
@@ -273,6 +275,9 @@ end
 function instancestats()
     all_df = post_process()
     CSV.write("solvetimes.csv", DataFrame(hcat(log10.(all_df[!, :solve_time]))))
+
+    transform!(all_df, [:n, :p, :q] => tuple_sum => :npq)
+    CSV.write("npq.csv", DataFrame(hcat(log10.(all_df[!, :npq]))))
 
     one_solver = filter!(t ->
         t.stepper == "CombinedStepper" &&
