@@ -115,6 +115,7 @@ perf = DataFrames.DataFrame(
     nu = Float64[],
     cone_types = Vector{String}[],
     num_cones = Int[],
+    maxq = Int[],
     status = String[],
     solve_time = Float64[],
     iters = Int[],

@@ -102,8 +102,9 @@ end
 function get_model_stats(model::Models.Model)
     string_cones = [string(nameof(c)) for c in unique(typeof.(model.cones))]
     num_cones = length(model.cones)
+    maxq = maximum(Cones.dimension(c) for c in model.cones)
     # string_cones = [string(nameof(c)) for c in typeof.(model.cones)]
-    return (model.n, model.p, model.q, model.nu, string_cones, num_cones)
+    return (model.n, model.p, model.q, model.nu, string_cones, num_cones, maxq)
 end
 
 use_curve_search(::Solvers.Stepper) = true
