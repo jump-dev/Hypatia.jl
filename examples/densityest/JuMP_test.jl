@@ -1,4 +1,5 @@
 
+relaxed_tols = (default_tol_relax = 1000,)
 insts = Dict()
 insts["minimal"] = [
     ((5, 2, 2, true, true, true),),
@@ -37,11 +38,11 @@ insts["slow"] = [
     ((500, 4, 6, true, false, true),),
     ]
 insts["various"] = [
-    ((50, 2, 8, true, false, false),),
-    ((50, 2, 8, true, false, false), ExpPSDOptimizer),
-    ((50, 2, 8, true, false, false), SOCExpPSDOptimizer),
-    ((50, 2, 8, false, false, false),),
-    ((50, 2, 8, false, false, true),),
+    ((50, 2, 16, true, false, false),),
+    ((50, 2, 16, true, false, false), ExpPSDOptimizer),
+    ((50, 2, 16, true, false, false), SOCExpPSDOptimizer),
+    ((50, 2, 16, false, false, false),),
+    ((50, 2, 16, false, false, true),),
     ((50, 8, 4, true, false, false),),
     ((50, 8, 4, true, false, false), ExpPSDOptimizer),
     ((50, 8, 4, true, false, false), SOCExpPSDOptimizer),
@@ -50,10 +51,8 @@ insts["various"] = [
     ((50, 32, 2, true, false, false),),
     ((50, 32, 2, true, false, false), ExpPSDOptimizer),
     ((50, 32, 2, true, false, false), SOCExpPSDOptimizer),
-    ((50, 32, 2, false, false, false),),
-    ((50, 32, 2, false, false, true),),
-    ((:iris, 4, false, false, false),),
-    ((:iris, 5, true, false, false),),
+    ((50, 32, 2, false, false, false), nothing, relaxed_tols),
+    ((50, 32, 2, false, false, true), nothing, relaxed_tols),
     ((:iris, 6, true, true, true),),
     ((:cancer, 4, true, true, true),),
     ]

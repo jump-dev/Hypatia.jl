@@ -23,7 +23,7 @@ default_options = (
     # verbose = false,
     verbose = true,
     default_tol_relax = 10,
-    iter_limit = 250,
+    iter_limit = 1000,
     )
 
 predorcent = Solvers.PredOrCentStepper{Float64}

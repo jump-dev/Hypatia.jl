@@ -56,10 +56,6 @@ insts["slow"] = [
     ((2, 30, false, false),),
     ]
 insts["various"] = [
-    ((2, 3, true, true),),
-    ((2, 3, true, false),),
-    ((2, 3, false, true),),
-    ((2, 3, false, false),),
     ((4, 5, true, true),),
     ((4, 5, true, false),),
     ((4, 5, false, true),),

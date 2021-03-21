@@ -1,4 +1,5 @@
 
+relaxed_tols = (default_tol_relax = 100,)
 insts = Dict()
 insts["minimal"] = [
     ((1, 1, 1, false, false, true),),
@@ -17,5 +18,13 @@ insts["slow"] = [
     ((4, 2, 5, false, true, false),),
     ((4, 2, 5, true, false, false),),
     ]
-insts["various"] = vcat(insts["fast"], insts["slow"])
+insts["various"] = [
+    ((4, 2, 5, false, false, true),),
+    ((4, 2, 5, false, true, false),),
+    ((4, 2, 5, true, false, false),),
+    ((4, 2, 10, false, true, false), nothing, relaxed_tols),
+    ((4, 2, 10, true, false, false),),
+    ((4, 4, 5, false, true, false), nothing, relaxed_tols),
+    ((4, 4, 5, true, false, false),),
+    ]
 return (RandomPolyMatJuMP, insts)

@@ -26,12 +26,12 @@ insts["slow"] = [
     ((2000, true, true), nothing, relaxed_tols),
     ]
 insts["various"] = [
-    ((100, true, true),),
-    ((100, true, false),),
-    ((100, false, true),),
-    ((100, true, true), SOCExpPSDOptimizer),
-    ((100, true, false), SOCExpPSDOptimizer),
-    ((100, false, true), SOCExpPSDOptimizer),
+    ((500, true, true),),
+    ((500, true, false),),
+    ((500, false, true),),
+    ((500, true, true), SOCExpPSDOptimizer),
+    ((500, true, false), SOCExpPSDOptimizer),
+    ((500, false, true), SOCExpPSDOptimizer),
     ((1000, true, true),),
     ((1000, true, false),),
     ((1000, false, true),),

@@ -1,5 +1,5 @@
 
-relaxed_tols = (default_tol_relax = 100,)
+relaxed_tols = (default_tol_relax = 1000,)
 insts = Dict()
 insts["minimal"] = [
     ((2, 4, true, true),),
@@ -24,12 +24,12 @@ insts["slow"] = [
     ((50, 50, false, true),),
     ]
 insts["various"] = [
-    ((6, 6, true, true),),
-    ((6, 6, true, false),),
+    ((6, 6, true, true), nothing, relaxed_tols),
+    ((6, 6, true, false), nothing, relaxed_tols),
     ((6, 6, false, true),),
     ((6, 6, false, false),),
-    ((12, 12, true, true),),
-    ((12, 12, true, false),),
+    ((12, 12, true, true), nothing, relaxed_tols),
+    ((12, 12, true, false), nothing, relaxed_tols),
     ((12, 12, false, true),),
     ((12, 12, false, false),),
     ((24, 24, true, true), nothing, relaxed_tols),
