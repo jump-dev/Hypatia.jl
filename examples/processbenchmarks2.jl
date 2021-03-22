@@ -4,13 +4,11 @@ using Plots
 using Printf
 using BenchmarkProfiles
 
-nickname = "various"
-
 enhancements = ["basic", "TOA", "curve", "comb", "shift"]
 process_entry(x::Float64) = @sprintf("%.2f", x)
 process_entry(x::Int) = string(x)
 
-bench_file = joinpath("bench2", "various", "bench_" * nickname * ".csv")
+bench_file = joinpath("bench2", "various", "bench" * ".csv")
 
 function shifted_geomean(metric::AbstractVector, conv::AbstractVector{Bool}; shift = 0, cap = -1, skipnotfinite = false)
     if cap > 0
@@ -48,7 +46,7 @@ function agg_stats()
     MAX_TIME = maximum(all_df[!, :solve_time])
     MAX_ITER = maximum(all_df[!, :iters])
 
-    df_agg = combine(groupby(all_df, [:stepper, :system_solver, :use_corr, :use_curve_search, :shift]),
+    df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search, :shift]),
         [:solve_time, :conv] => shifted_geomean => :time_geomean_thisconv,
         [:iters, :conv] => ((x, y) -> shifted_geomean(x, y, shift = 1)) => :iters_geomean_thisconv,
         [:solve_time, :all_conv] => shifted_geomean => :time_geomean_allconv,
@@ -64,14 +62,14 @@ function agg_stats()
         :status => (x -> count(isequal("IterationLimit"), x)) => :iterationlimit,
         :status => length => :total,
         )
-    sort!(df_agg, [order(:stepper, rev = true), :use_corr, :use_curve_search, :shift, :system_solver])
-    CSV.write(joinpath(output_folder, "agg_" * nickname * ".csv"), df_agg)
+    sort!(df_agg, [order(:stepper, rev = true), :use_corr, :use_curve_search, :shift])
+    CSV.write(joinpath(output_folder, "agg" * ".csv"), df_agg)
 
     # combine feasible and infeasible statuses
     transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] => ByRow((x...) -> sum(x)) => :converged)
     cols = [:converged, :iters_geomean_thisconv, :iters_geomean_allconv, :iters_geomean_all, :time_geomean_thisconv, :time_geomean_allconv, :time_geomean_all]
     sep = " & "
-    tex = open(joinpath(output_folder, "agg_" * nickname * ".tex"), "w")
+    tex = open(joinpath(output_folder, "agg" * ".tex"), "w")
     for i in 1:length(enhancements)
         row_str = enhancements[i]
         for c in cols
@@ -139,9 +137,9 @@ function subtime()
         [:time_search, :conv, :iters] => ((x, y, z) -> shifted_geomean(x ./ z, cap = max_search_iter, y, shift = shift, skipnotfinite = true)) => :search_piter_all,
         )
     sort!(df_agg, [order(:stepper, rev = true), :use_corr, :use_curve_search, :shift])
-    CSV.write(joinpath(output_folder, "subtime_" * nickname * ".csv"), df_agg)
+    CSV.write(joinpath(output_folder, "subtime" * ".csv"), df_agg)
 
-    subtime_tex = open(joinpath(output_folder, "subtime_" * nickname * ".tex"), "w")
+    subtime_tex = open(joinpath(output_folder, "subtime" * ".tex"), "w")
     sep = " & "
 
     for s in sets, i in 1:nrow(df_agg)
@@ -169,28 +167,17 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
         use_curve_search = [true]
         stepper = [s1, s2]
         shift = [0]
-        system_solver = ["QRCholDenseSystemSolver"]
     elseif feature == :shift
         s1 = 0
         s2 = 2
         stepper = ["CombinedStepper"]
         use_corr = [true]
         use_curve_search = [true]
-        system_solver = ["QRCholDenseSystemSolver"]
         shift = [s1, s2]
-    elseif feature == :system_solver
-        s1 = "QRCholDenseSystemSolver"
-        s2 = "SymIndefSparseSystemSolver"
-        stepper = ["CombinedStepper"]
-        use_corr = [true]
-        use_curve_search = [true]
-        shift = [2]
-        system_solver = [s1, s2]
     else
         s1 = false
         s2 = true
         stepper = ["PredOrCentStepper"]
-        system_solver = ["QRCholDenseSystemSolver"]
         shift = [0]
         if feature == :use_corr
             use_curve_search = [false]
@@ -206,14 +193,13 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
         t.stepper in stepper &&
         t.use_corr in use_corr &&
         t.use_curve_search in use_curve_search &&
-        t.shift in shift &&
-        t.system_solver in system_solver,
-        all_df,
+        t.shift in shift,
+        all_df
         )
 
     # remove instances where neither stepper being compared converged
-    all_df = combine(groupby(all_df, :inst_key), names(all_df), :conv => any => :any_conv)
-    filter!(t -> t.any_conv, all_df)
+    # all_df = combine(groupby(all_df, :inst_key), names(all_df), :conv => any => :any_conv)
+    # filter!(t -> t.any_conv, all_df)
 
     # BenchmarkProfiles expects NaNs for failures
     select!(all_df,
@@ -266,7 +252,6 @@ function instancestats()
 
     one_solver = filter!(t ->
         t.stepper == "PredOrCentStepper" &&
-        t.system_solver == "QRCholDenseSystemSolver" &&
         t.use_corr == 0 &&
         t.use_curve_search == 0,
         all_df
