@@ -1,4 +1,5 @@
 
+relaxed_tols = (default_tol_relax = 100,)
 insts = Dict()
 insts["minimal"] = [
     ((2, 2),),
@@ -40,7 +41,7 @@ insts["various"] = [
     ((:MCW19ex8,),),
     ((3, 2),),
     ((3, 2), SOCExpPSDOptimizer),
-    ((20, 3),),
-    ((20, 3), SOCExpPSDOptimizer),
+    ((20, 3), nothing, relaxed_tols),
+    ((20, 3), SOCExpPSDOptimizer, relaxed_tols),
     ]
 return (SignomialMinJuMP, insts)

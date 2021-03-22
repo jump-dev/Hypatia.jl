@@ -2,6 +2,7 @@ using CSV
 using DataFrames
 using Plots
 using Printf
+using BenchmarkProfiles
 
 nickname = "various"
 
@@ -9,23 +10,27 @@ enhancements = ["basic", "TOA", "curve", "comb", "shift"]
 process_entry(x::Float64) = @sprintf("%.2f", x)
 process_entry(x::Int) = string(x)
 
-tuple_sum(x...) = sum([x...])
-
 bench_file = joinpath("bench2", "various", "bench_" * nickname * ".csv")
 
-function shifted_geomean_all(metric, conv; shift = 0, cap = Inf)
-    x = copy(metric)
-    x[.!conv] .= cap
+function shifted_geomean(metric::AbstractVector, conv::AbstractVector{Bool}; shift = 0, cap = -1, skipnotfinite = false)
+    if cap > 0
+        x = copy(metric)
+        x[.!conv] .= cap
+    else
+        x = metric[conv]
+    end
+    if skipnotfinite
+        x = x[isfinite.(x)]
+    end
     return exp(sum(log, x .+ shift) / length(x)) - shift
 end
-shifted_geomean_conv(metric, conv; shift = 0) = exp(sum(log, metric[conv] .+ shift) / count(conv)) - shift
 
 function post_process()
     all_df = CSV.read(bench_file, DataFrame)
     transform!(all_df,
         :status => ByRow(x -> !ismissing(x) && x in ["Optimal", "PrimalInfeasible", "DualInfeasible"]) => :conv,
         # each instance is identified by instance data + extender combination
-        [:inst_data, :extender] => ((x, y) -> x .* y) => :inst_key,
+        [:example, :inst_data, :extender] => ((x, y, z) -> x .* y .* z) => :inst_key,
         )
     # assumes that nothing returned incorrect status, which is checked manually
     all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> all(in(["Optimal", "PrimalInfeasible", "DualInfeasible"]).(x))) => :all_conv)
@@ -44,12 +49,12 @@ function agg_stats()
     MAX_ITER = maximum(all_df[!, :iters])
 
     df_agg = combine(groupby(all_df, [:stepper, :system_solver, :use_corr, :use_curve_search, :shift]),
-        [:solve_time, :conv] => shifted_geomean_conv => :time_geomean_thisconv,
-        [:iters, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = 1)) => :iters_geomean_thisconv,
-        [:solve_time, :all_conv] => shifted_geomean_conv => :time_geomean_allconv,
-        [:iters, :all_conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = 1)) => :iters_geomean_allconv,
-        [:solve_time, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = MAX_TIME)) => :time_geomean_all,
-        [:iters, :conv] => ((x, y) -> shifted_geomean_all(x, y, shift = 1, cap = MAX_ITER)) => :iters_geomean_all,
+        [:solve_time, :conv] => shifted_geomean => :time_geomean_thisconv,
+        [:iters, :conv] => ((x, y) -> shifted_geomean(x, y, shift = 1)) => :iters_geomean_thisconv,
+        [:solve_time, :all_conv] => shifted_geomean => :time_geomean_allconv,
+        [:iters, :all_conv] => ((x, y) -> shifted_geomean(x, y, shift = 1)) => :iters_geomean_allconv,
+        [:solve_time, :conv] => ((x, y) -> shifted_geomean(x, y, cap = MAX_TIME)) => :time_geomean_all,
+        [:iters, :conv] => ((x, y) -> shifted_geomean(x, y, shift = 1, cap = MAX_ITER)) => :iters_geomean_all,
         :status => (x -> count(isequal("Optimal"), x)) => :optimal,
         :status => (x -> count(isequal("PrimalInfeasible"), x)) => :priminfeas,
         :status => (x -> count(isequal("DualInfeasible"), x)) => :dualinfeas,
@@ -63,116 +68,97 @@ function agg_stats()
     CSV.write(joinpath(output_folder, "agg_" * nickname * ".csv"), df_agg)
 
     # combine feasible and infeasible statuses
-    transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] => tuple_sum => :converged)
-    select!(df_agg, Not(:optimal), Not(:priminfeas), Not(:dualinfeas))
-    subdfs = ["status", "iter", "time"]
-    status = [:converged, :numerical, :slowprogress, :iterationlimit]
-    iter = [:iters_geomean_thisconv, :iters_geomean_allconv, :iters_geomean_all]
-    time = [:time_geomean_thisconv, :time_geomean_allconv, :time_geomean_all]
+    transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] => ByRow((x...) -> sum(x)) => :converged)
+    cols = [:converged, :iters_geomean_thisconv, :iters_geomean_allconv, :iters_geomean_all, :time_geomean_thisconv, :time_geomean_allconv, :time_geomean_all]
     sep = " & "
-
-    for (k, subcols) in enumerate([status, iter, time])
-        metric = subdfs[k]
-        tex = open(joinpath(output_folder, metric * "_" * nickname * ".tex"), "w")
-        subdf = df_agg[!, subcols]
-        for i in 1:length(enhancements)
-            row_str = enhancements[i]
-            for j in 1:ncol(subdf)
-                x = (metric == "time" ? subdf[i, j] * 1000 : subdf[i, j])
-                row_str *= sep * process_entry(x)
-            end
-            row_str *= " \\\\"
-            println(tex, row_str)
+    tex = open(joinpath(output_folder, "agg_" * nickname * ".tex"), "w")
+    for i in 1:length(enhancements)
+        row_str = enhancements[i]
+        for c in cols
+            subdf = df_agg[!, c]
+            row_str *= sep * process_entry(subdf[i])
         end
-        close(tex)
-
-        # maybe merge table with above
-        system_solver_tex = open(joinpath(output_folder, metric * "_system_solvers_" * nickname * ".tex"), "w")
-        subdf = df_agg[!, subcols]
-        for i in length(enhancements):nrow(subdf)
-            row_str = ""
-            for j in 1:ncol(subdf)
-                x = (metric == "time" ? subdf[i, j] * 1000 : subdf[i, j])
-                row_str *= sep * process_entry(x)
-            end
-            row_str *= " \\\\"
-            println(system_solver_tex, row_str)
-        end
-        close(system_solver_tex)
+        row_str *= " \\\\"
+        println(tex, row_str)
     end
+    close(tex)
 
     return
 end
-agg_stats()
+# agg_stats()
 
-function bottlenecks()
+function subtime()
     output_folder = mkpath(joinpath(@__DIR__, "results"))
 
     all_df = post_process()
-    shift = 1e-4 # TODO use minimum values?
+    shift = 1e-4
 
     preproc_cols = [:time_rescale, :time_initx, :time_inity, :time_unproc]
+    metrics = [:preproc, :uplhs, :uprhs, :getdir, :search, :uplhs_piter, :uprhs_piter, :getdir_piter, :search_piter]
+    sets = [:_thisconv, :_allconv, :_all]
 
+    # get values to replace unconverged instances for the "all" group
     max_upsys = maximum(all_df[!, :time_upsys])
     max_uprhs =  maximum(all_df[!, :time_uprhs])
     max_getdir =  maximum(all_df[!, :time_getdir])
     max_search =  maximum(all_df[!, :time_search])
-    max_upsys_iter =  maximum(all_df[!, :time_upsys] ./ (all_df[!, :iters] .+ 1))
-    max_uprhs_iter =  maximum(all_df[!, :time_uprhs] ./ (all_df[!, :iters] .+ 1))
-    max_getdir_iter =  maximum(all_df[!, :time_getdir] ./ (all_df[!, :iters] .+ 1))
-    max_search_iter =  maximum(all_df[!, :time_search] ./ (all_df[!, :iters] .+ 1))
+    max_upsys_iter =  maximum(x -> isfinite(x) ? x : 0, all_df[!, :time_upsys] ./ all_df[!, :iters])
+    max_uprhs_iter =  maximum(x -> isfinite(x) ? x : 0, all_df[!, :time_uprhs] ./ all_df[!, :iters])
+    max_getdir_iter =  maximum(x -> isfinite(x) ? x : 0, all_df[!, :time_getdir] ./ all_df[!, :iters])
+    max_search_iter =  maximum(x -> isfinite(x) ? x : 0, all_df[!, :time_search] ./ all_df[!, :iters])
 
-    df_agg = combine(groupby(all_df, [:stepper, :system_solver, :use_corr, :use_curve_search, :shift]),
-        # vcat(:conv, preproc_cols) => ((y, x...) -> shifted_geomean_conv(sum(x), y, shift = shift)) => :preproc_thisconv,
-        # [:time_upsys, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :uplhs_thisconv,
-        # [:time_uprhs, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :uprhs_thisconv,
-        # [:time_getdir, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :getdir_thisconv,
-        # [:time_search, :conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :search_thisconv,
-        # [:time_upsys, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :uplhs_piter_thisconv,
-        # [:time_uprhs, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :uprhs_piter_thisconv,
-        # [:time_getdir, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :getdir_piter_thisconv,
-        # [:time_search, :conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :search_piter_thisconv,
+    df_agg = combine(groupby(all_df, [:stepper, :use_corr, :use_curve_search, :shift]),
+        vcat(:conv, preproc_cols) => ((y, x...) -> shifted_geomean(sum(x), y, shift = shift)) => :preproc_thisconv,
+        [:time_upsys, :conv] => ((x, y) -> shifted_geomean(x, y, shift = shift)) => :uplhs_thisconv,
+        [:time_uprhs, :conv] => ((x, y) -> shifted_geomean(x, y, shift = shift)) => :uprhs_thisconv,
+        [:time_getdir, :conv] => ((x, y) -> shifted_geomean(x, y, shift = shift)) => :getdir_thisconv,
+        [:time_search, :conv] => ((x, y) -> shifted_geomean(x, y, shift = shift)) => :search_thisconv,
+        [:time_upsys, :conv, :iters] => ((x, y, z) -> shifted_geomean(x ./ z, y, shift = shift, skipnotfinite = true)) => :uplhs_piter_thisconv,
+        [:time_uprhs, :conv, :iters] => ((x, y, z) -> shifted_geomean(x ./ z, y, shift = shift, skipnotfinite = true)) => :uprhs_piter_thisconv,
+        [:time_getdir, :conv, :iters] => ((x, y, z) -> shifted_geomean(x ./ z, y, shift = shift, skipnotfinite = true)) => :getdir_piter_thisconv,
+        [:time_search, :conv, :iters] => ((x, y, z) -> shifted_geomean(x ./ z, y, shift = shift, skipnotfinite = true)) => :search_piter_thisconv,
         #
-        # vcat(:conv, preproc_cols) => ((y, x...) -> shifted_geomean_conv(sum(x), y, shift = shift)) => :preproc_allconv,
-        # [:time_upsys, :all_conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :uplhs_allconv,
-        # [:time_uprhs, :all_conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :uprhs_allconv,
-        # [:time_getdir, :all_conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :getdir_allconv,
-        # [:time_search, :all_conv] => ((x, y) -> shifted_geomean_conv(x, y, shift = shift)) => :search_allconv,
-        # [:time_upsys, :all_conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :uplhs_piter_allconv,
-        # [:time_uprhs, :all_conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :uprhs_piter_allconv,
-        # [:time_getdir, :all_conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :getdir_piter_allconv,
-        # [:time_search, :all_conv, :iters] => ((x, y, z) -> shifted_geomean_conv(x ./ (z .+ 1), y, shift = shift)) => :search_piter_allconv,
-        # #
-        vcat(:conv, preproc_cols) => ((y, x...) -> shifted_geomean_all(sum(x), y, cap = max_upsys, shift = shift)) => :preproc_all,
-        [:time_upsys, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = max_upsys, shift = shift)) => :uplhs_all,
-        [:time_uprhs, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = max_uprhs, shift = shift)) => :uprhs_all,
-        [:time_getdir, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = max_getdir, shift = shift)) => :getdir_all,
-        [:time_search, :conv] => ((x, y) -> shifted_geomean_all(x, y, cap = max_search, shift = shift)) => :search_all,
-        [:time_upsys, :conv, :iters] => ((x, y, z) -> shifted_geomean_all(x ./ (z .+ 1), y, cap = max_upsys_iter, shift = shift)) => :uplhs_piter_all,
-        [:time_uprhs, :conv, :iters] => ((x, y, z) -> shifted_geomean_all(x ./ (z .+ 1), y, cap = max_uprhs_iter, shift = shift)) => :uprhs_piter_all,
-        [:time_getdir, :conv, :iters] => ((x, y, z) -> shifted_geomean_all(x ./ (z .+ 1), cap = max_getdir_iter, y, shift = shift)) => :getdir_piter_all,
-        [:time_search, :conv, :iters] => ((x, y, z) -> shifted_geomean_all(x ./ (z .+ 1), cap = max_search_iter, y, shift = shift)) => :search_piter_all,
+        vcat(:all_conv, preproc_cols) => ((y, x...) -> shifted_geomean(sum(x), y, shift = shift)) => :preproc_allconv,
+        [:time_upsys, :all_conv] => ((x, y) -> shifted_geomean(x, y, shift = shift)) => :uplhs_allconv,
+        [:time_uprhs, :all_conv] => ((x, y) -> shifted_geomean(x, y, shift = shift)) => :uprhs_allconv,
+        [:time_getdir, :all_conv] => ((x, y) -> shifted_geomean(x, y, shift = shift)) => :getdir_allconv,
+        [:time_search, :all_conv] => ((x, y) -> shifted_geomean(x, y, shift = shift)) => :search_allconv,
+        [:time_upsys, :all_conv, :iters] => ((x, y, z) -> shifted_geomean(x ./ z, y, shift = shift, skipnotfinite = true)) => :uplhs_piter_allconv,
+        [:time_uprhs, :all_conv, :iters] => ((x, y, z) -> shifted_geomean(x ./ z, y, shift = shift, skipnotfinite = true)) => :uprhs_piter_allconv,
+        [:time_getdir, :all_conv, :iters] => ((x, y, z) -> shifted_geomean(x ./ z, y, shift = shift, skipnotfinite = true)) => :getdir_piter_allconv,
+        [:time_search, :all_conv, :iters] => ((x, y, z) -> shifted_geomean(x ./ z, y, shift = shift, skipnotfinite = true)) => :search_piter_allconv,
+        #
+        vcat(:conv, preproc_cols) => ((y, x...) -> shifted_geomean(sum(x), y, cap = max_upsys, shift = shift)) => :preproc_all,
+        [:time_upsys, :conv] => ((x, y) -> shifted_geomean(x, y, cap = max_upsys, shift = shift)) => :uplhs_all,
+        [:time_uprhs, :conv] => ((x, y) -> shifted_geomean(x, y, cap = max_uprhs, shift = shift)) => :uprhs_all,
+        [:time_getdir, :conv] => ((x, y) -> shifted_geomean(x, y, cap = max_getdir, shift = shift)) => :getdir_all,
+        [:time_search, :conv] => ((x, y) -> shifted_geomean(x, y, cap = max_search, shift = shift)) => :search_all,
+        [:time_upsys, :conv, :iters] => ((x, y, z) -> shifted_geomean(x ./ z, y, cap = max_upsys_iter, shift = shift, skipnotfinite = true)) => :uplhs_piter_all,
+        [:time_uprhs, :conv, :iters] => ((x, y, z) -> shifted_geomean(x ./ z, y, cap = max_uprhs_iter, shift = shift, skipnotfinite = true)) => :uprhs_piter_all,
+        [:time_getdir, :conv, :iters] => ((x, y, z) -> shifted_geomean(x ./ z, cap = max_getdir_iter, y, shift = shift, skipnotfinite = true)) => :getdir_piter_all,
+        [:time_search, :conv, :iters] => ((x, y, z) -> shifted_geomean(x ./ z, cap = max_search_iter, y, shift = shift, skipnotfinite = true)) => :search_piter_all,
         )
-    sort!(df_agg, [order(:stepper, rev = true), :use_corr, :use_curve_search, :shift, :system_solver])
-    CSV.write(joinpath(output_folder, "bottlenecks_" * nickname * ".csv"), df_agg)
+    sort!(df_agg, [order(:stepper, rev = true), :use_corr, :use_curve_search, :shift])
+    CSV.write(joinpath(output_folder, "subtime_" * nickname * ".csv"), df_agg)
 
-    enhancements = ["basic", "TOA", "curve", "comb", "shift", "symdense", "symsparse"] # TODO make consistent with df_agg
-
-    bottlenecks_tex = open(joinpath(output_folder, "bottlenecks_" * nickname * ".tex"), "w")
+    subtime_tex = open(joinpath(output_folder, "subtime_" * nickname * ".tex"), "w")
     sep = " & "
-    for i in 1:nrow(df_agg)
-        row_str = enhancements[i]
-        for j in 6:ncol(df_agg)
-            row_str *= sep * process_entry(df_agg[i, j] * 1000)
+
+    for s in sets, i in 1:nrow(df_agg)
+        row_str = sep * enhancements[i]
+        for m in metrics
+            col = Symbol(m, s)
+            row_str *= sep * process_entry(df_agg[i, col] * 1000)
         end
         row_str *= " \\\\"
-        println(bottlenecks_tex, row_str)
+        println(subtime_tex, row_str)
     end
-    close(bottlenecks_tex)
+
+    close(subtime_tex)
 
     return
 end
-bottlenecks()
+subtime()
 
 # performance profiles, currently hardcoded for corrector vs no corrector
 function perf_prof(; feature = :stepper, metric = :solve_time)
@@ -201,8 +187,6 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
         shift = [2]
         system_solver = [s1, s2]
     else
-        # s1 = "FALSE"
-        # s2 = "TRUE"
         s1 = false
         s2 = true
         stepper = ["PredOrCentStepper"]
@@ -228,46 +212,46 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
         )
 
     # remove instances where neither stepper being compared converged
-    all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> any(in(["Optimal", "PrimalInfeasible", "DualInfeasible"]).(x))) => :any_conv)
+    all_df = combine(groupby(all_df, :inst_key), names(all_df), :conv => any => :any_conv)
     filter!(t -> t.any_conv, all_df)
 
+    # BenchmarkProfiles expects NaNs for failures
     select!(all_df,
         :inst_key,
         feature,
-        [:solve_time, :conv] => ByRow((x, y) -> (y ? x : missing)) => :solve_time,
-        [:iters, :conv] => ByRow((x, y) -> (y ? x : missing)) => :iters,
+        [metric, :conv] => ByRow((x, y) -> (y ? x : NaN)) => metric,
         )
 
-    # replacing 0 iterations by 1 iteration gives correct result for all cases (none, one, or both steppers converged) and avoids NaNs
-    transform!(all_df, :iters => ByRow(x -> !ismissing(x) && iszero(x) ? 1 : x) => :iters)
+    wide_df = unstack(all_df, feature, metric)
+    @show names(wide_df)
+    (ratios, max_ratio) = BenchmarkProfiles.performance_ratios(Matrix{Float64}(wide_df[!, string.([s1, s2])]))
 
-    all_df = combine(groupby(all_df, :inst_key), names(all_df), metric => (x -> x ./ minimum(skipmissing(x))) => :ratios)
-    # assign maximum ratio to failures
-    max_ratio = maximum(skipmissing(all_df[!, :ratios]))
-    all_df[ismissing.(all_df[!, metric]), :ratios] .= max_ratio
-    sort!(all_df, :ratios)
+    # copied from https://github.com/JuliaSmoothOptimizers/BenchmarkProfiles.jl/blob/master/src/performance_profiles.jl
+    (np, ns) = size(ratios)
+    ratios = [ratios; 2.0 * max_ratio * ones(1, ns)]
+    xs = [1:np+1;] / np
+    for s = 1 : 2
+        rs = view(ratios, :, s)
+        xidx = zeros(Int,length(rs)+1)
+        k = 0
+        rv = minimum(rs)
+        maxval = maximum(rs)
+        while rv < maxval
+            k += 1
+            xidx[k] = findlast(rs .<= rv)
+            rv = max(rs[xidx[k]], rs[xidx[k]+1])
+        end
+        xidx[k+1] = length(rs)
+        xidx = xidx[xidx .> 0]
+        xidx = unique(xidx) # Needed?
 
-    npts = div(nrow(all_df), 2)
-    subdf1 = filter(feature => isequal(s1), all_df)
-    subdf2 = filter(feature => isequal(s2), all_df)
-    unique_ratios = unique(all_df[!, :ratios])
-    plot_x = log10.(unique_ratios)
-    plot_y1 = [count(subdf1[!, :ratios] .<= ti) ./ npts for ti in unique_ratios]
-    plot_y2 = [count(subdf2[!, :ratios] .<= ti) ./ npts for ti in unique_ratios]
-    if metric == :solve_time
-        @assert 1 <= plot_y1[1] + plot_y2[1] <= 1.01
+        # because we are making a step line graph from a CSV, modify (x, y) to make steps
+        x = rs[xidx]
+        y = xs[xidx]
+        x = vcat(x[1], repeat(x[2:end], inner = 2))
+        y = vcat(repeat(y[1:(end - 1)], inner = 2), y[end])
+        CSV.write(string(feature) * "_" * string(metric) * "_$(s)" * "_pp" * ".csv", DataFrame(x = x, y = y))
     end
-
-    plot(xlim = (0, log10(maximum(all_df[!, :ratios]))), ylim = (0, 1))
-    plot!(log10.(unique_ratios), plot_y1, label = string(s1), t = :steppre)
-    plot!(log10.(unique_ratios), plot_y2, label = string(s2), t = :steppre)
-    xaxis!("logratio")
-    plot_name = string(feature) * "_" * string(metric) * "_pp"
-    title!(plot_name)
-
-    png(plot_name)
-
-    CSV.write(plot_name * ".csv", DataFrame(x = plot_x, y1 = plot_y1, y2 = plot_y2))
 
     return
 end
@@ -276,32 +260,31 @@ for feature in [:stepper, :use_curve_search, :use_corr, :shift], metric in [:sol
     @show feature, metric
     perf_prof(feature = feature, metric = metric)
 end
-# for feature in [:system_solver], metric in [:solve_time, :iters]
-#     perf_prof(feature = feature, metric = metric)
-# end
 
 function instancestats()
     all_df = post_process()
-    CSV.write("solvetimes.csv", DataFrame(hcat(log10.(all_df[!, :solve_time]))))
 
     one_solver = filter!(t ->
         t.stepper == "PredOrCentStepper" &&
         t.system_solver == "QRCholDenseSystemSolver" &&
         t.use_corr == 0 &&
-        t.use_curve == 0,
+        t.use_curve_search == 0,
         all_df
         )
-    CSV.write("numcones.csv", DataFrame(hcat(log10.(one_solver[!, :num_cones]))))
+    inst_df = select(one_solver, :num_cones => ByRow(log10) => :numcones, [:n, :p, :q] => ((x, y, z) -> log10.(x .+ y .+ z)) => :npq)
+    CSV.write("inststats.csv", inst_df)
+    # for solve times, only include converged instances
+    solve_times = filter!(t -> t.conv, one_solver)
+    CSV.write("solvetimes.csv", select(solve_times, :solve_time => ByRow(log10) => :time))
 
-    transform!(one_solver, [:n, :p, :q] => tuple_sum => :npq)
-    CSV.write("npq.csv", DataFrame(hcat(log10.(one_solver[!, :npq]))))
-
+    # only used to get list of cones manually
     ex_df = combine(groupby(one_solver, :example),
         :cone_types => (x -> union(eval.(Meta.parse.(x)))) => :cones,
         :cone_types => length => :num_instances,
         )
     CSV.write("examplestats.csv", ex_df)
 
+    return
 end
 instancestats()
 
@@ -334,22 +317,22 @@ instancestats()
 # timings = unstack(all_df, :stepper, :log_time)
 # boxplot(["pc_00" "pc_01" "pc_11" "comb"], Matrix(timings[:, 2:end]), leg = false)
 
-function stats_plots()
-    all_df = post_process()
-    histogram(log10.(all_df[!, :solve_time]))
-    title!("log10 solve time")
-    png("solvehist")
-
-    histogram(log10.(sum(eachcol(all_df[!, [:n, :p, :q]]))))
-    title!("log10 n + p + q")
-    png("npqhist")
-
-    histogram(log10.(max.(0.01, all_df[!, :n] - all_df[!, :p])))
-    title!("log10(n - p)")
-    png("nphist")
-
-    histogram(all_df[!, :solve_time])
-    title!("num cones")
-    png("Khist")
-end
+# function stats_plots()
+#     all_df = post_process()
+#     histogram(log10.(all_df[!, :solve_time]))
+#     title!("log10 solve time")
+#     png("solvehist")
+#
+#     histogram(log10.(sum(eachcol(all_df[!, [:n, :p, :q]]))))
+#     title!("log10 n + p + q")
+#     png("npqhist")
+#
+#     histogram(log10.(max.(0.01, all_df[!, :n] - all_df[!, :p])))
+#     title!("log10(n - p)")
+#     png("nphist")
+#
+#     histogram(all_df[!, :solve_time])
+#     title!("num cones")
+#     png("Khist")
+# end
 # stats_plots()
