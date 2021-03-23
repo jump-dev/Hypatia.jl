@@ -17,4 +17,4 @@ insts["slow"] = [
     ((4, 2, 5, false, true, false),),
     ((4, 2, 5, true, false, false),),
     ]
-return (RandomPolyMatJuMP, insts)
+return (NearestPolyMatJuMP, insts)
