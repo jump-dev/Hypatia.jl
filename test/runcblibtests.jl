@@ -11,8 +11,7 @@ examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "common_JuMP.jl"))
 
 # CBLIB file folder location (use default)
-cblib_dir = "C:\\Users\\lkape\\Documents\\cblib\\all\\cblib.zib.de\\download\\all"
-# cblib_dir = joinpath(ENV["HOME"], "cblib/cblib.zib.de/download/all")
+cblib_dir = joinpath(ENV["HOME"], "cblib/cblib.zib.de/download/all")
 
 # path to write results DataFrame to CSV, if any
 # results_path = joinpath(homedir(), "bench", "bench.csv")
