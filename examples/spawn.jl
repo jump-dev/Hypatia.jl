@@ -68,7 +68,6 @@ function run_instance_check(
     inst::Tuple,
     extender,
     solver::Tuple,
-    stepper::Hypatia.Solvers.Stepper,
     solve::Bool;
     )
     worker = addprocs(1, enable_threaded_blas = true, exeflags = `--threads $num_threads`)[1]
@@ -87,7 +86,7 @@ function run_instance_check(
     original_stdout = stdout
     (out_rd, out_wr) = redirect_stdout() # don't print output
     @fetchfrom worker begin
-        run_instance(ex_type, compile_inst, extender, (stepper = stepper,), solver[2], default_options = solver[3], test = false)
+        run_instance(ex_type, compile_inst, extender, NamedTuple(), solver[2], default_options = solver[3], test = false)
         flush(stdout); flush(stderr)
         return nothing
     end
@@ -98,7 +97,7 @@ function run_instance_check(
     println("\nsetup model")
     print_memory()
     setup_fun() = @eval begin
-        (model, model_stats) = setup_model($ex_type, $inst, $extender, $(merge(solver[3], (stepper = stepper,))), $(solver[2]))
+        (model, model_stats) = setup_model($ex_type, $inst, $extender, $(solver[3]), $(solver[2]))
         GC.gc()
         return model_stats
     end

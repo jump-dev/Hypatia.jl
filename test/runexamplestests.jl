@@ -143,6 +143,26 @@ perf = DataFrames.DataFrame(
 
 isnothing(results_path) || CSV.write(results_path, perf)
 
+# TODO decide what to do with this.
+# counts number of instances with loosened tols
+# n = 1
+# exs = []
+# for ex_name in eval(Symbol("JuMP", "_example_names"))
+#     include(joinpath(examples_dir, ex_name, "JuMP" * ".jl"))
+#     (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP" * "_test.jl"))
+#     inst_subset = ex_insts["various"]
+#     for (inst_num, inst) in enumerate(inst_subset)
+#         if length(inst) == 3
+#             global n += 1
+#             push!(exs, ex_name)
+#             @show ex_name
+#             @show inst[3].default_tol_relax
+#         end
+#     end
+# end
+# @show n
+# @show unique(exs)
+
 @testset "examples tests" begin
 @testset "$mod_type" for mod_type in model_types
 @testset "$ex_name" for ex_name in eval(Symbol(mod_type, "_example_names"))

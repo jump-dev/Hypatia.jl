@@ -17,7 +17,7 @@ insts["fast"] = [
     ((:matpoly3, true, true), nothing, relaxed_tols),
     ((:matpoly3, true, false), nothing, relaxed_tols),
     ((:matpoly3, false, false), SOCExpPSDOptimizer),
-    ((:matpoly4, true, true), ntothing, relaxed_tols),
+    ((:matpoly4, true, true), nothing, relaxed_tols),
     ((:matpoly4, true, false),),
     ((:matpoly4, false, false), SOCExpPSDOptimizer),
     ((:matpoly6, true, true),),

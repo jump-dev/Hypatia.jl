@@ -11,7 +11,8 @@ examples_dir = joinpath(@__DIR__, "../examples")
 include(joinpath(examples_dir, "common_JuMP.jl"))
 
 # CBLIB file folder location (use default)
-cblib_dir = joinpath(ENV["HOME"], "cblib/cblib.zib.de/download/all")
+cblib_dir = "C:\\Users\\lkape\\Documents\\cblib\\all\\cblib.zib.de\\download\\all"
+# cblib_dir = joinpath(ENV["HOME"], "cblib/cblib.zib.de/download/all")
 
 # path to write results DataFrame to CSV, if any
 # results_path = joinpath(homedir(), "bench", "bench.csv")
@@ -46,6 +47,8 @@ perf = DataFrames.DataFrame(
     q = Int[],
     nu = Float64[],
     cone_types = Vector{String}[],
+    num_cones = Int[],
+    maxq = Int[],
     status = String[],
     solve_time = Float64[],
     iters = Int[],
@@ -56,6 +59,16 @@ perf = DataFrames.DataFrame(
     x_viol = Float64[],
     y_viol = Float64[],
     z_viol = Float64[],
+    time_rescale = Float64[],
+    time_initx = Float64[],
+    time_inity = Float64[],
+    time_unproc = Float64[],
+    time_loadsys = Float64[],
+    time_upsys = Float64[],
+    time_upfact = Float64[],
+    time_uprhs = Float64[],
+    time_getdir = Float64[],
+    time_search = Float64[],
     setup_time = Float64[],
     check_time = Float64[],
     total_time = Float64[],
