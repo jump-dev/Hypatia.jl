@@ -145,3 +145,26 @@ function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
 
     return corr
 end
+function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
+    @assert cone.grad_updated
+    sumAinvAs = cone.sumAinvAs
+    corr = cone.correction
+    dim = cone.dim
+    side = cone.side
+
+    A_aux = [zeros(dim) for _ in 1:side, _ in 1:side]
+    for i in 1:dim, k in 1:side, j in 1:side
+        A_aux[j, k][i] = sumAinvAs[i][j, k]
+    end
+
+    B = zero(sumAinvAs[1])
+    for k in 1:side, j in 1:side
+        B[j, k] = dot(A_aux[j, k], primal_dir)
+    end
+
+    for i in 1:dim
+        corr[i] = dot(B * sumAinvAs[i], B')
+    end
+
+    return corr
+end
