@@ -38,20 +38,20 @@ function post_process()
     return all_df
 end
 
-
 # aggregate stuff
 function agg_stats()
     all_df = post_process()
     conv = all_df[!, :conv]
     MAX_TIME = maximum(all_df[!, :solve_time][conv])
     MAX_ITER = maximum(all_df[!, :iters][conv])
+    time_shift = 1e-2
 
     df_agg = combine(groupby(all_df, [:stepper, :toa, :curve, :shift]),
-        [:solve_time, :conv] => shifted_geomean => :time_geomean_thisconv,
+        [:solve_time, :conv] => ((x, y) -> shifted_geomean(x, y, shift = time_shift)) => :time_geomean_thisconv,
         [:iters, :conv] => ((x, y) -> shifted_geomean(x, y, shift = 1)) => :iters_geomean_thisconv,
-        [:solve_time, :every_conv] => shifted_geomean => :time_geomean_everyconv,
+        [:solve_time, :every_conv] => ((x, y) -> shifted_geomean(x, y, shift = time_shift)) => :time_geomean_everyconv,
         [:iters, :every_conv] => ((x, y) -> shifted_geomean(x, y, shift = 1)) => :iters_geomean_everyconv,
-        [:solve_time, :conv] => ((x, y) -> shifted_geomean(x, y, cap = MAX_TIME, use_cap = true)) => :time_geomean_all,
+        [:solve_time, :conv] => ((x, y) -> shifted_geomean(x, y, cap = MAX_TIME, use_cap = true, shift = time_shift)) => :time_geomean_all,
         [:iters, :conv] => ((x, y) -> shifted_geomean(x, y, shift = 1, cap = MAX_ITER, use_cap = true)) => :iters_geomean_all,
         :status => (x -> count(isequal("Optimal"), x)) => :optimal,
         :status => (x -> count(isequal("PrimalInfeasible"), x)) => :priminfeas,
@@ -86,7 +86,8 @@ end
 agg_stats()
 
 function subtime()
-    shift = 1e-4
+    total_shift = 1e-4
+    piter_shift = 1e-4
     all_df = post_process()
     divfunc(x, y) = (x ./ y)
     preproc_cols = [:time_rescale, :time_initx, :time_inity, :time_unproc]
@@ -115,21 +116,21 @@ function subtime()
 
     function get_subtime_df(set, convcol, use_cap)
         subtime_df = combine(groupby(all_df, [:stepper, :toa, :curve, :shift]),
-            [:time_linalg, convcol] => ((x, y) -> shifted_geomean(x, y, shift = shift, cap = max_linalg, use_cap = use_cap)) => Symbol(:linalg, set),
-            [:time_upsys, convcol] => ((x, y) -> shifted_geomean(x, y, shift = shift, cap = max_upsys, use_cap = use_cap)) => Symbol(:uplhs, set),
-            [:time_uprhs, convcol] => ((x, y) -> shifted_geomean(x, y, shift = shift, cap = max_uprhs, use_cap = use_cap)) => Symbol(:uprhs, set),
-            [:time_getdir, convcol] => ((x, y) -> shifted_geomean(x, y, shift = shift, cap = max_getdir, use_cap = use_cap)) => Symbol(:getdir, set),
-            [:time_search, convcol] => ((x, y) -> shifted_geomean(x, y, shift = shift, cap = max_search)) => Symbol(:search, set),
-            [:time_upsys_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = shift, skipnotfinite = true, cap = max_upsys_iter, use_cap = use_cap)) => Symbol(:uplhs_piter, set),
-            [:time_uprhs_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = shift, skipnotfinite = true, cap = max_uprhs_iter, use_cap = use_cap)) => Symbol(:uprhs_piter, set),
-            [:time_getdir_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = shift, skipnotfinite = true, cap = max_getdir_iter, use_cap = use_cap)) => Symbol(:getdir_piter, set),
-            [:time_search_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = shift, skipnotfinite = true, cap = max_search_iter, use_cap = use_cap)) => Symbol(:search_piter, set),
+            [:time_linalg, convcol] => ((x, y) -> shifted_geomean(x, y, shift = total_shift, cap = max_linalg, use_cap = use_cap)) => Symbol(:linalg, set),
+            [:time_upsys, convcol] => ((x, y) -> shifted_geomean(x, y, shift = total_shift, cap = max_upsys, use_cap = use_cap)) => Symbol(:uplhs, set),
+            [:time_uprhs, convcol] => ((x, y) -> shifted_geomean(x, y, shift = total_shift, cap = max_uprhs, use_cap = use_cap)) => Symbol(:uprhs, set),
+            [:time_getdir, convcol] => ((x, y) -> shifted_geomean(x, y, shift = total_shift, cap = max_getdir, use_cap = use_cap)) => Symbol(:getdir, set),
+            [:time_search, convcol] => ((x, y) -> shifted_geomean(x, y, shift = total_shift, cap = max_search)) => Symbol(:search, set),
+            [:time_upsys_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_upsys_iter, use_cap = use_cap)) => Symbol(:uplhs_piter, set),
+            [:time_uprhs_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_uprhs_iter, use_cap = use_cap)) => Symbol(:uprhs_piter, set),
+            [:time_getdir_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_getdir_iter, use_cap = use_cap)) => Symbol(:getdir_piter, set),
+            [:time_search_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_search_iter, use_cap = use_cap)) => Symbol(:search_piter, set),
             )
         sort!(subtime_df, [order(:stepper, rev = true), :toa, :curve, :shift])
         CSV.write(joinpath(output_folder, "subtime" * string(set) * "_.csv"), subtime_df)
         return subtime_df
     end
-    
+
     sep = " & "
     for s in sets
         if s == :_thisconv
@@ -216,35 +217,41 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
     (ratios, max_ratio) = BenchmarkProfiles.performance_ratios(Matrix{Float64}(wide_df[!, string.([s1, s2])]))
 
     # performance_profile(Matrix{Float64}(wide_df[!, string.([s1, s2])]), ["p", "c"])
-
-    # copied from https://github.com/JuliaSmoothOptimizers/BenchmarkProfiles.jl/blob/master/src/performance_profiles.jl
-    (np, ns) = size(ratios)
-    ratios = [ratios; 2.0 * max_ratio * ones(1, ns)]
-    xs = collect(1:(np + 1)) / np
+    (x_plot, y_plot, max_ratio) = BenchmarkProfiles.performance_profile_data(Matrix{Float64}(wide_df[!, string.([s1, s2])]), logscale = true)
     for s = 1 : 2
-        rs = view(ratios, :, s)
-        xidx = zeros(Int,length(rs)+1)
-        k = 0
-        rv = minimum(rs)
-        maxval = maximum(rs)
-        while rv < maxval
-            k += 1
-            xidx[k] = findlast(rs .<= rv)
-            rv = max(rs[xidx[k]], rs[xidx[k]+1])
-        end
-        xidx[k+1] = length(rs)
-        xidx = xidx[xidx .> 0]
-        xidx = unique(xidx) # Needed?
-
-        # because we are making a step line graph from a CSV, modify (x, y) to make steps
-        x = rs[xidx]
-        y = xs[xidx]
-        # x = vcat(0, 0, repeat(x[1:(end - 1)], inner = 2), x[end])
-        # y = vcat(0, repeat(y, inner = 2))
-        x = vcat(0, repeat(x, inner = 2))
-        y = vcat(0, 0, repeat(y[1:(end - 1)], inner = 2), y[end])
+        x = vcat(0, repeat(x_plot[s], inner = 2))
+        y = vcat(0, 0, repeat(y_plot[s][1:(end - 1)], inner = 2), y_plot[s][end])
         CSV.write(joinpath(output_folder, string(feature) * "_" * string(metric) * "_$(s)" * "_pp" * ".csv"), DataFrame(x = x, y = y))
     end
+
+    # # copied from https://github.com/JuliaSmoothOptimizers/BenchmarkProfiles.jl/blob/master/src/performance_profiles.jl
+    # (np, ns) = size(ratios)
+    # ratios = [ratios; 2.0 * max_ratio * ones(1, ns)]
+    # xs = collect(1:(np + 1)) / np
+    # for s = 1 : 2
+    #     rs = view(ratios, :, s)
+    #     xidx = zeros(Int,length(rs)+1)
+    #     k = 0
+    #     rv = minimum(rs)
+    #     maxval = maximum(rs)
+    #     while rv < maxval
+    #         k += 1
+    #         xidx[k] = findlast(rs .<= rv)
+    #         rv = max(rs[xidx[k]], rs[xidx[k]+1])
+    #     end
+    #     xidx[k+1] = length(rs)
+    #     xidx = xidx[xidx .> 0]
+    #     xidx = unique(xidx) # Needed?
+    #
+    #     # because we are making a step line graph from a CSV, modify (x, y) to make steps
+    #     x = rs[xidx]
+    #     y = xs[xidx]
+    #     # x = vcat(0, 0, repeat(x[1:(end - 1)], inner = 2), x[end])
+    #     # y = vcat(0, repeat(y, inner = 2))
+    #     x = vcat(0, repeat(x, inner = 2))
+    #     y = vcat(0, 0, repeat(y[1:(end - 1)], inner = 2), y[end])
+    #     CSV.write(joinpath(output_folder, string(feature) * "_" * string(metric) * "_$(s)" * "_pp" * ".csv"), DataFrame(x = x, y = y))
+    # end
 
     return
 end
