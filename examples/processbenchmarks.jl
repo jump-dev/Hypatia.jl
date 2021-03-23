@@ -49,7 +49,7 @@ examples_params = Dict(
         [:L1, :n, :d, :m], [5, 1, 3, 4],
         [:SEP,], Symbol[]
         ),
-    "RandomPolyMatJuMP" => (
+    "NearestPolyMatJuMP" => (
         [:n, :d, :m], [1, 2, 3],
         [:SEP,], Symbol[]
         ),

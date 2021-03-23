@@ -81,7 +81,7 @@ JuMP_example_names = [
     # "polymin",
     # "polynorm",
     # "portfolio",
-    # "randompolymat",
+    # "nearestpolymat",
     # "shapeconregr",
     ]
 
