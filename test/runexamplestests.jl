@@ -13,7 +13,7 @@ include(joinpath(examples_dir, "common_native.jl"))
 
 # path to write results DataFrame to CSV, if any
 # results_path = joinpath(homedir(), "bench", "bench.csv")
-results_path = joinpath(pwd(), "bench2", "bench_various.csv")
+results_path = joinpath(pwd(), "bench2", "bench.csv")
 # results_path = nothing
 
 print_memory() = println("free memory (GB): ", Float64(Sys.free_memory()) / 2^30)
@@ -106,8 +106,8 @@ perf = DataFrames.DataFrame(
     extender = String[],
     stepper = Symbol[],
     system_solver = Symbol[],
-    use_corr = Bool[],
-    use_curve_search = Bool[],
+    toa = Bool[],
+    curve = Bool[],
     shift = Int[],
     n = Int[],
     p = Int[],
