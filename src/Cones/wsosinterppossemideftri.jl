@@ -143,18 +143,18 @@ end
 is_dual_feas(cone::WSOSInterpPosSemidefTri) = true
 
 # diagonal from each (i, j) block in mat' * mat
-function block_diag_prod!(vect::Vector{T}, mat::Matrix{T}, U::Int, R::Int, rt2::T, scal::Int = 1) where T
+function block_diag_prod!(vect::Vector{T}, mat::Matrix{T}, U::Int, R::Int, rt2::T) where T
     @inbounds for u in 1:U
         idx = u
         j_idx = u
         for j in 1:R
             i_idx = u
             for i in 1:(j - 1)
-                @views vect[idx] += dot(mat[:, i_idx], mat[:, j_idx]) * rt2 * scal
+                @views vect[idx] += dot(mat[:, i_idx], mat[:, j_idx]) * rt2
                 idx += U
                 i_idx += U
             end
-            @views vect[idx] += sum(abs2, mat[:, j_idx]) * scal
+            @views vect[idx] += sum(abs2, mat[:, j_idx])
             j_idx += U
             idx += U
         end
@@ -166,6 +166,7 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
     @assert is_feas(cone)
     U = cone.U
     R = cone.R
+    grad = cone.grad
     cone.grad .= 0
 
     @inbounds for k in eachindex(cone.PΛiP)
@@ -194,8 +195,9 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
         end
 
         # update grad
-        block_diag_prod!(cone.grad, ΛFLP, U, R, cone.rt2, -1)
+        block_diag_prod!(grad, ΛFLP, U, R, cone.rt2)
     end
+    grad .*= -1
 
     cone.grad_updated = true
     return cone.grad

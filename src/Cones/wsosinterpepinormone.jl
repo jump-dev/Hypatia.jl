@@ -208,52 +208,36 @@ function update_grad(cone::WSOSInterpEpiNormOne)
     @assert cone.is_feas
     U = cone.U
     R = cone.R
-    R2 = R - 2
     Λfact = cone.Λfact
     matfact = cone.matfact
+    grad = cone.grad
+    grad .= 0
 
-    cone.grad .= 0
-    for k in eachindex(cone.Ps)
+    @inbounds for k in eachindex(cone.Ps)
         Pk = cone.Ps[k]
         Λ11LiP = cone.Λ11LiP[k]
-        PΛ11iP = cone.tempUU_vec[k]
-        PΛiPs1 = cone.PΛiPs1[k]
-        PΛiPs2 = cone.PΛiPs2[k]
         ΛLi_Λ = cone.ΛLi_Λ[k]
         factk = cone.matfact[k]
         ΛLiPs11 = cone.ΛLiPs11[k]
         ΛLiPs12 = cone.ΛLiPs12[k]
 
-        # P * inv(Λ_11) * P' for (1, 1) hessian block and adding to PΛiPs[r][r]
+        # prep ΛLiPs
         ldiv!(Λ11LiP, cone.Λfact[k].L, Pk')
-        mul!(PΛ11iP, Λ11LiP', Λ11LiP)
 
-        # prep PΛiPs
-        L = size(Pk, 2)
         for r in 1:(R - 1)
             mul!(ΛLiPs12[r], ΛLi_Λ[r]', Λ11LiP, -1, false)
             ldiv!(factk[r].L, ΛLiPs12[r])
-        end
-        # get all the PΛiPs that are in row one or on the diagonal
-        for r in 1:(R - 1)
             ldiv!(ΛLiPs11[r], factk[r].L, Pk')
-            mul!(PΛiPs2[r], ΛLiPs12[r]', ΛLiPs11[r])
-            mul!(PΛiPs1[r], ΛLiPs12[r]', ΛLiPs12[r])
-            @. PΛiPs1[r] += PΛ11iP
         end
 
-        # (1, 1)-block
-        # gradient is diag of sum(-PΛiPs[i][i] for i in 1:R) + (R - 1) * Lambda_11 - Lambda_11
-        @inbounds for i in 1:U
-            cone.grad[i] += PΛ11iP[i, i] * R2
-            @inbounds for r in 1:(R - 1)
-                cone.grad[i] -= 2 * PΛiPs1[r][i, i]
+        @views for u in 1:U
+            grad[u] -= sum(abs2, Λ11LiP[:, u]) * R
+            idx = u + U
+            for r in 1:(R - 1)
+                grad[u] -= 2 * sum(abs2, ΛLiPs12[r][:, u])
+                grad[idx] -= 2 * dot(ΛLiPs12[r][:, u], ΛLiPs11[r][:, u])
+                idx += U
             end
-        end
-        idx = U + 1
-        @inbounds for r in 1:(R - 1), i in 1:U
-            cone.grad[idx] -= 2 * PΛiPs2[r][i, i]
-            idx += 1
         end
     end
 
@@ -293,17 +277,27 @@ function update_hess_prod(cone::WSOSInterpEpiNormOne)
     cone.hess_diag_blocks[R] .= 0
 
     @inbounds for k in eachindex(cone.Ps)
+        Λ11LiP = cone.Λ11LiP[k]
+        PΛ11iP = cone.tempUU_vec[k]
         PΛiPs1 = cone.PΛiPs1[k]
         PΛiPs2 = cone.PΛiPs2[k]
+        ΛLiPs11 = cone.ΛLiPs11[k]
+        ΛLiPs12 = cone.ΛLiPs12[k]
 
-        PΛ11iP = cone.tempUU_vec[k]
-        for r in 1:(R - 1), j in 1:U, i in 1:j
-            ij1 = PΛiPs1[r][i, j]
-            ij2 = PΛiPs2[r][i, j]
-            uu = 2 * (abs2(ij1) + abs2(ij2))
-            cone.hess_diag_blocks[1][i, j] += uu
-            cone.hess_diag_blocks[r + 1][i, j] += uu
-            cone.hess_edge_blocks[r][i, j] += 4 * (ij1 * ij2)
+        # P * inv(Λ_11) * P' for (1, 1) hessian block and adding to PΛiPs[r][r]
+        mul!(PΛ11iP, Λ11LiP', Λ11LiP)
+        for r in 1:(R - 1)
+            mul!(PΛiPs2[r], ΛLiPs12[r]', ΛLiPs11[r])
+            mul!(PΛiPs1[r], ΛLiPs12[r]', ΛLiPs12[r])
+            @. PΛiPs1[r] += PΛ11iP
+            for j in 1:U, i in 1:j
+                ij1 = PΛiPs1[r][i, j]
+                ij2 = PΛiPs2[r][i, j]
+                uu = 2 * (abs2(ij1) + abs2(ij2))
+                cone.hess_diag_blocks[1][i, j] += uu
+                cone.hess_diag_blocks[r + 1][i, j] += uu
+                cone.hess_edge_blocks[r][i, j] += 4 * (ij1 * ij2)
+            end
         end
         for j in 1:U, i in 1:j
             cone.hess_diag_blocks[1][i, j] -= abs2(PΛ11iP[i, j]) * R2
