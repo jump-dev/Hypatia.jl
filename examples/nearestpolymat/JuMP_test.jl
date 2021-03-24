@@ -27,4 +27,4 @@ insts["various"] = [
     ((4, 4, 5, false, true, false), nothing, relaxed_tols),
     ((4, 4, 5, true, false, false),),
     ]
-return (RandomPolyMatJuMP, insts)
+return (NearestPolyMatJuMP, insts)

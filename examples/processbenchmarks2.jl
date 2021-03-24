@@ -120,7 +120,7 @@ function subtime()
             [:time_upsys, convcol] => ((x, y) -> shifted_geomean(x, y, shift = total_shift, cap = max_upsys, use_cap = use_cap)) => Symbol(:uplhs, set),
             [:time_uprhs, convcol] => ((x, y) -> shifted_geomean(x, y, shift = total_shift, cap = max_uprhs, use_cap = use_cap)) => Symbol(:uprhs, set),
             [:time_getdir, convcol] => ((x, y) -> shifted_geomean(x, y, shift = total_shift, cap = max_getdir, use_cap = use_cap)) => Symbol(:getdir, set),
-            [:time_search, convcol] => ((x, y) -> shifted_geomean(x, y, shift = total_shift, cap = max_search)) => Symbol(:search, set),
+            [:time_search, convcol] => ((x, y) -> shifted_geomean(x, y, shift = total_shift, cap = max_search, use_cap = use_cap)) => Symbol(:search, set),
             [:time_upsys_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_upsys_iter, use_cap = use_cap)) => Symbol(:uplhs_piter, set),
             [:time_uprhs_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_uprhs_iter, use_cap = use_cap)) => Symbol(:uprhs_piter, set),
             [:time_getdir_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_getdir_iter, use_cap = use_cap)) => Symbol(:getdir_piter, set),
@@ -213,46 +213,14 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
         )
 
     wide_df = unstack(all_df, feature, metric)
-    @show names(wide_df)
     (ratios, max_ratio) = BenchmarkProfiles.performance_ratios(Matrix{Float64}(wide_df[!, string.([s1, s2])]))
 
-    # performance_profile(Matrix{Float64}(wide_df[!, string.([s1, s2])]), ["p", "c"])
     (x_plot, y_plot, max_ratio) = BenchmarkProfiles.performance_profile_data(Matrix{Float64}(wide_df[!, string.([s1, s2])]), logscale = true)
     for s = 1 : 2
         x = vcat(0, repeat(x_plot[s], inner = 2))
         y = vcat(0, 0, repeat(y_plot[s][1:(end - 1)], inner = 2), y_plot[s][end])
         CSV.write(joinpath(output_folder, string(feature) * "_" * string(metric) * "_$(s)" * "_pp" * ".csv"), DataFrame(x = x, y = y))
     end
-
-    # # copied from https://github.com/JuliaSmoothOptimizers/BenchmarkProfiles.jl/blob/master/src/performance_profiles.jl
-    # (np, ns) = size(ratios)
-    # ratios = [ratios; 2.0 * max_ratio * ones(1, ns)]
-    # xs = collect(1:(np + 1)) / np
-    # for s = 1 : 2
-    #     rs = view(ratios, :, s)
-    #     xidx = zeros(Int,length(rs)+1)
-    #     k = 0
-    #     rv = minimum(rs)
-    #     maxval = maximum(rs)
-    #     while rv < maxval
-    #         k += 1
-    #         xidx[k] = findlast(rs .<= rv)
-    #         rv = max(rs[xidx[k]], rs[xidx[k]+1])
-    #     end
-    #     xidx[k+1] = length(rs)
-    #     xidx = xidx[xidx .> 0]
-    #     xidx = unique(xidx) # Needed?
-    #
-    #     # because we are making a step line graph from a CSV, modify (x, y) to make steps
-    #     x = rs[xidx]
-    #     y = xs[xidx]
-    #     # x = vcat(0, 0, repeat(x[1:(end - 1)], inner = 2), x[end])
-    #     # y = vcat(0, repeat(y, inner = 2))
-    #     x = vcat(0, repeat(x, inner = 2))
-    #     y = vcat(0, 0, repeat(y[1:(end - 1)], inner = 2), y[end])
-    #     CSV.write(joinpath(output_folder, string(feature) * "_" * string(metric) * "_$(s)" * "_pp" * ".csv"), DataFrame(x = x, y = y))
-    # end
-
     return
 end
 
