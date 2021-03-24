@@ -6,7 +6,7 @@ import LinearAlgebra.BlasReal
 import LinearAlgebra.BlasFloat
 import LinearAlgebra.BlasInt
 import LinearAlgebra.BLAS.@blasfunc
-import LinearAlgebra.LAPACK.liblapack
+import LinearAlgebra.BLAS.liblapack
 
 # outer product B = alpha * A' * A + beta * B
 outer_prod(A::AbstractMatrix{T}, B::AbstractMatrix{T}, alpha::Real, beta::Real) where {T <: LinearAlgebra.BlasReal} = BLAS.syrk!('U', 'T', alpha, A, beta, B)

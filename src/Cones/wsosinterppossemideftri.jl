@@ -146,26 +146,27 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
     @assert is_feas(cone)
     U = cone.U
     R = cone.R
+    cone.grad .= 0
 
-    # update PΛiP
+    # update ΛFLP
     @inbounds for k in eachindex(cone.PΛiP)
         L = size(cone.Ps[k], 2)
         ΛFL = cone.ΛFL[k].L
         ΛFLP = cone.ΛFLP[k]
 
         # given cholesky L factor ΛFL, get ΛFLP = ΛFL \ kron(I, P')
-        @inbounds for p in 1:R
+        for p in 1:R
             block_U_p_idxs = block_idxs(U, p)
             block_L_p_idxs = block_idxs(L, p)
             @views ΛFLP_pp = ΛFLP[block_L_p_idxs, block_U_p_idxs]
             # ΛFLP_pp = ΛFL_pp \ P'
             @views ldiv!(ΛFLP_pp, LowerTriangular(ΛFL[block_L_p_idxs, block_L_p_idxs]), cone.Ps[k]')
             # to get off-diagonals in ΛFLP, subtract known blocks aggregated in ΛFLP_qp
-            @inbounds for q in (p + 1):R
+            for q in (p + 1):R
                 block_L_q_idxs = block_idxs(L, q)
                 @views ΛFLP_qp = ΛFLP[block_L_q_idxs, block_U_p_idxs]
                 ΛFLP_qp .= 0
-                @inbounds for p2 in p:(q - 1)
+                for p2 in p:(q - 1)
                     block_L_p2_idxs = block_idxs(L, p2)
                     @views mul!(ΛFLP_qp, ΛFL[block_L_q_idxs, block_L_p2_idxs], ΛFLP[block_L_p2_idxs, block_U_p_idxs], -1, 1)
                 end
@@ -173,28 +174,21 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
             end
         end
 
-        # PΛiP = ΛFLP' * ΛFLP
-        PΛiPk = cone.PΛiP[k]
-        @inbounds for p in 1:R, q in p:R
-            block_p_idxs = block_idxs(U, p)
-            block_q_idxs = block_idxs(U, q)
-            # since ΛFLP is block lower triangular rows only from max(p,q) start making a nonzero contribution to the product
-            row_range = ((q - 1) * L + 1):(L * R)
-            @inbounds @views mul!(PΛiPk[block_p_idxs, block_q_idxs], ΛFLP[row_range, block_p_idxs]', ΛFLP[row_range, block_q_idxs])
-        end
-        LinearAlgebra.copytri!(PΛiPk, 'U')
-    end
-
-    # update gradient
-    for p in 1:cone.R, q in 1:p
-        scal = (p == q ? -1 : -cone.rt2)
-        idx = (svec_idx(p, q) - 1) * U
-        block_p = (p - 1) * U
-        block_q = (q - 1) * U
-        for i in 1:U
-            block_p_i = block_p + i
-            block_q_i = block_q + i
-            @inbounds cone.grad[idx + i] = scal * sum(PΛiPk[block_q_i, block_p_i] for PΛiPk in cone.PΛiP)
+        # diagonal from each (i, j) block in ΛFLP' * ΛFLP
+        for u in 1:U
+            idx = u
+            j_idx = u
+            for j in 1:R
+                i_idx = u
+                for i in 1:(j - 1)
+                    @views cone.grad[idx] -= dot(ΛFLP[:, i_idx], ΛFLP[:, j_idx]) * cone.rt2
+                    idx += U
+                    i_idx += U
+                end
+                @views cone.grad[idx] -= sum(abs2, ΛFLP[:, j_idx])
+                j_idx += U
+                idx += U
+            end
         end
     end
 
@@ -208,6 +202,23 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     U = cone.U
     H = cone.hess.data
     H .= 0
+
+    # update ΛFLP
+    @inbounds for k in eachindex(cone.PΛiP)
+        L = size(cone.Ps[k], 2)
+        # PΛiP = ΛFLP' * ΛFLP
+        PΛiPk = cone.PΛiP[k]
+        ΛFLP = cone.ΛFLP[k]
+        for p in 1:R, q in p:R
+            block_p_idxs = block_idxs(U, p)
+            block_q_idxs = block_idxs(U, q)
+            # since ΛFLP is block lower triangular rows only from max(p,q) start making a nonzero contribution to the product
+            row_range = ((q - 1) * L + 1):(L * R)
+            @views mul!(PΛiPk[block_p_idxs, block_q_idxs], ΛFLP[row_range, block_p_idxs]', ΛFLP[row_range, block_q_idxs])
+        end
+        LinearAlgebra.copytri!(PΛiPk, 'U')
+    end
+
     @inbounds for p in 1:R, q in 1:p
         block = svec_idx(p, q)
         idxs = block_idxs(U, block)
