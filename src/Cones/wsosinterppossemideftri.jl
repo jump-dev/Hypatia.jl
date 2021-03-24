@@ -142,13 +142,33 @@ end
 
 is_dual_feas(cone::WSOSInterpPosSemidefTri) = true
 
+# diagonal from each (i, j) block in mat' * mat
+function block_diag_prod!(vect::Vector{T}, mat::Matrix{T}, U::Int, R::Int, rt2::T) where T
+    @inbounds for u in 1:U
+        idx = u
+        j_idx = u
+        for j in 1:R
+            i_idx = u
+            for i in 1:(j - 1)
+                @views vect[idx] += dot(mat[:, i_idx], mat[:, j_idx]) * rt2
+                idx += U
+                i_idx += U
+            end
+            @views vect[idx] += sum(abs2, mat[:, j_idx])
+            j_idx += U
+            idx += U
+        end
+    end
+    return
+end
+
 function update_grad(cone::WSOSInterpPosSemidefTri)
     @assert is_feas(cone)
     U = cone.U
     R = cone.R
+    grad = cone.grad
     cone.grad .= 0
 
-    # update ΛFLP
     @inbounds for k in eachindex(cone.PΛiP)
         L = size(cone.Ps[k], 2)
         ΛFL = cone.ΛFL[k].L
@@ -174,23 +194,10 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
             end
         end
 
-        # diagonal from each (i, j) block in ΛFLP' * ΛFLP
-        for u in 1:U
-            idx = u
-            j_idx = u
-            for j in 1:R
-                i_idx = u
-                for i in 1:(j - 1)
-                    @views cone.grad[idx] -= dot(ΛFLP[:, i_idx], ΛFLP[:, j_idx]) * cone.rt2
-                    idx += U
-                    i_idx += U
-                end
-                @views cone.grad[idx] -= sum(abs2, ΛFLP[:, j_idx])
-                j_idx += U
-                idx += U
-            end
-        end
+        # update grad
+        block_diag_prod!(grad, ΛFLP, U, R, cone.rt2)
     end
+    grad .*= -1
 
     cone.grad_updated = true
     return cone.grad
@@ -203,7 +210,6 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     H = cone.hess.data
     H .= 0
 
-    # update ΛFLP
     @inbounds for k in eachindex(cone.PΛiP)
         L = size(cone.Ps[k], 2)
         # PΛiP = ΛFLP' * ΛFLP
@@ -277,23 +283,7 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
         end
 
         big_mat_half = mul!(cone.tempLRUR2[k], ΛFLP_dir, Symmetric(cone.PΛiP[k], :U))
-        # diagonal from each (i, j) block in big_mat_half' * big_mat_half
-        for u in 1:U
-            idx = u
-            j_idx = u
-            for j in 1:R
-                i_idx = u
-                for i in 1:(j - 1)
-                    @views corr[idx] += dot(big_mat_half[:, i_idx], big_mat_half[:, j_idx]) * cone.rt2
-                    idx += U
-                    i_idx += U
-                end
-                @views corr[idx] += sum(abs2, big_mat_half[:, j_idx])
-                j_idx += U
-                idx += U
-            end
-        end
-
+        block_diag_prod!(corr, big_mat_half, U, R, cone.rt2)
     end
 
     return corr

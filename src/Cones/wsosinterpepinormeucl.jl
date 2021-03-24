@@ -179,52 +179,36 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
     @assert cone.is_feas
     U = cone.U
     R = cone.R
-    R2 = R - 2
     Λfact = cone.Λfact
     matfact = cone.matfact
+    grad = cone.grad
 
-    cone.grad .= 0
+    grad .= 0
     @inbounds for k in eachindex(cone.Ps)
         Pk = cone.Ps[k]
         Λ11LiP = cone.Λ11LiP[k]
-        PΛ11iP = cone.PΛ11iP[k]
         ΛLiP_edge = cone.ΛLiPs_edge[k]
         matLiP = cone.matLiP[k]
-        PΛiPs = cone.PΛiP_blocks_U[k]
         ΛLi_Λ = cone.ΛLi_Λ[k]
 
-        # P * inv(Λ_11) * P' for (1, 1) hessian block and adding to PΛiPs[r][r]
         ldiv!(Λ11LiP, cone.Λfact[k].L, Pk') # TODO may be more efficient to do ldiv(fact.U', B) than ldiv(fact.L, B) here and elsewhere since the factorizations are of symmetric :U matrices
-        mul!(PΛ11iP, Λ11LiP', Λ11LiP)
 
-        # prep PΛiPs
-        # block-(1,1) is P * inv(mat) * P'
+        # prep PΛiP halves
         ldiv!(matLiP, matfact[k].L, Pk')
-        mul!(PΛiPs[1, 1], matLiP', matLiP)
         # top edge of ΛLiP
         for r in 1:(R - 1)
             mul!(ΛLiP_edge[r], ΛLi_Λ[r]', Λ11LiP, -1, false)
             ldiv!(matfact[k].L, ΛLiP_edge[r])
         end
-        # get all the PΛiPs that are in row one or on the diagonal
-        for r in 2:R
-            mul!(PΛiPs[r, 1], ΛLiP_edge[r - 1]', matLiP)
-            mul!(PΛiPs[r, r], ΛLiP_edge[r - 1]', ΛLiP_edge[r - 1])
-            @. PΛiPs[r, r] += PΛ11iP
-        end
 
-        # (1, 1)-block
-        # gradient is diag of sum(-PΛiPs[i][i] for i in 1:R) + (R - 1) * P((Lambda_11)\P') - P((Lambda_11)\P')
-        for i in 1:U
-            cone.grad[i] += PΛ11iP[i, i] * R2
-            for r in 1:R
-                cone.grad[i] -= PΛiPs[r, r][i, i]
+        @views for u in 1:U
+            grad[u] -= sum(abs2, Λ11LiP[:, u]) + sum(abs2, matLiP[:, u])
+            idx = U + u
+            for r in 2:R
+                grad[idx] -= 2 * dot(ΛLiP_edge[r - 1][:, u], matLiP[:, u])
+                grad[u] -= sum(abs2, ΛLiP_edge[r - 1][:, u])
+                idx += U
             end
-        end
-        idx = U + 1
-        for r in 2:R, i in 1:U
-            cone.grad[idx] -= 2 * PΛiPs[r, 1][i, i]
-            idx += 1
         end
     end
 
@@ -247,9 +231,22 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
         PΛ11iP = cone.PΛ11iP[k]
         UUk = cone.tempUU_vec[k]
         ΛLiP_edge = cone.ΛLiPs_edge[k]
-        # get the PΛiPs not calculated in update_grad
-        for r in 2:R, r2 in 2:(r - 1)
-            mul!(PΛiPs[r, r2], ΛLiP_edge[r - 1]', ΛLiP_edge[r2 - 1])
+        matLiP = cone.matLiP[k]
+        Λ11LiP = cone.Λ11LiP[k]
+
+        # prep PΛiPs
+        # P * inv(Λ_11) * P' for (1, 1) hessian block and adding to PΛiPs[r][r]
+        mul!(PΛ11iP, Λ11LiP', Λ11LiP)
+        # block-(1,1) is P * inv(mat) * P'
+        mul!(PΛiPs[1, 1], matLiP', matLiP)
+        # get all the PΛiPs that are in row one or on the diagonal
+        for r in 2:R
+            mul!(PΛiPs[r, 1], ΛLiP_edge[r - 1]', matLiP)
+            mul!(PΛiPs[r, r], ΛLiP_edge[r - 1]', ΛLiP_edge[r - 1])
+            @. PΛiPs[r, r] += PΛ11iP
+            for r2 in 2:(r - 1)
+                mul!(PΛiPs[r, r2], ΛLiP_edge[r - 1]', ΛLiP_edge[r2 - 1])
+            end
         end
         copytri!(cone.PΛiPs[k], 'L')
 
