@@ -208,7 +208,6 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     H = cone.hess.data
     H .= 0
 
-    # update ΛFLP
     @inbounds for k in eachindex(cone.PΛiP)
         L = size(cone.Ps[k], 2)
         # PΛiP = ΛFLP' * ΛFLP
