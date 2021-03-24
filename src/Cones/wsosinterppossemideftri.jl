@@ -144,7 +144,7 @@ is_dual_feas(cone::WSOSInterpPosSemidefTri) = true
 
 # diagonal from each (i, j) block in mat' * mat
 function block_diag_prod!(vect::Vector{T}, mat::Matrix{T}, U::Int, R::Int, rt2::T, scal::Int = 1) where T
-    for u in 1:U
+    @inbounds for u in 1:U
         idx = u
         j_idx = u
         for j in 1:R
