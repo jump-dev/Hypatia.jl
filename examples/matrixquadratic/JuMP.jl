@@ -8,6 +8,9 @@ where Omega is a set of fixed indices and P is a random PSD matrix
 the nonlinear constraint Y - X*X' in S^n_+ is equivalent to
 the conic constraint (Y, 0.5, X) in MatrixEpiPerSquareCone(),
 and also to the larger conic constraint [I X'; X Y] in S^{n + m}_+
+
+simple case of nonlinfear matrix inequality example from Lectures on Modern
+Convex Optimization by Aharon Ben-Tal and Arkadi Nemirovski, pg 154
 =#
 
 using SparseArrays
