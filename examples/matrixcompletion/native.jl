@@ -1,20 +1,14 @@
 #=
-TODO write proper description of the model
+TODO improve description of the model
 
-references minimizing the nuclear norm:
-Minimization of a Particular Singular Value by Alborz Alavian and Michael Rotkowitz
-The Power of Convex Relaxation Emmanuel J. Candes and Terence Tao
-http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
-other:
-https://www.cvxpy.org/examples/dgp/pf_matrix_completion.html
-
-hypogeomean constraint inspired by:
-https://www.cvxpy.org/examples/dgp/pf_matrix_completion.html
+see e.g.:
+- "The Power of Convex Relaxation" by Emmanuel J. Candes and Terence Tao
+- http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
+- https://www.cvxpy.org/examples/dgp/pf_matrix_completion.html (includes geomean constraint)
 
 extended formulations to (u, W) in EpiNormSpectral(use_dual = true) uses:
 min 1/2(tr(W1) + tr(W2))
 [W1 X; X' W2] ⪰ 0
-from http://www.mit.edu/~parrilo/pubs/talkfiles/ISMP2009.pdf
 =#
 
 struct MatrixCompletionNative{T <: Real} <: ExampleInstanceNative{T}
