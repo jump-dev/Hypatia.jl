@@ -1,5 +1,5 @@
 #=
-D-optimal experimental design
+D-optimal experiment design maximizes the determinant of the information matrix
 adapted from Boyd and Vandenberghe, "Convex Optimization", section 7.5
 maximize    F(V*diagm(np)*V')
 subject to  sum(np) == n
