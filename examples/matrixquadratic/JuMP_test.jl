@@ -25,7 +25,7 @@ insts["various"] = [
     ((30, 40, false),),
     ((60, 80, true),),
     ((60, 80, false),),
-    ((120, 160, true),),
-    ((120, 160, false),),
+    ((30, 160, true),),
+    ((30, 160, false),),
     ]
 return (MatrixQuadraticJuMP, insts)

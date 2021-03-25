@@ -215,12 +215,14 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
         )
 
     wide_df = unstack(all_df, feature, metric)
-    (ratios, max_ratio) = BenchmarkProfiles.performance_ratios(Matrix{Float64}(wide_df[!, string.([s1, s2])]))
-
     (x_plot, y_plot, max_ratio) = BenchmarkProfiles.performance_profile_data(Matrix{Float64}(wide_df[!, string.([s1, s2])]), logscale = true)
-    for s = 1 : 2
+    for s in 1:2
         x = vcat(0, repeat(x_plot[s], inner = 2))
         y = vcat(0, 0, repeat(y_plot[s][1:(end - 1)], inner = 2), y_plot[s][end])
+        # cut off last point (keeps largest x value which is 2 * max ratio)
+        # x = vcat(0, repeat(x_plot[s][1:(end - 1)], inner = 2), x_plot[s][end])
+        # y = vcat(0, 0, repeat(y_plot[s][1:(end - 1)], inner = 2))
+        # cut off last two points (so only go up to max_ratio)
         CSV.write(joinpath(output_folder, string(feature) * "_" * string(metric) * "_$(s)" * "_pp" * ".csv"), DataFrame(x = x, y = y))
     end
     return
@@ -243,7 +245,7 @@ function instancestats()
     inst_df = select(one_solver, :num_cones => ByRow(log10) => :numcones, [:n, :p, :q] => ((x, y, z) -> log10.(x .+ y .+ z)) => :npq)
     CSV.write(joinpath(output_folder, "inststats.csv"), inst_df)
     # for solve times, only include converged instances
-    solve_times = filter!(t -> t.conv, one_solver)
+    solve_times = filter(t -> t.conv, one_solver)
     CSV.write(joinpath(output_folder, "solvetimes.csv"), select(solve_times, :solve_time => ByRow(log10) => :time))
 
     # only used to get list of cones manually
