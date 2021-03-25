@@ -53,5 +53,7 @@ insts["various"] = [
     ((2, 10, false), ExpPSDOptimizer),
     ((6, 3, true),),
     ((6, 3, false),),
+    ((8, 3, true),),
+    ((8, 3, false),),
     ]
 return (CentralPolyMatJuMP, insts)

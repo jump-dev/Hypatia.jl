@@ -61,5 +61,11 @@ insts["various"] = [
     ((200, false, false, true),),
     ((200, true, true, true),),
     ((200, true, false, true),),
+    ((400, false, true, false),),
+    ((400, false, false, false),),
+    ((400, false, true, true),),
+    ((400, false, false, true),),
+    ((400, true, true, true),),
+    ((400, true, false, true),),
     ]
 return (NearestPSDJuMP, insts)

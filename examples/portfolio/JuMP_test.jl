@@ -40,5 +40,7 @@ insts["various"] = [
     ((2000, true, true),),
     ((4000, true, false),),
     ((4000, true, true),),
+    ((8000, true, false),),
+    ((8000, true, true),),
     ]
 return (PortfolioJuMP, insts)
