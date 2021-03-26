@@ -1,6 +1,6 @@
 #=
 univariate cubic dynamical system
-example taken from "Convex computation of the region of attraction of polynomial control systems" by D. Henrion and M. Korda
+example taken from Section 9.1 of "Convex computation of the region of attraction of polynomial control systems" by D. Henrion and M. Korda
 =#
 
 import DynamicPolynomials
