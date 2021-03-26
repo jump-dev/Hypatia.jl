@@ -1,4 +1,5 @@
 
+relaxed_tols = (default_tol_relax = 1000,)
 insts = Dict()
 insts["minimal"] = [
     ((3, true, false),),
@@ -41,6 +42,6 @@ insts["various"] = [
     ((4000, true, false),),
     ((4000, true, true),),
     ((8000, true, false),),
-    ((8000, true, true),),
+    ((8000, true, true), nothing, relaxed_tols),
     ]
 return (PortfolioJuMP, insts)
