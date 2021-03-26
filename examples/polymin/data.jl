@@ -102,6 +102,20 @@ function random_interp_data(
     return (interp_vals, Ps, true_min)
 end
 
+# function random_interp_data(
+#     ::Type{T},
+#     n::Int,
+#     halfdeg::Int,
+#     poly_unbnd::Bool,
+#     dom = (poly_unbnd ? ModelUtilities.FreeDomain{T}(n) : ModelUtilities.Box{T}(-ones(T, n), ones(T, n))),
+#     ) where {T <: Real}
+#     (U, pts, Ps) = ModelUtilities.interpolate(dom, halfdeg)
+#     interp_vals = randn(T, U)
+#     true_min = T(NaN) # TODO could get an upper bound by evaluating at random points in domain
+#     return (interp_vals, Ps, true_min)
+# end
+
+
 # real polynomials
 function real_poly_data(polyname::Symbol, T::Type{<:Real} = Float64)
     if polyname == :butcher
@@ -205,6 +219,20 @@ function real_poly_data(polyname::Symbol, T::Type{<:Real} = Float64)
     #     f = (x[1]-x[2]^2)^2+(x[2]-1)^2+(x[1]-x[3]^2)^2+(x[3]-1)^2
     #     dom = ModelUtilities.Ball{T}(zeros(T, 3), 10 * sqrt(T(3)))
     #     true_obj = 0 # small neighborhood around box
+    elseif polyname == :infeas1
+        n = 1
+        DP.@polyvar x[1:n]
+        f = sum(x)^3
+        dom = ModelUtilities.FreeDomain{T}(n)
+        true_obj = -Inf
+
+    elseif polyname == :infeas2
+        n = 1
+        DP.@polyvar x[1:n]
+        f = -sum(x)^2
+        dom = ModelUtilities.FreeDomain{T}(n)
+        true_obj = -Inf
+
     else
         error("poly $polyname not recognized")
     end

@@ -7,6 +7,7 @@ include(joinpath(@__DIR__, "data.jl"))
 struct PolyMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     interp_vals::Vector{T}
     Ps::Vector{Matrix{T}}
+    # poly_unbnd::Bool # minimum value of polynomial is unbounded so instance is primal or dual infeasible, else feasible
     true_min::Real
     use_primal::Bool # solve primal, else solve dual
     use_wsos::Bool # use wsosinterpnonnegative cone, else PSD formulation
@@ -20,6 +21,7 @@ end
 function PolyMinJuMP{Float64}(
     n::Int,
     halfdeg::Int,
+    # poly_unbnd::Bool
     args...)
     return PolyMinJuMP{Float64}(random_interp_data(Float64, n, halfdeg)..., args...)
 end
@@ -76,7 +78,11 @@ function build(inst::PolyMinJuMP{T}) where {T <: Float64}
 end
 
 function test_extra(inst::PolyMinJuMP{T}, model::JuMP.Model) where T
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
+    if inst.true_min == -Inf
+        @test JuMP.termination_status(model) == (inst.use_primal ? MOI.INFEASIBLE : MOI.DUAL_INFEASIBLE)
+    else
+        @test JuMP.termination_status(model) == MOI.OPTIMAL
+    end
     if JuMP.termination_status(model) == MOI.OPTIMAL && !isnan(inst.true_min)
         # check objective value is correct
         tol = eps(T)^0.1

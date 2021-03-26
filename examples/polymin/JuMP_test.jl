@@ -5,6 +5,10 @@ insts["minimal"] = [
     ((1, 2, false, true),),
     ((1, 2, false, false),),
     ((:lotkavolterra, 3, true, true),),
+    ((:infeas1, 3, true, true),),
+    ((:infeas1, 3, false, true),),
+    ((:infeas2, 3, true, true),),
+    ((:infeas2, 3, false, true),),
     ]
 insts["fast"] = [
     ((1, 3, true, true),),
