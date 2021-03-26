@@ -136,11 +136,21 @@ perf = DataFrames.DataFrame(
     x_viol = Float64[],
     y_viol = Float64[],
     z_viol = Float64[],
+    time_rescale = Float64[],
+    time_initx = Float64[],
+    time_inity = Float64[],
+    time_unproc = Float64[],
+    time_loadsys = Float64[],
+    time_upsys = Float64[],
+    time_upfact = Float64[],
+    time_uprhs = Float64[],
+    time_getdir = Float64[],
+    time_search = Float64[],
     setup_time = Float64[],
     check_time = Float64[],
     total_time = Float64[],
     )
-DataFrames.allowmissing!(perf, 7:21)
+DataFrames.allowmissing!(perf, 7:DataFrames.ncol(perf))
 
 isnothing(results_path) || CSV.write(results_path, perf)
 time_all = time()

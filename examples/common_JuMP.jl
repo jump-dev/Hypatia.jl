@@ -190,7 +190,8 @@ function solve_check(
     (x_viol, y_viol, z_viol) = certificate_violations(hyp_status, hyp_data, x, y, z, s)
     flush(stdout); flush(stderr)
 
-    solve_stats = (hyp_status, solve_time, num_iters, primal_obj, dual_obj, rel_obj_diff, compl, x_viol, y_viol, z_viol)
+    solve_stats = (hyp_status, solve_time, num_iters, primal_obj, dual_obj, rel_obj_diff, compl, x_viol, y_viol, z_viol,
+        NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
     return solve_stats
 end
 
