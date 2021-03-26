@@ -1,19 +1,24 @@
 #=
-check a sufficient condition for pointwise membership of vector valued polynomials in the second order cone
+check a sufficient condition for pointwise membership of vector valued polynomials in the epinormone/epinormeucl cone
 =#
 
-struct SecondOrderPolyJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+struct NormConePoly{T <: Real} <: ExampleInstanceJuMP{T}
     polys_name::Symbol
     deg::Int
     is_feas::Bool # whether model should be primal-dual feasible; only for testing
+    use_L2::Bool # check for membership in epigraph of L2, otherwise use L1
 end
 
-function build(inst::SecondOrderPolyJuMP{T}) where {T <: Float64}
+function build(inst::NormConePoly{T}) where {T <: Float64}
     halfdeg = div(inst.deg + 1, 2)
     (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{Float64}(1), halfdeg)
-    vals = secondorderpoly_data[inst.polys_name].(pts)
+    vals = normconepoly_data[inst.polys_name].(pts)
     l = length(vals[1])
-    cone = Hypatia.WSOSInterpEpiNormEuclCone{Float64}(l, U, Ps)
+    if inst.use_L2
+        cone = Hypatia.WSOSInterpEpiNormEuclCone{Float64}(l, U, Ps)
+    else
+        cone = Hypatia.WSOSInterpEpiNormOneCone{Float64}(l, U, Ps)
+    end
 
     model = JuMP.Model()
     JuMP.@constraint(model, [v[i] for i in 1:l for v in vals] in cone)
@@ -21,11 +26,11 @@ function build(inst::SecondOrderPolyJuMP{T}) where {T <: Float64}
     return model
 end
 
-function test_extra(inst::SecondOrderPolyJuMP{T}, model::JuMP.Model) where T
+function test_extra(inst::NormConePoly{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) == (inst.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 
-secondorderpoly_data = Dict(
+normconepoly_data = Dict(
     :polys1 => (x -> [x^2 + 2, x]),
     :polys2 => (x -> [2x^2 + 2, x, x]),
     :polys3 => (x -> [x^2 + 2, x, x]),

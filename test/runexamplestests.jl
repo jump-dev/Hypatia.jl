@@ -40,12 +40,12 @@ stepper_solvers = [
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    # ("minimal", Float64, 100),
+    ("minimal", Float64, 100),
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
     # ("fast", Float64, 300),
     # ("slow", Float64, 120),
-    ("compile", Float64, 3600),
+    # ("compile", Float64, 3600),
     ("various", Float64, 3600),
     ]
 
@@ -91,7 +91,7 @@ JuMP_example_names = [
     "nearestpolymat",
     "regionofattr",
     "robustgeomprog",
-    "secondorderpoly",
+    "normconepoly",
     "semidefinitepoly",
     "shapeconregr",
     "signomialmin",
@@ -172,7 +172,7 @@ include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
 
 for (stepper, system_solvers) in stepper_solvers, system_solver in system_solvers, (inst_set, real_T, time_limit) in instance_sets
     print_memory()
-    (inst_set == "compile") && (ex_insts["compile"] = ex_insts["various"])        
+    (inst_set == "compile") && (ex_insts["compile"] = ex_insts["various"])
     haskey(ex_insts, inst_set) || continue
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue

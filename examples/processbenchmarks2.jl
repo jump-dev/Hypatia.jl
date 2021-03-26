@@ -46,7 +46,7 @@ function agg_stats()
     conv = all_df[!, :conv]
     MAX_TIME = maximum(all_df[!, :solve_time][conv])
     MAX_ITER = maximum(all_df[!, :iters][conv])
-    time_shift = 0
+    time_shift = 1e-3
 
     df_agg = combine(groupby(all_df, [:stepper, :toa, :curve, :shift]),
         [:solve_time, :conv] => ((x, y) -> shifted_geomean(x, y, shift = time_shift)) => :time_geomean_thisconv,
@@ -85,11 +85,11 @@ function agg_stats()
 
     return
 end
-agg_stats()
+# agg_stats()
 
 function subtime()
     total_shift = 1e-4
-    piter_shift = 1e-4
+    piter_shift = 1e-5
     all_df = post_process()
     divfunc(x, y) = (x ./ y)
     preproc_cols = [:time_rescale, :time_initx, :time_inity, :time_unproc]
@@ -111,10 +111,12 @@ function subtime()
     max_uprhs = maximum(all_df[!, :time_uprhs][conv])
     max_getdir = maximum(all_df[!, :time_getdir][conv])
     max_search = maximum(all_df[!, :time_search][conv])
-    max_upsys_iter = maximum(all_df[!, :time_upsys_piter][conv])
-    max_uprhs_iter = maximum(all_df[!, :time_uprhs_piter][conv])
-    max_getdir_iter = maximum(all_df[!, :time_getdir_piter][conv])
-    max_search_iter = maximum(all_df[!, :time_search_piter][conv])
+    # get maximum values to use as caps for the "all" subset
+    skipnan(x) = (isnan(x) ? 0 : x)
+    max_upsys_iter = maximum(skipnan, all_df[!, :time_upsys_piter][conv])
+    max_uprhs_iter = maximum(skipnan, all_df[!, :time_uprhs_piter][conv])
+    max_getdir_iter = maximum(skipnan, all_df[!, :time_getdir_piter][conv])
+    max_search_iter = maximum(skipnan, all_df[!, :time_search_piter][conv])
 
     function get_subtime_df(set, convcol, use_cap)
         subtime_df = combine(groupby(all_df, [:stepper, :toa, :curve, :shift]),
@@ -222,16 +224,15 @@ function perf_prof(; feature = :stepper, metric = :solve_time)
         # cut off last point (keeps largest x value which is 2 * max ratio)
         # x = vcat(0, repeat(x_plot[s][1:(end - 1)], inner = 2), x_plot[s][end])
         # y = vcat(0, 0, repeat(y_plot[s][1:(end - 1)], inner = 2))
-        # cut off last two points (so only go up to max_ratio)
         CSV.write(joinpath(output_folder, string(feature) * "_" * string(metric) * "_$(s)" * "_pp" * ".csv"), DataFrame(x = x, y = y))
     end
     return
 end
 
-for feature in [:stepper, :curve, :toa, :shift], metric in [:solve_time, :iters]
-    @show feature, metric
-    perf_prof(feature = feature, metric = metric)
-end
+# for feature in [:stepper, :curve, :toa, :shift], metric in [:solve_time, :iters]
+#     @show feature, metric
+#     perf_prof(feature = feature, metric = metric)
+# end
 
 function instancestats()
     all_df = post_process()
