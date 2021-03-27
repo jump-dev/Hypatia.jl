@@ -7,5 +7,6 @@ deps/deps.jl
 scratch.jl
 */scratch.jl
 */raw/*
+*/*/raw/*
 benchmarks/*/analysis/*
 *bench.csv
