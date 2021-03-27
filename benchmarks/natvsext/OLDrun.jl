@@ -1,20 +1,31 @@
+import DataFrames
+import CSV
+using Printf
+import LinearAlgebra
 using Distributed
 using Hypatia
 using MosekTools
-include(joinpath(@__DIR__, "../spawn.jl"))
+
+interrupt()
+@assert nprocs() == 1
+println()
+
+examples_dir = @__DIR__
+include(joinpath(examples_dir, "common_JuMP.jl"))
 
 # path to write results DataFrame to CSV, if any
 results_path = joinpath(homedir(), "bench", "bench.csv")
 # results_path = nothing
 
-# script verbosity
-script_verbose = false
+spawn_runs = true # spawn new process for each instance
+# spawn_runs = false
 
 setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
 # setup_model_anyway = false
 
 verbose = true # make solvers print output
 # verbose = false
+
 num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
 free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
 optimizer_time_limit = 1800
@@ -68,16 +79,72 @@ JuMP_example_names = [
     # "shapeconregr",
     ]
 
-interrupt()
-@assert nprocs() == 1
-println()
-
 for ex_name in JuMP_example_names
     include(joinpath(examples_dir, ex_name, "JuMP.jl"))
 end
 
 print_memory() = println("free memory (GB): ", Float64(Sys.free_memory()) / 2^30)
+
 print_memory()
+
+if spawn_runs
+    include(joinpath(examples_dir, "spawn.jl"))
+else
+    LinearAlgebra.BLAS.set_num_threads(num_threads)
+    function run_instance_check(
+        ::String,
+        ex_type::Type{<:ExampleInstanceJuMP{Float64}},
+        ::Tuple,
+        inst_data::Tuple,
+        extender,
+        solver::Tuple,
+        ::Bool,
+        )
+        return (false, false, run_instance(ex_type, inst_data, extender, NamedTuple(), solver[2], default_options = solver[3], test = false))
+    end
+end
+
+inst_start = (spawn_runs ? 2 : 1) # if spawning, will run first instance to compile
+
+perf = DataFrames.DataFrame(
+    example = String[],
+    inst_set = String[],
+    count = Int[],
+    inst_data = Tuple[],
+    extender = String[],
+    solver = String[],
+    n = Int[],
+    p = Int[],
+    q = Int[],
+    nu = Float64[],
+    cone_types = Vector{String}[],
+    num_cones = Int[],
+    max_q = Int[],
+    status = String[],
+    solve_time = Float64[],
+    iters = Int[],
+    primal_obj = Float64[],
+    dual_obj = Float64[],
+    rel_obj_diff = Float64[],
+    compl = Float64[],
+    x_viol = Float64[],
+    y_viol = Float64[],
+    z_viol = Float64[],
+    time_rescale = Float64[],
+    time_initx = Float64[],
+    time_inity = Float64[],
+    time_unproc = Float64[],
+    time_loadsys = Float64[],
+    time_upsys = Float64[],
+    time_upfact = Float64[],
+    time_uprhs = Float64[],
+    time_getdir = Float64[],
+    time_search = Float64[],
+    setup_time = Float64[],
+    check_time = Float64[],
+    total_time = Float64[],
+    )
+DataFrames.allowmissing!(perf, 7:DataFrames.ncol(perf))
 
 isnothing(results_path) || CSV.write(results_path, perf)
 time_all = time()
@@ -94,28 +161,17 @@ for ex_name in JuMP_example_names
 
         for inst_subset in inst_subsets
             solve = true
-            compile_inst = inst_subset[1] # first instance is only used for compilation
-            for (inst_num, inst) in enumerate(inst_subset[2:end])
+            compile_inst = inst_subset[1]
+            for (inst_num, inst) in enumerate(inst_subset[inst_start:end])
                 println()
                 @info("starting $ex_type $inst_set $(solver[1]) $inst_num: $inst ...")
                 flush(stdout); flush(stderr)
 
-                other_info = (; :example => ex_name, inst_num, Float64, :solver => solver[1], :solver_options => (), inst_set)
+                time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, compile_inst, inst, extender, solver, solve)
 
-
-                total_time = @elapsed p = run_instance(ex_type_T, inst..., default_options = new_default_options, verbose = verbose)
-
-
-                inst_data = inst[1]
-                extender = string(get_extender(inst, ex_type_T))
-                inst_perf = (; other_info..., inst_data, extender, p..., total_time)
-
-                push!(perf, inst_perf)
-                if !isnothing(results_path)
-                    CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
-                end
-
-                @printf("... %8.2e seconds\n\n", total_time)
+                push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], p..., time_inst))
+                isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
+                @printf("... %8.2e seconds\n\n", time_inst)
                 flush(stdout); flush(stderr)
 
                 setup_killed && break

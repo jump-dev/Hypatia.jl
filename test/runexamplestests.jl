@@ -10,7 +10,7 @@ include(joinpath(@__DIR__, "../benchmarks/setup.jl"))
 results_path = nothing
 
 # script verbosity
-verbose = false
+script_verbose = false
 
 # default options to solvers
 default_options = (
@@ -64,7 +64,7 @@ JuMP_example_names = [
     # "lyapunovstability",
     # "matrixcompletion",
     # "matrixquadratic",
-    "matrixregression",
+    # "matrixregression",
     # "maxvolume",
     # "muconvexity",
     # "nearestpsd",
@@ -96,19 +96,29 @@ for (inst_set, real_T, time_limit) in instance_sets
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue
     new_default_options = (; default_options..., time_limit = time_limit)
+    ex_type_T = ex_type{real_T}
 
-    println("\nstarting $ex_type $real_T $inst_set tests")
-    @testset "$ex_type $real_T $inst_set" begin
+    println("\nstarting $ex_type_T $inst_set tests")
+    @testset "$ex_type_T $inst_set" begin
     for (inst_num, inst) in enumerate(inst_subset)
         test_info = "inst $inst_num: $(inst[1])"
         @testset "$test_info" begin
-            println(test_info, " ...")
+        println(test_info, " ...")
 
-            other_info = (; :example => ex_name, inst_num, real_T, :solver => "Hypatia", :solver_options => (), inst_set)
+        total_time = @elapsed run_perf = run_instance(ex_type_T, inst...,
+            default_options = new_default_options, verbose = script_verbose)
 
-            record_time = @elapsed record_instance(perf, results_path, ex_type{real_T}, inst, other_info, new_default_options, verbose)
+        new_perf = (; real_T, inst_set, inst_num,
+            :solver => "Hypatia",
+            :solver_options => (),
+            :example => ex_name,
+            :inst_data => inst[1],
+            :extender => get_extender(inst, ex_type_T),
+            run_perf..., total_time,
+            )
+        write_perf(perf, results_path, new_perf)
 
-            @printf("%8.2e seconds\n", record_time)
+        @printf("%8.2e seconds\n", total_time)
         end
     end
     end
@@ -116,10 +126,9 @@ end
 
 end
 end
+
 println("\n")
 DataFrames.show(perf, allrows = true, allcols = true)
 println("\n")
-# @show sum(perf[!, :iters])
-# @show sum(perf[!, :solve_time])
 end
 ;

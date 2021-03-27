@@ -2,8 +2,6 @@
 utilities for spawning benchmark runs
 =#
 
-include(joinpath(@__DIR__, "setup.jl"))
-
 # reduce printing for worker
 Base.eval(Distributed, :(function redirect_worker_output(ident, stream)
     @async while !eof(stream)
