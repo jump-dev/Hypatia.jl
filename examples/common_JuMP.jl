@@ -59,7 +59,7 @@ function run_instance(
     verbose && println("solve and check")
     check_time = @elapsed solve_stats = solve_check(model, test = test)
 
-    return (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time)
+    return (; model_stats..., solve_stats..., setup_time, check_time)
 end
 
 function setup_model(
@@ -150,7 +150,8 @@ function solve_check(
     if opt isa Hypatia.Optimizer
         test && test_extra(model.ext[:inst], model)
         flush(stdout); flush(stderr)
-        return process_result(opt.model, opt.solver)[1:(end - 4)]
+        (solve_stats, _) = process_result(opt.model, opt.solver)
+        return solve_stats
     end
 
     test && @info("cannot run example tests if solver is not Hypatia")
@@ -189,6 +190,10 @@ function solve_check(
     compl = dot(s, z)
     (x_viol, y_viol, z_viol) = certificate_violations(hyp_status, hyp_data, x, y, z, s)
     flush(stdout); flush(stderr)
+
+
+    error("needs fixing")
+
 
     solve_stats = (
         hyp_status, solve_time, num_iters, primal_obj, dual_obj,

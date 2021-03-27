@@ -3,12 +3,14 @@ run examples tests from the examples folder
 =#
 
 examples_dir = joinpath(@__DIR__, "../examples")
-# include(joinpath(@__DIR__, "../benchmarks/setup.jl"))
-include(joinpath(@__DIR__, "../benchmarks/OLDtestaux.jl"))
+include(joinpath(@__DIR__, "../benchmarks/setup.jl"))
 
 # path to write results DataFrame to CSV, if any
 # results_path = joinpath(homedir(), "bench", "bench.csv")
 results_path = nothing
+
+# script verbosity
+verbose = false
 
 # default options to solvers
 default_options = (
@@ -31,27 +33,27 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
+    "native",
     "JuMP",
     ]
 
 # list of names of native examples to run
 native_example_names = [
-    "densityest",
-    "envelope",
-    "expdesign",
-    "linearopt",
-    "matrixcompletion",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
+    # "linearopt",
+    # "matrixcompletion",
     "matrixregression",
-    "maxvolume",
-    "polymin",
-    "portfolio",
-    "sparsepca",
+    # "maxvolume",
+    # "polymin",
+    # "portfolio",
+    # "sparsepca",
     ]
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "CBLIB", # some instance sets require directory of CBLIB files
+    "CBLIB",
     # "centralpolymat",
     # "conditionnum",
     # "contraction",
@@ -62,7 +64,7 @@ JuMP_example_names = [
     # "lyapunovstability",
     # "matrixcompletion",
     # "matrixquadratic",
-    # "matrixregression",
+    "matrixregression",
     # "maxvolume",
     # "muconvexity",
     # "nearestpsd",
@@ -79,21 +81,43 @@ JuMP_example_names = [
     # "stabilitynumber",
     ]
 
+perf = setup_benchmark_dataframe()
 isnothing(results_path) || CSV.write(results_path, perf)
 
-steppers = [Solvers.CombinedStepper{Float64}()]
 
 @testset "examples tests" begin
 @testset "$mod_type" for mod_type in model_types
-    @testset "$ex_name" for ex_name in eval(Symbol(mod_type, "_example_names"))
-        include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
-        (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, mod_type * "_test.jl"))
-        test_instances(mod_type, steppers, instance_sets, ex_insts, ex_type, default_options, results_path)
+@testset "$ex_name" for ex_name in eval(Symbol(mod_type, "_example_names"))
+
+include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
+(ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, mod_type * "_test.jl"))
+
+for (inst_set, real_T, time_limit) in instance_sets
+    haskey(ex_insts, inst_set) || continue
+    inst_subset = ex_insts[inst_set]
+    isempty(inst_subset) && continue
+    new_default_options = (; default_options..., time_limit = time_limit)
+
+    println("\nstarting $ex_type $real_T $inst_set tests")
+    @testset "$ex_type $real_T $inst_set" begin
+    for (inst_num, inst) in enumerate(inst_subset)
+        test_info = "inst $inst_num: $(inst[1])"
+        @testset "$test_info" begin
+            println(test_info, " ...")
+
+            record_time = @elapsed record_instance(perf, results_path, ex_type, real_T, inst_set, inst, inst_num, new_default_options, verbose)
+
+            @printf("%8.2e seconds\n", record_time)
+        end
+    end
     end
 end
-# println("\n")
-# DataFrames.show(perf, allrows = true, allcols = true)
-# println("\n")
+
+end
+end
+println("\n")
+DataFrames.show(perf, allrows = true, allcols = true)
+println("\n")
 # @show sum(perf[!, :iters])
 # @show sum(perf[!, :solve_time])
 end

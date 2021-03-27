@@ -7,8 +7,8 @@ include(joinpath(@__DIR__, "common.jl"))
 abstract type ExampleInstanceNative{T <: Real} <: ExampleInstance{T} end
 
 # fallback: just check optimal status
-function test_extra(inst::ExampleInstanceNative, result::NamedTuple)
-    @test result.status == Solvers.Optimal
+function test_extra(inst::ExampleInstanceNative, solve_stats::NamedTuple, ::NamedTuple)
+    @test solve_stats.status == Solvers.Optimal
 end
 
 function run_instance(
@@ -39,17 +39,11 @@ function run_instance(
         Solvers.solve(solver)
         flush(stdout); flush(stderr)
 
-        solve_stats = process_result(model, solver)
+        (solve_stats, solution) = process_result(model, solver)
 
-        if test
-            named_result = NamedTuple{(:status, :primal_obj, :dual_obj, :x, :y, :z, :s)}(
-                solve_stats.status, solve_stats.primal_obj, solve_stats.dual_obj,
-                solve_stats.x, solve_stats.y, solve_stats.z, solve_stats.s
-                )
-            test_extra(inst, named_result)
-        end
+        test && test_extra(inst, solve_stats, solution)
     end
     flush(stdout); flush(stderr)
 
-    return (model_stats..., string(solve_stats[1]), solve_stats[2:(end - 4)]..., setup_time, check_time)
+    return (; model_stats..., solve_stats..., setup_time, check_time)
 end

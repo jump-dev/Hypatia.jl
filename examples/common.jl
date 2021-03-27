@@ -69,7 +69,7 @@ function process_result(
     ) where {T <: Real}
     status = Solvers.get_status(solver)
     solve_time = Solvers.get_solve_time(solver)
-    num_iters = Solvers.get_num_iters(solver)
+    iters = Solvers.get_num_iters(solver)
     primal_obj = Solvers.get_primal_obj(solver)
     dual_obj = Solvers.get_dual_obj(solver)
     rel_obj_diff = (primal_obj - dual_obj) / (1 + abs(dual_obj))
@@ -81,20 +81,33 @@ function process_result(
     compl = dot(s, z)
     (x_viol, y_viol, z_viol) = certificate_violations(status, model, x, y, z, s)
 
-    solve_stats = (
-        status, solve_time, num_iters, primal_obj, dual_obj, rel_obj_diff, compl, x_viol, y_viol, z_viol,
-        solver.time_rescale, solver.time_initx, solver.time_inity, solver.time_unproc, solver.time_loadsys,
-        solver.time_upsys, solver.time_upfact, solver.time_uprhs, solver.time_getdir, solver.time_search,
-        x, y, z, s
-        )
-
     flush(stdout); flush(stderr)
-    return solve_stats
+
+    solve_stats = (;
+        status, solve_time, iters, primal_obj, dual_obj,
+        rel_obj_diff, compl, x_viol, y_viol, z_viol,
+        :time_rescale => solver.time_rescale,
+        :time_initx => solver.time_initx,
+        :time_inity => solver.time_inity,
+        :time_unproc => solver.time_unproc,
+        :time_loadsys => solver.time_loadsys,
+        :time_upsys => solver.time_upsys,
+        :time_upfact => solver.time_upfact,
+        :time_uprhs => solver.time_uprhs,
+        :time_getdir => solver.time_getdir,
+        :time_search => solver.time_search,
+        )
+    solution = (; x, y, z, s)
+
+    return (solve_stats, solution)
 end
 
-function get_model_stats(model::Models.Model)
-    string_cones = [string(nameof(c)) for c in unique(typeof.(model.cones))]
-    num_cones = length(model.cones)
-    max_q = maximum(Cones.dimension(c) for c in model.cones)
-    return (model.n, model.p, model.q, model.nu, string_cones, num_cones, max_q)
-end
+get_model_stats(model::Models.Model) = (;
+    :n => model.n,
+    :p => model.p,
+    :q => model.q,
+    :nu => model.nu,
+    :cone_types => [string(nameof(c)) for c in unique(typeof.(model.cones))],
+    :num_cones => length(model.cones),
+    :max_q => maximum(Cones.dimension(c) for c in model.cones),
+    )

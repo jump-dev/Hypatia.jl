@@ -132,8 +132,8 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         co_idxs = findall((group_df[:, :status] .== "co") .& group_df[:, :converged])
         if length(co_idxs) >= 2
             for i in eachindex(co_idxs)
-                first_optval = group_df[co_idxs[i], :prim_obj]
-                other_optvals = group_df[co_idxs[Not(i)], :prim_obj]
+                first_optval = group_df[co_idxs[i], :primal_obj]
+                other_optvals = group_df[co_idxs[Not(i)], :primal_obj]
                 if !all(relative_tol_satisfied.(other_optvals, first_optval))
                     println("objective values of: $(ex_name) $(group_df[!, :inst_data][1]) do not agree")
                 end
