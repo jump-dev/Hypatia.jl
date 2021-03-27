@@ -45,11 +45,11 @@ examples_params = Dict(
         [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
         ),
     # SOS paper examples:
-    "PolyNorm" => (
+    "polynorm" => (
         [:L1, :n, :d, :m], [5, 1, 3, 4],
         [:SEP,], Symbol[]
         ),
-    "NearestPolyMat" => (
+    "nearestpolymat" => (
         [:n, :d, :m], [1, 2, 3],
         [:SEP,], Symbol[]
         ),
