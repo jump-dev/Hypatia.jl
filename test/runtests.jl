@@ -11,7 +11,6 @@ test_files = [
     "barrier",
     "native",
     "moi",
-    # "cblib",
     "examples",
     # NOTE require optional dependencies:
     # "pardiso",
