@@ -10,7 +10,7 @@ process_entry(x::Int) = string(x)
 bench_file = joinpath(@__DIR__, "raw", "bench.csv")
 output_folder = mkpath(joinpath(@__DIR__, "analysis"))
 tex_folder = mkpath(joinpath(output_folder, "tex"))
-raw_folder = mkpath(joinpath(output_folder, "raw")) # TODO change name
+stats_folder = mkpath(joinpath(output_folder, "stats"))
 
 function shifted_geomean(metric::AbstractVector, conv::AbstractVector{Bool}; shift = 0, cap = Inf, skipnotfinite = false, use_cap = false)
     if use_cap
@@ -31,22 +31,22 @@ function post_process()
         :status => ByRow(x -> !ismissing(x) && x in ["Optimal", "PrimalInfeasible", "DualInfeasible"]) => :conv,
         # each instance is identified by instance data + extender combination
         [:example, :inst_data, :extender] => ((x, y, z) -> x .* y .* z) => :inst_key,
+        :solver_options => ByRow(x -> eval(Meta.parse(x))[1]) => :solver_options,
         )
     # assumes that nothing returned incorrect status, which is checked manually
-    all_df = combine(groupby(all_df, :inst_key), names(all_df), :status => (x -> all(in(["Optimal", "PrimalInfeasible", "DualInfeasible"]).(x))) => :every_conv)
+    all_df = combine(groupby(all_df, :inst_key), names(all_df), :conv => all => :every_conv)
     # remove precompile instances
     filter!(t -> t.inst_set == "various", all_df)
     return all_df
 end
 
-function agg_stats()
-    all_df = post_process()
+function agg_stats(all_df)
     conv = all_df[!, :conv]
     max_time = maximum(all_df[!, :solve_time][conv])
     max_iter = maximum(all_df[!, :iters][conv])
     time_shift = 1e-3
 
-    df_agg = combine(groupby(all_df, [:stepper, :toa, :curve, :shift]),
+    df_agg = combine(groupby(all_df, :solver_options),
         [:solve_time, :conv] => ((x, y) -> shifted_geomean(x, y, shift = time_shift)) => :time_geomean_thisconv,
         [:iters, :conv] => ((x, y) -> shifted_geomean(x, y, shift = 1)) => :iters_geomean_thisconv,
         [:solve_time, :every_conv] => ((x, y) -> shifted_geomean(x, y, shift = time_shift)) => :time_geomean_everyconv,
@@ -62,8 +62,7 @@ function agg_stats()
         :status => (x -> count(isequal("IterationLimit"), x)) => :iterationlimit,
         :status => length => :total,
         )
-    sort!(df_agg, [order(:stepper, rev = true), :toa, :curve, :shift])
-    CSV.write(joinpath(raw_folder, "agg" * ".csv"), df_agg)
+    CSV.write(joinpath(stats_folder, "agg" * ".csv"), df_agg)
 
     # combine feasible and infeasible statuses
     transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] => ByRow((x...) -> sum(x)) => :converged)
@@ -74,7 +73,8 @@ function agg_stats()
         row_str = enhancements[i]
         for c in cols
             subdf = df_agg[!, c]
-            row_str *= sep * process_entry(subdf[i])
+            x = (startswith(string(c), "time") ? subdf[i] * 1000 : subdf[i])
+            row_str *= sep * process_entry(x)
         end
         row_str *= " \\\\"
         println(tex, row_str)
@@ -84,10 +84,9 @@ function agg_stats()
     return
 end
 
-function subtime()
+function subtime(all_df)
     total_shift = 1e-4
     piter_shift = 1e-5
-    all_df = post_process()
     divfunc(x, y) = (x ./ y)
     preproc_cols = [:time_rescale, :time_initx, :time_inity, :time_unproc]
     transform!(all_df,
@@ -116,7 +115,7 @@ function subtime()
     max_search_iter = maximum(skipnan, all_df[!, :time_search_piter][conv])
 
     function get_subtime_df(set, convcol, use_cap)
-        subtime_df = combine(groupby(all_df, [:stepper, :toa, :curve, :shift]),
+        subtime_df = combine(groupby(all_df, :solver_options),
             [:time_linalg, convcol] => ((x, y) -> shifted_geomean(x, y, shift = total_shift, cap = max_linalg, use_cap = use_cap)) => Symbol(:linalg, set),
             [:time_upsys, convcol] => ((x, y) -> shifted_geomean(x, y, shift = total_shift, cap = max_upsys, use_cap = use_cap)) => Symbol(:uplhs, set),
             [:time_uprhs, convcol] => ((x, y) -> shifted_geomean(x, y, shift = total_shift, cap = max_uprhs, use_cap = use_cap)) => Symbol(:uprhs, set),
@@ -127,8 +126,7 @@ function subtime()
             [:time_getdir_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_getdir_iter, use_cap = use_cap)) => Symbol(:getdir_piter, set),
             [:time_search_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_search_iter, use_cap = use_cap)) => Symbol(:search_piter, set),
             )
-        sort!(subtime_df, [order(:stepper, rev = true), :toa, :curve, :shift])
-        CSV.write(joinpath(raw_folder, "subtime" * string(set) * "_.csv"), subtime_df)
+        CSV.write(joinpath(stats_folder, "subtime" * string(set) * ".csv"), subtime_df)
         return subtime_df
     end
 
@@ -162,69 +160,28 @@ function subtime()
     return
 end
 
-function perf_prof(; feature = :stepper, metric = :solve_time)
-    if feature == :stepper
-        s1 = "PredOrCentStepper"
-        s2 = "CombinedStepper"
-        toa = [true]
-        curve = [true]
-        stepper = [s1, s2]
-        shift = [0]
-    elseif feature == :shift
-        s1 = 0
-        s2 = 2
-        stepper = ["CombinedStepper"]
-        toa = [true]
-        curve = [true]
-        shift = [s1, s2]
-    else
-        s1 = false
-        s2 = true
-        stepper = ["PredOrCentStepper"]
-        shift = [0]
-        if feature == :toa
-            curve = [false]
-            toa = [s1, s2]
-        elseif feature == :curve
-            toa = [true]
-            curve = [s1, s2]
-        end
-    end
-
-    all_df = post_process()
-    filter!(t ->
-        t.stepper in stepper &&
-        t.toa in toa &&
-        t.curve in curve &&
-        t.shift in shift,
-        all_df
-        )
+function perf_prof(all_df, comp, metric)
+    pp = filter(t -> t.solver_options in comp, all_df)
     # BenchmarkProfiles.jl expects NaNs for failures
-    select!(all_df,
+    select!(pp,
         :inst_key,
-        feature,
+        :solver_options,
         [metric, :conv] => ByRow((x, y) -> (y ? x : NaN)) => metric,
         )
+    wide_df = unstack(pp, :solver_options, metric)
+    (x_plot, y_plot, max_ratio) = BenchmarkProfiles.performance_profile_data(Matrix{Float64}(wide_df[!, string.(comp)]), logscale = true)
 
-    wide_df = unstack(all_df, feature, metric)
-    (x_plot, y_plot, max_ratio) = BenchmarkProfiles.performance_profile_data(Matrix{Float64}(wide_df[!, string.([s1, s2])]), logscale = true)
+    # make steps like :steppost in Plots
     for s in 1:2
         x = vcat(0, repeat(x_plot[s], inner = 2))
         y = vcat(0, 0, repeat(y_plot[s][1:(end - 1)], inner = 2), y_plot[s][end])
-        CSV.write(joinpath(output_folder, string(feature) * "_" * string(metric) * "_$(s)" * "_pp" * ".csv"), DataFrame(x = x, y = y))
+        CSV.write(joinpath(output_folder, comp[s] * "_vs_" * comp[2 - s + 1] * "_" * string(metric) * ".csv"), DataFrame(x = x, y = y))
     end
     return
 end
 
-function instancestats()
-    all_df = post_process()
-
-    one_solver = filter!(t ->
-        t.stepper == "PredOrCentStepper" &&
-        t.toa == 0 &&
-        t.curve == 0,
-        all_df
-        )
+function instancestats(all_df)
+    one_solver = filter(t -> t.solver_options == "basic", all_df)
     inst_df = select(one_solver, :num_cones => ByRow(log10) => :numcones, [:n, :p, :q] => ((x, y, z) -> log10.(x .+ y .+ z)) => :npq)
     CSV.write(joinpath(output_folder, "inststats.csv"), inst_df)
     # for solve times, only include converged instances
@@ -236,18 +193,19 @@ function instancestats()
         :cone_types => (x -> union(eval.(Meta.parse.(x)))) => :cones,
         :cone_types => length => :num_instances,
         )
-    CSV.write(joinpath(raw_folder, "examplestats.csv"), ex_df)
+    CSV.write(joinpath(stats_folder, "examplestats.csv"), ex_df)
 
     return
 end
 
 function runall()
-    agg_stats()
-    subtime()
-    for feature in [:stepper, :curve, :toa, :shift], metric in [:solve_time, :iters]
-        perf_prof(feature = feature, metric = metric)
+    all_df = post_process()
+    agg_stats(all_df)
+    subtime(all_df)
+    for comp in [["basic", "toa"], ["toa", "curve"], ["curve", "comb"], ["comb", "shift"]], metric in [:solve_time, :iters]
+        perf_prof(all_df, comp, metric)
     end
-    instancestats()
+    instancestats(all_df)
     return
 end
 runall()
