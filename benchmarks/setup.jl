@@ -2,7 +2,6 @@
 helpers for benchmark run scripts
 =#
 
-using Test
 using Printf
 import DataFrames
 import CSV

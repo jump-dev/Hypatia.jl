@@ -84,7 +84,6 @@ JuMP_example_names = [
 perf = setup_benchmark_dataframe()
 isnothing(results_path) || CSV.write(results_path, perf)
 
-
 @testset "examples tests" begin
 @testset "$mod_type" for mod_type in model_types
 @testset "$ex_name" for ex_name in eval(Symbol(mod_type, "_example_names"))

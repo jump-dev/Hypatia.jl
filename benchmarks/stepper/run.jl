@@ -1,35 +1,50 @@
 #=
+TODO rewrite these descriptions
+
+
+
 run stepper benchmarks from the examples folder
 unlike runbenchmarks.jl this script does not spawn and is meant for benchmarking Hypatia steppers only
 to use the "various" instance set, uncomment it in testaux.jl and run on cmd line:
 killall julia; ~/julia/julia examples/runstepperbenchmarks.jl &> ~/bench/bench.txt
 =#
 
-examples_dir = joinpath(@__DIR__, "../examples")
-(perf, test_instances) = include(joinpath(examples_dir, "testaux.jl"))
+include(joinpath(@__DIR__, "../setup.jl"))
 
 # path to write results DataFrame to CSV, if any
-results_path = joinpath(homedir(), "bench", "bench.csv")
+results_path = joinpath(@__DIR__, "raw", "bench.csv")
 # results_path = nothing
+
+# script verbosity
+verbose = false
 
 # default options to solvers
 default_options = (
     # verbose = false,
     verbose = true,
     default_tol_relax = 10,
-    stepper = Solvers.CombinedStepper{Float64}(),
-    # stepper = Solvers.PredOrCentStepper{Float64}(),
     iter_limit = 1000,
     )
 
-    # instance sets and real types to run and corresponding time limits (seconds)
-    instance_sets = [
-        ("minimal", Float64, 60),
-        # ("minimal", Float32, 60),
-        # ("minimal", BigFloat, 60),
-        # ("fast", Float64, 60),
-        # ("slow", Float64, 120),
-        ]
+# stepper option sets to run
+porc = Solvers.PredOrCentStepper{Float64}
+comb = Solvers.CombinedStepper{Float64}
+stepper_options = [
+    "basic" => porc(use_correction = false, use_curve_search = false),
+    "toa" => porc(use_correction = true, use_curve_search = false),
+    "curve" => porc(use_correction = true, use_curve_search = true),
+    "comb" => comb(),
+    "shift" => comb(2),
+    ]
+
+# instance sets and real types to run and corresponding time limits (seconds)
+instance_sets = [
+    ("minimal", Float64, 60),
+    # ("minimal", Float32, 60),
+    # ("minimal", BigFloat, 60),
+    # ("fast", Float64, 60),
+    # ("slow", Float64, 120),
+    ]
 
 # types of models to run and corresponding options and example names
 model_types = [
@@ -39,12 +54,12 @@ model_types = [
 
 # list of names of native examples to run
 native_example_names = [
-    "densityest",
+    # "densityest",
     # "envelope",
     # "expdesign",
     # "linearopt",
     # "matrixcompletion",
-    # "matrixregression",
+    "matrixregression",
     # "maxvolume",
     # "polymin",
     # "portfolio",
@@ -63,7 +78,7 @@ JuMP_example_names = [
     # "lyapunovstability",
     # "matrixcompletion",
     # "matrixquadratic",
-    # "matrixregression",
+    "matrixregression",
     # "maxvolume",
     # "muconvexity",
     # "nearestpsd",
@@ -80,35 +95,45 @@ JuMP_example_names = [
     # "stabilitynumber",
     ]
 
-
-
-# use_curve_search(::Solvers.Stepper) = true
-# use_curve_search(stepper::Solvers.PredOrCentStepper) = stepper.use_curve_search
-# use_correction(::Solvers.Stepper) = true
-# use_correction(stepper::Solvers.PredOrCentStepper) = stepper.use_correction
-# shift(::Solvers.Stepper) = 0
-# shift(stepper::Solvers.CombinedStepper) = stepper.shift_alpha_sched
-
-
-
+perf = setup_benchmark_dataframe()
 isnothing(results_path) || CSV.write(results_path, perf)
-
-predorcent = Solvers.PredOrCentStepper{Float64}
-combined = Solvers.CombinedStepper{Float64}
-steppers = [
-    (predorcent(use_correction = false, use_curve_search = false)),
-    (predorcent(use_correction = true, use_curve_search = false)),
-    (predorcent(use_correction = true, use_curve_search = true)),
-    (combined()),
-    (combined(2)),
-    ]
 
 @testset "examples tests" begin
 @testset "$mod_type" for mod_type in model_types
-    @testset "$ex_name" for ex_name in eval(Symbol(mod_type, "_example_names"))
-        include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
-        (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, mod_type * "_test.jl"))
-        test_instances(mod_type, steppers, instance_sets, ex_insts, ex_type, default_options, results_path)
+@testset "$ex_name" for ex_name in eval(Symbol(mod_type, "_example_names"))
+
+include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
+(ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, mod_type * "_test.jl"))
+
+for (inst_set, real_T, time_limit) in instance_sets, (step_name, stepper) in stepper_options
+    haskey(ex_insts, inst_set) || continue
+    inst_subset = ex_insts[inst_set]
+    isempty(inst_subset) && continue
+    new_default_options = (; default_options..., stepper = stepper, time_limit = time_limit)
+
+    println("\nstarting $ex_type $real_T $inst_set tests")
+    @testset "$ex_type $real_T $inst_set" begin
+    for (inst_num, inst) in enumerate(inst_subset)
+        test_info = "inst $inst_num: $(inst[1])"
+        @testset "$test_info" begin
+            println(test_info, " ...")
+
+            other_info = (; :example => ex_name, inst_num, real_T, :solver => "Hypatia", :solver_options => (step_name,), inst_set)
+
+            record_time = @elapsed record_instance(perf, results_path, ex_type{real_T}, inst, other_info, new_default_options, verbose)
+
+            @printf("%8.2e seconds\n", record_time)
+        end
+    end
     end
 end
+
 end
+end
+println("\n")
+DataFrames.show(perf, allrows = true, allcols = true)
+println("\n")
+# @show sum(perf[!, :iters])
+# @show sum(perf[!, :solve_time])
+end
+;
