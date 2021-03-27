@@ -95,32 +95,14 @@ for (inst_set, real_T, time_limit) in instance_sets
     haskey(ex_insts, inst_set) || continue
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue
+
+    info_perf = (; inst_set, real_T, :example => ex_name, :solver_options => ())
     new_default_options = (; default_options..., time_limit = time_limit)
     ex_type_T = ex_type{real_T}
 
     println("\nstarting $ex_type_T $inst_set tests")
     @testset "$ex_type_T $inst_set" begin
-    for (inst_num, inst) in enumerate(inst_subset)
-        test_info = "inst $inst_num: $(inst[1])"
-        @testset "$test_info" begin
-        println(test_info, " ...")
-
-        total_time = @elapsed run_perf = run_instance(ex_type_T, inst...,
-            default_options = new_default_options, verbose = script_verbose)
-
-        new_perf = (; real_T, inst_set, inst_num,
-            :solver => "Hypatia",
-            :solver_options => (),
-            :example => ex_name,
-            :inst_data => inst[1],
-            :extender => get_extender(inst, ex_type_T),
-            run_perf..., total_time,
-            )
-        write_perf(perf, results_path, new_perf)
-
-        @printf("%8.2e seconds\n", total_time)
-        end
-    end
+        run_instance_set(inst_subset, ex_type_T, info_perf, new_default_options, script_verbose)
     end
 end
 

@@ -68,3 +68,31 @@ function write_perf(
     end
     return
 end
+
+function run_instance_set(
+    inst_subset::Vector,
+    ex_type_T::Type{<:ExampleInstance{<:Real}},
+    info_perf::NamedTuple,
+    new_default_options::NamedTuple,
+    script_verbose::Bool,
+    )
+    for (inst_num, inst) in enumerate(inst_subset)
+        test_info = "inst $inst_num: $(inst[1])"
+        @testset "$test_info" begin
+            println(test_info, " ...")
+
+            total_time = @elapsed run_perf = run_instance(ex_type_T, inst...,
+                default_options = new_default_options, verbose = script_verbose)
+
+            new_perf = (;
+                info_perf..., run_perf..., total_time, inst_num,
+                :solver => "Hypatia", :inst_data => inst[1],
+                :extender => get_extender(inst, ex_type_T),
+                )
+            write_perf(perf, results_path, new_perf)
+
+            @printf("%8.2e seconds\n", total_time)
+        end
+    end
+    return
+end
