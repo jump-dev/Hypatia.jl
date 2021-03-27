@@ -1,9 +1,3 @@
-#=
-run benchmarks from the examples folder
-to use the bench instance set and run on cmd line:
-killall julia; ~/julia/julia examples/runbenchmarks.jl &> ~/bench/bench.txt
-=#
-
 import DataFrames
 import CSV
 using Printf

@@ -7,5 +7,5 @@ deps/deps.jl
 scratch.jl
 */scratch.jl
 benchmarks/*/raw/*
-benchmarks/*/processed/*
+benchmarks/*/analysis/*
 *bench.csv

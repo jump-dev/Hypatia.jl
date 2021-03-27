@@ -1,14 +1,3 @@
-#=
-TODO rewrite these descriptions
-
-
-
-run stepper benchmarks from the examples folder
-unlike runbenchmarks.jl this script does not spawn and is meant for benchmarking Hypatia steppers only
-to use the "various" instance set, uncomment it in testaux.jl and run on cmd line:
-killall julia; ~/julia/julia examples/runstepperbenchmarks.jl &> ~/bench/bench.txt
-=#
-
 include(joinpath(@__DIR__, "../setup.jl"))
 
 # path to write results DataFrame to CSV, if any
