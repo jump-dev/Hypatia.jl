@@ -198,37 +198,6 @@ function solve_check(
     return solve_stats
 end
 
-# run a CBF instance with a given solver and return solve info
-function run_cbf(
-    inst::String, # a CBF file name
-    solver_options::NamedTuple,
-    solver_type = Hypatia.Optimizer; # TODO generalize for other solvers
-    test::Bool = true,
-    verbose::Bool = true,
-    )
-    verbose && println("setup model")
-    setup_time = @elapsed begin
-        model = JuMP.read_from_file(joinpath(cblib_dir, inst * ".cbf.gz"))
-
-        # delete integer constraints
-        JuMP.delete.(model, JuMP.all_constraints(model, JuMP.VariableRef, MOI.Integer))
-
-        # TODO refactor code in run_instance, so can use other solvers easily
-        opt = solver_type(; solver_options...)
-        backend = JuMP.backend(model)
-        MOI.Utilities.reset_optimizer(backend, opt)
-        MOI.Utilities.attach_optimizer(backend)
-
-        model_stats = get_model_stats(opt.model)
-        flush(stdout); flush(stderr)
-    end
-
-    verbose && println("solve and check")
-    check_time = @elapsed solve_stats = solve_check(model, test = false)
-
-    return (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time)
-end
-
 moi_hyp_status_map = Dict(
     MOI.OPTIMAL => Solvers.Optimal,
     MOI.INFEASIBLE => Solvers.PrimalInfeasible,

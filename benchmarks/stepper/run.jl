@@ -80,6 +80,17 @@ JuMP_example_names = [
     # "stabilitynumber",
     ]
 
+
+
+# use_curve_search(::Solvers.Stepper) = true
+# use_curve_search(stepper::Solvers.PredOrCentStepper) = stepper.use_curve_search
+# use_correction(::Solvers.Stepper) = true
+# use_correction(stepper::Solvers.PredOrCentStepper) = stepper.use_correction
+# shift(::Solvers.Stepper) = 0
+# shift(stepper::Solvers.CombinedStepper) = stepper.shift_alpha_sched
+
+
+
 isnothing(results_path) || CSV.write(results_path, perf)
 
 predorcent = Solvers.PredOrCentStepper{Float64}

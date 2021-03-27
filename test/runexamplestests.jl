@@ -3,7 +3,8 @@ run examples tests from the examples folder
 =#
 
 examples_dir = joinpath(@__DIR__, "../examples")
-(perf, test_instances) = include(joinpath(examples_dir, "testaux.jl"))
+# include(joinpath(@__DIR__, "../benchmarks/setup.jl"))
+include(joinpath(@__DIR__, "../benchmarks/OLDtestaux.jl"))
 
 # path to write results DataFrame to CSV, if any
 # results_path = joinpath(homedir(), "bench", "bench.csv")
@@ -50,6 +51,7 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
+    "CBLIB",
     "centralpolymat",
     "conditionnum",
     "contraction",
@@ -95,3 +97,4 @@ end
 # @show sum(perf[!, :iters])
 # @show sum(perf[!, :solve_time])
 end
+;
