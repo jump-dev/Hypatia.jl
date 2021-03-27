@@ -59,7 +59,7 @@ function run_instance(
     verbose && println("solve and check")
     check_time = @elapsed solve_stats = solve_check(model, test = test)
 
-    return (; model_stats..., solve_stats..., setup_time, check_time)
+    return (; model_stats..., solve_stats..., setup_time, check_time, :script_status => "Success")
 end
 
 function setup_model(

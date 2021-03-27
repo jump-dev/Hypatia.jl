@@ -1,5 +1,5 @@
 #=
-helpers for benchmark run scripts
+utilities for benchmark scripts
 =#
 
 using Printf
@@ -19,6 +19,7 @@ function setup_benchmark_dataframe()
         extender = String[],
         solver = String[],
         solver_options = Tuple[],
+        script_status = String[],
         n = Int[],
         p = Int[],
         q = Int[],
@@ -50,19 +51,19 @@ function setup_benchmark_dataframe()
         check_time = Float64[],
         total_time = Float64[],
         )
-    DataFrames.allowmissing!(perf, 9:DataFrames.ncol(perf))
+    DataFrames.allowmissing!(perf, 10:DataFrames.ncol(perf))
     return perf
 end
 
-get_extender(inst::Tuple, ::Type{<:ExampleInstanceJuMP{<:Real}}) = (length(inst) > 1 ? string(inst[2]) : "")
-get_extender(inst::Tuple, ::Type{<:ExampleInstance{<:Real}}) = ""
+get_extender(inst::Tuple, ::Type{<:ExampleInstanceJuMP{<:Real}}) = (length(inst) > 1 ? inst[2] : nothing)
+get_extender(inst::Tuple, ::Type{<:ExampleInstance{<:Real}}) = nothing
 
 function write_perf(
     perf::DataFrames.DataFrame,
     results_path::Union{String, Nothing},
     new_perf::NamedTuple,
     )
-    push!(perf, new_perf)
+    push!(perf, new_perf, cols = :subset)
     if !isnothing(results_path)
         CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
     end
@@ -75,6 +76,8 @@ function run_instance_set(
     info_perf::NamedTuple,
     new_default_options::NamedTuple,
     script_verbose::Bool,
+    perf::DataFrames.DataFrame,
+    results_path::Union{String, Nothing},
     )
     for (inst_num, inst) in enumerate(inst_subset)
         test_info = "inst $inst_num: $(inst[1])"
@@ -87,7 +90,7 @@ function run_instance_set(
             new_perf = (;
                 info_perf..., run_perf..., total_time, inst_num,
                 :solver => "Hypatia", :inst_data => inst[1],
-                :extender => get_extender(inst, ex_type_T),
+                :extender => string(get_extender(inst, ex_type_T)),
                 )
             write_perf(perf, results_path, new_perf)
 

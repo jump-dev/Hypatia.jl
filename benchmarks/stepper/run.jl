@@ -1,7 +1,7 @@
 include(joinpath(@__DIR__, "../setup.jl"))
 
 # path to write results DataFrame to CSV, if any
-results_path = joinpath(@__DIR__, "raw", "bench.csv")
+results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
 # results_path = nothing
 
 # script verbosity
@@ -30,7 +30,6 @@ stepper_options = [
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
     "minimal",
-    # "fast", 60),
     ]
 
 # types of models to run and corresponding options and example names
@@ -46,7 +45,7 @@ native_example_names = [
     # "expdesign",
     # "linearopt",
     # "matrixcompletion",
-    "matrixregression",
+    # "matrixregression",
     # "maxvolume",
     # "polymin",
     # "portfolio",
@@ -65,7 +64,7 @@ JuMP_example_names = [
     # "lyapunovstability",
     # "matrixcompletion",
     # "matrixquadratic",
-    "matrixregression",
+    # "matrixregression",
     # "maxvolume",
     # "muconvexity",
     # "nearestpsd",
@@ -84,6 +83,7 @@ JuMP_example_names = [
 
 perf = setup_benchmark_dataframe()
 isnothing(results_path) || CSV.write(results_path, perf)
+time_all = time()
 
 @testset "examples tests" begin
 @testset "$mod_type" for mod_type in model_types
@@ -91,6 +91,7 @@ isnothing(results_path) || CSV.write(results_path, perf)
 
 include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
 (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, mod_type * "_test.jl"))
+ex_type_T = ex_type{Float64}
 
 for inst_set in instance_sets, (step_name, stepper) in stepper_options
     haskey(ex_insts, inst_set) || continue
@@ -99,19 +100,20 @@ for inst_set in instance_sets, (step_name, stepper) in stepper_options
 
     info_perf = (; inst_set, :example => ex_name, :real_T => Float64, :solver_options => (step_name,))
     new_default_options = (; default_options..., stepper = stepper)
-    ex_type_T = ex_type{Float64}
 
-    println("\nstarting $ex_type_T $inst_set tests")
-    @testset "$ex_type_T $inst_set" begin
-        run_instance_set(inst_subset, ex_type_T, info_perf, new_default_options, script_verbose)
+    println("\nstarting $ex_type $inst_set tests")
+    @testset "$ex_type $inst_set" begin
+        run_instance_set(inst_subset, ex_type_T, info_perf, new_default_options, script_verbose, perf, results_path)
     end
 end
 
 end
 end
 
-println("\n")
-DataFrames.show(perf, allrows = true, allcols = true)
-println("\n")
+# println("\n")
+# DataFrames.show(perf, allrows = true, allcols = true)
+# println("\n")
 end
+
+@printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)
 ;

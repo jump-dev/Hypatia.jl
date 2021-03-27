@@ -7,10 +7,10 @@ enhancements = ["basic", "TOA", "curve", "comb", "shift"]
 process_entry(x::Float64) = @sprintf("%.2f", x)
 process_entry(x::Int) = string(x)
 
-bench_file = joinpath("bench2", "various", "bench" * ".csv")
-output_folder = mkpath(joinpath(@__DIR__, "results"))
+bench_file = joinpath(@__DIR__, "raw", "bench.csv")
+output_folder = mkpath(joinpath(@__DIR__, "analysis"))
 tex_folder = mkpath(joinpath(output_folder, "tex"))
-raw_folder = mkpath(joinpath(output_folder, "raw"))
+raw_folder = mkpath(joinpath(output_folder, "raw")) # TODO change name
 
 function shifted_geomean(metric::AbstractVector, conv::AbstractVector{Bool}; shift = 0, cap = Inf, skipnotfinite = false, use_cap = false)
     if use_cap

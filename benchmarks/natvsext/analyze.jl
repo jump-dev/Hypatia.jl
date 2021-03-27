@@ -2,8 +2,8 @@ using Printf
 using CSV
 using DataFrames
 
-bench_file = joinpath(@__DIR__, "bench.csv")
-output_folder = mkpath(joinpath(@__DIR__, "results"))
+bench_file = joinpath(@__DIR__, "raw", "bench.csv")
+output_folder = mkpath(joinpath(@__DIR__, "analysis"))
 
 # uncomment examples to process
 examples_params = Dict(

@@ -45,5 +45,5 @@ function run_instance(
     end
     flush(stdout); flush(stderr)
 
-    return (; model_stats..., solve_stats..., setup_time, check_time)
+    return (; model_stats..., solve_stats..., setup_time, check_time, :script_status => "Success")
 end
