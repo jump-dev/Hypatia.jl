@@ -105,7 +105,9 @@ for (inst_set, real_T, time_limit) in instance_sets
         @testset "$test_info" begin
             println(test_info, " ...")
 
-            record_time = @elapsed record_instance(perf, results_path, ex_type, real_T, inst_set, inst, inst_num, new_default_options, verbose)
+            other_info = (; :example => ex_name, inst_num, real_T, :solver => "Hypatia", :solver_options => (), inst_set)
+
+            record_time = @elapsed record_instance(perf, results_path, ex_type{real_T}, inst, other_info, new_default_options, verbose)
 
             @printf("%8.2e seconds\n", record_time)
         end

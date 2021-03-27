@@ -14,15 +14,11 @@ setup_benchmark_dataframe() = DataFrames.DataFrame(
     example = String[],
     inst_set = String[],
     real_T = Type{<:Real}[],
-    count = Int[],
+    inst_num = Int[],
     inst_data = Tuple[],
     extender = String[],
-    # solver = String[],
-    # solver_options = Tuple[],
-    # stepper = Symbol[],
-    # toa = Bool[],
-    # curve = Bool[],
-    # shift = Int[],
+    solver = String[],
+    solver_options = Tuple[],
     n = Int[],
     p = Int[],
     q = Int[],
@@ -56,24 +52,19 @@ setup_benchmark_dataframe() = DataFrames.DataFrame(
     )
 
 function record_instance(
-    perf,
-    results_path,
-    ex_type::Type,
-    real_T::Type,
-    inst_set,
-    inst,
-    count::Int,
-    new_default_options,
-    verbose,
+    perf::DataFrames.DataFrame,
+    results_path::Union{String, Nothing},
+    ex_type_T::Type{<:ExampleInstance{<:Real}},
+    inst::Tuple,
+    other_info::NamedTuple,
+    new_default_options::NamedTuple,
+    verbose::Bool,
     )
-    ex_type_T = ex_type{real_T}
-
     total_time = @elapsed p = run_instance(ex_type_T, inst..., default_options = new_default_options, verbose = verbose)
 
-    example = string(ex_type)
     inst_data = inst[1]
     extender = string(get_extender(inst, ex_type_T))
-    inst_perf = (; example, inst_set, real_T, count, inst_data, extender, p..., total_time)
+    inst_perf = (; other_info..., inst_data, extender, p..., total_time)
 
     push!(perf, inst_perf)
     if !isnothing(results_path)
