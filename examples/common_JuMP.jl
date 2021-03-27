@@ -157,7 +157,7 @@ function solve_check(
     test && @info("cannot run example tests if solver is not Hypatia")
 
     solve_time = JuMP.solve_time(model)
-    num_iters = MOI.get(model, MOI.BarrierIterations())
+    iters = MOI.get(model, MOI.BarrierIterations())
     primal_obj = JuMP.objective_value(model)
     dual_obj = JuMP.dual_objective_value(model)
     moi_status = MOI.get(model, MOI.TerminationStatus())
@@ -191,14 +191,9 @@ function solve_check(
     (x_viol, y_viol, z_viol) = certificate_violations(hyp_status, hyp_data, x, y, z, s)
     flush(stdout); flush(stderr)
 
-
-    error("needs fixing")
-
-
-    solve_stats = (
-        hyp_status, solve_time, num_iters, primal_obj, dual_obj,
+    solve_stats = (;
+        :status => hyp_status, solve_time, iters, primal_obj, dual_obj,
         rel_obj_diff, compl, x_viol, y_viol, z_viol,
-        NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN
         )
     return solve_stats
 end

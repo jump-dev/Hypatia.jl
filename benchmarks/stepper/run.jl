@@ -112,7 +112,7 @@ end
 
 # println("\n")
 # DataFrames.show(perf, allrows = true, allcols = true)
-# println("\n")
+println("\n")
 end
 
 @printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)

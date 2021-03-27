@@ -103,10 +103,7 @@ function process_result(
 end
 
 get_model_stats(model::Models.Model) = (;
-    :n => model.n,
-    :p => model.p,
-    :q => model.q,
-    :nu => model.nu,
+    :n => model.n, :p => model.p, :q => model.q, :nu => model.nu,
     :cone_types => [string(nameof(c)) for c in unique(typeof.(model.cones))],
     :num_cones => length(model.cones),
     :max_q => maximum(Cones.dimension(c) for c in model.cones),

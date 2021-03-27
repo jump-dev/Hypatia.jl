@@ -51,7 +51,7 @@ instance_sets = [
 
 # models to run
 JuMP_example_names = [
-    "densityest",
+    # "densityest",
     # "expdesign",
     # "matrixcompletion",
     # "matrixquadratic",
@@ -120,10 +120,12 @@ for ex_name in JuMP_example_names
 end
 
 interrupt()
-flush(stdout); flush(stderr)
+
+# flush(stdout); flush(stderr)
+# println("\n")
+# DataFrames.show(perf, allrows = true, allcols = true)
 println("\n")
-DataFrames.show(perf, allrows = true, allcols = true)
-println("\n")
 flush(stdout); flush(stderr)
+
 @printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)
 ;
