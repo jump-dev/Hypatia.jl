@@ -1,7 +1,6 @@
 # stepper option comparisons
 
-TODO
-
+scripts in this directory are used for comparing solver options in Hypatia
 
 run scripts from this directory
 
@@ -14,6 +13,6 @@ killall julia; ~/julia/julia run.jl &> raw/bench.txt
 
 ## analyze script
 
-puts analyzed output files into "processed" folder
+puts analyzed output files into "analysis" folder
 
 ~/julia/julia analyze.jl

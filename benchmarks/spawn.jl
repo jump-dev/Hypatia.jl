@@ -125,6 +125,7 @@ function spawn_instance(
         check_killed = (script_status != :Success)
         check_killed && println("solve and check failed: $script_status")
     else
+        solve_stats = NamedTuple()
         check_time = 0.0
         check_killed = true
     end

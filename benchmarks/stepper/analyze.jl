@@ -25,7 +25,7 @@ function shifted_geomean(metric::AbstractVector, conv::AbstractVector{Bool}; shi
     return exp(sum(log, x .+ shift) / length(x)) - shift
 end
 
-function post_process()
+function prep_df()
     all_df = CSV.read(bench_file, DataFrame)
     transform!(all_df,
         :status => ByRow(x -> !ismissing(x) && x in ["Optimal", "PrimalInfeasible", "DualInfeasible"]) => :conv,
@@ -84,7 +84,7 @@ function agg_stats(all_df)
     return
 end
 
-function subtime(all_df)
+function subtimings(all_df)
     total_shift = 1e-4
     piter_shift = 1e-5
     divfunc(x, y) = (x ./ y)
@@ -180,7 +180,7 @@ function perf_prof(all_df, comp, metric)
     return
 end
 
-function instancestats(all_df)
+function instance_stats(all_df)
     one_solver = filter(t -> t.solver_options == "basic", all_df)
     inst_df = select(one_solver, :num_cones => ByRow(log10) => :numcones, [:n, :p, :q] => ((x, y, z) -> log10.(x .+ y .+ z)) => :npq)
     CSV.write(joinpath(output_folder, "inststats.csv"), inst_df)
@@ -198,15 +198,15 @@ function instancestats(all_df)
     return
 end
 
-function runall()
-    all_df = post_process()
+function post_process()
+    all_df = prep_df()
     agg_stats(all_df)
-    subtime(all_df)
+    subtimings(all_df)
     for comp in [["basic", "toa"], ["toa", "curve"], ["curve", "comb"], ["comb", "shift"]], metric in [:solve_time, :iters]
         perf_prof(all_df, comp, metric)
     end
-    instancestats(all_df)
+    instance_stats(all_df)
     return
 end
-runall()
+post_process()
 ;

@@ -43,7 +43,7 @@ native_example_names = [
     # "densityest",
     # "envelope",
     # "expdesign",
-    # "linearopt",
+    "linearopt",
     # "matrixcompletion",
     # "matrixregression",
     # "maxvolume",

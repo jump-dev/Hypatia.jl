@@ -117,7 +117,7 @@ function make_wide_csv(ex_df, ex_name, ex_params)
     transform!(ex_df,
         [:inst_ext, :solver] => ((x, y) -> inst_solver_name.(x, y)) => :inst_solver,
         [:x_viol, :y_viol, :z_viol, :rel_obj_diff] => ByRow((res...) -> residual_tol_satisfied(coalesce.(res, NaN))) => :converged,
-        :status => ByRow(x -> status_map[x]) => :status,
+        [:status, :script_status] => ByRow((x, y) -> (y == "Success" ? status_map[x] : status_map[y])) => :status,
         )
     for (name, pos) in zip(inst_keys, ex_params[2])
         transform!(ex_df, :inst_data => ByRow(x -> eval(Meta.parse(x))[pos]) => name)
