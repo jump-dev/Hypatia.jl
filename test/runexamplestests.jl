@@ -24,10 +24,10 @@ default_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    # ("minimal", Float64, 60),
+    ("minimal", Float64, 60),
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
-    ("fast", Float64, 60),
+    # ("fast", Float64, 60),
     # ("slow", Float64, 120),
     ]
 
@@ -39,16 +39,16 @@ model_types = [
 
 # list of names of native examples to run
 native_example_names = [
-    # "densityest",
-    # "envelope",
-    # "expdesign",
-    # "linearopt",
-    # "matrixcompletion",
-    # "matrixregression",
-    # "maxvolume",
-    # "polymin",
-    # "portfolio",
-    # "sparsepca",
+    "densityest",
+    "envelope",
+    "expdesign",
+    "linearopt",
+    "matrixcompletion",
+    "matrixregression",
+    "maxvolume",
+    "polymin",
+    "portfolio",
+    "sparsepca",
     ]
 
 # list of names of JuMP examples to run
