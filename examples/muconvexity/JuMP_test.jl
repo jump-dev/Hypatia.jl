@@ -14,4 +14,5 @@ insts["fast"] = [
     ((:poly2, :dom4, false, -2), SOCExpPSDOptimizer),
     ]
 insts["slow"] = Tuple[]
+insts["various"] = insts["fast"]
 return (MuConvexityJuMP, insts)
