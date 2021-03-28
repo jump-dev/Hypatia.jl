@@ -25,7 +25,7 @@ function shifted_geomean(metric::AbstractVector, conv::AbstractVector{Bool}; shi
     return exp(sum(log, x .+ shift) / length(x)) - shift
 end
 
-function prep_df()
+function preprocess_df()
     all_df = CSV.read(bench_file, DataFrame)
     transform!(all_df,
         :status => ByRow(x -> !ismissing(x) && x in ["Optimal", "PrimalInfeasible", "DualInfeasible"]) => :conv,
@@ -40,7 +40,7 @@ function prep_df()
     return all_df
 end
 
-function agg_stats(all_df)
+function make_agg_tables(all_df)
     conv = all_df[!, :conv]
     max_time = maximum(all_df[!, :solve_time][conv])
     max_iter = maximum(all_df[!, :iters][conv])
@@ -84,7 +84,7 @@ function agg_stats(all_df)
     return
 end
 
-function subtimings(all_df)
+function make_subtime_tables(all_df)
     total_shift = 1e-4
     piter_shift = 1e-5
     divfunc(x, y) = (x ./ y)
@@ -160,7 +160,7 @@ function subtimings(all_df)
     return
 end
 
-function perf_prof(all_df, comp, metric)
+function make_perf_profiles(all_df, comp, metric)
     pp = filter(t -> t.solver_options in comp, all_df)
     # BenchmarkProfiles.jl expects NaNs for failures
     select!(pp,
@@ -199,11 +199,11 @@ function instance_stats(all_df)
 end
 
 function post_process()
-    all_df = prep_df()
-    agg_stats(all_df)
-    subtimings(all_df)
+    all_df = preprocess_df()
+    make_agg_tables(all_df)
+    make_subtime_tables(all_df)
     for comp in [["basic", "toa"], ["toa", "curve"], ["curve", "comb"], ["comb", "shift"]], metric in [:solve_time, :iters]
-        perf_prof(all_df, comp, metric)
+        make_perf_profiles(all_df, comp, metric)
     end
     instance_stats(all_df)
     return

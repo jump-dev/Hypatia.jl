@@ -156,8 +156,6 @@ function make_wide_csv(ex_df, ex_name, ex_params)
 end
 
 string_ast = "\$\\ast\$"
-process_entry_round(x::Float64) = (isnan(x) ? string_ast : string(round(Int, x)))
-process_entry_round(x) = process_entry(x)
 process_entry(::Missing) = string_ast
 process_entry(::Missing, ::Missing) = "sk" # no data so instance was skipped
 function process_entry(x::Float64)
@@ -199,7 +197,7 @@ function make_table_tex(ex_name, ex_params, ex_df_wide, inst_solvers)
             row_str *= sep * process_entry(row[i])
         end
         for s in print_sizes
-            row_str *= sep * process_entry_round(row[s]) # NOTE rounds nu to integer
+            row_str *= sep * process_entry(row[s])
         end
         if print_table_solvers
             for inst_solver in inst_solvers
