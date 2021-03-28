@@ -18,4 +18,14 @@ insts["slow"] = [
     ((60, 80, true),),
     ((60, 80, false),),
     ]
+insts["various"] = [
+    ((15, 20, true),),
+    ((15, 20, false),),
+    ((30, 40, true),),
+    ((30, 40, false),),
+    ((60, 80, true),),
+    ((60, 80, false),),
+    ((30, 160, true),),
+    ((30, 160, false),),
+    ]
 return (MatrixQuadraticJuMP, insts)

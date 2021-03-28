@@ -66,4 +66,17 @@ insts["slow"] = [
     ((5, 500, :func10, 4, 4, false, true, true, false, false), SOCExpPSDOptimizer),
     ((5, 500, :func10, 4, 4, false, true, true, true, false), SOCExpPSDOptimizer),
     ]
+insts["various"] = [
+    ((8, 100, :func4, 5, 3, true, true, true, true, false),),
+    ((8, 100, :func4, 5, 3, true, false, true, true, false),),
+    ((8, 100, :func4, 5, 3, false, true, true, true, false),),
+    ((8, 100, :func4, 5, 3, false, false, true, true, false),),
+    ((5, 500, :func4, 5, 6, true, true, true, true, false),),
+    ((5, 500, :func4, 5, 6, true, false, true, true, false),),
+    ((:naics5811, 3, true, true, true, true, false),),
+    ((:naics5811, 3, true, false, true, true, false),),
+    ((:naics5811, 3, false, true, true, true, false),),
+    ((:naics5811, 3, false, true, true, true, false), SOCExpPSDOptimizer),
+    ((:naics5811, 3, false, false, true, true, false),),
+    ]
 return (ShapeConRegrJuMP, insts)

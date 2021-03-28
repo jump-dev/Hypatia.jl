@@ -5,7 +5,6 @@ Alexandre d’Aspremont, Laurent El Ghaoui, Michael I. Jordan, Gert R. G. Lanckr
 
 import Distributions
 using SparseArrays
-import LinearMaps
 
 struct SparsePCANative{T <: Real} <: ExampleInstanceNative{T}
     p::Int

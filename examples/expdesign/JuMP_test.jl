@@ -34,4 +34,22 @@ insts["slow"] = [
     ((100, 200, 200, 10, false, true, false),),
     ((100, 200, 200, 10, false, false, true),),
     ]
+insts["various"] = [
+    ((25, 45, 75, 10, true, false, false),),
+    ((25, 45, 75, 10, true, false, false), SOCExpPSDOptimizer),
+    ((25, 45, 75, 10, false, true, false),),
+    ((25, 45, 75, 10, false, true, false), ExpPSDOptimizer),
+    ((25, 45, 75, 10, false, true, false), SOCExpPSDOptimizer),
+    ((25, 45, 75, 10, false, false, true),),
+    ((25, 45, 75, 10, false, false, true), ExpPSDOptimizer),
+    ((25, 45, 75, 10, false, false, true), SOCExpPSDOptimizer),
+    ((50, 90, 150, 10, true, false, false),),
+    ((50, 90, 150, 10, true, false, false), SOCExpPSDOptimizer),
+    ((50, 90, 150, 10, false, true, false),),
+    ((50, 90, 150, 10, false, true, false), ExpPSDOptimizer),
+    ((50, 90, 150, 10, false, true, false), SOCExpPSDOptimizer),
+    ((50, 90, 150, 10, false, false, true),),
+    ((100, 180, 300, 10, true, false, false),),
+    ((100, 180, 300, 10, false, true, false),),
+    ]
 return (ExpDesignJuMP, insts)
