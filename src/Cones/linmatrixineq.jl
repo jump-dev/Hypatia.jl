@@ -129,18 +129,22 @@ function update_hess(cone::LinMatrixIneq)
 end
 
 function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
-    @assert cone.grad_updated
-    sumAinvAs = cone.sumAinvAs
+    @assert cone.feas_updated
     corr = cone.correction
-    dim = cone.dim
+    As = cone.As
+    fact = cone.fact
 
-    temp = zero(sumAinvAs[1])
-    temp .= 0
-    @inbounds for j in 1:dim, k in 1:dim
-        mul!(temp, sumAinvAs[j], sumAinvAs[k], primal_dir[j] * primal_dir[k], true)
-    end
-    @inbounds for i in 1:dim
-        corr[i] = real(dot(sumAinvAs[i], temp'))
+    # dir_mat = sum(d_i * A_i for (d_i, A_i) in zip(primal_dir, As)).data
+    # LinearAlgebra.copytri!(dir_mat, As[1].uplo, cone.is_complex)
+    # ldiv!(fact, dir_mat)
+    # rdiv!(dir_mat, fact.U)
+    # M = dir_mat * dir_mat'
+    dir_mat = sum(d_i * A_i for (d_i, A_i) in zip(primal_dir, As))
+    Y1 = fact \ dir_mat
+    Y2 = Y1 / fact.U
+    M = Y2 * Y2'
+    for i in 1:cone.dim
+        corr[i] = real(dot(M, As[i]))
     end
 
     return corr
