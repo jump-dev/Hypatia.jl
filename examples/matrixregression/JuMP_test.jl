@@ -28,4 +28,17 @@ insts["slow"] = [
     ((15, 20, 50, false, 0.1, 0.1, 0.1, 0.2, 0.2), SOCExpPSDOptimizer),
     ((15, 20, 50, false, 0, 0.1, 0.1, 0, 0),),
     ]
+insts["various"] = [
+    ((3, 2, 80, true, 0.1, 0.1, 0.1, 0.2, 0.2), SOCExpPSDOptimizer),
+    ((3, 2, 80, true, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((3, 2, 80, false, 0.1, 0.1, 0.1, 0.2, 0.2), SOCExpPSDOptimizer),
+    ((3, 2, 80, false, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((6, 4, 80, true, 0.1, 0.1, 0.1, 0.2, 0.2), SOCExpPSDOptimizer),
+    ((6, 4, 80, true, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((6, 4, 80, false, 0.1, 0.1, 0.1, 0.2, 0.2), SOCExpPSDOptimizer),
+    ((6, 4, 80, false, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((12, 8, 80, true, 0.1, 0.1, 0.1, 0.2, 0.2), SOCExpPSDOptimizer),
+    ((12, 8, 80, true, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ((12, 8, 80, false, 0.1, 0.1, 0.1, 0.2, 0.2),),
+    ]
 return (MatrixRegressionJuMP, insts)

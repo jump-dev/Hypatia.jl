@@ -20,4 +20,13 @@ insts["slow"] = [
     ((2, 40),),
     ((10, 18),),
     ]
+insts["various"] = [
+    ((5, 8),),
+    ((5, 8), ExpPSDOptimizer),
+    ((5, 8), SOCExpPSDOptimizer),
+    ((5, 12),),
+    ((5, 12), SOCExpPSDOptimizer),
+    ((5, 16),),
+    ((5, 20),),
+    ]
 return (MatrixCompletionJuMP, insts)
