@@ -1,6 +1,6 @@
 #=
 find maximum volume hypercube with edges parallel to the axes inside a polyhedron
-defined with l_1, l_infty, or l_2 ball constraints (different to native.jl)
+or an ellipsoid defined with l_1, l_infty, or l_2 ball constraints (different to native.jl)
 =#
 
 struct MaxVolumeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -10,10 +10,12 @@ struct MaxVolumeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 function build(inst::MaxVolumeJuMP{T}) where {T <: Float64}
+    @assert xor(inst.epipernormeucl_constr, inst.epinorminf_constrs)
     n = inst.n
     A = randn(n, n)
     # ensure there will be a feasible solution
     x = randn(n)
+    A = A * A' + 10I
     gamma = norm(A * x) / sqrt(n)
 
     model = JuMP.Model()

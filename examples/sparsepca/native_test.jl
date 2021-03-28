@@ -17,4 +17,12 @@ insts["fast"] = [
     ((30, 10, false, 10),),
     ]
 insts["slow"] = Tuple[]
+insts["various"] = [
+    ((10, 3, true, 10),),
+    ((10, 3, false, 10),),
+    ((20, 6, true, 10),),
+    ((20, 6, false, 10),),
+    ((40, 12, true, 10),),
+    ((40, 12, false, 10),),
+    ]
 return (SparsePCANative, insts)
