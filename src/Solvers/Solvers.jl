@@ -11,6 +11,7 @@ import SuiteSparse
 import LinearMaps
 import IterativeSolvers
 using Test
+import Base.convert
 import Hypatia.Cones
 import Hypatia.Models
 import Hypatia.SparseNonSymCache
@@ -48,6 +49,8 @@ include("point.jl")
     NumericalFailure
     UnknownStatus
 end
+
+convert(::Type{String}, status::Status) = string(status)
 
 abstract type Stepper{T <: Real} end
 

@@ -3,7 +3,7 @@ given a random polynomial matrix H, find a polynomial matrix Q such that Q - H i
 and the total volume of all polynomials in Q over the unit box is minimized
 =#
 
-struct RandomPolyMatJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+struct NearestPolyMatJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
     halfdeg::Int
     R::Int # side dimension of polynomial matrices
@@ -12,7 +12,7 @@ struct RandomPolyMatJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_sdp::Bool # use SDP formulation with auxiliary polynomial
 end
 
-function build(inst::RandomPolyMatJuMP{T}) where {T <: Float64}
+function build(inst::NearestPolyMatJuMP{T}) where {T <: Float64}
     (n, halfdeg, R) = (inst.n, inst.halfdeg, inst.R)
     @assert inst.use_wsos + inst.use_matrixwsos + inst.use_sdp == 1
     U = binomial(n + 2 * halfdeg, n)

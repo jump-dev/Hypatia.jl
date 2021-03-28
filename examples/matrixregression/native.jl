@@ -257,14 +257,14 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
     return model
 end
 
-function test_extra(inst::MatrixRegressionNative{T}, result::NamedTuple) where T
-    @test result.status == Solvers.Optimal
-    if result.status == Solvers.Optimal
+function test_extra(inst::MatrixRegressionNative{T}, solve_stats::NamedTuple, solution::NamedTuple) where T
+    @test solve_stats.status == Solvers.Optimal
+    if solve_stats.status == Solvers.Optimal
         # check objective value is correct
         (Y, X) = (inst.Y, inst.X)
         A_opt = zeros(eltype(Y), size(X, 2), size(Y, 2))
         A_len = length(A_opt) * (inst.is_complex ? 2 : 1)
-        @views Cones.vec_copy_to!(A_opt, result.x[1 .+ (1:A_len)])
+        @views Cones.vec_copy_to!(A_opt, solution.x[1 .+ (1:A_len)])
         loss = (sum(abs2, X * A_opt) / 2 - real(dot(X' * Y, A_opt))) / size(Y, 1)
         obj_result = loss +
             inst.lam_fro * norm(vec(A_opt), 2) +
@@ -273,6 +273,6 @@ function test_extra(inst::MatrixRegressionNative{T}, result::NamedTuple) where T
             inst.lam_glr * sum(norm, eachrow(A_opt)) +
             inst.lam_glc * sum(norm, eachcol(A_opt))
         tol = eps(T)^0.25
-        @test result.primal_obj ≈ obj_result atol = tol rtol = tol
+        @test solve_stats.primal_obj ≈ obj_result atol = tol rtol = tol
     end
 end

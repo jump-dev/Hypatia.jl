@@ -2,6 +2,9 @@
 utilities for spawning benchmark runs
 =#
 
+using Distributed
+include(joinpath(@__DIR__, "setup.jl"))
+
 # reduce printing for worker
 Base.eval(Distributed, :(function redirect_worker_output(ident, stream)
     @async while !eof(stream)
@@ -11,7 +14,7 @@ end))
 
 function spawn_step(fun::Function, fun_name::Symbol, time_limit::Real, worker::Int)
     @assert nprocs() == 2
-    status = :OK
+    status = :Success
     time_start = time()
 
     fut = Future()
@@ -52,8 +55,11 @@ function spawn_step(fun::Function, fun_name::Symbol, time_limit::Real, worker::I
     end
 
     output = (killed_proc || !isready(fut)) ? nothing : fetch(fut)
-    if isnothing(output) && status == :OK
-        status = Symbol(fun_name, :CaughtError)
+    if isnothing(output)
+        if status == :Success
+            status = Symbol(fun_name, :CaughtError)
+        end
+        output = NamedTuple()
     end
     finalize(fut)
     flush(stdout); flush(stderr)
@@ -61,11 +67,11 @@ function spawn_step(fun::Function, fun_name::Symbol, time_limit::Real, worker::I
     return (status, output)
 end
 
-function run_instance_check(
+function spawn_instance(
     ex_name::String,
     ex_type::Type{<:ExampleInstanceJuMP{Float64}},
     compile_inst::Tuple,
-    inst::Tuple,
+    inst_data::Tuple,
     extender,
     solver::Tuple,
     solve::Bool;
@@ -97,15 +103,15 @@ function run_instance_check(
     println("\nsetup model")
     print_memory()
     setup_fun() = @eval begin
-        (model, model_stats) = setup_model($ex_type, $inst, $extender, $(solver[3]), $(solver[2]))
+        (model, model_stats) = setup_model($ex_type, $inst_data, $extender, $(solver[3]), $(solver[2]))
         GC.gc()
         return model_stats
     end
-    setup_time = @elapsed (status, model_stats) = spawn_step(setup_fun, :SetupModel, setup_time_limit, worker)
-    setup_killed = (status != :OK)
+    setup_time = @elapsed (script_status, model_stats) = spawn_step(setup_fun, :SetupModel, setup_time_limit, worker)
+    setup_killed = (script_status != :Success)
     if setup_killed
-        println("setup model failed: $status")
-        model_stats = ntuple(_ -> missing, 5)
+        println("setup model failed: $script_status")
+        model_stats = NamedTuple()
     end
 
     if solve && !setup_killed
@@ -115,25 +121,23 @@ function run_instance_check(
             solve_stats = solve_check(model, test = false)
             return solve_stats
         end
-        check_time = @elapsed (status, check_stats) = spawn_step(check_fun, :SolveCheck, check_time_limit, worker)
-        check_killed = (status != :OK)
-        check_killed && println("solve and check failed: $status")
+        check_time = @elapsed (script_status, solve_stats) = spawn_step(check_fun, :SolveCheck, check_time_limit, worker)
+        check_killed = (script_status != :Success)
+        check_killed && println("solve and check failed: $script_status")
     else
+        solve_stats = NamedTuple()
         check_time = 0.0
         check_killed = true
     end
     if check_killed
-        if status == :OK
+        if script_status == :Success
             @assert !solve
-            status = :SkippedSolveCheck
+            script_status = :SkippedSolveCheck
         end
-        check_stats = (string(status), ntuple(_ -> missing, 9)...)
         solver_hit_limit = true
     else
-        solver_status = string(check_stats[1])
-        check_stats = (solver_status, check_stats[2:end]...)
-        solver_hit_limit = (solver_status == "TimeLimit")
-        solver_hit_limit && println("solver hit limit: $solver_status")
+        solver_hit_limit = (string(solve_stats.status) == "TimeLimit")
+        solver_hit_limit && println("solver hit time limit")
     end
 
     try
@@ -143,5 +147,7 @@ function run_instance_check(
     end
     @assert nprocs() == 1
 
-    return (setup_killed, solver_hit_limit, (model_stats..., check_stats..., setup_time, check_time))
+    script_status = string(script_status)
+    run_perf = (; model_stats..., solve_stats..., setup_time, check_time, script_status)
+    return (setup_killed, solver_hit_limit, run_perf)
 end

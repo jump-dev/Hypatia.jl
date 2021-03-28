@@ -1,5 +1,5 @@
 #=
-compute a gram matrix of a polynomial, minimizing its log-determinant or root-determinant (equivalent optimal solutions with different optimal objective values)
+compute a maximum-determinant gram matrix of a polynomial
 =#
 
 import DynamicPolynomials
