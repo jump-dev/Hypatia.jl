@@ -10,7 +10,8 @@ process_entry(x::Int) = string(x)
 bench_file = joinpath(@__DIR__, "raw", "bench.csv")
 output_folder = mkpath(joinpath(@__DIR__, "analysis"))
 tex_folder = mkpath(joinpath(output_folder, "tex"))
-stats_folder = mkpath(joinpath(output_folder, "stats"))
+aux_folder = mkpath(joinpath(output_folder, "aux"))
+csv_folder = mkpath(joinpath(output_folder, "csvs"))
 
 function shifted_geomean(metric::AbstractVector, conv::AbstractVector{Bool}; shift = 0, cap = Inf, skipnotfinite = false, use_cap = false)
     if use_cap
@@ -62,7 +63,7 @@ function make_agg_tables(all_df)
         :status => (x -> count(isequal("IterationLimit"), x)) => :iterationlimit,
         :status => length => :total,
         )
-    CSV.write(joinpath(stats_folder, "agg" * ".csv"), df_agg)
+    CSV.write(joinpath(aux_folder, "agg" * ".csv"), df_agg)
 
     # combine feasible and infeasible statuses
     transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] => ByRow((x...) -> sum(x)) => :converged)
@@ -126,7 +127,7 @@ function make_subtime_tables(all_df)
             [:time_getdir_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_getdir_iter, use_cap = use_cap)) => Symbol(:getdir_piter, set),
             [:time_search_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_search_iter, use_cap = use_cap)) => Symbol(:search_piter, set),
             )
-        CSV.write(joinpath(stats_folder, "subtime" * string(set) * ".csv"), subtime_df)
+        CSV.write(joinpath(aux_folder, "subtime" * string(set) * ".csv"), subtime_df)
         return subtime_df
     end
 
@@ -175,7 +176,7 @@ function make_perf_profiles(all_df, comp, metric)
     for s in 1:2
         x = vcat(0, repeat(x_plot[s], inner = 2))
         y = vcat(0, 0, repeat(y_plot[s][1:(end - 1)], inner = 2), y_plot[s][end])
-        CSV.write(joinpath(output_folder, comp[s] * "_vs_" * comp[2 - s + 1] * "_" * string(metric) * ".csv"), DataFrame(x = x, y = y))
+        CSV.write(joinpath(csv_folder, comp[s] * "_vs_" * comp[2 - s + 1] * "_" * string(metric) * ".csv"), DataFrame(x = x, y = y))
     end
     return
 end
@@ -183,17 +184,17 @@ end
 function instance_stats(all_df)
     one_solver = filter(t -> t.solver_options == "basic", all_df)
     inst_df = select(one_solver, :num_cones => ByRow(log10) => :numcones, [:n, :p, :q] => ((x, y, z) -> log10.(x .+ y .+ z)) => :npq)
-    CSV.write(joinpath(output_folder, "inststats.csv"), inst_df)
+    CSV.write(joinpath(csv_folder, "inststats.csv"), inst_df)
     # for solve times, only include converged instances
     solve_times = filter(t -> t.conv, one_solver)
-    CSV.write(joinpath(output_folder, "solvetimes.csv"), select(solve_times, :solve_time => ByRow(log10) => :time))
+    CSV.write(joinpath(csv_folder, "solvetimes.csv"), select(solve_times, :solve_time => ByRow(log10) => :time))
 
     # only used to get list of cones manually
     ex_df = combine(groupby(one_solver, :example),
         :cone_types => (x -> union(eval.(Meta.parse.(x)))) => :cones,
         :cone_types => length => :num_instances,
         )
-    CSV.write(joinpath(stats_folder, "examplestats.csv"), ex_df)
+    CSV.write(joinpath(aux_folder, "examplestats.csv"), ex_df)
 
     return
 end
