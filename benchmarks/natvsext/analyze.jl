@@ -2,54 +2,57 @@ using Printf
 using CSV
 using DataFrames
 
-bench_file = joinpath(@__DIR__, "bench.csv")
-output_folder = mkpath(joinpath(@__DIR__, "results"))
+bench_file = joinpath(@__DIR__, "raw", "bench.csv")
+output_folder = mkpath(joinpath(@__DIR__, "analysis"))
+tex_folder = mkpath(joinpath(output_folder, "tex"))
+aux_folder = mkpath(joinpath(output_folder, "aux"))
+csv_folder = mkpath(joinpath(csv, "csvs"))
 
 # uncomment examples to process
 examples_params = Dict(
     # Hypatia paper examples:
-    "DensityEstJuMP" => (
+    "densityest" => (
         [:m, :twok], [2, 3],
         [:SEP,], [:nu_nat, :n_nat, :n_SEP]
         ),
-    "ExpDesignJuMP" => (
+    "expdesign" => (
         [:logdet, :k], [5, 1],
         # [:EP,], [:n_nat, :n_EP, :q_nat, :q_EP]
         # [:SEP,], [:n_SEP, :q_nat, :q_SEP]
         [:EP, :SEP], [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
         ),
-    "MatrixCompletionJuMP" => (
+    "matrixcompletion" => (
         [:m, :k], [1, 2],
         # [:EP,], [:n_EP, :p_nat, :q_EP]
         # [:SEP,], [:n_SEP, :p_nat, :q_SEP]
         [:EP, :SEP], [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
         ),
-    "MatrixRegressionJuMP" => (
+    "matrixregression" => (
         [:m, :k], [2, 1],
         [:SEP,], [:n_SEP, :q_nat]
         ),
-    "NearestPSDJuMP" => (
+    "nearestpsd" => (
         [:compl, :k], [2, 1],
         [:SEP,], [:n_nat, :q_SEP]
         ),
-    "PolyMinJuMP" => (
+    "polymin" => (
         [:m, :k], [1, 2],
         [:SEP,], [:nu_nat, :n_nat, :q_SEP]
         ),
-    "PortfolioJuMP" => (
+    "portfolio" => (
         [:k], [1],
         [:SEP,], Symbol[]
         ),
-    "ShapeConRegrJuMP" => (
+    "shapeconregr" => (
         [:m, :twok], [1, 5],
         [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
         ),
     # SOS paper examples:
-    "PolyNormJuMP" => (
+    "polynorm" => (
         [:L1, :n, :d, :m], [5, 1, 3, 4],
         [:SEP,], Symbol[]
         ),
-    "NearestPolyMatJuMP" => (
+    "nearestpolymat" => (
         [:n, :d, :m], [1, 2, 3],
         [:SEP,], Symbol[]
         ),
@@ -66,7 +69,7 @@ function post_process()
     replace!(all_df.extender, extender_map...)
     for (ex_name, ex_params) in examples_params
         println()
-        ex_df = all_df[(all_df.example .== ex_name) .& in.(all_df.extender, Ref(vcat("", string.(ex_params[3])))), :]
+        ex_df = filter(t -> t.example == ex_name && t.extender in vcat("", string.(ex_params[3])), all_df)
         if isempty(ex_df)
             @info("no data for $ex_name with params: $ex_params")
             continue
@@ -104,7 +107,7 @@ status_map = Dict(
 residual_tol_satisfied(a, tol = 1e-5) = (all(isfinite, a) && maximum(a) < tol)
 relative_tol_satisfied(a::T, b::T, tol::T = 1e-5) where {T <: Real} = (abs(a - b) / (1 + max(abs(a), abs(b))) < tol)
 
-ex_wide_file(ex_name::String) = joinpath(output_folder, ex_name * "_wide.csv")
+ex_wide_file(ex_name::String) = joinpath(aux_folder, ex_name * "_wide.csv")
 
 function make_wide_csv(ex_df, ex_name, ex_params)
     @info("making wide csv for $ex_name")
@@ -117,7 +120,7 @@ function make_wide_csv(ex_df, ex_name, ex_params)
     transform!(ex_df,
         [:inst_ext, :solver] => ((x, y) -> inst_solver_name.(x, y)) => :inst_solver,
         [:x_viol, :y_viol, :z_viol, :rel_obj_diff] => ByRow((res...) -> residual_tol_satisfied(coalesce.(res, NaN))) => :converged,
-        :status => ByRow(x -> status_map[x]) => :status,
+        [:status, :script_status] => ByRow((x, y) -> (y == "Success" ? status_map[x] : status_map[y])) => :status,
         )
     for (name, pos) in zip(inst_keys, ex_params[2])
         transform!(ex_df, :inst_data => ByRow(x -> eval(Meta.parse(x))[pos]) => name)
@@ -132,8 +135,8 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         co_idxs = findall((group_df[:, :status] .== "co") .& group_df[:, :converged])
         if length(co_idxs) >= 2
             for i in eachindex(co_idxs)
-                first_optval = group_df[co_idxs[i], :prim_obj]
-                other_optvals = group_df[co_idxs[Not(i)], :prim_obj]
+                first_optval = group_df[co_idxs[i], :primal_obj]
+                other_optvals = group_df[co_idxs[Not(i)], :primal_obj]
                 if !all(relative_tol_satisfied.(other_optvals, first_optval))
                     println("objective values of: $(ex_name) $(group_df[!, :inst_data][1]) do not agree")
                 end
@@ -156,8 +159,6 @@ function make_wide_csv(ex_df, ex_name, ex_params)
 end
 
 string_ast = "\$\\ast\$"
-process_entry_round(x::Float64) = (isnan(x) ? string_ast : string(round(Int, x)))
-process_entry_round(x) = process_entry(x)
 process_entry(::Missing) = string_ast
 process_entry(::Missing, ::Missing) = "sk" # no data so instance was skipped
 function process_entry(x::Float64)
@@ -186,7 +187,7 @@ function make_table_tex(ex_name, ex_params, ex_df_wide, inst_solvers)
     print_sizes = ex_params[4]
 
     sep = " & "
-    ex_tex = open(joinpath(output_folder, ex_name * "_table.tex"), "w")
+    ex_tex = open(joinpath(tex_folder, ex_name * "_table.tex"), "w")
     header_str = prod(string(s) * sep for s in vcat(inst_keys, print_sizes))
     if print_table_solvers
         header_str *= prod(s * " & & & " for s in inst_solvers)
@@ -199,7 +200,7 @@ function make_table_tex(ex_name, ex_params, ex_df_wide, inst_solvers)
             row_str *= sep * process_entry(row[i])
         end
         for s in print_sizes
-            row_str *= sep * process_entry_round(row[s]) # NOTE rounds nu to integer
+            row_str *= sep * process_entry(row[s])
         end
         if print_table_solvers
             for inst_solver in inst_solvers
@@ -229,7 +230,7 @@ function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
         transform_plot_cols(ex_df_wide, inst_solver)
     end
 
-    plot_file_start = joinpath(output_folder, ex_name * "_plot")
+    plot_file_start = joinpath(csv_folder, ex_name * "_plot")
     axis_name = last(inst_keys)
     if num_params == 1
         success_df = select(ex_df_wide, axis_name, inst_solvers...)

@@ -1,37 +1,16 @@
-#=
-run benchmarks from the examples folder
-to use the bench instance set and run on cmd line:
-killall julia; ~/julia/julia examples/runbenchmarks.jl &> ~/bench/bench.txt
-=#
-
-import DataFrames
-import CSV
-using Printf
-import LinearAlgebra
-using Distributed
 using Hypatia
 using MosekTools
-
-interrupt()
-@assert nprocs() == 1
-println()
-
-examples_dir = @__DIR__
-include(joinpath(examples_dir, "common_JuMP.jl"))
+include(joinpath(@__DIR__, "../spawn.jl"))
 
 # path to write results DataFrame to CSV, if any
-results_path = joinpath(homedir(), "bench", "bench.csv")
+results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
 # results_path = nothing
-
-spawn_runs = true # spawn new process for each instance
-# spawn_runs = false
 
 setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
 # setup_model_anyway = false
 
 verbose = true # make solvers print output
 # verbose = false
-
 num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
 free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
 optimizer_time_limit = 1800
@@ -85,87 +64,46 @@ JuMP_example_names = [
     # "shapeconregr",
     ]
 
+interrupt()
+@assert nprocs() == 1
+println()
+
 for ex_name in JuMP_example_names
     include(joinpath(examples_dir, ex_name, "JuMP.jl"))
 end
 
 print_memory() = println("free memory (GB): ", Float64(Sys.free_memory()) / 2^30)
-
 print_memory()
 
-if spawn_runs
-    include(joinpath(examples_dir, "spawn.jl"))
-else
-    LinearAlgebra.BLAS.set_num_threads(num_threads)
-    function run_instance_check(
-        ::String,
-        ex_type::Type{<:ExampleInstanceJuMP{Float64}},
-        ::Tuple,
-        inst_data::Tuple,
-        extender,
-        solver::Tuple,
-        ::Bool,
-        )
-        return (false, false, run_instance(ex_type, inst_data, extender, NamedTuple(), solver[2], default_options = solver[3], test = false))
-    end
-end
-
-inst_start = (spawn_runs ? 2 : 1) # if spawning, will run first instance to compile
-
-perf = DataFrames.DataFrame(
-    example = String[],
-    inst_set = String[],
-    count = Int[],
-    inst_data = Tuple[],
-    extender = String[],
-    solver = String[],
-    n = Int[],
-    p = Int[],
-    q = Int[],
-    nu = Float64[],
-    cone_types = Vector{String}[],
-    status = String[],
-    solve_time = Float64[],
-    iters = Int[],
-    prim_obj = Float64[],
-    dual_obj = Float64[],
-    rel_obj_diff = Float64[],
-    compl = Float64[],
-    x_viol = Float64[],
-    y_viol = Float64[],
-    z_viol = Float64[],
-    setup_time = Float64[],
-    check_time = Float64[],
-    total_time = Float64[],
-    )
-DataFrames.allowmissing!(perf, 7:21)
-
+perf = setup_benchmark_dataframe()
 isnothing(results_path) || CSV.write(results_path, perf)
 time_all = time()
 
-@info("starting benchmark runs")
+println("\nstarting benchmark runs\n")
 for ex_name in JuMP_example_names
     (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
+    ex_type_T = ex_type{Float64}
 
     for (inst_set, solver) in instance_sets
         haskey(ex_insts, inst_set) || continue
         (extender, inst_subsets) = ex_insts[inst_set]
         isempty(inst_subsets) && continue
-        @info("starting instances for $ex_type $inst_set")
+        info_perf = (; inst_set, :extender => string(extender), :example => ex_name, :real_T => Float64, :solver_options => (), :solver => solver[1])
 
+        println("\nstarting instances for $ex_type $inst_set\n")
         for inst_subset in inst_subsets
             solve = true
-            compile_inst = inst_subset[1]
-            for (inst_num, inst) in enumerate(inst_subset[inst_start:end])
-                println()
-                @info("starting $ex_type $inst_set $(solver[1]) $inst_num: $inst ...")
+            compile_inst = inst_subset[1] # first instance is only used for compilation
+            for (inst_num, inst_data) in enumerate(inst_subset[2:end])
+                println("\nstarting $ex_type $inst_set $(solver[1]) $inst_num: $inst_data ...\n")
                 flush(stdout); flush(stderr)
 
-                time_inst = @elapsed (setup_killed, check_killed, p) = run_instance_check(ex_name, ex_type{Float64}, compile_inst, inst, extender, solver, solve)
+                total_time = @elapsed (setup_killed, check_killed, run_perf) = spawn_instance(ex_name, ex_type_T, compile_inst, inst_data, extender, solver, solve)
 
-                push!(perf, (string(ex_type), inst_set, inst_num, inst, string(extender), solver[1], p..., time_inst))
-                isnothing(results_path) || CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
-                @printf("... %8.2e seconds\n\n", time_inst)
+                new_perf = (; info_perf..., run_perf..., total_time, inst_num, inst_data)
+                write_perf(perf, results_path, new_perf)
+
+                @printf("%8.2e seconds\n", total_time)
                 flush(stdout); flush(stderr)
 
                 setup_killed && break
@@ -181,9 +119,13 @@ for ex_name in JuMP_example_names
     end
 end
 
-@printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)
-DataFrames.show(perf, allrows = true, allcols = true)
-println()
-spawn_runs && interrupt()
+interrupt()
+
+# flush(stdout); flush(stderr)
+# println("\n")
+# DataFrames.show(perf, allrows = true, allcols = true)
+println("\n")
 flush(stdout); flush(stderr)
+
+@printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)
 ;

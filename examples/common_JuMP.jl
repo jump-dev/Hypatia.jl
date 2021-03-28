@@ -59,7 +59,7 @@ function run_instance(
     verbose && println("solve and check")
     check_time = @elapsed solve_stats = solve_check(model, test = test)
 
-    return (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time)
+    return (; model_stats..., solve_stats..., setup_time, check_time, :script_status => "Success")
 end
 
 function setup_model(
@@ -150,13 +150,14 @@ function solve_check(
     if opt isa Hypatia.Optimizer
         test && test_extra(model.ext[:inst], model)
         flush(stdout); flush(stderr)
-        return process_result(opt.model, opt.solver)[1:(end - 4)]
+        (solve_stats, _) = process_result(opt.model, opt.solver)
+        return solve_stats
     end
 
     test && @info("cannot run example tests if solver is not Hypatia")
 
     solve_time = JuMP.solve_time(model)
-    num_iters = MOI.get(model, MOI.BarrierIterations())
+    iters = MOI.get(model, MOI.BarrierIterations())
     primal_obj = JuMP.objective_value(model)
     dual_obj = JuMP.dual_objective_value(model)
     moi_status = MOI.get(model, MOI.TerminationStatus())
@@ -190,39 +191,11 @@ function solve_check(
     (x_viol, y_viol, z_viol) = certificate_violations(hyp_status, hyp_data, x, y, z, s)
     flush(stdout); flush(stderr)
 
-    solve_stats = (hyp_status, solve_time, num_iters, primal_obj, dual_obj, rel_obj_diff, compl, x_viol, y_viol, z_viol)
+    solve_stats = (;
+        :status => hyp_status, solve_time, iters, primal_obj, dual_obj,
+        rel_obj_diff, compl, x_viol, y_viol, z_viol,
+        )
     return solve_stats
-end
-
-# run a CBF instance with a given solver and return solve info
-function run_cbf(
-    inst::String, # a CBF file name
-    solver_options::NamedTuple,
-    solver_type = Hypatia.Optimizer; # TODO generalize for other solvers
-    test::Bool = true,
-    verbose::Bool = true,
-    )
-    verbose && println("setup model")
-    setup_time = @elapsed begin
-        model = JuMP.read_from_file(joinpath(cblib_dir, inst * ".cbf.gz"))
-
-        # delete integer constraints
-        JuMP.delete.(model, JuMP.all_constraints(model, JuMP.VariableRef, MOI.Integer))
-
-        # TODO refactor code in run_instance, so can use other solvers easily
-        opt = solver_type(; solver_options...)
-        backend = JuMP.backend(model)
-        MOI.Utilities.reset_optimizer(backend, opt)
-        MOI.Utilities.attach_optimizer(backend)
-
-        model_stats = get_model_stats(opt.model)
-        flush(stdout); flush(stderr)
-    end
-
-    verbose && println("solve and check")
-    check_time = @elapsed solve_stats = solve_check(model, test = false)
-
-    return (model_stats..., string(solve_stats[1]), solve_stats[2:end]..., setup_time, check_time)
 end
 
 moi_hyp_status_map = Dict(
