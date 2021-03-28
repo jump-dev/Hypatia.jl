@@ -8,48 +8,48 @@ output_folder = mkpath(joinpath(@__DIR__, "analysis"))
 # uncomment examples to process
 examples_params = Dict(
     # Hypatia paper examples:
-    "DensityEstJuMP" => (
+    "densityest" => (
         [:m, :twok], [2, 3],
         [:SEP,], [:nu_nat, :n_nat, :n_SEP]
         ),
-    "ExpDesignJuMP" => (
+    "expdesign" => (
         [:logdet, :k], [5, 1],
         # [:EP,], [:n_nat, :n_EP, :q_nat, :q_EP]
         # [:SEP,], [:n_SEP, :q_nat, :q_SEP]
         [:EP, :SEP], [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
         ),
-    "MatrixCompletionJuMP" => (
+    "matrixcompletion" => (
         [:m, :k], [1, 2],
         # [:EP,], [:n_EP, :p_nat, :q_EP]
         # [:SEP,], [:n_SEP, :p_nat, :q_SEP]
         [:EP, :SEP], [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
         ),
-    "MatrixRegressionJuMP" => (
+    "matrixregression" => (
         [:m, :k], [2, 1],
         [:SEP,], [:n_SEP, :q_nat]
         ),
-    "NearestPSDJuMP" => (
+    "nearestpsd" => (
         [:compl, :k], [2, 1],
         [:SEP,], [:n_nat, :q_SEP]
         ),
-    "PolyMinJuMP" => (
+    "polymin" => (
         [:m, :k], [1, 2],
         [:SEP,], [:nu_nat, :n_nat, :q_SEP]
         ),
-    "PortfolioJuMP" => (
+    "portfolio" => (
         [:k], [1],
         [:SEP,], Symbol[]
         ),
-    "ShapeConRegrJuMP" => (
+    "shapeconregr" => (
         [:m, :twok], [1, 5],
         [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
         ),
     # SOS paper examples:
-    "PolyNormJuMP" => (
+    "polynorm" => (
         [:L1, :n, :d, :m], [5, 1, 3, 4],
         [:SEP,], Symbol[]
         ),
-    "NearestPolyMatJuMP" => (
+    "nearestpolymat" => (
         [:n, :d, :m], [1, 2, 3],
         [:SEP,], Symbol[]
         ),
@@ -66,7 +66,7 @@ function post_process()
     replace!(all_df.extender, extender_map...)
     for (ex_name, ex_params) in examples_params
         println()
-        ex_df = all_df[(all_df.example .== ex_name) .& in.(all_df.extender, Ref(vcat("", string.(ex_params[3])))), :]
+        ex_df = filter(t -> t.example == ex_name && t.extender in vcat("", string.(ex_params[3])), all_df)
         if isempty(ex_df)
             @info("no data for $ex_name with params: $ex_params")
             continue
