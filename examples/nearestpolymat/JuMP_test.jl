@@ -21,7 +21,6 @@ insts["various"] = [
     ((4, 2, 5, false, false, true),),
     ((4, 2, 5, false, true, false),),
     ((4, 2, 5, true, false, false),),
-    # don't use SDP in larger sizes
     ((4, 2, 10, false, true, false), nothing, relaxed_tols),
     ((4, 2, 10, true, false, false),),
     ((4, 4, 5, false, true, false), nothing, relaxed_tols),
