@@ -13,7 +13,7 @@ default_options = (
     # verbose = true,
     default_tol_relax = 10,
     iter_limit = 1000,
-    time_limit = 2500,
+    time_limit = 3600,
     )
 
 # stepper option sets to run
@@ -30,6 +30,7 @@ stepper_options = [
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
     "minimal",
+    "various",
     ]
 
 # types of models to run and corresponding options and example names
@@ -44,41 +45,41 @@ native_example_names = [
     # "envelope",
     # "expdesign",
     "linearopt",
-    # "matrixcompletion",
+    "matrixcompletion",
     # "matrixregression",
-    # "maxvolume",
+    "maxvolume",
     # "polymin",
     # "portfolio",
-    # "sparsepca",
+    "sparsepca",
     ]
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    # "centralpolymat",
-    # "conditionnum",
-    # "contraction",
-    # "densityest",
-    # "envelope",
-    # "expdesign",
-    # "lotkavolterra",
-    # "lyapunovstability",
-    # "matrixcompletion",
-    # "matrixquadratic",
-    # "matrixregression",
-    # "maxvolume",
-    # "muconvexity",
-    # "nearestpsd",
-    # "normconepoly",
-    # "polymin",
-    # "polynorm",
-    # "portfolio",
-    # "nearestpolymat",
-    # "regionofattr",
-    # "robustgeomprog",
-    # "semidefinitepoly",
-    # "shapeconregr",
-    # "signomialmin",
-    # "stabilitynumber",
+    "centralpolymat",
+    "conditionnum",
+    "contraction",
+    "densityest",
+    "envelope",
+    "expdesign",
+    "lotkavolterra",
+    "lyapunovstability",
+    "matrixcompletion",
+    "matrixquadratic",
+    "matrixregression",
+    "maxvolume",
+    "muconvexity",
+    "nearestpsd",
+    "normconepoly",
+    "polymin",
+    "polynorm",
+    "portfolio",
+    "nearestpolymat",
+    "regionofattr",
+    "robustgeomprog",
+    "semidefinitepoly",
+    "shapeconregr",
+    "signomialmin",
+    "stabilitynumber",
     ]
 
 perf = setup_benchmark_dataframe()
