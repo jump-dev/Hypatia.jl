@@ -90,7 +90,6 @@ lmi_fact(arr::Union{UniformScaling{R}, Diagonal{R}}) where {R} = arr # NOTE coul
 lmi_fact(arr::AbstractSparseMatrix{R}) where {R} = cholesky(Hermitian(arr), shift=false, check=false)
 lmi_fact(arr::AbstractMatrix{R}) where {R} = cholesky!(Hermitian(arr), check=false)
 
-rdiv_sqrt!(arr::AbstractMatrix{R}, fact::UniformScaling{R}) where {R} = arr ./ sqrt(fact.λ)
 rdiv_sqrt!(arr::AbstractMatrix{R}, fact::Diagonal{R}) where {R} = @. arr / sqrt(fact)
 rdiv_sqrt!(arr::AbstractMatrix{R}, fact::Cholesky) where {R} = rdiv!(arr, fact.U)
 rdiv_sqrt!(arr::AbstractMatrix{R}, fact::SuiteSparse.CHOLMOD.Factor{R}) where {R} = (fact.L \ arr)'
