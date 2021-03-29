@@ -41,15 +41,15 @@ model_types = [
 
 # list of names of native examples to run
 native_example_names = [
-    "densityest",
-    "envelope",
-    "expdesign",
+    # "densityest",
+    # "envelope",
+    # "expdesign",
     "linearopt",
     "matrixcompletion",
-    "matrixregression",
+    # "matrixregression",
     "maxvolume",
-    "polymin",
-    "portfolio",
+    # "polymin",
+    # "portfolio",
     "sparsepca",
     ]
 
