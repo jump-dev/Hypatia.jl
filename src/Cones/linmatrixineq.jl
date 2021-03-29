@@ -4,6 +4,7 @@ TODO
 - assumes first A matrix is PSD (eg identity)
 =#
 
+import SuiteSparse
 # TODO remove if https://github.com/JuliaLang/julia/pull/40250 is merged
 import LinearAlgebra.dot
 dot(A::AbstractMatrix, J::UniformScaling) = tr(A) * J.λ
@@ -89,6 +90,11 @@ lmi_fact(arr::Union{UniformScaling{R}, Diagonal{R}}) where {R} = arr # NOTE coul
 lmi_fact(arr::AbstractSparseMatrix{R}) where {R} = cholesky(Hermitian(arr), shift=false, check=false)
 lmi_fact(arr::AbstractMatrix{R}) where {R} = cholesky!(Hermitian(arr), check=false)
 
+rdiv_sqrt!(arr::AbstractMatrix{R}, fact::UniformScaling{R}) where {R} = arr ./ sqrt(fact.λ)
+rdiv_sqrt!(arr::AbstractMatrix{R}, fact::Diagonal{R}) where {R} = @. arr / sqrt(fact)
+rdiv_sqrt!(arr::AbstractMatrix{R}, fact::Cholesky) where {R} = rdiv!(arr, fact.U)
+rdiv_sqrt!(arr::AbstractMatrix{R}, fact::SuiteSparse.CHOLMOD.Factor{R}) where {R} = (fact.L \ arr)'
+
 function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert !cone.feas_updated
 
@@ -145,7 +151,7 @@ function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
     # M = dir_mat * dir_mat'
     dir_mat = sum(d_i * A_i for (d_i, A_i) in zip(primal_dir, As))
     Y1 = fact \ dir_mat
-    Y2 = Y1 / fact.U
+    Y2 = rdiv_sqrt!(Y1, fact)
     M = Y2 * Y2'
     for i in 1:cone.dim
         corr[i] = real(dot(M, As[i]))
