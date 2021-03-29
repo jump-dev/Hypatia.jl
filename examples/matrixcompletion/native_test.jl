@@ -30,4 +30,5 @@ insts["slow"] = [
     ((18, 180, true, true, true, false),),
     ((18, 180, true, true, false, false),),
     ]
+insts["various"] = insts["slow"]
 return (MatrixCompletionNative, insts)
