@@ -13,8 +13,8 @@ cone_from_moi(::Type{T}, cone::MOI.SecondOrderCone) where {T <: Real} = Cones.Ep
 cone_from_moi(::Type{T}, cone::MOI.RotatedSecondOrderCone) where {T <: Real} = Cones.EpiPerSquare{T}(MOI.dimension(cone))
 cone_from_moi(::Type{T}, cone::MOI.ExponentialCone) where {T <: Real} = Cones.HypoPerLog{T}(3)
 cone_from_moi(::Type{T}, cone::MOI.DualExponentialCone) where {T <: Real} = Cones.HypoPerLog{T}(3, use_dual = true)
-cone_from_moi(::Type{T}, cone::MOI.PowerCone{T}) where {T <: Real} = Cones.Power{T}(T[cone.exponent, 1 - cone.exponent], 1)
-cone_from_moi(::Type{T}, cone::MOI.DualPowerCone{T}) where {T <: Real} = Cones.Power{T}(T[cone.exponent, 1 - cone.exponent], 1, use_dual = true)
+cone_from_moi(::Type{T}, cone::MOI.PowerCone{T}) where {T <: Real} = Cones.GeneralizedPower{T}(T[cone.exponent, 1 - cone.exponent], 1)
+cone_from_moi(::Type{T}, cone::MOI.DualPowerCone{T}) where {T <: Real} = Cones.GeneralizedPower{T}(T[cone.exponent, 1 - cone.exponent], 1, use_dual = true)
 cone_from_moi(::Type{T}, cone::MOI.GeometricMeanCone) where {T <: Real} = (l = MOI.dimension(cone) - 1; Cones.HypoGeoMean{T}(1 + l))
 cone_from_moi(::Type{T}, cone::MOI.RelativeEntropyCone) where {T <: Real} = Cones.EpiRelEntropy{T}(MOI.dimension(cone))
 cone_from_moi(::Type{T}, cone::MOI.NormSpectralCone) where {T <: Real} = Cones.EpiNormSpectral{T, T}(extrema((cone.row_dim, cone.column_dim))...)
@@ -156,7 +156,7 @@ struct PowerCone{T <: Real} <: MOI.AbstractVectorSet
 end
 PowerCone{T}(alpha::Vector{T}, n::Int) where {T <: Real} = PowerCone{T}(alpha, n, false)
 MOI.dimension(cone::PowerCone) = length(cone.alpha) + cone.n
-cone_from_moi(::Type{T}, cone::PowerCone{T}) where {T <: Real} = Cones.Power{T}(cone.alpha, cone.n, use_dual = cone.use_dual)
+cone_from_moi(::Type{T}, cone::PowerCone{T}) where {T <: Real} = Cones.GeneralizedPower{T}(cone.alpha, cone.n, use_dual = cone.use_dual)
 
 export HypoPerLogCone
 struct HypoPerLogCone{T <: Real} <: MOI.AbstractVectorSet

@@ -195,21 +195,21 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
             G_geo_unknown[1, 1] = -1
             G_geo_unknown[2, 2] = -1
             G_geo_newvars[3, 1] = -1
-            push!(cones, Cones.Power{T}(fill(inv(T(2)), 2), 1))
+            push!(cones, Cones.GeneralizedPower{T}(fill(inv(T(2)), 2), 1))
             offset = 4
             # loop over new vars
             for i in 1:(num_unknown - 3)
                 G_geo_newvars[offset + 2, i + 1] = -1
                 G_geo_newvars[offset + 1, i] = -1
                 G_geo_unknown[offset, i + 2] = -1
-                push!(cones, Cones.Power{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
+                push!(cones, Cones.GeneralizedPower{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
                 offset += 3
             end
 
             # last row also special because hypograph variable is fixed
             G_geo_unknown[offset, num_unknown] = -1
             G_geo_newvars[offset + 1, num_unknown - 2] = -1
-            push!(cones, Cones.Power{T}([inv(T(num_unknown)), T(num_unknown - 1) / T(num_unknown)], 1))
+            push!(cones, Cones.GeneralizedPower{T}([inv(T(num_unknown)), T(num_unknown - 1) / T(num_unknown)], 1))
             h = vcat(h_norm, zeros(T, 3 * (num_unknown - 2)), T[0, 0, 1])
 
             # if using extended with spectral objective G_geo needs to be prepadded with an epigraph variable

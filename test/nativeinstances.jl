@@ -1189,7 +1189,7 @@ function power1(T; options...)
     h = zeros(T, 3)
 
     for use_dual in (false, true)
-        cones = Cone{T}[Cones.Power{T}(ones(T, 2) / 2, 1, use_dual = use_dual)]
+        cones = Cone{T}[Cones.GeneralizedPower{T}(ones(T, 2) / 2, 1, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
@@ -1208,7 +1208,7 @@ function power2(T; options...)
     h = zeros(T, 4)
 
     for use_dual in (false, true)
-        cones = Cone{T}[Cones.Power{T}(ones(T, 2) / 2, 2, use_dual = use_dual)]
+        cones = Cone{T}[Cones.GeneralizedPower{T}(ones(T, 2) / 2, 2, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
@@ -1229,7 +1229,7 @@ function power3(T; options...)
 
     for use_dual in (false, true)
         b = [one(T), zero(T)]
-        cones = Cone{T}[Cones.Power{T}(fill(inv(T(l)), l), 2, use_dual = use_dual)]
+        cones = Cone{T}[Cones.GeneralizedPower{T}(fill(inv(T(l)), l), 2, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
@@ -1248,7 +1248,7 @@ function power4(T; options...)
     h = zeros(T, l + 3)
 
     for use_dual in (false, true)
-        cones = Cone{T}[Cones.Power{T}(fill(inv(T(l)), l), 3, use_dual = use_dual)]
+        cones = Cone{T}[Cones.GeneralizedPower{T}(fill(inv(T(l)), l), 3, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal

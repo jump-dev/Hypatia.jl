@@ -7,7 +7,7 @@ barrier from "On self-concordant barriers for generalized power cones" by Roy & 
 -log(prod_i((u_i)^(2 * alpha_i)) - norm_2(w)^2) - sum_i((1 - alpha_i)*log(u_i))
 =#
 
-mutable struct Power{T <: Real} <: Cone{T}
+mutable struct GeneralizedPower{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     use_heuristic_neighborhood::Bool
     dim::Int
@@ -37,7 +37,7 @@ mutable struct Power{T <: Real} <: Cone{T}
     auiproduuw::Vector{T}
     tempm::Vector{T}
 
-    function Power{T}(
+    function GeneralizedPower{T}(
         alpha::Vector{T},
         n::Int;
         use_dual::Bool = false,
@@ -60,10 +60,10 @@ mutable struct Power{T <: Real} <: Cone{T}
     end
 end
 
-dimension(cone::Power) = length(cone.alpha) + cone.n
+dimension(cone::GeneralizedPower) = length(cone.alpha) + cone.n
 
 # TODO only allocate the fields we use
-function setup_extra_data(cone::Power{T}) where {T <: Real}
+function setup_extra_data(cone::GeneralizedPower{T}) where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -75,16 +75,16 @@ function setup_extra_data(cone::Power{T}) where {T <: Real}
     return cone
 end
 
-get_nu(cone::Power) = length(cone.alpha) + 1
+get_nu(cone::GeneralizedPower) = length(cone.alpha) + 1
 
-function set_initial_point(arr::AbstractVector, cone::Power)
+function set_initial_point(arr::AbstractVector, cone::GeneralizedPower)
     m = length(cone.alpha)
     @. @views arr[1:m] = sqrt(1 + cone.alpha)
     @views arr[(m + 1):cone.dim] .= 0
     return arr
 end
 
-function update_feas(cone::Power{T}) where {T <: Real}
+function update_feas(cone::GeneralizedPower{T}) where {T <: Real}
     @assert !cone.feas_updated
     m = length(cone.alpha)
     @views u = cone.point[1:m]
@@ -101,7 +101,7 @@ function update_feas(cone::Power{T}) where {T <: Real}
     return cone.is_feas
 end
 
-function is_dual_feas(cone::Power{T}) where {T <: Real}
+function is_dual_feas(cone::GeneralizedPower{T}) where {T <: Real}
     alpha = cone.alpha
     m = length(cone.alpha)
     @views u = cone.dual_point[1:m]
@@ -115,7 +115,7 @@ function is_dual_feas(cone::Power{T}) where {T <: Real}
     return false
 end
 
-function update_grad(cone::Power)
+function update_grad(cone::GeneralizedPower)
     @assert cone.is_feas
     m = length(cone.alpha)
     @views u = cone.point[1:m]
@@ -132,7 +132,7 @@ function update_grad(cone::Power)
     return cone.grad
 end
 
-function update_hess(cone::Power)
+function update_hess(cone::GeneralizedPower)
     @assert cone.grad_updated
     m = length(cone.alpha)
     @views u = cone.point[1:m]
@@ -167,7 +167,7 @@ function update_hess(cone::Power)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::GeneralizedPower)
     @assert cone.grad_updated
     m = length(cone.alpha)
     @views u = cone.point[1:m]
@@ -194,7 +194,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Power)
     return prod
 end
 
-function correction(cone::Power, primal_dir::AbstractVector)
+function correction(cone::GeneralizedPower, primal_dir::AbstractVector)
     m = length(cone.alpha)
     @views u = cone.point[1:m]
     @views w = cone.point[(m + 1):end]

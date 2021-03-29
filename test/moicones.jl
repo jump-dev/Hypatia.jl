@@ -66,7 +66,7 @@ function test_moi_cones(T::Type{<:Real})
         iT5 = inv(T(5))
         moi_cone = MOI.PowerCone{T}(iT5)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa Cones.Power{T}
+        @test hyp_cone isa Cones.GeneralizedPower{T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
         @test !Cones.use_dual_barrier(hyp_cone)
         @test hyp_cone.alpha == T[iT5, 1 - iT5]
@@ -76,7 +76,7 @@ function test_moi_cones(T::Type{<:Real})
         iT5 = inv(T(5))
         moi_cone = MOI.DualPowerCone{T}(iT5)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa Cones.Power{T}
+        @test hyp_cone isa Cones.GeneralizedPower{T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
         @test Cones.use_dual_barrier(hyp_cone)
         @test hyp_cone.alpha == T[iT5, 1 - iT5]
@@ -216,7 +216,7 @@ function test_moi_cones(T::Type{<:Real})
         alpha ./= sum(alpha)
         moi_cone = Hypatia.PowerCone{T}(alpha, 3)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa Cones.Power{T}
+        @test hyp_cone isa Cones.GeneralizedPower{T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 5
         @test hyp_cone.alpha == alpha
     end
