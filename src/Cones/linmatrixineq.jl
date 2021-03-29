@@ -4,13 +4,16 @@ TODO
 - assumes first A matrix is PSD (eg identity)
 =#
 
+# TODO remove if https://github.com/JuliaLang/julia/pull/40250 is merged
+import LinearAlgebra.dot
+dot(A::AbstractMatrix, J::UniformScaling) = tr(A) * J.λ
+
 mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     use_heuristic_neighborhood::Bool
     dim::Int
     side::Int
     As::Vector
-    is_complex::Bool
 
     point::Vector{T}
     dual_point::Vector{T}
@@ -134,8 +137,9 @@ function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
     As = cone.As
     fact = cone.fact
 
+    # TODO specialize if As are all Hermitian AbstractMatrix
     # dir_mat = sum(d_i * A_i for (d_i, A_i) in zip(primal_dir, As)).data
-    # LinearAlgebra.copytri!(dir_mat, As[1].uplo, cone.is_complex)
+    # LinearAlgebra.copytri!(dir_mat, As[1].uplo)
     # ldiv!(fact, dir_mat)
     # rdiv!(dir_mat, fact.U)
     # M = dir_mat * dir_mat'
