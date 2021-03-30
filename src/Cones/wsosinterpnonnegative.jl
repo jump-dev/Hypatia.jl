@@ -30,10 +30,10 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     hess_fact_cache
 
     tempLL::Vector{Matrix{R}}
+    tempLL2::Vector{Matrix{R}}
     tempUL::Vector{Matrix{R}}
     tempLU::Vector{Matrix{R}}
     tempLU2::Vector{Matrix{R}}
-    tempLU3::Vector{Matrix{R}}
     tempUU::Vector{Matrix{R}} # TODO for corrector, this can stay as a single matrix if we only use LU
     ΛF::Vector
     Ps_times::Vector{Float64}
@@ -66,10 +66,10 @@ function setup_extra_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrC
     load_matrix(cone.hess_fact_cache, cone.hess)
     Ls = [size(Pk, 2) for Pk in cone.Ps]
     cone.tempLL = [zeros(R, L, L) for L in Ls]
+    cone.tempLL2 = [zeros(R, L, L) for L in Ls]
     cone.tempUL = [zeros(R, dim, L) for L in Ls]
     cone.tempLU = [zeros(R, L, dim) for L in Ls]
     cone.tempLU2 = [zeros(R, L, dim) for L in Ls]
-    cone.tempLU3 = [zeros(R, L, dim) for L in Ls]
     cone.tempUU = [zeros(R, dim, dim) for L in Ls]
     K = length(Ls)
     cone.ΛF = Vector{Any}(undef, K)
@@ -150,13 +150,21 @@ end
 
 function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
     corr = cone.correction
-
     corr .= 0
     @inbounds for k in eachindex(cone.Ps)
-        mul!(cone.tempLU2[k], cone.tempLU[k], Diagonal(primal_dir))
-        LpdU = mul!(cone.tempLU3[k], cone.tempLU2[k], Hermitian(cone.tempUU[k], :U))
+        Pk = cone.Ps[k]
+        ΛFk = cone.ΛF[k]
+        ULk = cone.tempUL[k]
+        LLk = cone.tempLL2[k]
+        LUk = cone.tempLU2[k]
+        D = Diagonal(primal_dir)
+        mul!(ULk, D, Pk)
+        mul!(LLk, Pk', ULk)
+        ldiv!(ΛFk.L, LLk)
+        rdiv!(LLk, ΛFk)
+        mul!(LUk, LLk, Pk')
         for j in 1:cone.dim
-            @views corr[j] += sum(abs2, LpdU[:, j])
+            @views corr[j] += sum(abs2, LUk[:, j])
         end
     end
 

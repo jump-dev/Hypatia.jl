@@ -47,13 +47,9 @@ examples_params = Dict(
         [:m, :twok], [1, 5],
         [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
         ),
-    # SOS paper examples:
+    # SOS paper example:
     "polynorm" => (
         [:L1, :n, :d, :m], [5, 1, 3, 4],
-        [:SEP,], Symbol[]
-        ),
-    "nearestpolymat" => (
-        [:n, :d, :m], [1, 2, 3],
         [:SEP,], Symbol[]
         ),
     )
@@ -221,6 +217,7 @@ function transform_plot_cols(ex_df_wide, inst_solver)
 end
 
 function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
+    ex_name == "polynorm" && return
     @info("making plot csv for $ex_name")
     inst_keys = ex_params[1]
     num_params = length(inst_keys)
