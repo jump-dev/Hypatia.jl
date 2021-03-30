@@ -34,7 +34,6 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tempUL::Vector{Matrix{R}}
     tempLU::Vector{Matrix{R}}
     tempLU2::Vector{Matrix{R}}
-    tempLU3::Vector{Matrix{R}}
     tempUU::Vector{Matrix{R}} # TODO for corrector, this can stay as a single matrix if we only use LU
     ΛF::Vector
     Ps_times::Vector{Float64}
@@ -71,7 +70,6 @@ function setup_extra_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrC
     cone.tempUL = [zeros(R, dim, L) for L in Ls]
     cone.tempLU = [zeros(R, L, dim) for L in Ls]
     cone.tempLU2 = [zeros(R, L, dim) for L in Ls]
-    cone.tempLU3 = [zeros(R, L, dim) for L in Ls]
     cone.tempUU = [zeros(R, dim, dim) for L in Ls]
     K = length(Ls)
     cone.ΛF = Vector{Any}(undef, K)
@@ -158,7 +156,7 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
         ΛFk = cone.ΛF[k]
         ULk = cone.tempUL[k]
         LLk = cone.tempLL2[k]
-        LUk = cone.tempLU3[k]
+        LUk = cone.tempLU2[k]
         D = Diagonal(primal_dir)
         mul!(ULk, D, Pk)
         mul!(LLk, Pk', ULk)

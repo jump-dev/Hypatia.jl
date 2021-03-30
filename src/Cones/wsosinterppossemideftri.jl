@@ -34,8 +34,8 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     rt2i::T
     tempU::Vector{T}
     tempLRLR::Vector{Symmetric{T, Matrix{T}}}
+    tempLRLR2::Vector{Matrix{T}}
     tempLRUR::Vector{Matrix{T}}
-    tempLRUR2::Vector{Matrix{T}}
     ΛFL::Vector
     ΛFLP::Vector{Matrix{T}}
     tempLU::Vector{Matrix{T}}
@@ -81,8 +81,8 @@ function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.tempU = zeros(T, U)
     Ls = [size(Pk, 2) for Pk in cone.Ps]
     cone.tempLRLR = [Symmetric(zeros(T, L * R, L * R), :L) for L in Ls]
+    cone.tempLRLR2 = [zeros(T, L * R, L * R) for L in Ls]
     cone.tempLRUR = [zeros(T, L * R, U * R) for L in Ls]
-    cone.tempLRUR2 = [zeros(T, L * R, U * R) for L in Ls]
     cone.tempLU = [zeros(T, L, U) for L in Ls]
     cone.ΛFL = Vector{Any}(undef, K)
     cone.ΛFLP = [zeros(T, R * L, R * U) for L in Ls]
@@ -262,27 +262,27 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
     R = cone.R
 
     @inbounds for k in eachindex(cone.Ps)
-        L = size(cone.Ps[k], 2)
-        ΛFLP = cone.ΛFLP[k]
-        # ΛFLP * scattered Diagonal of primal_dir
-        ΛFLP_dir = cone.tempLRUR[k]
-        ΛFLP_dir .= 0
-        for i in 1:R
-            for p in 1:i # only go up to i since ΛFLP is lower block triangular
-                for j in 1:(p - 1)
-                    sidx = svec_idx(p, j)
-                    @views mul!(ΛFLP_dir[block_idxs(L, i), block_idxs(U, j)], ΛFLP[block_idxs(L, i), block_idxs(U, p)], Diagonal(primal_dir[block_idxs(U, sidx)]), cone.rt2i, true)
-                end
-                sidx = svec_idx(p, p)
-                @views mul!(ΛFLP_dir[block_idxs(L, i), block_idxs(U, p)], ΛFLP[block_idxs(L, i), block_idxs(U, p)], Diagonal(primal_dir[block_idxs(U, sidx)]), true, true)
-                for j in (p + 1):R
-                    sidx = svec_idx(j, p)
-                    @views mul!(ΛFLP_dir[block_idxs(L, i), block_idxs(U, j)], ΛFLP[block_idxs(L, i), block_idxs(U, p)], Diagonal(primal_dir[block_idxs(U, sidx)]), cone.rt2i, true)
-                end
-            end
-        end
+        Pk = cone.Ps[k]
+        LU = cone.tempLU[k]
+        L = size(Pk, 2)
+        Δ = cone.tempLRLR2[k]
+        ΛFLk = cone.ΛFL[k]
+        big_mat_half = cone.tempLRUR[k]
 
-        big_mat_half = mul!(cone.tempLRUR2[k], ΛFLP_dir, Symmetric(cone.PΛiP[k], :U))
+        for q in 1:R, p in 1:q
+            @. @views cone.tempU = primal_dir[block_idxs(cone.U, svec_idx(q, p))]
+            if p != q
+                cone.tempU .*= cone.rt2i
+            end
+            mul!(LU, Pk', Diagonal(cone.tempU))
+            @views mul!(Δ[block_idxs(L, p), block_idxs(L, q)], LU, Pk)
+        end
+        LinearAlgebra.copytri!(Δ, 'U')
+        ldiv!(ΛFLk.L, Δ)
+        rdiv!(Δ, ΛFLk)
+        for q in 1:R, p in 1:R
+            @views mul!(big_mat_half[block_idxs(L, p), block_idxs(U, q)], Δ[block_idxs(L, p), block_idxs(L, q)], Pk')
+        end
         block_diag_prod!(corr, big_mat_half, U, R, cone.rt2)
     end
 
