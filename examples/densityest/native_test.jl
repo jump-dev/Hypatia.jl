@@ -4,7 +4,7 @@ insts["minimal"] = [
     ((5, 1, 2, true, true, true),),
     ((5, 1, 2, false, true, true),),
     ((5, 2, 1, false, true, true),),
-    ((5, 1, 2, true, false, true),),
+    ((5, 1, 2, true, false, true), (default_tol_relax = 100,)),
     ((5, 1, 2, true, true, false),),
     ((:iris, 2, true, true, true),),
     ]
