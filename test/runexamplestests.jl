@@ -29,7 +29,7 @@ instance_sets = [
     ("minimal", Float64, 60),
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
-    # ("fast", Float64, 60),
+    ("fast", Float64, 60),
     # ("slow", Float64, 120),
     ]
 
@@ -69,7 +69,7 @@ JuMP_example_names = [
     # "maxvolume",
     # "muconvexity",
     # "nearestpsd",
-    "polymin",
+    # "polymin",
     # "polynorm",
     # "portfolio",
     # "nearestpolymat",
@@ -80,6 +80,7 @@ JuMP_example_names = [
     # "shapeconregr",
     # "signomialmin",
     # "stabilitynumber",
+    "svm",
     ]
 
 perf = DataFrames.DataFrame(

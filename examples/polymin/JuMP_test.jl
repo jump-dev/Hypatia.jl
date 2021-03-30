@@ -1,15 +1,16 @@
 
 relaxed_tols = (default_tol_relax = 1000,)
+more_relaxed_tols = (default_tol_relax = 10_000,)
 insts = Dict()
 insts["minimal"] = [
     # ((1, 2, true, true),),
     # ((1, 2, false, true),),
     # ((1, 2, false, false),),
     # ((:lotkavolterra, 3, true, true),),
-    ((:infeas1, 5, true, true), nothing, relaxed_tols),
-    ((:infeas1, 5, false, true), nothing, relaxed_tols),
-    ((:infeas2, 5, true, true), nothing, relaxed_tols),
-    ((:infeas2, 5, false, true), nothing, relaxed_tols),
+    ((:infeas1, 5, true, true), nothing, more_relaxed_tols),
+    ((:infeas1, 5, false, true), nothing, more_relaxed_tols),
+    ((:infeas2, 5, true, true), nothing, more_relaxed_tols),
+    ((:infeas2, 5, false, true), nothing, more_relaxed_tols),
 
     ((:infeas1, 5, true, false), nothing, relaxed_tols),
     ((:infeas1, 5, false, false), nothing, relaxed_tols),

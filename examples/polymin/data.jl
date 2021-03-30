@@ -220,9 +220,9 @@ function real_poly_data(polyname::Symbol, T::Type{<:Real} = Float64)
     #     dom = ModelUtilities.Ball{T}(zeros(T, 3), 10 * sqrt(T(3)))
     #     true_obj = 0 # small neighborhood around box
     elseif polyname == :infeas1
-        n = 3
+        n = 2
         DP.@polyvar x[1:n]
-        f = sum(x)^9
+        f = sum(x)^9 - sum(x.^10)
         dom = ModelUtilities.FreeDomain{T}(n)
         true_obj = -Inf
 
