@@ -143,16 +143,11 @@ function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
     fact = cone.fact
 
     # TODO specialize if As are all Hermitian AbstractMatrix
-    # dir_mat = sum(d_i * A_i for (d_i, A_i) in zip(primal_dir, As)).data
-    # LinearAlgebra.copytri!(dir_mat, As[1].uplo)
-    # ldiv!(fact, dir_mat)
-    # rdiv!(dir_mat, fact.U)
-    # M = dir_mat * dir_mat'
     dir_mat = sum(d_i * A_i for (d_i, A_i) in zip(primal_dir, As))
     Y1 = fact \ dir_mat
     Y2 = rdiv_sqrt!(Y1, fact)
     M = Y2 * Y2'
-    for i in 1:cone.dim
+    @inbounds for i in 1:cone.dim
         corr[i] = real(dot(M, As[i]))
     end
 
