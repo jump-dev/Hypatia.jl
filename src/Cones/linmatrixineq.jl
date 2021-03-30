@@ -142,7 +142,6 @@ function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
     As = cone.As
     fact = cone.fact
 
-    # TODO specialize if As are all Hermitian AbstractMatrix
     dir_mat = sum(d_i * A_i for (d_i, A_i) in zip(primal_dir, As))
     Y1 = fact \ dir_mat
     Y2 = rdiv_sqrt!(Y1, fact)
