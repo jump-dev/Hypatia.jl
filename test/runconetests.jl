@@ -7,48 +7,47 @@ using Printf
 import Hypatia.Cones
 include(joinpath(@__DIR__, "cone.jl"))
 
-cone_types(T::Type{<:Real}) = [
-    Cones.Nonnegative{T},
-    Cones.EpiNormInf{T, T},
-    Cones.EpiNormInf{T, Complex{T}},
-    Cones.EpiNormEucl{T},
-    Cones.EpiPerSquare{T},
-    Cones.HypoPerLog{T},
-    Cones.EpiPerEntropy{T},
-    Cones.EpiRelEntropy{T},
-    Cones.HypoGeoMean{T},
-    Cones.HypoPowerMean{T},
-    Cones.GeneralizedPower{T},
-    ]
-
-# barrier_test_names = [
-#     "nonnegative",
-#     "epinorminf",
-#     "epinormeucl",
-#     # "epiperentropy",
-#     # "epipersquare",
-#     # "epipertraceentropytri",
-#     # "epitracerelentropytri",
-#     # "epirelentropy",
-#     # "hypoperlog",
-#     # "power",
-#     # "hypopowermean",
-#     # "hypogeomean",
-#     # "epinormspectral",
-#     # "linmatrixineq", # NOTE failing on Julia v1.5.1 with ForwardDiff or BigFloat
-#     # "possemideftri",
-#     # "possemideftrisparse",
-#     # "doublynonnegativetri",
-#     # "matrixepipersquare",
-#     # "hypoperlogdettri",
-#     # "hyporootdettri",
-#     # "epitracerelentropytri",
-#     # "wsosinterpnonnegative",
-#     # "wsosinterpepinormone",
-#     # "wsosinterpepinormeucl",
-#     # "wsosinterppossemideftri",
-#     ]
-#
+function cone_types(T::Type{<:Real})
+    cones_T = [
+        Cones.Nonnegative{T},
+        Cones.PosSemidefTri{T, T},
+        Cones.PosSemidefTri{T, Complex{T}},
+        Cones.DoublyNonnegativeTri{T},
+        Cones.LinMatrixIneq{T},
+        Cones.EpiNormInf{T, T},
+        Cones.EpiNormInf{T, Complex{T}},
+        Cones.EpiNormEucl{T},
+        Cones.EpiPerSquare{T},
+        Cones.EpiNormSpectral{T, T},
+        Cones.EpiNormSpectral{T, Complex{T}},
+        Cones.MatrixEpiPerSquare{T, T},
+        Cones.MatrixEpiPerSquare{T, Complex{T}},
+        Cones.GeneralizedPower{T},
+        Cones.HypoPowerMean{T},
+        Cones.HypoGeoMean{T},
+        Cones.HypoRootdetTri{T, T},
+        Cones.HypoRootdetTri{T, Complex{T}},
+        Cones.HypoPerLog{T},
+        Cones.HypoPerLogdetTri{T, T},
+        Cones.HypoPerLogdetTri{T, Complex{T}},
+        Cones.EpiPerEntropy{T},
+        Cones.EpiPerTraceEntropyTri{T},
+        Cones.EpiRelEntropy{T},
+        Cones.EpiTraceRelEntropyTri{T}, # TODO tighten tol on test_barrier
+        Cones.WSOSInterpNonnegative{T, T},
+        # Cones.WSOSInterpNonnegative{T, Complex{T}}, # TODO
+        Cones.WSOSInterpPosSemidefTri{T},
+        Cones.WSOSInterpEpiNormEucl{T},
+        Cones.WSOSInterpEpiNormOne{T},
+        ]
+    if T <: LinearAlgebra.BlasReal
+        append!(cones_T, [
+            Cones.PosSemidefTriSparse{T, T},
+            Cones.PosSemidefTriSparse{T, Complex{T}},
+            ])
+    end
+    return cones_T
+end
 
 @testset "cone tests" begin
 
