@@ -49,14 +49,14 @@ function build(inst::MaxVolumeNative{T}) where {T <: Real}
         G_geo_orig[1, 1] = -1
         G_geo_orig[2, 2] = -1
         G_geo_newvars[3, 1] = -1
-        push!(cones, Cones.Power{T}(fill(inv(T(2)), 2), 1))
+        push!(cones, Cones.GeneralizedPower{T}(fill(inv(T(2)), 2), 1))
         offset = 4
         # loop over new vars
         for i in 1:(n - 3)
             G_geo_newvars[offset + 2, i + 1] = -1
             G_geo_newvars[offset + 1, i] = -1
             G_geo_orig[offset, i + 2] = -1
-            push!(cones, Cones.Power{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
+            push!(cones, Cones.GeneralizedPower{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
             offset += 3
         end
         # last row also special becuase hypograph variable is involved
@@ -65,7 +65,7 @@ function build(inst::MaxVolumeNative{T}) where {T <: Real}
         G = [
             vcat(zeros(T, len_power - 1), -one(T))  G_geo_orig  G_geo_newvars
             ]
-        push!(cones, Cones.Power{T}([inv(T(n)), T(n - 1) / T(n)], 1))
+        push!(cones, Cones.GeneralizedPower{T}([inv(T(n)), T(n - 1) / T(n)], 1))
         h = zeros(T, 3 * (n - 1))
     else
         @assert inst.use_epipersquare == true

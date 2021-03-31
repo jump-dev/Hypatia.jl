@@ -8,7 +8,7 @@ using Hypatia
 
 test_files = [
     "modelutilities",
-    "barrier",
+    "cone",
     "native",
     "moi",
     "examples",
