@@ -17,7 +17,7 @@ default_options = (
     verbose = false,
     # verbose = true,
     default_tol_relax = 10,
-    stepper = Solvers.CombinedStepper{Float64}(),
+    # stepper = Solvers.CombinedStepper{Float64}(),
     # stepper = Solvers.PredOrCentStepper{Float64}(),
     iter_limit = 250,
     )
