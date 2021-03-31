@@ -24,24 +24,23 @@ unit_exclude = [
 
 conic_exclude = String[
     # "lin",
+    # "sdp",
     # "norminf",
     # "normone",
     # "soc",
     # "rsoc",
-    # "exp",
-    # "dualexp",
+    # "normspec",
+    # "normnuc",
     # "pow",
     # "dualpow",
     # "geomean",
-    # "relentr",
-    # "normspec",
-    # "normnuc",
-    # "sdp",
-    # "logdet", # TODO currently failing due to barrier with high parameter
     # "rootdet",
-    # square logdet and rootdet cones not handled
-    "logdets",
     "rootdets",
+    # "exp",
+    # "dualexp",
+    # "logdet",
+    "logdets",
+    # "relentr",
     ]
 
 function test_moi(T::Type{<:Real}; solver_options...)

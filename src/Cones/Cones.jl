@@ -1,7 +1,5 @@
 #=
 functions and caches for cones
-
-TODO maybe write a fallback dual feas check that checks if ray of dual point intersects dikin ellipsoid at primal point
 =#
 
 module Cones
@@ -33,29 +31,29 @@ hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}()
 abstract type Cone{T <: Real} end
 
 include("nonnegative.jl")
+include("possemideftri.jl")
+include("doublynonnegativetri.jl")
+include("possemideftrisparse.jl")
+include("linmatrixineq.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")
-include("epiperentropy.jl")
-include("epipertraceentropytri.jl")
 include("epipersquare.jl")
-include("epirelentropy.jl")
-include("hypoperlog.jl")
-include("power.jl")
+include("epinormspectral.jl")
+include("matrixepipersquare.jl")
+include("generalizedpower.jl")
 include("hypopowermean.jl")
 include("hypogeomean.jl")
-include("epinormspectral.jl")
-include("linmatrixineq.jl")
-include("possemideftri.jl")
-include("possemideftrisparse.jl")
-include("doublynonnegativetri.jl")
-include("matrixepipersquare.jl")
-include("hypoperlogdettri.jl")
 include("hyporootdettri.jl")
+include("hypoperlog.jl")
+include("hypoperlogdettri.jl")
+include("epiperentropy.jl")
+include("epipertraceentropytri.jl")
+include("epirelentropy.jl")
 include("epitracerelentropytri.jl")
 include("wsosinterpnonnegative.jl")
+include("wsosinterppossemideftri.jl")
 include("wsosinterpepinormone.jl")
 include("wsosinterpepinormeucl.jl")
-include("wsosinterppossemideftri.jl")
 
 use_dual_barrier(cone::Cone) = cone.use_dual_barrier
 dimension(cone::Cone) = cone.dim
