@@ -79,7 +79,7 @@ real_types = [
 end
 end
 
-println("\nstarting allocation tests")
+println("\nstarting time/allocation measurements")
 @testset "allocation tests" begin
 real_types = [
     Float64,

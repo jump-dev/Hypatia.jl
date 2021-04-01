@@ -14,8 +14,8 @@ script_verbose = false
 
 # default options to solvers
 default_options = (
-    verbose = false,
-    # verbose = true,
+    # verbose = false,
+    verbose = true,
     default_tol_relax = 10,
     # stepper = Solvers.CombinedStepper{Float64}(),
     # stepper = Solvers.PredOrCentStepper{Float64}(),
@@ -27,7 +27,7 @@ instance_sets = [
     ("minimal", Float64, 60),
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
-    # ("fast", Float64, 60),
+    ("fast", Float64, 60),
     # ("slow", Float64, 120),
     ]
 
@@ -100,7 +100,7 @@ for (inst_set, real_T, time_limit) in instance_sets
     new_default_options = (; default_options..., time_limit = time_limit)
     ex_type_T = ex_type{real_T}
 
-    println("\nstarting $ex_type_T $inst_set tests")
+    println("\nstarting $ex_type_T $inst_set tests\n")
     @testset "$ex_type_T $inst_set" begin
         run_instance_set(inst_subset, ex_type_T, info_perf, new_default_options, script_verbose, perf, results_path)
     end
