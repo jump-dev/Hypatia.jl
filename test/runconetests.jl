@@ -88,8 +88,7 @@ real_types = [
     ]
 @testset "$cone" for T in real_types, cone in cone_types(T)
     println("\n$cone")
-    test_time = @elapsed allocs = get_allocs(cone)
-    display(allocs)
+    test_time = @elapsed show_time_alloc(cone)
     @printf("%8.2e seconds\n", test_time)
 end
 println()

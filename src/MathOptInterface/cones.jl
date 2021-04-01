@@ -30,32 +30,32 @@ permute_affine(::MOI.AbstractVectorSet, idxs::AbstractVector) = idxs
 rescale_affine(::MOI.AbstractVectorSet, vals::AbstractVector) = vals
 rescale_affine(::MOI.AbstractVectorSet, vals::AbstractVector, ::AbstractVector) = vals
 
-# transformation for MOI relative entropy cone
-needs_untransform(::MOI.RelativeEntropyCone) = true
-
-function untransform_affine(::MOI.RelativeEntropyCone, vals::AbstractVector)
-    w_dim = div(length(vals) - 1, 2)
-    v_vals = vals[2:2:(end - 1)]
-    w_vals = vals[3:2:end]
-    vals[2:(w_dim + 1)] = v_vals
-    vals[(w_dim + 2):end] = w_vals
-    return vals
-end
-
-function permute_affine(cone::MOI.RelativeEntropyCone, idxs::AbstractVector)
-    dim = MOI.dimension(cone)
-    w_dim = div(dim - 1, 2)
-    new_idxs = collect(idxs)
-    for (i, idx) in enumerate(idxs)
-        idx <= 1 && continue
-        if idx <= 1 + w_dim
-            new_idxs[i] = 2 * (idx - 1)
-        else
-            new_idxs[i] = 2 * (idx - w_dim) - 1
-        end
-    end
-    return new_idxs
-end
+# # transformation for MOI relative entropy cone
+# needs_untransform(::MOI.RelativeEntropyCone) = true
+#
+# function untransform_affine(::MOI.RelativeEntropyCone, vals::AbstractVector)
+#     w_dim = div(length(vals) - 1, 2)
+#     v_vals = vals[2:2:(end - 1)]
+#     w_vals = vals[3:2:end]
+#     vals[2:(w_dim + 1)] = v_vals
+#     vals[(w_dim + 2):end] = w_vals
+#     return vals
+# end
+#
+# function permute_affine(cone::MOI.RelativeEntropyCone, idxs::AbstractVector)
+#     dim = MOI.dimension(cone)
+#     w_dim = div(dim - 1, 2)
+#     new_idxs = collect(idxs)
+#     for (i, idx) in enumerate(idxs)
+#         idx <= 1 && continue
+#         if idx <= 1 + w_dim
+#             new_idxs[i] = 2 * (idx - 1)
+#         else
+#             new_idxs[i] = 2 * (idx - w_dim) - 1
+#         end
+#     end
+#     return new_idxs
+# end
 
 # transformations (transposition of matrix) for MOI rectangular matrix cones with matrix of more rows than columns
 

@@ -1,6 +1,6 @@
 #=
 (closure of) epigraph of sum of perspectives of entropies (AKA vector relative entropy cone)
-(u in R, v in R_+^n, w in R_+^n) : u >= sum_i w_i*log(w_i/v_i) TODO update description here for non-contiguous v/w
+(u in R, v in R_+^n, w in R_+^n) : u >= sum_i w_i*log(w_i/v_i)
 
 barrier from "Primal-Dual Interior-Point Methods for Domain-Driven Formulations" by Karimi & Tuncel, 2019
 -log(u - sum_i w_i*log(w_i/v_i)) - sum_i (log(v_i) + log(w_i))
@@ -10,8 +10,8 @@ mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
     w_dim::Int
-    v_idxs
-    w_idxs
+    v_idxs::UnitRange{Int64}
+    w_idxs::UnitRange{Int64}
 
     point::Vector{T}
     dual_point::Vector{T}
@@ -24,8 +24,6 @@ mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
     hess_updated::Bool
     inv_hess_updated::Bool
     inv_hess_aux_updated::Bool
-    inv_hess_sqrt_aux_updated::Bool
-    use_inv_hess_sqrt::Bool
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, SparseMatrixCSC{T, Int}}
@@ -40,12 +38,6 @@ mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
     Hivv::Vector{T}
     Hivw::Vector{T}
     Hiww::Vector{T}
-    rtiuu::T
-    rtiuv::Vector{T}
-    rtiuw::Vector{T}
-    rtivv::Vector{T}
-    rtivw::Vector{T}
-    rtiww::Vector{T}
     temp1::Vector{T}
     temp2::Vector{T}
 
@@ -58,31 +50,18 @@ mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
         cone = new{T}()
         cone.use_dual_barrier = use_dual
         cone.dim = dim
-        cone.w_dim = div(dim - 1, 2)
-        cone.v_idxs = 2:2:dim
-        cone.w_idxs = 3:2:dim
+        w_dim = cone.w_dim = div(dim - 1, 2)
+        cone.v_idxs = 1 .+ (1:w_dim)
+        cone.w_idxs = w_dim .+ cone.v_idxs
         return cone
     end
 end
 
 use_heuristic_neighborhood(cone::EpiRelEntropy) = false
 
-reset_data(cone::EpiRelEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_aux_updated = cone.inv_hess_sqrt_aux_updated = false)
+reset_data(cone::EpiRelEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_aux_updated = false)
 
-function use_sqrt_oracles(cone::EpiRelEntropy{T}) where T
-    cone.inv_hess_sqrt_aux_updated || update_inv_hess_sqrt_aux(cone)
-    cone.use_inv_hess_sqrt || return false
-    # check numerics
-    # TODO tune
-    tol = sqrt(sqrt(eps(T))) * dimension(cone)
-    nu = get_nu(cone)
-    vec1 = cone.vec1
-    hess_sqrt_prod!(vec1, cone.point, cone)
-    hess_viol = abs(1 - sum(abs2, vec1) / nu)
-    inv_hess_sqrt_prod!(vec1, grad(cone), cone)
-    inv_hess_viol = abs(1 - sum(abs2, vec1) / nu)
-    return (max(hess_viol, inv_hess_viol) < tol)
-end
+use_sqrt_oracles(cone::EpiRelEntropy) = false # TODO remove in favor of BHB oracles
 
 # TODO only allocate the fields we use
 function setup_extra_data(cone::EpiRelEntropy{T}) where {T <: Real}
@@ -95,14 +74,8 @@ function setup_extra_data(cone::EpiRelEntropy{T}) where {T <: Real}
     cone.Hivv = zeros(T, w_dim)
     cone.Hivw = zeros(T, w_dim)
     cone.Hiww = zeros(T, w_dim)
-    cone.rtiuv = zeros(T, w_dim)
-    cone.rtiuw = zeros(T, w_dim)
-    cone.rtivv = zeros(T, w_dim)
-    cone.rtivw = zeros(T, w_dim)
-    cone.rtiww = zeros(T, w_dim)
     cone.temp1 = zeros(T, w_dim)
     cone.temp2 = zeros(T, w_dim)
-    cone.use_inv_hess_sqrt = true
     return cone
 end
 
@@ -121,7 +94,7 @@ function update_feas(cone::EpiRelEntropy{T}) where T
     @views v = cone.point[cone.v_idxs]
     @views w = cone.point[cone.w_idxs]
 
-    if all(vi -> vi > eps(T), v) && all(wi -> wi > eps(T), w)
+    if all(>(eps(T)), v) && all(>(eps(T)), w)
         @. cone.lwv = log(w / v)
         cone.z = u - dot(w, cone.lwv)
         cone.is_feas = (cone.z > eps(T))
@@ -138,7 +111,7 @@ function is_dual_feas(cone::EpiRelEntropy{T}) where T
     @views v = cone.dual_point[cone.v_idxs]
     @views w = cone.dual_point[cone.w_idxs]
 
-    if all(vi -> vi > eps(T), v) && u > eps(T)
+    if all(>(eps(T)), v) && u > eps(T)
         return all(u * (1 + log(vi / u)) + wi > eps(T) for (vi, wi) in zip(v, w))
     end
 
@@ -249,19 +222,41 @@ end
 # updates for nonzero values in the inverse Hessian
 function update_inv_hess(cone::EpiRelEntropy{T}) where T
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
+    dim = cone.dim
+    w_dim = cone.w_dim
 
     if !isdefined(cone, :inv_hess)
         # initialize sparse idxs for upper triangle of inverse Hessian
-        cone.inv_hess = Symmetric(sparse_arrow_block2(T, cone.w_dim), :U)
+        nnz_tri = 2 * dim - 1 + w_dim
+        I = Vector{Int}(undef, nnz_tri)
+        J = Vector{Int}(undef, nnz_tri)
+        idxs1 = 1:dim
+        @views I[idxs1] .= 1
+        @views J[idxs1] .= idxs1
+        idxs2 = (dim + 1):(2 * dim - 1)
+        @views I[idxs2] .= 2:dim
+        @views J[idxs2] .= 2:dim
+        idxs3 = (2 * dim):nnz_tri
+        @views I[idxs3] .= 1 .+ (1:w_dim)
+        @views J[idxs3] .= (1 + w_dim) .+ (1:w_dim)
+        V = ones(T, nnz_tri)
+        cone.inv_hess = Symmetric(sparse(I, J, V, dim, dim), :U)
     end
 
     # modify nonzeros of upper triangle of inverse Hessian
     nzval = cone.inv_hess.data.nzval
     nzval[1] = cone.Hiuu
-    nz_idx = 1
+    nz_idx = 2
     @inbounds for i in 1:cone.w_dim
-        @. nzval[nz_idx .+ (1:5)] = (cone.Hiuv[i], cone.Hivv[i], cone.Hiuw[i], cone.Hivw[i], cone.Hiww[i])
-        nz_idx += 5
+        nzval[nz_idx] = cone.Hiuv[i]
+        nzval[nz_idx + 1] = cone.Hivv[i]
+        nz_idx += 2
+    end
+    @inbounds for i in 1:cone.w_dim
+        nzval[nz_idx] = cone.Hiuw[i]
+        nzval[nz_idx + 1] = cone.Hivw[i]
+        nzval[nz_idx + 2] = cone.Hiww[i]
+        nz_idx += 3
     end
 
     cone.inv_hess_updated = true
@@ -298,26 +293,24 @@ end
 
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelEntropy)
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-    return arrow_prod(prod, arr, cone.Hiuu, cone.Hiuv, cone.Hiuw, cone.Hivv, cone.Hivw, cone.Hiww)
-end
 
-function update_inv_hess_sqrt_aux(cone::EpiRelEntropy)
-    cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-    @assert !cone.inv_hess_sqrt_aux_updated
-    cone.rtiuu = arrow_sqrt(cone.Hiuu, cone.Hiuv, cone.Hiuw, cone.Hivv, cone.Hivw, cone.Hiww, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww)
-    cone.use_inv_hess_sqrt = !iszero(cone.rtiuu)
-    cone.inv_hess_sqrt_aux_updated = true
-    return
-end
+    @inbounds @views begin
+        u_arr = arr[1, :]
+        u_prod = prod[1, :]
+        v_arr = arr[cone.v_idxs, :]
+        v_prod = prod[cone.v_idxs, :]
+        w_arr = arr[cone.w_idxs, :]
+        w_prod = prod[cone.w_idxs, :]
+        @. u_prod = cone.Hiuu * u_arr
+        mul!(u_prod, v_arr', cone.Hiuv, true, true)
+        mul!(u_prod, w_arr', cone.Hiuw, true, true)
+        mul!(v_prod, cone.Hiuv, u_arr')
+        mul!(w_prod, cone.Hiuw, u_arr')
+        @. v_prod += cone.Hivv * v_arr + cone.Hivw * w_arr
+        @. w_prod += cone.Hivw * v_arr + cone.Hiww * w_arr
+    end
 
-function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelEntropy)
-    @assert cone.inv_hess_sqrt_aux_updated && cone.use_inv_hess_sqrt
-    return inv_arrow_sqrt_prod(prod, arr, cone.rtiuu, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww)
-end
-
-function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelEntropy)
-    @assert cone.inv_hess_sqrt_aux_updated && cone.use_inv_hess_sqrt
-    return arrow_sqrt_prod(prod, arr, cone.rtiuu, cone.rtiuv, cone.rtiuw, cone.rtivv, cone.rtivw, cone.rtiww)
+    return prod
 end
 
 function correction(cone::EpiRelEntropy, primal_dir::AbstractVector)
@@ -363,8 +356,8 @@ end
 # TODO remove this in favor of new hess_nz_count etc functions that directly use uu, uw, ww etc
 inv_hess_nz_count(cone::EpiRelEntropy) = 3 * cone.dim - 2 + 2 * cone.w_dim
 inv_hess_nz_count_tril(cone::EpiRelEntropy) = 2 * cone.dim - 1 + cone.w_dim
-inv_hess_nz_idxs_col(cone::EpiRelEntropy, j::Int) = (j == 1 ? (1:cone.dim) : (iseven(j) ? [1, j, j + 1] : [1, j - 1, j]))
-inv_hess_nz_idxs_col_tril(cone::EpiRelEntropy, j::Int) = (j == 1 ? (1:cone.dim) : (iseven(j) ? [j, j + 1] : [j]))
+inv_hess_nz_idxs_col(cone::EpiRelEntropy, j::Int) = (j == 1 ? (1:cone.dim) : (j <= (1 + cone.w_dim) ? [1, j, j + cone.w_dim] : [1, j - cone.w_dim, j]))
+inv_hess_nz_idxs_col_tril(cone::EpiRelEntropy, j::Int) = (j == 1 ? (1:cone.dim) : (j <= (1 + cone.w_dim) ? [j, j + cone.w_dim] : [j]))
 
 # see analysis in https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
 function get_central_ray_epirelentropy(w_dim::Int)
