@@ -353,11 +353,12 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
 
     @inbounds @views begin
-        copyto!(prod[1, :], arr[1, :])
-        mul!(prod[1, :], arr[2:end, :]', cone.Hiure, true, true)
-        @. prod[2:end, :] = cone.Hiure * prod[1, :]'
-        prod ./= cone.schur
-        @. prod[2:end, :] += arr[2:end, :] / cone.Hrere
+        w_arr = arr[2:end, :]
+        u_prod = prod[1, :]
+        copyto!(u_prod, arr[1, :])
+        mul!(u_prod, w_arr', cone.Hiure, true, true)
+        u_prod ./= cone.schur
+        @. prod[2:end, :] = cone.Hiure * u_prod' + w_arr / cone.Hrere
     end
 
     return prod
@@ -367,18 +368,15 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
 
     @inbounds @views begin
-        copyto!(prod[1, :], arr[1, :])
-        mul!(prod[1, :], arr[2:2:end, :]', cone.Hiure, true, true)
-        mul!(prod[1, :], arr[3:2:end, :]', cone.Hiuim, true, true)
-        @. prod[2:2:end, :] = cone.Hiure * prod[1, :]'
-        @. prod[3:2:end, :] = cone.Hiuim * prod[1, :]'
-        prod ./= cone.schur
-    end
-
-    @inbounds @views for j in 1:cone.n
-        j2 = 2j
-        @. prod[j2, :] += (cone.Himim[j] * arr[j2, :] - cone.Hreim[j] * arr[j2 + 1, :]) / cone.idet[j]
-        @. prod[j2 + 1, :] += (cone.Hrere[j] * arr[j2 + 1, :] - cone.Hreim[j] * arr[j2, :]) / cone.idet[j]
+        u_prod = prod[1, :]
+        re_arr = arr[2:2:end, :]
+        im_arr = arr[3:2:end, :]
+        copyto!(u_prod, arr[1, :])
+        mul!(u_prod, re_arr', cone.Hiure, true, true)
+        mul!(u_prod, im_arr', cone.Hiuim, true, true)
+        u_prod ./= cone.schur
+        @. prod[2:2:end, :] = cone.Hiure * u_prod' + (cone.Himim * re_arr - cone.Hreim * im_arr) / cone.idet
+        @. prod[3:2:end, :] = cone.Hiuim * u_prod' + (cone.Hrere * im_arr - cone.Hreim * re_arr) / cone.idet
     end
 
     return prod
@@ -392,13 +390,15 @@ function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T
 
     u3 = T(1.5) / u
     udu = udir / u
-    corr1 = -udir * sum(z * (u3 - z) * z for z in cone.uden) * udir - udu * (cone.n - 1) / u * udu
+    corr[1] = -udir * sum(z * (u3 - z) * z for z in cone.uden) * udir - udu * (cone.n - 1) / u * udu
+
     @inbounds for i in 1:cone.n
         deni = -4 * cone.den[i]
         udeni = 2 * cone.uden[i]
         suuw = udir * (-1 + udeni * u)
         wi = cone.w[i]
         wdeni = 2 * cone.wden[i]
+
         if cone.is_complex
             (wdenire, wdeniim) = reim(wdeni)
             (wire, wiim) = reim(wi)
@@ -414,7 +414,8 @@ function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T
             imimwimimim = wdeniim * (2 + uimimim)
             imimwrereim = wdeniim * uimimre * dire
             imimwimimre = wdenire * uimimim * diim
-            corr1 += (2 * (uuwre * dire + uuwim * diim) + uimimrere * dire + uimimimim * diim + 2 * uimimimre * diim * dire) / deni
+
+            corr[1] += (2 * (uuwre * dire + uuwim * diim) + uimimrere * dire + uimimimim * diim + 2 * uimimimre * diim * dire) / deni
             corr[2i] = (udir * (2 * (uimimrere + uimimimre * diim) + uuwre) + (abs2(dire) * imimwrerere + diim * (2 * imimwrereim + imimwimimre))) / deni
             corr[2i + 1] = (udir * (2 * (uimimimim + uimimimre * dire) + uuwim) + (abs2(diim) * imimwimimim + dire * (2 * imimwimimre + imimwrereim))) / deni
         else
@@ -422,11 +423,11 @@ function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T
             uuw = suuw * wdeni
             uimim = 1 + wdeni * wi
             uimim2 = -udeni * uimim * di
-            corr1 += di * (2 * uuw + uimim2) / deni
+
+            corr[1] += di * (2 * uuw + uimim2) / deni
             corr[1 + i] = (udir * (uuw + 2 * uimim2) + di * wdeni * (2 + uimim) * di) / deni
         end
     end
-    corr[1] = corr1
 
     return corr
 end
