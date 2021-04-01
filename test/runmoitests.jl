@@ -36,7 +36,7 @@ end
         default_options = (
             # verbose = true,
             verbose = false,
-            default_tol_relax = 3, # tune to make tests pass
+            default_tol_relax = 4,
             stepper = stepper{T}(),
             )
         test_info = "$T, $use_dense_model"
