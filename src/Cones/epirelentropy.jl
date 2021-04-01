@@ -240,6 +240,7 @@ function update_inv_hess(cone::EpiRelEntropy{T}) where T
         @views I[idxs3] .= 1 .+ (1:w_dim)
         @views J[idxs3] .= (1 + w_dim) .+ (1:w_dim)
         V = ones(T, nnz_tri)
+
         cone.inv_hess = Symmetric(sparse(I, J, V, dim, dim), :U)
     end
 

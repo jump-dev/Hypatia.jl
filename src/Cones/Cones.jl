@@ -346,8 +346,14 @@ vec_copy_to!(v1::AbstractVecOrMat{Complex{T}}, v2::AbstractVecOrMat{T}) where {T
 # utilities for hessians for cones with PSD parts
 
 # TODO parallelize
-function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T; upper_only::Bool = true) where {T <: Real}
+function symm_kron(
+    H::AbstractMatrix{T},
+    mat::AbstractMatrix{T},
+    rt2::T;
+    upper_only::Bool = true,
+    ) where {T <: Real}
     side = size(mat, 1)
+
     col_idx = 1
     @inbounds for l in 1:side
         for k in 1:(l - 1)
@@ -364,6 +370,7 @@ function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T; upper_o
             end
             col_idx += 1
         end
+
         row_idx = 1
         for j in 1:side
             upper_only && row_idx > col_idx && continue
@@ -376,12 +383,18 @@ function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{T}, rt2::T; upper_o
         end
         col_idx += 1
     end
+
     return H
 end
 
 # TODO test output for non-Hermitian mat, the result may need transposing
-function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{Complex{T}}, rt2::T) where {T <: Real}
+function symm_kron(
+    H::AbstractMatrix{T},
+    mat::AbstractMatrix{Complex{T}},
+    rt2::T,
+    ) where {T <: Real}
     side = size(mat, 1)
+
     col_idx = 1
     for i in 1:side, j in 1:i
         row_idx = 1
@@ -428,15 +441,28 @@ function symm_kron(H::AbstractMatrix{T}, mat::AbstractMatrix{Complex{T}}, rt2::T
             col_idx += 2
         end
     end
+
     return H
 end
 
-function hess_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::T, term2::T) where {T <: Real}
+function hess_element(
+    H::Matrix{T},
+    r_idx::Int,
+    c_idx::Int,
+    term1::T,
+    term2::T,
+    ) where {T <: Real}
     @inbounds H[r_idx, c_idx] = term1 + term2
     return
 end
 
-function hess_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, term2::Complex{T}) where {T <: Real}
+function hess_element(
+    H::Matrix{T},
+    r_idx::Int,
+    c_idx::Int,
+    term1::Complex{T},
+    term2::Complex{T},
+    ) where {T <: Real}
     @inbounds begin
         H[r_idx, c_idx] = real(term1) + real(term2)
         H[r_idx + 1, c_idx] = imag(term2) - imag(term1)
@@ -446,165 +472,28 @@ function hess_element(H::Matrix{T}, r_idx::Int, c_idx::Int, term1::Complex{T}, t
     return
 end
 
-# set up sparse arrow matrix data structure
-# TODO remove this in favor of new hess_nz_count etc functions that directly use uu, uw, ww etc
-function sparse_arrow(T::Type{<:Real}, w_dim::Int)
-    dim = w_dim + 1
-    nnz_tri = 2 * dim - 1
-    I = Vector{Int}(undef, nnz_tri)
-    J = Vector{Int}(undef, nnz_tri)
-    idxs1 = 1:dim
-    @views I[idxs1] .= 1
-    @views J[idxs1] .= idxs1
-    idxs2 = (dim + 1):(2 * dim - 1)
-    @views I[idxs2] .= 2:dim
-    @views J[idxs2] .= 2:dim
-    V = ones(T, nnz_tri)
-    return sparse(I, J, V, dim, dim)
-end
-
-# 2x2 block case
-function sparse_arrow_block2(T::Type{<:Real}, w_dim::Int)
-    dim = 2 * w_dim + 1
-    nnz_tri = 2 * dim - 1 + w_dim
-    I = Vector{Int}(undef, nnz_tri)
-    J = Vector{Int}(undef, nnz_tri)
-    idxs1 = 1:dim
-    @views I[idxs1] .= 1
-    @views J[idxs1] .= idxs1
-    idxs2 = (dim + 1):(2 * dim - 1)
-    @views I[idxs2] .= 2:dim
-    @views J[idxs2] .= 2:dim
-    idxs3 = (2 * dim):nnz_tri
-    @views I[idxs3] .= 2:2:dim
-    @views J[idxs3] .= 3:2:dim
-    V = ones(T, nnz_tri)
-    return sparse(I, J, V, dim, dim)
-end
-
-# lmul with arrow matrix
-function arrow_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, uu::T, uw::Vector{T}, ww::Vector{T}) where {T <: Real}
-    @inbounds @views begin
-        arru = arr[1, :]
-        arrw = arr[2:end, :]
-        produ = prod[1, :]
-        prodw = prod[2:end, :]
-        copyto!(produ, arru)
-        mul!(produ, arrw', uw, true, uu)
-        mul!(prodw, uw, arru')
-        @. prodw += ww * arrw
-    end
-    return prod
-end
-
-# 2x2 block case
-function arrow_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, uu::T, uv::Vector{T}, uw::Vector{T}, vv::Vector{T}, vw::Vector{T}, ww::Vector{T}) where {T <: Real}
-    @inbounds @views begin
-        arru = arr[1, :]
-        arrv = arr[2:2:end, :]
-        arrw = arr[3:2:end, :]
-        produ = prod[1, :]
-        prodv = prod[2:2:end, :]
-        prodw = prod[3:2:end, :]
-        @. produ = uu * arru
-        mul!(produ, arrv', uv, true, true)
-        mul!(produ, arrw', uw, true, true)
-        mul!(prodv, uv, arru')
-        mul!(prodw, uw, arru')
-        @. prodv += vv * arrv + vw * arrw
-        @. prodw += ww * arrw + vw * arrv
-    end
-    return prod
-end
-
-# factorize arrow matrix
-function arrow_sqrt(uu::T, uw::Vector{T}, ww::Vector{T}, rtuw::Vector{T}, rtww::Vector{T}) where {T <: Real}
-    tol = sqrt(eps(T))
-    any(<(tol), ww) && return zero(T)
-    @. rtww = sqrt(ww)
-    @. rtuw = uw / rtww
-    diff = uu - sum(abs2, rtuw)
-    (diff < tol) && return zero(T)
-    return sqrt(diff)
-end
-
-# 2x2 block case
-function arrow_sqrt(uu::T, uv::Vector{T}, uw::Vector{T}, vv::Vector{T}, vw::Vector{T}, ww::Vector{T}, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
-    tol = sqrt(eps(T))
-    any(<(tol), ww) && return zero(T)
-    @. rtww = sqrt(ww)
-    @. rtvw = vw / rtww
-    @. rtuw = uw / rtww
-    @. rtuv = vv - abs2(rtvw)
-    any(<(tol), rtuv) && return zero(T)
-    @. rtvv = sqrt(rtuv)
-    @. rtuv = (uv - rtvw * rtuw) / rtvv
-    diff = uu - sum(abs2, rtuv) - sum(abs2, rtuw)
-    (diff < tol) && return zero(T)
-    return sqrt(diff)
-end
-
-# lmul with lower Cholesky factor of arrow matrix
-function arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuw::Vector{T}, rtww::Vector{T}) where {T <: Real}
-    @inbounds @views begin
-        arr1 = arr[1, :]
-        @. prod[1, :] = rtuu * arr1
-        @. prod[2:end, :] = rtuw * arr1' + rtww * arr[2:end, :]
-    end
-    return prod
-end
-
-# 2x2 block case
-function arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
-    @inbounds @views begin
-        arr1 = arr[1, :]
-        arrv = arr[2:2:end, :]
-        @. prod[1, :] = rtuu * arr1
-        @. prod[2:2:end, :] = rtuv * arr1' + rtvv * arrv
-        @. prod[3:2:end, :] = rtuw * arr1' + rtvw * arrv + rtww * arr[3:2:end, :]
-    end
-    return prod
-end
-
-# ldiv with upper Cholesky factor of arrow matrix
-function inv_arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuw::Vector{T}, rtww::Vector{T}) where {T <: Real}
-    @inbounds @. @views prod[2:end, :] = arr[2:end, :] / rtww
-    @inbounds @views for j in 1:size(arr, 2)
-        prod[1, j] = (arr[1, j] - dot(prod[2:end, j], rtuw)) / rtuu
-    end
-    return prod
-end
-
-# 2x2 block case
-function inv_arrow_sqrt_prod(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, rtuu::T, rtuv::Vector{T}, rtuw::Vector{T}, rtvv::Vector{T}, rtvw::Vector{T}, rtww::Vector{T}) where {T <: Real}
-    @inbounds @views begin
-        prodw = prod[3:2:end, :]
-        @. prodw = arr[3:2:end, :] / rtww
-        @. prod[2:2:end, :] = (arr[2:2:end, :] - rtvw * prodw) / rtvv
-    end
-    @inbounds @views for j in 1:size(arr, 2)
-        prod[1, j] = (arr[1, j] - dot(prod[2:2:end, j], rtuv) - dot(prod[3:2:end, j], rtuw)) / rtuu
-    end
-    return prod
-end
-
 function grad_logm!(
-        mat::Matrix{T},
-        vecs::Matrix{T},
-        tempmat1::Matrix{T},
-        tempmat2::Matrix{T},
-        tempvec::Vector{T},
-        diff_mat::AbstractMatrix{T},
-        rt2::T,
-        ) where T
+    mat::Matrix{T},
+    vecs::Matrix{T},
+    tempmat1::Matrix{T},
+    tempmat2::Matrix{T},
+    tempvec::Vector{T},
+    diff_mat::AbstractMatrix{T},
+    rt2::T,
+    ) where {T <: Real}
     veckron = symm_kron(tempmat1, vecs, rt2, upper_only = false)
     smat_to_svec!(tempvec, diff_mat, one(T))
     mul!(tempmat2, veckron, Diagonal(tempvec))
     return mul!(mat, tempmat2, veckron')
 end
 
-function diff_mat!(mat::Matrix{T}, vals::Vector{T}, log_vals::Vector{T}) where T
+function diff_mat!(
+    mat::Matrix{T},
+    vals::Vector{T},
+    log_vals::Vector{T},
+    ) where {T <: Real}
     rteps = sqrt(eps(T))
+
     @inbounds for j in eachindex(vals)
         (vj, lvj) = (vals[j], log_vals[j])
         for i in 1:(j - 1)
@@ -613,14 +502,21 @@ function diff_mat!(mat::Matrix{T}, vals::Vector{T}, log_vals::Vector{T}) where T
         end
         mat[j, j] = inv(vj)
     end
+
     return mat
 end
 
-function diff_tensor!(diff_tensor::Array{T, 3}, diff_mat::AbstractMatrix{T}, vals::Vector{T}) where T
+function diff_tensor!(
+    diff_tensor::Array{T, 3},
+    diff_mat::AbstractMatrix{T},
+    vals::Vector{T},
+    ) where {T <: Real}
     rteps = sqrt(eps(T))
     d = size(diff_mat, 1)
+
     @inbounds for k in 1:d, j in 1:k, i in 1:j
         (vi, vj, vk) = (vals[i], vals[j], vals[k])
+
         if abs(vj - vk) < rteps
             if abs(vi - vj) < rteps
                 vijk = (vi + vj + vk) / 3
@@ -632,9 +528,11 @@ function diff_tensor!(diff_tensor::Array{T, 3}, diff_mat::AbstractMatrix{T}, val
         else
             t = (diff_mat[i, j] - diff_mat[i, k]) / (vj - vk)
         end
+
         diff_tensor[i, j, k] = diff_tensor[i, k, j] = diff_tensor[j, i, k] =
             diff_tensor[j, k, i] = diff_tensor[k, i, j] = diff_tensor[k, j, i] = t
     end
+
     return diff_tensor
 end
 
