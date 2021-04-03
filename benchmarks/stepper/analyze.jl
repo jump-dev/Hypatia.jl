@@ -8,10 +8,10 @@ process_entry(x::Float64) = @sprintf("%.2f", x)
 process_entry(x::Int) = string(x)
 
 bench_file = joinpath(@__DIR__, "raw", "bench.csv")
-output_folder = mkpath(joinpath(@__DIR__, "analysis"))
-tex_folder = mkpath(joinpath(output_folder, "tex"))
-aux_folder = mkpath(joinpath(output_folder, "aux"))
-csv_folder = mkpath(joinpath(output_folder, "csvs"))
+output_dir = mkpath(joinpath(@__DIR__, "analysis"))
+tex_dir = mkpath(joinpath(output_dir, "tex"))
+stats_dir = mkpath(joinpath(output_dir, "stats"))
+csv_dir = mkpath(joinpath(output_dir, "csvs"))
 
 function shifted_geomean(metric::AbstractVector, conv::AbstractVector{Bool}; shift = 0, cap = Inf, skipnotfinite = false, use_cap = false)
     if use_cap
@@ -63,13 +63,13 @@ function make_agg_tables(all_df)
         :status => (x -> count(isequal("IterationLimit"), x)) => :iterationlimit,
         :status => length => :total,
         )
-    CSV.write(joinpath(aux_folder, "agg" * ".csv"), df_agg)
+    CSV.write(joinpath(stats_dir, "agg" * ".csv"), df_agg)
 
     # combine feasible and infeasible statuses
     transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] => ByRow((x...) -> sum(x)) => :converged)
     cols = [:converged, :iters_geomean_thisconv, :iters_geomean_everyconv, :iters_geomean_all, :time_geomean_thisconv, :time_geomean_everyconv, :time_geomean_all]
     sep = " & "
-    tex = open(joinpath(tex_folder, "agg" * ".tex"), "w")
+    tex = open(joinpath(tex_dir, "agg" * ".tex"), "w")
     for i in 1:length(enhancements)
         row_str = enhancements[i]
         for c in cols
@@ -127,7 +127,7 @@ function make_subtime_tables(all_df)
             [:time_getdir_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_getdir_iter, use_cap = use_cap)) => Symbol(:getdir_piter, set),
             [:time_search_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_search_iter, use_cap = use_cap)) => Symbol(:search_piter, set),
             )
-        CSV.write(joinpath(aux_folder, "subtime" * string(set) * ".csv"), subtime_df)
+        CSV.write(joinpath(stats_dir, "subtime" * string(set) * ".csv"), subtime_df)
         return subtime_df
     end
 
@@ -145,7 +145,7 @@ function make_subtime_tables(all_df)
         end
         subtime_df = get_subtime_df(s, convcol, use_cap)
 
-        subtime_tex = open(joinpath(tex_folder, "subtime" * string(s) * ".tex"), "w")
+        subtime_tex = open(joinpath(tex_dir, "subtime" * string(s) * ".tex"), "w")
         for i in 1:nrow(subtime_df)
             row_str = sep * enhancements[i]
             for m in metrics
@@ -176,45 +176,53 @@ function make_perf_profiles(all_df, comp, metric)
     for s in 1:2
         x = vcat(0, repeat(x_plot[s], inner = 2))
         y = vcat(0, 0, repeat(y_plot[s][1:(end - 1)], inner = 2), y_plot[s][end])
-        CSV.write(joinpath(csv_folder, comp[s] * "_vs_" * comp[2 - s + 1] * "_" * string(metric) * ".csv"), DataFrame(x = x, y = y))
+        CSV.write(joinpath(csv_dir, comp[s] * "_vs_" * comp[2 - s + 1] * "_" * string(metric) * ".csv"), DataFrame(x = x, y = y))
     end
     return
 end
 
 function instance_stats(all_df)
+    all_df = transform(all_df, [:n, :p, :q] => ((x, y, z) -> x .+ y .+ z) => :npq)
     basic_solver = filter(t -> t.solver_options == "basic", all_df)
-    inst_df = select(basic_solver,
-        :num_cones => ByRow(log10) => :lognumcones,
-        [:n, :p, :q] => ((x, y, z) -> log10.(x .+ y .+ z)) => :lognpq,
-        )
-    CSV.write(joinpath(csv_folder, "inststats.csv"), inst_df)
-    # for other stats, only include converged instances
+
+    # get stats from basic
+    CSV.write(joinpath(csv_dir, "basic.csv"), select(basic_solver,
+        :num_cones => ByRow(log10) => :log_numcones,
+        :npq => ByRow(log10) => :log_npq,
+        ),)
+
+    # basic and converged
     basic_solver_conv = filter(t -> t.conv, basic_solver)
-    CSV.write(joinpath(csv_folder, "basicinststats.csv"), select(basic_solver_conv,
+    CSV.write(joinpath(csv_dir, "basicconv.csv"), select(basic_solver_conv,
+        :iters,
         :solve_time,
         :solve_time => ByRow(log10) => :log_solve_time,
-        [:n, :p, :q] => ((x, y, z) -> x .+ y .+ z) => :npq,
+        :npq,
         ),)
-    # use shift for proportion in uprhs
+
+    # shift and converged
     shift_solver = filter(t -> t.solver_options == "shift", all_df)
     shift_solver_conv = filter(t -> t.conv, shift_solver)
-    CSV.write(joinpath(csv_folder, "shiftinststats.csv"), select(shift_solver_conv,
-        [:time_uprhs, :solve_time] => ((x, y) -> log10.(x ./ y)) => :logproprhs,
-        [:time_uprhs, :solve_time] => ((x, y) -> x ./ y) => :proprhs,
+    CSV.write(joinpath(csv_dir, "shiftconv.csv"), select(shift_solver_conv,
+        :solve_time,
+        :npq,
+        [:time_uprhs, :solve_time] => ((x, y) -> x ./ y) => :prop_rhs,
         ),)
-    # for relative improvement, include only basic and shift, and then only instances where both converged
+
+    # basic and shift where both converged
     two_solver = filter(t -> t.solver_options in ("basic", "shift"), all_df)
     two_solver = combine(groupby(two_solver, :inst_key), names(all_df), :conv => all => :two_conv)
     two_solver_conv = filter(t -> t.two_conv, two_solver)
-    two_solver_conv = combine(groupby(two_solver_conv, :inst_key), names(two_solver_conv), :solve_time => (x -> (x[1] - x[2]) / x[1]) => :improvement)
-    CSV.write(joinpath(csv_folder, "basicshiftinststats.csv"), select(two_solver_conv, :solve_time, :improvement))
+    two_solver_conv = combine(groupby(two_solver_conv, :inst_key), [:solver_options, :solve_time], :solve_time => (x -> (x[1] - x[2]) / x[1]) => :improvement)
+    filter!(t -> t.solver_options == "basic", two_solver_conv)
+    CSV.write(joinpath(csv_dir, "basicshiftconv.csv"), select(two_solver_conv, :solve_time, :improvement))
 
     # only used to get list of cones manually
     ex_df = combine(groupby(basic_solver, :example),
         :cone_types => (x -> union(eval.(Meta.parse.(x)))) => :cones,
         :cone_types => length => :num_instances,
         )
-    CSV.write(joinpath(aux_folder, "examplestats.csv"), ex_df)
+    CSV.write(joinpath(stats_dir, "examplestats.csv"), ex_df)
 
     return
 end
