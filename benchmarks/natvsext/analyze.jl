@@ -100,7 +100,7 @@ status_map = Dict(
     "SolveCheckCaughtError" => "other",
     )
 
-residual_tol_satisfied(a, tol = 1e-5) = (all(isfinite, a) && maximum(a) < tol)
+residual_tol_satisfied(a, tol = 1e-5) = (all(isfinite, a) && maximum(abs, a) < tol)
 relative_tol_satisfied(a::T, b::T, tol::T = 1e-5) where {T <: Real} = (abs(a - b) / (1 + max(abs(a), abs(b))) < tol)
 
 ex_wide_file(ex_name::String) = joinpath(stats_dir, ex_name * "_wide.csv")
