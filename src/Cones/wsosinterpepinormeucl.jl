@@ -418,26 +418,18 @@ function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
         end
 
         lambda_inv_half = zeros(L * R, L * R)
-        lambda_inv_half[1:L, 1:L] = cholesky(inv(cone.matfact[k])).U
+        Mi = inv(cone.matfact[k])
+        mchol = cholesky(Mi)
+        # lambda_inv_half[1:L, 1:L] = mchol.U
+        lambda_inv_half[1:L, 1:L] = inv(cone.matfact[k].L)
         for r in 2:R
-            lambda_inv_half[1:L, block_idxs(L, r)] = -inv(lambda_inv_half[1:L, 1:L])' * inv(cone.matfact[k]) * lambda_full[1:L, block_idxs(L, r)] * inv(cone.Λfact[k])
-            lambda_inv_half[block_idxs(L, r), block_idxs(L, r)] = cholesky(inv(cone.Λfact[k])).U
+            # lambda_inv_half[1:L, block_idxs(L, r)] = -inv(mchol.U)' * Mi * lambda_full[1:L, block_idxs(L, r)] * inv(cone.Λfact[k])
+            lambda_inv_half[1:L, block_idxs(L, r)] = -inv(lambda_inv_half[1:L, 1:L])' * Mi * lambda_full[1:L, block_idxs(L, r)] * inv(cone.Λfact[k])
+            # lambda_inv_half[block_idxs(L, r), block_idxs(L, r)] = cholesky(inv(cone.Λfact[k])).U
+            lambda_inv_half[block_idxs(L, r), block_idxs(L, r)] = inv(cone.Λfact[k].L)
         end
+        # @show (lambda_inv_half' * lambda_inv_half) ./ inv(lambda_full)
 
-        chalf = lambda_inv_half * Δ * lambda_inv_half' * lambda_inv_half * kron(I(R), Pk')
-
-        @views for u in 1:U
-            c2[u] += sum(abs2, chalf[:, u])
-            idx = U + u
-            for r in 2:R
-                c2[idx] += 2 * dot(chalf[:, idx], chalf[:, u])
-                c2[u] += sum(abs2, chalf[:, idx])
-                idx += U
-            end
-        end
-        L11 = lambda_full[1:L, 1:L]
-        Δ11 = Δ[1:L, 1:L]
-        c2[1:U] -= (R - 2) * diag(Pk * inv(L11) * Δ11 * inv(L11) * Δ11 * inv(L11) * Pk')
 
         At = lambda_inv_half[1:L, 1:L]
         Bt = lambda_inv_half[1:L, (L + 1):end]
@@ -465,93 +457,31 @@ function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
         end
 
         # s^2 * L^2 * U
-        chalf2 = zeros(L * R, L * R)
+        chalf = zeros(L * R, L * R)
         # chalf[1:L, 1:U] = LΔL[1:L, :] * LP[:, 1:L]
-        chalf2 = LΔL[:, 1:L] * LP[1:L, :]
+        chalf = LΔL[:, 1:L] * LP[1:L, :]
         for r in 2:R
-            chalf2[1:L, block_idxs(U, r)] = LΔL[1:L, 1:L] * LP[1:L, block_idxs(U, r)] + LΔL[1:L, block_idxs(L, r)] * LP[block_idxs(L, r), block_idxs(U, r)]
-            chalf2[block_idxs(L, r), block_idxs(U, r)] = LΔL[block_idxs(L, r), block_idxs(L, r)] * LP[block_idxs(L, r), block_idxs(U, r)]
+            chalf[1:L, block_idxs(U, r)] += LΔL[1:L, block_idxs(L, r)] * LP[block_idxs(L, r), block_idxs(U, r)]
+            chalf[block_idxs(L, r), block_idxs(U, r)] += LΔL[block_idxs(L, r), block_idxs(L, r)] * LP[block_idxs(L, r), block_idxs(U, r)]
         end
 
+        @views for u in 1:U
+            c2[u] += sum(abs2, chalf[:, u])
+            idx = U + u
+            for r in 2:R
+                c2[idx] += 2 * dot(chalf[:, idx], chalf[:, u])
+                c2[u] += sum(abs2, chalf[:, idx])
+                idx += U
+            end
+        end
+        L11 = lambda_full[1:L, 1:L]
+        Δ11 = Δ[1:L, 1:L]
+        c2[1:U] -= (R - 2) * diag(Pk * inv(L11) * Δ11 * inv(L11) * Δ11 * inv(L11) * Pk')
 
-        # @show LΔL
-        # @show LΔL ≈ (lambda_inv_half * Δ * lambda_inv_half')
-        # @show LΔL * LP ≈ chalf
-        @show R
-        @show norm(chalf2 - chalf, Inf), norm(chalf, Inf)
-
-        # @show norm(LΔL - (lambda_inv_half * Δ * lambda_inv_half'))
-
-
-        #
-        # lambda_full = zeros(L * R, L * R)
-        # lambda_full[1:L, 1:L] = Pk' * Diagonal(cone.point_views[1]) * Pk
-        # for r in 2:R
-        #     # s t^2 U
-        #     lambda_full[block_idxs(L, r), block_idxs(L, r)] = lambda_full[1:L, 1:L]
-        #     lambda_full[block_idxs(L, r), 1:L] = lambda_full[1:L, block_idxs(L, r)] = Pk' * Diagonal(cone.point_views[r]) * Pk
-        # end
-        #
-        # ΛLiP_edge = cone.ΛLiPs_edge[k]
-        # matLiP = cone.matLiP[k]
-        # LiP = zeros(L * R, U * R)
-        # Li = zeros(L * R, L * R)
-        # LiP[1:L, 1:U] .= Λ11LiP
-        #
-        # Li[1:L, 1:L] .= inv(cone.Λfact[k].L)
-        # for r in 2:R
-        #     LiP[block_idxs(L, r), block_idxs(U, r)] .= matLiP
-        #     LiP[block_idxs(L, r), 1:U] .= ΛLiP_edge[r - 1]
-        #
-        #     Li[block_idxs(L, r), block_idxs(L, r)] .= inv(cone.matfact[k].L)
-        #     Li[block_idxs(L, r), 1:L] .= -cone.matfact[k].L \ (cone.ΛLi_Λ[k][r - 1]' * inv(cone.Λfact[k].L))
-        # end
-        #
-        # lam_sqrt = cholesky(Hermitian(lambda_full)).L
-        #
-        # # @show (Li' * Li) ./ inv(lambda_full)
-        #  # @show (kron(I(R), Pk) * Li' * Li * kron(I(R), Pk')) ./ (kron(I(R), Pk) * inv(lambda_full) * kron(I(R), Pk'))
-        # # @show Li * kron(I(R), Pk') ≈ LiP
-        # @show (LiP' * LiP) ./ (kron(I(R), Pk) * inv(lambda_full) * kron(I(R), Pk'))
-        #
-        # # chalf = Li * Δ * Li' * LiP
-        # chalf = inv(lam_sqrt) * Δ * inv(lambda_full) * kron(I(R), Pk')
-        # # arrow_outer_prod!(c2, chalf, U, R)
-        #
-        # L11 = lambda_full[1:L, 1:L]
-        # Δ11 = Δ[1:L, 1:L]
-        #
-        # @views for u in 1:U
-        #     c2[u] += sum(abs2, chalf[:, u])
-        #     idx = U + u
-        #     for r in 2:R
-        #         c2[idx] += 2 * dot(chalf[:, idx], chalf[:, u])
-        #         c2[u] += sum(abs2, chalf[:, idx])
-        #         idx += U
-        #     end
-        # end
-        #
-        #
-        # c2[1:U] -= (R - 2) * diag(Pk * inv(L11) * Δ11 * inv(L11) * Δ11 * inv(L11) * Pk')
-        #
-        # # bigthing = kron(I(R), Pk) * inv(lambda_full) * Δ * inv(lambda_full) * Δ * inv(lambda_full) * kron(I(R), Pk')
-        # # function lamadj(vec, mat)
-        # #     idx = 1
-        # #     vec[1:U] += sum(diag(mat[block_idxs(U, r), block_idxs(U, r)]) for r in 1:R)
-        # #     for r in 2:R
-        # #         vec[block_idxs(U, r)] += 2 * diag(mat[block_idxs(U, r), 1:U])
-        # #     end
-        # #     return vec
-        # # end
-        # # lamadj(c2, bigthing)
-        # # L11 = lambda_full[1:L, 1:L]
-        # # Δ11 = Δ[1:L, 1:L]
-        # # c2[1:U] -= (R - 2) * diag(Pk * inv(L11) * Δ11 * inv(L11) * Δ11 * inv(L11) * Pk')
-        #
-        # # @show chalf
 
     end
-    @show c2 ./ corr
+    corr .= c2
+    # @show c2 ./ corr
 
     return corr
 end
