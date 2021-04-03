@@ -3,10 +3,10 @@ using CSV
 using DataFrames
 
 bench_file = joinpath(@__DIR__, "raw", "bench.csv")
-output_folder = mkpath(joinpath(@__DIR__, "analysis"))
-tex_folder = mkpath(joinpath(output_folder, "tex"))
-aux_folder = mkpath(joinpath(output_folder, "aux"))
-csv_folder = mkpath(joinpath(csv, "csvs"))
+output_dir = mkpath(joinpath(@__DIR__, "analysis"))
+tex_dir = mkpath(joinpath(output_dir, "tex"))
+stats_dir = mkpath(joinpath(output_dir, "stats"))
+csv_dir = mkpath(joinpath(csv, "csvs"))
 
 # uncomment examples to process
 examples_params = Dict(
@@ -103,7 +103,7 @@ status_map = Dict(
 residual_tol_satisfied(a, tol = 1e-5) = (all(isfinite, a) && maximum(a) < tol)
 relative_tol_satisfied(a::T, b::T, tol::T = 1e-5) where {T <: Real} = (abs(a - b) / (1 + max(abs(a), abs(b))) < tol)
 
-ex_wide_file(ex_name::String) = joinpath(aux_folder, ex_name * "_wide.csv")
+ex_wide_file(ex_name::String) = joinpath(stats_dir, ex_name * "_wide.csv")
 
 function make_wide_csv(ex_df, ex_name, ex_params)
     @info("making wide csv for $ex_name")
@@ -183,7 +183,7 @@ function make_table_tex(ex_name, ex_params, ex_df_wide, inst_solvers)
     print_sizes = ex_params[4]
 
     sep = " & "
-    ex_tex = open(joinpath(tex_folder, ex_name * "_table.tex"), "w")
+    ex_tex = open(joinpath(tex_dir, ex_name * "_table.tex"), "w")
     header_str = prod(string(s) * sep for s in vcat(inst_keys, print_sizes))
     if print_table_solvers
         header_str *= prod(s * " & & & " for s in inst_solvers)
@@ -227,7 +227,7 @@ function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
         transform_plot_cols(ex_df_wide, inst_solver)
     end
 
-    plot_file_start = joinpath(csv_folder, ex_name * "_plot")
+    plot_file_start = joinpath(csv_dir, ex_name * "_plot")
     axis_name = last(inst_keys)
     if num_params == 1
         success_df = select(ex_df_wide, axis_name, inst_solvers...)
