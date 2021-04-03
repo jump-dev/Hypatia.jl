@@ -182,34 +182,40 @@ function make_perf_profiles(all_df, comp, metric)
 end
 
 function instance_stats(all_df)
+    all_df = transform(all_df, [:n, :p, :q] => ((x, y, z) -> x .+ y .+ z) => :npq)
     basic_solver = filter(t -> t.solver_options == "basic", all_df)
-    inst_df = select(basic_solver,
-        :num_cones => ByRow(log10) => :lognumcones,
-        [:n, :p, :q] => ((x, y, z) -> log10.(x .+ y .+ z)) => :lognpq,
-        )
-    CSV.write(joinpath(csv_dir, "inststats.csv"), inst_df)
-    # for other stats, only include converged instances
+
+    # get stats from basic
+    CSV.write(joinpath(csv_dir, "basic.csv"), select(basic_solver,
+        :num_cones => ByRow(log10) => :log_numcones,
+        :npq => ByRow(log10) => :log_npq,
+        ),)
+
+    # basic and converged
     basic_solver_conv = filter(t -> t.conv, basic_solver)
-    CSV.write(joinpath(csv_dir, "basicinststats.csv"), select(basic_solver_conv,
+    CSV.write(joinpath(csv_dir, "basicconv.csv"), select(basic_solver_conv,
         :iters,
         :solve_time,
         :solve_time => ByRow(log10) => :log_solve_time,
-        [:n, :p, :q] => ((x, y, z) -> x .+ y .+ z) => :npq,
+        :npq,
         ),)
-    # use shift for proportion in uprhs
+
+    # shift and converged
     shift_solver = filter(t -> t.solver_options == "shift", all_df)
     shift_solver_conv = filter(t -> t.conv, shift_solver)
-    CSV.write(joinpath(csv_dir, "shiftinststats.csv"), select(shift_solver_conv,
+    CSV.write(joinpath(csv_dir, "shiftconv.csv"), select(shift_solver_conv,
         :solve_time,
-        [:time_uprhs, :solve_time] => ((x, y) -> x ./ y) => :proprhs,
+        :npq,
+        [:time_uprhs, :solve_time] => ((x, y) -> x ./ y) => :prop_rhs,
         ),)
-    # for relative improvement, include only basic and shift, and then only instances where both converged
+
+    # basic and shift where both converged
     two_solver = filter(t -> t.solver_options in ("basic", "shift"), all_df)
     two_solver = combine(groupby(two_solver, :inst_key), names(all_df), :conv => all => :two_conv)
     two_solver_conv = filter(t -> t.two_conv, two_solver)
     two_solver_conv = combine(groupby(two_solver_conv, :inst_key), [:solver_options, :solve_time], :solve_time => (x -> (x[1] - x[2]) / x[1]) => :improvement)
     filter!(t -> t.solver_options == "basic", two_solver_conv)
-    CSV.write(joinpath(csv_dir, "basicshiftinststats.csv"), select(two_solver_conv, :solve_time, :improvement))
+    CSV.write(joinpath(csv_dir, "basicshiftconv.csv"), select(two_solver_conv, :solve_time, :improvement))
 
     # only used to get list of cones manually
     ex_df = combine(groupby(basic_solver, :example),
