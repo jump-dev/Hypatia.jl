@@ -29,7 +29,8 @@ stepper_options = [
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    "minimal",
+    # "minimal",
+    "compile",
     "various",
     ]
 
@@ -95,6 +96,9 @@ include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
 ex_type_T = ex_type{Float64}
 
 for inst_set in instance_sets, (step_name, stepper) in stepper_options
+    if inst_set == "compile"
+        ex_insts["compile"] = ex_insts["various"]
+    end
     haskey(ex_insts, inst_set) || continue
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue

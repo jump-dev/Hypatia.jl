@@ -26,18 +26,16 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
     mn = m * n
     rt2 = sqrt(T(2))
 
-    num_known = round(Int, mn * 0.1)
+    num_known = round(Int, mn * 0.8)
     known_rows = rand(1:m, num_known)
     known_cols = rand(1:n, num_known)
-    known_vals = rand(T, num_known) .- T(0.5)
-
-    mat_to_vec_idx(i::Int, j::Int) = (j - 1) * m + i
+    known_vals = 2 * rand(T, num_known) .- 1
 
     is_known = fill(false, mn)
     # h for the rows that X (the matrix and not epigraph variable) participates in
     h_norm_x = zeros(T, m * n)
     for (k, (i, j)) in enumerate(zip(known_rows, known_cols))
-        known_idx = mat_to_vec_idx(i, j)
+        known_idx = (j - 1) * m + i
         # if not using the epinorminf cone, indices relate to X'
         h_norm_x[known_idx] = known_vals[k]
         is_known[known_idx] = true

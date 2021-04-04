@@ -2048,9 +2048,9 @@ function epirelentropy1(T; options...)
         G = zeros(T, dim, 1)
         G[1, 1] = -1
         h = zeros(T, dim)
-        h[2:2:(end - 1)] .= 1
+        h[2:(1 + w_dim)] .= 1
         w = rand(T, w_dim) .+ 1
-        h[3:2:end] .= w
+        h[(2 + w_dim):end] .= w
         cones = Cone{T}[Cones.EpiRelEntropy{T}(dim)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
@@ -2068,10 +2068,10 @@ function epirelentropy2(T; options...)
         b = zeros(T, 0)
         G = zeros(T, dim, w_dim)
         for i in 1:w_dim
-            G[2i + 1, i] = -1
+            G[1 + w_dim + i, i] = -1
         end
         h = zeros(T, dim)
-        h[2:2:(dim - 1)] .= 1
+        h[1 .+ (1:w_dim)] .= 1
         cones = Cone{T}[Cones.EpiRelEntropy{T}(dim)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
@@ -2090,10 +2090,10 @@ function epirelentropy3(T; options...)
         b = T[dim]
         G = zeros(T, dim, w_dim)
         for i in 1:w_dim
-            G[2i, i] = -1
+            G[1 + i, i] = -1
         end
         h = zeros(T, dim)
-        h[3:2:end] .= 1
+        h[(2 + w_dim):end] .= 1
         cones = Cone{T}[Cones.EpiRelEntropy{T}(dim)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
@@ -2109,15 +2109,15 @@ function epirelentropy4(T; options...)
     A = zeros(T, 0, 1)
     b = zeros(T, 0)
     G = Matrix{T}(-I, 5, 1)
-    h = T[0, 1, 2, 5, 3]
+    h = T[0, 1, 5, 2, 3]
     cones = Cone{T}[Cones.EpiRelEntropy{T}(5)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
     entr = 2 * log(T(2)) + 3 * log(3 / T(5))
     @test r.primal_obj ≈ entr atol=tol rtol=tol
-    @test r.s ≈ [entr, 1, 2, 5, 3] atol=tol rtol=tol
-    @test r.z ≈ [1, 2, log(inv(T(2))) - 1, 3 / T(5), log(5 / T(3)) - 1] atol=tol rtol=tol
+    @test r.s ≈ [entr, 1, 5, 2, 3] atol=tol rtol=tol
+    @test r.z ≈ [1, 2, 3 / T(5), log(inv(T(2))) - 1, log(5 / T(3)) - 1] atol=tol rtol=tol
 end
 
 function epirelentropy5(T; options...)
@@ -2125,15 +2125,16 @@ function epirelentropy5(T; options...)
     c = T[0, -1]
     A = zeros(T, 0, 2)
     b = zeros(T, 0)
-    G = vcat(zeros(T, 1, 2), repeat(T[0 0; -1 -1], 3), [-1, 0]')
-    h = T[0, 1, 0, 1, 0, 1, 0, 0]
+    G = vcat(zeros(T, 4, 2), fill(-one(T), 3, 2), [-1, 0]')
+    h = zeros(T, 8)
+    h[2:4] .= 1
     cones = Cone{T}[Cones.EpiRelEntropy{T}(7), Cones.Nonnegative{T}(1)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
     @test r.primal_obj ≈ -1 atol=tol rtol=tol
     @test r.s ≈ [0, 1, 1, 1, 1, 1, 1, 0] atol=tol rtol=tol
-    @test r.z ≈ inv(T(3)) * [1, 1, -1, 1, -1, 1, -1, 3] atol=tol rtol=tol
+    @test r.z ≈ inv(T(3)) * [1, 1, 1, 1, -1, -1, -1, 3] atol=tol rtol=tol
 end
 
 function epitracerelentropytri1(T; options...)
