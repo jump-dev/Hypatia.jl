@@ -32,8 +32,8 @@ insts["slow"] = [
     ]
 insts["various"] = [
     ((5, 100, true, true, true, true),),
-    ((5, 100, true, true, true, false),),
+    ((5, 100, true, true, false, true),),
     ((10, 200, true, true, true, true),),
-    ((10, 200, true, true, true, true),),
+    ((10, 200, true, true, false, true),),
     ]
 return (MatrixCompletionNative, insts)

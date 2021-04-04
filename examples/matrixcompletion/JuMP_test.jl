@@ -25,8 +25,8 @@ insts["various"] = [
     ((10, 20), ExpPSDOptimizer),
     ((10, 20), SOCExpPSDOptimizer),
     ((10, 25),),
+    ((10, 25), ExpPSDOptimizer),
     ((10, 25), SOCExpPSDOptimizer),
-    ((10, 25),),
     ((10, 30),),
     ]
 return (MatrixCompletionJuMP, insts)
