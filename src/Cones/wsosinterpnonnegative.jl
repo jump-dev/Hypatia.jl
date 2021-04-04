@@ -148,6 +148,30 @@ function update_hess(cone::WSOSInterpNonnegative)
     return cone.hess
 end
 
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpNonnegative)
+    @assert is_feas(cone)
+    prod .= 0
+
+    @inbounds for i in 1:size(arr, 2), k in eachindex(cone.Ps)
+        Pk = cone.Ps[k]
+        ΛFk = cone.ΛF[k]
+        ULk = cone.tempUL[k]
+        LLk = cone.tempLL2[k]
+        LUk = cone.tempLU2[k]
+
+        mul!(ULk, Diagonal(view(arr, :, i)), Pk)
+        mul!(LLk, Pk', ULk)
+        ldiv!(ΛFk, LLk)
+        rdiv!(LLk, ΛFk)
+        mul!(LUk, LLk, Pk')
+        @views for j in 1:cone.dim
+            prod[j, i] += dot(Pk[j, :], LUk[:, j])
+        end
+    end
+
+    return prod
+end
+
 function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
     corr = cone.correction
     corr .= 0
