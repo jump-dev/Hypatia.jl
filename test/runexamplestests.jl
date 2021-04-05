@@ -29,6 +29,7 @@ instance_sets = [
     # ("minimal", BigFloat, 60),
     # ("fast", Float64, 60),
     # ("slow", Float64, 120),
+    # ("various", Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names

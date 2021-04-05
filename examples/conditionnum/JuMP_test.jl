@@ -1,6 +1,5 @@
 
 relaxed_tols = (default_tol_relax = 100,)
-relaxed_tols_2 = (default_tol_relax = 1000,)
 insts = Dict()
 insts["minimal"] = [
     ((3, 2, true),),
@@ -23,7 +22,7 @@ insts["various"] = [
     ((25, 4, false), nothing, relaxed_tols),
     ((50, 20, true), nothing, relaxed_tols),
     ((50, 20, false), nothing, relaxed_tols),
-    ((100, 100, true), nothing, relaxed_tols_2),
+    ((100, 100, true), nothing, relaxed_tols),
     ((100, 100, false), nothing, relaxed_tols),
     ]
 return (ConditionNumJuMP, insts)
