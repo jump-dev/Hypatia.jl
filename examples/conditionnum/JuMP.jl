@@ -7,7 +7,7 @@ minimize    gamma
 subject to  mu >= 0
             F(x) in S_+
             M(x) - mu*I in S_+
-mu*gamma*I - M(x) in S_+
+            mu*gamma*I - M(x) in S_+
 introduce nu = inv(mu), y = x/mu:
 minimize    gamma
 subject to  nu >= 0

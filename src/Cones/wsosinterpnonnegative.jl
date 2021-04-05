@@ -32,9 +32,8 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tempLL::Vector{Matrix{R}}
     tempLL2::Vector{Matrix{R}}
     tempUL::Vector{Matrix{R}}
-    tempLU::Vector{Matrix{R}}
-    tempLU2::Vector{Matrix{R}}
-    tempUU::Vector{Matrix{R}} # TODO for corrector, this can stay as a single matrix if we only use LU
+    ΛFLP::Vector{Matrix{R}}
+    tempUU::Matrix{R}
     ΛF::Vector
     Ps_times::Vector{Float64}
     Ps_order::Vector{Int}
@@ -68,9 +67,8 @@ function setup_extra_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrC
     cone.tempLL = [zeros(R, L, L) for L in Ls]
     cone.tempLL2 = [zeros(R, L, L) for L in Ls]
     cone.tempUL = [zeros(R, dim, L) for L in Ls]
-    cone.tempLU = [zeros(R, L, dim) for L in Ls]
-    cone.tempLU2 = [zeros(R, L, dim) for L in Ls]
-    cone.tempUU = [zeros(R, dim, dim) for L in Ls]
+    cone.ΛFLP = [zeros(R, L, dim) for L in Ls]
+    cone.tempUU = zeros(R, dim, dim)
     K = length(Ls)
     cone.ΛF = Vector{Any}(undef, K)
     cone.Ps_times = zeros(K)
@@ -114,16 +112,15 @@ end
 
 is_dual_feas(cone::WSOSInterpNonnegative) = true
 
-# TODO decide whether to compute the LUk' * LUk in grad or in hess (only diag needed for grad)
 function update_grad(cone::WSOSInterpNonnegative)
     @assert cone.is_feas
 
     cone.grad .= 0
     @inbounds for k in eachindex(cone.Ps)
-        LUk = cone.tempLU[k]
-        ldiv!(LUk, cone.ΛF[k].L, cone.Ps[k]')
-        for j in 1:cone.dim
-            @views cone.grad[j] -= sum(abs2, LUk[:, j])
+        ΛFLPk = cone.ΛFLP[k] # computed here
+        ldiv!(ΛFLPk, cone.ΛF[k].L, cone.Ps[k]')
+        @views for j in 1:cone.dim
+            cone.grad[j] -= sum(abs2, ΛFLPk[:, j])
         end
     end
 
@@ -133,14 +130,13 @@ end
 
 function update_hess(cone::WSOSInterpNonnegative)
     @assert cone.grad_updated
+    UU = cone.tempUU
 
     cone.hess .= 0
     @inbounds for k in eachindex(cone.Ps)
-        LUk = cone.tempLU[k]
-        UUk = cone.tempUU[k]
-        outer_prod(LUk, UUk, true, false)
+        outer_prod(cone.ΛFLP[k], UU, true, false)
         for j in 1:cone.dim, i in 1:j
-            cone.hess.data[i, j] += abs2(UUk[i, j])
+            cone.hess.data[i, j] += abs2(UU[i, j])
         end
     end
 
@@ -148,23 +144,48 @@ function update_hess(cone::WSOSInterpNonnegative)
     return cone.hess
 end
 
+# TODO expensive
+# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpNonnegative)
+#     @assert is_feas(cone)
+#     prod .= 0
+#
+#     @inbounds for k in eachindex(cone.Ps)
+#         Pk = cone.Ps[k]
+#         ΛFk = cone.ΛF[k]
+#         ULk = cone.tempUL[k]
+#         LLk = Hermitian(cone.tempLL2[k])
+#         ΛFLPk = cone.ΛFLP[k]
+#
+#         @views for j in 1:size(arr, 2)
+#             mul!(ULk, Diagonal(arr[:, j]), ΛFLPk')
+#             mul!(LLk.data, ΛFLPk, ULk)
+#             for i in 1:cone.dim
+#                 ΛFLPki = ΛFLPk[:, i]
+#                 prod[i, j] += real(dot(ΛFLPki, LLk, ΛFLPki))
+#             end
+#         end
+#     end
+#
+#     return prod
+# end
+
 function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
     corr = cone.correction
     corr .= 0
+
     @inbounds for k in eachindex(cone.Ps)
         Pk = cone.Ps[k]
         ΛFk = cone.ΛF[k]
         ULk = cone.tempUL[k]
         LLk = cone.tempLL2[k]
-        LUk = cone.tempLU2[k]
+        ΛFLPk = cone.ΛFLP[k]
         D = Diagonal(primal_dir)
-        mul!(ULk, D, Pk)
-        mul!(LLk, Pk', ULk)
-        ldiv!(ΛFk.L, LLk)
-        rdiv!(LLk, ΛFk)
-        mul!(LUk, LLk, Pk')
-        for j in 1:cone.dim
-            @views corr[j] += sum(abs2, LUk[:, j])
+
+        mul!(ULk, D, ΛFLPk')
+        mul!(LLk, ΛFLPk, ULk)
+        mul!(ULk, ΛFLPk', Hermitian(LLk))
+        @views for j in 1:cone.dim
+            corr[j] += sum(abs2, ULk[j, :])
         end
     end
 

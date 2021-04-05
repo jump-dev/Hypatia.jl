@@ -271,11 +271,21 @@ function rand_powers(T, d)
     return alpha
 end
 
+# real Ps for WSOS cones, use unit box domain
 function rand_interp(num_vars::Int, halfdeg::Int, T::Type{<:Real})
     Random.seed!(1)
-    # use a unit box domain
     domain = ModelUtilities.Box{T}(-ones(T, num_vars), ones(T, num_vars))
     (d, _, Ps, _) = ModelUtilities.interpolate(domain, halfdeg, sample = false)
+    return (d, Ps)
+end
+
+# complex Ps for WSOS cones, use unit ball domain
+function rand_interp(num_vars::Int, halfdeg::Int, R::Type{<:Complex{<:Real}})
+    Random.seed!(1)
+    gs = [z -> 1 - sum(abs2, z)]
+    g_halfdegs = [1]
+    (points, Ps) = ModelUtilities.interpolate(R, halfdeg, num_vars, gs, g_halfdegs)
+    d = length(points)
     return (d, Ps)
 end
 
@@ -715,7 +725,6 @@ show_time_alloc(C::Type{<:Cones.EpiTraceRelEntropyTri}) = show_time_alloc(C(13))
 
 
 # WSOSInterpNonnegative
-# TODO test complex case, but need complex interpolation
 function test_oracles(C::Type{Cones.WSOSInterpNonnegative{T, R}}) where {T, R}
     for (num_vars, halfdeg) in [(1, 1), (1, 3), (2, 1), (2, 2), (3, 1)]
         (d, Ps) = rand_interp(num_vars, halfdeg, R)
