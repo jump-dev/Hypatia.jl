@@ -44,6 +44,8 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     tempLU2::Vector{Matrix{T}}
     tempLU_vec::Vector{Vector{Matrix{T}}}
     tempLU_vec2::Vector{Vector{Matrix{T}}}
+    tempLU_vec3::Vector{Matrix{T}}
+    tempLU_vec4::Vector{Matrix{T}}
     tempLRUR::Vector{Matrix{T}}
     tempUU::Matrix{T}
     ΛLiPs_edge::Vector{Vector{Matrix{T}}}
@@ -99,6 +101,8 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.tempLU2 = [zeros(T, L, U) for L in Ls]
     cone.tempLU_vec = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.tempLU_vec2 = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
+    cone.tempLU_vec3 = [zeros(T, L, U * R) for L in Ls]
+    cone.tempLU_vec4 = [zeros(T, L, U * R) for L in Ls]
     cone.tempLRUR = [zeros(T, L * R, U * R) for L in Ls]
     cone.tempUU = zeros(T, U, U)
     cone.ΛLiPs_edge = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
@@ -294,76 +298,6 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
     return cone.hess
 end
 
-# function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
-#     @assert cone.grad_updated
-#     corr = cone.correction
-#     corr .= 0
-#     R = cone.R
-#     U = cone.U
-#
-#     @inbounds for k in eachindex(cone.Ps)
-#         Pk = cone.Ps[k]
-#         L = size(Pk, 2)
-#         Λfactk = cone.Λfact[k]
-#         ΛLi_Λk = cone.ΛLi_Λ[k]
-#         corr_half = cone.tempLRUR[k]
-#         LP_diag = cone.tempLU[k]
-#         LP_edge = zeros(L, R * U)
-#         LΔL_edge = zeros(L * R, L)
-#
-#         Δ_pt = Pk' * Diagonal(primal_dir[1:U]) * Pk
-#         Δ_edge = zeros(L * (R - 1), L)
-#         for r in 2:R
-#             Δ_edge[block_idxs(L, r - 1), :] = Pk' * Diagonal(primal_dir[block_idxs(U, r)]) * Pk
-#         end
-#
-#         ΛLi_edge = zeros(L * (R - 1), L)
-#         for r in 2:R
-#             ΛLi_edge[block_idxs(L, r - 1), :] = -(cone.Λfact[k].U \ (ΛLi_Λk[r - 1] / cone.matfact[k].U))
-#         end
-#
-#         Bt = ΛLi_edge'
-#
-#         # CtP = cone.Λfact[k].L \ Pk'
-#         CtZ = cone.Λfact[k].L \ Δ_pt
-#
-#         # lambda_inv_half * Δ * lambda_inv_half' is arrow
-#         ldiv!(LP_diag, cone.Λfact[k].L, Pk')
-#         BYA = Bt * (Δ_edge / cone.matfact[k].U)
-#         LΔL_edge[1:L, :] = cone.matfact[k].L \ (Δ_pt / cone.matfact[k].U) + BYA + BYA' + sum(Bt[:, block_idxs(L, r)] * Δ_pt * ΛLi_edge[block_idxs(L, r), :] for r in 1:(R - 1))
-#         LP_edge[1:L, 1:U] = cone.matfact[k].L \ Pk'
-#         LΔL_diag = cone.Λfact[k].L \ (Δ_pt / cone.Λfact[k].U)
-#         for r in 2:R
-#             LΔL_edge[block_idxs(L, r), :] = cone.Λfact[k].L \ (Δ_edge[block_idxs(L, r - 1), :] / cone.matfact[k].U) + CtZ * ΛLi_edge[block_idxs(L, r - 1), :]
-#             LP_edge[:, block_idxs(U, r)] = ΛLi_edge[block_idxs(L, r - 1), :]' * Pk'
-#         end
-#
-#         # s^2 * L^2 * U
-#         mul!(corr_half, LΔL_edge, LP_edge)
-#         for r in 2:R
-#             corr_half[1:L, block_idxs(U, r)] += LΔL_edge[block_idxs(L, r), :]' * LP_diag
-#             corr_half[block_idxs(L, r), block_idxs(U, r)] += LΔL_diag * LP_diag
-#         end
-#
-#         @views for u in 1:U
-#             corr[u] += sum(abs2, corr_half[:, u])
-#             idx = U + u
-#             for r in 2:R
-#                 corr[idx] += 2 * dot(corr_half[:, idx], corr_half[:, u])
-#                 corr[u] += sum(abs2, corr_half[:, idx])
-#                 idx += U
-#             end
-#         end
-#         Y = Λfactk.L \ (Δ_pt / Λfactk) * Pk'
-#         corr[1:U] -= (R - 2) * diag(Y' * Y)
-#
-#     end
-#
-#     return corr
-# end
-
-
-
 function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
     @assert cone.hess_updated
     corr = cone.correction
@@ -394,6 +328,12 @@ function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
         Λ11LiP = cone.Λ11LiP[k]
         scaled_row = cone.tempLU_vec[k]
         scaled_col = cone.tempLU_vec2[k]
+        ΛLiP_D_ΛLiPt_row = zeros(L, (R - 1) * U)
+        ΛLiP_edge_ctgs = cone.tempLU_vec4[k]
+        ΛLiP_D_ΛLiPt_col = zeros(R * L, L)
+        ΛLiP_D_ΛLiPt_diag = cone.tempLL[k]
+        corr_half = cone.tempLRUR[k]
+        corr_half .= 0
 
         # get ΛLiP * D * PΛiP where D is diagonalized primal_dir scattered in an arrow and ΛLiP is half an arrow
         # ΛLiP * D is an arrow matrix but row edge doesn't equal column edge
@@ -406,27 +346,24 @@ function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
             mul!(scaled_col[r - 1], Λ11LiP, Diagonal(primal_dir[block_idxs(U, r)]))
         end
 
-        ΛLiP_edge_ctgs = zeros(L, U * R)
         @. @views ΛLiP_edge_ctgs[:, 1:U] = matLiP
         for r in 2:R
             @. @views ΛLiP_edge_ctgs[:, block_idxs(U, r)] = ΛLiP_edge[r - 1]
         end
 
-        ΛLiP_D_ΛLiPt = zeros(L * R, L * R)
-        ΛLiP_D_ΛLiPt[1:L, 1:L] = scaled_pt * matLiP'
-        for r in 2:R
-            # TODO maybe also store ΛLiP_edge blocks contiguously so we don't do this
-            ΛLiP_D_ΛLiPt[1:L, 1:L] += scaled_row[r - 1] * ΛLiP_edge[r - 1]'
-            ΛLiP_D_ΛLiPt[1:L, block_idxs(L, r)] = scaled_row[r - 1] * Λ11LiP'
-            ΛLiP_D_ΛLiPt[block_idxs(L, r), 1:L] = scaled_col[r - 1] * matLiP' + scaled_diag * ΛLiP_edge[r - 1]'
-            ΛLiP_D_ΛLiPt[block_idxs(L, r), block_idxs(L, r)] = scaled_diag * Λ11LiP'
+        @views mul!(ΛLiP_D_ΛLiPt_col[1:L, :], scaled_pt, matLiP')
+        @views for r in 2:R
+            mul!(ΛLiP_D_ΛLiPt_col[1:L, :], scaled_row[r - 1], ΛLiP_edge[r - 1]', true, true)
+            mul!(ΛLiP_D_ΛLiPt_row[:, block_idxs(L, r - 1)], scaled_row[r - 1], Λ11LiP')
+            mul!(ΛLiP_D_ΛLiPt_col[block_idxs(L, r), :], scaled_col[r - 1], matLiP')
+            mul!(ΛLiP_D_ΛLiPt_col[block_idxs(L, r), :], scaled_diag, ΛLiP_edge[r - 1]', true, true)
+            mul!(ΛLiP_D_ΛLiPt_diag, scaled_diag, Λ11LiP')
         end
 
-        corr_half = cone.tempLRUR[k]
-        mul!(corr_half, ΛLiP_D_ΛLiPt[:, 1:L], ΛLiP_edge_ctgs)
-        for r in 2:R
-            corr_half[1:L, block_idxs(U, r)] += ΛLiP_D_ΛLiPt[1:L, block_idxs(L, r)] * Λ11LiP
-            corr_half[block_idxs(L, r), block_idxs(U, r)] += ΛLiP_D_ΛLiPt[block_idxs(L, r), block_idxs(L, r)] * Λ11LiP
+        mul!(corr_half, ΛLiP_D_ΛLiPt_col, ΛLiP_edge_ctgs)
+        @views for r in 2:R
+            mul!(corr_half[1:L, block_idxs(U, r)], ΛLiP_D_ΛLiPt_row[:, block_idxs(L, r - 1)], Λ11LiP, true, true)
+            mul!(corr_half[block_idxs(L, r), block_idxs(U, r)], ΛLiP_D_ΛLiPt_diag, Λ11LiP, true, true)
         end
 
         @views for u in 1:U
