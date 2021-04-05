@@ -173,20 +173,6 @@ end
 
 is_dual_feas(cone::WSOSInterpEpiNormEucl) = true
 
-# # block version of arrow(L * L') where L is half an arrow
-# function arrow_outer_prod!(vect::Vector{T}, mat::Matrix{T}, U::Int, R::Int) where T
-#     @views for u in 1:U
-#         vect[u] += sum(abs2, mat[:, u])
-#         idx = U + u
-#         for r in 2:R
-#             vect[idx] += 2 * dot(mat[:, idx], mat[:, u])
-#             vect[u] += sum(abs2, mat[:, idx])
-#             idx += U
-#         end
-#     end
-#     return vect
-# end
-
 function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
     @assert cone.is_feas
     U = cone.U
@@ -196,7 +182,6 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
     grad = cone.grad
 
     grad .= 0
-    g_try = copy(grad)
     @inbounds for k in eachindex(cone.Ps)
         Pk = cone.Ps[k]
         Λ11LiP = cone.Λ11LiP[k]
@@ -223,45 +208,7 @@ function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
                 idx += U
             end
         end
-
-        # L = size(Pk, 2)
-        # point_views = cone.point_views
-        # lambda_full = zeros(L * R, L * R)
-        # lambda_full[1:L, 1:L] = Pk' * Diagonal(point_views[1]) * Pk
-        # for r in 2:R
-        #     lambda_full[block_idxs(L, r), block_idxs(L, r)] = lambda_full[1:L, 1:L]
-        #     lambda_full[block_idxs(L, r), 1:L] = lambda_full[1:L, block_idxs(L, r)] = Pk' * Diagonal(point_views[r]) * Pk
-        # end
-        #
-        #
-        # lambda_inv_half = zeros(L * R, L * R)
-        # lambda_inv_half[1:L, 1:L] = cholesky(inv(matfact[k])).U
-        # for r in 2:R
-        #     lambda_inv_half[1:L, block_idxs(L, r)] = -inv(lambda_inv_half[1:L, 1:L])' * inv(matfact[k]) * lambda_full[1:L, block_idxs(L, r)] * inv(Λfact[k])
-        #     lambda_inv_half[block_idxs(L, r), block_idxs(L, r)] = cholesky(inv(Λfact[k])).U
-        #     # lambda_inv_half[block_idxs(L, r), 1:L] = -inv(Λfact[k]) * lambda_full[block_idxs(L, r), 1:L] * inv(matfact[k]) * inv(lambda_inv_half[1:L, 1:L])'
-        #     # lambda_inv_half[block_idxs(L, r), block_idxs(L, r)] = cholesky(inv(Λfact[k])).L
-        # end
-        # # lambda_inv_half = matfact[k].L \ lambda_inv_half
-        # # @show R
-        # @show (lambda_inv_half' * lambda_inv_half) ./ inv(lambda_full)
-        #
-        # lam_half_P = lambda_inv_half * kron(I(R), Pk')
-        # @views for u in 1:U
-        #     g_try[u] -= sum(abs2, lam_half_P[:, u])
-        #     idx = U + u
-        #     for r in 2:R
-        #         g_try[idx] -= 2 * dot(lam_half_P[:, idx], lam_half_P[:, u])
-        #         g_try[u] -= sum(abs2, lam_half_P[:, idx])
-        #         idx += U
-        #     end
-        # end
-        # g_try[1:U] += (R - 2) * diag(Pk * inv(Λfact[k]) * Pk')
-
-
-
     end
-    # @show g_try ./ cone.grad
 
     cone.grad_updated = true
     return cone.grad
@@ -346,151 +293,69 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
 end
 
 function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
-    @assert cone.hess_updated
+    @assert cone.grad_updated
     corr = cone.correction
     corr .= 0
     R = cone.R
     U = cone.U
-    c2 = zero(corr)
-    # @show R
 
-    # @inbounds for pk in eachindex(cone.Ps)
-    #     @views mul!(cone.tempLU[pk], cone.Λ11LiP[pk], Diagonal(primal_dir[1:U]))
-    #     tempLU2 = mul!(cone.tempLU2[pk], cone.tempLU[pk], cone.PΛ11iP[pk])
-    #     @views for u in 1:U
-    #         corr[u] += sum(abs2, tempLU2[:, u])
-    #     end
-    # end
-    # @. @views corr[1:U] *= 2 - R
-    #
     @inbounds for k in eachindex(cone.Ps)
-        L = size(cone.Ps[k], 2)
-    #     ΛLiP_edge = cone.ΛLiPs_edge[k]
-    #     matLiP = cone.matLiP[k]
-    #     PΛiP = cone.PΛiPs[k]
-    #     Λ11LiP = cone.Λ11LiP[k]
-    #     scaled_row = cone.tempLU_vec[k]
-    #     scaled_col = cone.tempLU_vec2[k]
-    #
-    #     # get ΛLiP * D * PΛiP where D is diagonalized primal_dir scattered in an arrow and ΛLiP is half an arrow
-    #     # ΛLiP * D is an arrow matrix but row edge doesn't equal column edge
-    #     @views scaled_diag = mul!(cone.tempLU[k], Λ11LiP, Diagonal(primal_dir[1:U]))
-    #     @views scaled_pt = mul!(cone.tempLU2[k], matLiP, Diagonal(primal_dir[1:U]))
-    #     @views for r in 2:R
-    #         mul!(scaled_pt, ΛLiP_edge[r - 1], Diagonal(primal_dir[block_idxs(U, r)]), true, true)
-    #         mul!(scaled_row[r - 1], matLiP, Diagonal(primal_dir[block_idxs(U, r)]))
-    #         mul!(scaled_row[r - 1], ΛLiP_edge[r - 1], Diagonal(primal_dir[1:U]), true, true)
-    #         mul!(scaled_col[r - 1], Λ11LiP, Diagonal(primal_dir[block_idxs(U, r)]))
-    #     end
-    #
-    #     corr_half = cone.tempLRUR[k]
-    #     corr_half .= 0
-    #     @views for c in 1:R
-    #         mul!(corr_half[1:L, block_idxs(U, c)], scaled_pt, PΛiP[1:U, block_idxs(U, c)])
-    #         for r in 2:R
-    #             mul!(corr_half[1:L, block_idxs(U, c)], scaled_row[r - 1], PΛiP[block_idxs(U, r), block_idxs(U, c)], true, true)
-    #             mul!(corr_half[block_idxs(L, r), block_idxs(U, c)], scaled_col[r - 1], PΛiP[1:U, block_idxs(U, c)])
-    #             mul!(corr_half[block_idxs(L, r), block_idxs(U, c)], scaled_diag, PΛiP[block_idxs(U, r), block_idxs(U, c)], true, true)
-    #         end
-    #     end
-    #
-    #     arrow_outer_prod!(corr, corr_half, U, R)
-
-
-
-
         Pk = cone.Ps[k]
+        L = size(Pk, 2)
         Λfactk = cone.Λfact[k]
+        ΛLi_Λk = cone.ΛLi_Λ[k]
+        corr_half = cone.tempLRUR[k]
+        LP_diag = cone.tempLU[k]
+        LP_edge = zeros(L, R * U)
+        LΔL_edge = zeros(L * R, L)
+
         Δ_pt = Pk' * Diagonal(primal_dir[1:U]) * Pk
         Δ_edge = zeros(L * (R - 1), L)
         for r in 2:R
             Δ_edge[block_idxs(L, r - 1), :] = Pk' * Diagonal(primal_dir[block_idxs(U, r)]) * Pk
         end
 
-        L = size(Pk, 2)
-        point_views = cone.point_views
-        lambda_full = zeros(L * R, L * R)
-        lambda_full[1:L, 1:L] = Pk' * Diagonal(point_views[1]) * Pk
+        ΛLi_edge = zeros(L * (R - 1), L)
         for r in 2:R
-            lambda_full[block_idxs(L, r), block_idxs(L, r)] = lambda_full[1:L, 1:L]
-            lambda_full[block_idxs(L, r), 1:L] = lambda_full[1:L, block_idxs(L, r)] = Pk' * Diagonal(point_views[r]) * Pk
+            ΛLi_edge[block_idxs(L, r - 1), :] = -(cone.Λfact[k].U \ (ΛLi_Λk[r - 1] / cone.matfact[k].U))
         end
 
-        lambda_inv_half_edge = zeros(L * (R - 1), L)
-        for r in 2:R
-            lambda_inv_half_edge[block_idxs(L, r - 1), :] = -(cone.Λfact[k] \ (lambda_full[1:L, block_idxs(L, r)]' / cone.matfact[k].U))
-        end
-
-
-        Bt = lambda_inv_half_edge'
+        Bt = ΛLi_edge'
 
         # CtP = cone.Λfact[k].L \ Pk'
         CtZ = cone.Λfact[k].L \ Δ_pt
 
         # lambda_inv_half * Δ * lambda_inv_half' is arrow
-        LP_diag = cone.Λfact[k].L \ Pk'
-        LP_edge = zeros(L, R * U)
-        LΔL_edge = zeros(L * R, L)
+        ldiv!(LP_diag, cone.Λfact[k].L, Pk')
         BYA = Bt * (Δ_edge / cone.matfact[k].U)
-        LΔL_edge[1:L, :] = cone.matfact[k].L \ (Δ_pt / cone.matfact[k].U) + BYA + BYA' + sum(Bt[:, block_idxs(L, r)] * Δ_pt * Bt[:, block_idxs(L, r)]' for r in 1:(R - 1))
+        LΔL_edge[1:L, :] = cone.matfact[k].L \ (Δ_pt / cone.matfact[k].U) + BYA + BYA' + sum(Bt[:, block_idxs(L, r)] * Δ_pt * ΛLi_edge[block_idxs(L, r), :] for r in 1:(R - 1))
         LP_edge[1:L, 1:U] = cone.matfact[k].L \ Pk'
         LΔL_diag = cone.Λfact[k].L \ (Δ_pt / cone.Λfact[k].U)
         for r in 2:R
-            # t * L^3
-            LΔL_edge[block_idxs(L, r), :] = cone.Λfact[k].L \ (Δ_edge[block_idxs(L, r - 1), :] / cone.matfact[k].U) + CtZ * Bt[:, block_idxs(L, r - 1)]'
-            # t * L^2*U
-            LP_edge[:, block_idxs(U, r)] = lambda_inv_half_edge[block_idxs(L, r - 1), :]' * Pk'
+            LΔL_edge[block_idxs(L, r), :] = cone.Λfact[k].L \ (Δ_edge[block_idxs(L, r - 1), :] / cone.matfact[k].U) + CtZ * ΛLi_edge[block_idxs(L, r - 1), :]
+            LP_edge[:, block_idxs(U, r)] = ΛLi_edge[block_idxs(L, r - 1), :]' * Pk'
         end
 
         # s^2 * L^2 * U
-        chalf = LΔL_edge * LP_edge
+        mul!(corr_half, LΔL_edge, LP_edge)
         for r in 2:R
-            chalf[1:L, block_idxs(U, r)] += LΔL_edge[block_idxs(L, r), :]' * LP_diag
-            chalf[block_idxs(L, r), block_idxs(U, r)] += LΔL_diag * LP_diag
+            corr_half[1:L, block_idxs(U, r)] += LΔL_edge[block_idxs(L, r), :]' * LP_diag
+            corr_half[block_idxs(L, r), block_idxs(U, r)] += LΔL_diag * LP_diag
         end
 
         @views for u in 1:U
-            c2[u] += sum(abs2, chalf[:, u])
+            corr[u] += sum(abs2, corr_half[:, u])
             idx = U + u
             for r in 2:R
-                c2[idx] += 2 * dot(chalf[:, idx], chalf[:, u])
-                c2[u] += sum(abs2, chalf[:, idx])
+                corr[idx] += 2 * dot(corr_half[:, idx], corr_half[:, u])
+                corr[u] += sum(abs2, corr_half[:, idx])
                 idx += U
             end
         end
         Y = Λfactk.L \ (Δ_pt / Λfactk) * Pk'
-        c2[1:U] -= (R - 2) * diag(Y' * Y)
-
-        # @views for u in 1:U
-        #     c2[u] += sum(abs2, (LΔL_edge * LP_edge)[:, u])
-        #     c2[u] += sum(abs2, (LΔL_diag * LP_diag)[:, u]) * (R - 1)
-        #     LΔL_LP_edge_u = LΔL_edge[1:L, :] * LP_edge[:, u]
-        #     LΔL_e_LP_edge_u = LΔL_edge[(L + 1):end, :] * LP_edge[:, u]
-        #     idx = U + u
-        #     for r in 2:R
-        #         LΔL_LP_edge = LΔL_edge[1:L, :] * LP_edge[:, idx]
-        #         edge_diag = LΔL_edge[block_idxs(L, r), :]' * LP_diag[:, u]
-        #         LΔL_e_LP_edge = LΔL_edge[(L + 1):end, :] * LP_edge[:, idx]
-        #
-        #         c2[idx] += 2 * dot(LΔL_LP_edge, LΔL_LP_edge_u)
-        #         c2[idx] += 2 * dot(edge_diag, LΔL_LP_edge_u)
-        #
-        #         c2[idx] += 2 * dot(LΔL_e_LP_edge, LΔL_e_LP_edge_u)
-        #         c2[idx] += 2 * dot(LΔL_diag * LP_diag[:, u], LΔL_edge[block_idxs(L, r), :] * LP_edge[:, u])
-        #
-        #         c2[u] += sum(abs2, LΔL_LP_edge + edge_diag)
-        #         c2[u] += sum(abs2, LΔL_e_LP_edge)
-        #         c2[u] += 2 * dot(LΔL_diag * LP_diag[:, u], LΔL_edge[block_idxs(L, r), :] * LP_edge[:, idx])
-        #         idx += U
-        #     end
-        # end
-        # Y = Λfactk.L \ (Δ_pt / Λfactk) * Pk'
-        # c2[1:U] -= (R - 2) * diag(Y' * Y)
-
+        corr[1:U] -= (R - 2) * diag(Y' * Y)
 
     end
-    corr .= c2
-    # @show c2 ./ corr
 
     return corr
 end
