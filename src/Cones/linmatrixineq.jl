@@ -113,21 +113,26 @@ function update_grad(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert cone.is_feas
 
     # grad[i] = -tr(inv(sumA) * A[i])
-    cone.sumAinvAs = [cone.fact \ A_i for A_i in cone.As] # TODO if dense, can do in-place
-    @inbounds for (i, sumAinvAs_i) in enumerate(cone.sumAinvAs)
-        cone.grad[i] = -sum(real(sumAinvAs_i[k, k]) for k in 1:cone.side)
+    invsumA = Hermitian(inv(cone.fact))
+    @inbounds for (i, Ai) in enumerate(cone.As)
+        cone.grad[i] = -real(dot(invsumA, Ai))
     end
+
+    # cone.sumAinvAs = [cone.fact \ A_i for A_i in cone.As]
+    # @inbounds for (i, sumAinvAs_i) in enumerate(cone.sumAinvAs)
+    #     cone.grad[i] = -sum(real(sumAinvAs_i[k, k]) for k in 1:cone.side)
+    # end
 
     cone.grad_updated = true
     return cone.grad
 end
 
 function update_hess(cone::LinMatrixIneq)
-    @assert cone.is_feas
-    sumAinvAs = cone.sumAinvAs
+    @assert cone.grad_updated
     H = cone.hess.data
 
     # H[i, j] = tr((cone.fact \ A_i) * (cone.fact \ A_j))
+    sumAinvAs = cone.sumAinvAs = [Hermitian((cone.fact.L \ A_i) / cone.fact.L') for A_i in cone.As]
     @inbounds for i in 1:cone.dim, j in i:cone.dim
         H[i, j] = real(dot(sumAinvAs[i], sumAinvAs[j]'))
     end
@@ -136,16 +141,68 @@ function update_hess(cone::LinMatrixIneq)
     return cone.hess
 end
 
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::LinMatrixIneq)
+    # @assert cone.hess_updated
+    update_hess(cone) # TODO
+    sumAinvAs = cone.sumAinvAs
+
+    # @inbounds @views for j in 1:size(arr, 2)
+    #     arr_j = arr[:, j]
+    #     j_mat = sum(aj_i * A_i for (aj_i, A_i) in zip(arr_j, cone.As))
+    #     j_laminv = Hermitian((cone.fact.L \ j_mat) / cone.fact.L')
+    #     for i in 1:cone.dim
+    #         prod[i, j] = real(dot(j_laminv, sumAinvAs[i]))
+    #     end
+    # end
+
+    # newlist = [Hermitian((cone.fact.L' \ mat_i) / cone.fact.L) for mat_i in sumAinvAs]
+    # @inbounds @views for j in 1:size(arr, 2)
+    #     arr_j = arr[:, j]
+    #     j_mat = Hermitian(sum(aj_i * A_i for (aj_i, A_i) in zip(arr_j, cone.As)))
+    #     for i in 1:cone.dim
+    #         prod[i, j] = real(dot(j_mat, newlist[i]))
+    #     end
+    # end
+
+    # @inbounds @views for j in 1:size(arr, 2)
+    #     arr_j = arr[:, j]
+    #     j_mat = Hermitian(sum(aj_i * mat_i for (aj_i, mat_i) in zip(arr_j, sumAinvAs)))
+    #     for i in 1:cone.dim
+    #         prod[i, j] = real(dot(j_mat, sumAinvAs[i]))
+    #     end
+    # end
+
+    @inbounds @views for j in 1:size(arr, 2)
+        arr_j = arr[:, j]
+        j_mat = Hermitian(sum(aj_i * mat_i for (aj_i, mat_i) in zip(arr_j, sumAinvAs)))
+        for i in 1:cone.dim
+            prod[i, j] = real(dot(j_mat, sumAinvAs[i]))
+        end
+    end
+
+    # @inbounds @views for j in 1:size(arr, 2)
+    #     arr_j = arr[:, j]
+    #     j_mat = sum(aj_i * A_i for (aj_i, A_i) in zip(arr_j, cone.As))
+    #     j_laminv = Hermitian((cone.fact.L \ j_mat) / cone.fact.L')
+    #     for i in 1:cone.dim
+    #         prod[i, j] = real(dot(j_laminv, sumAinvAs[i]))
+    #     end
+    # end
+
+    return prod
+end
+
 function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
-    @assert cone.feas_updated
+    @assert cone.hess_updated
     corr = cone.correction
     As = cone.As
     fact = cone.fact
 
+    # TODO use sumAinvAs
     dir_mat = sum(d_i * A_i for (d_i, A_i) in zip(primal_dir, As))
     Y1 = fact \ dir_mat
     Y2 = rdiv_sqrt!(Y1, fact)
-    M = Hermitian(Y2 * Y2', :U)
+    M = Hermitian(Y2 * Y2', :U) # TODO why not use ldiv instead of rdiv, and Y' * Y (and use our outer_prod function)
     @inbounds for i in 1:cone.dim
         corr[i] = real(dot(M, As[i]))
     end
