@@ -730,11 +730,12 @@ function linmatrixineq3(T; options...)
         # [sparse1, diag2],
         [diag1, dense2],
         # [diag1, sparse2],
-        [diag1, diag2],
+        # [diag1, diag2],
         [I, dense2],
         # [I, sparse2],
-        [I, diag2],
+        # [I, diag2],
         ]
+
     for As in As_list
         tol = test_tol(T)
         c = T[1]
