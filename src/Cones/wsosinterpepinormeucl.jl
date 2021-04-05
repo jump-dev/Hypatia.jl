@@ -45,7 +45,8 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     tempLU_vec::Vector{Vector{Matrix{T}}}
     tempLU_vec2::Vector{Vector{Matrix{T}}}
     tempLU_vec3::Vector{Matrix{T}}
-    tempLU_vec4::Vector{Matrix{T}}
+    tempLL_vec::Vector{Vector{Matrix{T}}}
+    tempLL_vec2::Vector{Matrix{T}}
     tempLRUR::Vector{Matrix{T}}
     tempUU::Matrix{T}
     ΛLiPs_edge::Vector{Vector{Matrix{T}}}
@@ -102,7 +103,8 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.tempLU_vec = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.tempLU_vec2 = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.tempLU_vec3 = [zeros(T, L, U * R) for L in Ls]
-    cone.tempLU_vec4 = [zeros(T, L, U * R) for L in Ls]
+    cone.tempLL_vec = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
+    cone.tempLL_vec2 = [zeros(R * L, L) for L in Ls]
     cone.tempLRUR = [zeros(T, L * R, U * R) for L in Ls]
     cone.tempUU = zeros(T, U, U)
     cone.ΛLiPs_edge = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
@@ -328,9 +330,9 @@ function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
         Λ11LiP = cone.Λ11LiP[k]
         scaled_row = cone.tempLU_vec[k]
         scaled_col = cone.tempLU_vec2[k]
-        ΛLiP_D_ΛLiPt_row = zeros(L, (R - 1) * U)
-        ΛLiP_edge_ctgs = cone.tempLU_vec4[k]
-        ΛLiP_D_ΛLiPt_col = zeros(R * L, L)
+        ΛLiP_edge_ctgs = cone.tempLU_vec3[k]
+        ΛLiP_D_ΛLiPt_row = cone.tempLL_vec[k]
+        ΛLiP_D_ΛLiPt_col = cone.tempLL_vec2[k]
         ΛLiP_D_ΛLiPt_diag = cone.tempLL[k]
         corr_half = cone.tempLRUR[k]
         corr_half .= 0
@@ -346,23 +348,23 @@ function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
             mul!(scaled_col[r - 1], Λ11LiP, Diagonal(primal_dir[block_idxs(U, r)]))
         end
 
-        @. @views ΛLiP_edge_ctgs[:, 1:U] = matLiP
-        for r in 2:R
-            @. @views ΛLiP_edge_ctgs[:, block_idxs(U, r)] = ΛLiP_edge[r - 1]
-        end
-
         @views mul!(ΛLiP_D_ΛLiPt_col[1:L, :], scaled_pt, matLiP')
         @views for r in 2:R
             mul!(ΛLiP_D_ΛLiPt_col[1:L, :], scaled_row[r - 1], ΛLiP_edge[r - 1]', true, true)
-            mul!(ΛLiP_D_ΛLiPt_row[:, block_idxs(L, r - 1)], scaled_row[r - 1], Λ11LiP')
+            mul!(ΛLiP_D_ΛLiPt_row[r - 1], scaled_row[r - 1], Λ11LiP')
             mul!(ΛLiP_D_ΛLiPt_col[block_idxs(L, r), :], scaled_col[r - 1], matLiP')
             mul!(ΛLiP_D_ΛLiPt_col[block_idxs(L, r), :], scaled_diag, ΛLiP_edge[r - 1]', true, true)
             mul!(ΛLiP_D_ΛLiPt_diag, scaled_diag, Λ11LiP')
         end
 
+        @. @views ΛLiP_edge_ctgs[:, 1:U] = matLiP
+        for r in 2:R
+            @. @views ΛLiP_edge_ctgs[:, block_idxs(U, r)] = ΛLiP_edge[r - 1]
+        end
+
         mul!(corr_half, ΛLiP_D_ΛLiPt_col, ΛLiP_edge_ctgs)
         @views for r in 2:R
-            mul!(corr_half[1:L, block_idxs(U, r)], ΛLiP_D_ΛLiPt_row[:, block_idxs(L, r - 1)], Λ11LiP, true, true)
+            mul!(corr_half[1:L, block_idxs(U, r)], ΛLiP_D_ΛLiPt_row[r - 1], Λ11LiP, true, true)
             mul!(corr_half[block_idxs(L, r), block_idxs(U, r)], ΛLiP_D_ΛLiPt_diag, Λ11LiP, true, true)
         end
 
