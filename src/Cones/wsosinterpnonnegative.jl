@@ -33,7 +33,6 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tempLL2::Vector{Matrix{R}}
     tempUL::Vector{Matrix{R}}
     ΛFLP::Vector{Matrix{R}}
-    # tempLU2::Vector{Matrix{R}}
     tempUU::Matrix{R}
     ΛF::Vector
     Ps_times::Vector{Float64}
@@ -69,7 +68,6 @@ function setup_extra_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrC
     cone.tempLL2 = [zeros(R, L, L) for L in Ls]
     cone.tempUL = [zeros(R, dim, L) for L in Ls]
     cone.ΛFLP = [zeros(R, L, dim) for L in Ls]
-    # cone.tempLU2 = [zeros(R, L, dim) for L in Ls]
     cone.tempUU = zeros(R, dim, dim)
     K = length(Ls)
     cone.ΛF = Vector{Any}(undef, K)
@@ -146,51 +144,30 @@ function update_hess(cone::WSOSInterpNonnegative)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpNonnegative)
-    @assert is_feas(cone)
-    prod .= 0
-
-    @inbounds for k in eachindex(cone.Ps)
-        Pk = cone.Ps[k]
-        ΛFk = cone.ΛF[k]
-        ULk = cone.tempUL[k]
-        LLk = cone.tempLL2[k]
-        # LUk = cone.tempLU2[k]
-        ΛFLPk = cone.ΛFLP[k]
-
-        # @views for j in 1:size(arr, 2)
-        #     mul!(ULk, Diagonal(arr[:, j]), ΛFLPk')
-        #     mul!(LLk, ΛFLPk, ULk)
-        #     mul!(LUk, LLk, ΛFLPk)
-        #     for i in 1:cone.dim
-        #         prod[i, j] += real(dot(ΛFLPk[:, i], LUk[:, i]))
-        #     end
-        # end
-
-        @views for j in 1:size(arr, 2)
-            mul!(ULk, Diagonal(arr[:, j]), ΛFLPk')
-            mul!(LLk, ΛFLPk, ULk)
-            HLLk = Hermitian(LLk)
-            for i in 1:cone.dim
-                ΛFLPki = ΛFLPk[:, i]
-                prod[i, j] += real(dot(ΛFLPki, HLLk, ΛFLPki))
-            end
-        end
-
-        # @views for j in 1:size(arr, 2)
-        #     mul!(ULk, Diagonal(arr[:, j]), Pk)
-        #     mul!(LLk, Pk', ULk)
-        #     ldiv!(ΛFk, LLk)
-        #     rdiv!(LLk, ΛFk)
-        #     mul!(LUk, LLk, Pk')
-        #     @views for i in 1:cone.dim
-        #         prod[i, j] += dot(Pk[i, :], LUk[:, i])
-        #     end
-        # end
-    end
-
-    return prod
-end
+# TODO expensive
+# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpNonnegative)
+#     @assert is_feas(cone)
+#     prod .= 0
+#
+#     @inbounds for k in eachindex(cone.Ps)
+#         Pk = cone.Ps[k]
+#         ΛFk = cone.ΛF[k]
+#         ULk = cone.tempUL[k]
+#         LLk = Hermitian(cone.tempLL2[k])
+#         ΛFLPk = cone.ΛFLP[k]
+#
+#         @views for j in 1:size(arr, 2)
+#             mul!(ULk, Diagonal(arr[:, j]), ΛFLPk')
+#             mul!(LLk.data, ΛFLPk, ULk)
+#             for i in 1:cone.dim
+#                 ΛFLPki = ΛFLPk[:, i]
+#                 prod[i, j] += real(dot(ΛFLPki, LLk, ΛFLPki))
+#             end
+#         end
+#     end
+#
+#     return prod
+# end
 
 function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
     corr = cone.correction
@@ -201,7 +178,6 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
         ΛFk = cone.ΛF[k]
         ULk = cone.tempUL[k]
         LLk = cone.tempLL2[k]
-        # LUk = cone.tempLU2[k]
         ΛFLPk = cone.ΛFLP[k]
         D = Diagonal(primal_dir)
 
@@ -211,15 +187,6 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
         @views for j in 1:cone.dim
             corr[j] += sum(abs2, ULk[j, :])
         end
-
-        # mul!(ULk, D, Pk)
-        # mul!(LLk, Pk', ULk)
-        # ldiv!(ΛFk.L, LLk)
-        # rdiv!(LLk, ΛFk)
-        # mul!(LUk, LLk, Pk')
-        # for j in 1:cone.dim
-        #     @views corr[j] += sum(abs2, LUk[:, j])
-        # end
     end
 
     return corr
