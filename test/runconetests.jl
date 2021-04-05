@@ -35,7 +35,7 @@ function cone_types(T::Type{<:Real})
         Cones.EpiRelEntropy{T},
         Cones.EpiTraceRelEntropyTri{T}, # TODO tighten tol on test_barrier
         Cones.WSOSInterpNonnegative{T, T},
-        # Cones.WSOSInterpNonnegative{T, Complex{T}}, # TODO
+        Cones.WSOSInterpNonnegative{T, Complex{T}},
         Cones.WSOSInterpPosSemidefTri{T},
         Cones.WSOSInterpEpiNormEucl{T},
         Cones.WSOSInterpEpiNormOne{T},

@@ -2276,6 +2276,44 @@ function wsosinterpnonnegative3(T; options...)
     @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
 end
 
+function wsosinterpnonnegative4(T; options...)
+    tol = test_tol(T)
+    f = (z -> 1 + sum(abs2, z))
+    gs = [z -> 1 - sum(abs2, z)]
+    (points, Ps) = ModelUtilities.interpolate(Complex{T}, 1, 2, gs, [1])
+    U = length(points)
+
+    c = T[-1]
+    A = zeros(T, 0, 1)
+    b = T[]
+    G = ones(T, U, 1)
+    h = f.(points)
+    cones = Cone{T}[Cones.WSOSInterpNonnegative{T, Complex{T}}(U, Ps, use_dual = false)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+end
+
+function wsosinterpnonnegative5(T; options...)
+    tol = test_tol(T)
+    f = (z -> 1 + sum(abs2, z))
+    gs = [z -> 1 - abs2(z[1]), z -> 1 - abs2(z[2])]
+    (points, Ps) = ModelUtilities.interpolate(Complex{T}, 2, 2, gs, [1, 1])
+    U = length(points)
+
+    c = f.(points)
+    A = ones(T, 1, U)
+    b = T[1]
+    G = -one(T) * I
+    h = zeros(T, U)
+    cones = Cone{T}[Cones.WSOSInterpNonnegative{T, Complex{T}}(U, Ps, use_dual = true)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ 1 atol=tol rtol=tol
+end
+
 function wsosinterppossemideftri1(T; options...)
     # convexity parameter for (x + 1) ^ 2 * (x - 1) ^ 2
     tol = test_tol(T)

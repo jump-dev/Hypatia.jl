@@ -11,6 +11,7 @@ include("domains.jl")
 using LinearAlgebra
 import Combinatorics
 include("interpolate.jl")
+include("complex.jl")
 
 # utilities for in-place vector and matrix rescalings for svec form
 function vec_to_svec!(arr::AbstractVecOrMat{T}; rt2 = sqrt(T(2)), incr::Int = 1) where T
