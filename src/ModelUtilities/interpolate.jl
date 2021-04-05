@@ -1,5 +1,5 @@
 #=
-utilities for polynomial interpolation on canonical domains
+utilities for polynomial interpolation on real canonical domains
 
 TODO put unused domains into polymin example (note ball and ellipse require GSL dependency)
 =#
