@@ -89,22 +89,22 @@ end
     end
 end
 
-# @testset "system solvers tests" begin
-#     println("\nstarting system solvers tests")
-#     system_solvers = [
-#         (Solvers.NaiveDenseSystemSolver, diff_reals),
-#         (Solvers.NaiveSparseSystemSolver, [Float64,]),
-#         (Solvers.NaiveElimDenseSystemSolver, diff_reals),
-#         (Solvers.NaiveElimSparseSystemSolver, [Float64,]),
-#         (Solvers.SymIndefDenseSystemSolver, all_reals),
-#         (Solvers.SymIndefSparseSystemSolver, [Float64,]),
-#         (Solvers.QRCholDenseSystemSolver, all_reals),
-#         ]
-#     for inst_name in inst_cones_few, (system_solver, real_types) in system_solvers, T in real_types
-#         options = (; default_options..., system_solver = system_solver{T}(), reduce = false)
-#         test_instance_solver(inst_name, T, options, string_nameof(system_solver))
-#     end
-# end
+@testset "system solvers tests" begin
+    println("\nstarting system solvers tests")
+    system_solvers = [
+        (Solvers.NaiveDenseSystemSolver, diff_reals),
+        (Solvers.NaiveSparseSystemSolver, [Float64,]),
+        (Solvers.NaiveElimDenseSystemSolver, diff_reals),
+        (Solvers.NaiveElimSparseSystemSolver, [Float64,]),
+        (Solvers.SymIndefDenseSystemSolver, all_reals),
+        (Solvers.SymIndefSparseSystemSolver, [Float64,]),
+        (Solvers.QRCholDenseSystemSolver, all_reals),
+        ]
+    for inst_name in inst_cones_few, (system_solver, real_types) in system_solvers, T in real_types
+        options = (; default_options..., system_solver = system_solver{T}(), reduce = false)
+        test_instance_solver(inst_name, T, options, string_nameof(system_solver))
+    end
+end
 
 @testset "PredOrCentStepper tests" begin
     println("\nstarting PredOrCentStepper tests (with printing)")
