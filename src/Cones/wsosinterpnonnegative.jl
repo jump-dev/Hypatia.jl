@@ -172,6 +172,7 @@ end
 function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
     corr = cone.correction
     corr .= 0
+    D = Diagonal(primal_dir)
 
     @inbounds for k in eachindex(cone.Ps)
         Pk = cone.Ps[k]
@@ -179,7 +180,6 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
         ULk = cone.tempUL[k]
         LLk = cone.tempLL2[k]
         ΛFLPk = cone.ΛFLP[k]
-        D = Diagonal(primal_dir)
 
         mul!(ULk, D, ΛFLPk')
         mul!(LLk, ΛFLPk, ULk)
