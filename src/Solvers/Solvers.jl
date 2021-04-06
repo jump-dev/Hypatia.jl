@@ -366,7 +366,6 @@ function solve(solver::Solver{T}) where {T <: Real}
             #     solver.max_ref_steps = 4
             # end
             solver.res_norm_cutoff = T(1e-4) * max(solver.x_norm_res, solver.y_norm_res, solver.z_norm_res, solver.tau_feas)
-            @show solver.res_norm_cutoff
 
             solver.worst_dir_res = 0
             step(stepper, solver) || break
