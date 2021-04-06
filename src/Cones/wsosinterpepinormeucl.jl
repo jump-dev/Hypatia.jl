@@ -39,12 +39,15 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     matfact::Vector
     ΛLi_Λ::Vector{Vector{Matrix{T}}}
     Λ11::Vector{Matrix{T}}
+    tempLL::Vector{Matrix{T}}
     tempLU::Vector{Matrix{T}}
     tempLU2::Vector{Matrix{T}}
     tempLU_vec::Vector{Vector{Matrix{T}}}
     tempLU_vec2::Vector{Vector{Matrix{T}}}
+    tempLU_vec3::Vector{Matrix{T}}
+    tempLL_vec::Vector{Vector{Matrix{T}}}
+    tempLL_vec2::Vector{Matrix{T}}
     tempLRUR::Vector{Matrix{T}}
-    tempUU_vec::Vector{Matrix{T}} # reused in update_hess
     tempUU::Matrix{T}
     ΛLiPs_edge::Vector{Vector{Matrix{T}}}
     PΛiPs::Vector{Matrix{T}}
@@ -94,12 +97,15 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.matfact = Vector{Any}(undef, K)
     cone.ΛLi_Λ = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
     cone.Λ11 = [zeros(T, L, L) for L in Ls]
+    cone.tempLL = [zeros(T, L, L) for L in Ls]
     cone.tempLU = [zeros(T, L, U) for L in Ls]
     cone.tempLU2 = [zeros(T, L, U) for L in Ls]
     cone.tempLU_vec = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.tempLU_vec2 = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
+    cone.tempLU_vec3 = [zeros(T, L, U * R) for L in Ls]
+    cone.tempLL_vec = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
+    cone.tempLL_vec2 = [zeros(R * L, L) for L in Ls]
     cone.tempLRUR = [zeros(T, L * R, U * R) for L in Ls]
-    cone.tempUU_vec = [zeros(T, U, U) for _ in eachindex(Ps)]
     cone.tempUU = zeros(T, U, U)
     cone.ΛLiPs_edge = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.matLiP = [zeros(T, L, U) for L in Ls]
@@ -175,7 +181,7 @@ end
 
 is_dual_feas(cone::WSOSInterpEpiNormEucl) = true
 
-function update_grad(cone::WSOSInterpEpiNormEucl{T}) where T
+function update_grad(cone::WSOSInterpEpiNormEucl)
     @assert cone.is_feas
     U = cone.U
     R = cone.R
@@ -229,7 +235,6 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
     @inbounds for k in eachindex(cone.Ps)
         PΛiPs = cone.PΛiP_blocks_U[k]
         PΛ11iP = cone.PΛ11iP[k]
-        UUk = cone.tempUU_vec[k]
         ΛLiP_edge = cone.ΛLiPs_edge[k]
         matLiP = cone.matLiP[k]
         Λ11LiP = cone.Λ11LiP[k]
@@ -260,8 +265,8 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
             for s in 1:(r - 1)
                 # block (1,1)
                 @. UU = abs2(PΛiPs[r, s])
-                @. UUk = UU + UU'
-                @. @views hess[1:U, 1:U] += UUk
+                @. @views hess[1:U, 1:U] += UU
+                @. @views hess[1:U, 1:U] += UU'
                 # blocks (1,r)
                 @. @views hess[1:U, idxs] += PΛiPs[s, 1] * PΛiPs[s, r]
             end
@@ -275,15 +280,17 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
             end
 
             # blocks (r, r2)
-            # NOTE for hess[idxs, idxs], UU and UUk are symmetric
+            # NOTE for hess[idxs, idxs], UU are symmetric
             @. UU = PΛiPs[r, 1] * PΛiPs[r, 1]'
-            @. UUk = PΛiPs[1, 1] * PΛiPs[r, r]
-            @. @views hess[idxs, idxs] += UU + UUk
+            @. @views hess[idxs, idxs] += UU
+            @. UU = PΛiPs[1, 1] * PΛiPs[r, r]
+            @. @views hess[idxs, idxs] += UU
             for r2 in (r + 1):R
-                @. UU = PΛiPs[r, 1] * PΛiPs[r2, 1]'
-                @. UUk = PΛiPs[1, 1] * PΛiPs[r2, r]'
                 idxs2 = block_idxs(U, r2)
-                @. @views hess[idxs, idxs2] += UU + UUk
+                @. UU = PΛiPs[r, 1] * PΛiPs[r2, 1]'
+                @. @views hess[idxs, idxs2] += UU
+                @. UU = PΛiPs[1, 1] * PΛiPs[r2, r]'
+                @. @views hess[idxs, idxs2] += UU
             end
         end
     end
@@ -300,28 +307,39 @@ function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
     R = cone.R
     U = cone.U
 
-    @inbounds for pk in eachindex(cone.Ps)
-        @views mul!(cone.tempLU[pk], cone.Λ11LiP[pk], Diagonal(primal_dir[1:U]))
-        tempLU2 = mul!(cone.tempLU2[pk], cone.tempLU[pk], cone.PΛ11iP[pk])
+    @inbounds for k in eachindex(cone.Ps)
+        Pk = cone.Ps[k]
+        LUk = cone.tempLU[k]
+        LLk = cone.tempLL[k]
+        ΛFLPk = cone.Λ11LiP[k]
+
+        @views mul!(LUk, ΛFLPk, Diagonal(primal_dir[1:U]))
+        mul!(LLk, LUk, ΛFLPk')
+        mul!(LUk, Hermitian(LLk), ΛFLPk)
         @views for u in 1:U
-            corr[u] += sum(abs2, tempLU2[:, u])
+            corr[u] += sum(abs2, LUk[:, u])
         end
     end
     @. @views corr[1:U] *= 2 - R
 
-    @inbounds for pk in eachindex(cone.Ps)
-        L = size(cone.Ps[pk], 2)
-        ΛLiP_edge = cone.ΛLiPs_edge[pk]
-        matLiP = cone.matLiP[pk]
-        PΛiP = cone.PΛiPs[pk]
-        Λ11LiP = cone.Λ11LiP[pk]
-        scaled_row = cone.tempLU_vec[pk]
-        scaled_col = cone.tempLU_vec2[pk]
+    @inbounds for k in eachindex(cone.Ps)
+        L = size(cone.Ps[k], 2)
+        ΛLiP_edge = cone.ΛLiPs_edge[k]
+        matLiP = cone.matLiP[k]
+        Λ11LiP = cone.Λ11LiP[k]
+        scaled_row = cone.tempLU_vec[k]
+        scaled_col = cone.tempLU_vec2[k]
+        ΛLiP_edge_ctgs = cone.tempLU_vec3[k]
+        ΛLiP_D_ΛLiPt_row = cone.tempLL_vec[k]
+        ΛLiP_D_ΛLiPt_col = cone.tempLL_vec2[k]
+        ΛLiP_D_ΛLiPt_diag = cone.tempLL[k]
+        corr_half = cone.tempLRUR[k]
+        corr_half .= 0
 
         # get ΛLiP * D * PΛiP where D is diagonalized primal_dir scattered in an arrow and ΛLiP is half an arrow
         # ΛLiP * D is an arrow matrix but row edge doesn't equal column edge
-        @views scaled_diag = mul!(cone.tempLU[pk], Λ11LiP, Diagonal(primal_dir[1:U]))
-        @views scaled_pt = mul!(cone.tempLU2[pk], matLiP, Diagonal(primal_dir[1:U]))
+        @views scaled_diag = mul!(cone.tempLU[k], Λ11LiP, Diagonal(primal_dir[1:U]))
+        @views scaled_pt = mul!(cone.tempLU2[k], matLiP, Diagonal(primal_dir[1:U]))
         @views for r in 2:R
             mul!(scaled_pt, ΛLiP_edge[r - 1], Diagonal(primal_dir[block_idxs(U, r)]), true, true)
             mul!(scaled_row[r - 1], matLiP, Diagonal(primal_dir[block_idxs(U, r)]))
@@ -329,15 +347,27 @@ function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
             mul!(scaled_col[r - 1], Λ11LiP, Diagonal(primal_dir[block_idxs(U, r)]))
         end
 
-        corr_half = cone.tempLRUR[pk]
-        corr_half .= 0
-        @views for c in 1:R
-            mul!(corr_half[1:L, block_idxs(U, c)], scaled_pt, PΛiP[1:U, block_idxs(U, c)])
-            for r in 2:R
-                mul!(corr_half[1:L, block_idxs(U, c)], scaled_row[r - 1], PΛiP[block_idxs(U, r), block_idxs(U, c)], true, true)
-                mul!(corr_half[block_idxs(L, r), block_idxs(U, c)], scaled_col[r - 1], PΛiP[1:U, block_idxs(U, c)])
-                mul!(corr_half[block_idxs(L, r), block_idxs(U, c)], scaled_diag, PΛiP[block_idxs(U, r), block_idxs(U, c)], true, true)
-            end
+        # ΛLiP is half an arrow, multiplying an arrow by its transpose gives another arrow
+        @views mul!(ΛLiP_D_ΛLiPt_col[1:L, :], scaled_pt, matLiP')
+        @views for r in 2:R
+            mul!(ΛLiP_D_ΛLiPt_col[1:L, :], scaled_row[r - 1], ΛLiP_edge[r - 1]', true, true)
+            mul!(ΛLiP_D_ΛLiPt_row[r - 1], scaled_row[r - 1], Λ11LiP')
+            mul!(ΛLiP_D_ΛLiPt_col[block_idxs(L, r), :], scaled_col[r - 1], matLiP')
+            mul!(ΛLiP_D_ΛLiPt_col[block_idxs(L, r), :], scaled_diag, ΛLiP_edge[r - 1]', true, true)
+            mul!(ΛLiP_D_ΛLiPt_diag, scaled_diag, Λ11LiP')
+        end
+
+        # TODO check that this is worthwhile
+        @. @views ΛLiP_edge_ctgs[:, 1:U] = matLiP
+        for r in 2:R
+            @. @views ΛLiP_edge_ctgs[:, block_idxs(U, r)] = ΛLiP_edge[r - 1]
+        end
+
+        # multiply by ΛLiP
+        mul!(corr_half, ΛLiP_D_ΛLiPt_col, ΛLiP_edge_ctgs)
+        @views for r in 2:R
+            mul!(corr_half[1:L, block_idxs(U, r)], ΛLiP_D_ΛLiPt_row[r - 1], Λ11LiP, true, true)
+            mul!(corr_half[block_idxs(L, r), block_idxs(U, r)], ΛLiP_D_ΛLiPt_diag, Λ11LiP, true, true)
         end
 
         @views for u in 1:U
