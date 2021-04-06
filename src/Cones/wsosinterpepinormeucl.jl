@@ -326,7 +326,6 @@ function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
         L = size(cone.Ps[k], 2)
         ΛLiP_edge = cone.ΛLiPs_edge[k]
         matLiP = cone.matLiP[k]
-        PΛiP = cone.PΛiPs[k]
         Λ11LiP = cone.Λ11LiP[k]
         scaled_row = cone.tempLU_vec[k]
         scaled_col = cone.tempLU_vec2[k]
@@ -348,6 +347,7 @@ function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
             mul!(scaled_col[r - 1], Λ11LiP, Diagonal(primal_dir[block_idxs(U, r)]))
         end
 
+        # ΛLiP is half an arrow, multiplying an arrow by its transpose gives another arrow
         @views mul!(ΛLiP_D_ΛLiPt_col[1:L, :], scaled_pt, matLiP')
         @views for r in 2:R
             mul!(ΛLiP_D_ΛLiPt_col[1:L, :], scaled_row[r - 1], ΛLiP_edge[r - 1]', true, true)
@@ -357,11 +357,13 @@ function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
             mul!(ΛLiP_D_ΛLiPt_diag, scaled_diag, Λ11LiP')
         end
 
+        # TODO check that this is worthwhile
         @. @views ΛLiP_edge_ctgs[:, 1:U] = matLiP
         for r in 2:R
             @. @views ΛLiP_edge_ctgs[:, block_idxs(U, r)] = ΛLiP_edge[r - 1]
         end
 
+        # multiply by ΛLiP
         mul!(corr_half, ΛLiP_D_ΛLiPt_col, ΛLiP_edge_ctgs)
         @views for r in 2:R
             mul!(corr_half[1:L, block_idxs(U, r)], ΛLiP_D_ΛLiPt_row[r - 1], Λ11LiP, true, true)
