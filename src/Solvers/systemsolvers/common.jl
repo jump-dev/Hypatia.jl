@@ -43,7 +43,6 @@ function get_directions(
         max_ref_steps = 0
     end
     for i in 1:max_ref_steps
-        @show res_norm
         (res_norm < res_norm_cutoff) && break
 
         # compute refined direction
