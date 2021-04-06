@@ -260,6 +260,7 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
     corr .= 0
     U = cone.U
     R = cone.R
+    tempU = cone.tempU
 
     @inbounds for k in eachindex(cone.Ps)
         Pk = cone.Ps[k]
@@ -267,22 +268,22 @@ function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector
         L = size(Pk, 2)
         Δ = cone.tempLRLR2[k]
         ΛFLk = cone.ΛFL[k]
+        ΛFLPk = cone.ΛFLP[k]
         big_mat_half = cone.tempLRUR[k]
 
-        for q in 1:R, p in 1:q
-            @. @views cone.tempU = primal_dir[block_idxs(cone.U, svec_idx(q, p))]
+        @views for q in 1:R, p in 1:q
+            @. tempU = primal_dir[block_idxs(U, svec_idx(q, p))]
             if p != q
-                cone.tempU .*= cone.rt2i
+                tempU .*= cone.rt2i
             end
-            mul!(LU, Pk', Diagonal(cone.tempU))
-            @views mul!(Δ[block_idxs(L, p), block_idxs(L, q)], LU, Pk)
+            mul!(LU, Pk', Diagonal(tempU))
+            mul!(Δ[block_idxs(L, p), block_idxs(L, q)], LU, Pk)
         end
+
         LinearAlgebra.copytri!(Δ, 'U')
         ldiv!(ΛFLk.L, Δ)
-        rdiv!(Δ, ΛFLk)
-        for q in 1:R, p in 1:R
-            @views mul!(big_mat_half[block_idxs(L, p), block_idxs(U, q)], Δ[block_idxs(L, p), block_idxs(L, q)], Pk')
-        end
+        rdiv!(Δ, ΛFLk.L')
+        mul!(big_mat_half, Symmetric(Δ), ΛFLPk)
         block_diag_prod!(corr, big_mat_half, U, R, cone.rt2)
     end
 
