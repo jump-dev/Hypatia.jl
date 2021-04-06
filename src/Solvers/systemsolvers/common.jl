@@ -15,55 +15,59 @@ mu/(taubar^2)*tau + kap = kaprhs
 function get_directions(
     stepper::Stepper{T},
     solver::Solver{T},
-    use_nt::Bool;
-    iter_ref_steps::Int = 5, # maximum number of iterative refinement steps
+    use_nt::Bool,
     ) where {T <: Real}
     rhs = stepper.rhs
     dir = stepper.dir
     dir_temp = stepper.dir_temp
     res = stepper.temp
     system_solver = solver.system_solver
+    res_norm_cutoff = solver.res_norm_cutoff
+    max_ref_steps = solver.max_ref_steps
 
     tau = solver.point.tau[]
     tau_scal = (use_nt ? solver.point.kap[] : solver.mu / tau) / tau
 
     solve_system(system_solver, solver, dir, rhs, tau_scal)
 
-    iszero(iter_ref_steps) && return dir
+    iszero(max_ref_steps) && return dir
 
-    # use iterative refinement
-    res_tol = 100 * eps(T)
+    # compute residual norm
     copyto!(dir_temp, dir.vec)
     apply_lhs(stepper, solver, tau_scal) # modifies res
     res.vec .-= rhs.vec
-    norm_inf = norm(res.vec, Inf)
-    norm_2 = norm(res.vec, 2)
+    res_norm = norm(res.vec, Inf)
 
-    for i in 1:iter_ref_steps
-        # @show norm_inf
-        if norm_inf < res_tol
-            break
-        end
+    # use iterative refinement if residual norm exceeds cutoff
+    if res_norm <= res_norm_cutoff
+        max_ref_steps = 0
+    end
+    for i in 1:max_ref_steps
+        @show res_norm
+        (res_norm < res_norm_cutoff) && break
+
+        # compute refined direction
         solve_system(system_solver, solver, dir, res, tau_scal)
         axpby!(true, dir_temp, -1, dir.vec)
-        res = apply_lhs(stepper, solver, tau_scal) # modifies res
+
+        # compute residual
+        apply_lhs(stepper, solver, tau_scal) # modifies res
         res.vec .-= rhs.vec
 
-        norm_inf_new = norm(res.vec, Inf)
-        norm_2_new = norm(res.vec, 2)
-        if norm_inf_new > norm_inf || norm_2_new > norm_2
+        res_norm_new = norm(res.vec, Inf)
+        if res_norm_new >= res_norm
             # residual has not improved
             copyto!(dir.vec, dir_temp)
             break
         end
 
-        # residual has improved, so use the iterative refinement
+        # residual has improved
         copyto!(dir_temp, dir.vec)
-        norm_inf = norm_inf_new
-        norm_2 = norm_2_new
+        res_norm = res_norm_new
     end
-    @assert !isnan(norm_inf) # TODO error
-    solver.worst_dir_res = max(solver.worst_dir_res, norm_inf)
+
+    @assert !isnan(res_norm) # TODO error instead
+    solver.worst_dir_res = max(solver.worst_dir_res, res_norm)
 
     return dir
 end

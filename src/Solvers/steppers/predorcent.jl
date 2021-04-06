@@ -7,12 +7,14 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     use_curve_search::Bool
     prev_alpha::T
     cent_count::Int
+
     rhs::Point{T}
     dir::Point{T}
     temp::Point{T}
     dir_nocorr::Point{T}
     dir_corr::Point{T}
     dir_temp::Vector{T}
+
     step_searcher::StepSearcher{T}
     uncorr_only::Bool
     uncorr_alpha::T
@@ -41,6 +43,7 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
 
     stepper.prev_alpha = one(T)
     stepper.cent_count = 0
+
     stepper.rhs = Point(model)
     stepper.dir = Point(model)
     stepper.temp = Point(model)
@@ -49,6 +52,7 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         stepper.dir_corr = Point(model, ztsk_only = true)
     end
     stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
+
     stepper.step_searcher = StepSearcher{T}(model)
     stepper.uncorr_only = false
     stepper.uncorr_alpha = 0

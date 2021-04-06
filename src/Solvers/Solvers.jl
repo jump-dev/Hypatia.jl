@@ -125,6 +125,10 @@ mutable struct Solver{T <: Real}
     y_norm_res::T
     z_norm_res::T
 
+    # direction solving helpers
+    res_norm_cutoff::T # desired worst-case residual norm (inf) on direction
+    max_ref_steps::Int # maximum number of iterative refinement steps
+
     # convergence parameters
     primal_obj_t::T
     dual_obj_t::T
@@ -246,6 +250,9 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.time_getdir = 0
     solver.time_search = 0
 
+    solver.res_norm_cutoff = 0
+    solver.max_ref_steps = 4
+
     solver.x_norm_res_t = NaN
     solver.y_norm_res_t = NaN
     solver.z_norm_res_t = NaN
@@ -353,6 +360,13 @@ function solve(solver::Solver{T}) where {T <: Real}
                     solver.prev_is_slow = false
                 end
             end
+
+            # update iterative refinement options for directions
+            # if iszero(solver.max_ref_steps) && (solver.mu < eps(T)^0.2)
+            #     solver.max_ref_steps = 4
+            # end
+            solver.res_norm_cutoff = T(1e-4) * max(solver.x_norm_res, solver.y_norm_res, solver.z_norm_res, solver.tau_feas)
+            @show solver.res_norm_cutoff
 
             solver.worst_dir_res = 0
             step(stepper, solver) || break
@@ -555,7 +569,7 @@ function print_header(stepper::Stepper, solver::Solver)
     else
         @printf("%9s %9s %9s ", "x_feas", "y_feas", "z_feas")
     end
-    @printf("%9s %9s %9s %9s ", "tau", "kap", "mu", "ir_res")
+    @printf("%9s %9s %9s %9s ", "tau", "kap", "mu", "dir_res")
     print_header_more(stepper, solver)
     println()
     return

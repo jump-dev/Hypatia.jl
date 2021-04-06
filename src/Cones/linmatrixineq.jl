@@ -122,19 +122,19 @@ function update_hess(cone::LinMatrixIneq)
     return cone.hess
 end
 
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::LinMatrixIneq)
-#     @assert cone.grad_updated
-#     sumAinvAs = cone.sumAinvAs
-#
-#     @inbounds for j in 1:size(arr, 2)
-#         j_mat = Hermitian(sum(arr[i, j] * sumAinvAs[i] for i in 1:cone.dim))
-#         for i in 1:cone.dim
-#             prod[i, j] = real(dot(j_mat, sumAinvAs[i]))
-#         end
-#     end
-#
-#     return prod
-# end
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::LinMatrixIneq)
+    @assert cone.grad_updated
+    sumAinvAs = cone.sumAinvAs
+
+    @inbounds for j in 1:size(arr, 2)
+        j_mat = Hermitian(sum(arr[i, j] * sumAinvAs[i] for i in 1:cone.dim))
+        for i in 1:cone.dim
+            prod[i, j] = real(dot(j_mat, sumAinvAs[i]))
+        end
+    end
+
+    return prod
+end
 
 function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
     @assert cone.grad_updated
