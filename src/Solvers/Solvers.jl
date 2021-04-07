@@ -65,6 +65,7 @@ mutable struct Solver{T <: Real}
     tol_abs_opt::T
     tol_feas::T
     tol_infeas::T
+    tol_illposed::T
     tol_slow::T
     preprocess::Bool
     reduce::Bool
@@ -163,6 +164,7 @@ mutable struct Solver{T <: Real}
         tol_abs_opt::RealOrNothing = nothing,
         tol_feas::RealOrNothing = nothing,
         tol_infeas::RealOrNothing = nothing,
+        tol_illposed::RealOrNothing = nothing,
         default_tol_power::RealOrNothing = nothing,
         default_tol_relax::RealOrNothing = nothing,
         tol_slow::Real = 1e-3,
@@ -204,7 +206,10 @@ mutable struct Solver{T <: Real}
         if isnothing(tol_infeas)
             tol_infeas = default_tol_tight
         end
-        @assert min(tol_rel_opt, tol_abs_opt, tol_feas, tol_infeas, tol_slow) > 0
+        if isnothing(tol_illposed)
+            tol_illposed = default_tol_tight / 100
+        end
+        @assert min(tol_rel_opt, tol_abs_opt, tol_feas, tol_infeas, tol_illposed, tol_slow) >= 0
 
         solver = new{T}()
 
@@ -215,6 +220,7 @@ mutable struct Solver{T <: Real}
         solver.tol_abs_opt = tol_abs_opt
         solver.tol_feas = tol_feas
         solver.tol_infeas = tol_infeas
+        solver.tol_illposed = tol_illposed
         solver.tol_slow = tol_slow
         solver.preprocess = preprocess
         solver.reduce = reduce
@@ -361,13 +367,9 @@ function solve(solver::Solver{T}) where {T <: Real}
                 end
             end
 
-            # update iterative refinement options for directions
-            # if iszero(solver.max_ref_steps) && (solver.mu < eps(T)^0.2)
-            #     solver.max_ref_steps = 4
-            # end
             solver.res_norm_cutoff = T(1e-4) * max(solver.x_norm_res, solver.y_norm_res, solver.z_norm_res, solver.tau_feas)
-
             solver.worst_dir_res = 0
+
             step(stepper, solver) || break
             flush(stdout)
             calc_mu(solver)
@@ -495,7 +497,7 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
     end
 
     # TODO experiment with ill-posedness check
-    if solver.mu <= solver.tol_infeas && tau <= solver.tol_infeas * min(one(T), solver.point.kap[])
+    if solver.mu <= solver.tol_illposed && tau <= solver.tol_illposed * min(one(T), solver.point.kap[])
         solver.verbose && println("ill-posedness detected; terminating")
         solver.status = IllPosed
         return true

@@ -15,7 +15,8 @@ mu/(taubar^2)*tau + kap = kaprhs
 function get_directions(
     stepper::Stepper{T},
     solver::Solver{T},
-    use_nt::Bool,
+    use_nt::Bool;
+    min_impr_tol::T = T(0.5) # improvement tolerance for slow progress in iterative refinement
     ) where {T <: Real}
     rhs = stepper.rhs
     dir = stepper.dir
@@ -38,15 +39,8 @@ function get_directions(
     res.vec .-= rhs.vec
     res_norm = norm(res.vec, Inf)
 
-# @show res_norm
-
     # use iterative refinement if residual norm exceeds cutoff
     if res_norm > res_norm_cutoff
-
-# TODO if prev and curr IR steps both didn't improve res by more than a threshold, then stop doing IR
-# and maybe allow 5 steps max again
-
-        min_impr_tol = T(0.5)
         is_prev_slow = false
         prev_res_norm = res_norm
 
@@ -70,12 +64,9 @@ function get_directions(
             copyto!(dir_temp, dir.vec)
             res_norm = res_norm_new
 
-# @show res_norm
-
             (res_norm < res_norm_cutoff) && break
             is_curr_slow = (res_norm > min_impr_tol * prev_res_norm)
-# is_prev_slow && is_curr_slow && println("slow")
-            is_prev_slow && is_curr_slow && break
+            is_prev_slow && is_curr_slow && break # last two iter ref steps made little progress, so stop
 
             prev_res_norm = res_norm
             is_prev_slow = is_curr_slow
@@ -84,8 +75,6 @@ function get_directions(
 
     @assert !isnan(res_norm) # TODO error instead
     solver.worst_dir_res = max(solver.worst_dir_res, res_norm)
-
-# println()
 
     return dir
 end
@@ -214,7 +203,10 @@ function solve_subsystem4(
     return sol
 end
 
-function setup_point_sub(system_solver::Union{QRCholSystemSolver{T}, SymIndefSystemSolver{T}}, model::Models.Model{T}) where {T <: Real}
+function setup_point_sub(
+    system_solver::Union{QRCholSystemSolver{T}, SymIndefSystemSolver{T}},
+    model::Models.Model{T},
+    ) where {T <: Real}
     (n, p, q) = (model.n, model.p, model.q)
     dim_sub = n + p + q
     z_start = model.n + model.p
