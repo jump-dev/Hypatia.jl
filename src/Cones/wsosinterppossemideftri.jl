@@ -254,7 +254,54 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     return cone.hess
 end
 
-function correction(cone::WSOSInterpPosSemidefTri{T}, primal_dir::AbstractVector{T}) where T
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpPosSemidefTri)
+    @assert cone.grad_updated
+    prod .= 0
+    R = cone.R
+    U = cone.U
+
+    @inbounds for k in eachindex(cone.Ps)
+        L = size(cone.Ps[k], 2)
+        LLk = Symmetric(cone.tempLRLR2[k], :U)
+        ΛFLPk = cone.ΛFLP[k]
+        LRUR = cone.tempLRUR[k]
+
+        @views for j in 1:size(arr, 2)
+            LRUR .= 0
+            Aj = view(arr, :, j)
+            for q in 1:R, p in 1:R
+                for z in 1:(p - 1)
+                    mul!(LRUR[block_idxs(L, q), block_idxs(U, p)], ΛFLPk[block_idxs(L, q), block_idxs(U, z)], Diagonal(Aj[block_idxs(U, svec_idx(p, z))]), cone.rt2i, true)
+                end
+                mul!(LRUR[block_idxs(L, q), block_idxs(U, p)], ΛFLPk[block_idxs(L, q), block_idxs(U, p)], Diagonal(Aj[block_idxs(U, svec_idx(p, p))]), true, true)
+                for z in (p + 1):q
+                    mul!(LRUR[block_idxs(L, q), block_idxs(U, p)], ΛFLPk[block_idxs(L, q), block_idxs(U, z)], Diagonal(Aj[block_idxs(U, svec_idx(z, p))]), cone.rt2i, true)
+                end
+            end
+            mul!(LLk.data, LRUR, ΛFLPk')
+
+            for u in 1:U
+                idx = u
+                q_idx = u
+                for q in 1:R
+                    p_idx = u
+                    for p in 1:(q - 1)
+                        prod[idx, j] += dot(ΛFLPk[:, p_idx], LLk, ΛFLPk[:, q_idx]) * cone.rt2
+                        idx += U
+                        p_idx += U
+                    end
+                    prod[idx, j] += dot(ΛFLPk[:, q_idx], LLk, ΛFLPk[:, q_idx])
+                    q_idx += U
+                    idx += U
+                end
+            end
+        end
+    end
+
+    return prod
+end
+
+function correction(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
     @assert cone.grad_updated
     corr = cone.correction
     corr .= 0
