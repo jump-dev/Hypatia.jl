@@ -14,8 +14,8 @@ script_verbose = false
 
 # default options to solvers
 default_options = (
-    # verbose = false,
-    verbose = true,
+    verbose = false,
+    # verbose = true,
     default_tol_relax = 10,
     # stepper = Solvers.CombinedStepper{Float64}(),
     # stepper = Solvers.PredOrCentStepper{Float64}(),
@@ -29,12 +29,12 @@ instance_sets = [
     # ("minimal", BigFloat, 60),
     # ("fast", Float64, 60),
     # ("slow", Float64, 120),
-    ("various", Float64, 120),
+    # ("various", Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
+    "native",
     "JuMP",
     ]
 
@@ -54,32 +54,32 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    # "CBLIB",
-    # "centralpolymat",
-    # "conditionnum",
-    # "contraction",
-    # "densityest",
+    "CBLIB",
+    "centralpolymat",
+    "conditionnum",
+    "contraction",
+    "densityest",
     "envelope",
-    # "expdesign",
-    # "lotkavolterra",
-    # "lyapunovstability",
-    # "matrixcompletion",
-    # "matrixquadratic",
-    # "matrixregression",
-    # "maxvolume",
-    # "muconvexity",
-    # "nearestpsd",
-    # "normconepoly",
-    # "polymin",
-    # "polynorm",
-    # "portfolio",
-    # "nearestpolymat",
-    # "regionofattr",
-    # "robustgeomprog",
-    # "semidefinitepoly",
-    # "shapeconregr",
-    # "signomialmin",
-    # "stabilitynumber",
+    "expdesign",
+    "lotkavolterra",
+    "lyapunovstability",
+    "matrixcompletion",
+    "matrixquadratic",
+    "matrixregression",
+    "maxvolume",
+    "muconvexity",
+    "nearestpsd",
+    "normconepoly",
+    "polymin",
+    "polynorm",
+    "portfolio",
+    "nearestpolymat",
+    "regionofattr",
+    "robustgeomprog",
+    "semidefinitepoly",
+    "shapeconregr",
+    "signomialmin",
+    "stabilitynumber",
     ]
 
 perf = setup_benchmark_dataframe()
@@ -111,8 +111,8 @@ end
 end
 end
 
-println("\n")
-DataFrames.show(perf, allrows = true, allcols = true)
-println("\n")
+# println("\n")
+# DataFrames.show(perf, allrows = true, allcols = true)
+# println("\n")
 end
 ;

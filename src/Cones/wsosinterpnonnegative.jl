@@ -145,10 +145,8 @@ function update_hess(cone::WSOSInterpNonnegative)
 end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpNonnegative)
-    @assert is_feas(cone)
+    @assert cone.grad_updated
     prod .= 0
-
-    println("hess prod ", size(arr, 2))
 
     @inbounds for k in eachindex(cone.Ps)
         Pk = cone.Ps[k]
@@ -157,13 +155,12 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInt
         ΛFLPk = cone.ΛFLP[k]
 
         @views for j in 1:size(arr, 2)
-            @time mul!(LUk, ΛFLPk, Diagonal(arr[:, j]))
-            @time mul!(LLk.data, LUk, ΛFLPk')
+            mul!(LUk, ΛFLPk, Diagonal(arr[:, j]))
+            mul!(LLk.data, LUk, ΛFLPk')
+            mul!(LUk, LLk, ΛFLPk)
             for i in 1:cone.dim
-                ΛFLPki = ΛFLPk[:, i]
-                prod[i, j] += real(dot(ΛFLPki, LLk, ΛFLPki))
+                prod[i, j] += real(dot(ΛFLPk[:, i], LUk[:, i]))
             end
-            println()
         end
     end
 
@@ -171,6 +168,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInt
 end
 
 function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
+    @assert cone.grad_updated
     corr = cone.correction
     corr .= 0
     D = Diagonal(primal_dir)
