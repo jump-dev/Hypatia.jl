@@ -148,7 +148,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInt
     @assert is_feas(cone)
     prod .= 0
 
-    # println("hess prod ", size(arr, 2))
+    println("hess prod ", size(arr, 2))
 
     @inbounds for k in eachindex(cone.Ps)
         Pk = cone.Ps[k]
@@ -157,12 +157,13 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInt
         ΛFLPk = cone.ΛFLP[k]
 
         @views for j in 1:size(arr, 2)
-            mul!(LUk, Diagonal(arr[:, j]), ΛFLPk')
-            mul!(LLk.data, ΛFLPk, LUk)
+            @time mul!(LUk, ΛFLPk, Diagonal(arr[:, j]))
+            @time mul!(LLk.data, LUk, ΛFLPk')
             for i in 1:cone.dim
                 ΛFLPki = ΛFLPk[:, i]
                 prod[i, j] += real(dot(ΛFLPki, LLk, ΛFLPki))
             end
+            println()
         end
     end
 
