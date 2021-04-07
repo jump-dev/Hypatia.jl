@@ -187,11 +187,6 @@ function in_neighborhood(
     if abs(1 + dot(g, cone.point) / nu) > gtol * dim
         return false
     end
-    # hess check
-    hess_prod!(vec1, cone.point, cone)
-    if abs(1 - dot(vec1, cone.point) / nu) > Htol * dim
-        return false
-    end
     # inv hess check
     inv_hess_prod!(vec1, g, cone)
     if abs(1 - dot(vec1, g) / nu) > Htol * dim
