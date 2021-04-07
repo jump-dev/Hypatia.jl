@@ -88,7 +88,7 @@ for ex_name in JuMP_example_names
         haskey(ex_insts, inst_set) || continue
         (extender, inst_subsets) = ex_insts[inst_set]
         isempty(inst_subsets) && continue
-        info_perf = (; inst_set, :extender => string(extender), :example => ex_name, :real_T => Float64, :solver_options => (), :solver => solver[1])
+        info_perf = (; inst_set, :extender => string(extender), :example => ex_name, :model_type => "JuMP", :real_T => Float64, :solver_options => (), :solver => solver[1])
 
         println("\nstarting instances for $ex_type $inst_set\n")
         for inst_subset in inst_subsets

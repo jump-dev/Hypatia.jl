@@ -103,7 +103,7 @@ for inst_set in instance_sets, (step_name, stepper) in stepper_options
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue
 
-    info_perf = (; inst_set, :example => ex_name, :real_T => Float64, :solver_options => (step_name,))
+    info_perf = (; inst_set, :example => ex_name, :model_type => mod_type, :real_T => Float64, :solver_options => (step_name,))
     new_default_options = (; default_options..., stepper = stepper)
 
     println("\nstarting $ex_type $inst_set tests")

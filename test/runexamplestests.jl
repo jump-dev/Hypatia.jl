@@ -97,7 +97,7 @@ for (inst_set, real_T, time_limit) in instance_sets
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue
 
-    info_perf = (; inst_set, real_T, :example => ex_name, :solver_options => ())
+    info_perf = (; inst_set, real_T, :example => ex_name, :model_type => mod_type, :solver_options => ())
     new_default_options = (; default_options..., time_limit = time_limit)
     ex_type_T = ex_type{real_T}
 
