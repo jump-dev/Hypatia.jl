@@ -150,7 +150,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInt
 
     @inbounds for k in eachindex(cone.Ps)
         Pk = cone.Ps[k]
-        ΛFk = cone.ΛF[k]
         ULk = cone.tempUL[k]
         LLk = Hermitian(cone.tempLL2[k])
         ΛFLPk = cone.ΛFLP[k]
@@ -175,7 +174,6 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
 
     @inbounds for k in eachindex(cone.Ps)
         Pk = cone.Ps[k]
-        ΛFk = cone.ΛF[k]
         ULk = cone.tempUL[k]
         LLk = cone.tempLL2[k]
         ΛFLPk = cone.ΛFLP[k]

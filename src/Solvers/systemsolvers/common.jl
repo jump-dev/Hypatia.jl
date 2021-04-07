@@ -38,6 +38,11 @@ function get_directions(
     res.vec .-= rhs.vec
     res_norm = norm(res.vec, Inf)
 
+
+
+# TODO if prev and curr IR steps both didn't improve res by more than a threshold, then stop doing IR
+# and maybe allow 5 steps max again
+
     # use iterative refinement if residual norm exceeds cutoff
     if res_norm <= res_norm_cutoff
         max_ref_steps = 0
