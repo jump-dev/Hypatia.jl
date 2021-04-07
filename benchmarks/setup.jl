@@ -52,7 +52,7 @@ function setup_benchmark_dataframe()
         check_time = Float64[],
         total_time = Float64[],
         )
-    DataFrames.allowmissing!(perf, 10:DataFrames.ncol(perf))
+    DataFrames.allowmissing!(perf, 11:DataFrames.ncol(perf))
     return perf
 end
 
