@@ -20,6 +20,13 @@ inst_infeas = [
     "dualinfeas3",
     ]
 
+inst_minimal = [
+    "primalinfeas3",
+    "dualinfeas3",
+    "epinorminf4",
+    "hyporootdettri4",
+    ]
+
 inst_cones_few = [
     "nonnegative1",
     "possemideftri1",

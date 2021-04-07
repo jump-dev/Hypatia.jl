@@ -100,7 +100,7 @@ end
         (Solvers.SymIndefSparseSystemSolver, [Float64,]),
         (Solvers.QRCholDenseSystemSolver, all_reals),
         ]
-    for inst_name in inst_cones_few, (system_solver, real_types) in system_solvers, T in real_types
+    for inst_name in inst_minimal, (system_solver, real_types) in system_solvers, T in real_types
         options = (; default_options..., system_solver = system_solver{T}(), reduce = false)
         test_instance_solver(inst_name, T, options, string_nameof(system_solver))
     end
@@ -109,7 +109,7 @@ end
 @testset "PredOrCentStepper tests" begin
     println("\nstarting PredOrCentStepper tests (with printing)")
     use_corr_curv = [(false, false), (true, false), (true, true)]
-    for inst_name in inst_cones_few, (corr, curv) in use_corr_curv, T in diff_reals
+    for inst_name in inst_minimal, (corr, curv) in use_corr_curv, T in diff_reals
         options = (; default_options..., verbose = true, stepper = Solvers.PredOrCentStepper{T}(use_correction = corr, use_curve_search = curv))
         test_instance_solver(inst_name, T, options, "corr=$corr curv=$curv")
     end
@@ -117,9 +117,10 @@ end
 
 @testset "CombinedStepper tests" begin
     println("\nstarting CombinedStepper tests (with printing)")
-    for inst_name in inst_cones_few, T in diff_reals
-        options = (; default_options..., verbose = true, stepper = Solvers.CombinedStepper{T}())
-        test_instance_solver(inst_name, T, options)
+    use_shift = [0, 2]
+    for inst_name in inst_minimal, shift in use_shift, T in diff_reals
+        options = (; default_options..., verbose = true, stepper = Solvers.CombinedStepper{T}(shift))
+        test_instance_solver(inst_name, T, options, "shift=$shift")
     end
 end
 
