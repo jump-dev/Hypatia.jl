@@ -144,30 +144,28 @@ function update_hess(cone::WSOSInterpNonnegative)
     return cone.hess
 end
 
-# TODO expensive
-# function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpNonnegative)
-#     @assert is_feas(cone)
-#     prod .= 0
-#
-#     @inbounds for k in eachindex(cone.Ps)
-#         Pk = cone.Ps[k]
-#         ΛFk = cone.ΛF[k]
-#         ULk = cone.tempUL[k]
-#         LLk = Hermitian(cone.tempLL2[k])
-#         ΛFLPk = cone.ΛFLP[k]
-#
-#         @views for j in 1:size(arr, 2)
-#             mul!(ULk, Diagonal(arr[:, j]), ΛFLPk')
-#             mul!(LLk.data, ΛFLPk, ULk)
-#             for i in 1:cone.dim
-#                 ΛFLPki = ΛFLPk[:, i]
-#                 prod[i, j] += real(dot(ΛFLPki, LLk, ΛFLPki))
-#             end
-#         end
-#     end
-#
-#     return prod
-# end
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpNonnegative)
+    @assert is_feas(cone)
+    prod .= 0
+
+    @inbounds for k in eachindex(cone.Ps)
+        Pk = cone.Ps[k]
+        ULk = cone.tempUL[k]
+        LLk = Hermitian(cone.tempLL2[k])
+        ΛFLPk = cone.ΛFLP[k]
+
+        @views for j in 1:size(arr, 2)
+            mul!(ULk, Diagonal(arr[:, j]), ΛFLPk')
+            mul!(LLk.data, ΛFLPk, ULk)
+            for i in 1:cone.dim
+                ΛFLPki = ΛFLPk[:, i]
+                prod[i, j] += real(dot(ΛFLPki, LLk, ΛFLPki))
+            end
+        end
+    end
+
+    return prod
+end
 
 function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
     corr = cone.correction

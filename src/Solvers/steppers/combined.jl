@@ -5,6 +5,7 @@ combined predict and center stepper
 mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     prev_alpha::T
     shift_alpha_sched::Int
+
     rhs::Point{T}
     dir::Point{T}
     temp::Point{T}
@@ -13,6 +14,7 @@ mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     dir_pred::Point{T}
     dir_predcorr::Point{T}
     dir_temp::Vector{T}
+
     step_searcher::StepSearcher{T}
     cent_only::Bool
     uncorr_only::Bool
@@ -30,6 +32,7 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
 
     stepper.prev_alpha = one(T)
+
     stepper.rhs = Point(model)
     stepper.dir = Point(model)
     stepper.temp = Point(model)
@@ -38,6 +41,7 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.dir_centcorr = Point(model, ztsk_only = true)
     stepper.dir_predcorr = Point(model, ztsk_only = true)
     stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
+
     stepper.step_searcher = StepSearcher{T}(model)
     stepper.uncorr_only = stepper.cent_only = false
 

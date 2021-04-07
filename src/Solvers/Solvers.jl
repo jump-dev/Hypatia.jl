@@ -65,6 +65,7 @@ mutable struct Solver{T <: Real}
     tol_abs_opt::T
     tol_feas::T
     tol_infeas::T
+    tol_illposed::T
     tol_slow::T
     preprocess::Bool
     reduce::Bool
@@ -125,6 +126,10 @@ mutable struct Solver{T <: Real}
     y_norm_res::T
     z_norm_res::T
 
+    # direction solving helpers
+    res_norm_cutoff::T # desired worst-case residual norm (inf) on direction
+    max_ref_steps::Int # maximum number of iterative refinement steps
+
     # convergence parameters
     primal_obj_t::T
     dual_obj_t::T
@@ -159,6 +164,7 @@ mutable struct Solver{T <: Real}
         tol_abs_opt::RealOrNothing = nothing,
         tol_feas::RealOrNothing = nothing,
         tol_infeas::RealOrNothing = nothing,
+        tol_illposed::RealOrNothing = nothing,
         default_tol_power::RealOrNothing = nothing,
         default_tol_relax::RealOrNothing = nothing,
         tol_slow::Real = 1e-3,
@@ -200,7 +206,10 @@ mutable struct Solver{T <: Real}
         if isnothing(tol_infeas)
             tol_infeas = default_tol_tight
         end
-        @assert min(tol_rel_opt, tol_abs_opt, tol_feas, tol_infeas, tol_slow) > 0
+        if isnothing(tol_illposed)
+            tol_illposed = default_tol_tight / 100
+        end
+        @assert min(tol_rel_opt, tol_abs_opt, tol_feas, tol_infeas, tol_illposed, tol_slow) >= 0
 
         solver = new{T}()
 
@@ -211,6 +220,7 @@ mutable struct Solver{T <: Real}
         solver.tol_abs_opt = tol_abs_opt
         solver.tol_feas = tol_feas
         solver.tol_infeas = tol_infeas
+        solver.tol_illposed = tol_illposed
         solver.tol_slow = tol_slow
         solver.preprocess = preprocess
         solver.reduce = reduce
@@ -245,6 +255,9 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.time_uprhs = 0
     solver.time_getdir = 0
     solver.time_search = 0
+
+    solver.res_norm_cutoff = 0
+    solver.max_ref_steps = 5
 
     solver.x_norm_res_t = NaN
     solver.y_norm_res_t = NaN
@@ -354,7 +367,9 @@ function solve(solver::Solver{T}) where {T <: Real}
                 end
             end
 
+            solver.res_norm_cutoff = T(1e-4) * max(solver.x_norm_res, solver.y_norm_res, solver.z_norm_res, solver.tau_feas)
             solver.worst_dir_res = 0
+
             step(stepper, solver) || break
             flush(stdout)
             calc_mu(solver)
@@ -482,7 +497,7 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
     end
 
     # TODO experiment with ill-posedness check
-    if solver.mu <= solver.tol_infeas && tau <= solver.tol_infeas * min(one(T), solver.point.kap[])
+    if solver.mu <= solver.tol_illposed && tau <= solver.tol_illposed * min(one(T), solver.point.kap[])
         solver.verbose && println("ill-posedness detected; terminating")
         solver.status = IllPosed
         return true
@@ -549,13 +564,14 @@ free_memory(system_solver::Union{NaiveSparseSystemSolver, SymIndefSparseSystemSo
 # verbose helpers
 function print_header(stepper::Stepper, solver::Solver)
     println()
-    @printf("%5s %12s %12s %9s ", "iter", "p_obj", "d_obj", "abs_gap")
+    @printf("%5s %12s %12s |%9s ", "iter", "p_obj", "d_obj", "abs_gap")
     if iszero(solver.model.p)
         @printf("%9s %9s ", "x_feas", "z_feas")
     else
         @printf("%9s %9s %9s ", "x_feas", "y_feas", "z_feas")
     end
-    @printf("%9s %9s %9s %9s ", "tau", "kap", "mu", "ir_res")
+    @printf("|%9s %9s %9s |%9s ", "tau", "kap", "mu", "dir_res")
+
     print_header_more(stepper, solver)
     println()
     return
@@ -563,14 +579,18 @@ end
 print_header_more(stepper::Stepper, solver::Solver) = nothing
 
 function print_iteration(stepper::Stepper, solver::Solver)
-    @printf("%5d %12.4e %12.4e %9.2e ", solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap)
+    @printf("%5d %12.4e %12.4e |%9.2e ", solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap)
     if iszero(solver.model.p)
         @printf("%9.2e %9.2e ", solver.x_feas, solver.z_feas)
     else
         @printf("%9.2e %9.2e %9.2e ", solver.x_feas, solver.y_feas, solver.z_feas)
     end
-    @printf("%9.2e %9.2e %9.2e %9.2e ", solver.point.tau[], solver.point.kap[], solver.mu, solver.worst_dir_res)
-    print_iteration_more(stepper, solver)
+    @printf("|%9.2e %9.2e %9.2e |", solver.point.tau[], solver.point.kap[], solver.mu)
+
+    if !iszero(solver.num_iters)
+        @printf("%9.2e ", solver.worst_dir_res)
+        print_iteration_more(stepper, solver)
+    end
     println()
     return
 end

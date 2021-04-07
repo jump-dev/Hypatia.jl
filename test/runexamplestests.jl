@@ -101,10 +101,11 @@ for (inst_set, real_T, time_limit) in instance_sets
     new_default_options = (; default_options..., time_limit = time_limit)
     ex_type_T = ex_type{real_T}
 
-    println("\nstarting $ex_type_T $inst_set tests\n")
+    println("starting $ex_type_T $inst_set tests\n")
     @testset "$ex_type_T $inst_set" begin
         run_instance_set(inst_subset, ex_type_T, info_perf, new_default_options, script_verbose, perf, results_path)
     end
+    println()
 end
 
 end

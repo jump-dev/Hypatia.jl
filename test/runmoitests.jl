@@ -15,7 +15,7 @@ include(joinpath(@__DIR__, "moi.jl"))
     println("starting MOI wrapper cone tests")
     real_types = [
         Float64,
-        Float32,
+        # Float32,
         BigFloat,
         ]
     for T in real_types
