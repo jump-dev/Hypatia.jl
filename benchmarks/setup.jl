@@ -12,11 +12,12 @@ include(joinpath(examples_dir, "common_native.jl"))
 function setup_benchmark_dataframe()
     perf = DataFrames.DataFrame(
         example = String[],
+        model_type = String[],
         inst_set = String[],
-        real_T = Type{<:Real}[],
         inst_num = Int[],
         inst_data = Tuple[],
         extender = String[],
+        real_T = Type{<:Real}[],
         solver = String[],
         solver_options = Tuple[],
         script_status = String[],
@@ -51,7 +52,7 @@ function setup_benchmark_dataframe()
         check_time = Float64[],
         total_time = Float64[],
         )
-    DataFrames.allowmissing!(perf, 10:DataFrames.ncol(perf))
+    DataFrames.allowmissing!(perf, 11:DataFrames.ncol(perf))
     return perf
 end
 
