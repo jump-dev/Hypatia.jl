@@ -562,13 +562,14 @@ free_memory(system_solver::Union{NaiveSparseSystemSolver, SymIndefSparseSystemSo
 # verbose helpers
 function print_header(stepper::Stepper, solver::Solver)
     println()
-    @printf("%5s %12s %12s %9s ", "iter", "p_obj", "d_obj", "abs_gap")
+    @printf("%5s %12s %12s |%9s ", "iter", "p_obj", "d_obj", "abs_gap")
     if iszero(solver.model.p)
         @printf("%9s %9s ", "x_feas", "z_feas")
     else
         @printf("%9s %9s %9s ", "x_feas", "y_feas", "z_feas")
     end
-    @printf("%9s %9s %9s %9s ", "tau", "kap", "mu", "dir_res")
+    @printf("|%9s %9s %9s |%9s ", "tau", "kap", "mu", "dir_res")
+
     print_header_more(stepper, solver)
     println()
     return
@@ -576,14 +577,18 @@ end
 print_header_more(stepper::Stepper, solver::Solver) = nothing
 
 function print_iteration(stepper::Stepper, solver::Solver)
-    @printf("%5d %12.4e %12.4e %9.2e ", solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap)
+    @printf("%5d %12.4e %12.4e |%9.2e ", solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap)
     if iszero(solver.model.p)
         @printf("%9.2e %9.2e ", solver.x_feas, solver.z_feas)
     else
         @printf("%9.2e %9.2e %9.2e ", solver.x_feas, solver.y_feas, solver.z_feas)
     end
-    @printf("%9.2e %9.2e %9.2e %9.2e ", solver.point.tau[], solver.point.kap[], solver.mu, solver.worst_dir_res)
-    print_iteration_more(stepper, solver)
+    @printf("|%9.2e %9.2e %9.2e |", solver.point.tau[], solver.point.kap[], solver.mu)
+
+    if !iszero(solver.num_iters)
+        @printf("%9.2e ", solver.worst_dir_res)
+        print_iteration_more(stepper, solver)
+    end
     println()
     return
 end

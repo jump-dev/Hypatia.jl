@@ -38,40 +38,54 @@ function get_directions(
     res.vec .-= rhs.vec
     res_norm = norm(res.vec, Inf)
 
+# @show res_norm
 
+    # use iterative refinement if residual norm exceeds cutoff
+    if res_norm > res_norm_cutoff
 
 # TODO if prev and curr IR steps both didn't improve res by more than a threshold, then stop doing IR
 # and maybe allow 5 steps max again
 
-    # use iterative refinement if residual norm exceeds cutoff
-    if res_norm <= res_norm_cutoff
-        max_ref_steps = 0
-    end
-    for i in 1:max_ref_steps
-        (res_norm < res_norm_cutoff) && break
+        min_impr_tol = T(0.5)
+        is_prev_slow = false
+        prev_res_norm = res_norm
 
-        # compute refined direction
-        solve_system(system_solver, solver, dir, res, tau_scal)
-        axpby!(true, dir_temp, -1, dir.vec)
+        for i in 1:max_ref_steps
+            # compute refined direction
+            solve_system(system_solver, solver, dir, res, tau_scal)
+            axpby!(true, dir_temp, -1, dir.vec)
 
-        # compute residual
-        apply_lhs(stepper, solver, tau_scal) # modifies res
-        res.vec .-= rhs.vec
+            # compute residual
+            apply_lhs(stepper, solver, tau_scal) # modifies res
+            res.vec .-= rhs.vec
 
-        res_norm_new = norm(res.vec, Inf)
-        if res_norm_new >= res_norm
-            # residual has not improved
-            copyto!(dir.vec, dir_temp)
-            break
+            res_norm_new = norm(res.vec, Inf)
+            if res_norm_new >= res_norm
+                # residual has not improved
+                copyto!(dir.vec, dir_temp)
+                break
+            end
+
+            # residual has improved
+            copyto!(dir_temp, dir.vec)
+            res_norm = res_norm_new
+
+# @show res_norm
+
+            (res_norm < res_norm_cutoff) && break
+            is_curr_slow = (res_norm > min_impr_tol * prev_res_norm)
+# is_prev_slow && is_curr_slow && println("slow")
+            is_prev_slow && is_curr_slow && break
+
+            prev_res_norm = res_norm
+            is_prev_slow = is_curr_slow
         end
-
-        # residual has improved
-        copyto!(dir_temp, dir.vec)
-        res_norm = res_norm_new
     end
 
     @assert !isnan(res_norm) # TODO error instead
     solver.worst_dir_res = max(solver.worst_dir_res, res_norm)
+
+# println()
 
     return dir
 end
