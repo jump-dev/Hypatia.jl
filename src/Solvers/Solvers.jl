@@ -251,7 +251,7 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.time_search = 0
 
     solver.res_norm_cutoff = 0
-    solver.max_ref_steps = 4
+    solver.max_ref_steps = 5
 
     solver.x_norm_res_t = NaN
     solver.y_norm_res_t = NaN
