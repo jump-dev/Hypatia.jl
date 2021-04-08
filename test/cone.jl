@@ -77,10 +77,18 @@ function test_oracles(
     @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
     @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
 
-    if Cones.use_sqrt_oracles(cone)
-        prod_mat2 = Matrix(Cones.hess_sqrt_prod!(prod_mat, inv_hess, cone)')
-        @test Cones.hess_sqrt_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
-        Cones.inv_hess_sqrt_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+    if hasproperty(cone, :use_hess_prod_slow)
+        Cones.update_use_hess_prod_slow(cone)
+        @test cone.use_hess_prod_slow_updated
+        @test !cone.use_hess_prod_slow
+        cone.use_hess_prod_slow = true
+        @test Cones.hess_prod_slow!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    end
+
+    if Cones.use_sqrt_hess_oracles(cone)
+        prod_mat2 = Matrix(Cones.sqrt_hess_prod!(prod_mat, inv_hess, cone)')
+        @test Cones.sqrt_hess_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+        Cones.inv_sqrt_hess_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
         @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
     end
 
@@ -180,11 +188,18 @@ function show_time_alloc(
     println("inv_hess_prod")
     @time Cones.inv_hess_prod!(point2, point1, cone)
 
-    if Cones.use_sqrt_oracles(cone)
-        println("hess_sqrt_prod")
-        @time Cones.hess_sqrt_prod!(point2, point1, cone)
-        println("inv_hess_sqrt_prod")
-        @time Cones.inv_hess_sqrt_prod!(point2, point1, cone)
+    if hasproperty(cone, :use_hess_prod_slow)
+        cone.use_hess_prod_slow_updated = true
+        cone.use_hess_prod_slow = true
+        println("hess_prod_slow")
+        @time Cones.hess_prod_slow!(point2, point1, cone)
+    end
+
+    if Cones.use_sqrt_hess_oracles(cone)
+        println("sqrt_hess_prod")
+        @time Cones.sqrt_hess_prod!(point2, point1, cone)
+        println("inv_sqrt_hess_prod")
+        @time Cones.inv_sqrt_hess_prod!(point2, point1, cone)
     end
 
     if Cones.use_correction(cone)

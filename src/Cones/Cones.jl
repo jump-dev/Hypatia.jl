@@ -62,7 +62,7 @@ function setup_data(cone::Cone{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
-    if hasfield(typeof(cone), :correction)
+    if hasproperty(cone, :correction)
         cone.correction = zeros(T, dim)
     end
     cone.vec1 = zeros(T, dim)
@@ -86,7 +86,7 @@ reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_upda
 
 get_nu(cone::Cone) = cone.nu
 
-function use_sqrt_oracles(cone::Cone)
+function use_sqrt_hess_oracles(cone::Cone)
     if !cone.hess_fact_updated
         update_hess_fact(cone) || return false
     end
@@ -109,7 +109,7 @@ function update_use_hess_prod_slow(cone::Cone{T}) where {T <: Real}
     rel_viol = abs(1 - dot(cone.point, cone.hess, cone.point) / get_nu(cone))
     # TODO tune
     cone.use_hess_prod_slow = (rel_viol > dimension(cone) * sqrt(eps(T)))
-    cone.use_hess_prod_slow && println("switching to slow hess prod")
+    # cone.use_hess_prod_slow && println("switching to slow hess prod")
     cone.use_hess_prod_slow_updated = true
     return
 end
@@ -149,14 +149,14 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Con
     return prod
 end
 
-function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+function sqrt_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     update_hess_fact(cone)
     copyto!(prod, arr)
     sqrt_prod(cone.hess_fact_cache, prod)
     return prod
 end
 
-function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+function inv_sqrt_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     update_hess_fact(cone)
     copyto!(prod, arr)
     inv_sqrt_prod(cone.hess_fact_cache, prod)

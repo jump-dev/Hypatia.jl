@@ -59,7 +59,7 @@ end
 
 reset_data(cone::EpiRelEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_aux_updated = false)
 
-use_sqrt_oracles(cone::EpiRelEntropy) = false # TODO remove in favor of BHB oracles
+use_sqrt_hess_oracles(cone::EpiRelEntropy) = false # TODO remove in favor of BHB oracles
 
 # TODO only allocate the fields we use
 function setup_extra_data(cone::EpiRelEntropy{T}) where {T <: Real}
