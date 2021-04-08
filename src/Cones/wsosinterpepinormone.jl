@@ -430,30 +430,35 @@ function correction(cone::WSOSInterpEpiNormOne, primal_dir::AbstractVector)
     R = cone.R
     U = cone.U
 
+    # TODO refactor with other WSOS cones
     @inbounds for k in eachindex(cone.Ps)
-        @views mul!(cone.tempLU[k], cone.Λ11LiP[k], Diagonal(primal_dir[1:U]))
-        tempLU2 = mul!(cone.tempLU2[k], cone.tempLU[k], cone.tempUU_vec[k])
+        Pk = cone.Ps[k]
+        LUk = cone.tempLU[k]
+        LLk = cone.tempLL[k]
+        ΛFLPk = cone.Λ11LiP[k]
+
+        @views mul!(LUk, ΛFLPk, Diagonal(primal_dir[1:U]))
+        mul!(LLk, LUk, ΛFLPk')
+        mul!(LUk, Hermitian(LLk), ΛFLPk)
         @views for u in 1:U
-            corr[u] += sum(abs2, tempLU2[:, u])
+            corr[u] += sum(abs2, LUk[:, u])
         end
     end
     @. @views corr[1:U] *= 2 - R
 
     @inbounds for k in eachindex(cone.Ps)
         L = size(cone.Ps[k], 2)
-        PΛiPs1 = cone.PΛiPs1[k]
-        PΛiPs2 = cone.PΛiPs2[k]
         ΛLiPs11 = cone.ΛLiPs11[k]
         ΛLiPs12 = cone.ΛLiPs12[k]
         Λ11LiP = cone.Λ11LiP[k]
-        tempLU = cone.tempLU[k]
+        LUk = cone.tempLU[k]
         ΛLiP_dir11 = cone.ΛLiP_dir11[k]
         ΛLiP_dir12 = cone.ΛLiP_dir12[k]
         ΛLiP_dir21 = cone.ΛLiP_dir21[k]
-        factk = cone.matfact[k]
         corr_half = cone.corr_half[k]
+        LLk = cone.tempLL[k]
 
-        @views ΛLiP_dir22 = mul!(tempLU, Λ11LiP, Diagonal(primal_dir[1:U]))
+        @views ΛLiP_dir22 = mul!(LUk, Λ11LiP, Diagonal(primal_dir[1:U]))
         @views for r in 2:R
             mul!(ΛLiP_dir11[r - 1], ΛLiPs11[r - 1], Diagonal(primal_dir[1:U]))
             mul!(ΛLiP_dir11[r - 1], ΛLiPs12[r - 1], Diagonal(primal_dir[block_idxs(U, r)]), true, true)
@@ -462,25 +467,44 @@ function correction(cone::WSOSInterpEpiNormOne, primal_dir::AbstractVector)
             mul!(ΛLiP_dir21[r - 1], Λ11LiP, Diagonal(primal_dir[block_idxs(U, r)]))
         end
 
+        ΛLiP_dir22_Λ11LiP = ΛLiP_dir22 * Λ11LiP'
         @views for s in 1:(R - 1)
-            mul!(corr_half[s][1:L, 1:U], ΛLiP_dir11[s], PΛiPs1[s])
-            mul!(corr_half[s][1:L, 1:U], ΛLiP_dir12[s], PΛiPs2[s], true, true)
-            mul!(corr_half[s][1:L, (U + 1):(2 * U)], ΛLiP_dir11[s], PΛiPs2[s])
-            mul!(corr_half[s][1:L, (U + 1):(2 * U)], ΛLiP_dir12[s], PΛiPs1[s], true, true)
-            mul!(corr_half[s][(L + 1):(2 * L), 1:U], ΛLiP_dir21[s], PΛiPs1[s])
-            mul!(corr_half[s][(L + 1):(2 * L), 1:U], ΛLiP_dir22, PΛiPs2[s], true, true)
-            mul!(corr_half[s][(L + 1):(2 * L), (U + 1):(2 * U)], ΛLiP_dir21[s], PΛiPs2[s])
-            mul!(corr_half[s][(L + 1):(2 * L), (U + 1):(2 * U)], ΛLiP_dir22, PΛiPs1[s], true, true)
+            mul!(LLk, ΛLiP_dir11[s], ΛLiPs12[s]')
+            mul!(corr_half[s][1:L, 1:U], LLk, ΛLiPs12[s])
+            mul!(corr_half[s][1:L, (U + 1):(2 * U)], LLk, ΛLiPs11[s])
+
+            mul!(LLk, ΛLiP_dir12[s], ΛLiPs12[s]')
+            mul!(corr_half[s][1:L, 1:U], LLk, ΛLiPs11[s], true, true)
+            mul!(corr_half[s][1:L, (U + 1):(2 * U)], LLk, ΛLiPs12[s], true, true)
+
+            mul!(LLk, ΛLiP_dir21[s], ΛLiPs12[s]')
+            mul!(corr_half[s][(L + 1):(2 * L), 1:U], LLk, ΛLiPs12[s])
+            mul!(corr_half[s][(L + 1):(2 * L), (U + 1):(2 * U)], LLk, ΛLiPs11[s])
+
+            mul!(LLk, ΛLiP_dir22, ΛLiPs12[s]')
+            mul!(corr_half[s][(L + 1):(2 * L), 1:U], LLk, ΛLiPs11[s], true, true)
+            mul!(corr_half[s][(L + 1):(2 * L), (U + 1):(2 * U)], LLk, ΛLiPs12[s], true, true)
+
+            mul!(LLk, ΛLiP_dir11[s], Λ11LiP')
+            mul!(corr_half[s][1:L, 1:U], LLk, Λ11LiP, true, true)
+            mul!(LLk, ΛLiP_dir12[s], Λ11LiP')
+            mul!(corr_half[s][1:L, (U + 1):(2 * U)], LLk, Λ11LiP, true, true)
+            mul!(LLk, ΛLiP_dir21[s], Λ11LiP')
+            mul!(corr_half[s][(L + 1):(2 * L), 1:U], LLk, Λ11LiP, true, true)
         end
+        mul!(LLk, ΛLiP_dir22, Λ11LiP')
+        mul!(LUk, LLk, Λ11LiP)
 
         idx = U + 1
-        @views for s in 1:(R - 1), u in 1:U
-            corr[u] += sum(abs2, corr_half[s][:, u])
-            corr[u] += sum(abs2, corr_half[s][:, U + u])
-            corr[idx] += 2 * dot(corr_half[s][:, U + u], corr_half[s][:, u])
-            idx += 1
+        @views for s in 1:(R - 1)
+            @. corr_half[s][(L + 1):(2 * L), (U + 1):(2 * U)] += LUk
+            for u in 1:U
+                corr[u] += sum(abs2, corr_half[s][:, u])
+                corr[u] += sum(abs2, corr_half[s][:, U + u])
+                corr[idx] += 2 * dot(corr_half[s][:, U + u], corr_half[s][:, u])
+                idx += 1
+            end
         end
-
     end
 
     return corr
