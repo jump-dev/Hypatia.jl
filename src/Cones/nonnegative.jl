@@ -36,11 +36,9 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::Nonnegative) = false
-
 reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
-use_sqrt_oracles(cone::Nonnegative) = true
+use_sqrt_hess_oracles(cone::Nonnegative) = true
 
 # TODO only allocate the fields we use
 function setup_extra_data(cone::Nonnegative{T}) where {T <: Real}
@@ -98,13 +96,13 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Non
     return prod
 end
 
-function hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+function sqrt_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
     @assert cone.is_feas
     @. prod = arr / cone.point
     return prod
 end
 
-function inv_hess_sqrt_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+function inv_sqrt_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
     @assert cone.is_feas
     @. prod = arr * cone.point
     return prod

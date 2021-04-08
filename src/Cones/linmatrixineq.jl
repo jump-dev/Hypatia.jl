@@ -6,7 +6,6 @@ TODO
 
 mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     dim::Int
     side::Int
     As::Vector
@@ -26,6 +25,8 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    use_hess_prod_slow::Bool
+    use_hess_prod_slow_updated::Bool
 
     sumA::AbstractMatrix
     fact
@@ -34,7 +35,6 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     function LinMatrixIneq{T}(
         As::Vector;
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         dim = length(As)
@@ -55,7 +55,6 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         @assert isposdef(first(As))
         cone = new{T}()
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim
         cone.side = side
         cone.As = As
@@ -63,6 +62,8 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         return cone
     end
 end
+
+reset_data(cone::LinMatrixIneq) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.use_hess_prod_slow = cone.use_hess_prod_slow_updated = false)
 
 # TODO only allocate the fields we use
 function setup_extra_data(cone::LinMatrixIneq{T}) where {T <: Real}
@@ -95,7 +96,7 @@ function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
     return cone.is_feas
 end
 
-is_dual_feas(cone::LinMatrixIneq) = true # TODO use a dikin ellipsoid condition?
+is_dual_feas(cone::LinMatrixIneq) = true
 
 function update_grad(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert cone.is_feas
@@ -122,7 +123,11 @@ function update_hess(cone::LinMatrixIneq)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::LinMatrixIneq)
+function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::LinMatrixIneq)
+    cone.use_hess_prod_slow_updated || update_use_hess_prod_slow(cone)
+    @assert cone.hess_updated
+    cone.use_hess_prod_slow || return hess_prod!(prod, arr, cone)
+
     @assert cone.grad_updated
     sumAinvAs = cone.sumAinvAs
 

@@ -21,8 +21,8 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
-    hess_sqrt_prod_updated::Bool
-    inv_hess_sqrt_prod_updated::Bool
+    sqrt_hess_prod_updated::Bool
+    inv_sqrt_hess_prod_updated::Bool
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
@@ -30,8 +30,8 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     dist::T
     rtdist::T
     denom::T
-    hess_sqrt_vec::Vector{T}
-    inv_hess_sqrt_vec::Vector{T}
+    sqrt_hess_vec::Vector{T}
+    inv_sqrt_hess_vec::Vector{T}
 
     function EpiPerSquare{T}(
         dim::Int;
@@ -45,19 +45,17 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::EpiPerSquare) = false
+reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.sqrt_hess_prod_updated = cone.inv_sqrt_hess_prod_updated = false)
 
-reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_sqrt_prod_updated = cone.inv_hess_sqrt_prod_updated = false)
-
-use_sqrt_oracles(cone::EpiPerSquare) = true
+use_sqrt_hess_oracles(cone::EpiPerSquare) = true
 
 # TODO only allocate the fields we use
 function setup_extra_data(cone::EpiPerSquare{T}) where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.hess_sqrt_vec = zeros(T, dim)
-    cone.inv_hess_sqrt_vec = zeros(T, dim)
+    cone.sqrt_hess_vec = zeros(T, dim)
+    cone.inv_sqrt_hess_vec = zeros(T, dim)
     return cone
 end
 
@@ -172,40 +170,40 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     return prod
 end
 
-function update_hess_sqrt_prod(cone::EpiPerSquare)
+function update_sqrt_hess_prod(cone::EpiPerSquare)
     @assert cone.is_feas
-    @assert !cone.hess_sqrt_prod_updated
+    @assert !cone.sqrt_hess_prod_updated
 
     rtdist = cone.rtdist = sqrt(cone.dist)
     cone.denom = 2 * rtdist + cone.point[1] + cone.point[2]
-    vec = cone.hess_sqrt_vec
+    vec = cone.sqrt_hess_vec
     @. @views vec[3:end] = cone.point[3:end] / rtdist
     vec[1] = -cone.point[2] / rtdist - 1
     vec[2] = -cone.point[1] / rtdist - 1
 
-    cone.hess_sqrt_prod_updated = true
+    cone.sqrt_hess_prod_updated = true
     return
 end
 
-function update_inv_hess_sqrt_prod(cone::EpiPerSquare)
+function update_inv_sqrt_hess_prod(cone::EpiPerSquare)
     @assert cone.is_feas
-    @assert !cone.inv_hess_sqrt_prod_updated
+    @assert !cone.inv_sqrt_hess_prod_updated
 
     rtdist = cone.rtdist = sqrt(cone.dist)
     cone.denom = 2 * rtdist + cone.point[1] + cone.point[2]
-    vec = cone.inv_hess_sqrt_vec
+    vec = cone.inv_sqrt_hess_vec
     copyto!(vec, cone.point)
     vec[1:2] .+= rtdist
 
-    cone.inv_hess_sqrt_prod_updated = true
+    cone.inv_sqrt_hess_prod_updated = true
     return
 end
 
-function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
-    if !cone.hess_sqrt_prod_updated
-        update_hess_sqrt_prod(cone)
+function sqrt_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
+    if !cone.sqrt_hess_prod_updated
+        update_sqrt_hess_prod(cone)
     end
-    vec = cone.hess_sqrt_vec
+    vec = cone.sqrt_hess_vec
     rtdist = cone.rtdist
 
     @inbounds @views for j in 1:size(arr, 2)
@@ -219,11 +217,11 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, co
     return prod
 end
 
-function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
-    if !cone.inv_hess_sqrt_prod_updated
-        update_inv_hess_sqrt_prod(cone)
+function inv_sqrt_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
+    if !cone.inv_sqrt_hess_prod_updated
+        update_inv_sqrt_hess_prod(cone)
     end
-    vec = cone.inv_hess_sqrt_vec
+    vec = cone.inv_sqrt_hess_vec
     rtdist = cone.rtdist
 
     @inbounds @views for j in 1:size(arr, 2)

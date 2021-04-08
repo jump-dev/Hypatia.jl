@@ -71,8 +71,6 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::HypoPerLogdetTri) = false
-
 reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
 
 function setup_extra_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}

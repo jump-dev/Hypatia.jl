@@ -9,7 +9,6 @@ barrier from "On self-concordant barriers for generalized power cones" by Roy & 
 
 mutable struct GeneralizedPower{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     dim::Int
     alpha::Vector{T}
     n::Int
@@ -41,7 +40,6 @@ mutable struct GeneralizedPower{T <: Real} <: Cone{T}
         alpha::Vector{T},
         n::Int;
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert n >= 1
@@ -52,7 +50,6 @@ mutable struct GeneralizedPower{T <: Real} <: Cone{T}
         cone = new{T}()
         cone.n = n
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim
         cone.alpha = alpha
         cone.hess_fact_cache = hess_fact_cache

@@ -38,11 +38,9 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::EpiNormEucl) = false
-
 reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
-use_sqrt_oracles(cone::EpiNormEucl) = true
+use_sqrt_hess_oracles(cone::EpiNormEucl) = true
 
 # TODO only allocate the fields we use
 function setup_extra_data(cone::EpiNormEucl{T}) where {T <: Real}
@@ -156,7 +154,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     return prod
 end
 
-function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
+function sqrt_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
     w = @view cone.point[2:end]
@@ -177,7 +175,7 @@ function hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, co
     return prod
 end
 
-function inv_hess_sqrt_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
+function inv_sqrt_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiNormEucl{T}) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
     w = @view cone.point[2:end]

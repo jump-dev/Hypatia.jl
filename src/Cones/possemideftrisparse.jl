@@ -23,7 +23,6 @@ TODO
 
 mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     dim::Int
     side::Int
     row_idxs::Vector{Int}
@@ -46,6 +45,8 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    use_hess_prod_slow::Bool
+    use_hess_prod_slow_updated::Bool
 
     sparse_point
     sparse_point_map
@@ -73,7 +74,6 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
         row_idxs::Vector{Int},
         col_idxs::Vector{Int};
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {R <: RealOrComplex{T}} where {T <: BlasReal}
         # check validity of inputs
@@ -99,7 +99,6 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
         end
         @assert cone.dim >= 1
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.side = side # side dimension of sparse matrix
         cone.row_idxs = row_idxs
         cone.col_idxs = col_idxs
@@ -108,6 +107,8 @@ mutable struct PosSemidefTriSparse{T <: BlasReal, R <: RealOrComplex{T}} <: Cone
         return cone
     end
 end
+
+reset_data(cone::PosSemidefTriSparse) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.use_hess_prod_slow = cone.use_hess_prod_slow_updated = false)
 
 function setup_extra_data(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     dim = cone.dim
@@ -457,7 +458,11 @@ function update_hess(cone::PosSemidefTriSparse{T, R}) where {R <: RealOrComplex{
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTriSparse)
+function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTriSparse)
+    cone.use_hess_prod_slow_updated || update_use_hess_prod_slow(cone)
+    @assert cone.hess_updated
+    cone.use_hess_prod_slow || return hess_prod!(prod, arr, cone)
+
     @assert cone.grad_updated
     temp_blocks = cone.temp_blocks
 

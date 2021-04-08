@@ -6,11 +6,11 @@ u(x), w_1(x), ...,  w_R(x) are polynomials with U coefficients
 
 mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     dim::Int
     R::Int
     U::Int
     Ps::Vector{Matrix{T}}
+    nu::Int
 
     point::Vector{T}
     dual_point::Vector{T}
@@ -67,7 +67,6 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
         U::Int,
         Ps::Vector{Matrix{T}};
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert R >= 2
@@ -76,12 +75,12 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
         end
         cone = new{T}()
         cone.use_dual_barrier = !use_dual # using dual barrier
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = U * R
         cone.R = R
         cone.U = U
         cone.Ps = Ps
         cone.hess_fact_cache = hess_fact_cache
+        cone.nu = R * sum(size(Pk, 2) for Pk in Ps)
         return cone
     end
 end
@@ -133,9 +132,7 @@ end
 
 reset_data(cone::WSOSInterpEpiNormOne) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
 
-get_nu(cone::WSOSInterpEpiNormOne) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
-
-use_sqrt_oracles(::WSOSInterpEpiNormOne) = false # Hessian is block sparse
+use_sqrt_hess_oracles(::WSOSInterpEpiNormOne) = false # Hessian is block sparse
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormOne)
     @views arr[1:cone.U] .= 1
@@ -380,7 +377,7 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where T
         s_fact = cone.hess_schur_fact = cholesky!(Symmetric(schur_backup, :U), check = false)
         if !isposdef(s_fact)
             copyto!(schur_backup, schur)
-                if T <: BlasReal # TODO refac
+            if T <: BlasReal # TODO refac
                 cone.hess_schur_fact = bunchkaufman!(Symmetric(schur_backup, :U), true)
             else
                 cone.hess_schur_fact = lu!(Symmetric(schur_backup, :U))

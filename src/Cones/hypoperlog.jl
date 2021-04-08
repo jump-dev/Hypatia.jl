@@ -47,8 +47,6 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::HypoPerLog) = false
-
 reset_data(cone::HypoPerLog) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
 
 function setup_extra_data(cone::HypoPerLog{T}) where {T <: Real}

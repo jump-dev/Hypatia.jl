@@ -58,11 +58,9 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::EpiNormInf) = false
-
 reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.inv_hess_aux_updated = false)
 
-use_sqrt_oracles(cone::EpiNormInf) = false # TODO remove in favor of BHB oracles
+use_sqrt_hess_oracles(cone::EpiNormInf) = false # TODO remove in favor of BHB oracles
 
 # TODO only allocate the fields we use
 function setup_extra_data(cone::EpiNormInf{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}

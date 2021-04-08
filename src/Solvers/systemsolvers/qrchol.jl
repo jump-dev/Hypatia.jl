@@ -97,9 +97,9 @@ direct dense
 mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     lhs1::Symmetric{T, Matrix{T}}
     inv_hess_cones::Vector{Int}
-    inv_hess_sqrt_cones::Vector{Int}
+    inv_sqrt_hess_cones::Vector{Int}
     hess_cones::Vector{Int}
-    hess_sqrt_cones::Vector{Int}
+    sqrt_hess_cones::Vector{Int}
     rhs_sub::Point{T}
     sol_sub::Point{T}
     sol_const::Point{T}
@@ -140,9 +140,9 @@ function load(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}) wher
 
     num_cones = length(cone_idxs)
     system_solver.inv_hess_cones = sizehint!(Int[], num_cones)
-    system_solver.inv_hess_sqrt_cones = sizehint!(Int[], num_cones)
+    system_solver.inv_sqrt_hess_cones = sizehint!(Int[], num_cones)
     system_solver.hess_cones = sizehint!(Int[], num_cones)
-    system_solver.hess_sqrt_cones = sizehint!(Int[], num_cones)
+    system_solver.sqrt_hess_cones = sizehint!(Int[], num_cones)
 
     # NOTE very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
     GQ = model.G * solver.Ap_Q
@@ -180,30 +180,30 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
 
     if !isempty(system_solver.Q2div)
         inv_hess_cones = empty!(system_solver.inv_hess_cones)
-        inv_hess_sqrt_cones = empty!(system_solver.inv_hess_sqrt_cones)
+        inv_sqrt_hess_cones = empty!(system_solver.inv_sqrt_hess_cones)
         hess_cones = empty!(system_solver.hess_cones)
-        hess_sqrt_cones = empty!(system_solver.hess_sqrt_cones)
+        sqrt_hess_cones = empty!(system_solver.sqrt_hess_cones)
 
         # update hessian factorizations and partition of cones
         for (k, cone_k) in enumerate(model.cones)
-            if Cones.use_sqrt_oracles(cone_k)
-                cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_sqrt_cones : hess_sqrt_cones
+            if Cones.use_sqrt_hess_oracles(cone_k)
+                cones_list = Cones.use_dual_barrier(cone_k) ? inv_sqrt_hess_cones : sqrt_hess_cones
             else
                 cones_list = Cones.use_dual_barrier(cone_k) ? inv_hess_cones : hess_cones
             end
             push!(cones_list, k)
         end
 
-        # do inv_hess and inv_hess_sqrt cones
-        if isempty(inv_hess_sqrt_cones)
+        # do inv_hess and inv_sqrt_hess cones
+        if isempty(inv_sqrt_hess_cones)
             lhs .= 0
         else
             idx = 1
-            for k in inv_hess_sqrt_cones
+            for k in inv_sqrt_hess_cones
                 arr_k = system_solver.GQ2_k[k]
                 q_k = size(arr_k, 1)
                 @views prod_k = system_solver.HGQ2[idx:(idx + q_k - 1), :]
-                Cones.inv_hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
+                Cones.inv_sqrt_hess_prod!(prod_k, arr_k, model.cones[k])
                 idx += q_k
             end
             @views HGQ2_sub = system_solver.HGQ2[1:(idx - 1), :]
@@ -217,14 +217,14 @@ function update_lhs(system_solver::QRCholDenseSystemSolver{T}, solver::Solver{T}
             mul!(lhs, arr_k', prod_k, true, true)
         end
 
-        # do hess and hess_sqrt cones
-        if !isempty(hess_sqrt_cones)
+        # do hess and sqrt_hess cones
+        if !isempty(sqrt_hess_cones)
             idx = 1
-            for k in hess_sqrt_cones
+            for k in sqrt_hess_cones
                 arr_k = system_solver.GQ2_k[k]
                 q_k = size(arr_k, 1)
                 @views prod_k = system_solver.HGQ2[idx:(idx + q_k - 1), :]
-                Cones.hess_sqrt_prod!(prod_k, arr_k, model.cones[k])
+                Cones.sqrt_hess_prod!(prod_k, arr_k, model.cones[k])
                 idx += q_k
             end
             @views HGQ2_sub = system_solver.HGQ2[1:(idx - 1), :]

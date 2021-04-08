@@ -38,7 +38,7 @@ function update_rhs_predcorr(
         prim_dir_k = dir.primal_views[k]
 
         @. prim_k_scal = irtrtmu * prim_dir_k
-        Cones.hess_prod!(H_prim_dir_k, prim_dir_k, cone_k)
+        Cones.hess_prod_slow!(H_prim_dir_k, prim_dir_k, cone_k)
         corr_k = Cones.correction(cone_k, prim_k_scal)
 
         # only use correction if it nearly satisfies an identity
@@ -101,7 +101,7 @@ function update_rhs_centcorr(
         prim_dir_k = dir.primal_views[k]
 
         @. prim_k_scal = irtrtmu * prim_dir_k
-        Cones.hess_prod!(H_prim_dir_k_scal, prim_k_scal, cone_k)
+        Cones.hess_prod_slow!(H_prim_dir_k_scal, prim_k_scal, cone_k)
         corr_k = Cones.correction(cone_k, prim_k_scal)
 
         # only use correction if it nearly satisfies an identity
