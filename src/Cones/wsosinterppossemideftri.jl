@@ -8,11 +8,11 @@ and "Semidefinite Characterization of Sum-of-Squares Cones in Algebras" by D. Pa
 
 mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     dim::Int
     R::Int
     U::Int
     Ps::Vector{Matrix{T}}
+    nu::Int
 
     point::Vector{T}
     dual_point::Vector{T}
@@ -29,6 +29,8 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
+    use_hess_prod_slow::Bool
+    use_hess_prod_slow_updated::Bool
 
     rt2::T
     rt2i::T
@@ -49,7 +51,6 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         U::Int,
         Ps::Vector{Matrix{T}};
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         for Pk in Ps
@@ -57,15 +58,17 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         end
         cone = new{T}()
         cone.use_dual_barrier = !use_dual # using dual barrier
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = U * svec_length(R)
         cone.R = R
         cone.U = U
         cone.Ps = Ps
         cone.hess_fact_cache = hess_fact_cache
+        cone.nu = R * sum(size(Pk, 2) for Pk in Ps)
         return cone
     end
 end
+
+reset_data(cone::WSOSInterpPosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.use_hess_prod_slow = cone.use_hess_prod_slow_updated = false)
 
 function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     dim = cone.dim
@@ -92,8 +95,6 @@ function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.Ps_order = collect(1:K)
     return cone
 end
-
-get_nu(cone::WSOSInterpPosSemidefTri) = cone.R * sum(size(Pk, 2) for Pk in cone.Ps)
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpPosSemidefTri)
     arr .= 0
@@ -254,7 +255,11 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpPosSemidefTri)
+function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpPosSemidefTri)
+    cone.use_hess_prod_slow_updated || update_use_hess_prod_slow(cone)
+    @assert cone.hess_updated
+    cone.use_hess_prod_slow || return hess_prod!(prod, arr, cone)
+
     @assert cone.grad_updated
     prod .= 0
     R = cone.R

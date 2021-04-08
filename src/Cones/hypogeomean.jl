@@ -47,8 +47,6 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::HypoGeoMean) = false
-
 function setup_extra_data(cone::HypoGeoMean{T}) where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)

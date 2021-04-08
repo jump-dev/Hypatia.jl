@@ -23,8 +23,6 @@ import Hypatia.invert
 import Hypatia.increase_diag!
 import Hypatia.outer_prod
 
-default_use_heuristic_neighborhood() = false
-
 # hessian_cache(T::Type{<:BlasReal}) = DenseSymCache{T}() # use Bunch Kaufman for BlasReals from start
 hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}()
 
@@ -60,7 +58,7 @@ dimension(cone::Cone) = cone.dim
 
 function setup_data(cone::Cone{T}) where {T <: Real}
     reset_data(cone)
-    dim = cone.dim
+    dim = dimension(cone)
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
@@ -86,6 +84,8 @@ inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess : update_inv_hess(
 
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
+get_nu(cone::Cone) = cone.nu
+
 function use_sqrt_oracles(cone::Cone)
     if !cone.hess_fact_updated
         update_hess_fact(cone) || return false
@@ -98,18 +98,27 @@ use_correction(::Cone) = true
 update_hess_aux(cone::Cone) = nothing
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    if !cone.hess_updated
-        update_hess(cone)
-    end
+    cone.hess_updated || update_hess(cone)
     mul!(prod, cone.hess, arr)
     return prod
 end
 
+function update_use_hess_prod_slow(cone::Cone{T}) where {T <: Real}
+    cone.hess_updated || update_hess(cone)
+    @assert cone.hess_updated
+    rel_viol = abs(1 - dot(cone.point, cone.hess, cone.point) / get_nu(cone))
+    # TODO tune
+    cone.use_hess_prod_slow = (rel_viol > dimension(cone) * sqrt(eps(T)))
+    cone.use_hess_prod_slow && println("switching to slow hess prod")
+    cone.use_hess_prod_slow_updated = true
+    return
+end
+
+hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone) = hess_prod!(prod, arr, cone)
+
 function update_hess_fact(cone::Cone{T}) where {T <: Real}
     cone.hess_fact_updated && return true
-    if !cone.hess_updated
-        update_hess(cone)
-    end
+    cone.hess_updated || update_hess(cone)
 
     if !update_fact(cone.hess_fact_cache, cone.hess)
         if T <: BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
@@ -165,12 +174,11 @@ hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 inv_hess_nz_idxs_col(cone::Cone, j::Int) = 1:dimension(cone)
 inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
-use_heuristic_neighborhood(cone::Cone) = cone.use_heuristic_neighborhood
-
 function in_neighborhood(
     cone::Cone{T},
     rtmu::T,
-    max_nbhd::T,
+    max_nbhd::T;
+    # use_heuristic_neighborhood::Bool = false, # TODO make option to solver
     ) where {T <: Real}
     is_feas(cone) || return false
     g = grad(cone)
@@ -184,21 +192,16 @@ function in_neighborhood(
     dim = dimension(cone)
     nu = get_nu(cone)
     # grad check
-    if abs(1 + dot(g, cone.point) / nu) > gtol * dim
-        return false
-    end
+    (abs(1 + dot(g, cone.point) / nu) > gtol * dim) && return false
     # inv hess check
     inv_hess_prod!(vec1, g, cone)
-    if abs(1 - dot(vec1, g) / nu) > Htol * dim
-        return false
-    end
+    (abs(1 - dot(vec1, g) / nu) > Htol * dim) && return false
 
     # check neighborhood condition
     @. vec1 = cone.dual_point + rtmu * g
-    if use_heuristic_neighborhood(cone)
-        nbhd = norm(vec1, Inf) / norm(g, Inf)
-        # nbhd = maximum(abs(dj / gj) for (dj, gj) in zip(vec1, g)) # TODO try this neighborhood
-    else
+    # if use_heuristic_neighborhood(cone)
+    #     nbhd = norm(vec1, Inf) / norm(g, Inf)
+    # else
         vec2 = cone.vec2
         inv_hess_prod!(vec2, vec1, cone)
         nbhd_sqr = dot(vec2, vec1)
@@ -206,7 +209,7 @@ function in_neighborhood(
             return false
         end
         nbhd = sqrt(abs(nbhd_sqr))
-    end
+    # end
 
     return (nbhd < rtmu * max_nbhd)
 end

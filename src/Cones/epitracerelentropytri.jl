@@ -14,7 +14,6 @@ TODO reduce allocations
 
 mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     dim::Int
     d::Int
 
@@ -67,13 +66,11 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     function EpiTraceRelEntropyTri{T}(
         dim::Int;
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim > 2
         cone = new{T}()
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim
         cone.vw_dim = div(dim - 1, 2)
         cone.d = round(Int, sqrt(0.25 + 2 * cone.vw_dim) - 0.5)

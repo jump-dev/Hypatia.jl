@@ -9,7 +9,6 @@ barrier from "Constructing self-concordant barriers for convex cones" by Yu. Nes
 
 mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     dim::Int
     alpha::Vector{T}
 
@@ -36,7 +35,6 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     function HypoPowerMean{T}(
         alpha::Vector{T};
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         dim = length(alpha) + 1
@@ -45,7 +43,6 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
         @assert sum(alpha) ≈ 1
         cone = new{T}()
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim
         cone.alpha = alpha
         cone.hess_fact_cache = hess_fact_cache

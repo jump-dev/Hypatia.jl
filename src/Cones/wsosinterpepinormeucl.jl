@@ -13,11 +13,11 @@ since our D is an (R - 1) x (R - 1) block diagonal matrix
 
 mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     dim::Int
     R::Int
     U::Int
     Ps::Vector{Matrix{T}}
+    nu::Int
 
     point::Vector{T}
     dual_point::Vector{T}
@@ -65,7 +65,6 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
         U::Int,
         Ps::Vector{Matrix{T}};
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         for Pj in Ps
@@ -73,12 +72,12 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
         end
         cone = new{T}()
         cone.use_dual_barrier = !use_dual # using dual barrier
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = U * R
         cone.R = R
         cone.U = U
         cone.Ps = Ps
         cone.hess_fact_cache = hess_fact_cache
+        cone.nu = 2 * sum(size(Pk, 2) for Pk in Ps)
         return cone
     end
 end
@@ -119,8 +118,6 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.Ps_order = collect(1:K)
     return cone
 end
-
-get_nu(cone::WSOSInterpEpiNormEucl) = 2 * sum(size(Pk, 2) for Pk in cone.Ps)
 
 function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormEucl)
     @views arr[1:cone.U] .= 1

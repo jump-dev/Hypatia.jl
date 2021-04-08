@@ -36,8 +36,6 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::Nonnegative) = false
-
 reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
 use_sqrt_oracles(cone::Nonnegative) = true

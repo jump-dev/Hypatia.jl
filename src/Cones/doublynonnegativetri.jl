@@ -10,7 +10,6 @@ TODO
 
 mutable struct DoublyNonnegativeTri{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
-    use_heuristic_neighborhood::Bool
     dim::Int
     side::Int
     rt2::T
@@ -43,13 +42,11 @@ mutable struct DoublyNonnegativeTri{T <: Real} <: Cone{T}
     function DoublyNonnegativeTri{T}(
         dim::Int;
         use_dual::Bool = false,
-        use_heuristic_neighborhood::Bool = default_use_heuristic_neighborhood(),
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim >= 1
         cone = new{T}()
         cone.use_dual_barrier = use_dual
-        cone.use_heuristic_neighborhood = use_heuristic_neighborhood
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
         cone.side = side = round(Int, sqrt(0.25 + 2 * dim) - 0.5)
@@ -59,8 +56,6 @@ mutable struct DoublyNonnegativeTri{T <: Real} <: Cone{T}
         return cone
     end
 end
-
-use_heuristic_neighborhood(cone::DoublyNonnegativeTri) = false
 
 reset_data(cone::DoublyNonnegativeTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 

@@ -61,8 +61,6 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::PosSemidefTri) = false
-
 reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
 
 use_sqrt_oracles(cone::PosSemidefTri) = true

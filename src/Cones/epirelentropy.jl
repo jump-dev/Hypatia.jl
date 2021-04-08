@@ -57,8 +57,6 @@ mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::EpiRelEntropy) = false
-
 reset_data(cone::EpiRelEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_aux_updated = false)
 
 use_sqrt_oracles(cone::EpiRelEntropy) = false # TODO remove in favor of BHB oracles

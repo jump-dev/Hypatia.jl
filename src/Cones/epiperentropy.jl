@@ -48,8 +48,6 @@ mutable struct EpiPerEntropy{T <: Real} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(cone::EpiPerEntropy) = false
-
 function setup_extra_data(cone::EpiPerEntropy{T}) where T
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)

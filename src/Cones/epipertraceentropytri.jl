@@ -60,8 +60,6 @@ mutable struct EpiPerTraceEntropyTri{T <: Real} <: Cone{T}
     end
 end
 
-use_heuristic_neighborhood(::EpiPerTraceEntropyTri) = false
-
 function setup_extra_data(cone::EpiPerTraceEntropyTri{T}) where T
     dim = cone.dim
     sdim = cone.dim - 2
