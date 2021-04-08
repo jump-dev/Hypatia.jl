@@ -224,6 +224,23 @@ function instance_stats(all_df)
         )
     CSV.write(joinpath(stats_dir, "examplestats.csv"), ex_df)
 
+    # count instances with loosened tols
+    examples_dir = "../../examples"
+    include(joinpath(examples_dir, "common.jl"))
+    n = 1
+    for (m, l) in (("JuMP", 3), ("native", 2))
+        include(joinpath(examples_dir, "common_" * m * ".jl"))
+        m_df = filter(t -> (t.model_type == m), all_df)
+        for ex_name in unique(m_df[!, :example])
+            include(joinpath(examples_dir, ex_name, m * ".jl"))
+            (_, ex_insts) = include(joinpath(examples_dir, ex_name, m * "_test.jl"))
+            for inst in ex_insts["various"]
+                (length(inst) == l) && (n += 1)
+            end
+        end
+    end
+    @show n
+
     return
 end
 
