@@ -63,6 +63,7 @@ function make_agg_tables(all_df)
         :status => (x -> count(isequal("IterationLimit"), x)) => :iterationlimit,
         :status => length => :total,
         )
+    sort!(df_agg, order(:solver_options, by = (x -> findfirst(isequal(x), lowercase.(enhancements)))))
     CSV.write(joinpath(stats_dir, "agg" * ".csv"), df_agg)
 
     # combine feasible and infeasible statuses
@@ -127,6 +128,7 @@ function make_subtime_tables(all_df)
             [:time_getdir_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_getdir_iter, use_cap = use_cap)) => Symbol(:getdir_piter, set),
             [:time_search_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_search_iter, use_cap = use_cap)) => Symbol(:search_piter, set),
             )
+        sort!(subtime_df, order(:solver_options, by = (x -> findfirst(isequal(x), lowercase.(enhancements)))))
         CSV.write(joinpath(stats_dir, "subtime" * string(set) * ".csv"), subtime_df)
         return subtime_df
     end
