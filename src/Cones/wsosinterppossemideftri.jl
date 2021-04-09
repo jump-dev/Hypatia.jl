@@ -41,8 +41,8 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     ΛFL::Vector
     ΛFLP::Vector{Matrix{T}}
     tempLU::Vector{Matrix{T}}
-    PΛiP::Vector{Matrix{T}}
-    PΛiP_blocks_U::Vector
+    PΛiP::Matrix{T}
+    PΛiP_blocks_U
     Ps_times::Vector{Float64}
     Ps_order::Vector{Int}
 
@@ -89,8 +89,8 @@ function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.tempLU = [zeros(T, L, U) for L in Ls]
     cone.ΛFL = Vector{Any}(undef, K)
     cone.ΛFLP = [zeros(T, R * L, R * U) for L in Ls]
-    cone.PΛiP = [zeros(T, R * U, R * U) for _ in eachindex(Ps)]
-    cone.PΛiP_blocks_U = [[view(PΛiPk, block_idxs(U, r), block_idxs(U, s)) for r in 1:R, s in 1:R] for PΛiPk in cone.PΛiP]
+    cone.PΛiP = zeros(T, R * U, R * U)
+    cone.PΛiP_blocks_U = [view(cone.PΛiP, block_idxs(U, r), block_idxs(U, s)) for r in 1:R, s in 1:R]
     cone.Ps_times = zeros(K)
     cone.Ps_order = collect(1:K)
     return cone
@@ -170,7 +170,7 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
     grad = cone.grad
     cone.grad .= 0
 
-    @inbounds for k in eachindex(cone.PΛiP)
+    @inbounds for k in eachindex(cone.Ps)
         L = size(cone.Ps[k], 2)
         ΛFL = cone.ΛFL[k].L
         ΛFLP = cone.ΛFLP[k]
@@ -208,45 +208,38 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
     @assert cone.grad_updated
     R = cone.R
     U = cone.U
+    PΛiP_blocks = cone.PΛiP_blocks_U
     H = cone.hess.data
     H .= 0
 
-    @inbounds for k in eachindex(cone.PΛiP)
+    @inbounds for k in eachindex(cone.Ps)
         L = size(cone.Ps[k], 2)
         # PΛiP = ΛFLP' * ΛFLP
-        PΛiPk = cone.PΛiP[k]
         ΛFLP = cone.ΛFLP[k]
         for p in 1:R, q in p:R
-            block_p_idxs = block_idxs(U, p)
-            block_q_idxs = block_idxs(U, q)
             # since ΛFLP is block lower triangular rows only from max(p,q) start making a nonzero contribution to the product
             row_range = ((q - 1) * L + 1):(L * R)
-            @views mul!(PΛiPk[block_p_idxs, block_q_idxs], ΛFLP[row_range, block_p_idxs]', ΛFLP[row_range, block_q_idxs])
+            @views mul!(PΛiP_blocks[p, q], ΛFLP[row_range, block_idxs(U, p)]', ΛFLP[row_range, block_idxs(U, q)])
         end
-        LinearAlgebra.copytri!(PΛiPk, 'U')
-    end
+        LinearAlgebra.copytri!(cone.PΛiP, 'U')
 
-    @inbounds for p in 1:R, q in 1:p
-        block = svec_idx(p, q)
-        idxs = block_idxs(U, block)
+        for p in 1:R, q in 1:p
+            block = svec_idx(p, q)
+            idxs = block_idxs(U, block)
 
-        for p2 in 1:R, q2 in 1:p2
-            block2 = svec_idx(p2, q2)
-            if block2 < block
-                continue
-            end
-            idxs2 = block_idxs(U, block2)
-
-            @views Hview = H[idxs, idxs2]
-            for k in eachindex(cone.Ps)
-                PΛiPk = cone.PΛiP_blocks_U[k]
-                @inbounds @. Hview += PΛiPk[p, p2] * PΛiPk[q, q2]
-                if (p != q) && (p2 != q2)
-                    @inbounds @. Hview += PΛiPk[p, q2] * PΛiPk[q, p2]
+            for p2 in 1:R, q2 in 1:p2
+                block2 = svec_idx(p2, q2)
+                if block2 < block
+                    continue
                 end
-            end
-            if xor(p == q, p2 == q2)
-                @. Hview *= cone.rt2
+                idxs2 = block_idxs(U, block2)
+
+                @views Hview = H[idxs, idxs2]
+                scal = (xor(p == q, p2 == q2) ? cone.rt2 : 1)
+                @. Hview += PΛiP_blocks[p, p2] * PΛiP_blocks[q, q2] * scal
+                if (p != q) && (p2 != q2)
+                    @inbounds @. Hview += PΛiP_blocks[p, q2] * PΛiP_blocks[q, p2]
+                end
             end
         end
     end
