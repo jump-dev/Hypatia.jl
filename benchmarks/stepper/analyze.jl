@@ -3,7 +3,7 @@ using DataFrames
 using Printf
 using BenchmarkProfiles
 
-enhancements = ["basic", "TOA", "curve", "comb", "shift"]
+enhancements = ["basic", "TOA", "curve", "comb", "back"]
 process_entry(x::Float64) = @sprintf("%.2f", x)
 process_entry(x::Int) = string(x)
 
@@ -200,22 +200,22 @@ function instance_stats(all_df)
         :npq,
         ),)
 
-    # shift and converged
-    shift_solver = filter(t -> t.solver_options == "shift", all_df)
-    shift_solver_conv = filter(t -> t.conv, shift_solver)
-    CSV.write(joinpath(csv_dir, "shiftconv.csv"), select(shift_solver_conv,
+    # back and converged
+    back_solver = filter(t -> t.solver_options == "back", all_df)
+    back_solver_conv = filter(t -> t.conv, back_solver)
+    CSV.write(joinpath(csv_dir, "backconv.csv"), select(back_solver_conv,
         :solve_time,
         :npq,
         [:time_uprhs, :solve_time] => ((x, y) -> x ./ y) => :prop_rhs,
         ),)
 
-    # basic and shift where both converged
-    two_solver = filter(t -> t.solver_options in ("basic", "shift"), all_df)
+    # basic and back where both converged
+    two_solver = filter(t -> t.solver_options in ("basic", "back"), all_df)
     two_solver = combine(groupby(two_solver, :inst_key), names(all_df), :conv => all => :two_conv)
     two_solver_conv = filter(t -> t.two_conv, two_solver)
     two_solver_conv = combine(groupby(two_solver_conv, :inst_key), [:solver_options, :solve_time], :solve_time => (x -> (x[1] - x[2]) / x[1]) => :improvement)
     filter!(t -> t.solver_options == "basic", two_solver_conv)
-    CSV.write(joinpath(csv_dir, "basicshiftconv.csv"), select(two_solver_conv, :solve_time, :improvement))
+    CSV.write(joinpath(csv_dir, "basicbackconv.csv"), select(two_solver_conv, :solve_time, :improvement))
 
     # only used to get list of cones manually
     ex_df = combine(groupby(basic_solver, :example),
@@ -231,7 +231,7 @@ function post_process()
     all_df = preprocess_df()
     make_agg_tables(all_df)
     make_subtime_tables(all_df)
-    for comp in [["basic", "toa"], ["toa", "curve"], ["curve", "comb"], ["comb", "shift"]], metric in [:solve_time, :iters]
+    for comp in [["basic", "toa"], ["toa", "curve"], ["curve", "comb"], ["comb", "back"]], metric in [:solve_time, :iters]
         make_perf_profiles(all_df, comp, metric)
     end
     instance_stats(all_df)
