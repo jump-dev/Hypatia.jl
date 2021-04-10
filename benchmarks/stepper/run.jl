@@ -24,7 +24,7 @@ stepper_options = [
     "toa" => porc(use_correction = true, use_curve_search = false),
     "curve" => porc(use_correction = true, use_curve_search = true),
     "comb" => comb(),
-    "shift" => comb(2),
+    "back" => comb(2),
     ]
 
 # instance sets and real types to run and corresponding time limits (seconds)
