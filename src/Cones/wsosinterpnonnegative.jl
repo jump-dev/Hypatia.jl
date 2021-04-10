@@ -152,23 +152,17 @@ function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WS
 
     @assert cone.grad_updated
     prod .= 0
-
     @inbounds for k in eachindex(cone.Ps)
-        Pk = cone.Ps[k]
-        LUk = cone.tempLU[k]
-        LLk = Hermitian(cone.tempLL2[k])
         ΛFLPk = cone.ΛFLP[k]
-
+        LUk = cone.tempLU[k]
+        LLk = cone.tempLL2[k]
         @views for j in 1:size(arr, 2)
-            mul!(LUk, ΛFLPk, Diagonal(arr[:, j]))
-            mul!(LLk.data, LUk, ΛFLPk')
-            mul!(LUk, LLk, ΛFLPk)
+            partial_lambda!(LUk, arr[:, j], LLk, ΛFLPk)
             for i in 1:cone.dim
                 prod[i, j] += real(dot(ΛFLPk[:, i], LUk[:, i]))
             end
         end
     end
-
     return prod
 end
 
@@ -176,21 +170,23 @@ function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
     @assert cone.grad_updated
     corr = cone.correction
     corr .= 0
-    D = Diagonal(primal_dir)
-
     @inbounds for k in eachindex(cone.Ps)
-        Pk = cone.Ps[k]
-        LUk = cone.tempLU[k]
-        LLk = cone.tempLL2[k]
-        ΛFLPk = cone.ΛFLP[k]
-
-        mul!(LUk, ΛFLPk, D)
-        mul!(LLk, LUk, ΛFLPk')
-        mul!(LUk, Hermitian(LLk), ΛFLPk)
+        LUk = partial_lambda!(cone.tempLU[k], primal_dir, cone.tempLL2[k], cone.ΛFLP[k])
         @views for j in 1:cone.dim
             corr[j] += sum(abs2, LUk[:, j])
         end
     end
-
     return corr
+end
+
+function partial_lambda!(
+    LUk::Matrix,
+    dir::AbstractVector,
+    LLk::Matrix,
+    ΛFLPk::Matrix,
+    )
+    mul!(LUk, ΛFLPk, Diagonal(dir))
+    mul!(LLk, LUk, ΛFLPk')
+    mul!(LUk, Hermitian(LLk), ΛFLPk)
+    return LUk
 end
