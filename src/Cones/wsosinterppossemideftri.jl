@@ -143,26 +143,6 @@ end
 
 is_dual_feas(cone::WSOSInterpPosSemidefTri) = true
 
-# diagonal from each (i, j) block in mat' * mat
-function block_diag_prod!(vect::Vector{T}, mat::Matrix{T}, U::Int, R::Int, rt2::T) where T
-    @inbounds for u in 1:U
-        idx = u
-        j_idx = u
-        for j in 1:R
-            i_idx = u
-            for i in 1:(j - 1)
-                @views vect[idx] += dot(mat[:, i_idx], mat[:, j_idx]) * rt2
-                idx += U
-                i_idx += U
-            end
-            @views vect[idx] += sum(abs2, mat[:, j_idx])
-            j_idx += U
-            idx += U
-        end
-    end
-    return
-end
-
 function update_grad(cone::WSOSInterpPosSemidefTri)
     @assert is_feas(cone)
     U = cone.U
@@ -196,7 +176,7 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
         end
 
         # update grad
-        block_diag_prod!(grad, ΛFLP, U, R, cone.rt2)
+        block_diag_prod!(grad, ΛFLP, ΛFLP, cone)
     end
     grad .*= -1
 
@@ -204,7 +184,7 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
     return cone.grad
 end
 
-function update_hess(cone::WSOSInterpPosSemidefTri)
+function update_hess(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     @assert cone.grad_updated
     R = cone.R
     U = cone.U
@@ -235,7 +215,7 @@ function update_hess(cone::WSOSInterpPosSemidefTri)
                 idxs2 = block_idxs(U, block2)
 
                 @views Hview = H[idxs, idxs2]
-                scal = (xor(p == q, p2 == q2) ? cone.rt2 : 1)
+                scal = (xor(p == q, p2 == q2) ? cone.rt2 : one(T))
                 @. Hview += PΛiP_blocks[p, p2] * PΛiP_blocks[q, q2] * scal
                 if (p != q) && (p2 != q2)
                     @inbounds @. Hview += PΛiP_blocks[p, q2] * PΛiP_blocks[q, p2]
@@ -252,85 +232,82 @@ function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WS
     cone.use_hess_prod_slow_updated || update_use_hess_prod_slow(cone)
     @assert cone.hess_updated
     cone.use_hess_prod_slow || return hess_prod!(prod, arr, cone)
-
-    @assert cone.grad_updated
-    prod .= 0
-    R = cone.R
-    U = cone.U
-
-    @inbounds for k in eachindex(cone.Ps)
-        L = size(cone.Ps[k], 2)
-        LLk = Symmetric(cone.tempLRLR2[k], :U)
-        ΛFLPk = cone.ΛFLP[k]
-        LRUR = cone.tempLRUR[k]
-
-        @views for j in 1:size(arr, 2)
-            LRUR .= 0
-            Aj = view(arr, :, j)
-            for q in 1:R, p in 1:R
-                for z in 1:(p - 1)
-                    mul!(LRUR[block_idxs(L, q), block_idxs(U, p)], ΛFLPk[block_idxs(L, q), block_idxs(U, z)], Diagonal(Aj[block_idxs(U, svec_idx(p, z))]), cone.rt2i, true)
-                end
-                mul!(LRUR[block_idxs(L, q), block_idxs(U, p)], ΛFLPk[block_idxs(L, q), block_idxs(U, p)], Diagonal(Aj[block_idxs(U, svec_idx(p, p))]), true, true)
-                for z in (p + 1):q
-                    mul!(LRUR[block_idxs(L, q), block_idxs(U, p)], ΛFLPk[block_idxs(L, q), block_idxs(U, z)], Diagonal(Aj[block_idxs(U, svec_idx(z, p))]), cone.rt2i, true)
-                end
-            end
-            mul!(LLk.data, LRUR, ΛFLPk')
-
-            for u in 1:U
-                idx = u
-                q_idx = u
-                for q in 1:R
-                    p_idx = u
-                    for p in 1:(q - 1)
-                        prod[idx, j] += dot(ΛFLPk[:, p_idx], LLk, ΛFLPk[:, q_idx]) * cone.rt2
-                        idx += U
-                        p_idx += U
-                    end
-                    prod[idx, j] += dot(ΛFLPk[:, q_idx], LLk, ΛFLPk[:, q_idx])
-                    q_idx += U
-                    idx += U
-                end
-            end
-        end
-    end
-
-    return prod
+    return partial_prod!(prod, arr, false, cone)
 end
 
 function correction(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
     @assert cone.grad_updated
-    corr = cone.correction
-    corr .= 0
+    return partial_prod!(cone.correction, primal_dir, true, cone)
+end
+
+# diagonal from each (i, j) block in mat1' * mat2
+function block_diag_prod!(
+    vect::AbstractVector{T},
+    mat1::Matrix{T},
+    mat2::Matrix{T},
+    cone::WSOSInterpPosSemidefTri{T},
+    ) where T
+    U = cone.U
+    @inbounds for u in 1:U
+        idx = u
+        j_idx = u
+        for j in 1:cone.R
+            i_idx = u
+            for i in 1:(j - 1)
+                @views vect[idx] += dot(mat1[:, i_idx], mat2[:, j_idx]) * cone.rt2
+                idx += U
+                i_idx += U
+            end
+            @views vect[idx] += dot(mat1[:, j_idx], mat2[:, j_idx])
+            j_idx += U
+            idx += U
+        end
+    end
+    return
+end
+
+function partial_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    use_symm_prod::Bool,
+    cone::WSOSInterpPosSemidefTri,
+    )
+    @assert cone.grad_updated
+    prod .= 0
     U = cone.U
     R = cone.R
     tempU = cone.tempU
 
-    @inbounds for k in eachindex(cone.Ps)
-        Pk = cone.Ps[k]
-        LU = cone.tempLU[k]
-        L = size(Pk, 2)
-        Δ = cone.tempLRLR2[k]
+    @inbounds for (k, Pk) in enumerate(cone.Ps)
+        Lk = size(Pk, 2)
+        LUk = cone.tempLU[k]
+        LRURk = cone.tempLRUR[k]
+        LRLRk = cone.tempLRLR2[k]
         ΛFLk = cone.ΛFL[k]
         ΛFLPk = cone.ΛFLP[k]
-        big_mat_half = cone.tempLRUR[k]
+        left_prod = (use_symm_prod ? LRURk : ΛFLPk)
 
-        @views for q in 1:R, p in 1:q
-            @. tempU = primal_dir[block_idxs(U, svec_idx(q, p))]
-            if p != q
-                tempU .*= cone.rt2i
+        @views for j in 1:size(arr, 2)
+            delta = arr[:, j]
+
+            for q in 1:R, p in 1:q
+                @. tempU = delta[block_idxs(U, svec_idx(q, p))]
+                if p != q
+                    # svec scaling
+                    tempU .*= cone.rt2i
+                end
+                mul!(LUk, Pk', Diagonal(tempU))
+                mul!(LRLRk[block_idxs(Lk, p), block_idxs(Lk, q)], LUk, Pk)
             end
-            mul!(LU, Pk', Diagonal(tempU))
-            mul!(Δ[block_idxs(L, p), block_idxs(L, q)], LU, Pk)
-        end
 
-        LinearAlgebra.copytri!(Δ, 'U')
-        ldiv!(ΛFLk.L, Δ)
-        rdiv!(Δ, ΛFLk.L')
-        mul!(big_mat_half, Symmetric(Δ), ΛFLPk)
-        block_diag_prod!(corr, big_mat_half, U, R, cone.rt2)
+            LinearAlgebra.copytri!(LRLRk, 'U')
+            ldiv!(ΛFLk.L, LRLRk)
+            rdiv!(LRLRk, ΛFLk.L')
+            mul!(LRURk, Symmetric(LRLRk), ΛFLPk)
+
+            block_diag_prod!(prod[:, j], left_prod, LRURk, cone)
+        end
     end
 
-    return corr
+    return prod
 end
