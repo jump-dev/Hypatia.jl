@@ -343,7 +343,6 @@ vec_copy_to!(v1::AbstractVecOrMat{Complex{T}}, v2::AbstractVecOrMat{T}) where {T
 
 # utilities for hessians for cones with PSD parts
 
-# TODO parallelize
 function symm_kron(
     H::AbstractMatrix{T},
     mat::AbstractMatrix{T},
@@ -359,8 +358,7 @@ function symm_kron(
             for j in 1:side
                 upper_only && row_idx > col_idx && continue
                 for i in 1:(j - 1)
-                    scal = (i == j ? 1 : rt2) * (k == l ? 1 : rt2) / 2
-                    H[row_idx, col_idx] = scal * (mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k])
+                    H[row_idx, col_idx] = mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k]
                     row_idx += 1
                 end
                 H[row_idx, col_idx] = rt2 * mat[j, k] * mat[j, l]
@@ -385,7 +383,6 @@ function symm_kron(
     return H
 end
 
-# TODO test output for non-Hermitian mat, the result may need transposing
 function symm_kron(
     H::AbstractMatrix{T},
     mat::AbstractMatrix{Complex{T}},
