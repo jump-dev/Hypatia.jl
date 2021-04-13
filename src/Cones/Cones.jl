@@ -31,7 +31,7 @@ abstract type Cone{T <: Real} end
 include("nonnegative.jl")
 include("possemideftri.jl")
 include("doublynonnegativetri.jl")
-include("possemideftrisparse.jl")
+include("possemideftrisparse/possemideftrisparse.jl")
 include("linmatrixineq.jl")
 include("epinorminf.jl")
 include("epinormeucl.jl")
@@ -356,7 +356,7 @@ function symm_kron(
         for k in 1:(l - 1)
             row_idx = 1
             for j in 1:side
-                upper_only && row_idx > col_idx && continue
+                upper_only && (row_idx > col_idx) && break
                 for i in 1:(j - 1)
                     H[row_idx, col_idx] = mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k]
                     row_idx += 1
@@ -369,7 +369,7 @@ function symm_kron(
 
         row_idx = 1
         for j in 1:side
-            upper_only && row_idx > col_idx && continue
+            upper_only && (row_idx > col_idx) && break
             for i in 1:(j - 1)
                 H[row_idx, col_idx] = rt2 * mat[i, l] * mat[j, l]
                 row_idx += 1

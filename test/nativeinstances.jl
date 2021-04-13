@@ -1,9 +1,5 @@
 #=
 native test instances
-
-TODO
-- improve efficiency of many of the tests by doing in-place linear algebra etc
-- maybe pass in tol?
 =#
 
 using Test
@@ -526,141 +522,146 @@ function doublynonnegativetri3(T; options...)
 end
 
 function possemideftrisparse1(T; options...)
-    if !(T <: LinearAlgebra.BlasReal)
-        return # only works with BLAS real types
-    end
-    tol = test_tol(T)
-    c = T[0, -1, 0]
-    A = T[1 0 0; 0 0 1]
-    b = T[0.5, 1]
-    G = -one(T) * I
-    h = zeros(T, 3)
-    row_idxs = [1, 2, 2]
-    col_idxs = [1, 1, 2]
-    cones = Cone{T}[Cones.PosSemidefTriSparse{T, T}(2, row_idxs, col_idxs)]
+    for (psdsparseimpl, realtypes) in Cones.PSDSparseImplList
+        (T <: realtypes) || continue
 
-    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
-    @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -one(T) atol=tol rtol=tol
-    @test r.x[2] ≈ one(T) atol=tol rtol=tol
-end
-
-function possemideftrisparse2(T; options...)
-    if !(T <: LinearAlgebra.BlasReal)
-        return # only works with BLAS real types
-    end
-    tol = test_tol(T)
-    Trt2 = sqrt(T(2))
-    Trt2i = inv(Trt2)
-    c = T[1, 0, 0, 1]
-    A = T[0 0 1 0]
-    b = T[1]
-    G = Diagonal(-one(T) * I, 4)
-    h = zeros(T, 4)
-    row_idxs = [1, 2, 2]
-    col_idxs = [1, 1, 2]
-    cones = Cone{T}[Cones.PosSemidefTriSparse{T, Complex{T}}(2, row_idxs, col_idxs)]
-
-    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
-    @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ Trt2 atol=tol rtol=tol
-    @test r.x ≈ [Trt2i, 0, 1, Trt2i] atol=tol rtol=tol
-end
-
-function possemideftrisparse3(T; options...)
-    if !(T <: LinearAlgebra.BlasReal)
-        return # only works with BLAS real types
-    end
-    tol = test_tol(T)
-    rt2 = sqrt(T(2))
-    Random.seed!(1)
-    for is_complex in (false, true), side in [1, 2, 5, 20]
-        R = (is_complex ? Complex{T} : T)
-        rand_mat_L = tril!(sprand(R, side, side, inv(sqrt(side))) + I)
-        (row_idxs, col_idxs, vals) = findnz(rand_mat_L)
-        dim = (is_complex ? side + 2 * (length(row_idxs) - side) : length(row_idxs))
-        c = zeros(T, dim)
-        A = zeros(T, 1, dim)
-        idx = 1
-        for (i, v) in enumerate(vals) # scale
-            if row_idxs[i] == col_idxs[i]
-                c[idx] = -real(v)
-                A[idx] = 1
-            else
-                c[idx] = -rt2 * real(v)
-                if is_complex
-                    idx += 1
-                    c[idx] = -rt2 * imag(v)
-                end
-            end
-            idx += 1
-        end
-        b = T[1]
-        G = Diagonal(-one(T) * I, dim)
-        h = zeros(T, dim)
-        cones = Cone{T}[Cones.PosSemidefTriSparse{T, R}(side, row_idxs, col_idxs, use_dual = true)]
+        tol = test_tol(T)
+        c = T[0, -1, 0]
+        A = T[1 0 0; 0 0 1]
+        b = T[0.5, 1]
+        G = -one(T) * I
+        h = zeros(T, 3)
+        row_idxs = [1, 2, 2]
+        col_idxs = [1, 1, 2]
+        cones = Cone{T}[Cones.PosSemidefTriSparse{psdsparseimpl, T, T}(2, row_idxs, col_idxs)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        eig_max = maximum(eigvals(Hermitian(Matrix(rand_mat_L), :L)))
-        @test r.primal_obj ≈ -eig_max atol=tol rtol=tol
+        @test r.primal_obj ≈ -one(T) atol=tol rtol=tol
+        @test r.x[2] ≈ one(T) atol=tol rtol=tol
+    end
+end
+
+function possemideftrisparse2(T; options...)
+    for (psdsparseimpl, realtypes) in Cones.PSDSparseImplList
+        (T <: realtypes) || continue
+
+        tol = test_tol(T)
+        Trt2 = sqrt(T(2))
+        Trt2i = inv(Trt2)
+        c = T[1, 0, 0, 1]
+        A = T[0 0 1 0]
+        b = T[1]
+        G = Diagonal(-one(T) * I, 4)
+        h = zeros(T, 4)
+        row_idxs = [1, 2, 2]
+        col_idxs = [1, 1, 2]
+        cones = Cone{T}[Cones.PosSemidefTriSparse{psdsparseimpl, T, Complex{T}}(2, row_idxs, col_idxs)]
+
+        r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+        @test r.status == Solvers.Optimal
+        @test r.primal_obj ≈ Trt2 atol=tol rtol=tol
+        @test r.x ≈ [Trt2i, 0, 1, Trt2i] atol=tol rtol=tol
+    end
+end
+
+function possemideftrisparse3(T; options...)
+    for (psdsparseimpl, realtypes) in Cones.PSDSparseImplList
+        (T <: realtypes) || continue
+
+        tol = test_tol(T)
+        rt2 = sqrt(T(2))
+        Random.seed!(1)
+        for is_complex in (false, true), side in [1, 2, 5, 20]
+            R = (is_complex ? Complex{T} : T)
+            rand_mat_L = tril!(sprand(R, side, side, inv(sqrt(side))) + I)
+            (row_idxs, col_idxs, vals) = findnz(rand_mat_L)
+            dim = (is_complex ? side + 2 * (length(row_idxs) - side) : length(row_idxs))
+            c = zeros(T, dim)
+            A = zeros(T, 1, dim)
+            idx = 1
+            for (i, v) in enumerate(vals) # scale
+                if row_idxs[i] == col_idxs[i]
+                    c[idx] = -real(v)
+                    A[idx] = 1
+                else
+                    c[idx] = -rt2 * real(v)
+                    if is_complex
+                        idx += 1
+                        c[idx] = -rt2 * imag(v)
+                    end
+                end
+                idx += 1
+            end
+            b = T[1]
+            G = Diagonal(-one(T) * I, dim)
+            h = zeros(T, dim)
+            cones = Cone{T}[Cones.PosSemidefTriSparse{psdsparseimpl, T, R}(side, row_idxs, col_idxs, use_dual = true)]
+
+            r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+            @test r.status == Solvers.Optimal
+            eig_max = maximum(eigvals(Hermitian(Matrix(rand_mat_L), :L)))
+            @test r.primal_obj ≈ -eig_max atol=tol rtol=tol
+        end
     end
 end
 
 function possemideftrisparse4(T; options...)
-    if !(T <: LinearAlgebra.BlasReal)
-        return # only works with BLAS real types
-    end
-    tol = test_tol(T)
-    rt2 = sqrt(T(2))
-    c = T[1]
-    A = zeros(T, 0, 1)
-    b = T[]
-    G = zeros(T, 10, 1)
-    G[[1, 2, 3, 6, 10]] .= -1
-    h = zeros(T, 10)
-    @. h[[4, 5, 7, 8, 9]] = rt2 * [1, 1, 1, -1, 1]
-    row_idxs = [1, 2, 3, 4, 4, 4, 5, 5, 5, 5]
-    col_idxs = [1, 2, 3, 1, 2, 4, 1, 2, 3, 5]
-    cones = Cone{T}[Cones.PosSemidefTriSparse{T, T}(5, row_idxs, col_idxs)]
+    for (psdsparseimpl, realtypes) in Cones.PSDSparseImplList
+        (T <: realtypes) || continue
 
-    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
-    @test r.status == Solvers.Optimal
-    rt3 = sqrt(T(3))
-    @test r.primal_obj ≈ rt3 atol=tol rtol=tol
-    @test r.s ≈ [rt3, rt3, rt3, rt2, rt2, rt3, rt2, -rt2, rt2, rt3] atol=tol rtol=tol
-    inv6 = inv(T(6))
-    rt2inv6 = rt2 / 6
-    invrt6 = inv(rt2 * rt3)
-    @test r.z ≈ [inv6, inv6, inv6, 0, 0, 0, -invrt6, invrt6, -invrt6, inv(T(2))] atol=tol rtol=tol
+        tol = test_tol(T)
+        rt2 = sqrt(T(2))
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        G = zeros(T, 10, 1)
+        G[[1, 2, 3, 6, 10]] .= -1
+        h = zeros(T, 10)
+        @. h[[4, 5, 7, 8, 9]] = rt2 * [1, 1, 1, -1, 1]
+        row_idxs = [1, 2, 3, 4, 4, 4, 5, 5, 5, 5]
+        col_idxs = [1, 2, 3, 1, 2, 4, 1, 2, 3, 5]
+        cones = Cone{T}[Cones.PosSemidefTriSparse{psdsparseimpl, T, T}(5, row_idxs, col_idxs)]
+
+        r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+        @test r.status == Solvers.Optimal
+        rt3 = sqrt(T(3))
+        @test r.primal_obj ≈ rt3 atol=tol rtol=tol
+        @test r.s ≈ [rt3, rt3, rt3, rt2, rt2, rt3, rt2, -rt2, rt2, rt3] atol=tol rtol=tol
+        inv6 = inv(T(6))
+        rt2inv6 = rt2 / 6
+        invrt6 = inv(rt2 * rt3)
+        @test r.z ≈ [inv6, inv6, inv6, 0, 0, 0, -invrt6, invrt6, -invrt6, inv(T(2))] atol=tol rtol=tol
+    end
 end
 
 function possemideftrisparse5(T; options...)
-    if !(T <: LinearAlgebra.BlasReal)
-        return # only works with BLAS real types
-    end
-    tol = test_tol(T)
-    rt2 = sqrt(T(2))
-    inv2 = inv(T(2))
-    c = vcat(one(T), zeros(T, 5))
-    A = zeros(T, 0, 6)
-    b = T[]
-    G = vcat(Matrix(-one(T) * I, 6, 6), zeros(T, 6, 6))
-    G[1, 2:end] .= inv2
-    h = vcat(zeros(T, 6), rt2 * [1, 1, 0, 1, -1, 1])
-    row_idxs = [1, 2, 3, 4, 5, 4, 4, 4, 5, 5, 5]
-    col_idxs = [1, 2, 3, 4, 5, 1, 2, 3, 1, 2, 3]
-    cones = Cone{T}[Cones.Nonnegative{T}(1), Cones.PosSemidefTriSparse{T, T}(5, row_idxs, col_idxs, use_dual = true)]
+    for (psdsparseimpl, realtypes) in Cones.PSDSparseImplList
+        (T <: realtypes) || continue
 
-    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
-    @test r.status == Solvers.Optimal
-    rt3 = sqrt(T(3))
-    @test r.primal_obj ≈ rt2 + rt3 atol=tol rtol=tol
-    invrt2 = inv(rt2)
-    invrt3 = inv(rt3)
-    @test r.s ≈ [0, invrt2 + invrt3, invrt2 + invrt3, invrt3, rt2, rt3, rt2, rt2, 0, rt2, -rt2, rt2] atol=tol rtol=tol
-    invrt6 = invrt2 * invrt3
-    @test r.z ≈ [1, inv2, inv2, inv2, inv2, inv2, -inv2, -inv2, 0, -invrt6, invrt6, -invrt6] atol=tol rtol=tol
+        tol = test_tol(T)
+        rt2 = sqrt(T(2))
+        inv2 = inv(T(2))
+        c = vcat(one(T), zeros(T, 5))
+        A = zeros(T, 0, 6)
+        b = T[]
+        G = vcat(Matrix(-one(T) * I, 6, 6), zeros(T, 6, 6))
+        G[1, 2:end] .= inv2
+        h = vcat(zeros(T, 6), rt2 * [1, 1, 0, 1, -1, 1])
+        row_idxs = [1, 2, 3, 4, 5, 4, 4, 4, 5, 5, 5]
+        col_idxs = [1, 2, 3, 4, 5, 1, 2, 3, 1, 2, 3]
+        cones = Cone{T}[Cones.Nonnegative{T}(1), Cones.PosSemidefTriSparse{psdsparseimpl, T, T}(5, row_idxs, col_idxs, use_dual = true)]
+
+        r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+        @test r.status == Solvers.Optimal
+        rt3 = sqrt(T(3))
+        @test r.primal_obj ≈ rt2 + rt3 atol=tol rtol=tol
+        invrt2 = inv(rt2)
+        invrt3 = inv(rt3)
+        @test r.s ≈ [0, invrt2 + invrt3, invrt2 + invrt3, invrt3, rt2, rt3, rt2, rt2, 0, rt2, -rt2, rt2] atol=tol rtol=tol
+        invrt6 = invrt2 * invrt3
+        @test r.z ≈ [1, inv2, inv2, inv2, inv2, inv2, -inv2, -inv2, 0, -invrt6, invrt6, -invrt6] atol=tol rtol=tol
+    end
 end
 
 function linmatrixineq1(T; options...)

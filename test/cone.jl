@@ -368,7 +368,7 @@ function test_oracles(C::Type{<:Cones.PosSemidefTriSparse})
     end
 end
 
-function test_barrier(C::Type{Cones.PosSemidefTriSparse{T, T}}) where T
+function test_barrier(C::Type{<:Cones.PosSemidefTriSparse{<:Cones.PSDSparseImpl, T, T}}) where T
     dW = 25
     (row_idxs, col_idxs) = rand_sppsd_pattern(dW)
     invrt2 = inv(sqrt(T(2)))
@@ -381,7 +381,7 @@ function test_barrier(C::Type{Cones.PosSemidefTriSparse{T, T}}) where T
     test_barrier(C(dW, row_idxs, col_idxs), barrier)
 end
 
-function test_barrier(C::Type{Cones.PosSemidefTriSparse{T, Complex{T}}}) where T
+function test_barrier(C::Type{<:Cones.PosSemidefTriSparse{<:Cones.PSDSparseImpl, T, Complex{T}}}) where T
     dW = 25
     (row_idxs, col_idxs) = rand_sppsd_pattern(dW)
     invrt2 = inv(sqrt(T(2)))

@@ -19,8 +19,10 @@ include(joinpath(@__DIR__, "moi.jl"))
         BigFloat,
         ]
     for T in real_types
-        println(T, " ...")
-        test_moi_cones(T)
+        @testset "$T" begin
+            println(T, " ...")
+            test_moi_cones(T)
+        end
     end
 end
 
