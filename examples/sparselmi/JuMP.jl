@@ -1,10 +1,10 @@
 #=
 solve a simple LMI problem
 
-min c⋅x
-st. x₁ = 0
-    sumᵢ Pₖ₀ + xᵢ Pₖᵢ ⪰ 0, ∀k = 1..K
-where Pₖᵢ ∈ 𝕊ˢ, Pₖ₀ ≺ 0, Pₖ₁ = I, Pₖᵢ ⪰ 0 ∀k > 0
+min y
+st. sum(x) = 1
+    Qₖ + y I + sumᵢ xᵢ Pₖᵢ ⪰ 0, ∀k = 1..K
+where Qₖ ≺ 0, Pₖᵢ ∈ 𝕊ˢ
 
 formulations: PSD, sparse PSD (sparse Pₖᵢ, with sparse or dense chol), LMI (sparse or dense Pₖᵢ)
 =#
@@ -26,29 +26,33 @@ function build(inst::SparseLMIJuMP{T}) where {T <: Float64}
     @assert (inst.use_psd + inst.use_sparsepsd + inst.use_linmatrixineq) == 1
     (num_lmis, side_Ps, num_Ps) = (inst.num_lmis, inst.side_Ps, inst.num_Ps)
 
-    # TODO make sparse if inst.sparse_Ps
-    rand_psd() = (M = randn(side_Ps, side_Ps); Symmetric(M * M'))
-
-    P0s = Vector(undef, num_lmis)
-    Ps = Matrix(undef, num_lmis, num_Ps)
-    for k in 1:num_lmis
-        for i in 2:num_Ps
-            Ps[k, i] = rand_psd() # ≻ 0
+    function rand_symm()
+        if inst.sparse_Ps
+            sparsity = min(3.0 / side_Ps, 1.0) # sparsity factor
+            M = sprandn(side_Ps, side_Ps, sparsity)
+            for idx in rand(1:side_Ps, div(side_Ps, 3))
+                M[idx, idx] = rand()
+            end
+            return Symmetric(M)
+        else
+            return Symmetric(randn(side_Ps, side_Ps))
         end
-        P0s[k] = -sum(Ps[k, 2:end]) # ≺ 0, feasible for x = 1
-        # TODO Ps[k, 1] = I
-        Ps[k, 1] = Symmetric(one(P0s[k]))
     end
-    c = rand(num_Ps)
+    rand_psd() = (M = rand_symm(); Symmetric(M * M'))
+
+    Ps = [rand_symm() for k in 1:num_lmis, i in 1:num_Ps]
+    Qs = [-rand_psd() for k in 1:num_lmis]
+    matI = Symmetric(one(Qs[1]))
 
     model = JuMP.Model()
+    JuMP.@variable(model, y)
+    JuMP.@objective(model, Min, y)
     JuMP.@variable(model, x[1:num_Ps])
-    JuMP.@objective(model, Min, dot(c, x))
-    JuMP.@constraint(model, x[1] == 0)
+    JuMP.@constraint(model, sum(x) == 1)
 
     if inst.use_psd || inst.use_sparsepsd
         for k in 1:num_lmis
-            Sk = Symmetric(P0s[k] + sum(x[i] * Ps[k, i] for i in 1:num_Ps))
+            Sk = Symmetric(Qs[k] + y * matI + sum(x[i] * Ps[k, i] for i in 1:num_Ps))
             if inst.use_psd
                 JuMP.@constraint(model, Sk in JuMP.PSDCone())
             else
@@ -60,7 +64,7 @@ function build(inst::SparseLMIJuMP{T}) where {T <: Float64}
         end
     elseif inst.use_linmatrixineq
         JuMP.@constraint(model, [k in 1:num_lmis],
-            vcat(x, 1) in Hypatia.LinMatrixIneqCone{Float64}([Ps[k, :]..., P0s[k]]))
+            vcat(y, x, 1) in Hypatia.LinMatrixIneqCone{Float64}([matI, Ps[k, :]..., Qs[k]]))
     else
         error()
     end

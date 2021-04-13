@@ -111,8 +111,8 @@ end
 
 is_dual_feas(cone::PosSemidefTriSparse) = true # TODO try completable matrix test
 
-include("possemideftrisparse/denseimpl.jl")
-include("possemideftrisparse/cholmodimpl.jl")
+include("denseimpl.jl")
+include("cholmodimpl.jl")
 const PSDSparseImplList = [
     (Cones.PSDSparseDense, Real),
     (Cones.PSDSparseCholmod, LinearAlgebra.BlasReal),
