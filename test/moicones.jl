@@ -167,19 +167,21 @@ function test_moi_cones(T::Type{<:Real})
     end
 
     @testset "PosSemidefTriSparse" begin
-        if T <: LinearAlgebra.BlasReal # only works with BLAS real types
+        for (psdsparseimpl, realtypes) in Cones.PSDSparseImplList
+            (T <: realtypes) || continue
+
             Random.seed!(1)
             side = 5
             (row_idxs, col_idxs, _) = SparseArrays.findnz(tril!(SparseArrays.sprand(Bool, side, side, 0.3)) + I)
 
-            moi_cone = Hypatia.PosSemidefTriSparseCone{T, T}(side, row_idxs, col_idxs)
+            moi_cone = Hypatia.PosSemidefTriSparseCone{psdsparseimpl, T, T}(side, row_idxs, col_idxs)
             hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-            @test hyp_cone isa Cones.PosSemidefTriSparse{T, T}
+            @test hyp_cone isa Cones.PosSemidefTriSparse{psdsparseimpl, T, T}
             @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == length(row_idxs)
 
-            moi_cone = Hypatia.PosSemidefTriSparseCone{T, Complex{T}}(side, row_idxs, col_idxs)
+            moi_cone = Hypatia.PosSemidefTriSparseCone{psdsparseimpl, T, Complex{T}}(side, row_idxs, col_idxs)
             hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-            @test hyp_cone isa Cones.PosSemidefTriSparse{T, Complex{T}}
+            @test hyp_cone isa Cones.PosSemidefTriSparse{psdsparseimpl, T, Complex{T}}
             @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 2 * length(row_idxs) - side
         end
     end

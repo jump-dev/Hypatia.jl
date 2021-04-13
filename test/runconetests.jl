@@ -13,6 +13,8 @@ function cone_types(T::Type{<:Real})
         Cones.PosSemidefTri{T, T},
         Cones.PosSemidefTri{T, Complex{T}},
         Cones.DoublyNonnegativeTri{T},
+        Cones.PosSemidefTriSparse{Cones.PSDSparseDense, T, T},
+        Cones.PosSemidefTriSparse{Cones.PSDSparseDense, T, Complex{T}},
         Cones.LinMatrixIneq{T},
         Cones.EpiNormInf{T, T},
         Cones.EpiNormInf{T, Complex{T}},
@@ -42,8 +44,8 @@ function cone_types(T::Type{<:Real})
         ]
     if T <: LinearAlgebra.BlasReal
         append!(cones_T, [
-            Cones.PosSemidefTriSparse{T, T},
-            Cones.PosSemidefTriSparse{T, Complex{T}},
+            Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, T},
+            Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, Complex{T}},
             ])
     end
     return cones_T

@@ -19,6 +19,7 @@ struct NearestPSDJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_completable::Bool # solve problem (2) above, else solve problem (1)
     use_chordal_sparsity::Bool # use a chordal sparsity pattern, else use a general sparsity pattern
     use_sparsepsd::Bool # use sparse PSD cone formulation, else dense PSD formulation
+    use_cholmod_impl::Bool # use sparsePSD cone with CHOLMOD implementation, else dense implementation
 end
 
 function build(inst::NearestPSDJuMP{T}) where {T <: Float64}
@@ -29,7 +30,6 @@ function build(inst::NearestPSDJuMP{T}) where {T <: Float64}
     A = tril!(sprandn(side, side, sparsity)) + Diagonal(randn(side))
     if inst.use_chordal_sparsity
         # compute a (heuristic) chordal extension of A using CHOLMOD functions
-        # TODO extend ModelUtilities to compute chordal extensions
         copyto!(A, I)
         A = sparse(cholesky(Symmetric(A, :L)).L)
         (row_idxs, col_idxs, _) = findnz(A)
@@ -49,7 +49,9 @@ function build(inst::NearestPSDJuMP{T}) where {T <: Float64}
         if inst.use_sparsepsd
             rt2 = sqrt(2)
             X_scal = [X[k] * (row_idxs[k] == col_idxs[k] ? 1.0 : rt2) for k in eachindex(X)]
-            JuMP.@constraint(model, X_scal in Hypatia.PosSemidefTriSparseCone{Float64, Float64}(side, row_idxs, col_idxs, inst.use_completable))
+            impl = (inst.use_cholmod_impl ? Cones.PSDSparseCholmod : Cones.PSDSparseDense)
+            cone = Hypatia.PosSemidefTriSparseCone{impl, Float64, Float64}
+            JuMP.@constraint(model, X_scal in cone(side, row_idxs, col_idxs, inst.use_completable))
         else
             X_sparse = sparse(row_idxs, col_idxs, X)
             JuMP.@SDconstraint(model, Symmetric(Matrix(X_sparse), :L) >= 0)

@@ -36,21 +36,21 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
-    "JuMP",
+    # "native",
+    # "JuMP",
     ]
 
 # list of names of native examples to run
 native_example_names = [
-    # "densityest",
-    # "envelope",
-    # "expdesign",
+    "densityest",
+    "envelope",
+    "expdesign",
     "linearopt",
     "matrixcompletion",
-    # "matrixregression",
+    "matrixregression",
     "maxvolume",
-    # "polymin",
-    # "portfolio",
+    "polymin",
+    "portfolio",
     "sparsepca",
     ]
 
@@ -80,6 +80,7 @@ JuMP_example_names = [
     "semidefinitepoly",
     "shapeconregr",
     "signomialmin",
+    "sparselmi",
     "stabilitynumber",
     ]
 
@@ -115,8 +116,8 @@ end
 end
 end
 
-# println("\n")
-# DataFrames.show(perf, allrows = true, allcols = true)
+println("\n")
+DataFrames.show(perf, allrows = true, allcols = true)
 println("\n")
 end
 
