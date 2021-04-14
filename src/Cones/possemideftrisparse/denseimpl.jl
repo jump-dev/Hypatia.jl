@@ -35,7 +35,7 @@ function update_feas(cone::PosSemidefTriSparse{PSDSparseDense})
 end
 
 function update_grad(cone::PosSemidefTriSparse{PSDSparseDense})
-    @assert cone.is_feas
+    @assert !cone.grad_updated && cone.is_feas
     cache = cone.cache
 
     cache.inv_mat = inv(cache.fact_mat)

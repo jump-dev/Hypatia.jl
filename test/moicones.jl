@@ -310,10 +310,10 @@ function test_moi_cones(T::Type{<:Real})
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
     end
 
-    @testset "EpiPerTraceEntropyTriCone" begin
-        moi_cone = Hypatia.EpiPerTraceEntropyTriCone{T}(3)
+    @testset "EpiPerTrEntropyTriCone" begin
+        moi_cone = Hypatia.EpiPerTrEntropyTriCone{T}(3)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa Cones.EpiPerTraceEntropyTri{T}
+        @test hyp_cone isa Cones.EpiPerTrEntropyTri{T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
     end
 
@@ -324,10 +324,10 @@ function test_moi_cones(T::Type{<:Real})
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 5
     end
 
-    @testset "EpiTraceRelEntropyTriCone" begin
-        moi_cone = Hypatia.EpiTraceRelEntropyTriCone{T}(3)
+    @testset "EpiTrRelEntropyTriCone" begin
+        moi_cone = Hypatia.EpiTrRelEntropyTriCone{T}(3)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa Cones.EpiTraceRelEntropyTri{T}
+        @test hyp_cone isa Cones.EpiTrRelEntropyTri{T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
     end
 

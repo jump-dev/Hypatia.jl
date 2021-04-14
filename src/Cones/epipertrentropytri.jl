@@ -5,7 +5,7 @@
 barrier -log(u - tr(W * log(W / v))) - log(v) - logdet(W) where log() is the matrix logarithm
 =#
 
-mutable struct EpiPerTraceEntropyTri{T <: Real} <: Cone{T}
+mutable struct EpiPerTrEntropyTri{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
     d::Int
@@ -44,7 +44,7 @@ mutable struct EpiPerTraceEntropyTri{T <: Real} <: Cone{T}
     matsdim2::Matrix{T}
     grad_logW::Matrix{T}
 
-    function EpiPerTraceEntropyTri{T}(
+    function EpiPerTrEntropyTri{T}(
         dim::Int;
         use_dual::Bool = false,
         hess_fact_cache = hessian_cache(T),
@@ -60,7 +60,7 @@ mutable struct EpiPerTraceEntropyTri{T <: Real} <: Cone{T}
     end
 end
 
-function setup_extra_data(cone::EpiPerTraceEntropyTri{T}) where T
+function setup_extra_data(cone::EpiPerTrEntropyTri{T}) where T
     dim = cone.dim
     sdim = cone.dim - 2
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -80,9 +80,9 @@ function setup_extra_data(cone::EpiPerTraceEntropyTri{T}) where T
     return cone
 end
 
-get_nu(cone::EpiPerTraceEntropyTri) = cone.d + 2
+get_nu(cone::EpiPerTrEntropyTri) = cone.d + 2
 
-function set_initial_point(arr::AbstractVector{T}, cone::EpiPerTraceEntropyTri{T}) where T
+function set_initial_point(arr::AbstractVector{T}, cone::EpiPerTrEntropyTri{T}) where T
     d = cone.d
     (u, w) = get_central_ray_epiperentropy(d)
     arr[1] = u
@@ -93,7 +93,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::EpiPerTraceEntropyTri{T
     return arr
 end
 
-function update_feas(cone::EpiPerTraceEntropyTri{T}) where T
+function update_feas(cone::EpiPerTrEntropyTri{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
@@ -101,7 +101,7 @@ function update_feas(cone::EpiPerTraceEntropyTri{T}) where T
     copyto!(cone.mat2, W)
     (W_vals, W_vecs) = cone.fact_W = eigen!(Hermitian(cone.mat2, :U))
 
-    if (v > eps(T)) && all(wi -> wi > eps(T), W_vals)
+    if (v > eps(T)) && all(>(eps(T)), W_vals)
         @. cone.W_vals_log = log(W_vals)
         mul!(cone.mat, W_vecs, Diagonal(cone.W_vals_log))
         mul!(cone.lwv, cone.mat, W_vecs')
@@ -119,7 +119,7 @@ function update_feas(cone::EpiPerTraceEntropyTri{T}) where T
     return cone.is_feas
 end
 
-function is_dual_feas(cone::EpiPerTraceEntropyTri{T}) where T
+function is_dual_feas(cone::EpiPerTrEntropyTri{T}) where T
     u = cone.dual_point[1]
     if u > eps(T)
         v = cone.dual_point[2]
@@ -133,7 +133,7 @@ function is_dual_feas(cone::EpiPerTraceEntropyTri{T}) where T
     return false
 end
 
-function update_grad(cone::EpiPerTraceEntropyTri)
+function update_grad(cone::EpiPerTrEntropyTri)
     @assert cone.is_feas
     u = cone.point[1]
     v = cone.point[2]
@@ -159,7 +159,7 @@ function update_grad(cone::EpiPerTraceEntropyTri)
     return cone.grad
 end
 
-function update_hess(cone::EpiPerTraceEntropyTri{T}) where T
+function update_hess(cone::EpiPerTrEntropyTri{T}) where T
     @assert cone.grad_updated
     d = cone.d
     u = cone.point[1]
@@ -201,7 +201,7 @@ function update_hess(cone::EpiPerTraceEntropyTri{T}) where T
     return cone.hess
 end
 
-function correction(cone::EpiPerTraceEntropyTri{T}, primal_dir::AbstractVector{T}) where T
+function correction(cone::EpiPerTrEntropyTri{T}, primal_dir::AbstractVector{T}) where T
     @assert cone.hess_updated
     d = cone.d
     z = cone.z

@@ -9,8 +9,10 @@ real symmetric or complex Hermitian cases
 NOTE in complex Hermitian case, on-diagonal (real) elements have one slot in the vector and below diagonal (complex) elements have two consecutive slots in the vector, but row and column indices are not repeated
 =#
 
+# implementation type for sparse PSD factorizations etc
 abstract type PSDSparseImpl end
 
+# cache for implementation
 abstract type PSDSparseCache{T <: Real, R <: RealOrComplex{T}} end
 
 mutable struct PosSemidefTriSparse{I <: PSDSparseImpl, T <: Real, R <: RealOrComplex{T}} <: Cone{T}
@@ -48,7 +50,7 @@ mutable struct PosSemidefTriSparse{I <: PSDSparseImpl, T <: Real, R <: RealOrCom
         col_idxs::Vector{Int};
         use_dual::Bool = false,
         hess_fact_cache = hessian_cache(T),
-        ) where {I <: PSDSparseImpl, R <: RealOrComplex{T}} where {T <: Real}
+        ) where {I <: PSDSparseImpl, T <: Real, R <: RealOrComplex{T}}
         # check validity of inputs
         num_nz = length(row_idxs)
         @assert length(col_idxs) == num_nz
@@ -109,7 +111,7 @@ function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse)
     return arr
 end
 
-is_dual_feas(cone::PosSemidefTriSparse) = true # TODO try completable matrix test
+# is_dual_feas(cone::PosSemidefTriSparse) = true # TODO try completable matrix test
 
 include("denseimpl.jl")
 include("cholmodimpl.jl")

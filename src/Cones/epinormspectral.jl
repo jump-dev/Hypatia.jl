@@ -131,7 +131,6 @@ function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: BlasReal}
 
     return false
 end
-is_dual_feas(cone::EpiNormSpectral) = true # NOTE svdvals too slow for non-BLAS types
 
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas

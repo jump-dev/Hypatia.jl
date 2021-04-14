@@ -111,8 +111,6 @@ function update_feas(cone::WSOSInterpNonnegative)
     return cone.is_feas
 end
 
-is_dual_feas(cone::WSOSInterpNonnegative) = true
-
 function update_grad(cone::WSOSInterpNonnegative)
     @assert cone.is_feas
 

@@ -139,8 +139,6 @@ function update_feas(cone::DoublyNonnegativeTri{T}) where T
     return cone.is_feas
 end
 
-is_dual_feas(cone::DoublyNonnegativeTri) = true
-
 function update_grad(cone::DoublyNonnegativeTri)
     @assert cone.is_feas
 

@@ -12,7 +12,7 @@ uses the log-homogeneous but not self-concordant barrier
 TODO reduce allocations
 =#
 
-mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
+mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
     d::Int
@@ -63,7 +63,7 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     dz_sqr_dW_sqr::Matrix{T}
     dz_sqr_dW_dV::Matrix{T}
 
-    function EpiTraceRelEntropyTri{T}(
+    function EpiTrRelEntropyTri{T}(
         dim::Int;
         use_dual::Bool = false,
         hess_fact_cache = hessian_cache(T),
@@ -79,7 +79,7 @@ mutable struct EpiTraceRelEntropyTri{T <: Real} <: Cone{T}
     end
 end
 
-function setup_extra_data(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
+function setup_extra_data(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     dim = cone.dim
     vw_dim = cone.vw_dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -114,9 +114,9 @@ function setup_extra_data(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     return
 end
 
-get_nu(cone::EpiTraceRelEntropyTri) = 2 * cone.d + 1
+get_nu(cone::EpiTrRelEntropyTri) = 2 * cone.d + 1
 
-function set_initial_point(arr::AbstractVector, cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
+function set_initial_point(arr::AbstractVector, cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     arr .= 0
     # at the initial point V and W are diagonal, equivalent to epirelentropy
     (arr[1], v, w) = get_central_ray_epirelentropy(cone.d)
@@ -129,7 +129,7 @@ function set_initial_point(arr::AbstractVector, cone::EpiTraceRelEntropyTri{T}) 
     return arr
 end
 
-function update_feas(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
+function update_feas(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     @assert !cone.feas_updated
     point = cone.point
     vw_dim = cone.vw_dim
@@ -157,9 +157,9 @@ function update_feas(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     return cone.is_feas
 end
 
-is_dual_feas(::EpiTraceRelEntropyTri) = true
+is_dual_feas(::EpiTrRelEntropyTri) = true
 
-function update_grad(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
+function update_grad(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     @assert cone.is_feas
     d = cone.d
     rt2 = cone.rt2
@@ -191,7 +191,7 @@ function update_grad(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     return cone.grad
 end
 
-function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
+function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     @assert cone.grad_updated
     d = cone.d
     rt2 = cone.rt2
@@ -239,7 +239,7 @@ function update_hess(cone::EpiTraceRelEntropyTri{T}) where {T <: Real}
     return cone.hess
 end
 
-function correction(cone::EpiTraceRelEntropyTri{T}, primal_dir::AbstractVector{T}) where T
+function correction(cone::EpiTrRelEntropyTri{T}, primal_dir::AbstractVector{T}) where T
     @assert cone.hess_updated
     d = cone.d
     corr = cone.correction

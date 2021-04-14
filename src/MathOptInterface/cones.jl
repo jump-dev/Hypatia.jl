@@ -244,14 +244,14 @@ EpiPerEntropyCone{T}(dim::Int) where {T <: Real} = EpiPerEntropyCone{T}(dim, fal
 MOI.dimension(cone::EpiPerEntropyCone) = cone.dim
 cone_from_moi(::Type{T}, cone::EpiPerEntropyCone{T}) where {T <: Real} = Cones.EpiPerEntropy{T}(cone.dim, use_dual = cone.use_dual)
 
-export EpiPerTraceEntropyTriCone
-struct EpiPerTraceEntropyTriCone{T <: Real} <: MOI.AbstractVectorSet
+export EpiPerTrEntropyTriCone
+struct EpiPerTrEntropyTriCone{T <: Real} <: MOI.AbstractVectorSet
     dim::Int
     use_dual::Bool
 end
-EpiPerTraceEntropyTriCone{T}(dim::Int) where {T <: Real} = EpiPerTraceEntropyTriCone{T}(dim, false)
-MOI.dimension(cone::EpiPerTraceEntropyTriCone where {T <: Real}) = cone.dim
-cone_from_moi(::Type{T}, cone::EpiPerTraceEntropyTriCone{T}) where {T <: Real} = Cones.EpiPerTraceEntropyTri{T}(cone.dim, use_dual = cone.use_dual)
+EpiPerTrEntropyTriCone{T}(dim::Int) where {T <: Real} = EpiPerTrEntropyTriCone{T}(dim, false)
+MOI.dimension(cone::EpiPerTrEntropyTriCone where {T <: Real}) = cone.dim
+cone_from_moi(::Type{T}, cone::EpiPerTrEntropyTriCone{T}) where {T <: Real} = Cones.EpiPerTrEntropyTri{T}(cone.dim, use_dual = cone.use_dual)
 
 export EpiRelEntropyCone
 struct EpiRelEntropyCone{T <: Real} <: MOI.AbstractVectorSet
@@ -262,14 +262,14 @@ EpiRelEntropyCone{T}(dim::Int) where {T <: Real} = EpiRelEntropyCone{T}(dim, fal
 MOI.dimension(cone::EpiRelEntropyCone) = cone.dim
 cone_from_moi(::Type{T}, cone::EpiRelEntropyCone{T}) where {T <: Real} = Cones.EpiRelEntropy{T}(cone.dim, use_dual = cone.use_dual)
 
-export EpiTraceRelEntropyTriCone
-struct EpiTraceRelEntropyTriCone{T <: Real} <: MOI.AbstractVectorSet
+export EpiTrRelEntropyTriCone
+struct EpiTrRelEntropyTriCone{T <: Real} <: MOI.AbstractVectorSet
     dim::Int
     use_dual::Bool
 end
-EpiTraceRelEntropyTriCone{T}(dim::Int) where {T <: Real} = EpiTraceRelEntropyTriCone{T}(dim, false)
-MOI.dimension(cone::EpiTraceRelEntropyTriCone where {T <: Real}) = cone.dim
-cone_from_moi(::Type{T}, cone::EpiTraceRelEntropyTriCone{T}) where {T <: Real} = Cones.EpiTraceRelEntropyTri{T}(cone.dim, use_dual = cone.use_dual)
+EpiTrRelEntropyTriCone{T}(dim::Int) where {T <: Real} = EpiTrRelEntropyTriCone{T}(dim, false)
+MOI.dimension(cone::EpiTrRelEntropyTriCone where {T <: Real}) = cone.dim
+cone_from_moi(::Type{T}, cone::EpiTrRelEntropyTriCone{T}) where {T <: Real} = Cones.EpiTrRelEntropyTri{T}(cone.dim, use_dual = cone.use_dual)
 
 export WSOSInterpNonnegativeCone
 struct WSOSInterpNonnegativeCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
@@ -341,9 +341,9 @@ const HypatiaCones{T <: Real} = Union{
     HypoPerLogdetTriCone{T, T},
     HypoPerLogdetTriCone{T, Complex{T}},
     EpiPerEntropyCone{T},
-    EpiPerTraceEntropyTriCone{T},
+    EpiPerTrEntropyTriCone{T},
     EpiRelEntropyCone{T},
-    EpiTraceRelEntropyTriCone{T},
+    EpiTrRelEntropyTriCone{T},
     WSOSInterpNonnegativeCone{T, T},
     WSOSInterpNonnegativeCone{T, Complex{T}},
     WSOSInterpPosSemidefTriCone{T},

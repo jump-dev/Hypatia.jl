@@ -24,11 +24,11 @@ include("Cones/Cones.jl")
 include("Models/Models.jl")
 include("Solvers/Solvers.jl")
 
-# MathOptInterface helpers
-using SparseArrays
-import MathOptInterface
-const MOI = MathOptInterface
-include("MathOptInterface/cones.jl")
-include("MathOptInterface/wrapper.jl")
+# # MathOptInterface helpers
+# using SparseArrays
+# import MathOptInterface
+# const MOI = MathOptInterface
+# include("MathOptInterface/cones.jl")
+# include("MathOptInterface/wrapper.jl")
 
 end
