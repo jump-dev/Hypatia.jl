@@ -30,9 +30,10 @@ function cone_types(T::Type{<:Real})
         # Cones.HypoRootdetTri{T, T},
         # Cones.HypoRootdetTri{T, Complex{T}},
 
-        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.NegLogMMF, T}, # TODO put in a loop below
-        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.NegEntropyMMF, T}, # TODO put in a loop below
-        # Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.Power12MMF, T}, # TODO put in a loop below
+# TODO put in a loop below
+        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.NegLogMMF, T},
+        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.NegEntropyMMF, T},
+        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.SquareMMF, T},
 
         # Cones.HypoPerLog{T},
         # Cones.HypoPerLogdetTri{T, T},
@@ -86,20 +87,20 @@ real_types = [
 end
 end
 
-println("\nstarting time/allocation measurements")
-@testset "allocation tests" begin
-real_types = [
-    Float64,
-    # Float32,
-    # BigFloat,
-    ]
-@testset "$cone" for T in real_types, cone in cone_types(T)
-    println("\n$cone")
-    test_time = @elapsed show_time_alloc(cone)
-    @printf("%8.2e seconds\n", test_time)
-end
-println()
-end
+# println("\nstarting time/allocation measurements")
+# @testset "allocation tests" begin
+# real_types = [
+#     Float64,
+#     # Float32,
+#     # BigFloat,
+#     ]
+# @testset "$cone" for T in real_types, cone in cone_types(T)
+#     println("\n$cone")
+#     test_time = @elapsed show_time_alloc(cone)
+#     @printf("%8.2e seconds\n", test_time)
+# end
+# println()
+# end
 
 end
 ;

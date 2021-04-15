@@ -46,7 +46,7 @@ function update_feas(cone::EpiPerSepSpectral{VectorCSqr{T}, F, T}) where {T, F}
 
     if (v > eps(T)) && all(>(eps(T)), cone.w_view)
         @. cache.viw = cone.w_view / v
-        cache.ϕ = h_sum(F, cache.viw)
+        cache.ϕ = h_val(F, cache.viw)
         cache.ζ = cone.point[1] - v * cache.ϕ
         cone.is_feas = (cache.ζ > eps(T))
     else
@@ -58,13 +58,15 @@ function update_feas(cone::EpiPerSepSpectral{VectorCSqr{T}, F, T}) where {T, F}
 end
 
 function is_dual_feas(cone::EpiPerSepSpectral{<:VectorCSqr{T}, F, T}) where {T, F}
-    @show cone.dual_point
     u = cone.dual_point[1]
     (u < eps(T)) && return false
     @views w = cone.dual_point[3:end]
-    any(<(eps(T)), w) && return false
+    # TODO in-place:
+    temp = similar(w)
+    @. temp = w / u
+    h_conj_dom(F, temp) || return false
     v = cone.dual_point[2]
-    return (v - u * sum(h_conj(F, w_i / u) for w_i in w) > eps(T))
+    return (v - u * h_conj(F, temp) > eps(T))
 end
 
 function update_grad(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
@@ -83,7 +85,6 @@ function update_grad(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
     grad[2] = -inv(v) + ζi * cache.σ
     @. grad[3:end] = -cache.wi + cache.ζi∇h_viw
 
-    @show grad
     cone.grad_updated = true
     return grad
 end
