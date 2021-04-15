@@ -239,7 +239,7 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     return cone.hess
 end
 
-function correction(cone::EpiTrRelEntropyTri{T}, primal_dir::AbstractVector{T}) where T
+function correction(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
     @assert cone.hess_updated
     d = cone.d
     corr = cone.correction
@@ -260,11 +260,11 @@ function correction(cone::EpiTrRelEntropyTri{T}, primal_dir::AbstractVector{T}) 
     dlogW_dW = cone.dz_sqr_dW_sqr
     dlogV_dV = cone.dz_sqr_dW_dV
 
-    u_dir = primal_dir[1]
-    @views v_dir = primal_dir[V_idxs]
-    @views w_dir = primal_dir[W_idxs]
-    @views V_dir = Symmetric(svec_to_smat!(zeros(T, d, d), primal_dir[V_idxs], cone.rt2), :U)
-    @views W_dir = Symmetric(svec_to_smat!(zeros(T, d, d), primal_dir[W_idxs], cone.rt2), :U)
+    u_dir = dir[1]
+    @views v_dir = dir[V_idxs]
+    @views w_dir = dir[W_idxs]
+    @views V_dir = Symmetric(svec_to_smat!(zeros(T, d, d), dir[V_idxs], cone.rt2), :U)
+    @views W_dir = Symmetric(svec_to_smat!(zeros(T, d, d), dir[W_idxs], cone.rt2), :U)
     V_dir_similar = V_vecs' * V_dir * V_vecs
     W_dir_similar = W_vecs' * W_dir * W_vecs
 

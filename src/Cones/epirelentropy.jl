@@ -312,7 +312,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Epi
     return prod
 end
 
-function correction(cone::EpiRelEntropy, primal_dir::AbstractVector)
+function correction(cone::EpiRelEntropy, dir::AbstractVector)
     @assert cone.grad_updated
     tau = cone.tau
     z = cone.z
@@ -320,9 +320,9 @@ function correction(cone::EpiRelEntropy, primal_dir::AbstractVector)
     w_idxs = cone.w_idxs
     @views v = cone.point[v_idxs]
     @views w = cone.point[w_idxs]
-    u_dir = primal_dir[1]
-    @views v_dir = primal_dir[v_idxs]
-    @views w_dir = primal_dir[w_idxs]
+    u_dir = dir[1]
+    @views v_dir = dir[v_idxs]
+    @views w_dir = dir[w_idxs]
     corr = cone.correction
     @views v_corr = corr[v_idxs]
     @views w_corr = corr[w_idxs]

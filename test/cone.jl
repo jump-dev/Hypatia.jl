@@ -92,14 +92,14 @@ function test_oracles(
         @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
     end
 
-    # # test correction oracle
-    # if Cones.use_correction(cone)
-    #     @test -Cones.correction(cone, point) ≈ grad atol=tol rtol=tol
-    #
-    #     dir = perturb_scale(zeros(T, dim), noise, one(T))
-    #     corr = Cones.correction(cone, dir)
-    #     @test dot(corr, point) ≈ dot(dir, hess * dir) atol=tol rtol=tol
-    # end
+    # test correction oracle
+    if Cones.use_correction(cone)
+        @test -Cones.correction(cone, point) ≈ grad atol=tol rtol=tol
+
+        dir = perturb_scale(zeros(T, dim), noise, one(T))
+        corr = Cones.correction(cone, dir)
+        @test dot(corr, point) ≈ dot(dir, hess * dir) atol=tol rtol=tol
+    end
 
     return
 end
@@ -130,24 +130,24 @@ function test_barrier(
 
 
     hess = Cones.hess(cone)
-    fd_hess = ForwardDiff.hessian(barrier, point)
-    @show hess
-    @show fd_hess
-    @test hess ≈ fd_hess atol=tol rtol=tol
-
-
-
-
-    # dir = 10 * randn(T, dim)
-    # barrier_dir(s, t) = barrier(s + t * dir)
+    # fd_hess = ForwardDiff.hessian(barrier, point)
+    # @show hess
+    # @show fd_hess
+    # @test hess ≈ fd_hess atol=tol rtol=tol
     #
+
+
+
+    dir = 10 * randn(T, dim)
+    barrier_dir(s, t) = barrier(s + t * dir)
+
     # fd_hess_dir = ForwardDiff.gradient(s -> ForwardDiff.derivative(t -> barrier_dir(s, t), 0), point)
     # @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
     #
-    # if Cones.use_correction(cone)
-    #     fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), point)
-    #     @test -2 * Cones.correction(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
-    # end
+    if Cones.use_correction(cone)
+        fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), point)
+        @test -2 * Cones.correction(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
+    end
 
     return
 end
@@ -618,23 +618,23 @@ show_time_alloc(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R} = show_time_al
 
 
 
-# EpiPerTrMatMono
-function test_oracles(C::Type{<:Cones.EpiPerTrMatMono})
+# EpiPerTrSepSpectral
+function test_oracles(C::Type{<:Cones.EpiPerTrSepSpectral})
     for d in [1, 2, 3, 6]
         test_oracles(C(d), init_tol = Inf)
     end
 end
 
 # TODO other CSqr
-function test_barrier(C::Type{<:Cones.EpiPerTrMatMono{<:Cones.VectorCSqr, F}}) where F
+function test_barrier(C::Type{<:Cones.EpiPerTrSepSpectral{<:Cones.VectorCSqr, F}}) where F
     function barrier(s)
         (u, v, w) = (s[1], s[2], s[3:end])
         return -log(u - v * Cones.h_sum(F, w ./ v)) - log(v) - sum(log, w)
     end
-    test_barrier(C(3), barrier)
+    test_barrier(C(2), barrier)
 end
 
-show_time_alloc(C::Type{<:Cones.EpiPerTrMatMono{Cones.VectorCSqr}}) = show_time_alloc(C(8))
+show_time_alloc(C::Type{<:Cones.EpiPerTrSepSpectral{<:Cones.VectorCSqr}}) = show_time_alloc(C(1000))
 
 
 

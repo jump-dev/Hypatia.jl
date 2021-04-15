@@ -380,10 +380,10 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
     return prod
 end
 
-function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T <: Real}
+function correction(cone::EpiNormInf{T}, dir::AbstractVector{T}) where {T <: Real}
     @assert cone.grad_updated
     u = cone.point[1]
-    udir = primal_dir[1]
+    udir = dir[1]
     corr = cone.correction
 
     u3 = T(1.5) / u
@@ -400,7 +400,7 @@ function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T
         if cone.is_complex
             (wdenire, wdeniim) = reim(wdeni)
             (wire, wiim) = reim(wi)
-            (dire, diim) = (primal_dir[2i], primal_dir[2i + 1])
+            (dire, diim) = (dir[2i], dir[2i + 1])
             uuwre = suuw * wdenire
             uuwim = suuw * wdeniim
             uimimre = 1 + wdenire * wire
@@ -417,7 +417,7 @@ function correction(cone::EpiNormInf{T}, primal_dir::AbstractVector{T}) where {T
             corr[2i] = (udir * (2 * (uimimrere + uimimimre * diim) + uuwre) + (abs2(dire) * imimwrerere + diim * (2 * imimwrereim + imimwimimre))) / deni
             corr[2i + 1] = (udir * (2 * (uimimimim + uimimimre * dire) + uuwim) + (abs2(diim) * imimwimimim + dire * (2 * imimwimimre + imimwrereim))) / deni
         else
-            di = primal_dir[1 + i]
+            di = dir[1 + i]
             uuw = suuw * wdeni
             uimim = 1 + wdeni * wi
             uimim2 = -udeni * uimim * di

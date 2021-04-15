@@ -233,9 +233,9 @@ function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WS
     return partial_prod!(prod, arr, false, cone)
 end
 
-function correction(cone::WSOSInterpPosSemidefTri, primal_dir::AbstractVector)
+function correction(cone::WSOSInterpPosSemidefTri, dir::AbstractVector)
     @assert cone.grad_updated
-    return partial_prod!(cone.correction, primal_dir, true, cone)
+    return partial_prod!(cone.correction, dir, true, cone)
 end
 
 # diagonal from each (i, j) block in mat1' * mat2

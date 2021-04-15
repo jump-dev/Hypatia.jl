@@ -269,10 +269,10 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hyp
     return prod
 end
 
-function correction(cone::HypoRootdetTri{T}, primal_dir::AbstractVector{T}) where T
+function correction(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where T
     @assert cone.grad_updated
-    u_dir = primal_dir[1]
-    @views w_dir = primal_dir[2:end]
+    u_dir = dir[1]
+    @views w_dir = dir[2:end]
     corr = cone.correction
     @views w_corr = corr[2:end]
     sigma = cone.sigma

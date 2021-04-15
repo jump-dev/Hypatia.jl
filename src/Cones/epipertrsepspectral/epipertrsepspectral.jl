@@ -1,7 +1,7 @@
 #=
 TODO
 
-(closure of) epigraph of perspective of tr of a generic matrix monotone function on a cone of squares on a Jordan algebra
+(closure of) epigraph of perspective of tr of a generic separable spectral function on a cone of squares on a Jordan algebra
 =#
 
 # type of cone of squares on a Jordan algebra
@@ -11,10 +11,10 @@ abstract type ConeOfSquares{T <: Real} end
 abstract type CSqrCache{T <: Real} end
 
 # suitable univariate matrix monotone function
-abstract type MatMonoFunction end
+abstract type SepSpectralFun end
 
 # TODO maybe don't need F as a type parameter (may slow down compile), could just be a field - decide later
-mutable struct EpiPerTrMatMono{Q <: ConeOfSquares, F <: MatMonoFunction, T <: Real} <: Cone{T}
+mutable struct EpiPerTrSepSpectral{Q <: ConeOfSquares, F <: SepSpectralFun, T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     d::Int
     dim::Int
@@ -39,11 +39,11 @@ mutable struct EpiPerTrMatMono{Q <: ConeOfSquares, F <: MatMonoFunction, T <: Re
     w_view
     cache::CSqrCache{T}
 
-    function EpiPerTrMatMono{Q, F, T}(
+    function EpiPerTrSepSpectral{Q, F, T}(
         d::Int; # dimension parametrizing the cone of squares (not vectorized dimension)
         use_dual::Bool = false,
         hess_fact_cache = hessian_cache(T),
-        ) where {T <: Real, Q <: ConeOfSquares{T}, F <: MatMonoFunction}
+        ) where {T <: Real, Q <: ConeOfSquares{T}, F <: SepSpectralFun}
         @assert d >= 1
         cone = new{Q, F, T}()
         cone.use_dual_barrier = use_dual
@@ -55,7 +55,7 @@ mutable struct EpiPerTrMatMono{Q <: ConeOfSquares, F <: MatMonoFunction, T <: Re
     end
 end
 
-function setup_extra_data(cone::EpiPerTrMatMono{<:ConeOfSquares{T}}) where {T <: Real}
+function setup_extra_data(cone::EpiPerTrSepSpectral{<:ConeOfSquares{T}}) where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -74,8 +74,8 @@ const ConeOfSquaresList = [
     # EpiNormCSqr,
     ]
 
-include("matmonofunctions.jl")
-const MatMonoFunctionList = [
+include("sepspectralfun.jl")
+const SepSpectralFunList = [
     NegLogMMF,
     # EntropyMMF,
     # Power12MMF,

@@ -211,12 +211,12 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
     return prod
 end
 
-function correction(cone::HypoGeoMean, primal_dir::AbstractVector)
+function correction(cone::HypoGeoMean, dir::AbstractVector)
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
-    u_dir = primal_dir[1]
-    @views w_dir = primal_dir[2:end]
+    u_dir = dir[1]
+    @views w_dir = dir[2:end]
     corr = cone.correction
     z = cone.z
     wdw = cone.tempw

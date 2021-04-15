@@ -201,7 +201,7 @@ function update_hess(cone::EpiPerTrEntropyTri{T}) where T
     return cone.hess
 end
 
-function correction(cone::EpiPerTrEntropyTri{T}, primal_dir::AbstractVector{T}) where T
+function correction(cone::EpiPerTrEntropyTri{T}, dir::AbstractVector{T}) where T
     @assert cone.hess_updated
     d = cone.d
     z = cone.z
@@ -214,9 +214,9 @@ function correction(cone::EpiPerTrEntropyTri{T}, primal_dir::AbstractVector{T}) 
     v = cone.point[2]
     W = cone.W
     Wi = Symmetric(cone.Wi, :U)
-    u_dir = primal_dir[1]
-    v_dir = primal_dir[2]
-    @views W_dir = Symmetric(svec_to_smat!(cone.mat, primal_dir[3:cone.dim], cone.rt2), :U)
+    u_dir = dir[1]
+    v_dir = dir[2]
+    @views W_dir = Symmetric(svec_to_smat!(cone.mat, dir[3:cone.dim], cone.rt2), :U)
     corr = cone.correction
     @views w_corr = corr[3:cone.dim]
 
