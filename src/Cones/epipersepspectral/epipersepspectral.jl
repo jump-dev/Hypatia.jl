@@ -14,7 +14,7 @@ abstract type CSqrCache{T <: Real} end
 abstract type SepSpectralFun end
 
 # TODO maybe don't need F as a type parameter (may slow down compile), could just be a field - decide later
-mutable struct EpiPerTrSepSpectral{Q <: ConeOfSquares, F <: SepSpectralFun, T <: Real} <: Cone{T}
+mutable struct EpiPerSepSpectral{Q <: ConeOfSquares, F <: SepSpectralFun, T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     d::Int
     dim::Int
@@ -39,7 +39,7 @@ mutable struct EpiPerTrSepSpectral{Q <: ConeOfSquares, F <: SepSpectralFun, T <:
     w_view
     cache::CSqrCache{T}
 
-    function EpiPerTrSepSpectral{Q, F, T}(
+    function EpiPerSepSpectral{Q, F, T}(
         d::Int; # dimension parametrizing the cone of squares (not vectorized dimension)
         use_dual::Bool = false,
         hess_fact_cache = hessian_cache(T),
@@ -55,7 +55,7 @@ mutable struct EpiPerTrSepSpectral{Q <: ConeOfSquares, F <: SepSpectralFun, T <:
     end
 end
 
-function setup_extra_data(cone::EpiPerTrSepSpectral{<:ConeOfSquares{T}}) where {T <: Real}
+function setup_extra_data(cone::EpiPerSepSpectral{<:ConeOfSquares{T}}) where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)

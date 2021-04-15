@@ -30,9 +30,9 @@ function cone_types(T::Type{<:Real})
         # Cones.HypoRootdetTri{T, T},
         # Cones.HypoRootdetTri{T, Complex{T}},
 
-        Cones.EpiPerTrSepSpectral{Cones.VectorCSqr{T}, Cones.NegLogMMF, T}, # TODO put in a loop below
-        Cones.EpiPerTrSepSpectral{Cones.VectorCSqr{T}, Cones.NegEntropyMMF, T}, # TODO put in a loop below
-        # Cones.EpiPerTrSepSpectral{Cones.VectorCSqr{T}, Cones.Power12MMF, T}, # TODO put in a loop below
+        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.NegLogMMF, T}, # TODO put in a loop below
+        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.NegEntropyMMF, T}, # TODO put in a loop below
+        # Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.Power12MMF, T}, # TODO put in a loop below
 
         # Cones.HypoPerLog{T},
         # Cones.HypoPerLogdetTri{T, T},

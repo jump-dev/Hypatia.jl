@@ -22,7 +22,7 @@ mutable struct VectorCSqrCache{T <: Real} <: CSqrCache{T}
     VectorCSqrCache{T}() where {T <: Real} = new{T}()
 end
 
-function setup_csqr_cache(cone::EpiPerTrSepSpectral{VectorCSqr{T}}) where T
+function setup_csqr_cache(cone::EpiPerSepSpectral{VectorCSqr{T}}) where T
     cone.cache = cache = VectorCSqrCache{T}()
     cache.viw = zeros(T, cone.d)
     cache.wi = zeros(T, cone.d)
@@ -33,13 +33,13 @@ function setup_csqr_cache(cone::EpiPerTrSepSpectral{VectorCSqr{T}}) where T
     return
 end
 
-function set_initial_point(arr::AbstractVector, cone::EpiPerTrSepSpectral{<:VectorCSqr, F}) where F
+function set_initial_point(arr::AbstractVector, cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
     (arr[1], arr[2], w0) = get_initial_point(F, cone.d)
     @views fill!(arr[3:end], w0)
     return arr
 end
 
-function update_feas(cone::EpiPerTrSepSpectral{VectorCSqr{T}, F, T}) where {T, F}
+function update_feas(cone::EpiPerSepSpectral{VectorCSqr{T}, F, T}) where {T, F}
     @assert !cone.feas_updated
     cache = cone.cache
     v = cone.point[2]
@@ -57,18 +57,17 @@ function update_feas(cone::EpiPerTrSepSpectral{VectorCSqr{T}, F, T}) where {T, F
     return cone.is_feas
 end
 
-function is_dual_feas(cone::EpiPerTrSepSpectral{<:VectorCSqr{T}, F, T}) where {T, F}
+function is_dual_feas(cone::EpiPerSepSpectral{<:VectorCSqr{T}, F, T}) where {T, F}
     cache = cone.cache
     u = cone.dual_point[1]
     (u < eps(T)) && return false
     @views w = cone.dual_point[3:end]
     any(<(eps(T)), w) && return false
     v = cone.dual_point[2]
-    ζ⋆ = v - u * sum(h_conj(F, -w_i / u) for w_i in w)
-    return (ζ⋆ > eps(T))
+    return (v - u * sum(h_conj(F, -w_i / u) for w_i in w) > eps(T))
 end
 
-function update_grad(cone::EpiPerTrSepSpectral{<:VectorCSqr, F}) where F
+function update_grad(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
     @assert !cone.grad_updated && cone.is_feas
     grad = cone.grad
     v = cone.point[2]
@@ -88,7 +87,7 @@ function update_grad(cone::EpiPerTrSepSpectral{<:VectorCSqr, F}) where F
     return grad
 end
 
-function update_hess(cone::EpiPerTrSepSpectral{<:VectorCSqr, F}) where F
+function update_hess(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
     @assert cone.grad_updated && !cone.hess_updated
     d = cone.d
     v = cone.point[2]
@@ -141,7 +140,7 @@ function update_hess(cone::EpiPerTrSepSpectral{<:VectorCSqr, F}) where F
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerTrSepSpectral{<:VectorCSqr, F}) where F
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
     # cone.hess_aux_updated || update_hess_aux(cone) # TODO
     @assert cone.hess_updated
     v = cone.point[2]
@@ -178,11 +177,11 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerT
     return prod
 end
 
-# function update_inv_hess(cone::EpiPerTrSepSpectral{<:VectorCSqr, F}) where F
+# function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
 #
 # end
 
-# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerTrSepSpectral{<:VectorCSqr, F}) where F
+# function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
 #     # cone.hess_aux_updated || update_hess_aux(cone) # TODO
 #     v = cone.point[2]
 #     cache = cone.cache
@@ -196,7 +195,7 @@ end
 #     return prod
 # end
 
-function correction(cone::EpiPerTrSepSpectral{<:VectorCSqr{T}, F}, dir::AbstractVector{T}) where {T, F}
+function correction(cone::EpiPerSepSpectral{<:VectorCSqr{T}, F}, dir::AbstractVector{T}) where {T, F}
     @assert cone.hess_updated
     v = cone.point[2]
     w = cone.w_view
@@ -247,7 +246,7 @@ function get_χ(
     p::T,
     q::T,
     r::AbstractVector{T},
-    cone::EpiPerTrSepSpectral{<:VectorCSqr{T}},
+    cone::EpiPerSepSpectral{<:VectorCSqr{T}},
     ) where {T <: Real}
     cache = cone.cache
     return p - cache.σ * q - dot(cache.∇h_viw, r)

@@ -618,15 +618,15 @@ show_time_alloc(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R} = show_time_al
 
 
 
-# EpiPerTrSepSpectral
-function test_oracles(C::Type{<:Cones.EpiPerTrSepSpectral})
+# EpiPerSepSpectral
+function test_oracles(C::Type{<:Cones.EpiPerSepSpectral})
     for d in [1, 2, 3, 6]
         test_oracles(C(d), init_tol = Inf)
     end
 end
 
 # TODO other CSqr
-function test_barrier(C::Type{<:Cones.EpiPerTrSepSpectral{<:Cones.VectorCSqr, F}}) where F
+function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr, F}}) where F
     function barrier(s)
         (u, v, w) = (s[1], s[2], s[3:end])
         return -log(u - v * Cones.h_sum(F, w ./ v)) - log(v) - sum(log, w)
@@ -634,7 +634,7 @@ function test_barrier(C::Type{<:Cones.EpiPerTrSepSpectral{<:Cones.VectorCSqr, F}
     test_barrier(C(2), barrier)
 end
 
-show_time_alloc(C::Type{<:Cones.EpiPerTrSepSpectral{<:Cones.VectorCSqr}}) = show_time_alloc(C(1000))
+show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}}) = show_time_alloc(C(1000))
 
 
 

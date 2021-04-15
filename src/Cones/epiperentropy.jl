@@ -96,7 +96,6 @@ function is_dual_feas(cone::EpiPerEntropy{T}) where T
         @. cone.temp1 = -w / u - 1
         return v - u * sum(exp, cone.temp1) > eps(T)
     end
-
     return false
 end
 
