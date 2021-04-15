@@ -10,7 +10,7 @@ h_sum(F::Type{<:SepSpectralFun}, xs::Vector{<:Number}) = sum(h_val(F, x_i) for x
 struct NegLogMMF <: SepSpectralFun end
 
 h_val(::Type{NegLogMMF}, x::Number) = -log(x)
-h_conj(::Type{NegLogMMF}, x::Number) = -(1 + log(-x))
+h_conj(::Type{NegLogMMF}, x::Number) = -1 - log(x)
 h_der1(::Type{NegLogMMF}, x::Number) = -inv(x)
 h_der2(::Type{NegLogMMF}, x::Number) = x^-2
 h_der3(::Type{NegLogMMF}, x::Number) = -2 * x^-3
@@ -25,7 +25,7 @@ end
 struct NegEntropyMMF <: SepSpectralFun end
 
 h_val(::Type{NegEntropyMMF}, x::Number) = x * log(x)
-h_conj(::Type{NegEntropyMMF}, x::Number) = exp(x - 1)
+h_conj(::Type{NegEntropyMMF}, x::Number) = exp(1 + x)
 h_der1(::Type{NegEntropyMMF}, x::Number) = 1 + log(x)
 h_der2(::Type{NegEntropyMMF}, x::Number) = inv(x)
 h_der3(::Type{NegEntropyMMF}, x::Number) = -x^-2

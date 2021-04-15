@@ -90,6 +90,7 @@ end
 
 function is_dual_feas(cone::EpiPerEntropy{T}) where T
     u = cone.dual_point[1]
+    error("all(>(eps(T)), w) ??")
     if u > eps(T)
         v = cone.dual_point[2]
         @views w = cone.dual_point[3:cone.dim]
