@@ -180,7 +180,10 @@ end
 
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F}) where {T, R, F}
     # cone.hess_aux_updated || update_hess_aux(cone) # TODO
+
+    hess(cone) # TODO remove
     @assert cone.hess_updated
+
     v = cone.point[2]
     vi = inv(v)
     cache = cone.cache
@@ -200,19 +203,24 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
     r = Hermitian(zeros(R, d, d))
     ξ = Hermitian(zeros(R, d, d))
     # ζivi = ζi * vi
-    ∇h_viw_mat = Hermitian(viw_vecs * Diagonal(cache.∇h_viw) * viw_vecs')
+    ∇h_viw_mat = Hermitian(viw_vecs * Diagonal(∇h_viw) * viw_vecs')
 
     diff_mat = zeros(T, d, d)
     rteps = sqrt(eps(T))
     for j in 1:d
         viw_λ_j = viw_λ[j]
         ∇h_viw_j = ∇h_viw[j]
+        ∇2h_viw_j = ∇2h_viw[j]
         for i in 1:(j - 1)
             denom = viw_λ[i] - viw_λ_j
-            (abs(denom) < rteps) && println("small denom") # TODO
-            diff_mat[i, j] = (∇h_viw[i] - ∇h_viw_j) / denom
+            if abs(denom) < rteps
+                println("small denom") # TODO
+                diff_mat[i, j] = (∇2h_viw[i] + ∇2h_viw_j) / 2 # NOTE or take ∇2h at the average (viw[i] + viw[j]) / 2
+            else
+                diff_mat[i, j] = (∇h_viw[i] - ∇h_viw_j) / denom
+            end
         end
-        diff_mat[j, j] = ∇2h_viw[j]
+        diff_mat[j, j] = ∇2h_viw_j
     end
     diff_mat = Hermitian(diff_mat, :U)
 
@@ -229,12 +237,22 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
         χ = p - cache.σ * q - dot(∇h_viw_mat, r)
         ζi2χ = ζi2 * χ
 
-        temp = Hermitian(ζi * (diff_mat .* ξ))
+        temp = Hermitian(diff_mat .* (viw_vecs' * ξ * viw_vecs))
 
         prod[1, j] = ζi2χ
-        prod[2, j] = -σ * ζi2χ - dot(viw_λ, diag(temp)) + viq * vi
-        # TODO wrong:
-        prod_r = -ζi2χ * ∇h_viw_mat + viw_vecs * temp * viw_vecs' + wi * r * wi
+        prod[2, j] = -σ * ζi2χ - ζi * dot(diag(temp), viw_λ) + viq * vi
+
+        prod_r = -ζi2χ * ∇h_viw_mat + ζi * viw_vecs * temp * viw_vecs' + wi * r * wi
+
+        diag_λi = Diagonal([inv(v * viw_λ[i]) for i in 1:d])
+        prod_r2 = viw_vecs * (
+            -ζi2χ * Diagonal(∇h_viw) +
+            ζi * temp +
+            diag_λi * (viw_vecs' * r * viw_vecs) * diag_λi
+            ) * viw_vecs'
+
+        @show norm(prod_r - prod_r2) # ≈ 0
+
         smat_to_svec!(prod[3:end, j], prod_r, cache.rt2)
     end
 

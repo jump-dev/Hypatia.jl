@@ -43,6 +43,9 @@ function test_oracles(
     @test cone.dual_point == dual_point
     # @test Cones.in_neighborhood(cone, one(T), one(T))
 
+    prod_vec = zero(point)
+    @test Cones.hess_prod!(prod_vec, point, cone) ≈ dual_point atol=tol rtol=tol
+
     # test centrality of initial point
     if isfinite(init_tol)
         @test point ≈ dual_point atol=init_tol rtol=init_tol
@@ -68,7 +71,6 @@ function test_oracles(
     # inv_hess = Matrix(Cones.inv_hess(cone))
     # @test hess * inv_hess ≈ I atol=tol rtol=tol
     #
-    prod_vec = zero(point)
     # @test hess * point ≈ -grad atol=tol rtol=tol
     @test Cones.hess_prod!(prod_vec, point, cone) ≈ -grad atol=tol rtol=tol
     # @test Cones.inv_hess_prod!(prod_vec, grad, cone) ≈ -point atol=tol rtol=tol
