@@ -39,9 +39,9 @@ function cone_types(T::Type{<:Real})
         Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.NegEntropyMMF, T},
         Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.SquareMMF, T},
 
-        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegLogMMF, T},
-        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegEntropyMMF, T},
-        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.SquareMMF, T},
+        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegLogMMF, T},
+        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegEntropyMMF, T},
+        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.SquareMMF, T},
 
         # Cones.HypoPerLog{T},
         # Cones.HypoPerLogdetTri{T, T},

@@ -25,7 +25,7 @@ mutable struct MatrixCSqrCache{T <: Real, R <: RealOrComplex{T}} <: CSqrCache{T}
     ∇h_viw::Vector{T}
     ∇2h_viw::Vector{T}
     ∇3h_viw::Vector{T}
-    # ζi∇h_viw::Vector{T}
+    diff_mat::Matrix{T}
     MatrixCSqrCache{T, R}() where {T <: Real, R <: RealOrComplex{T}} = new{T, R}()
 end
 
@@ -40,7 +40,7 @@ function setup_csqr_cache(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R
     cache.∇h_viw = zeros(T, d)
     cache.∇2h_viw = zeros(T, d)
     cache.∇3h_viw = zeros(T, d)
-    # cache.ζi∇h_viw = zeros(T, d)
+    cache.diff_mat = zeros(T, d, d)
     return
 end
 
@@ -124,7 +124,7 @@ function update_grad(cone::EpiPerSepSpectral{<:MatrixCSqr, F}) where F
     return grad
 end
 
-function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr, F}) where F
+function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}, F, T}) where {T, F}
     @assert cone.grad_updated && !cone.hess_updated
     d = cone.d
     v = cone.point[2]
@@ -142,6 +142,27 @@ function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr, F}) where F
     # ζivi = ζi / v
     # ζiσ = ζi * σ
     cache.wi = inv(cache.w_chol) # TODO maybe not needed
+
+
+    diff_mat = cache.diff_mat
+    rteps = sqrt(eps(T))
+    for j in 1:d
+        viw_λ_j = viw_λ[j]
+        ∇h_viw_j = ∇h_viw[j]
+        ∇2h_viw_j = ∇2h_viw[j]
+        for i in 1:(j - 1)
+            denom = viw_λ[i] - viw_λ_j
+            if abs(denom) < rteps
+                println("small denom") # TODO
+                diff_mat[i, j] = (∇2h_viw[i] + ∇2h_viw_j) / 2 # NOTE or take ∇2h at the average (viw[i] + viw[j]) / 2
+            else
+                diff_mat[i, j] = (∇h_viw[i] - ∇h_viw_j) / denom
+            end
+        end
+        diff_mat[j, j] = ∇2h_viw_j
+    end
+    # diff_mat = Hermitian(diff_mat, :U)
+
 
     # # Huu
     # H[1, 1] = ζi2
@@ -197,67 +218,112 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
     wi = Hermitian(cache.wi, :U)
     viw_vecs = cache.viw_eigen.vectors
     viw_λ = cache.viw_eigen.values
+    diff_mat = Hermitian(cache.diff_mat, :U)
 
     # TODO prealloc
     d = cone.d
     r = Hermitian(zeros(R, d, d))
-    ξ = Hermitian(zeros(R, d, d))
-    # ζivi = ζi * vi
-    ∇h_viw_mat = Hermitian(viw_vecs * Diagonal(∇h_viw) * viw_vecs')
-
-    diff_mat = zeros(T, d, d)
-    rteps = sqrt(eps(T))
-    for j in 1:d
-        viw_λ_j = viw_λ[j]
-        ∇h_viw_j = ∇h_viw[j]
-        ∇2h_viw_j = ∇2h_viw[j]
-        for i in 1:(j - 1)
-            denom = viw_λ[i] - viw_λ_j
-            if abs(denom) < rteps
-                println("small denom") # TODO
-                diff_mat[i, j] = (∇2h_viw[i] + ∇2h_viw_j) / 2 # NOTE or take ∇2h at the average (viw[i] + viw[j]) / 2
-            else
-                diff_mat[i, j] = (∇h_viw[i] - ∇h_viw_j) / denom
-            end
-        end
-        diff_mat[j, j] = ∇2h_viw_j
-    end
-    diff_mat = Hermitian(diff_mat, :U)
-
+    # ξ = Hermitian(zeros(R, d, d))
 
     @inbounds @views for j in 1:size(arr, 2)
         p = arr[1, j]
         q = arr[2, j]
         svec_to_smat!(r.data, arr[3:end, j], cache.rt2)
 
-        viq = q * vi
-        @. ξ.data = vi * (r.data - viq * w.data) # TODO could just do vecs here
+        r_vecs = Hermitian(viw_vecs' * r * viw_vecs)
+        ξ = vi * (r_vecs - Diagonal(q * viw_λ))
 
         # χ = get_χ(p, q, r, cone)
-        χ = p - cache.σ * q - dot(∇h_viw_mat, r)
+        χ = p - cache.σ * q - dot(∇h_viw, diag(r_vecs))
         ζi2χ = ζi2 * χ
 
-        temp = Hermitian(diff_mat .* (viw_vecs' * ξ * viw_vecs))
+        temp = Hermitian(diff_mat .* ξ)
 
         prod[1, j] = ζi2χ
-        prod[2, j] = -σ * ζi2χ - ζi * dot(diag(temp), viw_λ) + viq * vi
-
-        prod_r = -ζi2χ * ∇h_viw_mat + ζi * viw_vecs * temp * viw_vecs' + wi * r * wi
+        prod[2, j] = -σ * ζi2χ - ζi * dot(diag(temp), viw_λ) + q * vi * vi
 
         diag_λi = Diagonal([inv(v * viw_λ[i]) for i in 1:d])
-        prod_r2 = viw_vecs * (
+        prod_r = viw_vecs * (
             -ζi2χ * Diagonal(∇h_viw) +
             ζi * temp +
-            diag_λi * (viw_vecs' * r * viw_vecs) * diag_λi
+            diag_λi * r_vecs * diag_λi
             ) * viw_vecs'
-
-        @show norm(prod_r - prod_r2) # ≈ 0
 
         smat_to_svec!(prod[3:end, j], prod_r, cache.rt2)
     end
 
     return prod
 end
+
+
+# function correction(cone::EpiPerSepSpectral{<:VectorCSqr{T}, F}, dir::AbstractVector{T}) where {T, F}
+#     # cone.hess_aux_updated || update_hess_aux(cone) # TODO
+#
+#     hess(cone) # TODO remove
+#     @assert cone.hess_updated
+#
+#     v = cone.point[2]
+#     vi = inv(v)
+#     cache = cone.cache
+#     w = Hermitian(cache.w)
+#     ζi = cache.ζi
+#     ζi2 = abs2(ζi)
+#     viw = Hermitian(cache.viw)
+#     σ = cache.σ
+#     ∇h_viw = cache.∇h_viw
+#     ∇2h_viw = cache.∇2h_viw
+#     wi = Hermitian(cache.wi, :U)
+#     viw_vecs = cache.viw_eigen.vectors
+#     viw_λ = cache.viw_eigen.values
+#
+#     # TODO prealloc
+#     d = cone.d
+#     r = Hermitian(zeros(R, d, d))
+#     ξ = Hermitian(zeros(R, d, d))
+#
+#
+#
+#     ∇3h_viw = cache.∇3h_viw
+#     @. ∇3h_viw = h_der3(F, cache.viw)
+#     wi = cache.wi
+#     corr = cone.correction
+#
+#     # TODO prealloc
+#     d = cone.d
+#     ξ = zeros(d)
+#     ξb = zeros(d)
+#     ∇3hξξ = zeros(d)
+#
+#     p = dir[1]
+#     q = dir[2]
+#     @views r = dir[3:end]
+#
+#     viq = q / v
+#     @. ξ = -viq * w + r
+#     ζivi = ζi / v
+#     @. ξb = ζivi * ∇2h_viw * ξ
+#     χ = get_χ(p, q, r, cone)
+#     ζiχ = ζi * χ
+#     ζiχpviq = ζiχ + viq
+#
+#     ξbξ = dot(ξb, ξ) / 2
+#     ξbviw = dot(ξb, viw)
+#     c1 = ζi * (ζiχ^2 + ξbξ)
+#
+#     ζivi2 = ζi / v / v / 2
+#     @. ∇3hξξ = ζivi2 * ∇3h_viw .* ξ .* ξ
+#
+#     corr[1] = c1
+#     corr[2] = -c1 * σ - ζiχpviq * ξbviw + (ξbξ + viq^2) / v + dot(∇3hξξ, viw)
+#     @. corr[3:end] = -c1 * ∇h_viw + ζiχpviq * ξb - ∇3hξξ + abs2(r * wi) * wi
+#
+#
+#
+#
+#     return corr
+# end
+
+
 
 # function get_χ(
 #     p::T,
