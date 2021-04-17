@@ -225,18 +225,16 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
         viq = q * vi
         @. ξ.data = vi * (r.data - viq * w.data) # TODO could just do vecs here
 
-        # TODO wrong?
-        temp = ζi * diff_mat .* (viw_vecs' * ξ * viw_vecs)
-
         # χ = get_χ(p, q, r, cone)
         χ = p - cache.σ * q - dot(∇h_viw_mat, r)
         ζi2χ = ζi2 * χ
 
+        temp = Hermitian(ζi * (diff_mat .* ξ))
+
         prod[1, j] = ζi2χ
+        prod[2, j] = -σ * ζi2χ - dot(viw_λ, diag(temp)) + viq * vi
         # TODO wrong:
-        prod[2, j] = -σ * ζi2χ - dot(viw, temp) + viq * vi
-        # TODO wrong:
-        prod_r = -ζi2χ * ∇h_viw_mat + temp + wi * r * wi
+        prod_r = -ζi2χ * ∇h_viw_mat + viw_vecs * temp * viw_vecs' + wi * r * wi
         smat_to_svec!(prod[3:end, j], prod_r, cache.rt2)
     end
 
