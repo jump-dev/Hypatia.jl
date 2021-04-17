@@ -54,7 +54,6 @@ end
 
 
 
-# TODO maybe do power 2 as special case.
 # TODO power 1 is homogeneous so don't need persp, and is just equal to trace, so is a linear function anyway. so maybe exclude it.
 # # power in (1,2]
 # # TODO or parametrize the type?

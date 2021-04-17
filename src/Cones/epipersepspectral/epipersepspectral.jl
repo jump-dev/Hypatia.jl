@@ -66,17 +66,17 @@ function setup_extra_data(cone::EpiPerSepSpectral{<:ConeOfSquares{T}}) where {T 
 end
 
 include("vectorcsqr.jl")
-# include("matrixcsqr.jl")
+include("matrixcsqr.jl")
 # include("epinormcsqr.jl")
-const ConeOfSquaresList = [
-    VectorCSqr,
-    # MatrixCSqr,
-    # EpiNormCSqr,
-    ]
+# const ConeOfSquaresList = [
+#     VectorCSqr,
+#     MatrixCSqr,
+#     # EpiNormCSqr,
+#     ]
 
 include("sepspectralfun.jl")
-const SepSpectralFunList = [
-    NegLogMMF,
-    # EntropyMMF,
-    # Power12MMF,
-    ]
+# const SepSpectralFunList = [
+#     NegLogMMF,
+#     EntropyMMF,
+#     Power12MMF,
+#     ]

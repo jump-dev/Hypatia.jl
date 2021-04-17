@@ -87,6 +87,7 @@ function set_initial_point(arr::AbstractVector{T}, cone::EpiPerTrEntropyTri{T}) 
     (u, w) = get_central_ray_epiperentropy(d)
     arr[1] = u
     arr[2] = sqrt(T(d) * w * u + one(T))
+    @views fill!(arr[3:end], 0)
     for i in 1:d
         arr[2 + sum(1:i)] = w
     end

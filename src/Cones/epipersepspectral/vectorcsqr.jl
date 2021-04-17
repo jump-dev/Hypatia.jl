@@ -24,12 +24,13 @@ end
 
 function setup_csqr_cache(cone::EpiPerSepSpectral{VectorCSqr{T}}) where T
     cone.cache = cache = VectorCSqrCache{T}()
-    cache.viw = zeros(T, cone.d)
-    cache.wi = zeros(T, cone.d)
-    cache.∇h_viw = zeros(T, cone.d)
-    cache.∇2h_viw = zeros(T, cone.d)
-    cache.∇3h_viw = zeros(T, cone.d)
-    cache.ζi∇h_viw = zeros(T, cone.d)
+    d = cone.d
+    cache.viw = zeros(T, d)
+    cache.wi = zeros(T, d)
+    cache.∇h_viw = zeros(T, d)
+    cache.∇2h_viw = zeros(T, d)
+    cache.∇3h_viw = zeros(T, d)
+    cache.ζi∇h_viw = zeros(T, d)
     return
 end
 
