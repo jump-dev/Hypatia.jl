@@ -130,18 +130,19 @@ function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}, F, T}) where {T, F
     v = cone.point[2]
     cache = cone.cache
     H = cone.hess.data
+    ζ = cache.ζ
     ζi = cache.ζi
     ζi2 = abs2(ζi)
     σ = cache.σ
     # viw = cache.viw
+    viw_vecs = cache.viw_eigen.vectors
     viw_λ = cache.viw_eigen.values
     ∇h_viw = cache.∇h_viw
     ∇2h_viw = cache.∇2h_viw
     @. ∇2h_viw = h_der2(F, viw_λ)
-    # ζi∇h_viw = cache.ζi∇h_viw
-    # ζivi = ζi / v
-    # ζiσ = ζi * σ
-    cache.wi = inv(cache.w_chol) # TODO maybe not needed
+    ζivi = ζi / v
+    ζiσ = ζi * σ
+    wi = cache.wi = inv(cache.w_chol) # TODO maybe not needed
 
 
     diff_mat = cache.diff_mat
@@ -161,39 +162,43 @@ function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}, F, T}) where {T, F
         end
         diff_mat[j, j] = ∇2h_viw_j
     end
-    # diff_mat = Hermitian(diff_mat, :U)
+    diff_mat = Hermitian(diff_mat, :U)
 
 
-    # # Huu
-    # H[1, 1] = ζi2
-    #
-    # # Huv
-    # H[1, 2] = -ζi2 * σ
-    #
-    # # Hvv start
-    # Hvv = v^-2 + abs2(ζi * σ)
-    #
-    # @inbounds for j in 1:d
-    #     ζi∇h_viw_j = ζi∇h_viw[j]
-    #     term_j = ζivi * viw[j] * ∇2h_viw[j]
-    #     Hvv += viw[j] * term_j
-    #     j2 = 2 + j
-    #
-    #     # Huw
-    #     H[1, j2] = -ζi * ζi∇h_viw_j
-    #
-    #     # Hvw
-    #     H[2, j2] = ζiσ * ζi∇h_viw_j - term_j
-    #
-    #     # Hww
-    #     for i in 1:(j - 1)
-    #         H[2 + i, j2] = ζi∇h_viw_j * ζi∇h_viw[i]
-    #     end
-    #     H[j2, j2] = abs2(ζi∇h_viw_j) + ζivi * ∇2h_viw[j] + abs2(wi[j])
-    # end
-    #
-    # # Hvv end
-    # H[2, 2] = Hvv
+    # Huu
+    H[1, 1] = ζi2
+
+    # Huv
+    H[1, 2] = -ζi2 * σ
+
+    # Hvv
+    H[2, 2] = v^-2 + abs2(ζi * σ) + ζivi * sum(abs2(viw_λ[j]) * ∇2h_viw[j] for j in 1:d)
+
+    # Huw
+    const1 = -ζi^2 * ∇h_viw
+    Huw = viw_vecs * Diagonal(const1) * viw_vecs'
+    @views smat_to_svec!(H[1, 3:end], Huw, cache.rt2)
+    temp1 = H[1, 3:end]
+
+    # Hvw
+    Hvw = viw_vecs * Diagonal(-ζivi * ∇2h_viw .* viw_λ - σ * const1) * viw_vecs'
+    @views smat_to_svec!(H[2, 3:end], Hvw, cache.rt2)
+
+    # Hww
+    @views Hww = H[3:end, 3:end]
+    symm_kron(Hww, wi, cache.rt2)
+    temp1 .*= -ζ
+    mul!(Hww, temp1, temp1', true, true)
+
+    temp2 = similar(Hww)
+    temp3 = similar(Hww)
+    temp4 = similar(temp1)
+    temp5 = similar(Hww)
+    symm_kron(temp3, viw_vecs, cache.rt2, upper_only = false)
+    smat_to_svec!(temp4, diff_mat, one(T))
+    mul!(temp5, temp3, Diagonal(temp4))
+    mul!(temp2, temp5, temp3')
+    @. Hww += ζivi * temp2
 
     cone.hess_updated = true
     return cone.hess
@@ -322,44 +327,36 @@ function correction(cone::EpiPerSepSpectral{<:MatrixCSqr{T, R}, F}, dir::Abstrac
     svec_to_smat!(r.data, dir[3:end], cache.rt2)
 
     r_vecs = Hermitian(viw_vecs' * r * viw_vecs)
-    # ξ = Hermitian(r - q * viw)
 
     viq = vi * q
     # χ = get_χ(p, q, r, cone)
     χ = p - cache.σ * q - dot(∇h_viw, diag(r_vecs))
     ζiχ = ζi * χ
-    ζi2χ = ζi2 * χ
     ζiχpviq = ζiχ + viq
 
-    ξ_vecs = vi * (r_vecs - Diagonal(q * viw_λ))
+    ξ_vecs = Hermitian(vi * (r_vecs - Diagonal(q * viw_λ)))
     temp = Hermitian(diff_mat .* ξ_vecs)
 
     ξbξ = ζi * v * dot(temp, ξ_vecs) / 2
     c1 = ζi * (ζiχ^2 + ξbξ)
 
-    ξbviw = ζi * dot(diag(temp), viw_λ)
+    # TODO too inefficient. don't form diff tensor explicitly
+    diff_dot = Hermitian([dot(ξ_vecs[:, p], Diagonal(diff_ten[:, p, q]), ξ_vecs[:, q]) for p in 1:d, q in 1:d])
 
     corr[1] = c1
 
-    diff_dot = [ξ_vecs[:, q]' * Diagonal(diff_ten[:, p, q]) * ξ_vecs[:, p] for p in 1:d, q in 1:d]
-    # diff_dot = [r_vecs[:, q]' * Diagonal(diff_ten[:, p, q]) * r_vecs[:, p] for p in 1:d, q in 1:d]
-    # diff_dot = [dot(r_vecs[:, q], Diagonal(diff_ten[:, p, q]), r_vecs[:, p]) for p in 1:d, q in 1:d]
-    # ∇3hξξ = viw_vecs * diff_dot * viw_vecs'
-
     corr[2] = -c1 * σ -
-        ζiχpviq * ξbviw +
+        ζi * ζiχpviq * dot(diag(temp), viw_λ) +
         (ξbξ + viq^2) / v +
         ζi * dot(diag(diff_dot), viw_λ)
-
 
     diag_λi = Diagonal([inv(v * viw_λ[i]) for i in 1:d])
     prod_w = viw_vecs * (
         -c1 * Diagonal(∇h_viw) +
         ζi * ζiχpviq * temp +
-        -ζi / 2 * diff_dot +
+        -ζi * diff_dot +
         diag_λi * r_vecs * diag_λi * r_vecs * diag_λi
         ) * viw_vecs'
-        # wi * r * wi * r * wi
 
     @views smat_to_svec!(corr[3:end], prod_w, cache.rt2)
 
