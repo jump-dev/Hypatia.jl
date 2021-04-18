@@ -137,11 +137,11 @@ function test_barrier(
     # @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
     prod_vec = zero(dir)
     @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
-    #
-    # if Cones.use_correction(cone)
-    #     fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), point)
-    #     @test -2 * Cones.correction(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
-    # end
+
+    if Cones.use_correction(cone)
+        fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), point)
+        @test -2 * Cones.correction(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
+    end
 
     return
 end
