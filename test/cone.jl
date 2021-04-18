@@ -94,14 +94,14 @@ function test_oracles(
     #     @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
     # end
     #
-    # # test correction oracle
-    # if Cones.use_correction(cone)
-    #     @test -Cones.correction(cone, point) ≈ grad atol=tol rtol=tol
-    #
-    #     dir = perturb_scale(zeros(T, dim), noise, one(T))
-    #     corr = Cones.correction(cone, dir)
-    #     @test dot(corr, point) ≈ dot(dir, hess * dir) atol=tol rtol=tol
-    # end
+    # test correction oracle
+    if Cones.use_correction(cone)
+        @test -Cones.correction(cone, point) ≈ grad atol=tol rtol=tol
+
+        dir = perturb_scale(zeros(T, dim), noise, one(T))
+        corr = Cones.correction(cone, dir)
+        @test dot(corr, point) ≈ dot(dir, hess * dir) atol=tol rtol=tol
+    end
 
     return
 end
@@ -132,11 +132,11 @@ function test_barrier(
     dir = 10 * randn(T, dim)
     barrier_dir(s, t) = barrier(s + t * dir)
 
-    fd_hess_dir = ForwardDiff.gradient(s -> ForwardDiff.derivative(t -> barrier_dir(s, t), 0), point)
-    Cones.hess(cone) # TODO remove
-    # @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
-    prod_vec = zero(dir)
-    @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
+    # fd_hess_dir = ForwardDiff.gradient(s -> ForwardDiff.derivative(t -> barrier_dir(s, t), 0), point)
+    # Cones.hess(cone) # TODO remove
+    # # @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
+    # prod_vec = zero(dir)
+    # @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
 
     if Cones.use_correction(cone)
         fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), point)

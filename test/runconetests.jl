@@ -35,13 +35,13 @@ function cone_types(T::Type{<:Real})
         # Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.NegEntropyMMF, T},
 #         Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.SquareMMF, T},
 
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.NegLogMMF, T},
+        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.NegLogMMF, T},
         Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.NegEntropyMMF, T},
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.SquareMMF, T},
-
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegLogMMF, T},
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegEntropyMMF, T},
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.SquareMMF, T},
+        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.SquareMMF, T},
+        #
+        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegLogMMF, T},
+        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegEntropyMMF, T},
+        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.SquareMMF, T},
 
         # Cones.HypoPerLog{T},
         # Cones.HypoPerLogdetTri{T, T},
@@ -67,19 +67,19 @@ end
 
 @testset "cone tests" begin
 
-# println("starting oracle tests")
-# @testset "oracle tests" begin
-# real_types = [
-#     Float64,
-#     # Float32,
-#     # BigFloat,
-#     ]
-# @testset "$cone" for T in real_types, cone in cone_types(T)
-#     println("$cone")
-#     test_time = @elapsed test_oracles(cone)
-#     @printf("%8.2e seconds\n", test_time)
-# end
-# end
+println("starting oracle tests")
+@testset "oracle tests" begin
+real_types = [
+    Float64,
+    # Float32,
+    # BigFloat,
+    ]
+@testset "$cone" for T in real_types, cone in cone_types(T)
+    println("$cone")
+    test_time = @elapsed test_oracles(cone)
+    @printf("%8.2e seconds\n", test_time)
+end
+end
 
 println("\nstarting barrier tests")
 @testset "barrier tests" begin
