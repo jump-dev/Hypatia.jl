@@ -389,7 +389,8 @@ end
 function symm_kron(
     H::AbstractMatrix{T},
     mat::AbstractMatrix{Complex{T}},
-    rt2::T,
+    rt2::T;
+    upper_only::Bool = true,
     ) where {T <: Real}
     side = size(mat, 1)
 
@@ -408,9 +409,7 @@ function symm_kron(
                     H[row_idx, col_idx] = -imag(c)
                     row_idx += 1
                 end
-                if row_idx > col_idx
-                    break
-                end
+                upper_only && (row_idx > col_idx) && break
             end
             col_idx += 1
         else
@@ -432,9 +431,7 @@ function symm_kron(
                     H[row_idx, col_idx + 1] = real(c2)
                     row_idx += 1
                 end
-                if row_idx > col_idx
-                    break
-                end
+                upper_only && (row_idx > col_idx) && break
             end
             col_idx += 2
         end

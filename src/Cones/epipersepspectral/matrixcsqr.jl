@@ -314,7 +314,6 @@ function correction(cone::EpiPerSepSpectral{<:MatrixCSqr{T, R}, F}, dir::Abstrac
     end
 
 
-    wi = cache.wi
     corr = cone.correction
 
     # TODO prealloc
@@ -332,7 +331,7 @@ function correction(cone::EpiPerSepSpectral{<:MatrixCSqr{T, R}, F}, dir::Abstrac
     # χ = get_χ(p, q, r, cone)
     χ = p - cache.σ * q - dot(∇h_viw, diag(r_vecs))
     ζiχ = ζi * χ
-    ζiχpviq = ζiχ + viq
+    ζi2χpviq = ζi * (ζiχ + viq)
 
     ξ_vecs = Hermitian(vi * (r_vecs - Diagonal(q * viw_λ)))
     temp = Hermitian(diff_mat .* ξ_vecs)
@@ -346,14 +345,14 @@ function correction(cone::EpiPerSepSpectral{<:MatrixCSqr{T, R}, F}, dir::Abstrac
     corr[1] = c1
 
     corr[2] = -c1 * σ -
-        ζi * ζiχpviq * dot(diag(temp), viw_λ) +
+        ζi2χpviq * dot(diag(temp), viw_λ) +
         (ξbξ + viq^2) / v +
         ζi * dot(diag(diff_dot), viw_λ)
 
     diag_λi = Diagonal([inv(v * viw_λ[i]) for i in 1:d])
     prod_w = viw_vecs * (
         -c1 * Diagonal(∇h_viw) +
-        ζi * ζiχpviq * temp +
+        ζi2χpviq * temp +
         -ζi * diff_dot +
         diag_λi * r_vecs * diag_λi * r_vecs * diag_λi
         ) * viw_vecs'
