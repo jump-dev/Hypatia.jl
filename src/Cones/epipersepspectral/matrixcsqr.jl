@@ -17,7 +17,6 @@ mutable struct MatrixCSqrCache{T <: Real, R <: RealOrComplex{T}} <: CSqrCache{T}
     w_chol
     viw::Matrix{R} # TODO is it needed?
     viw_eigen
-    wi::Matrix{R}
     ϕ::T
     ζ::T
     ζi::T
@@ -36,7 +35,6 @@ function setup_csqr_cache(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R
     d = cone.d
     cache.w = zeros(R, d, d)
     cache.viw = zeros(R, d, d)
-    cache.wi = zeros(R, d, d)
     cache.∇h_viw = zeros(T, d)
     cache.∇2h_viw = zeros(T, d)
     cache.∇3h_viw = zeros(T, d)
@@ -110,11 +108,9 @@ function update_grad(cone::EpiPerSepSpectral{<:MatrixCSqr, F}) where F
     ∇h_viw = cache.∇h_viw
     @. ∇h_viw = h_der1(F, viw_λ)
     cache.σ = cache.ϕ - dot(viw_λ, ∇h_viw) # TODO guessed, just dots vectors
-    # cache.wi = inv(cache.w_chol)
 
     viw_vecs = cache.viw_eigen.vectors
     temp = viw_vecs * Diagonal(ζi * ∇h_viw - inv.(v .* viw_λ)) * viw_vecs' # TODO combines the ∇h_viw and wi
-    # @. temp -= cache.wi
 
     grad[1] = -ζi
     grad[2] = -inv(v) + ζi * cache.σ
@@ -124,7 +120,7 @@ function update_grad(cone::EpiPerSepSpectral{<:MatrixCSqr, F}) where F
     return grad
 end
 
-function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}, F, T}) where {T, F}
+function update_hess(cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F, T}) where {T, R, F}
     @assert cone.grad_updated && !cone.hess_updated
     d = cone.d
     v = cone.point[2]
@@ -142,8 +138,7 @@ function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}, F, T}) where {T, F
     @. ∇2h_viw = h_der2(F, viw_λ)
     ζivi = ζi / v
     ζiσ = ζi * σ
-    wi = cache.wi = inv(cache.w_chol) # TODO maybe not needed
-
+    rt2 = cache.rt2
 
     diff_mat = cache.diff_mat
     rteps = sqrt(eps(T))
@@ -177,28 +172,38 @@ function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}, F, T}) where {T, F
     # Huw
     const1 = -ζi^2 * ∇h_viw
     Huw = viw_vecs * Diagonal(const1) * viw_vecs'
-    @views smat_to_svec!(H[1, 3:end], Huw, cache.rt2)
+    @views smat_to_svec!(H[1, 3:end], Huw, rt2)
     temp1 = H[1, 3:end]
 
     # Hvw
     Hvw = viw_vecs * Diagonal(-ζivi * ∇2h_viw .* viw_λ - σ * const1) * viw_vecs'
-    @views smat_to_svec!(H[2, 3:end], Hvw, cache.rt2)
+    @views smat_to_svec!(H[2, 3:end], Hvw, rt2)
 
     # Hww
     @views Hww = H[3:end, 3:end]
-    symm_kron(Hww, wi, cache.rt2)
-    temp1 .*= -ζ
-    mul!(Hww, temp1, temp1', true, true)
 
-    temp2 = similar(Hww)
+    # Hww kron parts
+    eigw = v * viw_λ
+    tempa = ζivi * diff_mat + inv.(eigw) * inv.(eigw)'
+    if cache.is_complex
+        tempa = Hermitian(ComplexF64.(tempa))
+    else
+        tempa = Symmetric(tempa)
+    end
+    # @show isposdef(tempa) # true
+
+    # TODO don't do it this way - it is d^6. do it implicitly
     temp3 = similar(Hww)
     temp4 = similar(temp1)
     temp5 = similar(Hww)
-    symm_kron(temp3, viw_vecs, cache.rt2, upper_only = false)
-    smat_to_svec!(temp4, diff_mat, one(T))
+    symm_kron(temp3, viw_vecs, rt2, upper_only = false)
+    smat_to_svec!(temp4, tempa, one(T))
     mul!(temp5, temp3, Diagonal(temp4))
-    mul!(temp2, temp5, temp3')
-    @. Hww += ζivi * temp2
+    mul!(Hww, temp5, temp3')
+
+    # Hww vector outer prod part
+    temp1 .*= -ζ
+    mul!(Hww, temp1, temp1', true, true)
 
     cone.hess_updated = true
     return cone.hess
@@ -220,7 +225,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
     σ = cache.σ
     ∇h_viw = cache.∇h_viw
     ∇2h_viw = cache.∇2h_viw
-    wi = Hermitian(cache.wi, :U)
     viw_vecs = cache.viw_eigen.vectors
     viw_λ = cache.viw_eigen.values
     diff_mat = Hermitian(cache.diff_mat, :U)
@@ -277,11 +281,14 @@ function correction(cone::EpiPerSepSpectral{<:MatrixCSqr{T, R}, F}, dir::Abstrac
     σ = cache.σ
     ∇h_viw = cache.∇h_viw
     ∇2h_viw = cache.∇2h_viw
-    wi = Hermitian(cache.wi, :U)
     viw_vecs = cache.viw_eigen.vectors
     viw_λ = cache.viw_eigen.values
     diff_mat = Hermitian(cache.diff_mat, :U)
     d = cone.d
+
+
+# TODO for square, h_der3 is 0 and h_der2 is constant, so can skip much of this
+
 
     ∇3h_viw = cache.∇3h_viw
     @. ∇3h_viw = h_der3(F, viw_λ)

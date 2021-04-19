@@ -111,7 +111,7 @@ function test_barrier(
     cone::Cones.Cone{T},
     barrier::Function;
     noise::T = T(1e-1),
-    scale::T = T(1e-2),
+    scale::T = T(1e-0),
     tol::Real = 1e4 * eps(T),
     ) where {T <: Real}
     Random.seed!(1)
@@ -132,13 +132,25 @@ function test_barrier(
     Cones.grad(cone)
     # dir = 10 * randn(T, dim)
     # Cones.correction(cone, dir)
-    fd_hess = ForwardDiff.hessian(barrier, point)
+    # fd_hess = ForwardDiff.hessian(barrier, point)
     hess = Cones.hess(cone)
-    @show fd_hess
-    @show hess
-    diff = fd_hess - hess
-    display(diff)
+    # @show fd_hess
+    # @show hess
+    # diff = fd_hess - hess
+    # display(diff)
     # @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
+
+    # println()
+    dir = 10 * randn(T, dim)
+    temp = similar(dir)
+    Cones.hess_prod!(temp, dir, cone)
+    # @assert temp ≈ fd_hess * dir
+    @test hess * dir ≈ temp atol=tol rtol=tol
+
+    # display(temp)
+    # display(hess * dir)
+    # println()
+
 
     # dir = 10 * randn(T, dim)
     # barrier_dir(s, t) = barrier(s + t * dir)
