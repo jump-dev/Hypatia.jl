@@ -5,7 +5,6 @@ tests for primitive cone barrier oracles
 using Test
 import Random
 import Random.randn
-import GenericLinearAlgebra.eigen
 using LinearAlgebra
 using SparseArrays
 import ForwardDiff
