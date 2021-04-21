@@ -132,20 +132,25 @@ function test_barrier(
     Cones.grad(cone)
     # dir = 10 * randn(T, dim)
     # Cones.correction(cone, dir)
-    # fd_hess = ForwardDiff.hessian(barrier, point)
+    fd_hess = ForwardDiff.hessian(barrier, point)
     hess = Cones.hess(cone)
-    # @show fd_hess
+    @show fd_hess
+    @show isposdef(fd_hess)
+fd_hww = fd_hess[3:end,3:end]
+    @show fd_hww
+hww = hess[3:end,3:end]
+    @show hww
     # @show hess
     # diff = fd_hess - hess
     # display(diff)
     # @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
 
-    # println()
+    println()
     dir = 10 * randn(T, dim)
     temp = similar(dir)
     Cones.hess_prod!(temp, dir, cone)
-    # @assert temp ≈ fd_hess * dir
-    @test hess * dir ≈ temp atol=tol rtol=tol
+    @test temp ≈ fd_hess * dir atol=tol rtol=tol
+    # @test hess * dir ≈ temp atol=tol rtol=tol
 
     # display(temp)
     # display(hess * dir)

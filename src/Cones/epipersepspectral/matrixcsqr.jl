@@ -184,26 +184,201 @@ function update_hess(cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F, T}) where {T, 
 
     # Hww kron parts
     eigw = v * viw_λ
-    tempa = ζivi * diff_mat + inv.(eigw) * inv.(eigw)'
-    if cache.is_complex
-        tempa = Hermitian(ComplexF64.(tempa))
-    else
-        tempa = Symmetric(tempa)
-    end
-    # @show isposdef(tempa) # true
+    tempa = Symmetric(ζivi * diff_mat + inv.(eigw) * inv.(eigw)')
+    @assert all(>(0), tempa)
 
-    # TODO don't do it this way - it is d^6. do it implicitly
-    temp3 = similar(Hww)
-    temp4 = similar(temp1)
-    temp5 = similar(Hww)
-    symm_kron(temp3, viw_vecs, rt2, upper_only = false)
-    smat_to_svec!(temp4, tempa, one(T))
-    mul!(temp5, temp3, Diagonal(temp4))
-    mul!(Hww, temp5, temp3')
 
-    # Hww vector outer prod part
     temp1 .*= -ζ
+    vecouter = temp1 * temp1'
+
+
+# kww = kron(transpose(viw_vecs), viw_vecs)
+# bigmat = kww * Diagonal(vec(tempa)) * kww'
+# @show bigmat
+#
+#     D = Diagonal(vec(tempa))
+#     Hww .= 0
+#
+#     col_idx = 1
+#     @inbounds for l in 1:d
+#         for k in 1:(l - 1)
+#             row_idx = 1
+#             for j in 1:d
+#                 (row_idx > col_idx) && break
+#                 for i in 1:(j - 1)
+#                     # Hww[row_idx, col_idx] = mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k]
+#                     Hww[row_idx, col_idx] = -1
+#                     row_idx += 1
+#                 end
+#                 # Hww[row_idx, col_idx] = rt2 * mat[j, k] * mat[j, l]
+#                 Hww[row_idx, col_idx] = -2
+#                 row_idx += 1
+#             end
+#             col_idx += 1
+#         end
+#
+#         row_idx = 1
+#         for j in 1:d
+#             (row_idx > col_idx) && break
+#             for i in 1:(j - 1)
+#                 # Hww[row_idx, col_idx] = rt2 * mat[i, l] * mat[j, l]
+#                 Hww[row_idx, col_idx] = -3
+#                 row_idx += 1
+#             end
+#             # Hww[row_idx, col_idx] = mat[j, l] * mat[l, j]
+#             @show svec_idx(j, l), svec_idx(l, j)
+#             Hww[row_idx, col_idx] = bigmat[svec_idx(j, l), svec_idx(l, j)]
+#             @show Hww[row_idx, col_idx]
+#             row_idx += 1
+#         end
+#         col_idx += 1
+#     end
+
+#
+#
+#     if cache.is_complex
+#         tempa = Hermitian(ComplexF64.(tempa - tempa*im))
+#     else
+#         tempa = Symmetric(tempa)
+#     end
+#     # @show isposdef(tempa) # true
+#
+
+    dim2 = svec_length(d)
+    temp3 = zeros(R, dim2, dim2)
+    # temp3 = similar(Hww)
+
+    temp4 = zeros(T, dim2)
+    smat_to_svec!(temp4, tempa, one(T))
+    # @show temp4
+    # temp4 = [tempa[i, j] for j in 1:d for i in 1:j]
+
+
+
+
+    symm_kron(temp3, viw_vecs, rt2, upper_only = false)
+    outer = temp3 * temp3'
+    @show outer ≈ I
+    println("outer")
+    display(UpperTriangular(round.(outer, digits=6)))
+
+#
+#     @show viw_vecs
+#     krvecs = kron(transpose(viw_vecs), viw_vecs)
+#     @show krvecs
+#     @show temp3
+# #
+#     try1 = krvecs * Diagonal(vec(tempa)) * krvecs'
+# @show try1
+    try1 = Hermitian(temp3 * Diagonal(temp4) * temp3')
+
+    if !cache.is_complex
+        Hww .+= try1
+    else
+
+
+    Hww .= 0
+
+    col_idx = 1
+    col_idx2 = 1
+    for i in 1:d, j in 1:i
+        row_idx = 1
+        row_idx2 = 1
+        if i == j
+            @inbounds for i2 in 1:d, j2 in 1:i2
+                if i2 == j2
+                    @show try1[row_idx2, col_idx2]
+                    Hww[row_idx, col_idx] = real(try1[row_idx2, col_idx2]) + imag(try1[row_idx2, col_idx2])
+                else
+                    c = try1[row_idx2, col_idx2]
+                    Hww[row_idx, col_idx] = real(c)
+                    row_idx += 1
+                    Hww[row_idx, col_idx] = -imag(c)
+                end
+                row_idx += 1
+                row_idx2 += 1
+                (row_idx > col_idx) && break
+            end
+            col_idx += 1
+            col_idx2 += 1
+        else
+            @inbounds for i2 in 1:d, j2 in 1:i2
+                if i2 == j2
+                    c = try1[row_idx2, col_idx2]
+                    Hww[row_idx, col_idx] = real(c)
+                    Hww[row_idx, col_idx + 1] = -imag(c)
+                else
+                    @show i,j,i2,j2
+                    @show svec_idx(i,j)
+                    @show svec_idx(i2,j2)
+                    @show svec_idx(i,i2)
+                    @show svec_idx(j,j2)
+                    @show svec_idx(j2,i)
+                    @show svec_idx(j,i2)
+                    @show row_idx2, col_idx2
+                    b1 = try1[row_idx2, col_idx2]
+                    b2 = try1[svec_idx(j,j2), svec_idx(i,i2)]
+                    c1 = b1 + b2
+                    Hww[row_idx, col_idx] = real(c1)
+                    Hww[row_idx, col_idx + 1] = -imag(c1)
+                    row_idx += 1
+                    c2 = b1 - b2
+                    Hww[row_idx, col_idx] = imag(c2)
+                    Hww[row_idx, col_idx + 1] = real(c2)
+                end
+                row_idx += 1
+                row_idx2 += 1
+                (row_idx > col_idx) && break
+            end
+            col_idx += 2
+            col_idx2 += 1
+        end
+    end
+
+@show try1
+
+
+    end
+#     # @show try1
+#     # @show try2
+
+    # temp3 .= 0
+    # symm_kron(temp3, inv(cache.viw_eigen), rt2)
+    # @show Hermitian(temp3)
+    # temp4 = zero(temp3)
+    # symm_kron(temp4, cache.viw, rt2)
+    # @show Hermitian(temp4)
+    # @show Hermitian(temp3) * Hermitian(temp4)
+
+
+    # rnd = rand(dim2)
+    # Rnd =
+    # try1 = vec(viw_vecs * rnd * viw_vecs)
+    # try2 = temp3 * [rnd[i, j] for j in 1:d for i in 1:j]
+    # @show try1
+    # @show try2
+
+    # smat_to_svec!(temp4, tempa, one(T))
+    # mul!(temp5, temp3, Diagonal(temp4))
+    # mul!(Hww, temp5, temp3')
+    # HwwR = temp3 * Diagonal(temp4) * temp3'
+    # @show temp4
+    # HwwR2 = temp3 * Diagonal(sqrt.(temp4))
+    # HwwR3 = HwwR2 * HwwR2'
+    # @show HwwR3 - HwwR
+    # Hww .+= HwwR
+    #
+    # # symm_kron(temp3, viw_vecs, rt2, upper_only = false)
+    # # @show temp3
+    # #
+    # # @show HwwR
+    #
+    # # Hww vector outer prod part
+    # temp1 .*= -ζ
+    # outer = temp1 * temp1'
+    # # @show outer
     mul!(Hww, temp1, temp1', true, true)
+    @show vecouter
 
     cone.hess_updated = true
     return cone.hess

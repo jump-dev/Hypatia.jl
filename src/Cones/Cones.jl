@@ -354,37 +354,142 @@ function symm_kron(
     ) where {T <: Real}
     side = size(mat, 1)
 
+    rho(idx1, idx2) = (idx1 == idx2 ? 1 : rt2)
+
+    X = mat
+    # Y = transpose(mat)
+    Y = mat
+
     col_idx = 1
     @inbounds for l in 1:side
-        for k in 1:(l - 1)
+        for k in 1:l
             row_idx = 1
             for j in 1:side
-                upper_only && (row_idx > col_idx) && break
-                for i in 1:(j - 1)
-                    H[row_idx, col_idx] = mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k]
+                # upper_only && (row_idx > col_idx) && break
+                for i in 1:j
+                    # @show 1, row_idx, col_idx
+                    # H[row_idx, col_idx] = mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k]
+                    H[row_idx, col_idx] = rho(i,j) * rho(k,l) / 4 *
+                        (X[i,k] * Y[j,l] + X[i,l] * Y[j,k] + X[j,l] * Y[i,k] + X[j,k] * Y[i,l])
                     row_idx += 1
                 end
-                H[row_idx, col_idx] = rt2 * mat[j, k] * mat[j, l]
-                row_idx += 1
             end
             col_idx += 1
         end
-
-        row_idx = 1
-        for j in 1:side
-            upper_only && (row_idx > col_idx) && break
-            for i in 1:(j - 1)
-                H[row_idx, col_idx] = rt2 * mat[i, l] * mat[j, l]
-                row_idx += 1
-            end
-            H[row_idx, col_idx] = abs2(mat[j, l])
-            row_idx += 1
-        end
-        col_idx += 1
     end
+
+
+    # col_idx = 1
+    # @inbounds for l in 1:side
+    #     for k in 1:(l - 1)
+    #         row_idx = 1
+    #         for j in 1:side
+    #             upper_only && (row_idx > col_idx) && break
+    #             for i in 1:(j - 1)
+    #                 # @show 1, row_idx, col_idx
+    #                 H[row_idx, col_idx] = mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k]
+    #                 row_idx += 1
+    #             end
+    #             # @show 2, row_idx, col_idx
+    #             H[row_idx, col_idx] = rt2 * mat[j, k] * mat[j, l]
+    #             row_idx += 1
+    #         end
+    #         col_idx += 1
+    #     end
+    #
+    #     row_idx = 1
+    #     for j in 1:side
+    #         upper_only && (row_idx > col_idx) && break
+    #         for i in 1:(j - 1)
+    #             # @show 3, row_idx, col_idx
+    #             H[row_idx, col_idx] = rt2 * mat[i, l] * mat[j, l]
+    #             row_idx += 1
+    #         end
+    #         # @show 4, row_idx, col_idx
+    #         H[row_idx, col_idx] = abs2(mat[j, l])
+    #         row_idx += 1
+    #     end
+    #     col_idx += 1
+    # end
 
     return H
 end
+
+
+
+
+
+function symm_kron(
+    H::AbstractMatrix{Complex{T}},
+    mat::AbstractMatrix{Complex{T}},
+    rt2::T;
+    upper_only::Bool = true,
+    ) where {T <: Real}
+    side = size(mat, 1)
+
+    rho(idx1, idx2) = (idx1 == idx2 ? 1 : rt2)
+
+    X = mat
+    # Y = transpose(mat)
+    Y = mat
+
+    col_idx = 1
+    @inbounds for l in 1:side
+        for k in 1:l
+            row_idx = 1
+            for j in 1:side
+                # upper_only && (row_idx > col_idx) && break
+                for i in 1:j
+                    # @show 1, row_idx, col_idx
+                    # H[row_idx, col_idx] = mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k]
+                    H[row_idx, col_idx] = rho(i,j) * rho(k,l) / 4 *
+                        (X[i,k] * Y[j,l] + X[i,l] * Y[j,k] + X[j,l] * Y[i,k] + X[j,k] * Y[i,l])
+                    row_idx += 1
+                end
+            end
+            col_idx += 1
+        end
+    end
+
+    # col_idx = 1
+    # @inbounds for l in 1:side
+    #     for k in 1:(l - 1)
+    #         row_idx = 1
+    #         for j in 1:side
+    #             upper_only && (row_idx > col_idx) && break
+    #             for i in 1:(j - 1)
+    #                 # @show 1, row_idx, col_idx
+    #                 H[row_idx, col_idx] = mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k]
+    #                 row_idx += 1
+    #             end
+    #             # @show 2, row_idx, col_idx
+    #             H[row_idx, col_idx] = rt2 * mat[j, k] * mat[j, l]
+    #             row_idx += 1
+    #         end
+    #         col_idx += 1
+    #     end
+    #
+    #     row_idx = 1
+    #     for j in 1:side
+    #         upper_only && (row_idx > col_idx) && break
+    #         for i in 1:(j - 1)
+    #             # @show 3, row_idx, col_idx
+    #             H[row_idx, col_idx] = rt2 * mat[i, l] * mat[j, l]
+    #             row_idx += 1
+    #         end
+    #         # @show 4, row_idx, col_idx
+    #         H[row_idx, col_idx] = abs2(mat[j, l])
+    #         # H[row_idx, col_idx] = mat[j, l] * mat[l, j]
+    #         row_idx += 1
+    #     end
+    #     col_idx += 1
+    # end
+
+    return H
+end
+
+
+
 
 function symm_kron(
     H::AbstractMatrix{T},
