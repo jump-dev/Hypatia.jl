@@ -126,19 +126,18 @@ function test_barrier(
     Cones.load_point(cone, point)
     @test Cones.is_feas(cone)
 
-    # fd_grad = ForwardDiff.gradient(barrier, point)
-    # @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
+    fd_grad = ForwardDiff.gradient(barrier, point)
+    @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
 
-    Cones.grad(cone)
+    # Cones.grad(cone)
     # dir = 10 * randn(T, dim)
-    # Cones.correction(cone, dir)
     # fd_hess = ForwardDiff.hessian(barrier, point)
     hess = Cones.hess(cone)
+    # @test hess ≈ fd_hess atol=tol rtol=tol
     # @show fd_hess
     # @show hess
     # diff = fd_hess - hess
     # display(diff)
-    # @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
 
     # println()
     dir = 10 * randn(T, dim)

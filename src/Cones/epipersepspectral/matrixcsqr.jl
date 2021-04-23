@@ -159,7 +159,6 @@ function update_hess(cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F, T}) where {T, 
     end
     diff_mat = Hermitian(diff_mat, :U)
 
-
     # Huu
     H[1, 1] = ζi2
 
@@ -185,21 +184,53 @@ function update_hess(cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F, T}) where {T, 
     # Hww kron parts
     eigw = v * viw_λ
     tempa = ζivi * diff_mat + inv.(eigw) * inv.(eigw)'
-    if cache.is_complex
-        tempa = Hermitian(ComplexF64.(tempa))
-    else
-        tempa = Symmetric(tempa)
-    end
     # @show isposdef(tempa) # true
 
-    # TODO don't do it this way - it is d^6. do it implicitly
-    temp3 = similar(Hww)
-    temp4 = similar(temp1)
-    temp5 = similar(Hww)
-    symm_kron(temp3, viw_vecs, rt2, upper_only = false)
-    smat_to_svec!(temp4, tempa, one(T))
-    mul!(temp5, temp3, Diagonal(temp4))
-    mul!(Hww, temp5, temp3')
+
+    # TODO explicit symm_kron way, doesn't work for complex, d^6 time?
+    # tempa = Symmetric(tempa)
+    # temp3 = similar(Hww)
+    # temp4 = similar(temp1)
+    # temp5 = similar(Hww)
+    # symm_kron(temp3, viw_vecs, rt2, upper_only = false)
+    # smat_to_svec!(temp4, tempa, one(T))
+    # mul!(temp5, temp3, Diagonal(temp4))
+    # mul!(Hww, temp5, temp3')
+    # Hwwcopy = copy(Hww)
+
+
+    # TODO implicit hess_prod like way, works for complex, d^5 time?
+    # TODO refac, in-place, simplify, precompute parts
+    rt2i = inv(rt2)
+    col_idx = 1
+    for j in 1:d, i in 1:j
+        vecsi = viw_vecs[i, :] # TODO to be efficient, make a transposed copy of vecs and index columns
+        if i == j
+            mat = vecsi * vecsi'
+        else
+            vecsj = viw_vecs[j, :]
+            mat = vecsi * vecsj'
+            mat = mat + mat'
+            mat .*= rt2i
+        end
+
+        mat .*= tempa
+        mat = viw_vecs * transpose(mat) * viw_vecs'
+        @views smat_to_svec!(Hww[:, col_idx], mat, rt2)
+        col_idx += 1
+
+        if cache.is_complex && (i != j)
+            vecsj = viw_vecs[j, :]
+            mat = vecsi * vecsj'
+            mat .*= rt2i * im
+            mat = mat + mat'
+
+            mat .*= tempa
+            mat = viw_vecs * transpose(mat) * viw_vecs'
+            @views smat_to_svec!(Hww[:, col_idx], mat, rt2)
+            col_idx += 1
+        end
+    end
 
     # Hww vector outer prod part
     temp1 .*= -ζ
