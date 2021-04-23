@@ -272,25 +272,43 @@ function update_hess(cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F, T}) where {T, 
 # @show try1
     try1 = Hermitian(temp3 * Diagonal(temp4) * temp3')
 
+
+
+
     if !cache.is_complex
         Hww .+= try1
     else
 
+    try1a = sqrt(Diagonal(temp4)) * temp3'
+    try1b = Hermitian(try1a' * try1a)
+    @show try1b ≈ try1
+    println()
+    try1 = try1a
+
+    dot1(a,b) = dot(try1[:, a], try1[:, b])
+    dot2(i,k,j,l) = dot1(svec_idx(i,k), svec_idx(j,l))
 
     Hww .= 0
 
     col_idx = 1
     col_idx2 = 1
+# @inbounds
     for i in 1:d, j in 1:i
         row_idx = 1
         row_idx2 = 1
         if i == j
-            @inbounds for i2 in 1:d, j2 in 1:i2
+            for i2 in 1:d, j2 in 1:i2
                 if i2 == j2
-                    @show try1[row_idx2, col_idx2]
-                    Hww[row_idx, col_idx] = real(try1[row_idx2, col_idx2]) + imag(try1[row_idx2, col_idx2])
+                    @show 1, row_idx2, col_idx2
+                    # Hww[row_idx, col_idx] = abs(dot1(row_idx2, col_idx2))
+                    k = i2
+                    l = j2
+                    @show i,j,k,l
+                    Hww[row_idx, col_idx] = (dot2(i,k,j,l) + dot2(i,l,j,k) + dot2(j,l,i,k) + dot2(j,k,i,l)) / 4
+                    # Hww[row_idx, col_idx] = (X[i,k] * Y[j,l] + X[i,l] * Y[j,k] + X[j,l] * Y[i,k] + X[j,k] * Y[i,l]) / 4
                 else
-                    c = try1[row_idx2, col_idx2]
+                    @show 2, row_idx2, col_idx2
+                    c = dot1(row_idx2, col_idx2)
                     Hww[row_idx, col_idx] = real(c)
                     row_idx += 1
                     Hww[row_idx, col_idx] = -imag(c)
@@ -302,28 +320,29 @@ function update_hess(cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F, T}) where {T, 
             col_idx += 1
             col_idx2 += 1
         else
-            @inbounds for i2 in 1:d, j2 in 1:i2
+            for i2 in 1:d, j2 in 1:i2
                 if i2 == j2
-                    c = try1[row_idx2, col_idx2]
+                    @show 3, row_idx2, col_idx2
+                    c = dot1(row_idx2, col_idx2)
                     Hww[row_idx, col_idx] = real(c)
                     Hww[row_idx, col_idx + 1] = -imag(c)
                 else
-                    @show i,j,i2,j2
-                    @show svec_idx(i,j)
-                    @show svec_idx(i2,j2)
-                    @show svec_idx(i,i2)
-                    @show svec_idx(j,j2)
-                    @show svec_idx(j2,i)
-                    @show svec_idx(j,i2)
-                    @show row_idx2, col_idx2
-                    b1 = try1[row_idx2, col_idx2]
-                    b2 = try1[svec_idx(j,j2), svec_idx(i,i2)]
+                    @show 4, row_idx2, col_idx2
+                    @show i, j, i2, j2
+                    @show svec_idx(i2,i), svec_idx(j,j2), svec_idx(j2,i), svec_idx(j,i2)
+                    # b1 = try1[row_idx2, col_idx2]
+                    b1 = dot1(svec_idx(j2,i), svec_idx(j,i2))
+                    b2 = dot1(svec_idx(i2,i), svec_idx(j,j2))
+                    # b2 = dot1(col_idx2, row_idx2)
+                    @show b1
+                    @show b2
+                    b1 -= hypot(b2)
                     c1 = b1 + b2
                     Hww[row_idx, col_idx] = real(c1)
-                    Hww[row_idx, col_idx + 1] = -imag(c1)
+                    Hww[row_idx, col_idx + 1] = imag(c1)
                     row_idx += 1
                     c2 = b1 - b2
-                    Hww[row_idx, col_idx] = imag(c2)
+                    Hww[row_idx, col_idx] = -imag(c2)
                     Hww[row_idx, col_idx + 1] = real(c2)
                 end
                 row_idx += 1
@@ -335,7 +354,7 @@ function update_hess(cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F, T}) where {T, 
         end
     end
 
-@show try1
+@show try1a
 
 
     end

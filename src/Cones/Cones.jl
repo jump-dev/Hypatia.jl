@@ -434,7 +434,8 @@ function symm_kron(
     Y = mat
 
     col_idx = 1
-    @inbounds for l in 1:side
+    # @inbounds 
+    for l in 1:side
         for k in 1:l
             row_idx = 1
             for j in 1:side
@@ -499,11 +500,13 @@ function symm_kron(
     ) where {T <: Real}
     side = size(mat, 1)
 
+    println("here")
     col_idx = 1
+# @inbounds
     for i in 1:side, j in 1:i
         row_idx = 1
         if i == j
-            @inbounds for i2 in 1:side, j2 in 1:i2
+            for i2 in 1:side, j2 in 1:i2
                 if i2 == j2
                     H[row_idx, col_idx] = abs2(mat[i2, i])
                     row_idx += 1
@@ -518,7 +521,7 @@ function symm_kron(
             end
             col_idx += 1
         else
-            @inbounds for i2 in 1:side, j2 in 1:i2
+            for i2 in 1:side, j2 in 1:i2
                 if i2 == j2
                     c = rt2 * mat[i2, i] * mat[j, j2]
                     H[row_idx, col_idx] = real(c)
