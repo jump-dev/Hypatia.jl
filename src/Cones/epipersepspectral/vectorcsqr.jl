@@ -156,6 +156,7 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
     ζi2 = abs2(ζi)
     σ = cache.σ
     viw = cache.viw
+    w = cone.w_view
     ∇h_viw = cache.∇h_viw
     ∇2h_viw = cache.∇2h_viw
     # @. ∇2h_viw = h_der2(F, cache.viw)
@@ -173,36 +174,34 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
     α = m .* ∇h_viw
     β = dot(∇h_viw, α)
 
-    γ = m .* ∇2h_viw .* viw
+    γ = m .* ∇2h_viw .* w
     # δ = sum(m .* ∇h_viw .* ∇2h_viw .* viw)
     δ = dot(∇h_viw, γ)
 
     Yu = -inv(ζ^2 + β) * α
     @assert Yu ≈ Symmetric(H[3:end, 3:end]) \ H[1, 3:end]
-    Yv = (σ + ζivi / v * δ) / (ζ^2 + β) * α - ζivi / v * γ
-    @show Yv
-    Yv2 = Symmetric(H[3:end, 3:end]) \ H[2, 3:end]
-    @show Yv2
-    @assert Yv ≈ Yv2
+    Yv = (ζ^(-2) * σ + ζ^(-3) / v^2 * δ) / (1 + ζ^(-2) * β) * α - v^(-2) / ζ * γ
+    # Yv = (σ + ζivi / v * δ) / (ζ^2 + β) * α - ζivi / v * γ
+    # @show Yv
+    # Yv2 = Symmetric(H[3:end, 3:end]) \ H[2, 3:end]
+    # @show Yv2
+    # @assert Yv ≈ Yv2
 
+    Zuu = ζi2 - inv(ζ^2 + β) / ζ^2 * dot(α, ∇h_viw)
+    # @show Zuu / (ζi2 - dot(H[1,3:end], Yu))
 
-    aa = sum(∇h_viw[i]^2 * m[i]^2 for i in 1:d)
-    ac = sum(∇h_viw[i] * viw[i] * ∇2h_viw[i] * m[i]^2 for i in 1:d)
-    cc = sum(viw[i]^2 * ∇2h_viw[i]^2 * m[i]^2 for i in 1:d)
-
-    # Zuu = Huu - ζ^(-4) / (1 + ζ^(-2) * β)^2 * aa
-    Zuu = ζi2 - inv(ζ^2 + β)^2 * aa
-
-    # Zvu = Hvu + (ζ^(-4) * σ + ζ^(-5) * v^(-2) * δ) / (1 + ζ^(-2) * β)^2 * aa - v^(-2) * ζ^(-3) / (1 + ζ^(-2) * β) * ac
     # TODO refac constants with above and below
-    Zvu = -ζi2 * σ + (σ + ζivi / v * δ) / (ζ^2 + β)^2 * aa - ζivi / v / (ζ^2 + β) * ac
+    Zvu = -ζi2 * σ + (ζi2 * σ + ζ^(-3) / v^2 * δ) / (1 + ζ^(-2) * β) * dot(α, ∇h_viw) / ζ^2 - v^(-2) * dot(γ, ∇h_viw) / ζ^3
+    # @show Zvu / (-ζi2 * σ - dot(H[2, 3:end], Yu))
 
     # c1 = (ζ^(-2) * σ + ζ^(-3) / v^2 * δ) / (1 + ζ^(-2) * β)
     c1 = (σ + ζivi / v * δ) / (ζ^2 + β)
     c2 = ζivi / v
+    c3 = ζi2 * σ
     Hvv = v^-2 + abs2(ζi * σ) + ζivi * sum(viw[i]^2 * ∇2h_viw[i] for i in 1:d)
     @assert Hvv ≈ H[2, 2]
-    Zvv = Hvv - (c1^2 * aa - 2 * c1 * c2 * ac + c2^2 * cc)
+    Zvv = Hvv - dot(c3 * ∇h_viw - c2 * ∇2h_viw .* w, c1 * α - c2 * γ)
+    # @show Zvv / (Hvv - dot(H[2, 3:end], Yv))
 
 
     # Huu, Huv, Hvv
