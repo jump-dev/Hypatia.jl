@@ -126,25 +126,29 @@ function test_barrier(
     Cones.load_point(cone, point)
     @test Cones.is_feas(cone)
 
-    fd_grad = ForwardDiff.gradient(barrier, point)
-    @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
+    # fd_grad = ForwardDiff.gradient(barrier, point)
+    # @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
 
-    # Cones.grad(cone)
+    Cones.grad(cone)
     # dir = 10 * randn(T, dim)
     # fd_hess = ForwardDiff.hessian(barrier, point)
     hess = Cones.hess(cone)
+    inv_hess = Cones.inv_hess(cone)
+    inv_hess_true = inv(hess)
+    @show inv_hess_true
+    @show inv_hess
     # @test hess ≈ fd_hess atol=tol rtol=tol
     # @show fd_hess
     # @show hess
     # diff = fd_hess - hess
     # display(diff)
 
-    # println()
-    dir = 10 * randn(T, dim)
-    temp = similar(dir)
-    Cones.hess_prod!(temp, dir, cone)
-    # @assert temp ≈ fd_hess * dir
-    @test hess * dir ≈ temp atol=tol rtol=tol
+    # # println()
+    # dir = 10 * randn(T, dim)
+    # temp = similar(dir)
+    # Cones.hess_prod!(temp, dir, cone)
+    # # @assert temp ≈ fd_hess * dir
+    # @test hess * dir ≈ temp atol=tol rtol=tol
 
     # display(temp)
     # display(hess * dir)
@@ -648,11 +652,11 @@ function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr, F}})
         (u, v, w) = (s[1], s[2], s[3:end])
         return -log(u - v * Cones.h_val(F, w ./ v)) - log(v) - sum(log, w)
     end
-    test_barrier(C(3), barrier) # TODO
+    test_barrier(C(2), barrier) # TODO
 end
 
 function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr{T, R}, F}}) where {T, R, F}
-    dW = 3 # TODO
+    dW = 2 # TODO
     function barrier(s)
         (u, v, w) = (s[1], s[2], s[3:end])
         W = new_mat_herm(w, dW, R)

@@ -143,6 +143,101 @@ function update_hess(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
     return cone.hess
 end
 
+
+# TODO uses old math from paper with wrong zeta definition
+function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
+    @assert cone.hess_updated # TODO
+    d = cone.d
+    v = cone.point[2]
+    cache = cone.cache
+    Hi = cone.inv_hess.data
+    ζi = cache.ζi
+    ζ = cache.ζ
+    ζi2 = abs2(ζi)
+    σ = cache.σ
+    viw = cache.viw
+    ∇h_viw = cache.∇h_viw
+    ∇2h_viw = cache.∇2h_viw
+    # @. ∇2h_viw = h_der2(F, cache.viw)
+    ζi∇h_viw = cache.ζi∇h_viw
+    wi = cache.wi
+    ζivi = ζi / v
+    ζiσ = ζi * σ
+
+
+    # TODO delete
+    H = cone.hess
+
+    # new
+    m = inv.(ζivi * ∇2h_viw + abs2.(wi))
+    α = m .* ∇h_viw
+    β = dot(∇h_viw, α)
+
+    γ = m .* ∇2h_viw .* viw
+    # δ = sum(m .* ∇h_viw .* ∇2h_viw .* viw)
+    δ = dot(∇h_viw, γ)
+
+    Yu = -inv(ζ^2 + β) * α
+    @assert Yu ≈ Symmetric(H[3:end, 3:end]) \ H[1, 3:end]
+    Yv = (σ + ζivi / v * δ) / (ζ^2 + β) * α - ζivi / v * γ
+    @show Yv
+    Yv2 = Symmetric(H[3:end, 3:end]) \ H[2, 3:end]
+    @show Yv2
+    @assert Yv ≈ Yv2
+
+
+    aa = sum(∇h_viw[i]^2 * m[i]^2 for i in 1:d)
+    ac = sum(∇h_viw[i] * viw[i] * ∇2h_viw[i] * m[i]^2 for i in 1:d)
+    cc = sum(viw[i]^2 * ∇2h_viw[i]^2 * m[i]^2 for i in 1:d)
+
+    # Zuu = Huu - ζ^(-4) / (1 + ζ^(-2) * β)^2 * aa
+    Zuu = ζi2 - inv(ζ^2 + β)^2 * aa
+
+    # Zvu = Hvu + (ζ^(-4) * σ + ζ^(-5) * v^(-2) * δ) / (1 + ζ^(-2) * β)^2 * aa - v^(-2) * ζ^(-3) / (1 + ζ^(-2) * β) * ac
+    # TODO refac constants with above and below
+    Zvu = -ζi2 * σ + (σ + ζivi / v * δ) / (ζ^2 + β)^2 * aa - ζivi / v / (ζ^2 + β) * ac
+
+    # c1 = (ζ^(-2) * σ + ζ^(-3) / v^2 * δ) / (1 + ζ^(-2) * β)
+    c1 = (σ + ζivi / v * δ) / (ζ^2 + β)
+    c2 = ζivi / v
+    Hvv = v^-2 + abs2(ζi * σ) + ζivi * sum(viw[i]^2 * ∇2h_viw[i] for i in 1:d)
+    @assert Hvv ≈ H[2, 2]
+    Zvv = Hvv - (c1^2 * aa - 2 * c1 * c2 * ac + c2^2 * cc)
+
+
+    # Huu, Huv, Hvv
+    # Zi = inv(Zuu * Zvv - Zvu^2) * [Zvv -Zvu; -Zvu Zuu]
+    DZi = inv(Zuu * Zvv - Zvu^2)
+    Hiuu = Hi[1, 1] = DZi * Zvv
+    Hiuv = Hi[1, 2] = -DZi * Zvu
+    Hivv = Hi[2, 2] = DZi * Zuu
+
+    # Huw, Hvw
+    @. Hi[1, 3:end] = -Hiuu * Yu - Hiuv * Yv
+    @. Hi[2, 3:end] = -Hiuv * Yu - Hivv * Yv
+
+    # # Hww
+    # # ?? TODO copied
+    # Ai = Diagonal(inv.(inv(v) / ζ * vec(diff_mat) + [inv(vals[i]) / vals[j] for i in 1:d for j in 1:d]))
+    # Hwwi = Ai - ζ^(-2) * Ai * vec(nablaphi) * vec(nablaphi)' * Ai / (1 + ζ^(-2) * dot(vec(nablaphi), Ai, vec(nablaphi)))
+    # Hiww = Hwwi + Y * Zi * Y'
+    #
+    # @inbounds for j in 1:d
+    #     j2 = 2 + j
+    #     for i in 1:(j - 1)
+    #         Hi[2 + i, j2] =
+    #     end
+    #     Hi[j2, j2] =
+    # end
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+
+
+
+
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
     # cone.hess_aux_updated || update_hess_aux(cone) # TODO
     @assert cone.hess_updated
@@ -179,10 +274,6 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
 
     return prod
 end
-
-# function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
-#
-# end
 
 # function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
 #     # cone.hess_aux_updated || update_hess_aux(cone) # TODO

@@ -31,17 +31,17 @@ function cone_types(T::Type{<:Real})
         # Cones.HypoRootdetTri{T, Complex{T}},
 
 # # TODO put in a loop below
-#         Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.NegLogMMF, T},
-        # Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.NegEntropyMMF, T},
+        # Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.NegLogMMF, T},
+        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.NegEntropyMMF, T},
 #         Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.SquareMMF, T},
 
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.NegLogMMF, T},
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.NegEntropyMMF, T},
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.SquareMMF, T},
-
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegLogMMF, T},
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegEntropyMMF, T},
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.SquareMMF, T},
+        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.NegLogMMF, T},
+        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.NegEntropyMMF, T},
+        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.SquareMMF, T},
+        #
+        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegLogMMF, T},
+        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegEntropyMMF, T},
+        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.SquareMMF, T},
 
         # Cones.HypoPerLog{T},
         # Cones.HypoPerLogdetTri{T, T},
