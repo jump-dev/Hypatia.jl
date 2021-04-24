@@ -68,8 +68,8 @@ function test_oracles(
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
 
     hess = Matrix(Cones.hess(cone))
-    # inv_hess = Matrix(Cones.inv_hess(cone))
-    # @test hess * inv_hess ≈ I atol=tol rtol=tol
+    inv_hess = Matrix(Cones.inv_hess(cone))
+    @test hess * inv_hess ≈ I atol=tol rtol=tol
     #
     # @test hess * point ≈ -grad atol=tol rtol=tol
     @test Cones.hess_prod!(prod_vec, point, cone) ≈ -grad atol=tol rtol=tol
@@ -137,6 +137,7 @@ function test_barrier(
     inv_hess_true = inv(hess)
     @show inv_hess_true
     @show inv_hess
+    @show inv_hess ./ inv_hess_true
     # @test hess ≈ fd_hess atol=tol rtol=tol
     # @show fd_hess
     # @show hess

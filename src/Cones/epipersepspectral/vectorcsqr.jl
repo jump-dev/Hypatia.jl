@@ -203,7 +203,6 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
     Zvv = Hvv - dot(c3 * ∇h_viw - c2 * ∇2h_viw .* w, c1 * α - c2 * γ)
     # @show Zvv / (Hvv - dot(H[2, 3:end], Yv))
 
-
     # Huu, Huv, Hvv
     # Zi = inv(Zuu * Zvv - Zvu^2) * [Zvv -Zvu; -Zvu Zuu]
     DZi = inv(Zuu * Zvv - Zvu^2)
@@ -215,19 +214,10 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
     @. Hi[1, 3:end] = -Hiuu * Yu - Hiuv * Yv
     @. Hi[2, 3:end] = -Hiuv * Yu - Hivv * Yv
 
-    # # Hww
-    # # ?? TODO copied
-    # Ai = Diagonal(inv.(inv(v) / ζ * vec(diff_mat) + [inv(vals[i]) / vals[j] for i in 1:d for j in 1:d]))
-    # Hwwi = Ai - ζ^(-2) * Ai * vec(nablaphi) * vec(nablaphi)' * Ai / (1 + ζ^(-2) * dot(vec(nablaphi), Ai, vec(nablaphi)))
-    # Hiww = Hwwi + Y * Zi * Y'
-    #
-    # @inbounds for j in 1:d
-    #     j2 = 2 + j
-    #     for i in 1:(j - 1)
-    #         Hi[2 + i, j2] =
-    #     end
-    #     Hi[j2, j2] =
-    # end
+    Hwwi = Diagonal(m) - ζi2 * α * α' / (1 + ζi2 * β)
+    Y = [Yu Yv]
+    Zi = Symmetric(Hi[1:2, 1:2], :U)
+    Hi[3:end, 3:end] .= Hwwi + Y * Zi * Y'
 
     cone.inv_hess_updated = true
     return cone.inv_hess
