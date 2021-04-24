@@ -56,9 +56,11 @@ native_example_names = [
 JuMP_example_names = [
     "CBLIB",
     "centralpolymat",
+    "classicalquantum",
     "conditionnum",
     "contraction",
     "densityest",
+    "entanglementassisted",
     "envelope",
     "expdesign",
     "lotkavolterra",
