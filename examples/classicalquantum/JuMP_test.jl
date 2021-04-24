@@ -8,8 +8,8 @@ insts["fast"] = [
     ]
 insts["slow"] = Tuple[]
 insts["various"] = [
-    ((10,),),
-    ((30,),),
+    ((25,),),
+    ((50,),),
     ((100,),),
     ]
 return (ClassicalQuantum, insts)

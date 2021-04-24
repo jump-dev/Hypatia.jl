@@ -16,7 +16,7 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     ρs = Matrix[]
     Hs = Float64[]
     for _ in 1:n
-        # ρ = randn(Complex{T}, n, n)
+        # TODO ρ = randn(Complex{T}, n, n)
         ρ = randn(T, n, n)
         ρ = ρ * ρ'
         ρ /= tr(ρ)
@@ -27,12 +27,10 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     model = JuMP.Model()
     JuMP.@variable(model, prob[1:n] >= 0)
     JuMP.@variable(model, qe_epi)
-
     entr_sum = sum(ρ * p for (ρ, p) in zip(ρs, prob))
-
     JuMP.@constraint(model, vcat(qe_epi, 1, Cones.smat_to_svec!(zeros(JuMP.AffExpr, sn), entr_sum, sqrt(2))) in Hypatia.EpiPerTraceEntropyTriCone{Float64}(2 + sn))
     JuMP.@constraint(model, sum(prob) == 1)
-    JuMP.@objective(model, Max, qe_epi - dot(prob, Hs))
+    JuMP.@objective(model, Max, -qe_epi + dot(prob, Hs))
 
     return model
 end
