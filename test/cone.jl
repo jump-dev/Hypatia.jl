@@ -70,15 +70,15 @@ function test_oracles(
     hess = Matrix(Cones.hess(cone))
     inv_hess = Matrix(Cones.inv_hess(cone))
     @test hess * inv_hess ≈ I atol=tol rtol=tol
-    #
-    # @test hess * point ≈ -grad atol=tol rtol=tol
+
+    @test hess * point ≈ -grad atol=tol rtol=tol
     @test Cones.hess_prod!(prod_vec, point, cone) ≈ -grad atol=tol rtol=tol
-    # @test Cones.inv_hess_prod!(prod_vec, grad, cone) ≈ -point atol=tol rtol=tol
-    #
-    # prod_mat = zeros(T, dim, dim)
-    # @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
-    # @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
-    #
+    @test Cones.inv_hess_prod!(prod_vec, grad, cone) ≈ -point atol=tol rtol=tol
+
+    prod_mat = zeros(T, dim, dim)
+    @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
+
     # if hasproperty(cone, :use_hess_prod_slow)
     #     Cones.update_use_hess_prod_slow(cone)
     #     @test cone.use_hess_prod_slow_updated
@@ -135,9 +135,10 @@ function test_barrier(
     hess = Cones.hess(cone)
     inv_hess = Cones.inv_hess(cone)
     inv_hess_true = inv(hess)
-    @show inv_hess_true
-    @show inv_hess
-    @show inv_hess ./ inv_hess_true
+    # @show inv_hess_true
+    # @show inv_hess
+    # @show inv_hess ./ inv_hess_true
+    @test inv_hess ≈ inv_hess_true atol=tol rtol=tol
     # @test hess ≈ fd_hess atol=tol rtol=tol
     # @show fd_hess
     # @show hess
@@ -657,7 +658,7 @@ function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr, F}})
 end
 
 function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr{T, R}, F}}) where {T, R, F}
-    dW = 2 # TODO
+    dW = 3 # TODO
     function barrier(s)
         (u, v, w) = (s[1], s[2], s[3:end])
         W = new_mat_herm(w, dW, R)

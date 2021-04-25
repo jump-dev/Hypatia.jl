@@ -143,88 +143,9 @@ function update_hess(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
     return cone.hess
 end
 
-
-# TODO uses old math from paper with wrong zeta definition
-function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
-    @assert cone.hess_updated # TODO
-    d = cone.d
-    v = cone.point[2]
-    cache = cone.cache
-    Hi = cone.inv_hess.data
-    ζi = cache.ζi
-    ζ = cache.ζ
-    ζi2 = abs2(ζi)
-    σ = cache.σ
-    viw = cache.viw
-    w = cone.w_view
-    ∇h_viw = cache.∇h_viw
-    ∇2h_viw = cache.∇2h_viw
-    # @. ∇2h_viw = h_der2(F, cache.viw)
-    ζi∇h_viw = cache.ζi∇h_viw
-    wi = cache.wi
-    ζivi = ζi / v
-    ζiσ = ζi * σ
-
-
-    # TODO delete
-    H = cone.hess
-
-    # new
-    m = inv.(ζivi * ∇2h_viw + abs2.(wi))
-    α = m .* ∇h_viw
-    β = dot(∇h_viw, α)
-
-    γ = m .* ∇2h_viw .* w
-    # δ = sum(m .* ∇h_viw .* ∇2h_viw .* viw)
-    δ = dot(∇h_viw, γ)
-
-    Yu = -inv(ζ^2 + β) * α
-    @assert Yu ≈ Symmetric(H[3:end, 3:end]) \ H[1, 3:end]
-    Yv = (ζ^(-2) * σ + ζ^(-3) / v^2 * δ) / (1 + ζ^(-2) * β) * α - v^(-2) / ζ * γ
-    # Yv = (σ + ζivi / v * δ) / (ζ^2 + β) * α - ζivi / v * γ
-    # @show Yv
-    # Yv2 = Symmetric(H[3:end, 3:end]) \ H[2, 3:end]
-    # @show Yv2
-    # @assert Yv ≈ Yv2
-
-
-    # TODO refac constants with above and below
-    c1 = (σ + ζivi / v * δ) / (ζ^2 + β)
-    c2 = ζivi / v
-    c3 = ζi2 * σ
-    c4 = dot(α, ∇h_viw) / ζ^2
-
-    Zuu = ζi2 - inv(ζ^2 + β) * c4
-    Zvu = -c3 + c1 * c4 - c2 * dot(γ, ∇h_viw) / ζ^2
-    Hvv = v^-2 + abs2(ζi * σ) + c2 * dot(w.^2, ∇2h_viw) / v
-    Zvv = Hvv - c3 * c1 * dot(∇h_viw, α) + c3 * c2 * dot(∇h_viw, γ) + c2 * c1 * dot(∇2h_viw .* w, α) - c2^2 * dot(∇2h_viw .* w, γ)
-
-    # Huu, Huv, Hvv
-    # Zi = inv(Zuu * Zvv - Zvu^2) * [Zvv -Zvu; -Zvu Zuu]
-    DZi = inv(Zuu * Zvv - Zvu^2)
-    Hiuu = Hi[1, 1] = DZi * Zvv
-    Hiuv = Hi[1, 2] = -DZi * Zvu
-    Hivv = Hi[2, 2] = DZi * Zuu
-
-    # Huw, Hvw
-    @. Hi[1, 3:end] = -Hiuu * Yu - Hiuv * Yv
-    @. Hi[2, 3:end] = -Hiuv * Yu - Hivv * Yv
-
-    Hwwi = Diagonal(m) - ζi2 * α * α' / (1 + ζi2 * β)
-    Y = [Yu Yv]
-    Zi = Symmetric(Hi[1:2, 1:2], :U)
-    Hi[3:end, 3:end] .= Hwwi + Y * Zi * Y'
-
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
-
-
-
-
-
 function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
     # cone.hess_aux_updated || update_hess_aux(cone) # TODO
+    hess(cone) # TODO
     @assert cone.hess_updated
     v = cone.point[2]
     w = cone.w_view
@@ -260,8 +181,76 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
     return prod
 end
 
+function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
+    @assert cone.hess_updated # TODO
+    d = cone.d
+    v = cone.point[2]
+    cache = cone.cache
+    Hi = cone.inv_hess.data
+    ζi = cache.ζi
+    ζ = cache.ζ
+    ζi2 = abs2(ζi)
+    σ = cache.σ
+    viw = cache.viw
+    w = cone.w_view
+    ∇h_viw = cache.∇h_viw
+    ∇2h_viw = cache.∇2h_viw
+    ζi∇h_viw = cache.ζi∇h_viw
+    wi = cache.wi
+    ζivi = ζi / v
+    ζivi2 = ζivi / v
+
+    m = inv.(ζivi * ∇2h_viw + abs2.(wi))
+    α = m .* ∇h_viw
+    β = dot(∇h_viw, α)
+    ζ2β = ζ^2 + β
+
+    w∇2h_viw = ζivi2 * w .* ∇2h_viw
+    γ = m .* w∇2h_viw
+    c1 = (σ + dot(∇h_viw, γ)) / ζ2β
+
+    c5 = -inv(ζ2β)
+    Yu = c5 * α
+    Yv = c1 * α - γ
+
+    c3 = ζi2 * σ
+    c4 = ζi2 * β
+    Zuu = ζi2 - c4 / ζ2β
+    Zvu = -c3 + c1 * c4 - ζi2 * dot(γ, ∇h_viw)
+    Zvv = (inv(v) + dot(w, w∇2h_viw)) / v + abs2(ζi * σ) + dot(w∇2h_viw - c3 * ∇h_viw, Yv)
+
+    # Hiuu, Hiuv, Hivv
+    DZi = inv(Zuu * Zvv - Zvu^2)
+    Hiuu = Hi[1, 1] = DZi * Zvv
+    Hiuv = Hi[1, 2] = -DZi * Zvu
+    Hivv = Hi[2, 2] = DZi * Zuu
+
+    @inbounds for j in 1:d
+        Yu_j = Yu[j]
+        Yv_j = Yv[j]
+        j2 = 2 + j
+
+        # Hiuw
+        Hi1j = Hi[1, j2] = -Hiuu * Yu_j - Hiuv * Yv_j
+
+        # Hivw
+        Hi2j = Hi[2, j2] = -Hiuv * Yu_j - Hivv * Yv_j
+
+        # Hiww
+        for i in 1:j
+            Hi[2 + i, j2] = Yu_j * α[i] - Yu[i] * Hi1j - Yv[i] * Hi2j
+        end
+        Hi[j2, j2] += m[j]
+    end
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
 # function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSepSpectral{<:VectorCSqr, F}) where F
 #     # cone.hess_aux_updated || update_hess_aux(cone) # TODO
+#     hess(cone) # TODO
+#     @assert cone.hess_updated
 #     v = cone.point[2]
 #     cache = cone.cache
 #

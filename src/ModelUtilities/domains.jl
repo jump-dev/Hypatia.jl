@@ -1,7 +1,5 @@
 #=
 definitions of Hypatia domains
-
-TODO put unused domains into polymin example (note ball and ellipse require GSL dependency)
 =#
 
 abstract type Domain{T <: Real} end
@@ -41,7 +39,7 @@ end
 get_dimension(dom::Box) = length(dom.l)
 get_degree(::Box) = 2
 
-# import GSL: sf_gamma_inc_Q
+# import GSL: sf_gamma_inc_Q # TODO use SpecialFunctions instead
 
 # # Euclidean hyperball
 # mutable struct Ball{T <: Real} <: Domain{T}

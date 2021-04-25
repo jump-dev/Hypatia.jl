@@ -1,7 +1,7 @@
 #=
 utilities for polynomial interpolation on real canonical domains
 
-TODO put unused domains into polymin example (note ball and ellipse require GSL dependency)
+TODO put unused domains into polymin example (note ball and ellipse require GSL or SpecialFunctions dependency)
 =#
 
 interp_sample(dom::FreeDomain{T}, npts::Int) where {T <: Real} = interp_sample(Box{T}(-ones(T, dom.n), ones(T, dom.n)), npts)
