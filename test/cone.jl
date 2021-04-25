@@ -625,21 +625,21 @@ function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}})
     end
 end
 
-# function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}}}) where {T, R}
-#     dW = 2
-#     for h in sep_spectral_funs
-#         function barrier(s)
-#             (u, v, w) = (s[1], s[2], s[3:end])
-#             W = new_mat_herm(w, dW, R)
-#             Wλ = eigen(W).values
-#             return -log(u - v * Cones.h_val(Wλ ./ v, h)) - log(v) - sum(log, Wλ)
-#         end
-#         test_barrier(C(h, dW), barrier)
-#     end
-# end
+function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}}}) where {T, R}
+    dW = 2
+    for h in sep_spectral_funs
+        function barrier(s)
+            (u, v, w) = (s[1], s[2], s[3:end])
+            W = new_mat_herm(w, dW, R)
+            Wλ = eigen(W).values
+            return -log(u - v * Cones.h_val(Wλ ./ v, h)) - log(v) - sum(log, Wλ)
+        end
+        test_barrier(C(h, dW), barrier)
+    end
+end
 
 show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 9))
-# show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 3))
+show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 3))
 
 
 # HypoPerLog

@@ -69,6 +69,6 @@ function setup_extra_data(cone::EpiPerSepSpectral{<:ConeOfSquares{T}}) where {T 
 end
 
 include("vectorcsqr.jl")
-# include("matrixcsqr.jl")
+include("matrixcsqr.jl")
 
 include("sepspectralfun.jl")

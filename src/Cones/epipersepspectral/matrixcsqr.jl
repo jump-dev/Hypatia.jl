@@ -11,7 +11,6 @@ mutable struct MatrixCSqrCache{T <: Real, R <: RealOrComplex{T}} <: CSqrCache{T}
     is_complex::Bool
     rt2::T
     w::Matrix{R}
-    w_chol
     viw::Matrix{R}
     viw_eigen
     ϕ::T
@@ -39,8 +38,8 @@ function setup_csqr_cache(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R
     return
 end
 
-function set_initial_point(arr::AbstractVector, cone::EpiPerSepSpectral{<:MatrixCSqr, F}) where F
-    (arr[1], arr[2], w0) = get_initial_point(F, cone.d)
+function set_initial_point(arr::AbstractVector, cone::EpiPerSepSpectral{<:MatrixCSqr})
+    (arr[1], arr[2], w0) = get_initial_point(cone.d, cone.h)
     @views fill!(arr[3:end], 0)
     incr = (cone.cache.is_complex ? 2 : 1)
     idx = 3
@@ -51,8 +50,7 @@ function set_initial_point(arr::AbstractVector, cone::EpiPerSepSpectral{<:Matrix
     return arr
 end
 
-# TODO can do a cholesky of w (fast) to check feas first (since logdet part only uses w), then eigen of w/v instead of w
-function update_feas(cone::EpiPerSepSpectral{<:MatrixCSqr{T}, F, T}) where {T, F}
+function update_feas(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     @assert !cone.feas_updated
     cache = cone.cache
     v = cone.point[2]
@@ -60,7 +58,7 @@ function update_feas(cone::EpiPerSepSpectral{<:MatrixCSqr{T}, F, T}) where {T, F
     cone.is_feas = false
     if v > eps(T)
         w = svec_to_smat!(cache.w, cone.w_view, cache.rt2)
-        w_chol = cache.w_chol = cholesky(Hermitian(w, :U), check = false) # TODO use in-place
+        w_chol = cholesky(Hermitian(w, :U), check = false) # TODO use in-place, check whether it is faster to do this before an eigdecomp
         if isposdef(w_chol)
             viw = cache.viw
             @. viw = w / v
@@ -68,7 +66,7 @@ function update_feas(cone::EpiPerSepSpectral{<:MatrixCSqr{T}, F, T}) where {T, F
             viw_eigen = cache.viw_eigen = eigen(Hermitian(viw, :U), sortby = nothing) # TODO use in-place
             viw_λ = viw_eigen.values
             if all(>(eps(T)), viw_λ)
-                cache.ϕ = h_val(F, viw_λ)
+                cache.ϕ = h_val(viw_λ, cone.h)
                 cache.ζ = cone.point[1] - v * cache.ϕ
                 cone.is_feas = (cache.ζ > eps(T))
             end
@@ -80,7 +78,7 @@ function update_feas(cone::EpiPerSepSpectral{<:MatrixCSqr{T}, F, T}) where {T, F
 end
 
 # TODO check if this is faster or slower than only using nbhd check
-function is_dual_feas(cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F, T}) where {T, R, F}
+function is_dual_feas(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R}
     u = cone.dual_point[1]
     (u < eps(T)) && return false
     @views w = cone.dual_point[3:end]
@@ -90,12 +88,12 @@ function is_dual_feas(cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F, T}) where {T,
     @. uiw /= u
     uiw_eigen = eigen(Hermitian(uiw, :U), sortby = nothing)
     uiw_λ = uiw_eigen.values
-    h_conj_dom(F, uiw_λ) || return false
+    h_conj_dom(uiw_λ, cone.h) || return false
     v = cone.dual_point[2]
-    return (v - u * h_conj(F, uiw_λ) > eps(T))
+    return (v - u * h_conj(uiw_λ, cone.h) > eps(T))
 end
 
-function update_grad(cone::EpiPerSepSpectral{<:MatrixCSqr, F}) where F
+function update_grad(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     @assert !cone.grad_updated && cone.is_feas
     grad = cone.grad
     v = cone.point[2]
@@ -103,7 +101,7 @@ function update_grad(cone::EpiPerSepSpectral{<:MatrixCSqr, F}) where F
     ζi = cache.ζi = inv(cache.ζ)
     viw_λ = cache.viw_eigen.values
     ∇h_viw = cache.∇h_viw
-    @. ∇h_viw = h_der1(F, viw_λ)
+    h_der1(∇h_viw, viw_λ, cone.h)
     cache.σ = cache.ϕ - dot(viw_λ, ∇h_viw) # TODO guessed, just dots vectors
 
     viw_vecs = cache.viw_eigen.vectors
@@ -117,7 +115,7 @@ function update_grad(cone::EpiPerSepSpectral{<:MatrixCSqr, F}) where F
     return grad
 end
 
-function update_hess(cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F, T}) where {T, R, F}
+function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     @assert cone.grad_updated && !cone.hess_updated
     d = cone.d
     v = cone.point[2]
@@ -132,7 +130,7 @@ function update_hess(cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F, T}) where {T, 
     viw_λ = cache.viw_eigen.values
     ∇h_viw = cache.∇h_viw
     ∇2h_viw = cache.∇2h_viw
-    @. ∇2h_viw = h_der2(F, viw_λ)
+    h_der2(∇2h_viw, viw_λ, cone.h)
     ζivi = ζi / v
     ζiσ = ζi * σ
     rt2 = cache.rt2
@@ -149,7 +147,7 @@ function update_hess(cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F, T}) where {T, 
         for i in 1:(j - 1)
             denom = viw_λ[i] - viw_λ_j
             if abs(denom) < rteps
-                println("small denom") # TODO
+                # println("small denom") # TODO
                 diff_mat[i, j] = (∇2h_viw[i] + ∇2h_viw_j) / 2 # NOTE or take ∇2h at the average (viw[i] + viw[j]) / 2
             else
                 diff_mat[i, j] = (∇h_viw[i] - ∇h_viw_j) / denom
@@ -232,7 +230,7 @@ function update_hess(cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F, T}) where {T, 
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSepSpectral{MatrixCSqr{T, R}, F}) where {T, R, F}
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R}
     # cone.hess_aux_updated || update_hess_aux(cone) # TODO
 
     hess(cone) # TODO remove
@@ -287,7 +285,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
     return prod
 end
 
-function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr, F}) where F
+function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     @assert cone.hess_updated # TODO
     d = cone.d
     v = cone.point[2]
@@ -393,7 +391,28 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr, F}) where F
     return cone.inv_hess
 end
 
-function correction(cone::EpiPerSepSpectral{<:MatrixCSqr{T, R}, F}, dir::AbstractVector{T}) where {T, R, F}
+function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R}
+    # cone.hess_aux_updated || update_hess_aux(cone) # TODO
+    hess(cone) # TODO
+    @assert cone.hess_updated
+    v = cone.point[2]
+    cache = cone.cache
+
+
+
+    Hi = update_inv_hess(cone)
+    mul!(prod, Hi, arr)
+
+    # # TODO @inbounds
+    # for j in 1:size(arr, 2)
+    #
+    #
+    # end
+
+    return prod
+end
+
+function correction(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}, dir::AbstractVector{T}) where {T, R}
     # cone.hess_aux_updated || update_hess_aux(cone) # TODO
 
     hess(cone) # TODO remove
@@ -419,7 +438,7 @@ function correction(cone::EpiPerSepSpectral{<:MatrixCSqr{T, R}, F}, dir::Abstrac
 
 
     ∇3h_viw = cache.∇3h_viw
-    @. ∇3h_viw = h_der3(F, viw_λ)
+    h_der3(∇3h_viw, viw_λ, cone.h)
 
     # TODO diff tensor
     # TODO "symmetric", could use a tensor package, or a symmetric matrix of symmetric matrices
@@ -433,9 +452,9 @@ function correction(cone::EpiPerSepSpectral{<:MatrixCSqr{T, R}, F}, dir::Abstrac
         denom_ik = viw_λ_i - viw_λ_k
 
         if abs(denom_ij) < rteps
-            println("small denom 1") # TODO
+            # println("small denom 1") # TODO
             if abs(denom_ik) < rteps
-                println("small denom 2") # TODO
+                # println("small denom 2") # TODO
                 t = (∇3h_i + ∇3h_j + ∇3h_k) / 6
             else
                 t = (diff_mat[i, j] - diff_mat[j, k]) / denom_ik
