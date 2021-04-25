@@ -29,20 +29,9 @@ function cone_types(T::Type{<:Real})
         # Cones.HypoGeoMean{T},
         # Cones.HypoRootdetTri{T, T},
         # Cones.HypoRootdetTri{T, Complex{T}},
-
-# # TODO put in a loop below
-        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.NegLogMMF, T},
-        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.NegEntropyMMF, T},
-        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, Cones.SquareMMF, T},
-
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.NegLogMMF, T},
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.NegEntropyMMF, T},
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, Cones.SquareMMF, T},
-        
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegLogMMF, T},
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.NegEntropyMMF, T},
-        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, Cones.SquareMMF, T},
-
+        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, T},
+        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, T},
+        # Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, T},
         # Cones.HypoPerLog{T},
         # Cones.HypoPerLogdetTri{T, T},
         # Cones.HypoPerLogdetTri{T, Complex{T}},
@@ -56,30 +45,39 @@ function cone_types(T::Type{<:Real})
         # Cones.WSOSInterpEpiNormEucl{T},
         # Cones.WSOSInterpEpiNormOne{T},
         ]
+
     # if T <: LinearAlgebra.BlasReal
     #     append!(cones_T, [
     #         Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, T},
     #         Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, Complex{T}},
     #         ])
     # end
+
     return cones_T
 end
 
+sep_spectral_funs = [
+    Cones.NegLogMMF(),
+    Cones.NegEntropyMMF(),
+    Cones.SquareMMF(),
+    Cones.Power12MMF(1.5),
+    ]
+
 @testset "cone tests" begin
 
-# println("starting oracle tests")
-# @testset "oracle tests" begin
-# real_types = [
-#     Float64,
-#     # Float32,
-#     # BigFloat,
-#     ]
-# @testset "$cone" for T in real_types, cone in cone_types(T)
-#     println("$cone")
-#     test_time = @elapsed test_oracles(cone)
-#     @printf("%8.2e seconds\n", test_time)
-# end
-# end
+println("starting oracle tests")
+@testset "oracle tests" begin
+real_types = [
+    Float64,
+    # Float32,
+    # BigFloat,
+    ]
+@testset "$cone" for T in real_types, cone in cone_types(T)
+    println("$cone")
+    test_time = @elapsed test_oracles(cone)
+    @printf("%8.2e seconds\n", test_time)
+end
+end
 
 println("\nstarting barrier tests")
 @testset "barrier tests" begin
@@ -95,20 +93,20 @@ real_types = [
 end
 end
 
-# println("\nstarting time/allocation measurements")
-# @testset "allocation tests" begin
-# real_types = [
-#     Float64,
-#     # Float32,
-#     # BigFloat,
-#     ]
-# @testset "$cone" for T in real_types, cone in cone_types(T)
-#     println("\n$cone")
-#     test_time = @elapsed show_time_alloc(cone)
-#     @printf("%8.2e seconds\n", test_time)
-# end
-# println()
-# end
+println("\nstarting time/allocation measurements")
+@testset "allocation tests" begin
+real_types = [
+    Float64,
+    # Float32,
+    # BigFloat,
+    ]
+@testset "$cone" for T in real_types, cone in cone_types(T)
+    println("\n$cone")
+    test_time = @elapsed show_time_alloc(cone)
+    @printf("%8.2e seconds\n", test_time)
+end
+println()
+end
 
 end
 ;

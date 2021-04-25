@@ -5,15 +5,15 @@ suitable univariate functions defined on ℝ₊₊ with matrix monotone derivati
 # negative logarithm: -log(x)
 struct NegLogMMF <: SepSpectralFun end
 
-h_val(::Type{NegLogMMF}, xs::Vector) = -sum(log, xs)
-h_conj_dom(::Type{NegLogMMF}, xs::Vector) = all(>(eps(eltype(xs))), xs)
-h_conj(::Type{NegLogMMF}, xs::Vector) = -length(xs) - sum(log, xs) # TODO check
+h_val(xs::Vector, ::NegLogMMF) = -sum(log, xs)
+h_conj_dom(xs::Vector, ::NegLogMMF) = all(>(eps(eltype(xs))), xs)
+h_conj(xs::Vector, ::NegLogMMF) = -length(xs) - sum(log, xs)
 
-h_der1(::Type{NegLogMMF}, x::Real) = -inv(x)
-h_der2(::Type{NegLogMMF}, x::Real) = x^-2
-h_der3(::Type{NegLogMMF}, x::Real) = -2 * x^-3
+h_der1(ds::Vector, xs::Vector, ::NegLogMMF) = (@. ds = -inv(xs))
+h_der2(ds::Vector, xs::Vector, ::NegLogMMF) = (@. ds = xs^-2)
+h_der3(ds::Vector, xs::Vector, ::NegLogMMF) = (@. ds = -2 * xs^-3)
 
-function get_initial_point(::Type{NegLogMMF}, d::Int)
+function get_initial_point(d::Int, ::NegLogMMF)
     # @warn("not initial central point") # TODO
     return (1, 1, 1)
 end
@@ -22,15 +22,15 @@ end
 # negative entropy: x * log(x)
 struct NegEntropyMMF <: SepSpectralFun end
 
-h_val(::Type{NegEntropyMMF}, xs::Vector) = sum(x * log(x) for x in xs)
-h_conj_dom(::Type{NegEntropyMMF}, ::Vector) = true
-h_conj(::Type{NegEntropyMMF}, xs::Vector) = sum(exp(-x - 1) for x in xs) # TODO check
+h_val(xs::Vector, ::NegEntropyMMF) = sum(x * log(x) for x in xs)
+h_conj_dom(xs::Vector, ::NegEntropyMMF) = true
+h_conj(xs::Vector, ::NegEntropyMMF) = sum(exp(-x - 1) for x in xs)
 
-h_der1(::Type{NegEntropyMMF}, x::Real) = 1 + log(x)
-h_der2(::Type{NegEntropyMMF}, x::Real) = inv(x)
-h_der3(::Type{NegEntropyMMF}, x::Real) = -x^-2
+h_der1(ds::Vector, xs::Vector, ::NegEntropyMMF) = (@. ds = 1 + log(xs))
+h_der2(ds::Vector, xs::Vector, ::NegEntropyMMF) = (@. ds = inv(xs))
+h_der3(ds::Vector, xs::Vector, ::NegEntropyMMF) = (@. ds = -xs^-2)
 
-function get_initial_point(::Type{NegEntropyMMF}, d::Int)
+function get_initial_point(d::Int, ::NegEntropyMMF)
     # @warn("not initial central point") # TODO
     return (1, 1, 1)
 end
@@ -39,39 +39,58 @@ end
 # square: x^2
 struct SquareMMF <: SepSpectralFun end
 
-h_val(::Type{SquareMMF}, xs::Vector) = sum(abs2, xs)
-h_conj_dom(::Type{SquareMMF}, ::Vector) = true
-h_conj(::Type{SquareMMF}, xs::Vector) = sum((x >= 0 ? zero(x) : abs2(x / 2)) for x in xs) # TODO check
+h_val(xs::Vector, ::SquareMMF) = sum(abs2, xs)
+h_conj_dom(xs::Vector, ::SquareMMF) = true
+h_conj(xs::Vector, ::SquareMMF) = sum((x >= 0 ? zero(x) : abs2(x / 2)) for x in xs)
 
-h_der1(::Type{SquareMMF}, x::Real) = 2 * x
-h_der2(::Type{SquareMMF}, x::Real) = 2
-h_der3(::Type{SquareMMF}, x::Real) = 0 # TODO ?
+h_der1(ds::Vector, xs::Vector, ::SquareMMF) = (@. ds = xs + xs)
+h_der2(ds::Vector, xs::Vector, ::SquareMMF) = (@. ds = 2)
+h_der3(ds::Vector, xs::Vector, ::SquareMMF) = (@. ds = 0)
 
-function get_initial_point(::Type{SquareMMF}, d::Int)
+function get_initial_point(d::Int, ::SquareMMF)
     # @warn("not initial central point") # TODO
     return (2d, 1, 1)
 end
 
 
+# power in (1,2]
+# NOTE power 1 is homogeneous and just equal to trace of PSD matrix (a linear function)
+# NOTE for power 2, use SquareMMF
+struct Power12MMF <: SepSpectralFun
+    p::Real
+    Power12MMF(p::Real) = (@assert 1 < p <= 2; new(p))
+end
 
-# TODO power 1 is homogeneous so don't need persp, and is just equal to trace, so is a linear function anyway. so maybe exclude it.
-# # power in (1,2]
-# # TODO or parametrize the type?
-# struct Power12MMF <: SepSpectralFun
-#     power::Real
-#     function Power12MMF(power::Real)
-#         @assert 1 < power <= 2
-#         return new(power)
-#     end
-# end
-#
-# h_val(f::Type{Power12MMF}, x::Real) = x^(f.power)
-# h_conj(::Type{Power12MMF}, x::Real) =
-# h_der1(::Type{Power12MMF}, x::Real) =
-# h_der2(::Type{Power12MMF}, x::Real) =
-# h_der3(::Type{Power12MMF}, x::Real) =
-#
-# function get_initial_point(::Type{Power12MMF}, d::Int)
-#     # @warn("not initial central point") # TODO
-#     return (1, 1, 1)
-# end
+h_val(xs::Vector, h::Power12MMF) = sum(x^h.p for x in xs)
+h_conj_dom(xs::Vector, h::Power12MMF) = true
+function h_conj(xs::Vector, h::Power12MMF)
+    p = h.p
+    q = p / (p - 1)
+    return (p - 1) * sum((x >= 0 ? zero(x) : (abs(x) / p)^q) for x in xs)
+end
+
+function h_der1(ds::Vector, xs::Vector, h::Power12MMF)
+    p = h.p
+    pm1 = p - 1
+    @. ds = p * xs^pm1
+    return ds
+end
+function h_der2(ds::Vector, xs::Vector, h::Power12MMF)
+    p = h.p
+    pm2 = p - 2
+    coef = p * (p - 1)
+    @. ds = coef * xs^pm2
+    return ds
+end
+function h_der3(ds::Vector, xs::Vector, h::Power12MMF)
+    p = h.p
+    pm3 = p - 3
+    coef = p * (p - 1) * (p - 2)
+    @. ds = coef * xs^pm3
+    return ds
+end
+
+function get_initial_point(d::Int, h::Power12MMF)
+    # @warn("not initial central point") # TODO
+    return (2d, 1, 1)
+end

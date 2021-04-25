@@ -1,6 +1,4 @@
 #=
-TODO
-
 matrix cone of squares, i.e. 𝕊₊ᵈ for d ≥ 1, with rank d
 =#
 
@@ -313,34 +311,16 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr, F}) where F
     ζivi2 = ζivi / v
     w_λ = v * viw_λ
 
-    # TODO delete
-    c(i) = viw_vecs[:, i] * viw_vecs[:, i]'
-    Mi(i) = inv(ζivi * ∇2h_viw[i] + inv(w_λ[i]^2))
-
     m = inv.(ζivi * ∇2h_viw + abs2.(inv.(w_λ)))
     α1 = m .* ∇h_viw
     α = viw_vecs * Diagonal(α1) * viw_vecs' # TODO can use sqrt
     β = dot(∇h_viw, α1)
     ζ2β = ζ^2 + β
 
-    # TODO delete
-    # AiR1 = sum(Mi(i) * ∇h_viw[i] * c(i) for i in 1:d)
-    # @assert α ≈ AiR1
-    # R1AiR1 = sum(Mi(i) * ∇h_viw[i]^2 for i in 1:d)
-    # R1 = viw_vecs * Diagonal(∇h_viw) * viw_vecs'
-    # @assert R1AiR1 ≈ dot(AiR1, R1)
-    # @show β
-    # @show R1AiR1
-    # @show sum(∇h_viw[i] * c(i) for i in 1:d)
-    # @show viw_vecs * Diagonal(∇h_viw) * viw_vecs'
-    # @show sum(c(i) for i in 1:d)
-    # @assert β ≈ R1AiR1
-
     w∇2h_viw = ζivi2 * w_λ .* ∇2h_viw
     γ1 = m .* w∇2h_viw
     γ = viw_vecs * Diagonal(γ1) * viw_vecs' # TODO maybe can use sqrt
     c1 = (σ + dot(∇h_viw, γ1)) / ζ2β
-
 
     c3 = ζi2 * σ
     c4 = ζi2 * β
@@ -357,8 +337,6 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr, F}) where F
     # Hiuw, Hivw
     @views HiuW = Hi[1, 3:end]
     @views HivW = Hi[2, 3:end]
-    # yu = similar(HiuW)
-    # yv = similar(HivW)
     αvec = similar(HiuW)
     γvec = similar(HiuW)
     smat_to_svec!(αvec, α, rt2)

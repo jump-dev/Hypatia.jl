@@ -41,7 +41,7 @@ function test_oracles(
     Cones.load_dual_point(cone, dual_point)
     @test Cones.is_dual_feas(cone)
     @test cone.dual_point == dual_point
-    # @test Cones.in_neighborhood(cone, one(T), one(T))
+    @test Cones.in_neighborhood(cone, one(T), one(T))
 
     prod_vec = zero(point)
     @test Cones.hess_prod!(prod_vec, point, cone) ≈ dual_point atol=tol rtol=tol
@@ -79,21 +79,21 @@ function test_oracles(
     @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
     @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
 
-    # if hasproperty(cone, :use_hess_prod_slow)
-    #     Cones.update_use_hess_prod_slow(cone)
-    #     @test cone.use_hess_prod_slow_updated
-    #     @test !cone.use_hess_prod_slow
-    #     cone.use_hess_prod_slow = true
-    #     @test Cones.hess_prod_slow!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
-    # end
-    #
-    # if Cones.use_sqrt_hess_oracles(cone)
-    #     prod_mat2 = Matrix(Cones.sqrt_hess_prod!(prod_mat, inv_hess, cone)')
-    #     @test Cones.sqrt_hess_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
-    #     Cones.inv_sqrt_hess_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
-    #     @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
-    # end
-    #
+    if hasproperty(cone, :use_hess_prod_slow)
+        Cones.update_use_hess_prod_slow(cone)
+        @test cone.use_hess_prod_slow_updated
+        @test !cone.use_hess_prod_slow
+        cone.use_hess_prod_slow = true
+        @test Cones.hess_prod_slow!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    end
+
+    if Cones.use_sqrt_hess_oracles(cone)
+        prod_mat2 = Matrix(Cones.sqrt_hess_prod!(prod_mat, inv_hess, cone)')
+        @test Cones.sqrt_hess_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+        Cones.inv_sqrt_hess_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+        @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+    end
+
     # test correction oracle
     if Cones.use_correction(cone)
         @test -Cones.correction(cone, point) ≈ grad atol=tol rtol=tol
@@ -126,50 +126,21 @@ function test_barrier(
     Cones.load_point(cone, point)
     @test Cones.is_feas(cone)
 
-    # fd_grad = ForwardDiff.gradient(barrier, point)
-    # @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
+    fd_grad = ForwardDiff.gradient(barrier, point)
+    @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
 
-    Cones.grad(cone)
-    # dir = 10 * randn(T, dim)
-    # fd_hess = ForwardDiff.hessian(barrier, point)
-    hess = Cones.hess(cone)
-    inv_hess = Cones.inv_hess(cone)
-    inv_hess_true = inv(hess)
-    # @show inv_hess_true
-    # @show inv_hess
-    # @show inv_hess ./ inv_hess_true
-    @test inv_hess ≈ inv_hess_true atol=tol rtol=tol
-    # @test hess ≈ fd_hess atol=tol rtol=tol
-    # @show fd_hess
-    # @show hess
-    # diff = fd_hess - hess
-    # display(diff)
+    dir = 10 * randn(T, dim)
+    barrier_dir(s, t) = barrier(s + t * dir)
 
-    # # println()
-    # dir = 10 * randn(T, dim)
-    # temp = similar(dir)
-    # Cones.hess_prod!(temp, dir, cone)
-    # # @assert temp ≈ fd_hess * dir
-    # @test hess * dir ≈ temp atol=tol rtol=tol
+    fd_hess_dir = ForwardDiff.gradient(s -> ForwardDiff.derivative(t -> barrier_dir(s, t), 0), point)
+    @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
+    prod_vec = zero(dir)
+    @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
 
-    # display(temp)
-    # display(hess * dir)
-    # println()
-
-
-    # dir = 10 * randn(T, dim)
-    # barrier_dir(s, t) = barrier(s + t * dir)
-    #
-    # # fd_hess_dir = ForwardDiff.gradient(s -> ForwardDiff.derivative(t -> barrier_dir(s, t), 0), point)
-    # # Cones.hess(cone) # TODO remove
-    # # # @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
-    # # prod_vec = zero(dir)
-    # # @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
-    #
-    # if Cones.use_correction(cone)
-    #     fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), point)
-    #     @test -2 * Cones.correction(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
-    # end
+    if Cones.use_correction(cone)
+        fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), point)
+        @test -2 * Cones.correction(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
+    end
 
     return
 end
@@ -637,46 +608,38 @@ end
 show_time_alloc(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R} = show_time_alloc(C(1 + dim_herm(3, R)))
 
 
-
-
-
-
-
 # EpiPerSepSpectral
 function test_oracles(C::Type{<:Cones.EpiPerSepSpectral})
-    for d in [1, 2, 3, 6]
-        test_oracles(C(d), init_tol = Inf)
+    for d in [1, 2, 3, 6], h in sep_spectral_funs
+        test_oracles(C(h, d), init_tol = Inf)
     end
 end
 
-function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr, F}}) where F
-    function barrier(s)
-        (u, v, w) = (s[1], s[2], s[3:end])
-        return -log(u - v * Cones.h_val(F, w ./ v)) - log(v) - sum(log, w)
+function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}})
+    for h in sep_spectral_funs
+        function barrier(s)
+            (u, v, w) = (s[1], s[2], s[3:end])
+            return -log(u - v * Cones.h_val(w ./ v, h)) - log(v) - sum(log, w)
+        end
+        test_barrier(C(h, 2), barrier)
     end
-    test_barrier(C(2), barrier) # TODO
 end
 
-function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr{T, R}, F}}) where {T, R, F}
-    dW = 3 # TODO
-    function barrier(s)
-        (u, v, w) = (s[1], s[2], s[3:end])
-        W = new_mat_herm(w, dW, R)
-        Wλ = eigen(W).values
-        return -log(u - v * Cones.h_val(F, Wλ ./ v)) - log(v) - sum(log, Wλ)
-    end
-    test_barrier(C(dW), barrier)
-end
+# function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}}}) where {T, R}
+#     dW = 2
+#     for h in sep_spectral_funs
+#         function barrier(s)
+#             (u, v, w) = (s[1], s[2], s[3:end])
+#             W = new_mat_herm(w, dW, R)
+#             Wλ = eigen(W).values
+#             return -log(u - v * Cones.h_val(Wλ ./ v, h)) - log(v) - sum(log, Wλ)
+#         end
+#         test_barrier(C(h, dW), barrier)
+#     end
+# end
 
-# TODO pick sizes
-show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}}) = show_time_alloc(C(1000))
-show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr}}) = show_time_alloc(C(30))
-
-
-
-
-
-
+show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 9))
+# show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 3))
 
 
 # HypoPerLog
