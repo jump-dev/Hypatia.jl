@@ -685,50 +685,6 @@ show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}}) = show_t
 show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 3))
 
 
-# EpiPerEntropy
-function test_oracles(C::Type{<:Cones.EpiPerEntropy})
-    for dw in [1, 2, 5]
-        test_oracles(C(2 + dw), init_tol = 1e-5)
-    end
-    for dw in [15, 40, 100]
-        test_oracles(C(2 + dw), init_tol = 1e-1, init_only = true)
-    end
-end
-
-function test_barrier(C::Type{<:Cones.EpiPerEntropy})
-    function barrier(s)
-        (u, v, w) = (s[1], s[2], s[3:end])
-        return -log(u - sum(wi * log(wi / v) for wi in w)) - log(v) - sum(log, w)
-    end
-    test_barrier(C(4), barrier)
-end
-
-show_time_alloc(C::Type{<:Cones.EpiPerEntropy}) = show_time_alloc(C(9))
-
-
-# EpiPerTrEntropyTri
-function test_oracles(C::Type{<:Cones.EpiPerTrEntropyTri})
-    for dW in [1, 2, 4]
-        test_oracles(C(2 + Cones.svec_length(dW)), init_tol = 1e-4)
-    end
-    for dW in [8, 12]
-        test_oracles(C(2 + Cones.svec_length(dW)), init_tol = 1e-1, init_only = true)
-    end
-end
-
-function test_barrier(C::Type{Cones.EpiPerTrEntropyTri{T}}) where T
-    dW = 3
-    function barrier(s)
-        (u, v, w) = (s[1], s[2], s[3:end])
-        W = new_mat_herm(w, dW, T)
-        return -log(u - dot(W, log(W / v))) - log(v) - logdet_pd(W)
-    end
-    test_barrier(C(2 + Cones.svec_length(dW)), barrier)
-end
-
-show_time_alloc(C::Type{<:Cones.EpiPerTrEntropyTri}) = show_time_alloc(C(8))
-
-
 # EpiRelEntropy
 function test_oracles(C::Type{<:Cones.EpiRelEntropy})
     for dw in [1, 2, 4]

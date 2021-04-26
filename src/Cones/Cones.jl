@@ -45,8 +45,6 @@ include("hyporootdettri.jl")
 include("hypoperlog.jl")
 include("hypoperlogdettri.jl")
 include("epipersepspectral/epipersepspectral.jl")
-include("epiperentropy.jl")
-include("epipertrentropytri.jl")
 include("epirelentropy.jl")
 include("epitrrelentropytri.jl")
 include("wsosinterpnonnegative.jl")
@@ -344,13 +342,12 @@ vec_copy_to!(v1::AbstractVecOrMat{T}, v2::AbstractVecOrMat{T}) where {T <: Real}
 vec_copy_to!(v1::AbstractVecOrMat{T}, v2::AbstractVecOrMat{Complex{T}}) where {T <: Real} = cvec_to_rvec!(v1, v2)
 vec_copy_to!(v1::AbstractVecOrMat{Complex{T}}, v2::AbstractVecOrMat{T}) where {T <: Real} = rvec_to_cvec!(v1, v2)
 
-# utilities for hessians for cones with PSD parts
+# kronecker utilities
 
 function symm_kron(
     H::AbstractMatrix{T},
     mat::AbstractMatrix{T},
-    rt2::T;
-    upper_only::Bool = true,
+    rt2::T,
     ) where {T <: Real}
     side = size(mat, 1)
 
@@ -359,26 +356,26 @@ function symm_kron(
         for k in 1:(l - 1)
             row_idx = 1
             for j in 1:side
-                upper_only && (row_idx > col_idx) && break
                 for i in 1:(j - 1)
                     H[row_idx, col_idx] = mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k]
                     row_idx += 1
                 end
                 H[row_idx, col_idx] = rt2 * mat[j, k] * mat[j, l]
                 row_idx += 1
+                (row_idx > col_idx) && break
             end
             col_idx += 1
         end
 
         row_idx = 1
         for j in 1:side
-            upper_only && (row_idx > col_idx) && break
             for i in 1:(j - 1)
                 H[row_idx, col_idx] = rt2 * mat[i, l] * mat[j, l]
                 row_idx += 1
             end
             H[row_idx, col_idx] = abs2(mat[j, l])
             row_idx += 1
+            (row_idx > col_idx) && break
         end
         col_idx += 1
     end
@@ -389,8 +386,7 @@ end
 function symm_kron(
     H::AbstractMatrix{T},
     mat::AbstractMatrix{Complex{T}},
-    rt2::T;
-    upper_only::Bool = true,
+    rt2::T,
     ) where {T <: Real}
     side = size(mat, 1)
 
@@ -409,7 +405,7 @@ function symm_kron(
                     H[row_idx, col_idx] = -imag(c)
                     row_idx += 1
                 end
-                upper_only && (row_idx > col_idx) && break
+                (row_idx > col_idx) && break
             end
             col_idx += 1
         else
@@ -431,7 +427,7 @@ function symm_kron(
                     H[row_idx, col_idx + 1] = real(c2)
                     row_idx += 1
                 end
-                upper_only && (row_idx > col_idx) && break
+                (row_idx > col_idx) && break
             end
             col_idx += 2
         end
@@ -465,70 +461,6 @@ function hess_element(
         H[r_idx + 1, c_idx + 1] = real(term1) - real(term2)
     end
     return
-end
-
-function grad_logm!(
-    mat::Matrix{T},
-    vecs::Matrix{T},
-    tempmat1::Matrix{T},
-    tempmat2::Matrix{T},
-    tempvec::Vector{T},
-    diff_mat::AbstractMatrix{T},
-    rt2::T,
-    ) where {T <: Real}
-    veckron = symm_kron(tempmat1, vecs, rt2, upper_only = false)
-    smat_to_svec!(tempvec, diff_mat, one(T))
-    mul!(tempmat2, veckron, Diagonal(tempvec))
-    return mul!(mat, tempmat2, veckron')
-end
-
-function diff_mat!(
-    mat::Matrix{T},
-    vals::Vector{T},
-    log_vals::Vector{T},
-    ) where {T <: Real}
-    rteps = sqrt(eps(T))
-
-    @inbounds for j in eachindex(vals)
-        (vj, lvj) = (vals[j], log_vals[j])
-        for i in 1:(j - 1)
-            (vi, lvi) = (vals[i], log_vals[i])
-            mat[i, j] = (abs(vi - vj) < rteps ? inv((vi + vj) / 2) : (lvi - lvj) / (vi - vj))
-        end
-        mat[j, j] = inv(vj)
-    end
-
-    return mat
-end
-
-function diff_tensor!(
-    diff_tensor::Array{T, 3},
-    diff_mat::AbstractMatrix{T},
-    vals::Vector{T},
-    ) where {T <: Real}
-    rteps = sqrt(eps(T))
-    d = size(diff_mat, 1)
-
-    @inbounds for k in 1:d, j in 1:k, i in 1:j
-        (vi, vj, vk) = (vals[i], vals[j], vals[k])
-
-        if abs(vj - vk) < rteps
-            if abs(vi - vj) < rteps
-                vijk = (vi + vj + vk) / 3
-                t = -inv(vijk) / vijk / 2
-            else
-                # diff_mat[j, k] ≈ diff_mat[j, j]
-                t = (diff_mat[j, k] - diff_mat[i, j]) / (vj - vi)
-            end
-        else
-            t = (diff_mat[i, j] - diff_mat[i, k]) / (vj - vk)
-        end
-
-        diff_tensor[i, j, k] = diff_tensor[i, k, j] = diff_tensor[j, i, k] =
-            diff_tensor[j, k, i] = diff_tensor[k, i, j] = diff_tensor[k, j, i] = t
-    end
-
-    return diff_tensor
 end
 
 end

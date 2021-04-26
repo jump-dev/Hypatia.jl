@@ -9,7 +9,7 @@ using Hypatia
 test_files = [
     # "modelutilities",
     "cone",
-    # "native",
+    "native",
     # "moi",
     # "examples",
     # # NOTE require optional dependencies:

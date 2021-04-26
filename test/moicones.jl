@@ -303,19 +303,19 @@ function test_moi_cones(T::Type{<:Real})
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 11
     end
 
-    @testset "EpiPerEntropy" begin
-        moi_cone = Hypatia.EpiPerEntropyCone{T}(3)
-        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa Cones.EpiPerEntropy{T}
-        @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
-    end
-
-    @testset "EpiPerTrEntropyTriCone" begin
-        moi_cone = Hypatia.EpiPerTrEntropyTriCone{T}(3)
-        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa Cones.EpiPerTrEntropyTri{T}
-        @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
-    end
+    # @testset "EpiPerEntropy" begin
+    #     moi_cone = Hypatia.EpiPerEntropyCone{T}(3)
+    #     hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+    #     @test hyp_cone isa Cones.EpiPerEntropy{T}
+    #     @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
+    # end
+    #
+    # @testset "EpiPerTrEntropyTriCone" begin
+    #     moi_cone = Hypatia.EpiPerTrEntropyTriCone{T}(3)
+    #     hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+    #     @test hyp_cone isa Cones.EpiPerTrEntropyTri{T}
+    #     @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
+    # end
 
     @testset "EpiRelEntropy" begin
         moi_cone = Hypatia.EpiRelEntropyCone{T}(5)
