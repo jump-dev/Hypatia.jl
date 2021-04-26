@@ -5,10 +5,10 @@ tests for primitive cone barrier oracles
 using Test
 import Random
 import Random.randn
-import GenericLinearAlgebra.eigen
 using LinearAlgebra
 using SparseArrays
 import ForwardDiff
+import GenericLinearAlgebra.eigen # NOTE needed by ForwardDiff currently for test_barrier
 import Hypatia
 import Hypatia.ModelUtilities
 import Hypatia.Cones

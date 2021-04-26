@@ -293,6 +293,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
 end
 
 function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
+    hess(cone) # TODO
     @assert cone.hess_updated # TODO
     d = cone.d
     v = cone.point[2]
