@@ -5,7 +5,7 @@ tests for primitive cone barrier oracles
 using Test
 import Random
 import Random.randn
-import GenericLinearAlgebra
+import GenericLinearAlgebra.eigen
 using LinearAlgebra
 using SparseArrays
 import ForwardDiff
@@ -111,7 +111,7 @@ function test_barrier(
     cone::Cones.Cone{T},
     barrier::Function;
     noise::T = T(1e-1),
-    scale::T = T(1e-0),
+    scale::T = T(1e-2),
     tol::Real = 1e4 * eps(T),
     ) where {T <: Real}
     Random.seed!(1)
@@ -674,7 +674,7 @@ function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}}}
     for h_fun in sep_spectral_funs
         function barrier(s)
             (u, v, w) = (s[1], s[2], s[3:end])
-            Wλ = GenericLinearAlgebra.eigen(new_mat_herm(w, dW, R)).values
+            Wλ = eigen(new_mat_herm(w, dW, R)).values
             return -log(u - v * Cones.h_val(Wλ ./ v, h_fun)) - log(v) - sum(log, Wλ)
         end
         test_barrier(C(h_fun, dW), barrier)
@@ -718,7 +718,7 @@ function test_oracles(C::Type{<:Cones.EpiTrRelEntropyTri})
 end
 
 function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T}}) where T
-    dW = 3
+    dW = 2
     dw = Cones.svec_length(dW)
     function barrier(s)
         (u, v, w) = (s[1], s[1 .+ (1:dw)], s[(2 + dw):end])

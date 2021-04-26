@@ -255,7 +255,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
 
 
 
-    Hi = update_inv_hess(cone)
+    Hi = inv_hess(cone)
     mul!(prod, Hi, arr)
 
     # # TODO @inbounds

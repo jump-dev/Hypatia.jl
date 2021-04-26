@@ -63,7 +63,7 @@ function update_feas(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
             viw = cache.viw
             @. viw = w / v
             # TODO other options? eigen(A; permute::Bool=true, scale::Bool=true, sortby) -> Eigen
-            viw_eigen = cache.viw_eigen = eigen(Hermitian(viw, :U), sortby = nothing) # TODO use in-place
+            viw_eigen = cache.viw_eigen = eigen(Hermitian(viw, :U)) # TODO use in-place
             viw_λ = viw_eigen.values
             if all(>(eps(T)), viw_λ)
                 cache.ϕ = h_val(viw_λ, cone.h)
@@ -94,7 +94,7 @@ function is_dual_feas(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R}
     svec_to_smat!(uiw, w, cone.cache.rt2)
     # TODO in-place:
     @. uiw /= u
-    uiw_eigen = eigen(Hermitian(uiw, :U), sortby = nothing)
+    uiw_eigen = eigen(Hermitian(uiw, :U))
     uiw_λ = uiw_eigen.values
     # h_conj_dom(uiw_λ, cone.h) || return false
     return (cone.dual_point[2] - u * h_conj(uiw_λ, cone.h) > eps(T))
@@ -407,7 +407,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
 
 
 
-    Hi = update_inv_hess(cone)
+    Hi = inv_hess(cone)
     mul!(prod, Hi, arr)
 
     # # TODO @inbounds

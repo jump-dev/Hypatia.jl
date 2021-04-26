@@ -18,13 +18,13 @@ default_options = (
     )
 
 all_reals = [
-    Float32,
+    # Float32,
     Float64,
-    BigFloat,
+    # BigFloat,
     ]
 diff_reals = [
     Float64,
-    BigFloat,
+    # BigFloat,
     ]
 
 string_nameof(T) = string(nameof(T))
