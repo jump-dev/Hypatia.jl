@@ -5,7 +5,7 @@ tests for primitive cone barrier oracles
 using Test
 import Random
 import Random.randn
-import GenericLinearAlgebra.eigen
+import GenericLinearAlgebra
 using LinearAlgebra
 using SparseArrays
 import ForwardDiff
@@ -674,7 +674,7 @@ function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}}}
     for h_fun in sep_spectral_funs
         function barrier(s)
             (u, v, w) = (s[1], s[2], s[3:end])
-            Wλ = eigen(new_mat_herm(w, dW, R)).values
+            Wλ = GenericLinearAlgebra.eigen(new_mat_herm(w, dW, R)).values
             return -log(u - v * Cones.h_val(Wλ ./ v, h_fun)) - log(v) - sum(log, Wλ)
         end
         test_barrier(C(h_fun, dW), barrier)
