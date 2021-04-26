@@ -303,19 +303,20 @@ function test_moi_cones(T::Type{<:Real})
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 11
     end
 
-    # @testset "EpiPerEntropy" begin
-    #     moi_cone = Hypatia.EpiPerEntropyCone{T}(3)
-    #     hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-    #     @test hyp_cone isa Cones.EpiPerEntropy{T}
-    #     @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
-    # end
-    #
-    # @testset "EpiPerTrEntropyTriCone" begin
-    #     moi_cone = Hypatia.EpiPerTrEntropyTriCone{T}(3)
-    #     hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-    #     @test hyp_cone isa Cones.EpiPerTrEntropyTri{T}
-    #     @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
-    # end
+    @testset "EpiPerSepSpectral" begin
+        h_fun = Cones.NegEntropyMMF()
+        QTs = [
+            Cones.VectorCSqr{T},
+            Cones.MatrixCSqr{T, T},
+            Cones.MatrixCSqr{T, Complex{T}},
+            ]
+        for QT in QTs
+            moi_cone = Hypatia.EpiPerSepSpectralCone{T}(h_fun, QT, 3)
+            hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+            @test hyp_cone isa Cones.EpiPerSepSpectral{QT, T}
+            @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone)
+        end
+    end
 
     @testset "EpiRelEntropy" begin
         moi_cone = Hypatia.EpiRelEntropyCone{T}(5)

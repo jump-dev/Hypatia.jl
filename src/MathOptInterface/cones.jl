@@ -235,23 +235,16 @@ HypoPerLogdetTriCone{T, R}(dim::Int) where {T <: Real, R <: RealOrComplex{T}} = 
 MOI.dimension(cone::HypoPerLogdetTriCone) = cone.dim
 cone_from_moi(::Type{T}, cone::HypoPerLogdetTriCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} = Cones.HypoPerLogdetTri{T, R}(cone.dim, use_dual = cone.use_dual)
 
-# export EpiPerEntropyCone
-# struct EpiPerEntropyCone{T <: Real} <: MOI.AbstractVectorSet
-#     dim::Int
-#     use_dual::Bool
-# end
-# EpiPerEntropyCone{T}(dim::Int) where {T <: Real} = EpiPerEntropyCone{T}(dim, false)
-# MOI.dimension(cone::EpiPerEntropyCone) = cone.dim
-# cone_from_moi(::Type{T}, cone::EpiPerEntropyCone{T}) where {T <: Real} = Cones.EpiPerEntropy{T}(cone.dim, use_dual = cone.use_dual)
-#
-# export EpiPerTrEntropyTriCone
-# struct EpiPerTrEntropyTriCone{T <: Real} <: MOI.AbstractVectorSet
-#     dim::Int
-#     use_dual::Bool
-# end
-# EpiPerTrEntropyTriCone{T}(dim::Int) where {T <: Real} = EpiPerTrEntropyTriCone{T}(dim, false)
-# MOI.dimension(cone::EpiPerTrEntropyTriCone where {T <: Real}) = cone.dim
-# cone_from_moi(::Type{T}, cone::EpiPerTrEntropyTriCone{T}) where {T <: Real} = Cones.EpiPerTrEntropyTri{T}(cone.dim, use_dual = cone.use_dual)
+export EpiPerSepSpectralCone
+struct EpiPerSepSpectralCone{T <: Real} <: MOI.AbstractVectorSet
+    h::Cones.SepSpectralFun
+    Q::Type{<:Cones.ConeOfSquares{T}}
+    d::Int
+    use_dual::Bool
+end
+EpiPerSepSpectralCone{T}(h::Cones.SepSpectralFun, Q::Type{<:Cones.ConeOfSquares{T}}, d::Int) where {T <: Real} = EpiPerSepSpectralCone{T}(h, Q, d, false)
+MOI.dimension(cone::EpiPerSepSpectralCone) = 2 + Cones.vector_dim(cone.Q, cone.d)
+cone_from_moi(::Type{T}, cone::EpiPerSepSpectralCone{T}) where {T <: Real} = Cones.EpiPerSepSpectral{cone.Q, T}(cone.h, cone.d, use_dual = cone.use_dual)
 
 export EpiRelEntropyCone
 struct EpiRelEntropyCone{T <: Real} <: MOI.AbstractVectorSet
@@ -340,8 +333,7 @@ const HypatiaCones{T <: Real} = Union{
     HypoPerLogCone{T},
     HypoPerLogdetTriCone{T, T},
     HypoPerLogdetTriCone{T, Complex{T}},
-    # EpiPerEntropyCone{T},
-    # EpiPerTrEntropyTriCone{T},
+    EpiPerSepSpectralCone{T},
     EpiRelEntropyCone{T},
     EpiTrRelEntropyTriCone{T},
     WSOSInterpNonnegativeCone{T, T},

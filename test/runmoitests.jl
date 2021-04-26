@@ -16,7 +16,7 @@ include(joinpath(@__DIR__, "moi.jl"))
     real_types = [
         Float64,
         # Float32,
-        BigFloat,
+        # BigFloat,
         ]
     for T in real_types
         @testset "$T" begin
