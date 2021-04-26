@@ -60,12 +60,13 @@ function is_dual_feas(cone::EpiPerSepSpectral{VectorCSqr{T}}) where T
     u = cone.dual_point[1]
     (u < eps(T)) && return false
     @views w = cone.dual_point[3:end]
+    h_conj_dom_pos(cone.h) && any(<(eps(T)), w) && return false
+
     # TODO in-place:
     temp = similar(w)
     @. temp = w / u
-    h_conj_dom(temp, cone.h) || return false
-    v = cone.dual_point[2]
-    return (v - u * h_conj(temp, cone.h) > eps(T))
+    # h_conj_dom(temp, cone.h) || return false
+    return (cone.dual_point[2] - u * h_conj(temp, cone.h) > eps(T))
 end
 
 function update_grad(cone::EpiPerSepSpectral{VectorCSqr{T}}) where T

@@ -1,12 +1,20 @@
 #=
 suitable univariate functions defined on ℝ₊₊ with matrix monotone derivative, and associated oracles
+- h_val evaluates (sum of) h
+- h_conj_dom_pos is true if domain of convex conjugate of h is ℝ₊₊, otherwise domain is ℝ
+- h_conj evaluates the convex conjugate of (sum of) h
+- h_der1/h_der2/h_der3 evaluate 1st/2nd/3rd derivatives of h pointwise
+- get_initial_point gives initial point for u,v,λ_i
+
+TODO derive central initial points for get_initial_point and return correct real type
 =#
 
 # negative logarithm: -log(x)
 struct NegLogMMF <: SepSpectralFun end
 
 h_val(xs::Vector, ::NegLogMMF) = -sum(log, xs)
-h_conj_dom(xs::Vector, ::NegLogMMF) = all(>(eps(eltype(xs))), xs)
+# h_conj_dom(xs::Vector, ::NegLogMMF) = all(>(eps(eltype(xs))), xs)
+h_conj_dom_pos(::NegLogMMF) = true
 h_conj(xs::Vector, ::NegLogMMF) = -length(xs) - sum(log, xs)
 
 h_der1(ds::Vector, xs::Vector, ::NegLogMMF) = (@. ds = -inv(xs))
@@ -23,7 +31,8 @@ end
 struct NegEntropyMMF <: SepSpectralFun end
 
 h_val(xs::Vector, ::NegEntropyMMF) = sum(x * log(x) for x in xs)
-h_conj_dom(xs::Vector, ::NegEntropyMMF) = true
+# h_conj_dom(xs::Vector, ::NegEntropyMMF) = true
+h_conj_dom_pos(::NegEntropyMMF) = false
 h_conj(xs::Vector, ::NegEntropyMMF) = sum(exp(-x - 1) for x in xs)
 
 h_der1(ds::Vector, xs::Vector, ::NegEntropyMMF) = (@. ds = 1 + log(xs))
@@ -40,7 +49,8 @@ end
 struct SquareMMF <: SepSpectralFun end
 
 h_val(xs::Vector, ::SquareMMF) = sum(abs2, xs)
-h_conj_dom(xs::Vector, ::SquareMMF) = true
+# h_conj_dom(xs::Vector, ::SquareMMF) = true
+h_conj_dom_pos(::SquareMMF) = false
 h_conj(xs::Vector, ::SquareMMF) = sum((x >= 0 ? zero(x) : abs2(x / 2)) for x in xs)
 
 h_der1(ds::Vector, xs::Vector, ::SquareMMF) = (@. ds = xs + xs)
@@ -62,7 +72,8 @@ struct Power12MMF <: SepSpectralFun
 end
 
 h_val(xs::Vector, h::Power12MMF) = sum(x^h.p for x in xs)
-h_conj_dom(xs::Vector, h::Power12MMF) = true
+# h_conj_dom(xs::Vector, h::Power12MMF) = true
+h_conj_dom_pos(::Power12MMF) = false
 function h_conj(xs::Vector, h::Power12MMF)
     p = h.p
     q = p / (p - 1)

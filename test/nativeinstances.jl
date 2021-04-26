@@ -17,6 +17,14 @@ import Hypatia.Cones
 import Hypatia.Cones.Cone
 import Hypatia.Solvers
 
+# for epipersepspectral instances
+sep_spectral_funs = [
+    Cones.NegLogMMF(),
+    Cones.NegEntropyMMF(),
+    Cones.SquareMMF(),
+    Cones.Power12MMF(1.5),
+    ]
+
 test_tol(::Type{T}) where T = sqrt(sqrt(eps(T)))
 
 # build model, solve, test conic certificates, and return solve information
@@ -1858,6 +1866,192 @@ function hypoperlogdettri4(T; options...)
     @test r.z ≈ [-1, -2, 1, 0, 1, 1, 1] atol=tol rtol=tol
 end
 
+
+
+
+
+
+function epipersepspectral_vector1(T; options...)
+    tol = test_tol(T)
+    Random.seed!(1)
+    for d in [1, 3]
+        dim = 2 + d
+        w = rand(T, d) .+ 1
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = zeros(T, 0)
+        G = zeros(T, dim, 1)
+        G[1, 1] = -1
+        h = zeros(T, dim)
+        h[2] = 1
+        h[3:end] .= w
+
+        for h_fun in sep_spectral_funs
+            cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, T}(h_fun, d)]
+
+            r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+            @test r.status == Solvers.Optimal
+            @test r.primal_obj ≈ Cones.h_val(w, h_fun) atol=tol rtol=tol
+        end
+    end
+end
+
+function epipersepspectral_vector2(T; options...)
+    tol = test_tol(T)
+    for d in [2, 4]
+        dim = 2 + d
+        c = zeros(T, dim)
+        c[1] = 1
+        A = zeros(T, 1, dim)
+        A[1, 1] = 1
+        b = zeros(T, 1)
+        G = Matrix{T}(-I, dim, dim)
+        h = zeros(T, dim)
+
+        for h_fun in sep_spectral_funs
+            cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, T}(h_fun, d, use_dual = true)]
+
+            r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+            @test r.status == Solvers.Optimal
+            @test r.primal_obj ≈ 0 atol=tol rtol=tol
+            @test r.x[1:2] ≈ [0, 1] atol=tol rtol=tol
+        end
+    end
+end
+
+function epipersepspectral_vector3(T; options...)
+    tol = test_tol(T)
+    c = T[1]
+    A = zeros(T, 0, 1)
+    b = zeros(T, 0)
+    G = Matrix{T}(-I, 4, 1)
+    h = T[0, 5, 2, 3]
+
+    for h_fun in sep_spectral_funs
+        cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, T}(h_fun, 2)]
+
+        r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+        @test r.status == Solvers.Optimal
+        val = 5 * Cones.h_val([2, 3] ./ 5, h_fun)
+        @test r.primal_obj ≈ val atol=tol rtol=tol
+        @test r.s ≈ [val, 5, 2, 3] atol=tol rtol=tol
+        @test r.z[1] ≈ 1 atol=tol rtol=tol
+        @test r.z[3:4] ≈ -Cones.h_der1(zeros(T, 2), [2, 3] ./ 5, h_fun) atol=tol rtol=tol
+        @test r.z[2] ≈ Cones.h_conj(r.z[3:4], h_fun) atol=tol rtol=tol
+    end
+end
+
+function epipersepspectral_vector4(T; options...)
+    tol = test_tol(T)
+    c = T[1]
+    A = zeros(T, 0, 1)
+    b = zeros(T, 0)
+    G = zeros(T, 4, 1)
+    G[2, 1] = -1
+
+    for h_fun in sep_spectral_funs
+        w = T[2, 3]
+        if !Cones.h_conj_dom_pos(h_fun)
+            w .*= -1
+        end
+        h = T[5, 0, w...]
+
+        cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, T}(h_fun, 2, use_dual = true)]
+
+        r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+        @test r.status == Solvers.Optimal
+        val = 5 * Cones.h_conj(w ./ 5, h_fun)
+        @test r.primal_obj ≈ val atol=tol rtol=tol
+        @test r.s ≈ [5, val, w...] atol=tol rtol=tol
+        @test r.z[2] ≈ 1 atol=tol rtol=tol
+        @test r.z[1] ≈ Cones.h_val(r.z[3:4], h_fun) atol=tol rtol=tol
+    end
+end
+
+function epipersepspectral_matrix1(T; options...)
+    tol = test_tol(T)
+    Random.seed!(1)
+    rt2 = sqrt(T(2))
+    for d in [1, 3], is_complex in [false, true]
+        R = (is_complex ? Complex{T} : T)
+        cone_dim = 2 + (is_complex ? d^2 : Cones.svec_length(d))
+        W = randn(R, d, d)
+        W = W * W' + I
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        G = zeros(T, cone_dim, 1)
+        G[1, 1] = -1
+        h = zeros(T, cone_dim)
+        h[2] = 1
+        @views Cones.smat_to_svec!(h[3:end], W, rt2)
+
+        for h_fun in sep_spectral_funs
+            cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}, T}(h_fun, d)]
+
+            r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+            @test r.status == Solvers.Optimal
+            @test r.primal_obj ≈ Cones.h_val(eigvals(Hermitian(W, :U)), h_fun) atol=tol rtol=tol
+        end
+    end
+end
+
+function epipersepspectral_matrix2(T; options...)
+    tol = test_tol(T)
+    Random.seed!(1)
+    rt2 = sqrt(T(2))
+    for d in [1, 3], is_complex in [false, true]
+        R = (is_complex ? Complex{T} : T)
+        cone_dim = 2 + (is_complex ? d^2 : Cones.svec_length(d))
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        G = zeros(T, cone_dim, 1)
+        G[2, 1] = -1
+        h = zeros(T, cone_dim)
+        h[1] = 1
+
+        for h_fun in sep_spectral_funs
+            W = randn(R, d, d)
+            if Cones.h_conj_dom_pos(h_fun)
+                W = W * W' + I
+            end
+            @views Cones.smat_to_svec!(h[3:end], W, rt2)
+
+            cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}, T}(h_fun, d, use_dual = true)]
+
+            r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+            @test r.status == Solvers.Optimal
+            @test r.primal_obj ≈ Cones.h_conj(eigvals(Hermitian(W, :U)), h_fun) atol=tol rtol=tol
+        end
+    end
+end
+
+function epipersepspectral_matrix3(T; options...)
+    tol = test_tol(T)
+    rt2 = sqrt(T(2))
+    for d in [2, 4], is_complex in [false, true]
+        R = (is_complex ? Complex{T} : T)
+        cone_dim = 2 + (is_complex ? d^2 : Cones.svec_length(d))
+        c = zeros(T, cone_dim)
+        c[1] = 1
+        A = zeros(T, 1, cone_dim)
+        A[1, 2] = 1
+        b = zeros(T, 1)
+        G = Matrix{T}(-I, cone_dim, cone_dim)
+        h = zeros(T, cone_dim)
+
+        for h_fun in sep_spectral_funs
+            cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}, T}(h_fun, d)]
+
+            r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+            @test r.status == Solvers.Optimal
+            @test r.primal_obj ≈ 0 atol=tol rtol=tol
+            @test r.x[1:2] ≈ [0, 0] atol=tol rtol=tol
+        end
+    end
+end
+
 # TODO add use_dual = true tests
 function epiperentropy1(T; options...)
     tol = test_tol(T)
@@ -1959,7 +2153,7 @@ function epipertrentropytri1(T; options...)
     rt2 = sqrt(T(2))
     side = 4
     svec_dim = Cones.svec_length(side)
-    cone_dim = svec_dim + 2
+    cone_dim = 2 + svec_dim
     c = T[1]
     A = zeros(T, 0, 1)
     b = T[]
@@ -1984,7 +2178,7 @@ function epipertrentropytri2(T; options...)
     rt2 = sqrt(T(2))
     side = 3
     svec_dim = Cones.svec_length(side)
-    cone_dim = svec_dim + 2
+    cone_dim = 2 + svec_dim
     c = vcat(zero(T), -ones(T, svec_dim))
     A = hcat(one(T), zeros(T, 1, svec_dim))
     b = T[1]
@@ -2004,7 +2198,7 @@ function epipertrentropytri3(T; options...)
     rt2 = sqrt(T(2))
     side = 3
     svec_dim = Cones.svec_length(side)
-    cone_dim = svec_dim + 2
+    cone_dim = 2 + svec_dim
     c = vcat(zeros(T, 2), ones(T, svec_dim))
     A = hcat(one(T), zeros(T, 1, svec_dim + 1))
     b = [zero(T)]
@@ -2024,7 +2218,7 @@ function epipertrentropytri4(T; options...)
     rt2 = sqrt(T(2))
     side = 3
     svec_dim = Cones.svec_length(side)
-    cone_dim = svec_dim + 2
+    cone_dim = 2 + svec_dim
     c = vcat(zero(T), one(T), zeros(T, svec_dim))
     A = hcat(one(T), zeros(T, 1, svec_dim + 1))
     b = [zero(T)]
@@ -2037,6 +2231,10 @@ function epipertrentropytri4(T; options...)
     @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
     @test r.s ≈ zeros(T, cone_dim) atol=tol rtol=tol
 end
+
+
+
+
 
 # TODO add use_dual = true tests
 function epirelentropy1(T; options...)

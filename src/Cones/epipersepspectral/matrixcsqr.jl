@@ -82,15 +82,22 @@ function is_dual_feas(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R}
     u = cone.dual_point[1]
     (u < eps(T)) && return false
     @views w = cone.dual_point[3:end]
-    # TODO in-place:
     uiw = zeros(R, cone.d, cone.d)
+    if h_conj_dom_pos(cone.h)
+        # use cholesky to check conjugate domain feasibility
+        # TODO check whether it is faster to do this before an eigdecomp
+        svec_to_smat!(uiw, w, cone.cache.rt2)
+        w_chol = cholesky!(Hermitian(uiw, :U), check = false)
+        isposdef(w_chol) || return false
+    end
+
     svec_to_smat!(uiw, w, cone.cache.rt2)
+    # TODO in-place:
     @. uiw /= u
     uiw_eigen = eigen(Hermitian(uiw, :U), sortby = nothing)
     uiw_λ = uiw_eigen.values
-    h_conj_dom(uiw_λ, cone.h) || return false
-    v = cone.dual_point[2]
-    return (v - u * h_conj(uiw_λ, cone.h) > eps(T))
+    # h_conj_dom(uiw_λ, cone.h) || return false
+    return (cone.dual_point[2] - u * h_conj(uiw_λ, cone.h) > eps(T))
 end
 
 function update_grad(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
