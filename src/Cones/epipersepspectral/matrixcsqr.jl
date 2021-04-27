@@ -501,6 +501,12 @@ function correction(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}, dir::AbstractVect
 
     # TODO too inefficient. don't form diff tensor explicitly
     diff_dot = Hermitian([dot(ξ_vecs[:, p], Diagonal(diff_ten[:, p, q]), ξ_vecs[:, q]) for p in 1:d, q in 1:d])
+    # @show diff_dot
+
+    display(diff_ten)
+    # @show diff_ten
+    # diff_dot2 = sum(ξ_vecs * diff_ten[:, :, p] * ξ_vecs for p in 1:d)
+    # @show diff_dot2
 
     corr[1] = c1
 

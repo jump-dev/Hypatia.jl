@@ -195,7 +195,6 @@ function update_inv_hess(cone::EpiPerSepSpectral{VectorCSqr{T}}) where T
     w = cone.w_view
     ∇h_viw = cache.∇h_viw
     ∇2h_viw = cache.∇2h_viw
-    ζi∇h_viw = cache.ζi∇h_viw
     wi = cache.wi
     ζivi = ζi / v
 
@@ -208,31 +207,26 @@ function update_inv_hess(cone::EpiPerSepSpectral{VectorCSqr{T}}) where T
     ζ2β = abs2(ζ) + dot(∇h_viw, α)
     c0 = σ + dot(∇h_viw, γ)
     c1 = c0 / ζ2β
-    c2 = -inv(ζ2β)
-    Yu = c2 * α
-    Yv = c1 * α - γ
-    c3 = abs2(inv(v)) + σ * c1 + sum((viw[i] + Yv[i]) * w∇2h_viw[i] for i in 1:d)
+    c3 = abs2(inv(v)) + σ * c1 + sum((viw[i] + c1 * α[i] - γ[i]) * w∇2h_viw[i] for i in 1:d)
     c4 = inv(c3 - c0 * c1)
 
     # Hiuu, Hiuv, Hivv
-    Hiuu = Hi[1, 1] = c4 * ζ2β * c3
-    Hiuv = Hi[1, 2] = c4 * c0
-    Hivv = Hi[2, 2] = c4
+    Hi[1, 1] = c4 * ζ2β * c3
+    Hi[1, 2] = c4 * c0
+    Hi[2, 2] = c4
 
     @inbounds for j in 1:d
-        Yu_j = Yu[j]
-        Yv_j = Yv[j]
         j2 = 2 + j
 
-        # Hiuw
-        Hi1j = Hi[1, j2] = -Hiuu * Yu_j - Hiuv * Yv_j
-
         # Hivw
-        Hi2j = Hi[2, j2] = -Hiuv * Yu_j - Hivv * Yv_j
+        Hivj = Hi[2, j2] = c4 * γ[j]
+
+        # Hiuw
+        Hi[1, j2] = α[j] + c0 * Hivj
 
         # Hiww
         for i in 1:j
-            Hi[2 + i, j2] = Yu_j * α[i] - Hi1j * Yu[i] - Hi2j * Yv[i]
+            Hi[2 + i, j2] = Hivj * γ[i]
         end
         Hi[j2, j2] += m[j]
     end
