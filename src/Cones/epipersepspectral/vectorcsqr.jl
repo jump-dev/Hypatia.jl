@@ -198,32 +198,26 @@ function update_inv_hess(cone::EpiPerSepSpectral{VectorCSqr{T}}) where T
     ζi∇h_viw = cache.ζi∇h_viw
     wi = cache.wi
     ζivi = ζi / v
-    ζivi2 = ζivi / v
 
+    # TODO in-place
     m = inv.(ζivi * ∇2h_viw + abs2.(wi))
     α = m .* ∇h_viw
-    β = dot(∇h_viw, α)
-    ζ2β = ζ^2 + β
-
-    w∇2h_viw = ζivi2 * w .* ∇2h_viw
+    w∇2h_viw = ζivi * ∇2h_viw .* viw
     γ = m .* w∇2h_viw
-    c1 = (σ + dot(∇h_viw, γ)) / ζ2β
 
-    c5 = -inv(ζ2β)
-    Yu = c5 * α
+    ζ2β = abs2(ζ) + dot(∇h_viw, α)
+    c0 = σ + dot(∇h_viw, γ)
+    c1 = c0 / ζ2β
+    c2 = -inv(ζ2β)
+    Yu = c2 * α
     Yv = c1 * α - γ
-
-    c3 = ζi2 * σ
-    c4 = ζi2 * β
-    Zuu = ζi2 - c4 / ζ2β
-    Zvu = -c3 + c1 * c4 - ζi2 * dot(γ, ∇h_viw)
-    Zvv = (inv(v) + dot(w, w∇2h_viw)) / v + abs2(ζi * σ) + dot(w∇2h_viw - c3 * ∇h_viw, Yv)
+    c3 = abs2(inv(v)) + σ * c1 + sum((viw[i] + Yv[i]) * w∇2h_viw[i] for i in 1:d)
+    c4 = inv(c3 - c0 * c1)
 
     # Hiuu, Hiuv, Hivv
-    DZi = inv(Zuu * Zvv - Zvu^2)
-    Hiuu = Hi[1, 1] = DZi * Zvv
-    Hiuv = Hi[1, 2] = -DZi * Zvu
-    Hivv = Hi[2, 2] = DZi * Zuu
+    Hiuu = Hi[1, 1] = c4 * ζ2β * c3
+    Hiuv = Hi[1, 2] = c4 * c0
+    Hivv = Hi[2, 2] = c4
 
     @inbounds for j in 1:d
         Yu_j = Yu[j]
