@@ -264,32 +264,23 @@ function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, con
     ζ2β = abs2(ζ) + dot(∇h_viw, α)
     c0 = σ + dot(∇h_viw, γ)
     c1 = c0 / ζ2β
-    c2 = -inv(ζ2β)
-    Yu = c2 * α
-    Yv = c1 * α - γ
-    c3 = abs2(inv(v)) + σ * c1 + sum((viw[i] + Yv[i]) * w∇2h_viw[i] for i in 1:d)
+    c3 = abs2(inv(v)) + σ * c1 + sum((viw[i] + c1 * α[i] - γ[i]) * w∇2h_viw[i] for i in 1:d)
     c4 = inv(c3 - c0 * c1)
 
+    c5 = ζ2β * c3
 
-    Zuu = c4 * ζ2β * c3
-    Zuv = c4 * c0
-    Zvv = c4
-
-    # Yu, Yv, Zuu, Zuv, Zvv, α, m
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
         q = arr[2, j]
         @views r = arr[3:end, j]
 
-        Yur = dot(Yu, r)
-        Yurp = Yur - p
-        Yvrq = dot(Yv, r) - q
-        cu = Zuu * Yurp + Zuv * Yvrq
-        cv = Zuv * Yurp + Zvv * Yvrq
+        qγr = q + dot(γ, r)
+        cu = c4 * (c5 * p + c0 * qγr)
+        cv = c4 * (c0 * p + qγr)
 
-        prod[1, j] = -cu
-        prod[2, j] = -cv
-        @. prod[3:end, j] = cu * Yu + cv * Yv + Yur * α + m * r
+        prod[1, j] = cu + dot(α, r)
+        prod[2, j] = cv
+        @. prod[3:end, j] = p * α + cv * γ + m * r
     end
 
     return prod
