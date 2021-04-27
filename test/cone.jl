@@ -71,13 +71,13 @@ function test_oracles(
     inv_hess = Matrix(Cones.inv_hess(cone))
     @test hess * inv_hess ≈ I atol=tol rtol=tol
 
-    # @test hess * point ≈ -grad atol=tol rtol=tol
-    # @test Cones.hess_prod!(prod_vec, point, cone) ≈ -grad atol=tol rtol=tol
-    # @test Cones.inv_hess_prod!(prod_vec, grad, cone) ≈ -point atol=tol rtol=tol
-    #
-    # prod_mat = zeros(T, dim, dim)
-    # @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
-    # @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
+    @test hess * point ≈ -grad atol=tol rtol=tol
+    @test Cones.hess_prod!(prod_vec, point, cone) ≈ -grad atol=tol rtol=tol
+    @test Cones.inv_hess_prod!(prod_vec, grad, cone) ≈ -point atol=tol rtol=tol
+
+    prod_mat = zeros(T, dim, dim)
+    @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
     #
     # if hasproperty(cone, :use_hess_prod_slow)
     #     Cones.update_use_hess_prod_slow(cone)

@@ -162,10 +162,10 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::E
     ξb = zeros(d)
     ζivi = ζi / v
 
-    @inbounds @views for j in 1:size(arr, 2)
+    @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
         q = arr[2, j]
-        r = arr[3:end, j]
+        @views r = arr[3:end, j]
 
         viq = q / v
         @. ξb = ζivi * ∇2h_viw * (-viq * w + r)
@@ -232,7 +232,7 @@ function update_inv_hess(cone::EpiPerSepSpectral{VectorCSqr{T}}) where T
 
         # Hiww
         for i in 1:j
-            Hi[2 + i, j2] = Yu_j * α[i] - Yu[i] * Hi1j - Yv[i] * Hi2j
+            Hi[2 + i, j2] = Yu_j * α[i] - Hi1j * Yu[i] - Hi2j * Yv[i]
         end
         Hi[j2, j2] += m[j]
     end
@@ -244,20 +244,59 @@ end
 function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSepSpectral{VectorCSqr{T}}) where T
     # cone.hess_aux_updated || update_hess_aux(cone) # TODO
     hess(cone) # TODO
-    @assert cone.hess_updated
+    @assert cone.hess_updated # TODO
+    d = cone.d
     v = cone.point[2]
     cache = cone.cache
+    Hi = cone.inv_hess.data
+    ζi = cache.ζi
+    ζ = cache.ζ
+    ζi2 = abs2(ζi)
+    σ = cache.σ
+    viw = cache.viw
+    w = cone.w_view
+    ∇h_viw = cache.∇h_viw
+    ∇2h_viw = cache.∇2h_viw
+    ζi∇h_viw = cache.ζi∇h_viw
+    wi = cache.wi
+    ζivi = ζi / v
+
+    # TODO in-place
+    m = inv.(ζivi * ∇2h_viw + abs2.(wi))
+    α = m .* ∇h_viw
+    w∇2h_viw = ζivi * ∇2h_viw .* viw
+    γ = m .* w∇2h_viw
+
+    ζ2β = abs2(ζ) + dot(∇h_viw, α)
+    c0 = σ + dot(∇h_viw, γ)
+    c1 = c0 / ζ2β
+    c2 = -inv(ζ2β)
+    Yu = c2 * α
+    Yv = c1 * α - γ
+    c3 = abs2(inv(v)) + σ * c1 + sum((viw[i] + Yv[i]) * w∇2h_viw[i] for i in 1:d)
+    c4 = inv(c3 - c0 * c1)
 
 
+    Zuu = c4 * ζ2β * c3
+    Zuv = c4 * c0
+    Zvv = c4
 
-    Hi = inv_hess(cone)
-    mul!(prod, Hi, arr)
+    # Yu, Yv, Zuu, Zuv, Zvv, α, m
+    @inbounds for j in 1:size(arr, 2)
+        p = arr[1, j]
+        q = arr[2, j]
+        @views r = arr[3:end, j]
 
-    # # TODO @inbounds
-    # for j in 1:size(arr, 2)
-    #
-    #
-    # end
+        Yur = dot(Yu, r)
+        Yurp = Yur - p
+        Yvrq = dot(Yv, r) - q
+        cu = Zuu * Yurp + Zuv * Yvrq
+        cv = Zuv * Yurp + Zvv * Yvrq
+
+        prod[1, j] = -cu
+        prod[2, j] = -cv
+        @. prod[3:end, j] = cu * Yu + cv * Yv + Yur * α + m * r
+    end
 
     return prod
 end

@@ -55,10 +55,10 @@ function cone_types(T::Type{<:Real})
 end
 
 sep_spectral_funs = [
-    Cones.NegLogMMF(),
+    # Cones.NegLogMMF(),
     Cones.NegEntropyMMF(),
-    Cones.SquareMMF(),
-    Cones.Power12MMF(1.5),
+    # Cones.SquareMMF(),
+    # Cones.Power12MMF(1.5),
     ]
 
 @testset "cone tests" begin
