@@ -55,10 +55,10 @@ function cone_types(T::Type{<:Real})
 end
 
 sep_spectral_funs = [
-    # Cones.NegLogMMF(),
+    Cones.NegLogMMF(),
     Cones.NegEntropyMMF(),
-    # Cones.SquareMMF(),
-    # Cones.Power12MMF(1.5),
+    Cones.SquareMMF(),
+    Cones.Power12MMF(1.5),
     ]
 
 @testset "cone tests" begin
@@ -77,19 +77,19 @@ real_types = [
 end
 end
 
-# println("\nstarting barrier tests")
-# @testset "barrier tests" begin
-# real_types = [
-#     Float64,
-#     # Float32,
-#     # BigFloat,
-#     ]
-# @testset "$cone" for T in real_types, cone in cone_types(T)
-#     println("$cone")
-#     test_time = @elapsed test_barrier(cone)
-#     @printf("%8.2e seconds\n", test_time)
-# end
-# end
+println("\nstarting barrier tests")
+@testset "barrier tests" begin
+real_types = [
+    Float64,
+    # Float32,
+    # BigFloat,
+    ]
+@testset "$cone" for T in real_types, cone in cone_types(T)
+    println("$cone")
+    test_time = @elapsed test_barrier(cone)
+    @printf("%8.2e seconds\n", test_time)
+end
+end
 
 # println("\nstarting time/allocation measurements")
 # @testset "allocation tests" begin

@@ -270,8 +270,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
 
         r_vecs = Hermitian(viw_vecs' * r * viw_vecs)
 
-        # χ = get_χ(p, q, r, cone)
-        χ = p - cache.σ * q - dot(∇h_viw, diag(r_vecs))
+        χ = p - σ * q - dot(∇h_viw, diag(r_vecs))
         ζi2χ = ζi2 * χ
 
         temp = Hermitian(diff_mat .* (r_vecs - Diagonal(q * viw_λ)))
@@ -490,8 +489,7 @@ function correction(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}, dir::AbstractVect
     r_vecs = Hermitian(viw_vecs' * r * viw_vecs)
 
     viq = vi * q
-    # χ = get_χ(p, q, r, cone)
-    χ = p - cache.σ * q - dot(∇h_viw, diag(r_vecs))
+    χ = p - σ * q - dot(∇h_viw, diag(r_vecs))
     ζiχ = ζi * χ
     ζi2χpviq = ζi * (ζiχ + viq)
 
@@ -523,17 +521,3 @@ function correction(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}, dir::AbstractVect
 
     return corr
 end
-
-
-
-# function get_χ(
-#     p::T,
-#     q::T,
-#     r::AbstractMatrix{T},
-#     cone::EpiPerSepSpectral{<:MatrixCSqr{T}},
-#     ) where {T <: Real}
-#     cache = cone.cache
-#     # TODO precompute vecs * cache.∇h_viw * vecs'
-#     ∇h_viw_mat = cache.vecs * Diagonal(cache.∇h_viw) * cache.vecs'
-#     return p - cache.σ * q - dot(∇h_viw_mat, r)
-# end

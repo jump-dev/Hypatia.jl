@@ -169,11 +169,11 @@ function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::E
 
         viq = q / v
         @. ξb = ζivi * ∇2h_viw * (-viq * w + r)
-        χ = get_χ(p, q, r, cone)
+        χ = p - σ * q - dot(∇h_viw, r)
         ζi2χ = ζi2 * χ
 
         prod[1, j] = ζi2χ
-        prod[2, j] = -σ * ζi2χ - dot(viw, ξb) + viq / v
+        prod[2, j] = -ζi2χ * σ - dot(viw, ξb) + viq / v
         @. prod[3:end, j] = -ζi2χ * ∇h_viw + ξb + r * wi * wi
     end
 
@@ -320,7 +320,7 @@ function correction(cone::EpiPerSepSpectral{VectorCSqr{T}}, dir::AbstractVector{
     d = cone.d
     ξ = zeros(d)
     ξb = zeros(d)
-    ∇3hξξ = zeros(d)
+    temp = zeros(d)
 
     p = dir[1]
     q = dir[2]
@@ -330,30 +330,20 @@ function correction(cone::EpiPerSepSpectral{VectorCSqr{T}}, dir::AbstractVector{
     @. ξ = -viq * w + r
     ζivi = ζi / v
     @. ξb = ζivi * ∇2h_viw * ξ
-    χ = get_χ(p, q, r, cone)
+    χ = p - σ * q - dot(∇h_viw, r)
     ζiχ = ζi * χ
-    ζiχpviq = ζiχ + viq
 
     ξbξ = dot(ξb, ξ) / 2
-    ξbviw = dot(ξb, viw)
     c1 = ζi * (ζiχ^2 + ξbξ)
 
-    ζivi2 = ζi / v / v / 2
-    @. ∇3hξξ = ζivi2 * ∇3h_viw .* ξ .* ξ
+    ζiχpviq = ζiχ + viq
+    c2 = ζi / 2
+    @. ξ /= v
+    @. temp = ζiχpviq * ξb - c2 * ∇3h_viw .* ξ .* ξ
 
     corr[1] = c1
-    corr[2] = -c1 * σ - ζiχpviq * ξbviw + (ξbξ + viq^2) / v + dot(∇3hξξ, viw)
-    @. corr[3:end] = -c1 * ∇h_viw + ζiχpviq * ξb - ∇3hξξ + abs2(r * wi) * wi
+    corr[2] = -c1 * σ - dot(viw, temp) + (ξbξ + viq^2) / v
+    @. corr[3:end] = -c1 * ∇h_viw + temp + abs2(r * wi) * wi
 
     return corr
-end
-
-function get_χ(
-    p::T,
-    q::T,
-    r::AbstractVector{T},
-    cone::EpiPerSepSpectral{VectorCSqr{T}},
-    ) where {T <: Real}
-    cache = cone.cache
-    return p - cache.σ * q - dot(cache.∇h_viw, r)
 end
