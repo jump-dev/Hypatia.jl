@@ -19,10 +19,9 @@ import Hypatia.Solvers
 
 # for epipersepspectral instances
 sep_spectral_funs = [
-    Cones.NegLogMMF(),
-    Cones.NegEntropyMMF(),
-    Cones.SquareMMF(),
-    Cones.Power12MMF(1.5),
+    Cones.NegLogSSF(),
+    Cones.NegEntropySSF(),
+    Cones.Power12SSF(1.5),
     ]
 
 test_tol(::Type{T}) where T = sqrt(sqrt(eps(T)))

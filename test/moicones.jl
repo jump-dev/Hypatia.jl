@@ -304,7 +304,7 @@ function test_moi_cones(T::Type{<:Real})
     end
 
     @testset "EpiPerSepSpectral" begin
-        h_fun = Cones.NegEntropyMMF()
+        h_fun = Cones.NegEntropySSF()
         QTs = [
             Cones.VectorCSqr{T},
             Cones.MatrixCSqr{T, T},
