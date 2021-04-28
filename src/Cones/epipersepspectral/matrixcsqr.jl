@@ -17,9 +17,9 @@ mutable struct MatrixCSqrCache{T <: Real, R <: RealOrComplex{T}} <: CSqrCache{T}
     ζ::T
     ζi::T
     σ::T
-    ∇h_viw::Vector{T}
-    ∇2h_viw::Vector{T}
-    ∇3h_viw::Vector{T}
+    ∇h::Vector{T}
+    ∇2h::Vector{T}
+    ∇3h::Vector{T}
     diff_mat::Matrix{T}
     MatrixCSqrCache{T, R}() where {T <: Real, R <: RealOrComplex{T}} = new{T, R}()
 end
@@ -31,9 +31,9 @@ function setup_csqr_cache(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R
     d = cone.d
     cache.w = zeros(R, d, d)
     cache.viw = zeros(R, d, d)
-    cache.∇h_viw = zeros(T, d)
-    cache.∇2h_viw = zeros(T, d)
-    cache.∇3h_viw = zeros(T, d)
+    cache.∇h = zeros(T, d)
+    cache.∇2h = zeros(T, d)
+    cache.∇3h = zeros(T, d)
     cache.diff_mat = zeros(T, d, d)
     return
 end
@@ -107,12 +107,12 @@ function update_grad(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     cache = cone.cache
     ζi = cache.ζi = inv(cache.ζ)
     viw_λ = cache.viw_eigen.values
-    ∇h_viw = cache.∇h_viw
-    h_der1(∇h_viw, viw_λ, cone.h)
-    cache.σ = cache.ϕ - dot(viw_λ, ∇h_viw) # TODO guessed, just dots vectors
+    ∇h = cache.∇h
+    h_der1(∇h, viw_λ, cone.h)
+    cache.σ = cache.ϕ - dot(viw_λ, ∇h) # TODO guessed, just dots vectors
 
     viw_vecs = cache.viw_eigen.vectors
-    temp = viw_vecs * Diagonal(ζi * ∇h_viw - inv.(v .* viw_λ)) * viw_vecs' # TODO combines the ∇h_viw and wi
+    temp = viw_vecs * Diagonal(ζi * ∇h - inv.(v .* viw_λ)) * viw_vecs' # TODO combines the ∇h and wi
 
     grad[1] = -ζi
     grad[2] = -inv(v) + ζi * cache.σ
@@ -135,9 +135,9 @@ function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     # viw = cache.viw
     viw_vecs = cache.viw_eigen.vectors
     viw_λ = cache.viw_eigen.values
-    ∇h_viw = cache.∇h_viw
-    ∇2h_viw = cache.∇2h_viw
-    h_der2(∇2h_viw, viw_λ, cone.h)
+    ∇h = cache.∇h
+    ∇2h = cache.∇2h
+    h_der2(∇2h, viw_λ, cone.h)
     ζivi = ζi / v
     ζiσ = ζi * σ
     rt2 = cache.rt2
@@ -149,18 +149,18 @@ function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     rteps = sqrt(eps(T))
     for j in 1:d
         viw_λ_j = viw_λ[j]
-        ∇h_viw_j = ∇h_viw[j]
-        ∇2h_viw_j = ∇2h_viw[j]
+        ∇h_j = ∇h[j]
+        ∇2h_j = ∇2h[j]
         for i in 1:(j - 1)
             denom = viw_λ[i] - viw_λ_j
             if abs(denom) < rteps
                 # println("small denom") # TODO
-                diff_mat[i, j] = (∇2h_viw[i] + ∇2h_viw_j) / 2 # NOTE or take ∇2h at the average (viw[i] + viw[j]) / 2
+                diff_mat[i, j] = (∇2h[i] + ∇2h_j) / 2 # NOTE or take ∇2h at the average (viw[i] + viw[j]) / 2
             else
-                diff_mat[i, j] = (∇h_viw[i] - ∇h_viw_j) / denom
+                diff_mat[i, j] = (∇h[i] - ∇h_j) / denom
             end
         end
-        diff_mat[j, j] = ∇2h_viw_j
+        diff_mat[j, j] = ∇2h_j
     end
     diff_mat = Hermitian(diff_mat, :U)
 
@@ -172,16 +172,16 @@ function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     H[1, 2] = -ζi2 * σ
 
     # Hvv
-    H[2, 2] = v^-2 + abs2(ζi * σ) + ζivi * sum(abs2(viw_λ[j]) * ∇2h_viw[j] for j in 1:d)
+    H[2, 2] = v^-2 + abs2(ζi * σ) + ζivi * sum(abs2(viw_λ[j]) * ∇2h[j] for j in 1:d)
 
     # Huw
-    const1 = -ζi^2 * ∇h_viw
+    const1 = -ζi^2 * ∇h
     Huw = viw_vecs * Diagonal(const1) * viw_vecs'
     @views smat_to_svec!(H[1, 3:end], Huw, rt2)
     temp1 = H[1, 3:end]
 
     # Hvw
-    Hvw = viw_vecs * Diagonal(-ζivi * ∇2h_viw .* viw_λ - σ * const1) * viw_vecs'
+    Hvw = viw_vecs * Diagonal(-ζivi * ∇2h .* viw_λ - σ * const1) * viw_vecs'
     @views smat_to_svec!(H[2, 3:end], Hvw, rt2)
 
     # Hww
@@ -251,8 +251,8 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
     ζi2 = abs2(ζi)
     viw = Hermitian(cache.viw)
     σ = cache.σ
-    ∇h_viw = cache.∇h_viw
-    ∇2h_viw = cache.∇2h_viw
+    ∇h = cache.∇h
+    ∇2h = cache.∇2h
     viw_vecs = cache.viw_eigen.vectors
     viw_λ = cache.viw_eigen.values
     diff_mat = Hermitian(cache.diff_mat, :U)
@@ -270,7 +270,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
 
         r_vecs = Hermitian(viw_vecs' * r * viw_vecs)
 
-        χ = p - σ * q - dot(∇h_viw, diag(r_vecs))
+        χ = p - σ * q - dot(∇h, diag(r_vecs))
         ζi2χ = ζi2 * χ
 
         temp = Hermitian(diff_mat .* (r_vecs - Diagonal(q * viw_λ)))
@@ -280,7 +280,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
 
         diag_λi = Diagonal([inv(v * viw_λ[i]) for i in 1:d])
         prod_w = viw_vecs * (
-            -ζi2χ * Diagonal(∇h_viw) +
+            -ζi2χ * Diagonal(∇h) +
             ζivi * temp +
             diag_λi * r_vecs * diag_λi
             ) * viw_vecs'
@@ -305,8 +305,8 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     # viw = cache.viw
     viw_vecs = cache.viw_eigen.vectors
     viw_λ = cache.viw_eigen.values
-    ∇h_viw = cache.∇h_viw
-    ∇2h_viw = cache.∇2h_viw
+    ∇h = cache.∇h
+    ∇2h = cache.∇2h
     ζivi = ζi / v
     ζiσ = ζi * σ
     rt2 = cache.rt2
@@ -316,22 +316,22 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     ζivi2 = ζivi / v
     w_λ = v * viw_λ
 
-    m = inv.(ζivi * ∇2h_viw + abs2.(inv.(w_λ)))
-    α1 = m .* ∇h_viw
+    m = inv.(ζivi * ∇2h + abs2.(inv.(w_λ)))
+    α1 = m .* ∇h
     α = viw_vecs * Diagonal(α1) * viw_vecs' # TODO can use sqrt
-    β = dot(∇h_viw, α1)
+    β = dot(∇h, α1)
     ζ2β = ζ^2 + β
 
-    w∇2h_viw = ζivi2 * w_λ .* ∇2h_viw
-    γ1 = m .* w∇2h_viw
+    w∇2h = ζivi2 * w_λ .* ∇2h
+    γ1 = m .* w∇2h
     γ = viw_vecs * Diagonal(γ1) * viw_vecs' # TODO maybe can use sqrt
-    c1 = (σ + dot(∇h_viw, γ1)) / ζ2β
+    c1 = (σ + dot(∇h, γ1)) / ζ2β
 
     c3 = ζi2 * σ
     c4 = ζi2 * β
     Zuu = ζi2 - c4 / ζ2β
-    Zvu = -c3 + c1 * c4 - ζi2 * dot(γ1, ∇h_viw)
-    Zvv = (inv(v) + dot(w_λ, w∇2h_viw)) / v + abs2(ζi * σ) + dot(w∇2h_viw - c3 * ∇h_viw, c1 * α1 - γ1)
+    Zvu = -c3 + c1 * c4 - ζi2 * dot(γ1, ∇h)
+    Zvv = (inv(v) + dot(w_λ, w∇2h)) / v + abs2(ζi * σ) + dot(w∇2h - c3 * ∇h, c1 * α1 - γ1)
 
     # Hiuu, Hiuv, Hivv
     DZi = inv(Zuu * Zvv - Zvu^2)
@@ -433,8 +433,8 @@ function correction(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}, dir::AbstractVect
     ζi2 = abs2(ζi)
     viw = Hermitian(cache.viw)
     σ = cache.σ
-    ∇h_viw = cache.∇h_viw
-    ∇2h_viw = cache.∇2h_viw
+    ∇h = cache.∇h
+    ∇2h = cache.∇2h
     viw_vecs = cache.viw_eigen.vectors
     viw_λ = cache.viw_eigen.values
     diff_mat = Hermitian(cache.diff_mat, :U)
@@ -444,8 +444,8 @@ function correction(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}, dir::AbstractVect
 # TODO for square, h_der3 is 0 and h_der2 is constant, so can skip much of this
 
 
-    ∇3h_viw = cache.∇3h_viw
-    h_der3(∇3h_viw, viw_λ, cone.h)
+    ∇3h = cache.∇3h
+    h_der3(∇3h, viw_λ, cone.h)
 
     # TODO diff tensor
     # TODO "symmetric", could use a tensor package, or a symmetric matrix of symmetric matrices
@@ -454,7 +454,7 @@ function correction(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}, dir::AbstractVect
     rteps = sqrt(eps(T))
     for k in 1:d, j in 1:k, i in 1:j
         (viw_λ_i, viw_λ_j, viw_λ_k) = (viw_λ[i], viw_λ[j], viw_λ[k])
-        (∇3h_i, ∇3h_j, ∇3h_k) = (∇3h_viw[i], ∇3h_viw[j], ∇3h_viw[k])
+        (∇3h_i, ∇3h_j, ∇3h_k) = (∇3h[i], ∇3h[j], ∇3h[k])
         denom_ij = viw_λ_i - viw_λ_j
         denom_ik = viw_λ_i - viw_λ_k
 
@@ -489,7 +489,7 @@ function correction(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}, dir::AbstractVect
     r_vecs = Hermitian(viw_vecs' * r * viw_vecs)
 
     viq = vi * q
-    χ = p - σ * q - dot(∇h_viw, diag(r_vecs))
+    χ = p - σ * q - dot(∇h, diag(r_vecs))
     ζiχ = ζi * χ
     ζi2χpviq = ζi * (ζiχ + viq)
 
@@ -517,7 +517,7 @@ function correction(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}, dir::AbstractVect
 
     diag_λi = Diagonal([inv(v * viw_λ[i]) for i in 1:d])
     prod_w = viw_vecs * (
-        -c1 * Diagonal(∇h_viw) +
+        -c1 * Diagonal(∇h) +
         ζi2χpviq * temp +
         -ζi * diff_dot +
         diag_λi * r_vecs * diag_λi * r_vecs * diag_λi

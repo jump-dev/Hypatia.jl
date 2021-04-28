@@ -79,29 +79,29 @@ function test_oracles(
     @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
     @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
 
-    # if hasproperty(cone, :use_hess_prod_slow)
-    #     Cones.update_use_hess_prod_slow(cone)
-    #     @test cone.use_hess_prod_slow_updated
-    #     @test !cone.use_hess_prod_slow
-    #     cone.use_hess_prod_slow = true
-    #     @test Cones.hess_prod_slow!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
-    # end
-    #
-    # if Cones.use_sqrt_hess_oracles(cone)
-    #     prod_mat2 = Matrix(Cones.sqrt_hess_prod!(prod_mat, inv_hess, cone)')
-    #     @test Cones.sqrt_hess_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
-    #     Cones.inv_sqrt_hess_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
-    #     @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
-    # end
-    #
-    # # test correction oracle
-    # if Cones.use_correction(cone)
-    #     @test -Cones.correction(cone, point) ≈ grad atol=tol rtol=tol
-    #
-    #     dir = perturb_scale(zeros(T, dim), noise, one(T))
-    #     corr = Cones.correction(cone, dir)
-    #     @test dot(corr, point) ≈ dot(dir, hess * dir) atol=tol rtol=tol
-    # end
+    if hasproperty(cone, :use_hess_prod_slow)
+        Cones.update_use_hess_prod_slow(cone)
+        @test cone.use_hess_prod_slow_updated
+        @test !cone.use_hess_prod_slow
+        cone.use_hess_prod_slow = true
+        @test Cones.hess_prod_slow!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    end
+
+    if Cones.use_sqrt_hess_oracles(cone)
+        prod_mat2 = Matrix(Cones.sqrt_hess_prod!(prod_mat, inv_hess, cone)')
+        @test Cones.sqrt_hess_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+        Cones.inv_sqrt_hess_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+        @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+    end
+
+    # test correction oracle
+    if Cones.use_correction(cone)
+        @test -Cones.correction(cone, point) ≈ grad atol=tol rtol=tol
+
+        dir = perturb_scale(zeros(T, dim), noise, one(T))
+        corr = Cones.correction(cone, dir)
+        @test dot(corr, point) ≈ dot(dir, hess * dir) atol=tol rtol=tol
+    end
 
     return
 end
