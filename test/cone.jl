@@ -21,7 +21,7 @@ Random.randn(::Type{Complex{BigFloat}}, dims::Integer...) = Complex{BigFloat}.(r
 function test_oracles(
     cone::Cones.Cone{T};
     noise::T = T(1e-1),
-    scale::T = T(1e-2),
+    scale::T = T(1e-1),
     tol::Real = 1e3 * eps(T),
     init_only::Bool = false,
     init_tol::Real = tol,
@@ -111,7 +111,7 @@ function test_barrier(
     cone::Cones.Cone{T},
     barrier::Function;
     noise::T = T(1e-1),
-    scale::T = T(1e-2),
+    scale::T = T(1e-1),
     tol::Real = 1e4 * eps(T),
     ) where {T <: Real}
     Random.seed!(1)
@@ -149,7 +149,7 @@ end
 function show_time_alloc(
     cone::Cones.Cone{T};
     noise::T = T(1e-1),
-    scale::T = T(1e-2),
+    scale::T = T(1e-1),
     ) where {T <: Real}
     Random.seed!(1)
     dim = Cones.dimension(cone)
@@ -654,8 +654,7 @@ show_time_alloc(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R} = show_time_
 
 # EpiPerSepSpectral
 function test_oracles(C::Type{<:Cones.EpiPerSepSpectral})
-    for d in [2], h_fun in sep_spectral_funs
-    # for d in [1, 2, 3, 6], h_fun in sep_spectral_funs
+    for d in [1, 2, 3, 6], h_fun in sep_spectral_funs
         test_oracles(C(h_fun, d), init_tol = Inf)
     end
 end
@@ -666,12 +665,12 @@ function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}})
             (u, v, w) = (s[1], s[2], s[3:end])
             return -log(u - v * Cones.h_val(w ./ v, h_fun)) - log(v) - sum(log, w)
         end
-        test_barrier(C(h_fun, 2), barrier)
+        test_barrier(C(h_fun, 3), barrier)
     end
 end
 
 function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}}}) where {T, R}
-    dW = 2
+    dW = 3
     for h_fun in sep_spectral_funs
         function barrier(s)
             (u, v, w) = (s[1], s[2], s[3:end])

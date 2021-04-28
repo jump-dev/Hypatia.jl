@@ -55,9 +55,9 @@ function cone_types(T::Type{<:Real})
 end
 
 sep_spectral_funs = [
-    # Cones.NegLogSSF(),
+    Cones.NegLogSSF(),
     Cones.NegEntropySSF(),
-    # Cones.Power12SSF(1.5),
+    Cones.Power12SSF(1.5),
     ]
 
 @testset "cone tests" begin
