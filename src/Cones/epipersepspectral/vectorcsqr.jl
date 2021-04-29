@@ -16,8 +16,8 @@ mutable struct VectorCSqrCache{T <: Real} <: CSqrCache{T}
     ∇h::Vector{T}
     ∇2h::Vector{T}
     ∇3h::Vector{T}
-    w1::Vector{T} # aux
-    w2::Vector{T} # aux
+    w1::Vector{T}
+    w2::Vector{T}
     # inv hess aux
     # TODO or move to cone if common
     # TODO rename constants?
@@ -215,7 +215,7 @@ function update_inv_hess_aux(cone::EpiPerSepSpectral{<:VectorCSqr})
     ζ2β = abs2(cache.ζ) + dot(∇h, α)
     c0 = σ + dot(∇h, γ)
     c1 = c0 / ζ2β
-    @inbounds c3 = abs2(inv(v)) + σ * c1 + sum((viw[i] + c1 * α[i] - γ[i]) * w1[i] for i in 1:cone.d)
+    @inbounds c3 = v^-2 + σ * c1 + sum((viw[i] + c1 * α[i] - γ[i]) * w1[i] for i in 1:cone.d)
     c4 = inv(c3 - c0 * c1)
     c5 = ζ2β * c3
     cache.c0 = c0

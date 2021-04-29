@@ -32,7 +32,7 @@ function cone_types(T::Type{<:Real})
         # Cones.HypoPerLog{T},
         # Cones.HypoPerLogdetTri{T, T},
         # Cones.HypoPerLogdetTri{T, Complex{T}},
-        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, T},
+        # Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, T},
         Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, T},
         Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, T},
         # Cones.EpiRelEntropy{T},
@@ -55,9 +55,9 @@ function cone_types(T::Type{<:Real})
 end
 
 sep_spectral_funs = [
-    Cones.NegLogSSF(),
+    # Cones.NegLogSSF(),
     Cones.NegEntropySSF(),
-    Cones.Power12SSF(1.5),
+    # Cones.Power12SSF(1.5),
     ]
 
 @testset "cone tests" begin
