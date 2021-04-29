@@ -681,8 +681,12 @@ function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}}}
     end
 end
 
-show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 9))
-show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 3))
+
+
+
+# TODO sizes
+show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 100))
+show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 30))
 
 
 # EpiRelEntropy
