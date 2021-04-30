@@ -8,6 +8,7 @@ import Random.randn
 using LinearAlgebra
 using SparseArrays
 import ForwardDiff
+import GenericLinearAlgebra.eigen # NOTE needed by ForwardDiff currently for test_barrier
 import Hypatia
 import Hypatia.ModelUtilities
 import Hypatia.Cones
@@ -20,7 +21,7 @@ Random.randn(::Type{Complex{BigFloat}}, dims::Integer...) = Complex{BigFloat}.(r
 function test_oracles(
     cone::Cones.Cone{T};
     noise::T = T(1e-1),
-    scale::T = T(1e-2),
+    scale::T = T(1e-1),
     tol::Real = 1e3 * eps(T),
     init_only::Bool = false,
     init_tol::Real = tol,
@@ -41,6 +42,9 @@ function test_oracles(
     @test Cones.is_dual_feas(cone)
     @test cone.dual_point == dual_point
     @test Cones.in_neighborhood(cone, one(T), one(T))
+
+    prod_vec = zero(point)
+    @test Cones.hess_prod!(prod_vec, point, cone) ≈ dual_point atol=tol rtol=tol
 
     # test centrality of initial point
     if isfinite(init_tol)
@@ -67,7 +71,6 @@ function test_oracles(
     inv_hess = Matrix(Cones.inv_hess(cone))
     @test hess * inv_hess ≈ I atol=tol rtol=tol
 
-    prod_vec = zero(point)
     @test hess * point ≈ -grad atol=tol rtol=tol
     @test Cones.hess_prod!(prod_vec, point, cone) ≈ -grad atol=tol rtol=tol
     @test Cones.inv_hess_prod!(prod_vec, grad, cone) ≈ -point atol=tol rtol=tol
@@ -108,7 +111,7 @@ function test_barrier(
     cone::Cones.Cone{T},
     barrier::Function;
     noise::T = T(1e-1),
-    scale::T = T(1e-2),
+    scale::T = T(1e-1),
     tol::Real = 1e4 * eps(T),
     ) where {T <: Real}
     Random.seed!(1)
@@ -131,6 +134,8 @@ function test_barrier(
 
     fd_hess_dir = ForwardDiff.gradient(s -> ForwardDiff.derivative(t -> barrier_dir(s, t), 0), point)
     @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
+    prod_vec = zero(dir)
+    @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
 
     if Cones.use_correction(cone)
         fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s -> ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), point)
@@ -144,7 +149,7 @@ end
 function show_time_alloc(
     cone::Cones.Cone{T};
     noise::T = T(1e-1),
-    scale::T = T(1e-2),
+    scale::T = T(1e-1),
     ) where {T <: Real}
     Random.seed!(1)
     dim = Cones.dimension(cone)
@@ -647,48 +652,37 @@ end
 show_time_alloc(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R} = show_time_alloc(C(2 + dim_herm(3, R)))
 
 
-# EpiPerEntropy
-function test_oracles(C::Type{<:Cones.EpiPerEntropy})
-    for dw in [1, 2, 5]
-        test_oracles(C(2 + dw), init_tol = 1e-5)
-    end
-    for dw in [15, 40, 100]
-        test_oracles(C(2 + dw), init_tol = 1e-1, init_only = true)
+# EpiPerSepSpectral
+function test_oracles(C::Type{<:Cones.EpiPerSepSpectral})
+    for d in [1, 2, 3, 6], h_fun in sep_spectral_funs
+        test_oracles(C(h_fun, d), init_tol = Inf)
     end
 end
 
-function test_barrier(C::Type{<:Cones.EpiPerEntropy})
-    function barrier(s)
-        (u, v, w) = (s[1], s[2], s[3:end])
-        return -log(u - sum(wi * log(wi / v) for wi in w)) - log(v) - sum(log, w)
-    end
-    test_barrier(C(4), barrier)
-end
-
-show_time_alloc(C::Type{<:Cones.EpiPerEntropy}) = show_time_alloc(C(9))
-
-
-# EpiPerTraceEntropyTri
-function test_oracles(C::Type{<:Cones.EpiPerTraceEntropyTri})
-    for dW in [1, 2, 4]
-        test_oracles(C(2 + Cones.svec_length(dW)), init_tol = 1e-4)
-    end
-    for dW in [8, 12]
-        test_oracles(C(2 + Cones.svec_length(dW)), init_tol = 1e-1, init_only = true)
+function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}})
+    for h_fun in sep_spectral_funs
+        function barrier(s)
+            (u, v, w) = (s[1], s[2], s[3:end])
+            return -log(u - v * Cones.h_val(w ./ v, h_fun)) - log(v) - sum(log, w)
+        end
+        test_barrier(C(h_fun, 3), barrier)
     end
 end
 
-function test_barrier(C::Type{Cones.EpiPerTraceEntropyTri{T}}) where T
+function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}}}) where {T, R}
     dW = 3
-    function barrier(s)
-        (u, v, w) = (s[1], s[2], s[3:end])
-        W = new_mat_herm(w, dW, T)
-        return -log(u - dot(W, log(W / v))) - log(v) - logdet_pd(W)
+    for h_fun in sep_spectral_funs
+        function barrier(s)
+            (u, v, w) = (s[1], s[2], s[3:end])
+            Wλ = eigen(new_mat_herm(w, dW, R)).values
+            return -log(u - v * Cones.h_val(Wλ ./ v, h_fun)) - log(v) - sum(log, Wλ)
+        end
+        test_barrier(C(h_fun, dW), barrier)
     end
-    test_barrier(C(2 + Cones.svec_length(dW)), barrier)
 end
 
-show_time_alloc(C::Type{<:Cones.EpiPerTraceEntropyTri}) = show_time_alloc(C(8))
+show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 9))
+show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 4))
 
 
 # EpiRelEntropy
@@ -713,8 +707,8 @@ end
 show_time_alloc(C::Type{<:Cones.EpiRelEntropy}) = show_time_alloc(C(9))
 
 
-# EpiTraceRelEntropyTri
-function test_oracles(C::Type{<:Cones.EpiTraceRelEntropyTri})
+# EpiTrRelEntropyTri
+function test_oracles(C::Type{<:Cones.EpiTrRelEntropyTri})
     for dW in [1, 2, 4]
         test_oracles(C(1 + 2 * Cones.svec_length(dW)), init_tol = 1e-4)
     end
@@ -723,8 +717,8 @@ function test_oracles(C::Type{<:Cones.EpiTraceRelEntropyTri})
     end
 end
 
-function test_barrier(C::Type{Cones.EpiTraceRelEntropyTri{T}}) where T
-    dW = 3
+function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T}}) where T
+    dW = 2
     dw = Cones.svec_length(dW)
     function barrier(s)
         (u, v, w) = (s[1], s[1 .+ (1:dw)], s[(2 + dw):end])
@@ -735,7 +729,7 @@ function test_barrier(C::Type{Cones.EpiTraceRelEntropyTri{T}}) where T
     test_barrier(C(1 + 2 * dw), barrier, tol = 1e8 * eps(T))
 end
 
-show_time_alloc(C::Type{<:Cones.EpiTraceRelEntropyTri}) = show_time_alloc(C(13))
+show_time_alloc(C::Type{<:Cones.EpiTrRelEntropyTri}) = show_time_alloc(C(13))
 
 
 # WSOSInterpNonnegative

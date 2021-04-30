@@ -111,8 +111,6 @@ function update_feas(cone::WSOSInterpNonnegative)
     return cone.is_feas
 end
 
-is_dual_feas(cone::WSOSInterpNonnegative) = true
-
 function update_grad(cone::WSOSInterpNonnegative)
     @assert cone.is_feas
 
@@ -166,12 +164,12 @@ function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WS
     return prod
 end
 
-function correction(cone::WSOSInterpNonnegative, primal_dir::AbstractVector)
+function correction(cone::WSOSInterpNonnegative, dir::AbstractVector)
     @assert cone.grad_updated
     corr = cone.correction
     corr .= 0
     @inbounds for k in eachindex(cone.Ps)
-        LUk = partial_lambda!(cone.tempLU[k], primal_dir, cone.tempLL2[k], cone.ΛFLP[k])
+        LUk = partial_lambda!(cone.tempLU[k], dir, cone.tempLL2[k], cone.ΛFLP[k])
         @views for j in 1:cone.dim
             corr[j] += sum(abs2, LUk[:, j])
         end

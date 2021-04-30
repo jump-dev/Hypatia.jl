@@ -139,8 +139,6 @@ function update_feas(cone::DoublyNonnegativeTri{T}) where T
     return cone.is_feas
 end
 
-is_dual_feas(cone::DoublyNonnegativeTri) = true
-
 function update_grad(cone::DoublyNonnegativeTri)
     @assert cone.is_feas
 
@@ -184,17 +182,17 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::DoublyN
     return prod
 end
 
-function correction(cone::DoublyNonnegativeTri, primal_dir::AbstractVector)
+function correction(cone::DoublyNonnegativeTri, dir::AbstractVector)
     @assert cone.grad_updated
 
-    S = copytri!(svec_to_smat!(cone.mat4, primal_dir, cone.rt2), 'U')
+    S = copytri!(svec_to_smat!(cone.mat4, dir, cone.rt2), 'U')
     ldiv!(cone.fact_mat, S)
     rdiv!(S, cone.fact_mat.U)
     mul!(cone.mat3, S, S') # TODO use outer prod function
     smat_to_svec!(cone.correction, cone.mat3, cone.rt2)
     offdiags = cone.offdiag_idxs
     @views point_offdiags = cone.point[offdiags]
-    @. @views cone.correction[offdiags] += abs2(primal_dir[offdiags] / point_offdiags) / point_offdiags
+    @. @views cone.correction[offdiags] += abs2(dir[offdiags] / point_offdiags) / point_offdiags
 
     return cone.correction
 end

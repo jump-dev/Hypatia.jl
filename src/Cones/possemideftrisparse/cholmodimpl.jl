@@ -501,12 +501,12 @@ function outer_L_prod(cone::PosSemidefTriSparse{PSDSparseCholmod}, k::Int)
     return F_block
 end
 
-function correction(cone::PosSemidefTriSparse{PSDSparseCholmod}, primal_dir::AbstractVector)
+function correction(cone::PosSemidefTriSparse{PSDSparseCholmod}, dir::AbstractVector)
     @assert cone.grad_updated
     cache = cone.cache
     temp_blocks = cache.temp_blocks
 
-    @views svec_to_smat_sparse!(temp_blocks, primal_dir, cone)
+    @views svec_to_smat_sparse!(temp_blocks, dir, cone)
     _hess_step1(cone, eachindex(cache.num_cols))
     _hess_step2(cone, eachindex(cache.num_cols), true)
     _hess_step3(cone)

@@ -325,11 +325,11 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hyp
     return prod
 end
 
-function correction(cone::HypoPerLogdetTri, primal_dir::AbstractVector)
+function correction(cone::HypoPerLogdetTri, dir::AbstractVector)
     @assert cone.grad_updated
-    u_dir = primal_dir[1]
-    v_dir = primal_dir[2]
-    @views w_dir = primal_dir[3:end]
+    u_dir = dir[1]
+    v_dir = dir[2]
+    @views w_dir = dir[3:end]
     corr = cone.correction
     @views w_corr = corr[3:end]
     v = cone.point[2]

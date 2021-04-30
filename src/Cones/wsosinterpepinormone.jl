@@ -420,7 +420,7 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSO
     return prod
 end
 
-function correction(cone::WSOSInterpEpiNormOne, primal_dir::AbstractVector)
+function correction(cone::WSOSInterpEpiNormOne, dir::AbstractVector)
     @assert cone.grad_updated
     corr = cone.correction
     corr .= 0
@@ -434,7 +434,7 @@ function correction(cone::WSOSInterpEpiNormOne, primal_dir::AbstractVector)
         LLk = cone.tempLL[k]
         ΛFLPk = cone.Λ11LiP[k]
 
-        @views mul!(LUk, ΛFLPk, Diagonal(primal_dir[1:U]))
+        @views mul!(LUk, ΛFLPk, Diagonal(dir[1:U]))
         mul!(LLk, LUk, ΛFLPk')
         mul!(LUk, Hermitian(LLk), ΛFLPk)
         @views for u in 1:U
@@ -455,13 +455,13 @@ function correction(cone::WSOSInterpEpiNormOne, primal_dir::AbstractVector)
         corr_half = cone.corr_half[k]
         LLk = cone.tempLL[k]
 
-        @views ΛLiP_dir22 = mul!(LUk, Λ11LiP, Diagonal(primal_dir[1:U]))
+        @views ΛLiP_dir22 = mul!(LUk, Λ11LiP, Diagonal(dir[1:U]))
         @views for r in 2:R
-            mul!(ΛLiP_dir11[r - 1], ΛLiPs11[r - 1], Diagonal(primal_dir[1:U]))
-            mul!(ΛLiP_dir11[r - 1], ΛLiPs12[r - 1], Diagonal(primal_dir[block_idxs(U, r)]), true, true)
-            mul!(ΛLiP_dir12[r - 1], ΛLiPs11[r - 1], Diagonal(primal_dir[block_idxs(U, r)]))
-            mul!(ΛLiP_dir12[r - 1], ΛLiPs12[r - 1], Diagonal(primal_dir[1:U]), true, true)
-            mul!(ΛLiP_dir21[r - 1], Λ11LiP, Diagonal(primal_dir[block_idxs(U, r)]))
+            mul!(ΛLiP_dir11[r - 1], ΛLiPs11[r - 1], Diagonal(dir[1:U]))
+            mul!(ΛLiP_dir11[r - 1], ΛLiPs12[r - 1], Diagonal(dir[block_idxs(U, r)]), true, true)
+            mul!(ΛLiP_dir12[r - 1], ΛLiPs11[r - 1], Diagonal(dir[block_idxs(U, r)]))
+            mul!(ΛLiP_dir12[r - 1], ΛLiPs12[r - 1], Diagonal(dir[1:U]), true, true)
+            mul!(ΛLiP_dir21[r - 1], Λ11LiP, Diagonal(dir[block_idxs(U, r)]))
         end
 
         ΛLiP_dir22_Λ11LiP = ΛLiP_dir22 * Λ11LiP'

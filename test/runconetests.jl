@@ -32,24 +32,33 @@ function cone_types(T::Type{<:Real})
         Cones.HypoPerLog{T},
         Cones.HypoPerLogdetTri{T, T},
         Cones.HypoPerLogdetTri{T, Complex{T}},
-        Cones.EpiPerEntropy{T},
-        Cones.EpiPerTraceEntropyTri{T},
+        Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, T},
+        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, T},
+        Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, T},
         Cones.EpiRelEntropy{T},
-        Cones.EpiTraceRelEntropyTri{T}, # TODO tighten tol on test_barrier
+        Cones.EpiTrRelEntropyTri{T}, # TODO tighten tol on test_barrier
         Cones.WSOSInterpNonnegative{T, T},
         Cones.WSOSInterpNonnegative{T, Complex{T}},
         Cones.WSOSInterpPosSemidefTri{T},
         Cones.WSOSInterpEpiNormEucl{T},
         Cones.WSOSInterpEpiNormOne{T},
         ]
+
     if T <: LinearAlgebra.BlasReal
         append!(cones_T, [
             Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, T},
             Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, Complex{T}},
             ])
     end
+
     return cones_T
 end
+
+sep_spectral_funs = [
+    Cones.NegLogSSF(),
+    Cones.NegEntropySSF(),
+    Cones.Power12SSF(1.5),
+    ]
 
 @testset "cone tests" begin
 
@@ -67,19 +76,19 @@ real_types = [
 end
 end
 
-# println("\nstarting barrier tests")
-# @testset "barrier tests" begin
-# real_types = [
-#     Float64,
-#     # Float32,
-#     # BigFloat,
-#     ]
-# @testset "$cone" for T in real_types, cone in cone_types(T)
-#     println("$cone")
-#     test_time = @elapsed test_barrier(cone)
-#     @printf("%8.2e seconds\n", test_time)
-# end
-# end
+println("\nstarting barrier tests")
+@testset "barrier tests" begin
+real_types = [
+    Float64,
+    # Float32,
+    # BigFloat,
+    ]
+@testset "$cone" for T in real_types, cone in cone_types(T)
+    println("$cone")
+    test_time = @elapsed test_barrier(cone)
+    @printf("%8.2e seconds\n", test_time)
+end
+end
 
 # println("\nstarting time/allocation measurements")
 # @testset "allocation tests" begin

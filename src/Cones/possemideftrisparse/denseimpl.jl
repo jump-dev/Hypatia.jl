@@ -35,7 +35,7 @@ function update_feas(cone::PosSemidefTriSparse{PSDSparseDense})
 end
 
 function update_grad(cone::PosSemidefTriSparse{PSDSparseDense})
-    @assert cone.is_feas
+    @assert !cone.grad_updated && cone.is_feas
     cache = cone.cache
 
     cache.inv_mat = inv(cache.fact_mat)
@@ -144,11 +144,11 @@ function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Po
     return prod
 end
 
-function correction(cone::PosSemidefTriSparse{PSDSparseDense}, primal_dir::AbstractVector)
+function correction(cone::PosSemidefTriSparse{PSDSparseDense}, dir::AbstractVector)
     @assert is_feas(cone)
     cache = cone.cache
 
-    Λ = svec_to_smat_sparse!(cache.mat2, primal_dir, cone)
+    Λ = svec_to_smat_sparse!(cache.mat2, dir, cone)
     copytri!(Λ, 'L', cone.is_complex)
     ldiv!(cache.fact_mat.L, Λ)
     rdiv!(Λ, cache.fact_mat)

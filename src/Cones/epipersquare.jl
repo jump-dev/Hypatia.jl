@@ -235,21 +235,21 @@ function inv_sqrt_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}
     return prod
 end
 
-function correction(cone::EpiPerSquare, primal_dir::AbstractVector)
+function correction(cone::EpiPerSquare, dir::AbstractVector)
     @assert cone.grad_updated
     dim = cone.dim
     corr = cone.correction
     point = cone.point
     u = point[1]
     v = point[2]
-    u_dir = primal_dir[1]
-    v_dir = primal_dir[2]
+    u_dir = dir[1]
+    v_dir = dir[2]
     @views w = point[3:end]
-    @views w_dir = primal_dir[3:end]
+    @views w_dir = dir[3:end]
 
     jdotpd = u * v_dir + v * u_dir - dot(w, w_dir)
-    hess_prod!(corr, primal_dir, cone)
-    dotdHd = -dot(primal_dir, corr)
+    hess_prod!(corr, dir, cone)
+    dotdHd = -dot(dir, corr)
     dotpHd = dot(point, corr)
     corr .*= jdotpd
     @. @views corr[3:end] += dotdHd * w + dotpHd * w_dir
