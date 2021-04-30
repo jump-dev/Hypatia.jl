@@ -19,8 +19,6 @@ mutable struct VectorCSqrCache{T <: Real} <: CSqrCache{T}
     w1::Vector{T}
     w2::Vector{T}
     # inv hess aux
-    # TODO or move to cone if common
-    # TODO rename constants?
     m::Vector{T}
     α::Vector{T}
     γ::Vector{T}
@@ -158,7 +156,11 @@ function update_hess(cone::EpiPerSepSpectral{<:VectorCSqr})
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSepSpectral{VectorCSqr{T}}) where T
+function hess_prod!(
+    prod::AbstractVecOrMat{T},
+    arr::AbstractVecOrMat{T},
+    cone::EpiPerSepSpectral{VectorCSqr{T}},
+    ) where T
     cone.hess_aux_updated || update_hess_aux(cone)
     v = cone.point[2]
     w = cone.w_view
@@ -205,7 +207,6 @@ function update_inv_hess_aux(cone::EpiPerSepSpectral{<:VectorCSqr})
     α = cache.α
     γ = cache.γ
 
-    # TODO prealloc
     @. w1 = ζivi * ∇2h
     @. m = inv(w1 + abs2(wi))
     @. α = m * ∇h
@@ -215,7 +216,8 @@ function update_inv_hess_aux(cone::EpiPerSepSpectral{<:VectorCSqr})
     ζ2β = abs2(cache.ζ) + dot(∇h, α)
     c0 = σ + dot(∇h, γ)
     c1 = c0 / ζ2β
-    @inbounds c3 = v^-2 + σ * c1 + sum((viw[i] + c1 * α[i] - γ[i]) * w1[i] for i in 1:cone.d)
+    @inbounds sum1 = sum((viw[i] + c1 * α[i] - γ[i]) * w1[i] for i in 1:cone.d)
+    c3 = v^-2 + σ * c1 + sum1
     c4 = inv(c3 - c0 * c1)
     c5 = ζ2β * c3
     cache.c0 = c0
@@ -261,7 +263,11 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr})
     return cone.inv_hess
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSepSpectral{VectorCSqr{T}}) where T
+function inv_hess_prod!(
+    prod::AbstractVecOrMat{T},
+    arr::AbstractVecOrMat{T},
+    cone::EpiPerSepSpectral{VectorCSqr{T}},
+    ) where T
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     cache = cone.cache
     m = cache.m

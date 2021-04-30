@@ -654,7 +654,8 @@ show_time_alloc(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R} = show_time_
 
 # EpiPerSepSpectral
 function test_oracles(C::Type{<:Cones.EpiPerSepSpectral})
-    for d in [1, 2, 3, 6], h_fun in sep_spectral_funs
+    # for d in [1, 2, 3, 6], h_fun in sep_spectral_funs
+    for d in [3], h_fun in sep_spectral_funs
         test_oracles(C(h_fun, d), init_tol = Inf)
     end
 end
