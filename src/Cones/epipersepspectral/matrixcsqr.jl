@@ -27,7 +27,7 @@ mutable struct MatrixCSqrCache{T <: Real, R <: RealOrComplex{T}} <: CSqrCache{T}
     Δ2h::Matrix{T}
     θ::Matrix{T}
 
-    # TODO reduce number of aux fields
+    # TODO try delete some aux fields
     wd::Vector{T}
     wT::Matrix{T}
     w1::Matrix{R}

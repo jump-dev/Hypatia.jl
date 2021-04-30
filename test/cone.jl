@@ -654,8 +654,7 @@ show_time_alloc(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R} = show_time_
 
 # EpiPerSepSpectral
 function test_oracles(C::Type{<:Cones.EpiPerSepSpectral})
-    # for d in [1, 2, 3, 6], h_fun in sep_spectral_funs
-    for d in [3], h_fun in sep_spectral_funs
+    for d in [1, 2, 3, 6], h_fun in sep_spectral_funs
         test_oracles(C(h_fun, d), init_tol = Inf)
     end
 end
@@ -682,12 +681,8 @@ function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}}}
     end
 end
 
-
-
-
-# TODO sizes
-show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 100))
-show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 30))
+show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 9))
+show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr}}) = show_time_alloc(C(first(sep_spectral_funs), 4))
 
 
 # EpiRelEntropy
