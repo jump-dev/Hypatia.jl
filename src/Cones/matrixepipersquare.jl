@@ -313,7 +313,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::MatrixE
 end
 
 # TODO reduce allocs
-function correction(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
+function correction(cone::MatrixEpiPerSquare, dir::AbstractVector)
     cone.hess_aux_updated || update_hess_aux(cone)
     d1 = cone.d1
     d2 = cone.d2
@@ -327,9 +327,9 @@ function correction(cone::MatrixEpiPerSquare, primal_dir::AbstractVector)
     v = cone.point[cone.v_idx]
     W = cone.W
 
-    @views U_dir = Hermitian(svec_to_smat!(zero(U.data), primal_dir[U_idxs], cone.rt2))
-    v_dir = primal_dir[v_idx]
-    @views W_dir = vec_copy_to!(zero(W), primal_dir[W_idxs])
+    @views U_dir = Hermitian(svec_to_smat!(zero(U.data), dir[U_idxs], cone.rt2))
+    v_dir = dir[v_idx]
+    @views W_dir = vec_copy_to!(zero(W), dir[W_idxs])
 
     corr = cone.correction
     U_corr = view(corr, U_idxs)

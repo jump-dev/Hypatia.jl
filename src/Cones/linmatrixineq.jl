@@ -96,8 +96,6 @@ function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
     return cone.is_feas
 end
 
-is_dual_feas(cone::LinMatrixIneq) = true
-
 function update_grad(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert cone.is_feas
 
@@ -141,12 +139,12 @@ function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Li
     return prod
 end
 
-function correction(cone::LinMatrixIneq, primal_dir::AbstractVector)
+function correction(cone::LinMatrixIneq, dir::AbstractVector)
     @assert cone.grad_updated
     corr = cone.correction
     sumAinvAs = cone.sumAinvAs
 
-    dir_mat = sum(d_i * mat_i for (d_i, mat_i) in zip(primal_dir, sumAinvAs))
+    dir_mat = sum(d_i * mat_i for (d_i, mat_i) in zip(dir, sumAinvAs))
     Z = Hermitian(dir_mat * dir_mat')
     @inbounds for i in 1:cone.dim
         corr[i] = real(dot(Z, sumAinvAs[i]))

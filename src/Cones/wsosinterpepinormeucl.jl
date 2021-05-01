@@ -176,8 +176,6 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
     return cone.is_feas
 end
 
-is_dual_feas(cone::WSOSInterpEpiNormEucl) = true
-
 function update_grad(cone::WSOSInterpEpiNormEucl)
     @assert cone.is_feas
     U = cone.U
@@ -297,7 +295,7 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
     return cone.hess
 end
 
-function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
+function correction(cone::WSOSInterpEpiNormEucl, dir::AbstractVector)
     @assert cone.hess_updated
     corr = cone.correction
     corr .= 0
@@ -310,7 +308,7 @@ function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
         LLk = cone.tempLL[k]
         ΛFLPk = cone.Λ11LiP[k]
 
-        @views mul!(LUk, ΛFLPk, Diagonal(primal_dir[1:U]))
+        @views mul!(LUk, ΛFLPk, Diagonal(dir[1:U]))
         mul!(LLk, LUk, ΛFLPk')
         mul!(LUk, Hermitian(LLk), ΛFLPk)
         @views for u in 1:U
@@ -333,15 +331,15 @@ function correction(cone::WSOSInterpEpiNormEucl, primal_dir::AbstractVector)
         corr_half = cone.tempLRUR[k]
         corr_half .= 0
 
-        # get ΛLiP * D * PΛiP where D is diagonalized primal_dir scattered in an arrow and ΛLiP is half an arrow
+        # get ΛLiP * D * PΛiP where D is diagonalized dir scattered in an arrow and ΛLiP is half an arrow
         # ΛLiP * D is an arrow matrix but row edge doesn't equal column edge
-        @views scaled_diag = mul!(cone.tempLU[k], Λ11LiP, Diagonal(primal_dir[1:U]))
-        @views scaled_pt = mul!(cone.tempLU2[k], matLiP, Diagonal(primal_dir[1:U]))
+        @views scaled_diag = mul!(cone.tempLU[k], Λ11LiP, Diagonal(dir[1:U]))
+        @views scaled_pt = mul!(cone.tempLU2[k], matLiP, Diagonal(dir[1:U]))
         @views for r in 2:R
-            mul!(scaled_pt, ΛLiP_edge[r - 1], Diagonal(primal_dir[block_idxs(U, r)]), true, true)
-            mul!(scaled_row[r - 1], matLiP, Diagonal(primal_dir[block_idxs(U, r)]))
-            mul!(scaled_row[r - 1], ΛLiP_edge[r - 1], Diagonal(primal_dir[1:U]), true, true)
-            mul!(scaled_col[r - 1], Λ11LiP, Diagonal(primal_dir[block_idxs(U, r)]))
+            mul!(scaled_pt, ΛLiP_edge[r - 1], Diagonal(dir[block_idxs(U, r)]), true, true)
+            mul!(scaled_row[r - 1], matLiP, Diagonal(dir[block_idxs(U, r)]))
+            mul!(scaled_row[r - 1], ΛLiP_edge[r - 1], Diagonal(dir[1:U]), true, true)
+            mul!(scaled_col[r - 1], Λ11LiP, Diagonal(dir[block_idxs(U, r)]))
         end
 
         # ΛLiP is half an arrow, multiplying an arrow by its transpose gives another arrow

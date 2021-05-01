@@ -191,15 +191,15 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::General
     return prod
 end
 
-function correction(cone::GeneralizedPower, primal_dir::AbstractVector)
+function correction(cone::GeneralizedPower, dir::AbstractVector)
     m = length(cone.alpha)
     @views u = cone.point[1:m]
     @views w = cone.point[(m + 1):end]
     corr = cone.correction
     @views u_corr = corr[1:m]
     @views w_corr = corr[(m + 1):end]
-    @views u_dir = primal_dir[1:m]
-    @views w_dir = primal_dir[(m + 1):end]
+    @views u_dir = dir[1:m]
+    @views w_dir = dir[(m + 1):end]
     alpha = cone.alpha
     produw = cone.produw
     produuw = cone.produuw

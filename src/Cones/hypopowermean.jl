@@ -170,12 +170,12 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPow
     return prod
 end
 
-function correction(cone::HypoPowerMean, primal_dir::AbstractVector)
+function correction(cone::HypoPowerMean, dir::AbstractVector)
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
-    u_dir = primal_dir[1]
-    @views w_dir = primal_dir[2:end]
+    u_dir = dir[1]
+    @views w_dir = dir[2:end]
     corr = cone.correction
     @views wcorr = corr[2:end]
     pi = cone.wprod # TODO rename

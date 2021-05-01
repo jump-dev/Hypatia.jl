@@ -108,8 +108,8 @@ function inv_sqrt_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone
     return prod
 end
 
-function correction(cone::Nonnegative, primal_dir::AbstractVector)
-    @. cone.correction = abs2(primal_dir / cone.point) / cone.point
+function correction(cone::Nonnegative, dir::AbstractVector)
+    @. cone.correction = abs2(dir / cone.point) / cone.point
     return cone.correction
 end
 

@@ -7,7 +7,7 @@ TODO
 - add random data generation
 =#
 
-import GSL: sf_gamma
+import SpecialFunctions: gamma
 import DynamicPolynomials
 const DP = DynamicPolynomials
 import SemialgebraicSets
@@ -49,7 +49,7 @@ function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64}
             return 0.0
         else
             bs = (as .+ 1) ./ 2.0
-            return 2.0 * prod(sf_gamma.(bs)) / (sf_gamma(sum(bs)) * (sum(as) + n))
+            return 2.0 * prod(gamma.(bs)) / (gamma(sum(bs)) * (sum(as) + n))
         end
     end
 

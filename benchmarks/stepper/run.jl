@@ -24,7 +24,7 @@ stepper_options = [
     "toa" => porc(use_correction = true, use_curve_search = false),
     "curve" => porc(use_correction = true, use_curve_search = true),
     "comb" => comb(),
-    "shift" => comb(2),
+    "back" => comb(2),
     ]
 
 # instance sets and real types to run and corresponding time limits (seconds)
@@ -36,21 +36,21 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
-    "JuMP",
+    # "native",
+    # "JuMP",
     ]
 
 # list of names of native examples to run
 native_example_names = [
-    # "densityest",
-    # "envelope",
-    # "expdesign",
+    "densityest",
+    "envelope",
+    "expdesign",
     "linearopt",
     "matrixcompletion",
-    # "matrixregression",
+    "matrixregression",
     "maxvolume",
-    # "polymin",
-    # "portfolio",
+    "polymin",
+    "portfolio",
     "sparsepca",
     ]
 
@@ -80,6 +80,7 @@ JuMP_example_names = [
     "semidefinitepoly",
     "shapeconregr",
     "signomialmin",
+    "sparselmi",
     "stabilitynumber",
     ]
 
@@ -115,8 +116,8 @@ end
 end
 end
 
-# println("\n")
-# DataFrames.show(perf, allrows = true, allcols = true)
+println("\n")
+DataFrames.show(perf, allrows = true, allcols = true)
 println("\n")
 end
 

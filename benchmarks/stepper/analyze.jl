@@ -3,7 +3,7 @@ using DataFrames
 using Printf
 using BenchmarkProfiles
 
-enhancements = ["basic", "TOA", "curve", "comb", "shift"]
+enhancements = ["basic", "TOA", "curve", "comb", "back"]
 process_entry(x::Float64) = @sprintf("%.2f", x)
 process_entry(x::Int) = string(x)
 
@@ -63,6 +63,7 @@ function make_agg_tables(all_df)
         :status => (x -> count(isequal("IterationLimit"), x)) => :iterationlimit,
         :status => length => :total,
         )
+    sort!(df_agg, order(:solver_options, by = (x -> findfirst(isequal(x), lowercase.(enhancements)))))
     CSV.write(joinpath(stats_dir, "agg" * ".csv"), df_agg)
 
     # combine feasible and infeasible statuses
@@ -127,6 +128,7 @@ function make_subtime_tables(all_df)
             [:time_getdir_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_getdir_iter, use_cap = use_cap)) => Symbol(:getdir_piter, set),
             [:time_search_piter, convcol] => ((x, y) -> shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true, cap = max_search_iter, use_cap = use_cap)) => Symbol(:search_piter, set),
             )
+        sort!(subtime_df, order(:solver_options, by = (x -> findfirst(isequal(x), lowercase.(enhancements)))))
         CSV.write(joinpath(stats_dir, "subtime" * string(set) * ".csv"), subtime_df)
         return subtime_df
     end
@@ -200,22 +202,22 @@ function instance_stats(all_df)
         :npq,
         ),)
 
-    # shift and converged
-    shift_solver = filter(t -> t.solver_options == "shift", all_df)
-    shift_solver_conv = filter(t -> t.conv, shift_solver)
-    CSV.write(joinpath(csv_dir, "shiftconv.csv"), select(shift_solver_conv,
+    # back and converged
+    back_solver = filter(t -> t.solver_options == "back", all_df)
+    back_solver_conv = filter(t -> t.conv, back_solver)
+    CSV.write(joinpath(csv_dir, "backconv.csv"), select(back_solver_conv,
         :solve_time,
         :npq,
         [:time_uprhs, :solve_time] => ((x, y) -> x ./ y) => :prop_rhs,
         ),)
 
-    # basic and shift where both converged
-    two_solver = filter(t -> t.solver_options in ("basic", "shift"), all_df)
+    # basic and back where both converged
+    two_solver = filter(t -> t.solver_options in ("basic", "back"), all_df)
     two_solver = combine(groupby(two_solver, :inst_key), names(all_df), :conv => all => :two_conv)
     two_solver_conv = filter(t -> t.two_conv, two_solver)
     two_solver_conv = combine(groupby(two_solver_conv, :inst_key), [:solver_options, :solve_time], :solve_time => (x -> (x[1] - x[2]) / x[1]) => :improvement)
     filter!(t -> t.solver_options == "basic", two_solver_conv)
-    CSV.write(joinpath(csv_dir, "basicshiftconv.csv"), select(two_solver_conv, :solve_time, :improvement))
+    CSV.write(joinpath(csv_dir, "basicbackconv.csv"), select(two_solver_conv, :solve_time, :improvement))
 
     # only used to get list of cones manually
     ex_df = combine(groupby(basic_solver, :example),
@@ -224,6 +226,23 @@ function instance_stats(all_df)
         )
     CSV.write(joinpath(stats_dir, "examplestats.csv"), ex_df)
 
+    # count instances with loosened tols
+    examples_dir = "../../examples"
+    include(joinpath(examples_dir, "common.jl"))
+    n = 1
+    for (m, l) in (("JuMP", 3), ("native", 2))
+        include(joinpath(examples_dir, "common_" * m * ".jl"))
+        m_df = filter(t -> (t.model_type == m), all_df)
+        for ex_name in unique(m_df[!, :example])
+            include(joinpath(examples_dir, ex_name, m * ".jl"))
+            (_, ex_insts) = include(joinpath(examples_dir, ex_name, m * "_test.jl"))
+            for inst in ex_insts["various"]
+                (length(inst) == l) && (n += 1)
+            end
+        end
+    end
+    @show n
+
     return
 end
 
@@ -231,7 +250,7 @@ function post_process()
     all_df = preprocess_df()
     make_agg_tables(all_df)
     make_subtime_tables(all_df)
-    for comp in [["basic", "toa"], ["toa", "curve"], ["curve", "comb"], ["comb", "shift"]], metric in [:solve_time, :iters]
+    for comp in [["basic", "toa"], ["toa", "curve"], ["curve", "comb"], ["comb", "back"]], metric in [:solve_time, :iters]
         make_perf_profiles(all_df, comp, metric)
     end
     instance_stats(all_df)

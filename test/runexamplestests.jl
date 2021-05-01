@@ -81,6 +81,7 @@ JuMP_example_names = [
     "semidefinitepoly",
     "shapeconregr",
     "signomialmin",
+    "sparselmi",
     "stabilitynumber",
     ]
 

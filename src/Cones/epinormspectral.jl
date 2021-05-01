@@ -131,7 +131,6 @@ function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: BlasReal}
 
     return false
 end
-is_dual_feas(cone::EpiNormSpectral) = true # NOTE svdvals too slow for non-BLAS types
 
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
@@ -231,13 +230,13 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNorm
     return prod
 end
 
-function correction(cone::EpiNormSpectral, primal_dir::AbstractVector)
+function correction(cone::EpiNormSpectral, dir::AbstractVector)
     @assert cone.hess_aux_updated
 
     u = cone.point[1]
     W = cone.W
-    u_dir = primal_dir[1]
-    @views W_dir = vec_copy_to!(cone.tempd1d2, primal_dir[2:end])
+    u_dir = dir[1]
+    @views W_dir = vec_copy_to!(cone.tempd1d2, dir[2:end])
     corr = cone.correction
 
     Zi = cone.Zi
