@@ -11,6 +11,7 @@ end
 
 function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     n = inst.n
+    rt2 = sqrt(T(2))
     R = (inst.complex ? Complex{T} : T)
     function hermtr1()
         ρ = randn(R, n, n)
@@ -29,9 +30,9 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
 
     cone = Hypatia.EpiPerSepSpectralCone{T}(Hypatia.Cones.NegEntropySSF(), Cones.MatrixCSqr{T, R}, n)
     entr_sum_vec = zeros(JuMP.AffExpr, MOI.dimension(cone) - 2)
-    ρ_vec = zeros(T, MOI.dimension(cone) - 2)
+    ρ_vec = zeros(T, length(entr_sum_vec))
     for (ρ, p) in zip(ρs, prob)
-        Cones.smat_to_svec!(ρ_vec, ρ, sqrt(T(2)))
+        Cones.smat_to_svec!(ρ_vec, ρ, rt2)
         entr_sum_vec += p * ρ_vec
     end
     JuMP.@constraint(model, vcat(qe_epi, 1, entr_sum_vec) in cone)
