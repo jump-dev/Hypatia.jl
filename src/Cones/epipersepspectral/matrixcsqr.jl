@@ -276,10 +276,10 @@ function hess_prod!(
         mul!(w_aux, Hermitian(r_X, :U), viw_X)
         mul!(r_X, viw_X', w_aux)
 
-        @inbounds sum1 = sum(∇h[i] * real(r_X[i, i]) for i in 1:cone.d)
+        sum1 = sum(∇h[i] * real(r_X[i, i]) for i in 1:cone.d)
         c1 = -ζi * (p - σ * q - sum1) * ζi
         @. w_aux = ζivi * Δh * (r_X - q * D_viw_λ)
-        @inbounds c2 = sum(viw_λ[i] * real(w_aux[i, i]) for i in 1:cone.d)
+        c2 = sum(viw_λ[i] * real(w_aux[i, i]) for i in 1:cone.d)
 
         rmul!(r_X, D_λi)
         @. w_aux += w_λi * r_X + c1 * D_∇h
@@ -398,7 +398,7 @@ function inv_hess_prod!(
 
         w_prod = r_X
         w_prod.data ./= cache.θ
-        @inbounds for i in 1:d
+        for i in 1:d
             w_prod.data[i, i] += p * α[i] + cv * γ[i]
         end
         mul!(w2, w_prod, viw_X')
