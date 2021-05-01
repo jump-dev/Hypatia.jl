@@ -23,24 +23,24 @@ unit_exclude = [
     ]
 
 conic_exclude = String[
-    # "lin",
-    # "sdp",
-    # "norminf",
-    # "normone",
-    # "soc",
-    # "rsoc",
-    # "normspec",
-    # "normnuc",
-    # "pow",
-    # "dualpow",
+    "lin",
+    "sdp",
+    "norminf",
+    "normone",
+    "soc",
+    "rsoc",
+    "normspec",
+    "normnuc",
+    "pow",
+    "dualpow",
     # "geomean",
-    # "rootdet",
+    "rootdet",
     "rootdets",
-    # "exp",
-    # "dualexp",
-    # "logdet",
+    "exp",
+    "dualexp",
+    "logdet",
     "logdets",
-    # "relentr",
+    "relentr",
     ]
 
 function test_moi(T::Type{<:Real}; solver_options...)
@@ -58,16 +58,20 @@ function test_moi(T::Type{<:Real}; solver_options...)
         )
 
     @testset "linear tests" begin
-        MOIT.contlineartest(optimizer, config)
+        # MOIT.contlineartest(optimizer, config)
     end
 
     if T == Float64
         # NOTE test other real types, waiting for https://github.com/jump-dev/MathOptInterface.jl/issues/841
         @testset "unit tests" begin
-            MOIT.unittest(optimizer, config, unit_exclude)
+            # MOIT.unittest(optimizer, config, unit_exclude)
         end
         @testset "conic tests" begin
-            MOIT.contconictest(MOI.Bridges.Constraint.Square{T}(optimizer), config, conic_exclude)
+            # MOIT.contconictest(MOI.Bridges.Constraint.Square{T}(optimizer), config, conic_exclude)
+            @info("relentr then geomean bridge")
+            MOIT.contconictest(MOI.Bridges.Constraint.GeoMeantoRelEntr{T}(MOI.Bridges.Constraint.RelativeEntropy{T}(optimizer)), config, conic_exclude)
+            @info("geomean then relentr bridge")
+            MOIT.contconictest(MOI.Bridges.Constraint.RelativeEntropy{T}(MOI.Bridges.Constraint.GeoMeantoRelEntr{T}(optimizer)), config, conic_exclude)
         end
     end
 
