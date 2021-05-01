@@ -1,6 +1,6 @@
 #=
 epigraph of the relative entropy cone
-(u in R, V in S_+^d, W in S_+^d) : u >= tr(W * log(W) - W * log(V))
+(u in R, V in S_+^d, W in S_+^d) : u >= tr(W * (log(W) - log(V)))
 
 derivatives for quantum relative entropy function adapted from
 "Long-Step Path-Following Algorithm in Quantum Information Theory: Some Numerical Aspects and Applications"
