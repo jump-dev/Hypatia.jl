@@ -4,8 +4,6 @@ adapted from https://github.com/hfawzi/cvxquad/blob/master/examples/cq_channel_c
 and listing 1 in "Efficient optimization of the quantum relative entropy" by H. Fawzi and O. Fawzi
 =#
 
-import QuantumInformation: ptrace
-
 struct ClassicalQuantum{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
     complex::Bool
@@ -18,22 +16,25 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
         ρ = randn(R, n, n)
         ρ = ρ * ρ'
         ρ ./= tr(ρ)
-        return ρ
+        return Hermitian(ρ)
     end
     ρs = [hermtr1() for _ in 1:n]
     Hs = [dot(ρ, log(ρ)) for ρ in ρs]
 
     model = JuMP.Model()
     JuMP.@variable(model, prob[1:n] >= 0)
-    JuMP.@variable(model, qe_epi)
-
-    entr_sum = sum(ρ * p for (ρ, p) in zip(ρs, prob))
-    sdn = div(n * (n + 1), 2)
-    entr_sum_vec = Cones.smat_to_svec!(zeros(JuMP.AffExpr, sdn), entr_sum, sqrt(T(2)))
-    cone = Hypatia.EpiPerTraceEntropyTriCone{T, R}(2 + sdn)
-    JuMP.@constraint(model, vcat(qe_epi, 1, entr_sum_vec) in cone)
     JuMP.@constraint(model, sum(prob) == 1)
+    JuMP.@variable(model, qe_epi)
     JuMP.@objective(model, Max, -qe_epi + dot(prob, Hs))
+
+    cone = Hypatia.EpiPerSepSpectralCone{T}(Hypatia.Cones.NegEntropySSF(), Cones.MatrixCSqr{T, R}, n)
+    entr_sum_vec = zeros(JuMP.AffExpr, MOI.dimension(cone) - 2)
+    ρ_vec = zeros(T, MOI.dimension(cone) - 2)
+    for (ρ, p) in zip(ρs, prob)
+        Cones.smat_to_svec!(ρ_vec, ρ, sqrt(T(2)))
+        entr_sum_vec += p * ρ_vec
+    end
+    JuMP.@constraint(model, vcat(qe_epi, 1, entr_sum_vec) in cone)
 
     return model
 end

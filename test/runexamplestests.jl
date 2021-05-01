@@ -14,8 +14,8 @@ script_verbose = false
 
 # default options to solvers
 default_options = (
-    verbose = false,
-    # verbose = true,
+    # verbose = false,
+    verbose = true,
     default_tol_relax = 10,
     # stepper = Solvers.CombinedStepper{Float64}(),
     # stepper = Solvers.PredOrCentStepper{Float64}(),
@@ -24,17 +24,17 @@ default_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
-    ("minimal", Float64, 60),
+    # ("minimal", Float64, 60),
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
     # ("fast", Float64, 60),
     # ("slow", Float64, 120),
-    # ("various", Float64, 120),
+    ("various", Float64, 120),
     ]
 
 # types of models to run and corresponding options and example names
 model_types = [
-    "native",
+    # "native",
     "JuMP",
     ]
 
@@ -54,35 +54,35 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
-    "CBLIB",
-    "centralpolymat",
+    # "CBLIB",
+    # "centralpolymat",
     "classicalquantum",
-    "conditionnum",
-    "contraction",
-    "densityest",
-    "entanglementassisted",
-    "envelope",
-    "expdesign",
-    "lotkavolterra",
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "muconvexity",
-    "nearestpsd",
-    "normconepoly",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    "nearestpolymat",
-    "regionofattr",
-    "robustgeomprog",
-    "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
-    "sparselmi",
-    "stabilitynumber",
+    # "conditionnum",
+    # "contraction",
+    # "densityest",
+    # "entanglementassisted",
+    # "envelope",
+    # "expdesign",
+    # "lotkavolterra",
+    # "lyapunovstability",
+    # "matrixcompletion",
+    # "matrixquadratic",
+    # "matrixregression",
+    # "maxvolume",
+    # "muconvexity",
+    # "nearestpsd",
+    # "normconepoly",
+    # "polymin",
+    # "polynorm",
+    # "portfolio",
+    # "nearestpolymat",
+    # "regionofattr",
+    # "robustgeomprog",
+    # "semidefinitepoly",
+    # "shapeconregr",
+    # "signomialmin",
+    # "sparselmi",
+    # "stabilitynumber",
     ]
 
 perf = setup_benchmark_dataframe()
