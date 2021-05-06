@@ -62,7 +62,7 @@ JuMP_example_names = [
     "conditionnum",
     "contraction",
     "densityest",
-    "entanglementassited",
+    "entanglementassisted",
     "envelope",
     "expdesign",
     "lotkavolterra",
