@@ -56,10 +56,13 @@ native_example_names = [
 
 # list of names of JuMP examples to run
 JuMP_example_names = [
+    "CBLIB",
     "centralpolymat",
+    "classicalquantum",
     "conditionnum",
     "contraction",
     "densityest",
+    "entanglementassited",
     "envelope",
     "expdesign",
     "lotkavolterra",
@@ -69,11 +72,13 @@ JuMP_example_names = [
     "matrixregression",
     "maxvolume",
     "muconvexity",
+    "nearestcorrelation",
     "nearestpsd",
     "normconepoly",
     "polymin",
     "polynorm",
     "portfolio",
+    "relentrentanglement",
     "nearestpolymat",
     "regionofattr",
     "robustgeomprog",
