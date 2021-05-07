@@ -1,8 +1,8 @@
 #=
-see description in examples/expdesign/JuMP.jl
+see description in JuMP.jl
 =#
 
-struct ExpDesignNative{T <: Real} <: ExampleInstanceNative{T}
+struct DOptimalDesignNative{T <: Real} <: ExampleInstanceNative{T}
     q::Int
     p::Int
     n::Int
@@ -15,7 +15,7 @@ struct ExpDesignNative{T <: Real} <: ExampleInstanceNative{T}
     use_epinorminf::Bool # use infinity norm cone, else use extended formulation
 end
 
-function build(inst::ExpDesignNative{T}) where {T <: Real}
+function build(inst::DOptimalDesignNative{T}) where {T <: Real}
     (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)
     @assert (p > q) && (n > q) && (n_max <= n)
     @assert inst.logdet_obj + inst.geomean_obj + inst.rootdet_obj == 1

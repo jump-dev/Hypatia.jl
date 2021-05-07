@@ -41,8 +41,8 @@ model_types = [
 # list of names of native examples to run
 native_example_names = [
     "densityest",
+    "doptimaldesign",
     "envelope",
-    "expdesign",
     "linearopt",
     "matrixcompletion",
     "matrixregression",
@@ -61,9 +61,9 @@ JuMP_example_names = [
     "contraction",
     "covarianceest",
     "densityest",
+    "doptimaldesign",
     "entanglementassisted",
     "envelope",
-    "expdesign",
     "lotkavolterra",
     "lyapunovstability",
     "matrixcompletion",

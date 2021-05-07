@@ -52,4 +52,4 @@ insts["various"] = [
     ((100, 180, 300, 10, true, false, false),),
     ((100, 180, 300, 10, false, true, false),),
     ]
-return (ExpDesignJuMP, insts)
+return (DOptimalDesignJuMP, insts)

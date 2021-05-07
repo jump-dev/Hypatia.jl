@@ -11,7 +11,7 @@ if logdet_obj or rootdet_obj is true, F is the logdet or rootdet function
 if geomean_obj is true, we use a formulation from https://picos-api.gitlab.io/picos/optdes.html that finds an equivalent minimizer
 =#
 
-struct ExpDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+struct DOptimalDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     q::Int
     p::Int
     n::Int
@@ -21,7 +21,7 @@ struct ExpDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     geomean_obj::Bool # use formulation with geomean objective
 end
 
-function build(inst::ExpDesignJuMP{T}) where {T <: Float64}
+function build(inst::DOptimalDesignJuMP{T}) where {T <: Float64}
     (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)
     @assert (p > q) && (n > q) && (n_max <= n)
     @assert inst.logdet_obj + inst.geomean_obj + inst.rootdet_obj == 1

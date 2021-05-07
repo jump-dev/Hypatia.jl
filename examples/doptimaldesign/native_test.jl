@@ -35,4 +35,4 @@ insts["slow"] = [
     ((100, 200, 200, 10, true, false, false, false, false, true),),
     ((100, 200, 200, 10, false, true, false, false, false, true),),
     ]
-return (ExpDesignNative, insts)
+return (DOptimalDesignNative, insts)
