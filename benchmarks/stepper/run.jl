@@ -61,6 +61,7 @@ JuMP_example_names = [
     "classicalquantum",
     "conditionnum",
     "contraction",
+    "covarianceest",
     "densityest",
     "entanglementassisted",
     "envelope",

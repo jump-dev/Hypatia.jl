@@ -23,6 +23,7 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     @assert d >= 1
     p0 = rand(T, d)
     p0 ./= sum(p0)
+
     sep_spectral_funs = [
         Cones.InvSSF(),
         Cones.NegLogSSF(),
