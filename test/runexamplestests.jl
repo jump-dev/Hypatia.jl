@@ -77,6 +77,7 @@ JuMP_example_names = [
     "portfolio",
     "nearestcorrelation",
     "nearestpolymat",
+    "nonparametricdistr",
     "regionofattr",
     "relentrentanglement",
     "robustgeomprog",

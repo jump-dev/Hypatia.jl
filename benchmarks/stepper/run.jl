@@ -80,6 +80,7 @@ JuMP_example_names = [
     "portfolio",
     "relentrentanglement",
     "nearestpolymat",
+    "nonparametricdistr",
     "regionofattr",
     "robustgeomprog",
     "semidefinitepoly",
