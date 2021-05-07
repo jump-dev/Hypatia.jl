@@ -55,6 +55,7 @@ function cone_types(T::Type{<:Real})
 end
 
 sep_spectral_funs = [
+    Cones.InvSSF(),
     Cones.NegLogSSF(),
     Cones.NegEntropySSF(),
     Cones.Power12SSF(1.5),

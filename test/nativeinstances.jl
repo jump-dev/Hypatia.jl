@@ -19,6 +19,7 @@ import Hypatia.Solvers
 
 # for epipersepspectral instances
 sep_spectral_funs = [
+    Cones.InvSSF(),
     Cones.NegLogSSF(),
     Cones.NegEntropySSF(),
     Cones.Power12SSF(1.5),
