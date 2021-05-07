@@ -13,7 +13,7 @@ else
         "ck_n25_m10_o1_1", # rsoc
         "rsyn0805h", # exp
         "2x3_3bars", # psd
-        # "HMCR-n20-m400", # power # TODO debug
+        "HMCR-n20-m400", # power
         "classical_20_0", # soc, orthant
         "achtziger_stolpe06-6.1flowc", # rsoc, orthant
         "LogExpCR-n100-m400", # exp, orthant
@@ -24,6 +24,7 @@ relaxed_tols = (default_tol_relax = 1000,)
 insts = Dict()
 insts["minimal"] = [(("expdesign_D_8_4",), nothing, relaxed_tols)]
 insts["fast"] = [((inst,), nothing, relaxed_tols) for inst in cblib_diverse_few[2:end]]
+insts["various"] = [((inst,), nothing, relaxed_tols) for inst in cblib_diverse_few]
 return (CBLIBJuMP, insts)
 
 # other sets:
