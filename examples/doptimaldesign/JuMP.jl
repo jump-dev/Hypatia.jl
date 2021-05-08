@@ -1,17 +1,17 @@
 #=
 D-optimal experiment design maximizes the determinant of the information matrix
 adapted from Boyd and Vandenberghe, "Convex Optimization", section 7.5
-maximize    F(V*diagm(np)*V')
+maximize    F(V × Diagonal(x) × V')
 subject to  sum(np) == n
             0 .<= np .<= n_max
-where np is a vector of variables representing the number of experiment p to run (fractional),
+where np is a vector of variables representing the number of experiment to run (fractional),
 and the columns of V are the vectors representing each experiment
 
 if logdet_obj or rootdet_obj is true, F is the logdet or rootdet function
 if geomean_obj is true, we use a formulation from https://picos-api.gitlab.io/picos/optdes.html that finds an equivalent minimizer
 =#
 
-struct ExpDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+struct DOptimalDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     q::Int
     p::Int
     n::Int
@@ -21,7 +21,7 @@ struct ExpDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     geomean_obj::Bool # use formulation with geomean objective
 end
 
-function build(inst::ExpDesignJuMP{T}) where {T <: Float64}
+function build(inst::DOptimalDesignJuMP{T}) where {T <: Float64}
     (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)
     @assert (p > q) && (n > q) && (n_max <= n)
     @assert inst.logdet_obj + inst.geomean_obj + inst.rootdet_obj == 1
@@ -39,7 +39,7 @@ function build(inst::ExpDesignJuMP{T}) where {T <: Float64}
     JuMP.@objective(model, Max, hypo)
 
     if inst.logdet_obj
-        JuMP.@constraint(model, vcat(hypo, 1.0, v1) in MOI.LogDetConeTriangle(q))
+        JuMP.@constraint(model, vcat(hypo, 1, v1) in MOI.LogDetConeTriangle(q))
     elseif inst.rootdet_obj
         JuMP.@constraint(model, vcat(hypo, v1) in MOI.RootDetConeTriangle(q))
     else

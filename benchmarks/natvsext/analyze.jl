@@ -15,7 +15,7 @@ examples_params = Dict(
         [:m, :twok], [2, 3],
         [:SEP,], [:nu_nat, :n_nat, :n_SEP]
         ),
-    "expdesign" => (
+    "doptimaldesign" => (
         [:logdet, :k], [5, 1],
         # [:EP,], [:n_nat, :n_EP, :q_nat, :q_EP]
         # [:SEP,], [:n_SEP, :q_nat, :q_SEP]

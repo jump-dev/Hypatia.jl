@@ -2,7 +2,7 @@
 insts = Dict()
 insts["minimal"] = [
     ((2,),),
-    ((3,),),
+    ((4,),),
     ]
 insts["fast"] = [
     ((25,),),
@@ -16,5 +16,7 @@ insts["various"] = [
     ((50,),),
     ((100,),),
     ((250,),),
+    ((1000,),),
+    ((2500,),),
     ]
 return (NonparametricDistrJuMP, insts)
