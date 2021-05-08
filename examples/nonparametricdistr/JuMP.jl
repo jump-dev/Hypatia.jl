@@ -11,7 +11,7 @@ subject to  Σᵢ pᵢ = 1               (probability distribution)
             gⱼ(Aⱼ p + aⱼ) ≤ kⱼ ∀j   (prior info as convex constraints)
             B p = b                 (prior info as equalities)
             C p ≤ c                 (prior info as inequalities)
-where f and gⱼ are spectral functions
+where f and gⱼ are convex spectral functions
 =#
 
 struct NonparametricDistrJuMP{T <: Real} <: ExampleInstanceJuMP{T}

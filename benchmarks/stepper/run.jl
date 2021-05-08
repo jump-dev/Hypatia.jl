@@ -66,6 +66,7 @@ JuMP_example_names = [
     "doptimaldesign",
     "entanglementassisted",
     "envelope",
+    "experimentdesign",
     "lotkavolterra",
     "lyapunovstability",
     "matrixcompletion",
