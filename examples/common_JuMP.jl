@@ -198,6 +198,7 @@ function solve_check(
     return solve_stats
 end
 
+# get Hypatia status from MOI status
 moi_hyp_status_map = Dict(
     MOI.OPTIMAL => Solvers.Optimal,
     MOI.INFEASIBLE => Solvers.PrimalInfeasible,
@@ -208,18 +209,17 @@ moi_hyp_status_map = Dict(
     MOI.OTHER_ERROR => Solvers.UnknownStatus,
     )
 
+# get MOI cones (defined in MOI itself, not Hypatia) from some Hypatia cones
 cone_from_hyp(cone::Cones.Cone) = error("cannot transform a Hypatia cone of type $(typeof(cone)) to an MOI cone")
 cone_from_hyp(cone::Cones.Nonnegative) = MOI.Nonnegatives(Cones.dimension(cone))
-cone_from_hyp(cone::Cones.EpiNormInf) = (Cones.use_dual_barrier(cone) ? MOI.NormOneCone : MOI.NormInfinityCone)(Cones.dimension(cone))
+cone_from_hyp(cone::Cones.EpiNormInf{T, T}) where {T <: Real} = (Cones.use_dual_barrier(cone) ? MOI.NormOneCone : MOI.NormInfinityCone)(Cones.dimension(cone))
 cone_from_hyp(cone::Cones.EpiNormEucl) = MOI.SecondOrderCone(Cones.dimension(cone))
 cone_from_hyp(cone::Cones.EpiPerSquare) = MOI.RotatedSecondOrderCone(Cones.dimension(cone))
 cone_from_hyp(cone::Cones.HypoPerLog) = (@assert Cones.dimension(cone) == 3; MOI.ExponentialCone())
 cone_from_hyp(cone::Cones.EpiRelEntropy) = MOI.RelativeEntropyCone(Cones.dimension(cone))
 cone_from_hyp(cone::Cones.HypoGeoMean) = MOI.GeometricMeanCone(Cones.dimension(cone))
 cone_from_hyp(cone::Cones.GeneralizedPower) = (@assert Cones.dimension(cone) == 3; MOI.PowerCone{Float64}(cone.alpha[1]))
-cone_from_hyp(cone::Cones.EpiNormSpectral) = (Cones.use_dual_barrier(cone) ? MOI.NormNuclearCone : MOI.NormSpectralCone)(cone.n, cone.m)
-cone_from_hyp(cone::Cones.PosSemidefTri{T, R}) where {R <: Hypatia.RealOrComplex{T}} where {T <: Real} = MOI.PositiveSemidefiniteConeTriangle(cone.side)
-cone_from_hyp(cone::Cones.LinMatrixIneq{T}) where {T <: Real} = Hypatia.LinMatrixIneqCone{T}(cone.As)
-cone_from_hyp(cone::Cones.HypoPerLogdetTri) = MOI.LogDetConeTriangle(cone.side)
-cone_from_hyp(cone::Cones.HypoRootdetTri) = MOI.RootDetConeTriangle(cone.side)
-cone_from_hyp(cone::Cones.MatrixEpiPerSquare{T, R}) where {R <: Hypatia.RealOrComplex{T}} where {T <: Real} = Hypatia.MatrixEpiPerSquareCone{T, R}(cone.n, cone.m)
+cone_from_hyp(cone::Cones.EpiNormSpectral{T, T}) where {T <: Real} = (Cones.use_dual_barrier(cone) ? MOI.NormNuclearCone : MOI.NormSpectralCone)(cone.n, cone.m)
+cone_from_hyp(cone::Cones.PosSemidefTri{T, T}) where {T <: Real} = MOI.PositiveSemidefiniteConeTriangle(cone.side)
+cone_from_hyp(cone::Cones.HypoPerLogdetTri{T, T}) where {T <: Real} = MOI.LogDetConeTriangle(cone.side)
+cone_from_hyp(cone::Cones.HypoRootdetTri{T, T}) where {T <: Real} = MOI.RootDetConeTriangle(cone.side)
