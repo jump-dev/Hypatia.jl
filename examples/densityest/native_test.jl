@@ -53,4 +53,5 @@ insts["slow"] = [
     ((400, 5, 6, true, false, true),),
     ((400, 5, 6, true, true, false),),
     ]
+insts["various"] = Tuple[]
 return (DensityEstNative, insts)

@@ -24,4 +24,5 @@ insts["slow"] = [
     ((2, 30, 4, 30, true),),
     ((2, 30, 4, 30, false),),
     ]
+insts["various"] = Tuple[]
 return (EnvelopeNative, insts)

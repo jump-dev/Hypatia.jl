@@ -26,4 +26,5 @@ insts["slow"] = [
     ((3000, false, true, false),),
     ((3000, true, true, true),),
     ]
+insts["various"] = Tuple[]
 return (PortfolioNative, insts)
