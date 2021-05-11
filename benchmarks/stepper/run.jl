@@ -36,8 +36,8 @@ instance_sets = [
 
 # types of models to run and corresponding options and example names
 model_types = [
-    # "native",
-    # "JuMP",
+    "native",
+    "JuMP",
     ]
 
 # list of names of native examples to run

@@ -39,4 +39,5 @@ insts["slow"] = [
     ((true, 15, 20, 50, 0.1, 0.1, 0.1, 0.2, 0.2),),
     ((true, 15, 20, 50, 0, 0.1, 0.1, 0, 0),),
     ]
+insts["various"] = Tuple[]
 return (MatrixRegressionNative, insts)

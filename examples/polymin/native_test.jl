@@ -69,4 +69,5 @@ insts["slow"] = [
     ((false, 2, 30, false, true),),
     ((false, 2, 30, false, false),),
     ]
+insts["various"] = Tuple[]
 return (PolyMinNative, insts)
