@@ -11,7 +11,7 @@ TODO
 - improve efficiency of hessian calculations using structure
 - use inbounds
 - improve efficiency of frontal matrix scattering etc
-- maybe allow passing more options to CHOLMOD eg through a common_struct argument to cone
+- maybe allow passing more options to CHOLMOD
 =#
 
 struct PSDSparseCholmod <: PSDSparseImpl end
@@ -46,11 +46,7 @@ function setup_psdsparse_cache(cone::PosSemidefTriSparse{PSDSparseCholmod, T, R}
     # setup symbolic factorization
     side = cone.side
     dim_R = length(cone.row_idxs)
-
-    cm = CHOLMOD.defaults(CHOLMOD.common_struct[Base.Threads.threadid()])
-    unsafe_store!(CHOLMOD.common_print[Base.Threads.threadid()], 0)
-    unsafe_store!(CHOLMOD.common_postorder[Base.Threads.threadid()], 1)
-    unsafe_store!(CHOLMOD.common_supernodal[Base.Threads.threadid()], 2)
+    cm = CHOLMOD.common
 
     fake_point = [R(l) for l in 1:dim_R]
     sparse_point = cache.sparse_point = CHOLMOD.Sparse(Hermitian(sparse(cone.row_idxs, cone.col_idxs, fake_point, side, side), :L))
@@ -59,11 +55,13 @@ function setup_psdsparse_cache(cone::PosSemidefTriSparse{PSDSparseCholmod, T, R}
     for l in 1:dim_R
         sparse_point_map[Int(unsafe_load(sx_ptr, l))] = l
     end
-    symb_mat = cache.symb_mat = CHOLMOD.fact_(sparse_point, cm)
+    CHOLMOD.@cholmod_param supernodal = 2 begin
+        cache.symb_mat = CHOLMOD.symbolic(sparse_point, postorder=true)
+    end
+    symb_mat = cache.symb_mat
 
     f = unsafe_load(pointer(symb_mat))
     @assert f.n == cone.side
-    @assert f.is_ll != 0
     @assert f.is_super != 0
 
     num_super = Int(f.nsuper)
@@ -206,7 +204,9 @@ function update_feas(cone::PosSemidefTriSparse{PSDSparseCholmod})
     end
 
     # update numeric factorization
-    cone.is_feas = isposdef(CHOLMOD.cholesky!(cache.symb_mat, sparse_point; check = false))
+    CHOLMOD.@cholmod_param supernodal = 2 begin
+        cone.is_feas = isposdef(CHOLMOD.cholesky!(cache.symb_mat, sparse_point; check = false))
+    end
 
     cone.feas_updated = true
     return cone.is_feas

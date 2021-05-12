@@ -1,6 +1,6 @@
 
 portfolio_insts = [
-    [(num_stocks, false, true) for num_stocks in vcat(10, 500:500:2000, 3000:1000:13000)] # includes compile run
+    [(num_stocks, false, true) for num_stocks in vcat(10, 500, 1000:1000:15000)] # includes compile run
     ]
 
 insts = Dict()

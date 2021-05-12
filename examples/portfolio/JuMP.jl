@@ -13,21 +13,21 @@ function build(inst::PortfolioJuMP{T}) where {T <: Float64}
     returns = rand(num_stocks)
     sigma_half = randn(num_stocks, num_stocks)
     x = randn(num_stocks)
-    x ./= norm(x)
-    gamma = sum(abs, sigma_half * x) / sqrt(num_stocks)
+    gamma = sum(abs, sigma_half * x) / norm(x)
+    A = randn(div(num_stocks, 2), num_stocks)
 
     model = JuMP.Model()
     JuMP.@variable(model, invest[1:num_stocks])
     JuMP.@objective(model, Max, dot(returns, invest))
     JuMP.@constraint(model, sum(invest) == 0)
+    JuMP.@constraint(model, A * invest .== 0)
 
-    aff_expr = sigma_half * invest
     if inst.epipernormeucl_constr
-        JuMP.@constraint(model, vcat(gamma, aff_expr) in JuMP.SecondOrderCone())
+        JuMP.@constraint(model, vcat(gamma, sigma_half * invest) in JuMP.SecondOrderCone())
     end
     if inst.epinorminf_constrs
-        JuMP.@constraint(model, vcat(gamma * sqrt(num_stocks), aff_expr) in MOI.NormOneCone(num_stocks + 1))
-        JuMP.@constraint(model, vcat(gamma, aff_expr) in MOI.NormInfinityCone(num_stocks + 1))
+        JuMP.@constraint(model, vcat(1, invest) in MOI.NormInfinityCone(1 + num_stocks))
+        JuMP.@constraint(model, vcat(gamma, sigma_half * invest) in MOI.NormOneCone(1 + num_stocks))
     end
 
     return model

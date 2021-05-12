@@ -111,11 +111,16 @@ function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse)
     return arr
 end
 
-# is_dual_feas(cone::PosSemidefTriSparse) = true # TODO try completable matrix test
-
 include("denseimpl.jl")
-include("cholmodimpl.jl")
-const PSDSparseImplList = [
-    (Cones.PSDSparseDense, Real),
-    (Cones.PSDSparseCholmod, LinearAlgebra.BlasReal),
-    ]
+# cholmod implementation only works after this commit
+# see https://github.com/JuliaLang/julia/pull/40560
+if VERSION >= v"1.7.0-DEV.1025"
+    include("cholmodimpl.jl")
+    const PSDSparseImplList = [
+        (PSDSparseDense, Real),
+        (PSDSparseCholmod, LinearAlgebra.BlasReal),
+        ]
+else
+    const PSDSparseCholmod = PSDSparseDense
+    const PSDSparseImplList = [(PSDSparseDense, Real),]
+end
