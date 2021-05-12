@@ -32,26 +32,36 @@ rescale_affine(::MOI.AbstractVectorSet, vals::AbstractVector, ::AbstractVector) 
 
 # transformations (transposition of matrix) for MOI rectangular matrix cones with matrix of more rows than columns
 
-NonSquareMatrixCone = Union{MOI.NormSpectralCone, MOI.NormNuclearCone}
+const SpecNucCone = Union{MOI.NormSpectralCone, MOI.NormNuclearCone}
 
-needs_untransform(cone::NonSquareMatrixCone) = (cone.row_dim > cone.column_dim)
+needs_untransform(cone::SpecNucCone) = (cone.row_dim > cone.column_dim)
 
-function untransform_affine(cone::NonSquareMatrixCone, vals::AbstractVector)
+function untransform_affine(cone::SpecNucCone, vals::AbstractVector)
     vals[2:end] = reshape(vals[2:end], cone.column_dim, cone.row_dim)'
     return vals
 end
 
-function permute_affine(cone::NonSquareMatrixCone, idxs::AbstractVector)
-    if cone.row_dim > cone.column_dim
-        idxs_new = collect(idxs)
-        # transpose the matrix part
-        for k in 2:length(idxs)
-            (col_old, row_old) = divrem(idxs[k] - 2, cone.row_dim)
-            idxs_new[k] = idxs[2 + row_old * cone.column_dim + col_old]
-        end
-        return idxs_new
+function permute_affine(cone::SpecNucCone, idxs::AbstractVector)
+    @assert cone.row_dim >= 1
+    @assert cone.column_dim >= 1
+    if cone.row_dim <= cone.column_dim
+        return idxs
     end
-    return idxs
+
+    # transpose the matrix part
+    idxs_new = zero(idxs)
+    for k in eachindex(idxs)
+        i = idxs[k]
+        @assert i >= 1
+        if i <= 2
+            idxs_new[k] = i
+            continue
+        end
+        (col_old, row_old) = divrem(i - 2, cone.row_dim)
+        k_idx = row_old * cone.column_dim + col_old + 2
+        idxs_new[k] = idxs[k_idx]
+    end
+    return idxs_new
 end
 
 # transformations (svec rescaling) for MOI symmetric matrix cones not in svec (scaled lower triangle) form
@@ -363,6 +373,16 @@ const SupportedCones{T <: Real} = Union{
     MOI.DualExponentialCone,
     MOI.LogDetConeTriangle,
     MOI.RelativeEntropyCone,
+    }
+
+const LinearCones{T <: Real} = Union{
+    MOI.EqualTo{T},
+    MOI.GreaterThan{T},
+    MOI.LessThan{T},
+    MOI.Interval{T},
+    MOI.Zeros,
+    MOI.Nonnegatives,
+    MOI.Nonpositives,
     }
 
 Base.copy(cone::HypatiaCones) = cone # NOTE maybe should deep copy the cone struct, but this is expensive

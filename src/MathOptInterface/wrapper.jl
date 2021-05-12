@@ -423,10 +423,11 @@ function MOI.copy_to(
     moi_other_cones = MOI.AbstractVectorSet[]
 
     for (F, S) in MOI.get(src, MOI.ListOfConstraints())
-        if S <: Union{MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives}
+        if S <: LinearCones{T}
             continue # already copied these constraints
         end
         @assert S <: SupportedCones{T}
+
         for ci in get_src_cons(F, S)
             i += 1
             idx_map[ci] = MOI.ConstraintIndex{F, S}(i)
@@ -435,6 +436,7 @@ function MOI.copy_to(
             si = get_con_set(ci)
             push!(moi_other_cones, si)
             dim = MOI.output_dimension(fi)
+
             if F == MOI.VectorOfVariables
                 JGi = (idx_map[vj].value for vj in fi.variables)
                 IGi = permute_affine(si, 1:dim)
@@ -449,6 +451,7 @@ function MOI.copy_to(
                 append!(Ih, Ihi)
                 append!(Vh, Vhi)
             end
+
             IGi = q .+ IGi
             append!(IG, IGi)
             append!(JG, JGi)
