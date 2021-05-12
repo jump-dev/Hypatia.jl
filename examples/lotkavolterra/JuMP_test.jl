@@ -2,17 +2,17 @@
 relaxed_tols = (default_tol_relax = 1000,)
 insts = Dict()
 insts["minimal"] = [
-    ((2,), SOCExpPSDOptimizer),
+    ((2,), :SOCExpPSD),
     ]
 insts["fast"] = [
-    ((3,), SOCExpPSDOptimizer),
+    ((3,), :SOCExpPSD),
     ]
 insts["slow"] = [
-    ((4,), SOCExpPSDOptimizer),
+    ((4,), :SOCExpPSD),
     ]
 insts["various"] = [
-    ((3,), SOCExpPSDOptimizer),
-    ((4,), SOCExpPSDOptimizer, relaxed_tols),
-    ((5,), SOCExpPSDOptimizer, relaxed_tols),
+    ((3,), :SOCExpPSD),
+    ((4,), :SOCExpPSD, relaxed_tols),
+    ((5,), :SOCExpPSD, relaxed_tols),
     ]
 return (LotkaVolterraJuMP, insts)

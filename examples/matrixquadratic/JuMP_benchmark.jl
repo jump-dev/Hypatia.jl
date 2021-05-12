@@ -5,5 +5,5 @@ matrixquadratic_insts(use_nat::Bool) = [
 
 insts = Dict()
 insts["nat"] = (nothing, matrixquadratic_insts(true))
-insts["ext"] = (SOCExpPSDOptimizer, matrixquadratic_insts(false))
+insts["ext"] = (:SOCExpPSD, matrixquadratic_insts(false))
 return (MatrixQuadraticJuMP, insts)

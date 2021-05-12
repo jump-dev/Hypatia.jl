@@ -56,8 +56,8 @@ function setup_benchmark_dataframe()
     return perf
 end
 
-get_extender(inst::Tuple, ::Type{<:ExampleInstanceJuMP{<:Real}}) = (length(inst) > 1 ? inst[2] : nothing)
-get_extender(inst::Tuple, ::Type{<:ExampleInstance{<:Real}}) = nothing
+get_extender(inst::Tuple, ::Type{<:ExampleInstanceJuMP}) = (length(inst) > 1 ? string(inst[2]) : "")
+get_extender(inst::Tuple, ::Type{<:ExampleInstance}) = ""
 
 function write_perf(
     perf::DataFrames.DataFrame,
@@ -73,7 +73,7 @@ end
 
 function run_instance_set(
     inst_subset::Vector,
-    ex_type_T::Type{<:ExampleInstance{<:Real}},
+    ex_type_T::Type{<:ExampleInstance},
     info_perf::NamedTuple,
     new_default_options::NamedTuple,
     script_verbose::Bool,
@@ -81,7 +81,8 @@ function run_instance_set(
     results_path::Union{String, Nothing},
     )
     for (inst_num, inst) in enumerate(inst_subset)
-        test_info = "inst $inst_num: $(inst[1])"
+        extender_name = get_extender(inst, ex_type_T)
+        test_info = "inst $inst_num: $(inst[1]) $extender_name"
         @testset "$test_info" begin
             println(test_info, " ...")
 
@@ -91,7 +92,7 @@ function run_instance_set(
             new_perf = (;
                 info_perf..., run_perf..., total_time, inst_num,
                 :solver => "Hypatia", :inst_data => inst[1],
-                :extender => string(get_extender(inst, ex_type_T)),
+                :extender => extender_name,
                 )
             write_perf(perf, results_path, new_perf)
 

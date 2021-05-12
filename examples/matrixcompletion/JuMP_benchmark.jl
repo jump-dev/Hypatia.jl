@@ -6,5 +6,5 @@ matrixcompletion_insts = [
 
 insts = Dict()
 insts["nat"] = (nothing, matrixcompletion_insts)
-insts["ext"] = (SOCExpPSDOptimizer, matrixcompletion_insts)
+insts["ext"] = (:SOCExpPSD, matrixcompletion_insts)
 return (MatrixCompletionJuMP, insts)

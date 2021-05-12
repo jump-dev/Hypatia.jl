@@ -59,5 +59,5 @@ shapeconregr_insts(use_nat::Bool) = [
 
 insts = Dict()
 insts["nat"] = (nothing, shapeconregr_insts(true))
-insts["ext"] = (SOCExpPSDOptimizer, shapeconregr_insts(false))
+insts["ext"] = (:SOCExpPSD, shapeconregr_insts(false))
 return (ShapeConRegrJuMP, insts)

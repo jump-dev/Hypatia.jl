@@ -65,5 +65,5 @@ polymin_insts(use_nat::Bool) = [
 
 insts = Dict()
 insts["nat"] = (nothing, polymin_insts(true))
-insts["ext"] = (SOCExpPSDOptimizer, polymin_insts(false))
+insts["ext"] = (:SOCExpPSD, polymin_insts(false))
 return (PolyMinJuMP, insts)
