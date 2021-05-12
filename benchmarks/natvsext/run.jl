@@ -51,17 +51,18 @@ instance_sets = [
 
 # models to run
 JuMP_example_names = [
+    # Hypatia paper examples:
     # "densityest",
     # "doptimaldesign",
     # "matrixcompletion",
-    # "matrixquadratic",
     # "matrixregression",
     # "nearestpsd",
     # "polymin",
-    # "polynorm",
     # "portfolio",
-    # "nearestpolymat",
     # "shapeconregr",
+    # SOS paper examples:
+    # "nearestpolymat",
+    # "polynorm",
     ]
 
 interrupt()
