@@ -1,4 +1,5 @@
 
+relaxed_tols = (default_tol_relax = 1000,)
 insts = Dict()
 insts["minimal"] = [
     ((2,), SOCExpPSDOptimizer),
