@@ -3,11 +3,11 @@ relaxed_tols = (default_tol_relax = 100,)
 insts = Dict()
 insts["minimal"] = [
     ((2, 2),),
-    ((2, 2), SOCExpPSDOptimizer),
+    ((2, 2), :SOCExpPSD),
     ]
 insts["fast"] = [
     ((:motzkin2,),),
-    ((:motzkin2,), SOCExpPSDOptimizer),
+    ((:motzkin2,), :SOCExpPSD),
     ((:motzkin3,),),
     ((:CS16ex8_13,),),
     ((:CS16ex8_14,),),
@@ -16,16 +16,16 @@ insts["fast"] = [
     ((:CS16ex13,),),
     ((:MCW19ex1_mod,),),
     ((:MCW19ex8,),),
-    ((:MCW19ex8,), SOCExpPSDOptimizer),
+    ((:MCW19ex8,), :SOCExpPSD),
     ((3, 2),),
-    ((3, 2), SOCExpPSDOptimizer),
+    ((3, 2), :SOCExpPSD),
     ((6, 6),),
     ((20, 3),),
-    ((20, 3), SOCExpPSDOptimizer),
+    ((20, 3), :SOCExpPSD),
     ]
 insts["slow"] = [
     ((10, 10),),
-    ((10, 10), SOCExpPSDOptimizer),
+    ((10, 10), :SOCExpPSD),
     ((20, 6),),
     ((40, 3),),
     ]
@@ -40,8 +40,8 @@ insts["various"] = [
     ((:MCW19ex1_mod,),),
     ((:MCW19ex8,),),
     ((3, 2),),
-    ((3, 2), SOCExpPSDOptimizer),
+    ((3, 2), :SOCExpPSD),
     ((20, 3), nothing, relaxed_tols),
-    ((20, 3), SOCExpPSDOptimizer, relaxed_tols),
+    ((20, 3), :SOCExpPSD, relaxed_tols),
     ]
 return (SignomialMinJuMP, insts)

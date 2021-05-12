@@ -69,10 +69,10 @@ end
 
 function spawn_instance(
     ex_name::String,
-    ex_type::Type{<:ExampleInstanceJuMP{Float64}},
+    ex_type::Type{<:ExampleInstanceJuMP},
     compile_inst::Tuple,
     inst_data::Tuple,
-    extender,
+    extender::Union{Symbol, Nothing},
     solver::Tuple,
     solve::Bool;
     )
@@ -102,8 +102,10 @@ function spawn_instance(
 
     println("\nsetup model")
     print_memory()
+
+    setup_model_args = (ex_type, inst_data, extender, solver[3], solver[2])
     setup_fun() = @eval begin
-        (model, model_stats) = setup_model($ex_type, $inst_data, $extender, $(solver[3]), $(solver[2]))
+        (model, model_stats) = setup_model($setup_model_args...)
         GC.gc()
         return model_stats
     end

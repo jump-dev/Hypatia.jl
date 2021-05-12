@@ -6,5 +6,5 @@ nearestpsd_insts(use_nat::Bool) = [
 
 insts = Dict()
 insts["nat"] = (nothing, nearestpsd_insts(true))
-insts["ext"] = (SOCExpPSDOptimizer, nearestpsd_insts(false))
+insts["ext"] = (:SOCExpPSD, nearestpsd_insts(false))
 return (NearestPSDJuMP, insts)

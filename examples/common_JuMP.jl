@@ -7,7 +7,7 @@ include(joinpath(@__DIR__, "common.jl"))
 import JuMP
 const MOI = JuMP.MOI
 
-MOI.Utilities.@model(SOCExpPSDOptimizer,
+MOI.Utilities.@model(SOCExpPSD,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
@@ -21,7 +21,7 @@ MOI.Utilities.@model(SOCExpPSDOptimizer,
     true,
     )
 
-MOI.Utilities.@model(ExpPSDOptimizer,
+MOI.Utilities.@model(ExpPSD,
     (),
     (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
     (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
@@ -37,14 +37,14 @@ MOI.Utilities.@model(ExpPSDOptimizer,
 abstract type ExampleInstanceJuMP{T <: Real} <: ExampleInstance{T} end
 
 # fallback: just check optimal status
-function test_extra(inst::ExampleInstanceJuMP{Float64}, model::JuMP.Model)
+function test_extra(inst::ExampleInstanceJuMP, model::JuMP.Model)
     @test JuMP.termination_status(model) == MOI.OPTIMAL
 end
 
 function run_instance(
-    ex_type::Type{<:ExampleInstanceJuMP{Float64}}, # an instance of a JuMP example
+    ex_type::Type{<:ExampleInstanceJuMP},
     inst_data::Tuple,
-    extender = nothing, # MOI.Utilities.@model-defined optimizer with subset of cones if using extended formulation
+    extender::Union{Symbol, Nothing} = nothing,
     inst_options::NamedTuple = NamedTuple(),
     solver_type = Hypatia.Optimizer;
     default_options::NamedTuple = NamedTuple(),
@@ -63,9 +63,9 @@ function run_instance(
 end
 
 function setup_model(
-    ex_type::Type{<:ExampleInstanceJuMP{Float64}},
+    ex_type::Type{<:ExampleInstanceJuMP},
     inst_data::Tuple,
-    extender,
+    extender::Union{Symbol, Nothing},
     solver_options::NamedTuple,
     solver_type;
     rseed::Int = 1,
@@ -79,7 +79,8 @@ function setup_model(
     opt = hyp_opt = (is_hypatia_opt ? Hypatia.Optimizer(; solver_options...) : Hypatia.Optimizer(use_dense_model = false))
     if !isnothing(extender)
         # use MOI automated extended formulation
-        opt = MOI.Bridges.full_bridge_optimizer(MOI.Utilities.CachingOptimizer(extender{Float64}(), opt), Float64)
+        extT = @eval $extender{Float64}()
+        opt = MOI.Bridges.full_bridge_optimizer(MOI.Utilities.CachingOptimizer(extT, opt), Float64)
         # for PolyJuMP/SumOfSquares models
         for B in model.bridge_types
             MOI.Bridges.add_bridge(opt, B{Float64})

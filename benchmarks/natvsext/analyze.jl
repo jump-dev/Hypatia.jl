@@ -82,8 +82,8 @@ end
 
 extender_map = Dict(
     "nothing" => "",
-    "ExpPSDOptimizer" => "EP",
-    "SOCExpPSDOptimizer" => "SEP",
+    "ExpPSD" => "EP",
+    "SOCExpPSD" => "SEP",
     )
 
 status_map = Dict(
