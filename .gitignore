@@ -4,9 +4,5 @@ Manifest.toml
 *.jl.*.cov
 *.jl.mem
 deps/deps.jl
-scratch.jl
-*/scratch.jl
-*/raw/*
-*/*/raw/*
 benchmarks/*/analysis/*
-*bench.csv
+benchmarks/*/raw/*

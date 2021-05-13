@@ -5,8 +5,6 @@ tests for ModelUtilities module
 using Test
 import Random
 using LinearAlgebra
-# import DynamicPolynomials
-import Hypatia
 import Hypatia.ModelUtilities
 
 function test_svec_conversion(T::Type{<:Real})
@@ -53,57 +51,3 @@ function test_cheb2_w(T::Type{<:Real})
         @test dot(w, [sum(pts[i, 1] ^ d for d in 0:(2halfdeg)) for i in 1:U]) ≈ sum(2 / (i + 1) for i in 0:2:(2halfdeg))
     end
 end
-
-# TODO restore and modify if bring lagrange polys (without DynamicPolynomials) functions to ModelUtilities modified from ContractionJuMP example
-# function test_recover_lagrange_polys(T::Type{<:Real})
-#     tol = sqrt(eps(T))
-#     Random.seed!(1)
-#     n = 1
-#     deg = 1
-#     pts = reshape(T[0, 1], 2, 1)
-#     lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, deg)
-#
-#     random_pts = rand(T, 5)
-#     @test lagrange_polys[1].(random_pts) ≈ 1 .- random_pts
-#     @test lagrange_polys[2].(random_pts) ≈ random_pts
-#
-#     deg = 2
-#     pts = reshape(T[0, 1, 2], 3, 1)
-#     lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, deg)
-#
-#     random_pts = rand(T, 5)
-#     @test lagrange_polys[1].(random_pts) ≈ (random_pts .- 1) .* (random_pts .- 2) * 0.5
-#     @test lagrange_polys[2].(random_pts) ≈ random_pts .* (random_pts .- 2) * -1
-#     @test lagrange_polys[3].(random_pts) ≈ random_pts .* (random_pts .- 1) * 0.5
-#
-#     n = 2
-#     deg = 2
-#     pts = rand(T, 6, 2)
-#     lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, deg)
-#
-#     for i in 1:6, j in 1:6
-#         @test lagrange_polys[i](pts[j, :]) ≈ (j == i ? 1 : 0) atol=tol rtol=tol
-#     end
-#
-#     for n in 1:3, sample in [true, false]
-#         halfdeg = 2
-#
-#         (U, pts, Ps, V, w) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(n), halfdeg, sample = sample, calc_V = true, calc_w = true)
-#         DynamicPolynomials.@polyvar x[1:n]
-#         monos = DynamicPolynomials.monomials(x, 0:(2 * halfdeg))
-#         lagrange_polys = ModelUtilities.recover_lagrange_polys(pts, 2 * halfdeg)
-#
-#         @test size(V) == (size(pts, 1), U)
-#         @test sum(lagrange_polys) ≈ 1
-#         @test sum(w[i] * lagrange_polys[j](pts[i, :]) for j in 1:U, i in 1:U) ≈ sum(w) atol=tol rtol=tol
-#         @test sum(w) ≈ 2^n
-#     end
-# end
-
-# function test_recover_cheb_polys(T::Type{<:Real})
-#     DynamicPolynomials.@polyvar x[1:2]
-#     halfdeg = 2
-#     monos = DynamicPolynomials.monomials(x, 0:halfdeg)
-#     cheb_polys = ModelUtilities.get_chebyshev_polys(x, halfdeg)
-#     @test cheb_polys == [1, x[1], x[2], 2x[1]^2 - 1, x[1] * x[2], 2x[2]^2 - 1]
-# end

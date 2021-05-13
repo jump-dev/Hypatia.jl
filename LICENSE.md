@@ -1,13 +1,14 @@
 
-Copyright (c) 2020: Chris Coey, Lea Kapelevich, and contributors
+Copyright (c) 2020
+Chris Coey, Lea Kapelevich, and contributors
 
-The Hypatia Julia module is licensed under the **[MIT]** License
+Hypatia.jl is licensed under the **[MIT License]**.
 
-[MPL]: https://opensource.org/licenses/MIT
+[MIT License]: https://opensource.org/licenses/MIT
 
     MIT License
 
-    Copyright (c) [year] [fullname]
+    Copyright (c) 2020, Chris Coey, Lea Kapelevich, and contributors
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
@@ -27,11 +28,11 @@ The Hypatia Julia module is licensed under the **[MIT]** License
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 
-Some code for setting up polynomial interpolations and some of the examples are
-inspired by the **[Alfonso]** and **[Chebfun]** packages in MATLAB (licenses below)
+Some code for polynomial interpolations (in the ModelUtilities module) and several sum-of-squares examples (in the examples folder) is adapted from the **[Alfonso]** and **[Chebfun]** packages in MATLAB (licenses below).
+
+**[Alfonso]**:
 
 [Alfonso]: https://github.com/dpapp-github/alfonso
-[Chebfun]: https://github.com/chebfun/chebfun
 
     Copyright (C) 2018, David Papp and Sercan Yildiz.
     All rights reserved.
@@ -57,6 +58,10 @@ inspired by the **[Alfonso]** and **[Chebfun]** packages in MATLAB (licenses bel
     CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
     ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
     POSSIBILITY OF SUCH DAMAGE.
+
+**[Chebfun]**:
+
+[Chebfun]: https://github.com/chebfun/chebfun
 
     Copyright (c) 2017, The Chancellor, Masters and Scholars of the University
     of Oxford, and the Chebfun Developers. All rights reserved.
