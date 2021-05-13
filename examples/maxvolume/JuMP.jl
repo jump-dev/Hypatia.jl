@@ -5,13 +5,14 @@ or an ellipsoid defined with l_1, l_infty, or l_2 ball constraints (different to
 
 struct MaxVolumeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
-    epipernormeucl_constr::Bool # add an L2 ball constraint, else don't add
+    epinormeucl_constr::Bool # add an L2 ball constraint, else don't add
     epinorminf_constrs::Bool # add L1 and Linfty ball constraints, else don't add
 end
 
 function build(inst::MaxVolumeJuMP{T}) where {T <: Float64}
-    @assert xor(inst.epipernormeucl_constr, inst.epinorminf_constrs)
+    @assert xor(inst.epinormeucl_constr, inst.epinorminf_constrs)
     n = inst.n
+
     A = randn(n, n)
     # ensure there will be a feasible solution
     x = randn(n)
@@ -24,7 +25,7 @@ function build(inst::MaxVolumeJuMP{T}) where {T <: Float64}
     JuMP.@objective(model, Max, t)
     JuMP.@constraint(model, vcat(t, end_pts) in MOI.GeometricMeanCone(n + 1))
 
-    if inst.epipernormeucl_constr
+    if inst.epinormeucl_constr
         JuMP.@constraint(model, vcat(gamma, A * end_pts) in JuMP.SecondOrderCone())
     end
     if inst.epinorminf_constrs

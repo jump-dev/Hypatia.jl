@@ -12,6 +12,7 @@ end
 function build(inst::MaxVolumeNative{T}) where {T <: Real}
     @assert inst.use_hypogeomean + inst.use_power + inst.use_epipersquare == 1
     n = inst.n
+
     poly_hrep = Matrix{T}(I, n, n)
     poly_hrep .+= T.(randn(n, n)) / n
     c = vcat(-1, zeros(T, n))
