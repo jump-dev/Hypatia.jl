@@ -1,7 +1,8 @@
 #=
-references:
-- https://github.com/hfawzi/cvxquad/blob/master/examples/entanglement_assisted_capacity.m
-- listing 2 in "Efficient optimization of the quantum relative entropy" by H. Fawzi and O. Fawzi
+see:
+https://github.com/hfawzi/cvxquad/blob/master/examples/entanglement_assisted_capacity.m
+listing 2 in "Efficient optimization of the quantum relative entropy"
+by H. Fawzi and O. Fawzi
 =#
 
 using SparseArrays
@@ -43,7 +44,8 @@ function build(inst::EntanglementAssisted{T}) where {T <: Float64}
     Q2_vec = Cones.smat_to_svec!(zeros(JuMP.AffExpr, sa), Q2, rt2)
     Q3_vec = Cones.smat_to_svec!(zeros(JuMP.AffExpr, sb), Q3, rt2)
     RE_cone = Hypatia.EpiTrRelEntropyTriCone{T}(1 + 2 * sa)
-    E_cone = Hypatia.EpiPerSepSpectralCone{T}(Hypatia.Cones.NegEntropySSF(), Cones.MatrixCSqr{T, T}, nb)
+    E_cone = Hypatia.EpiPerSepSpectralCone{T}(Hypatia.Cones.NegEntropySSF(),
+        Cones.MatrixCSqr{T, T}, nb)
 
     JuMP.@constraints(model, begin
         tr(ρ) == 1

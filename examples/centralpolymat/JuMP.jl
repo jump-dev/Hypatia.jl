@@ -34,7 +34,8 @@ function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64}
 
     # coefficients equal
     poly_Q = basis' * Q * basis
-    JuMP.@constraint(model, DynamicPolynomials.coefficients(poly_Q - poly_rand) .== 0)
+    JuMP.@constraint(model,
+        DynamicPolynomials.coefficients(poly_Q - poly_rand) .== 0)
 
     return model
 end

@@ -48,8 +48,8 @@ native_example_names = [
     "matrixregression",
     "maxvolume",
     "polymin",
-    "portfolio",
-    "sparsepca",
+    # "portfolio",
+    # "sparsepca",
     ]
 
 # list of names of JuMP examples to run
@@ -75,19 +75,19 @@ JuMP_example_names = [
     "nearestpsd",
     "normconepoly",
     "polymin",
-    "polynorm",
-    "portfolio",
-    "nearestcorrelation",
-    "nearestpolymat",
-    "nonparametricdistr",
-    "regionofattr",
-    "relentrentanglement",
-    "robustgeomprog",
-    "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
-    "sparselmi",
-    "stabilitynumber",
+    # "polynorm",
+    # "portfolio",
+    # "nearestcorrelation",
+    # "nearestpolymat",
+    # "nonparametricdistr",
+    # "regionofattr",
+    # "relentrentanglement",
+    # "robustgeomprog",
+    # "semidefinitepoly",
+    # "shapeconregr",
+    # "signomialmin",
+    # "sparselmi",
+    # "stabilitynumber",
     ]
 
 perf = setup_benchmark_dataframe()

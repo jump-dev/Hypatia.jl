@@ -1,5 +1,5 @@
 #=
-formulates and solves the (dual of the) polynomial envelope problem described in the paper:
+formulates and solves the (dual of the) polynomial envelope problem described in:
 D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programming
 available at https://arxiv.org/abs/1712.01792
 =#
@@ -20,7 +20,8 @@ function build(inst::EnvelopeNative{T}) where {T <: Real}
     domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))
 
     # generate interpolation
-    (U, pts, Ps, _, w) = ModelUtilities.interpolate(domain, inst.env_halfdeg, calc_w = true)
+    (U, pts, Ps, _, w) = ModelUtilities.interpolate(domain,
+        inst.env_halfdeg, calc_w = true)
 
     # generate random data
     L = binomial(n + inst.rand_halfdeg, n)
@@ -42,7 +43,8 @@ function build(inst::EnvelopeNative{T}) where {T <: Real}
         h = zeros(T, num_polys * U)
     end
 
-    cones = Cones.Cone{T}[Cones.WSOSInterpNonnegative{T, T}(U, Ps, use_dual = !inst.primal_wsos) for k in 1:num_polys]
+    cones = Cones.Cone{T}[Cones.WSOSInterpNonnegative{T, T}(U, Ps,
+        use_dual = !inst.primal_wsos) for k in 1:num_polys]
 
     model = Models.Model{T}(c, A, b, G, h, cones)
     return model

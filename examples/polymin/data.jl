@@ -31,7 +31,8 @@ function get_interp_data(
     return (interp_vals, Ps, true_min)
 end
 
-# get interpolation for a random real poly in n variables of half degree halfdeg and use a box domain
+# get interpolation for a random real poly in n variables of half degree
+# halfdeg and use a box domain
 function random_interp_data(
     ::Type{T},
     n::Int,
@@ -40,7 +41,7 @@ function random_interp_data(
     ) where {T <: Real}
     (U, pts, Ps) = ModelUtilities.interpolate(dom, halfdeg)
     interp_vals = randn(T, U)
-    true_min = T(NaN) # TODO could get an upper bound by evaluating at random points in domain
+    true_min = T(NaN)
     return (interp_vals, Ps, true_min)
 end
 
@@ -154,7 +155,8 @@ function real_poly_data(polyname::Symbol, T::Type{<:Real} = Float64)
     return (x, f, dom, true_obj)
 end
 
-# merge with real polys when complex polyvars are allowed in DynamicPolynomials: https://github.com/JuliaAlgebra/MultivariatePolynomials.jl/issues/11
+# merge with real polys when complex polyvars are allowed in DynamicPolynomials:
+# https://github.com/JuliaAlgebra/MultivariatePolynomials.jl/issues/11
 # real-valued complex polynomials
 complex_poly_data = Dict{Symbol, NamedTuple}(
     :abs1d => (n = 1,
@@ -194,7 +196,8 @@ complex_poly_data = Dict{Symbol, NamedTuple}(
         true_min = -2,
         ),
     :denseunit1d => (n = 1,
-        f = (z -> 1 + 2real(z[1]) + abs(z[1])^2 + 2real(z[1]^2) + 2real(z[1]^2 * conj(z[1])) + abs(z[1])^4),
+        f = (z -> 1 + 2real(z[1]) + abs(z[1])^2 + 2real(z[1]^2) +
+            2real(z[1]^2 * conj(z[1])) + abs(z[1])^4),
         gs = [z -> 1 - abs2(z[1])],
         g_halfdegs = [1],
         true_min = 0,

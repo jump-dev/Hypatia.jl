@@ -6,7 +6,6 @@ using Test
 import Random
 using LinearAlgebra
 import LinearAlgebra.BlasReal
-
 import Hypatia
 import Hypatia.ModelUtilities
 import Hypatia.Cones
@@ -17,10 +16,12 @@ abstract type ExampleInstance{T <: Real} end
 
 # NOTE this is a workaround for randn's lack of support for BigFloat
 Random.randn(R::Type{BigFloat}, dims::Vararg{Int, N} where N) = R.(randn(dims...))
-Random.randn(R::Type{Complex{BigFloat}}, dims::Vararg{Int, N} where N) = R.(randn(ComplexF64, dims...))
+Random.randn(R::Type{Complex{BigFloat}}, dims::Vararg{Int, N} where N) =
+    R.(randn(ComplexF64, dims...))
 
 # helper for calculating solution violations
-relative_residual(residual::Vector{T}, constant::Vector{T}) where {T <: Real} = norm(residual, Inf) / (1 + norm(constant, Inf))
+relative_residual(residual::Vector{T}, constant::Vector{T}) where {T <: Real} =
+    norm(residual, Inf) / (1 + norm(constant, Inf))
 
 # calculate violations for Hypatia certificate equalities
 function certificate_violations(
@@ -31,25 +32,25 @@ function certificate_violations(
     z::Vector{T},
     s::Vector{T},
     ) where {T <: Real}
-    (c, A, b, G, h, obj_offset) = (model.c, model.A, model.b, model.G, model.h, model.obj_offset)
+    (c, A, b, G, h, obj_offset) =
+        (model.c, model.A, model.b, model.G, model.h, model.obj_offset)
 
     if status == Solvers.PrimalInfeasible
-        # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         x_res = G' * z + A' * y
         x_viol = relative_residual(x_res, c)
         y_viol = T(NaN)
         z_viol = T(NaN)
     elseif status == Solvers.DualInfeasible
-        # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
         y_res = A * x
         z_res = G * x + s
         y_viol = relative_residual(y_res, b)
         z_viol = relative_residual(z_res, h)
         x_viol = T(NaN)
-    # TODO elseif status == Solvers.IllPosed # primal vs dual ill-posed statuses and conditions
+    # TODO elseif status == Solvers.IllPosed (primal vs dual ill-posed)
     else
         if status != Solvers.Optimal
-            println("status $status not handled, but computing optimality certificate violations anyway")
+            println("status $status not handled, but computing optimality " *
+                "certificate violations anyway")
         end
         x_res = G' * z + A' * y + c
         y_res = A * x - b

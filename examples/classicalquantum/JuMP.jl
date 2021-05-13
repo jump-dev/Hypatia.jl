@@ -28,7 +28,8 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     JuMP.@variable(model, qe_epi)
     JuMP.@objective(model, Max, -qe_epi + dot(prob, Hs))
 
-    cone = Hypatia.EpiPerSepSpectralCone{T}(Hypatia.Cones.NegEntropySSF(), Cones.MatrixCSqr{T, R}, n)
+    cone = Hypatia.EpiPerSepSpectralCone{T}(Hypatia.Cones.NegEntropySSF(),
+        Cones.MatrixCSqr{T, R}, n)
     entr_sum_vec = zeros(JuMP.AffExpr, MOI.dimension(cone) - 2)
     ρ_vec = zeros(T, length(entr_sum_vec))
     for (ρ, p) in zip(ρs, prob)

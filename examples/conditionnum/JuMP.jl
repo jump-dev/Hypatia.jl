@@ -1,5 +1,6 @@
 #=
-minimize the condition number of positive definite matrix M(x) = M_0 + sum_i x_i*M_i
+minimize the condition number of positive definite matrix
+M(x) = M_0 + sum_i x_i*M_i
 subject to F(x) = F_0 + sum_i x_i*F_i in S_+
 
 original formulation:
@@ -33,7 +34,8 @@ function build(inst::ConditionNumJuMP{T}) where {T <: Float64}
     Mi = [rand_pd() for i in 1:len_y]
     M0 = rand_pd()
     # make some F_i matrices pos def
-    Fi = [(rand() > 0.5 || i <= 2) ? rand_pd() : Symmetric(randn(side, side)) for i in 1:len_y]
+    Fi = [(rand() > 0.5 || i <= 2) ? rand_pd() :
+        Symmetric(randn(side, side)) for i in 1:len_y]
     F0 = rand_pd() + I
 
     model = JuMP.Model()
@@ -45,16 +47,22 @@ function build(inst::ConditionNumJuMP{T}) where {T <: Float64}
     JuMP.@objective(model, Min, gamma)
 
     if inst.use_linmatrixineq
+        lmiT = Hypatia.LinMatrixIneqCone{T}
         JuMP.@constraints(model, begin
-            vcat(nu, y) in Hypatia.LinMatrixIneqCone{Float64}([F0, Fi...])
-            vcat(-1, nu, y) in Hypatia.LinMatrixIneqCone{Float64}([I, M0, Mi...])
-            vcat(gamma, -nu, -y) in Hypatia.LinMatrixIneqCone{Float64}([I, M0, Mi...])
+            vcat(nu, y) in lmiT([F0, Fi...])
+            vcat(-1, nu, y) in lmiT([I, M0, Mi...])
+            vcat(gamma, -nu, -y) in lmiT([I, M0, Mi...])
         end)
     else
+        S1 = Symmetric(nu * F0 + sum(y[i] * Fi[i] for i in eachindex(y)))
+        S2 = Symmetric(nu * M0 + sum(y[i] * Mi[i] for i in eachindex(y)) - I)
+        S3 = Symmetric(gamma * Matrix(I, side, side) - nu * M0 -
+            sum(y[i] * Mi[i] for i in eachindex(y)))
+
         JuMP.@constraints(model, begin
-            Symmetric(nu * F0 + sum(y[i] * Fi[i] for i in eachindex(y))) in JuMP.PSDCone()
-            Symmetric(nu * M0 + sum(y[i] * Mi[i] for i in eachindex(y)) - I) in JuMP.PSDCone()
-            Symmetric(gamma * Matrix(I, side, side) - nu * M0 - sum(y[i] * Mi[i] for i in eachindex(y))) in JuMP.PSDCone()
+            S1 in JuMP.PSDCone()
+            S2 in JuMP.PSDCone()
+            S3 in JuMP.PSDCone()
         end)
     end
 

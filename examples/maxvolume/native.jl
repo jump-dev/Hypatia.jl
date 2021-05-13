@@ -19,17 +19,10 @@ function build(inst::MaxVolumeNative{T}) where {T <: Real}
     A = hcat(zeros(T, n), poly_hrep)
     b = ones(T, n)
 
-    # modified from https://github.com/JuliaOpt/MathOptInterface.jl/blob/master/src/Bridges/Constraint/geomean.jl
-    function log_floor(n, i)
-        if n <= 2 ^ i
-            i
-        else
-            log_floor(n, i + 1)
-        end
-    end
+    log_floor(n, i) = (n <= 2^i ? i : log_floor(n, i + 1))
     function log_floor(n::Integer)
         @assert n > zero(n)
-        log_floor(n, zero(n))
+        return log_floor(n, zero(n))
     end
 
     if inst.use_hypogeomean
@@ -39,14 +32,15 @@ function build(inst::MaxVolumeNative{T}) where {T <: Real}
     elseif inst.use_power
         @assert n > 2
         cones = Cones.Cone{T}[]
-        # number of 3-dimensional power cones needed is n - 1, number of new variables is n - 2
+        # n - 1 3-dim power cones needed, number of new variables is n - 2
         len_power = 3 * (n - 1)
         G_geo_orig = zeros(T, len_power, n)
         G_geo_newvars = zeros(T, len_power, n - 2)
         c = vcat(c, zeros(T, n - 2))
         A = hcat(A, zeros(T, n, n - 2))
 
-        # first cone is a special case since two of the original variables participate in it
+        # first cone is a special case since two of the original variables
+        # participate in it
         G_geo_orig[1, 1] = -1
         G_geo_orig[2, 2] = -1
         G_geo_newvars[3, 1] = -1
@@ -57,7 +51,8 @@ function build(inst::MaxVolumeNative{T}) where {T <: Real}
             G_geo_newvars[offset + 2, i + 1] = -1
             G_geo_newvars[offset + 1, i] = -1
             G_geo_orig[offset, i + 2] = -1
-            push!(cones, Cones.GeneralizedPower{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1))
+            push!(cones, Cones.GeneralizedPower{T}([inv(T(i + 2)),
+                T(i + 1) / T(i + 2)], 1))
             offset += 3
         end
         # last row also special becuase hypograph variable is involved
@@ -101,15 +96,15 @@ function build(inst::MaxVolumeNative{T}) where {T <: Real}
         end
 
         for j in 1:(2 ^ (num_layers - 1))
-            # in the last layer, we use the original variables
+            # in the last layer, we use the original variables;
+            # if beyond the number of variables in the actual
+            # geometric mean, adding the buffer variable
             if 2j - 1 > n
-                # if we are beyond the number of variables in the actual geometric mean, we are adding the buffer variable
                 G_rsoc[row, n + 1] = -inv(rtfact)
             else
                 G_rsoc[row, 2j - 1] = -1
             end
             if 2j > n
-                # if we are beyond the number of variables in the actual geometric mean, we are adding the buffer variable
                 G_rsoc[row + 1, n + 1] = -inv(rtfact)
             else
                 G_rsoc[row + 1, 2j] = -1

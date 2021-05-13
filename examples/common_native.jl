@@ -7,7 +7,11 @@ include(joinpath(@__DIR__, "common.jl"))
 abstract type ExampleInstanceNative{T <: Real} <: ExampleInstance{T} end
 
 # fallback: just check optimal status
-function test_extra(inst::ExampleInstanceNative, solve_stats::NamedTuple, ::NamedTuple)
+function test_extra(
+    inst::ExampleInstanceNative,
+    solve_stats::NamedTuple,
+    ::NamedTuple,
+    )
     @test solve_stats.status == Solvers.Optimal
 end
 
@@ -15,7 +19,7 @@ function run_instance(
     ex_type::Type{<:ExampleInstanceNative{T}}, # an instance of a native example
     inst_data::Tuple,
     inst_options::NamedTuple = NamedTuple(),
-    solver_type::Type{<:Solvers.Solver} = Solvers.Solver{T}; # TODO can generalize for other solvers
+    solver_type::Type{<:Solvers.Solver} = Solvers.Solver{T};
     default_options::NamedTuple = NamedTuple(),
     test::Bool = true,
     rseed::Int = 1,
@@ -45,5 +49,6 @@ function run_instance(
     end
     flush(stdout); flush(stderr)
 
-    return (; model_stats..., solve_stats..., setup_time, check_time, :script_status => "Success")
+    return (; model_stats..., solve_stats..., setup_time,
+        check_time, :script_status => "Success")
 end

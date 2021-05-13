@@ -4,11 +4,12 @@ adapted from Boyd and Vandenberghe, "Convex Optimization", section 7.5
 maximize    F(V × Diagonal(x) × V')
 subject to  sum(np) == n
             0 .<= np .<= n_max
-where np is a vector of variables representing the number of experiment to run (fractional),
+where np is a vector of variables representing the number of experiment to run,
 and the columns of V are the vectors representing each experiment
 
 if logdet_obj or rootdet_obj is true, F is the logdet or rootdet function
-if geomean_obj is true, we use a formulation from https://picos-api.gitlab.io/picos/optdes.html that finds an equivalent minimizer
+if geomean_obj is true, we use a formulation from
+https://picos-api.gitlab.io/picos/optdes.html that finds an equivalent minimizer
 =#
 
 struct DOptimalDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -29,7 +30,8 @@ function build(inst::DOptimalDesignJuMP{T}) where {T <: Float64}
 
     model = JuMP.Model()
     JuMP.@variable(model, np[1:p])
-    JuMP.@constraint(model, vcat(n_max / 2, np .- n_max / 2) in MOI.NormInfinityCone(p + 1))
+    JuMP.@constraint(model, vcat(n_max / 2, np .- n_max / 2) in
+        MOI.NormInfinityCone(p + 1))
     Q = V * diagm(np) * V' # information matrix
     JuMP.@constraint(model, sum(np) == n)
     v1 = [Q[i, j] for i in 1:q for j in 1:i] # vectorized Q
@@ -44,13 +46,13 @@ function build(inst::DOptimalDesignJuMP{T}) where {T <: Float64}
         JuMP.@constraint(model, vcat(hypo, v1) in MOI.RootDetConeTriangle(q))
     else
         # hypogeomean + epinormeucl formulation
-        JuMP.@variable(model, lowertri[i in 1:q, j in 1:i])
+        JuMP.@variable(model, L[i in 1:q, j in 1:i])
         JuMP.@variable(model, W[1:p, 1:q])
         VW = V * W
         JuMP.@constraints(model, begin
-            [i in 1:q, j in 1:i], VW[i, j] == lowertri[i, j]
+            [i in 1:q, j in 1:i], VW[i, j] == L[i, j]
             [i in 1:q, j in (i + 1):q], VW[i, j] == 0
-            vcat(hypo, [lowertri[i, i] for i in 1:q]) in MOI.GeometricMeanCone(q + 1)
+            vcat(hypo, [L[i, i] for i in 1:q]) in MOI.GeometricMeanCone(q + 1)
             [i in 1:p], vcat(sqrt(q) * np[i], W[i, :]) in JuMP.SecondOrderCone()
         end)
     end
