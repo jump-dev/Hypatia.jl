@@ -6,12 +6,12 @@ include(joinpath(@__DIR__, "../spawn.jl"))
 results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
 # results_path = nothing
 
-setup_model_anyway = true # keep setting up models of larger size even if previous solve-check was killed
+setup_model_anyway = true # keep setting up larger models even if last solve was killed
 # setup_model_anyway = false
 
 verbose = true # make solvers print output
 # verbose = false
-num_threads = 16 # number of threads to use for BLAS and Julia processes that run instances
+num_threads = 16 # number of threads for BLAS and Julia processes running instances
 free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
 optimizer_time_limit = 1800
 setup_time_limit = 2 * optimizer_time_limit
@@ -34,7 +34,7 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
     QUIET = !verbose,
     MSK_IPAR_NUM_THREADS = num_threads,
     MSK_IPAR_OPTIMIZER = Mosek.MSK_OPTIMIZER_CONIC,
-    MSK_IPAR_INTPNT_BASIS = Mosek.MSK_BI_NEVER, # do not do basis identification for LO problems
+    MSK_IPAR_INTPNT_BASIS = Mosek.MSK_BI_NEVER, # no basis identification for LP
     MSK_DPAR_OPTIMIZER_MAX_TIME = optimizer_time_limit,
     MSK_DPAR_INTPNT_CO_TOL_REL_GAP = tol_loose,
     MSK_DPAR_INTPNT_CO_TOL_PFEAS = tol_loose,
@@ -82,26 +82,36 @@ time_all = time()
 
 println("\nstarting benchmark runs\n")
 for ex_name in JuMP_example_names
-    (ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, "JuMP_benchmark.jl"))
+    (ex_type, ex_insts) = include(joinpath(
+        examples_dir, ex_name, "JuMP_benchmark.jl"))
     ex_type_T = ex_type{Float64}
 
     for (inst_set, solver) in instance_sets
         haskey(ex_insts, inst_set) || continue
         (extender, inst_subsets) = ex_insts[inst_set]
         isempty(inst_subsets) && continue
-        info_perf = (; inst_set, :extender => string(extender), :example => ex_name, :model_type => "JuMP", :real_T => Float64, :solver_options => (), :solver => solver[1])
+
+        info_perf = (; inst_set, :extender => string(extender),
+            :example => ex_name, :model_type => "JuMP", :real_T => Float64,
+            :solver_options => (), :solver => solver[1])
 
         println("\nstarting instances for $ex_type $inst_set\n")
         for inst_subset in inst_subsets
             solve = true
-            compile_inst = inst_subset[1] # first instance is only used for compilation
+            # first instance is only used for compilation
+            compile_inst = inst_subset[1]
+
             for (inst_num, inst_data) in enumerate(inst_subset[2:end])
-                println("\nstarting $ex_type $inst_set $(solver[1]) $inst_num: $inst_data ...\n")
+                println("\nstarting $ex_type $inst_set $(solver[1]) $inst_num:
+                    $inst_data ...\n")
                 flush(stdout); flush(stderr)
 
-                total_time = @elapsed (setup_killed, check_killed, run_perf) = spawn_instance(ex_name, ex_type_T, compile_inst, inst_data, extender, solver, solve)
+                total_time = @elapsed (setup_killed, check_killed, run_perf) =
+                    spawn_instance(ex_name, ex_type_T, compile_inst,
+                    inst_data, extender, solver, solve)
 
-                new_perf = (; info_perf..., run_perf..., total_time, inst_num, inst_data)
+                new_perf = (; info_perf..., run_perf..., total_time,
+                    inst_num, inst_data)
                 write_perf(perf, results_path, new_perf)
 
                 @printf("%8.2e seconds\n", total_time)

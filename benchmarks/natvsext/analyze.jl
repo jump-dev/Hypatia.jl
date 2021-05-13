@@ -65,7 +65,8 @@ function post_process()
     replace!(all_df.extender, extender_map...)
     for (ex_name, ex_params) in examples_params
         println()
-        ex_df = filter(t -> t.example == ex_name && t.extender in vcat("", string.(ex_params[3])), all_df)
+        ex_df = filter(t -> t.example == ex_name &&
+            t.extender in vcat("", string.(ex_params[3])), all_df)
         if isempty(ex_df)
             @info("no data for $ex_name with params: $ex_params")
             continue
@@ -100,8 +101,11 @@ status_map = Dict(
     "SolveCheckCaughtError" => "other",
     )
 
-residual_tol_satisfied(a, tol = 1e-5) = (all(isfinite, a) && maximum(abs, a) < tol)
-relative_tol_satisfied(a::T, b::T, tol::T = 1e-5) where {T <: Real} = (abs(a - b) / (1 + max(abs(a), abs(b))) < tol)
+residual_tol_satisfied(a, tol = 1e-5) =
+    (all(isfinite, a) && maximum(abs, a) < tol)
+
+relative_tol_satisfied(a::T, b::T, tol::T = 1e-5) where {T <: Real} =
+    (abs(a - b) / (1 + max(abs(a), abs(b))) < tol)
 
 ex_wide_file(ex_name::String) = joinpath(stats_dir, ex_name * "_wide.csv")
 
@@ -111,15 +115,19 @@ function make_wide_csv(ex_df, ex_name, ex_params)
 
     # add columns
     inst_ext_name(inst_set, extender) = (isempty(extender) ? inst_set : extender)
-    transform!(ex_df, [:inst_set, :extender] => ((x, y) -> inst_ext_name.(x, y)) => :inst_ext)
+    transform!(ex_df, [:inst_set, :extender] => ((x, y) ->
+        inst_ext_name.(x, y)) => :inst_ext)
     inst_solver_name(inst_ext, solver) = (inst_ext * "_" * solver)
     transform!(ex_df,
         [:inst_ext, :solver] => ((x, y) -> inst_solver_name.(x, y)) => :inst_solver,
-        [:x_viol, :y_viol, :z_viol, :rel_obj_diff] => ByRow((res...) -> residual_tol_satisfied(coalesce.(res, NaN))) => :converged,
-        [:status, :script_status] => ByRow((x, y) -> (y == "Success" ? status_map[x] : status_map[y])) => :status,
+        [:x_viol, :y_viol, :z_viol, :rel_obj_diff] => ByRow((res...) ->
+            residual_tol_satisfied(coalesce.(res, NaN))) => :converged,
+        [:status, :script_status] => ByRow((x, y) ->
+            (y == "Success" ? status_map[x] : status_map[y])) => :status,
         )
     for (name, pos) in zip(inst_keys, ex_params[2])
-        transform!(ex_df, :inst_data => ByRow(x -> eval(Meta.parse(x))[pos]) => name)
+        transform!(ex_df, :inst_data => ByRow(x ->
+            eval(Meta.parse(x))[pos]) => name)
     end
 
     inst_solvers = unique(ex_df[:, :inst_solver])
@@ -128,24 +136,28 @@ function make_wide_csv(ex_df, ex_name, ex_params)
     # check objectives if solver claims optimality
     for group_df in groupby(ex_df, inst_keys)
         # check all pairs of verified converged results
-        co_idxs = findall((group_df[:, :status] .== "co") .& group_df[:, :converged])
+        co_idxs = findall((group_df[:, :status] .== "co") .&
+            group_df[:, :converged])
         if length(co_idxs) >= 2
             for i in eachindex(co_idxs)
                 first_optval = group_df[co_idxs[i], :primal_obj]
                 other_optvals = group_df[co_idxs[Not(i)], :primal_obj]
                 if !all(relative_tol_satisfied.(other_optvals, first_optval))
-                    println("objective values of: $(ex_name) $(group_df[!, :inst_data][1]) do not agree")
+                    println("objective values of: $(ex_name)
+                        $(group_df[!, :inst_data][1]) do not agree")
                 end
             end
         end
     end
 
     unstacked_dims = [
-        unstack(ex_df, inst_keys, :inst_ext, v, renamecols = x -> Symbol(v, :_, x), allowduplicates=true)
+        unstack(ex_df, inst_keys, :inst_ext, v, renamecols = x ->
+            Symbol(v, :_, x), allowduplicates=true)
         for v in [:nu, :n, :p, :q]
         ]
     unstacked_res = [
-        unstack(ex_df, inst_keys, :inst_solver, v, renamecols = x -> Symbol(v, :_, x), allowduplicates=true)
+        unstack(ex_df, inst_keys, :inst_solver, v, renamecols = x ->
+            Symbol(v, :_, x), allowduplicates=true)
         for v in [:status, :converged, :iters, :solve_time]
         ]
     ex_df_wide = outerjoin(unstacked_dims..., unstacked_res..., on = inst_keys)
@@ -166,12 +178,14 @@ function process_entry(x::Float64)
         return @sprintf("%.0f.", x)
     end
 end
-process_entry(st::String, converged::Bool) = (converged ? "\\underline{$(st)}" : st)
+process_entry(st::String, converged::Bool) =
+    (converged ? "\\underline{$(st)}" : st)
 process_entry(x) = string(x)
 
 function process_inst_solver(row, inst_solver)
     sep = " & "
-    row_str = sep * process_entry(row[Symbol(:status_, inst_solver)], row[Symbol(:converged_, inst_solver)])
+    row_str = sep * process_entry(row[Symbol(:status_, inst_solver)],
+        row[Symbol(:converged_, inst_solver)])
     row_str *= sep * process_entry(row[Symbol(:iters_, inst_solver)])
     row_str *= sep * process_entry(row[Symbol(:solve_time_, inst_solver)])
     return row_str
@@ -213,7 +227,8 @@ end
 
 function transform_plot_cols(ex_df_wide, inst_solver)
     old_cols = Symbol.([:converged_, :solve_time_], inst_solver)
-    transform!(ex_df_wide, old_cols => ByRow((x, y) -> ((!ismissing(x) && x) ? y : missing)) => inst_solver)
+    transform!(ex_df_wide, old_cols => ByRow((x, y) ->
+        ((!ismissing(x) && x) ? y : missing)) => inst_solver)
 end
 
 function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
@@ -236,7 +251,8 @@ function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
         group_name = first(inst_keys)
         success_df = select(ex_df_wide, axis_name, group_name, inst_solvers...)
         for (group_id, group_df) in pairs(groupby(success_df, group_name))
-            CSV.write(plot_file_start * "_$(group_id[1]).csv", select(group_df, Not(group_name)))
+            CSV.write(plot_file_start * "_$(group_id[1]).csv",
+                select(group_df, Not(group_name)))
         end
     end
 

@@ -87,7 +87,7 @@ mutable struct Solver{T <: Real}
     time_unproc::Float64 # unprocess final point
     time_loadsys::Float64 # initialize/load system solver
     time_upsys::Float64 # update LHS and factorization etc for directions solving
-    time_upfact::Float64 # update inner sparse/dense factorization for directions solving only
+    time_upfact::Float64 # update inner factorization for directions solving only
     time_uprhs::Float64 # update RHSs for directions
     time_getdir::Float64 # solve for directions
     time_search::Float64 # searches for alpha parameters
