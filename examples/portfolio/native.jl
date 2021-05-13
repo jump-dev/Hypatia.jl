@@ -16,7 +16,9 @@ struct PortfolioNative{T <: Real} <: ExampleInstanceNative{T}
 end
 
 function build(inst::PortfolioNative{T}) where {T <: Real}
+    @assert xor(inst.epinormeucl_constr, inst.epinorminf_constrs)
     num_stocks = inst.num_stocks
+
     returns = rand(T, num_stocks)
     sigma_half = T.(randn(num_stocks, num_stocks))
     x = T.(randn(num_stocks))

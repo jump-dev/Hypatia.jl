@@ -4,12 +4,14 @@ portfolio rebalancing problem
 
 struct PortfolioJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     num_stocks::Int
-    epipernormeucl_constr::Bool # add an L2 ball constraint, else don't add
+    epinormeucl_constr::Bool # add an L2 ball constraint, else don't add
     epinorminf_constrs::Bool # add L1 and Linfty ball constraints, else don't add
 end
 
 function build(inst::PortfolioJuMP{T}) where {T <: Float64}
+    @assert xor(inst.epinormeucl_constr, inst.epinorminf_constrs)
     num_stocks = inst.num_stocks
+
     returns = rand(num_stocks)
     sigma_half = randn(num_stocks, num_stocks)
     x = randn(num_stocks)
@@ -22,8 +24,8 @@ function build(inst::PortfolioJuMP{T}) where {T <: Float64}
     JuMP.@constraint(model, sum(invest) == 0)
     JuMP.@constraint(model, A * invest .== 0)
 
-    if inst.epipernormeucl_constr
-        JuMP.@constraint(model, vcat(gamma, sigma_half * invest) in JuMP.SecondOrderCone())
+    if inst.epinormeucl_constr
+        JuMP.@constraint(model, vcat(gamma / sqrt(num_stocks), sigma_half * invest) in JuMP.SecondOrderCone())
     end
     if inst.epinorminf_constrs
         JuMP.@constraint(model, vcat(1, invest) in MOI.NormInfinityCone(1 + num_stocks))
