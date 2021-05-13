@@ -18,10 +18,13 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
     maxabsminrow(v::UniformScaling, ::Int) = max(abs(v.λ), minval)
     maxabsminrow(v::AbstractMatrix, i::Int) = maxabsmin(view(v, i, :))
     maxabsminrows(v::UniformScaling, ::UnitRange{Int}) = max(abs(v.λ), minval)
-    maxabsminrows(v::AbstractMatrix, rows::UnitRange{Int}) = maxabsmin(view(v, rows, :))
+    maxabsminrows(v::AbstractMatrix, rows::UnitRange{Int}) =
+        maxabsmin(view(v, rows, :))
 
-    @inbounds solver.c_scale = c_scale = T[sqrt(max(abs(c[j]), maxabsmincol(A, j), maxabsmincol(G, j))) for j in eachindex(c)]
-    @inbounds solver.b_scale = b_scale = T[sqrt(max(abs(b[i]), maxabsminrow(A, i))) for i in eachindex(b)]
+    @inbounds solver.c_scale = c_scale = T[sqrt(max(abs(c[j]),
+        maxabsmincol(A, j), maxabsmincol(G, j))) for j in eachindex(c)]
+    @inbounds solver.b_scale = b_scale = T[sqrt(max(abs(b[i]),
+        maxabsminrow(A, i))) for i in eachindex(b)]
 
     h_scale = solver.h_scale = ones(T, model.q)
     for (k, cone) in enumerate(model.cones)
@@ -32,7 +35,8 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
             end
         else
             # TODO store single scale value only?
-            @inbounds @views h_scale[idxs] .= sqrt(max(maxabsmin(h[idxs]), maxabsminrows(G, idxs)))
+            @inbounds @views h_scale[idxs] .= sqrt(
+                max(maxabsmin(h[idxs]), maxabsminrows(G, idxs)))
         end
     end
 
@@ -50,7 +54,8 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
     return true
 end
 
-# optionally preprocess dual equalities and solve for x as least squares solution to Ax = b, Gx = h - s
+# optionally preprocess dual equalities and solve for x as least squares
+# solution to Ax = b, Gx = h - s
 function find_initial_x(
     solver::Solver{T},
     init_s::Vector{T},
@@ -101,7 +106,9 @@ function find_initial_x(
     end
     if issparse(AG)
         if !(T <: Float64)
-            @warn("using dense factorization of [A; G] in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
+            @warn("using dense factorization of [A; G] in preprocessing and
+                initial point finding because sparse factorization for number
+                type $T is not supported by SuiteSparse packages")
             AG_fact = qr!(Matrix(AG), Val(true))
         else
             AG_fact = qr(AG, tol = solver.init_tol_qr)
@@ -112,7 +119,10 @@ function find_initial_x(
     AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
 
     if !solver.preprocess || (AG_rank == n)
-        AG_rank < n && @warn("some dual equalities appear to be dependent (possibly inconsistent); try using preprocess = true")
+        if AG_rank < n
+            @warn("some dual equalities appear to be dependent
+            (possibly inconsistent); try using preprocess = true")
+        end
         init_x = AG_fact \ rhs
         return init_x
     end
@@ -134,11 +144,17 @@ function find_initial_x(
     end
     @views residual = norm(A' * yz_sub[1:p] + G' * yz_sub[(p + 1):end] - model.c, Inf)
     if residual > solver.init_tol_qr
-        solver.verbose && println("some dual equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
+        if solver.verbose
+            println("some dual equality constraints are inconsistent
+            (residual $residual, tolerance $(solver.init_tol_qr))")
+        end
         solver.status = DualInconsistent
         return zeros(T, 0)
     end
-    solver.verbose && println("$(n - AG_rank) out of $n dual equality constraints are dependent")
+    if solver.verbose
+        println("$(n - AG_rank) out of $n dual equality
+        constraints are dependent")
+    end
 
     # modify solver.model to remove/reorder some primal variables x
     model.c = c_sub
@@ -156,7 +172,8 @@ function find_initial_x(
     return init_x
 end
 
-# optionally preprocess primal equalities and solve for y as least squares solution to A'y = -c - G'z
+# optionally preprocess primal equalities and solve for y as least squares
+# solution to A'y = -c - G'z
 function find_initial_y(
     solver::Solver{T},
     init_z::Vector{T},
@@ -194,7 +211,9 @@ function find_initial_y(
     # factorize A'
     if issparse(A)
         if !(T <: Float64)
-            @warn("using dense factorization of A' in preprocessing and initial point finding because sparse factorization for number type $T is not supported by SuiteSparse packages")
+            @warn("using dense factorization of A' in preprocessing and initial
+                point finding because sparse factorization for number type $T
+                is not supported by SuiteSparse packages")
             Ap_fact = qr!(Matrix(A'), Val(true))
         else
             Ap_fact = qr(sparse(A'), tol = solver.init_tol_qr)
@@ -205,7 +224,10 @@ function find_initial_y(
     Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
 
     if !reduce && !solver.preprocess
-        Ap_rank < p && @warn("some primal equalities appear to be dependent (possibly inconsistent); try using preprocess = true")
+        if Ap_rank < p
+            @warn("some primal equalities appear to be dependent
+            (possibly inconsistent); try using preprocess = true")
+        end
         init_y = Ap_fact \ rhs
         return init_y
     end
@@ -231,15 +253,22 @@ function find_initial_y(
         end
         residual = norm(A * x_sub - model.b, Inf)
         if residual > solver.init_tol_qr
-            solver.verbose && println("some primal equality constraints are inconsistent (residual $residual, tolerance $(solver.init_tol_qr))")
+            if solver.verbose
+                println("some primal equality constraints are inconsistent
+                (residual $residual, tolerance $(solver.init_tol_qr))")
+            end
             solver.status = PrimalInconsistent
             return zeros(T, 0)
         end
-        solver.verbose && println("$(p - Ap_rank) out of $p primal equality constraints are dependent")
+        if solver.verbose
+            println("$(p - Ap_rank) out of $p primal equality
+            constraints are dependent")
+        end
     end
 
     if reduce && isa(model.G, MatrixyAG)
-        # remove all primal equalities by making A and b empty with n = n0 - p0 and p = 0
+        # remove all primal equalities by making A and b empty with
+        # n = n0 - p0 and p = 0
         # TODO improve efficiency
         # TODO avoid calculating GQ1 explicitly if possible
         # recover original-space solution using:
@@ -270,7 +299,8 @@ function find_initial_y(
         model.obj_offset += dot(cQ1, Rpib0)
 
         # [GQ1 GQ2] = G0 * Q
-        # NOTE very inefficient method used for sparse G * QRSparseQ : see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
+        # NOTE very inefficient method used for sparse G * QRSparseQ
+        # see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
         if model.G isa UniformScaling
             side = size(Ap_Q, 1)
             G_mul = Matrix{T}(model.G, side, side)
@@ -329,9 +359,12 @@ function find_initial_y(
     return init_y
 end
 
-# NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable, see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
+# NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable
+# see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
 # TODO could replace this with rank(qr_fact) when available for both dense and sparse
-get_rank_est(qr_fact::SuiteSparse.SPQR.QRSparse, init_tol_qr::Real) = rank(qr_fact)
+get_rank_est(qr_fact::SuiteSparse.SPQR.QRSparse, init_tol_qr::Real) =
+    rank(qr_fact)
+
 function get_rank_est(qr_fact::QRPivoted, init_tol_qr::Real)
     factors = qr_fact.factors
     rank_est = 0
@@ -398,7 +431,8 @@ function postprocess(solver::Solver{T}) where {T <: Real}
             if !in(solver.status, (PrimalInfeasible, DualInfeasible))
                 ya .+= solver.reduce_cQ1
             end
-            @views ldiv!(solver.reduce_Ap_R, ya[1:length(solver.reduce_y_keep_idxs)])
+            @views ldiv!(solver.reduce_Ap_R,
+                ya[1:length(solver.reduce_y_keep_idxs)])
             @. @views result.y[solver.reduce_y_keep_idxs] = -ya
         else
             @. @views result.y[solver.y_keep_idxs] = point.y / tau

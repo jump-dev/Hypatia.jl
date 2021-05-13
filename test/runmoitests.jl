@@ -44,7 +44,8 @@ end
         test_info = "$T, $use_dense_model"
         @testset "$test_info" begin
             println(test_info, " ...")
-            test_time = @elapsed test_moi(T, use_dense_model = use_dense_model; default_options...)
+            test_time = @elapsed test_moi(T,
+                use_dense_model = use_dense_model; default_options...)
             @printf("%8.2e seconds\n", test_time)
         end
     end

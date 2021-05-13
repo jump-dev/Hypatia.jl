@@ -98,20 +98,23 @@ isnothing(results_path) || CSV.write(results_path, perf)
 @testset "$ex_name" for ex_name in eval(Symbol(mod_type, "_example_names"))
 
 include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
-(ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, mod_type * "_test.jl"))
+(ex_type, ex_insts) = include(joinpath(
+    examples_dir, ex_name, mod_type * "_test.jl"))
 
 for (inst_set, real_T, time_limit) in instance_sets
     haskey(ex_insts, inst_set) || continue
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue
 
-    info_perf = (; inst_set, real_T, :example => ex_name, :model_type => mod_type, :solver_options => ())
+    info_perf = (; inst_set, real_T, :example => ex_name,
+        :model_type => mod_type, :solver_options => ())
     new_default_options = (; default_options..., time_limit = time_limit)
     ex_type_T = ex_type{real_T}
 
     println("starting $ex_type_T $inst_set tests\n")
     @testset "$ex_type_T $inst_set" begin
-        run_instance_set(inst_subset, ex_type_T, info_perf, new_default_options, script_verbose, perf, results_path)
+        run_instance_set(inst_subset, ex_type_T, info_perf,
+            new_default_options, script_verbose, perf, results_path)
     end
     println()
 end

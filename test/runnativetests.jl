@@ -41,7 +41,10 @@ function test_instance_solver(
         println(test_info, " ...")
         solver = Solvers.Solver{T}(; options...)
         test_time = @elapsed eval(Symbol(inst_name))(T, solver = solver)
-        push!(perf, (inst_name, string(T), type_name(solver.stepper), type_name(solver.system_solver), solver.init_use_indirect, solver.preprocess, solver.reduce, test_time, string(Solvers.get_status(solver))))
+        push!(perf, (inst_name, string(T), type_name(solver.stepper),
+            type_name(solver.system_solver), solver.init_use_indirect,
+            solver.preprocess, solver.reduce, test_time,
+            string(Solvers.get_status(solver))))
         @printf("%8.2e seconds\n", test_time)
     end
     return nothing
@@ -76,7 +79,8 @@ end
 @testset "no preprocess tests" begin
     println("\nstarting no preprocess tests")
     for inst_name in inst_cones_few, T in diff_reals
-        options = (; default_options..., preprocess = false, reduce = false, system_solver = Solvers.SymIndefDenseSystemSolver{T}())
+        options = (; default_options..., preprocess = false, reduce = false,
+            system_solver = Solvers.SymIndefDenseSystemSolver{T}())
         test_instance_solver(inst_name, T, options)
     end
 end
@@ -84,7 +88,11 @@ end
 @testset "indirect solvers tests" begin
     println("\nstarting indirect solvers tests")
     for inst_name in inst_indirect, T in diff_reals
-        options = (; default_options..., init_use_indirect = true, preprocess = false, reduce = false, system_solver = Solvers.SymIndefIndirectSystemSolver{T}(), tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4, tol_infeas = 1e-6)
+        options = (; default_options..., init_use_indirect = true,
+            preprocess = false, reduce = false,
+            system_solver = Solvers.SymIndefIndirectSystemSolver{T}(),
+            tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4,
+            tol_infeas = 1e-6)
         test_instance_solver(inst_name, T, options)
     end
 end
@@ -100,8 +108,10 @@ end
         (Solvers.SymIndefSparseSystemSolver, [Float64,]),
         (Solvers.QRCholDenseSystemSolver, all_reals),
         ]
-    for inst_name in inst_minimal, (system_solver, real_types) in system_solvers, T in real_types
-        options = (; default_options..., system_solver = system_solver{T}(), reduce = false)
+    for inst_name in inst_minimal, (system_solver, real_types) in system_solvers,
+        T in real_types
+        options = (; default_options...,
+            system_solver = system_solver{T}(), reduce = false)
         test_instance_solver(inst_name, T, options, string_nameof(system_solver))
     end
 end
@@ -110,7 +120,9 @@ end
     println("\nstarting PredOrCentStepper tests (with printing)")
     use_corr_curv = [(false, false), (true, false), (true, true)]
     for inst_name in inst_minimal, (corr, curv) in use_corr_curv, T in diff_reals
-        options = (; default_options..., verbose = true, stepper = Solvers.PredOrCentStepper{T}(use_correction = corr, use_curve_search = curv))
+        options = (; default_options..., verbose = true, stepper =
+            Solvers.PredOrCentStepper{T}(
+            use_correction = corr, use_curve_search = curv))
         test_instance_solver(inst_name, T, options, "corr=$corr curv=$curv")
     end
 end
@@ -119,7 +131,8 @@ end
     println("\nstarting CombinedStepper tests (with printing)")
     use_shift = [0, 2]
     for inst_name in inst_minimal, shift in use_shift, T in diff_reals
-        options = (; default_options..., verbose = true, stepper = Solvers.CombinedStepper{T}(shift))
+        options = (; default_options..., verbose = true,
+            stepper = Solvers.CombinedStepper{T}(shift))
         test_instance_solver(inst_name, T, options, "shift=$shift")
     end
 end

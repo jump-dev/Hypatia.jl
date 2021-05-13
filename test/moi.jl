@@ -44,7 +44,10 @@ conic_exclude = String[
     ]
 
 function test_moi(T::Type{<:Real}; solver_options...)
-    optimizer = MOIU.CachingOptimizer(MOIU.UniversalFallback(MOIU.Model{T}()), Hypatia.Optimizer{T}(; solver_options...))
+    optimizer = MOIU.CachingOptimizer(
+        MOIU.UniversalFallback(MOIU.Model{T}()),
+        Hypatia.Optimizer{T}(; solver_options...)
+        )
 
     tol = 2sqrt(sqrt(eps(T)))
     config = MOIT.TestConfig{T}(
@@ -67,7 +70,8 @@ function test_moi(T::Type{<:Real}; solver_options...)
             MOIT.unittest(optimizer, config, unit_exclude)
         end
         @testset "conic tests" begin
-            MOIT.contconictest(MOI.Bridges.Constraint.Square{T}(optimizer), config, conic_exclude)
+            bridged = MOI.Bridges.Constraint.Square{T}(optimizer)
+            MOIT.contconictest(bridged, config, conic_exclude)
         end
     end
 

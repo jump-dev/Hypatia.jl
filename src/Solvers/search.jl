@@ -21,7 +21,9 @@ mutable struct StepSearcher{T <: Real}
         step_searcher.cone_order = collect(1:length(cones))
         step_searcher.min_nbhd = T(0.01) # TODO tune
         step_searcher.max_nbhd = T(0.99) # TODO tune, maybe should be different for cones without third order correction
-        step_searcher.alpha_sched = T[0.9999, 0.999, 0.99, 0.97, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5, 0.3, 0.1, 0.05, 0.01, 0.005, 0.001, 0.0005] # TODO tune
+        step_searcher.alpha_sched = T[ # TODO tune
+            0.9999, 0.999, 0.99, 0.97, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5,
+            0.3, 0.1, 0.05, 0.01, 0.005, 0.001, 0.0005]
         step_searcher.prev_sched = 0
         return step_searcher
     end
@@ -70,7 +72,8 @@ function check_cone_points(
     end
     mu_cand = (sum(skzk) + taukap_cand) / step_searcher.nup1
 
-    if (mu_cand < eps(T)) || (taukap_cand < min_nbhd * mu_cand) || (abs(taukap_cand - mu_cand) > max_nbhd * mu_cand)
+    if (mu_cand < eps(T)) || (taukap_cand < min_nbhd * mu_cand) ||
+        (abs(taukap_cand - mu_cand) > max_nbhd * mu_cand)
         return false
     end
     max_nbhd_sqr = abs2(max_nbhd)
@@ -93,7 +96,8 @@ function check_cone_points(
         Cones.load_point(cone_k, cand.primal_views[k], irtmu)
         Cones.load_dual_point(cone_k, cand.dual_views[k])
         Cones.reset_data(cone_k)
-        in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) && Cones.in_neighborhood(cone_k, rtmu, max_nbhd))
+        in_nbhd_k = (Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) &&
+            Cones.in_neighborhood(cone_k, rtmu, max_nbhd))
         step_searcher.cone_times[k] = time() - start_time
         in_nbhd_k || return false
     end
