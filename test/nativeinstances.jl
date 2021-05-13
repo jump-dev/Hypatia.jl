@@ -2034,7 +2034,7 @@ function epipersepspectral_matrix1(T; options...)
     for d in [1, 3], is_complex in [false, true]
         R = (is_complex ? Complex{T} : T)
         cone_dim = 2 + (is_complex ? d^2 : Cones.svec_length(d))
-        W = randn(R, d, d)
+        W = rand(R, d, d)
         W = W * W' + I
         c = T[1]
         A = zeros(T, 0, 1)
@@ -2073,7 +2073,7 @@ function epipersepspectral_matrix2(T; options...)
         h[1] = 1
 
         for h_fun in sep_spectral_funs
-            W = randn(R, d, d)
+            W = rand(R, d, d)
             if Cones.h_conj_dom_pos(h_fun)
                 W = W * W' + I
             end

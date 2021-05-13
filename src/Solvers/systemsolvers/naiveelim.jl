@@ -105,8 +105,8 @@ mutable struct NaiveElimSparseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T
         ) where {T <: Real}
         syssolver = new{T}()
         if !use_inv_hess
-            @warn("SymIndefSparseSystemSolver is not implemented with
-                `use_inv_hess` set to `false`, using `true` instead.")
+            @warn("SymIndefSparseSystemSolver is not implemented with " *
+                "`use_inv_hess` set to `false`, using `true` instead.")
         end
         syssolver.use_inv_hess = use_inv_hess
         syssolver.fact_cache = fact_cache

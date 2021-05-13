@@ -102,8 +102,8 @@ for ex_name in JuMP_example_names
             compile_inst = inst_subset[1]
 
             for (inst_num, inst_data) in enumerate(inst_subset[2:end])
-                println("\nstarting $ex_type $inst_set $(solver[1]) $inst_num:
-                    $inst_data ...\n")
+                println("\nstarting $ex_type $inst_set $(solver[1]) " *
+                    "$inst_num: $inst_data ...\n")
                 flush(stdout); flush(stderr)
 
                 total_time = @elapsed (setup_killed, check_killed, run_perf) =

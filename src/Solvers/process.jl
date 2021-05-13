@@ -106,9 +106,9 @@ function find_initial_x(
     end
     if issparse(AG)
         if !(T <: Float64)
-            @warn("using dense factorization of [A; G] in preprocessing and
-                initial point finding because sparse factorization for number
-                type $T is not supported by SuiteSparse packages")
+            @warn("using dense factorization of [A; G] in preprocessing and " *
+                "initial point finding because sparse factorization for number " *
+                "type $T is not supported by SuiteSparse packages")
             AG_fact = qr!(Matrix(AG), Val(true))
         else
             AG_fact = qr(AG, tol = solver.init_tol_qr)
@@ -120,8 +120,8 @@ function find_initial_x(
 
     if !solver.preprocess || (AG_rank == n)
         if AG_rank < n
-            @warn("some dual equalities appear to be dependent
-            (possibly inconsistent); try using preprocess = true")
+            @warn("some dual equalities appear to be dependent " *
+            "(possibly inconsistent); try using preprocess = true")
         end
         init_x = AG_fact \ rhs
         return init_x
@@ -146,15 +146,14 @@ function find_initial_x(
         yz_sub[(p + 1):end] - model.c, Inf)
     if residual > solver.init_tol_qr
         if solver.verbose
-            println("some dual equality constraints are inconsistent
-            (residual $residual, tolerance $(solver.init_tol_qr))")
+            println("some dual equality constraints are inconsistent " *
+            "(residual $residual, tolerance $(solver.init_tol_qr))")
         end
         solver.status = DualInconsistent
         return zeros(T, 0)
     end
     if solver.verbose
-        println("$(n - AG_rank) out of $n dual equality
-        constraints are dependent")
+        println("$(n - AG_rank) of $n dual equality constraints are dependent")
     end
 
     # modify solver.model to remove/reorder some primal variables x
@@ -212,9 +211,9 @@ function find_initial_y(
     # factorize A'
     if issparse(A)
         if !(T <: Float64)
-            @warn("using dense factorization of A' in preprocessing and initial
-                point finding because sparse factorization for number type $T
-                is not supported by SuiteSparse packages")
+            @warn("using dense factorization of A' in preprocessing and initial " *
+                "point finding because sparse factorization for number type $T " *
+                "is not supported by SuiteSparse packages")
             Ap_fact = qr!(Matrix(A'), Val(true))
         else
             Ap_fact = qr(sparse(A'), tol = solver.init_tol_qr)
@@ -226,8 +225,8 @@ function find_initial_y(
 
     if !reduce && !solver.preprocess
         if Ap_rank < p
-            @warn("some primal equalities appear to be dependent
-            (possibly inconsistent); try using preprocess = true")
+            @warn("some primal equalities appear to be dependent " *
+            "(possibly inconsistent); try using preprocess = true")
         end
         init_y = Ap_fact \ rhs
         return init_y
@@ -255,15 +254,15 @@ function find_initial_y(
         residual = norm(A * x_sub - model.b, Inf)
         if residual > solver.init_tol_qr
             if solver.verbose
-                println("some primal equality constraints are inconsistent
-                (residual $residual, tolerance $(solver.init_tol_qr))")
+                println("some primal equality constraints are inconsistent " *
+                "(residual $residual, tolerance $(solver.init_tol_qr))")
             end
             solver.status = PrimalInconsistent
             return zeros(T, 0)
         end
         if solver.verbose
-            println("$(p - Ap_rank) out of $p primal equality
-            constraints are dependent")
+            println("$(p - Ap_rank) of $p primal equality constraints " *
+                "are dependent")
         end
     end
 

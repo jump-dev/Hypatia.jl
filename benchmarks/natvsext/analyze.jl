@@ -143,8 +143,8 @@ function make_wide_csv(ex_df, ex_name, ex_params)
                 first_optval = group_df[co_idxs[i], :primal_obj]
                 other_optvals = group_df[co_idxs[Not(i)], :primal_obj]
                 if !all(relative_tol_satisfied.(other_optvals, first_optval))
-                    println("objective values of: $(ex_name)
-                        $(group_df[!, :inst_data][1]) do not agree")
+                    println("objective values of: $(ex_name) " *
+                        "$(group_df[!, :inst_data][1]) do not agree")
                 end
             end
         end

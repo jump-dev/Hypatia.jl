@@ -307,8 +307,8 @@ function solve(solver::Solver{T}) where {T <: Real}
         point.kap[] = one(T)
         calc_mu(solver)
         if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
-            @warn("initial mu is $(solver.mu) but should be 1 (this could
-                indicate a problem with cone barrier oracles)")
+            @warn("initial mu is $(solver.mu) but should be 1 (this could " *
+                "indicate a problem with cone barrier oracles)")
         end
         Cones.load_point.(model.cones, point.primal_views)
         Cones.load_dual_point.(model.cones, point.dual_views)
@@ -360,8 +360,8 @@ function solve(solver::Solver{T}) where {T <: Real}
                 if improv < solver.tol_slow
                     if solver.prev_is_slow && solver.prev2_is_slow
                         if solver.verbose
-                            println("slow progress in consecutive
-                                iterations; terminating")
+                            println("slow progress in consecutive " *
+                                "iterations; terminating")
                         end
                         solver.status = SlowProgress
                         break
@@ -384,8 +384,8 @@ function solve(solver::Solver{T}) where {T <: Real}
             calc_mu(solver)
 
             if min(point.tau[], point.kap[], solver.mu) <= 0
-                @warn("numerical failure: tau is $(point.tau[]),
-                    kappa is $(point.kap[]), mu is $(solver.mu); terminating")
+                @warn("numerical failure: tau is $(point.tau[]), " *
+                    "kappa is $(point.kap[]), mu is $(solver.mu); terminating")
                 solver.status = NumericalFailure
                 break
             end
@@ -404,8 +404,8 @@ function solve(solver::Solver{T}) where {T <: Real}
     free_memory(solver.syssolver)
 
     if solver.verbose
-        println("\nstatus is $(solver.status) after $(solver.num_iters) iterations
-            and $(trunc(solver.solve_time, digits=3)) seconds\n")
+        println("\nstatus is $(solver.status) after $(solver.num_iters) " *
+            "iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
     end
     flush(stdout)
 
