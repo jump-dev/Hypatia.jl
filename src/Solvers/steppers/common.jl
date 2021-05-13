@@ -1,5 +1,6 @@
 #=
-interior point stepping routines for algorithms based on homogeneous self dual embedding
+interior point stepping routines for algorithms based on the
+homogeneous self dual embedding
 =#
 
 # update the RHS for prediction direction
@@ -30,7 +31,7 @@ function update_rhs_predcorr(
     rhs.vec .= 0
 
     rteps = sqrt(eps(T))
-    irtrtmu = inv(sqrt(sqrt(solver.mu))) # TODO or mu^-0.25
+    irtrtmu = inv(sqrt(sqrt(solver.mu)))
     for (k, cone_k) in enumerate(solver.model.cones)
         Cones.use_correction(cone_k) || continue
         H_prim_dir_k = cone_k.vec1

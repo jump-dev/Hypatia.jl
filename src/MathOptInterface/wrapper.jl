@@ -33,10 +33,10 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
         ) where {T <: Real}
         opt = new{T}()
         opt.use_dense_model = use_dense_model
-        if !haskey(solver_options, :system_solver)
+        if !haskey(solver_options, :syssolver)
             # choose default system solver based on use_dense_model
             sstype = (use_dense_model ? Solvers.QRCholDenseSystemSolver : Solvers.SymIndefSparseSystemSolver)
-            solver_options = (solver_options..., system_solver = sstype{T}())
+            solver_options = (solver_options..., syssolver = sstype{T}())
         end
         if !haskey(solver_options, :preprocess)
             # only preprocess if using dense model # TODO maybe should preprocess if sparse

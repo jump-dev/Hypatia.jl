@@ -59,7 +59,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     dir_predcorr = stepper.dir_predcorr
 
     # update linear system solver factorization
-    solver.time_upsys += @elapsed update_lhs(solver.system_solver, solver)
+    solver.time_upsys += @elapsed update_lhs(solver.syssolver, solver)
 
     # calculate centering direction and correction
     solver.time_uprhs += @elapsed update_rhs_cent(solver, rhs)
@@ -91,12 +91,14 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
             println("trying centering with correction")
             stepper.cent_only = true
             stepper.uncorr_only = false
-            solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
+            solver.time_search += @elapsed alpha =
+                search_alpha(point, model, stepper)
 
             if iszero(alpha)
                 println("trying centering without correction")
                 stepper.uncorr_only = true
-                solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
+                solver.time_search += @elapsed alpha =
+                    search_alpha(point, model, stepper)
 
                 if iszero(alpha)
                     @warn("cannot step in centering direction")
@@ -146,17 +148,20 @@ function update_cone_points(
         end
     else
         # correction
-        dir_centcorr = (ztsk_only ? stepper.dir_centcorr.ztsk : stepper.dir_centcorr.vec)
+        dir_centcorr = (ztsk_only ? stepper.dir_centcorr.ztsk :
+            stepper.dir_centcorr.vec)
         alpha_sqr = abs2(alpha)
         if stepper.cent_only
             # centering
             @. cand += alpha * dir_cent + alpha_sqr * dir_centcorr
         else
             # combined
-            dir_predcorr = (ztsk_only ? stepper.dir_predcorr.ztsk : stepper.dir_predcorr.vec)
+            dir_predcorr = (ztsk_only ? stepper.dir_predcorr.ztsk :
+                stepper.dir_predcorr.vec)
             alpha_m1 = 1 - alpha
             alpha_m1sqr = abs2(alpha_m1)
-            @. cand += alpha * dir_pred + alpha_sqr * dir_predcorr + alpha_m1 * dir_cent + alpha_m1sqr * dir_centcorr
+            @. cand += alpha * dir_pred + alpha_sqr * dir_predcorr +
+                alpha_m1 * dir_cent + alpha_m1sqr * dir_centcorr
         end
     end
 
@@ -168,7 +173,8 @@ function start_sched(stepper::CombinedStepper, step_searcher::StepSearcher)
     return max(1, step_searcher.prev_sched - stepper.shift_alpha_sched)
 end
 
-print_header_more(stepper::CombinedStepper, solver::Solver) = @printf("%5s %9s", "step", "alpha")
+print_header_more(stepper::CombinedStepper, solver::Solver) =
+    @printf("%5s %9s", "step", "alpha")
 
 function print_iteration_more(stepper::CombinedStepper, solver::Solver)
     if stepper.cent_only

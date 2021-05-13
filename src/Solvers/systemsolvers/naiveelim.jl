@@ -7,9 +7,11 @@ eliminate s
 so if using primal barrier
 z_k + mu*H_k*s_k = srhs_k --> s_k = (mu*H_k)\(srhs_k - z_k)
 -->
--G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k (if use_inv_hess = true)
+-G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k
+(if use_inv_hess = true)
 -->
--mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k (if use_inv_hess = false)
+-mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
+(if use_inv_hess = false)
 or if using dual barrier
 mu*H_k*z_k + s_k = srhs_k --> s_k = srhs_k - mu*H_k*z_k
 -->
@@ -33,13 +35,13 @@ A'*y + G'*z + c*tau = xrhs
 abstract type NaiveElimSystemSolver{T <: Real} <: SystemSolver{T} end
 
 function solve_subsystem4(
-    system_solver::NaiveElimSystemSolver{T},
+    syssolver::NaiveElimSystemSolver{T},
     solver::Solver{T},
     sol::Point{T},
     rhs::Point{T},
     tau_scal::T,
     ) where {T <: Real}
-    rhs_sub = system_solver.rhs_sub
+    rhs_sub = syssolver.rhs_sub
     dim4 = length(rhs_sub.vec)
     @inbounds @views rhs_sub.vec .= rhs.vec[1:dim4]
 
@@ -50,7 +52,7 @@ function solve_subsystem4(
         if Cones.use_dual_barrier(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
             rhs_sub_z_k .+= rhs_s_k
-        elseif system_solver.use_inv_hess
+        elseif syssolver.use_inv_hess
             # -G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k
             Cones.inv_hess_prod!(rhs_sub_z_k, rhs_s_k, cone_k)
             rhs_sub_z_k .+= rhs_z_k
@@ -63,21 +65,25 @@ function solve_subsystem4(
     # -c'x - b'y - h'z + kapbar/taubar*tau = taurhs + kaprhs
     rhs_sub.vec[end] += rhs.kap[]
 
-    sol_sub = system_solver.sol_sub
-    solve_inner_system(system_solver, sol_sub, rhs_sub)
+    sol_sub = syssolver.sol_sub
+    solve_inner_system(syssolver, sol_sub, rhs_sub)
     @inbounds @views sol.vec[1:dim4] .= sol_sub.vec
 
     return sol
 end
 
-function setup_point_sub(system_solver::NaiveElimSystemSolver{T}, model::Models.Model{T}) where {T <: Real}
-    system_solver.sol_sub = Point{T}()
-    system_solver.rhs_sub = Point{T}()
+function setup_point_sub(
+    syssolver::NaiveElimSystemSolver{T},
+    model::Models.Model{T},
+    ) where {T <: Real}
+    syssolver.sol_sub = Point{T}()
+    syssolver.rhs_sub = Point{T}()
     z_start = model.n + model.p
-    dim_sub = size(system_solver.lhs_sub, 1)
-    for point_sub in (system_solver.sol_sub, system_solver.rhs_sub)
+    dim_sub = size(syssolver.lhs_sub, 1)
+    for point_sub in (syssolver.sol_sub, syssolver.rhs_sub)
         point_sub.vec = zeros(T, dim_sub)
-        point_sub.z_views = [view(point_sub.vec, z_start .+ idxs) for idxs in model.cone_idxs]
+        point_sub.z_views = [view(point_sub.vec, z_start .+ idxs) for
+            idxs in model.cone_idxs]
     end
     return nothing
 end
@@ -88,7 +94,7 @@ direct sparse
 
 mutable struct NaiveElimSparseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
     use_inv_hess::Bool
-    lhs_sub::SparseMatrixCSC # TODO type params will depend on factor cache Int type
+    lhs_sub::SparseMatrixCSC{T}
     fact_cache::SparseNonSymCache{T}
     rhs_sub::Point{T}
     sol_sub::Point{T}
@@ -97,30 +103,36 @@ mutable struct NaiveElimSparseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T
         use_inv_hess::Bool = true,
         fact_cache::SparseNonSymCache{T} = SparseNonSymCache{T}(),
         ) where {T <: Real}
-        system_solver = new{T}()
+        syssolver = new{T}()
         if !use_inv_hess
-            @warn("SymIndefSparseSystemSolver is not implemented with `use_inv_hess` set to `false`, using `true` instead.")
+            @warn("SymIndefSparseSystemSolver is not implemented with
+                `use_inv_hess` set to `false`, using `true` instead.")
         end
-        system_solver.use_inv_hess = use_inv_hess
-        system_solver.fact_cache = fact_cache
-        return system_solver
+        syssolver.use_inv_hess = use_inv_hess
+        syssolver.fact_cache = fact_cache
+        return syssolver
     end
 end
 
-function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
-    system_solver.fact_cache.analyzed = false
+function load(
+    syssolver::NaiveElimSparseSystemSolver{T},
+    solver::Solver{T},
+    ) where {T <: Real}
+    syssolver.fact_cache.analyzed = false
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     cones = model.cones
     cone_idxs = model.cone_idxs
 
     # form sparse LHS without Hessians and inverse Hessians in z/z block
-    lhs_sub = T[
-        spzeros(T, n, n)  model.A'          model.G'                  model.c;
-        -model.A          spzeros(T, p, p)  spzeros(T, p, q)          model.b;
-        -model.G          spzeros(T, q, p)  sparse(one(T) * I, q, q)  model.h;
-        -model.c'         -model.b'         -model.h'                 one(T);
-        ]
+    # TODO check for inefficiency, may need to implement more manually
+    spz(a, b) = spzeros(T, a, b)
+    lhs_sub = hvcat((4, 3, 3, 4),
+        spz(n, n), model.A', model.G', model.c,
+        -model.A, spz(p, p + q), model.b,
+        -model.G, spz(q, p + q), model.h,
+        -model.c', -model.b', -model.h', 1)
+    @assert lhs_sub isa SparseMatrixCSC{T}
     dropzeros!(lhs_sub)
     (Is, Js, Vs) = findnz(lhs_sub)
 
@@ -128,7 +140,9 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     if isempty(cones)
         hess_nz_total = 0
     else
-        hess_nz_total = sum(Cones.use_dual_barrier(cone_k) ? Cones.hess_nz_count(cone_k) : Cones.inv_hess_nz_count(cone_k) for cone_k in cones)
+        hess_nz_total = sum(Cones.use_dual_barrier(cone_k) ?
+            Cones.hess_nz_count(cone_k) : Cones.inv_hess_nz_count(cone_k)
+            for cone_k in cones)
     end
     H_Is = Vector{Int}(undef, hess_nz_total)
     H_Js = Vector{Int}(undef, hess_nz_total)
@@ -136,7 +150,9 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     for (cone_k, idxs_k) in zip(cones, cone_idxs)
         z_start_k = n + p + first(idxs_k) - 1
         for j in 1:Cones.dimension(cone_k)
-            nz_rows_kj = z_start_k .+ (Cones.use_dual_barrier(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j) : Cones.inv_hess_nz_idxs_col(cone_k, j))
+            nz_rows_kj = z_start_k .+ (Cones.use_dual_barrier(cone_k) ?
+                Cones.hess_nz_idxs_col(cone_k, j) :
+                Cones.inv_hess_nz_idxs_col(cone_k, j))
             len_kj = length(nz_rows_kj)
             IJV_idxs = offset:(offset + len_kj - 1)
             offset += len_kj
@@ -148,16 +164,17 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
     append!(Js, H_Js)
     append!(Vs, ones(T, hess_nz_total))
 
-    # prefer conversions of integer types to happen here than inside external wrappers
+    # convert integer types here rather than inside external wrappers
     # integer type supported by the sparse system solver library to be used
-    Ti = int_type(system_solver.fact_cache)
+    Ti = int_type(syssolver.fact_cache)
     Is = convert(Vector{Ti}, Is)
     Js = convert(Vector{Ti}, Js)
     dim = size(lhs_sub, 1)
-    lhs_sub = system_solver.lhs_sub = sparse(Is, Js, Vs, dim, dim)
+    lhs_sub = syssolver.lhs_sub = sparse(Is, Js, Vs, dim, dim)
 
-    # cache indices of nonzeros of Hessians and inverse Hessians in sparse LHS nonzeros vector
-    system_solver.hess_idxs = [Vector{Union{UnitRange, Vector{Int}}}(undef, Cones.dimension(cone_k)) for cone_k in cones]
+    # cache indices of nonzeros of (inv) Hessians in sparse LHS nonzeros vector
+    syssolver.hess_idxs = [Vector{Union{UnitRange, Vector{Int}}}(
+        undef, Cones.dimension(cone_k)) for cone_k in cones]
     for (k, cone_k) in enumerate(cones)
         z_start_k = n + p + first(cone_idxs[k]) - 1
         for j in 1:Cones.dimension(cone_k)
@@ -166,33 +183,43 @@ function load(system_solver::NaiveElimSparseSystemSolver{T}, solver::Solver{T}) 
             col_idx_start = lhs_sub.colptr[col]
             nz_rows = lhs_sub.rowval[col_idx_start:(lhs_sub.colptr[col + 1] - 1)]
             # get nonzero rows in column j of the Hessian or inverse Hessian
-            nz_hess_indices = (Cones.use_dual_barrier(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j) : Cones.inv_hess_nz_idxs_col(cone_k, j))
-            # get index corresponding to first nonzero Hessian element of the current column of the LHS
-            first_H = findfirst(isequal(z_start_k + first(nz_hess_indices)), nz_rows)
+            nz_hess_indices = (Cones.use_dual_barrier(cone_k) ?
+                Cones.hess_nz_idxs_col(cone_k, j) :
+                Cones.inv_hess_nz_idxs_col(cone_k, j))
+            # get index corresponding to first nonzero element of the current col
+            first_H = findfirst(isequal(z_start_k + first(nz_hess_indices)),
+                nz_rows)
             # indices of nonzero values for cone k column j
-            system_solver.hess_idxs[k][j] = (col_idx_start + first_H - 2) .+ (1:length(nz_hess_indices))
+            syssolver.hess_idxs[k][j] = (col_idx_start + first_H - 2) .+
+                (1:length(nz_hess_indices))
         end
     end
 
-    setup_point_sub(system_solver, model)
+    setup_point_sub(syssolver, model)
 
-    return system_solver
+    return syssolver
 end
 
-function update_lhs(system_solver::NaiveElimSparseSystemSolver, solver::Solver)
+function update_lhs(syssolver::NaiveElimSparseSystemSolver, solver::Solver)
     for (k, cone_k) in enumerate(solver.model.cones)
-        H_k = (Cones.use_dual_barrier(cone_k) ? Cones.hess(cone_k) : Cones.inv_hess(cone_k))
+        H_k = (Cones.use_dual_barrier(cone_k) ? Cones.hess(cone_k) :
+            Cones.inv_hess(cone_k))
         for j in 1:Cones.dimension(cone_k)
-            nz_rows = (Cones.use_dual_barrier(cone_k) ? Cones.hess_nz_idxs_col(cone_k, j) : Cones.inv_hess_nz_idxs_col(cone_k, j))
-            @views copyto!(system_solver.lhs_sub.nzval[system_solver.hess_idxs[k][j]], H_k[nz_rows, j])
+            nz_rows = (Cones.use_dual_barrier(cone_k) ?
+                Cones.hess_nz_idxs_col(cone_k, j) :
+                Cones.inv_hess_nz_idxs_col(cone_k, j))
+            @views copyto!(syssolver.lhs_sub.nzval[
+                syssolver.hess_idxs[k][j]], H_k[nz_rows, j])
         end
     end
     tau = solver.point.tau[]
-    system_solver.lhs_sub.nzval[end] = solver.mu / tau / tau # NOTE: mismatch when using NT for kaptau
+    # NOTE: mismatch when using NT for kaptau
+    syssolver.lhs_sub.nzval[end] = solver.mu / tau / tau
 
-    solver.time_upfact += @elapsed update_fact(system_solver.fact_cache, system_solver.lhs_sub)
+    solver.time_upfact += @elapsed update_fact(syssolver.fact_cache,
+        syssolver.lhs_sub)
 
-    return system_solver
+    return syssolver
 end
 
 #=
@@ -209,55 +236,69 @@ mutable struct NaiveElimDenseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
         use_inv_hess::Bool = true,
         fact_cache::DenseNonSymCache{T} = DenseNonSymCache{T}(),
         ) where {T <: Real}
-        system_solver = new{T}()
-        system_solver.use_inv_hess = use_inv_hess
-        system_solver.fact_cache = fact_cache
-        return system_solver
+        syssolver = new{T}()
+        syssolver.use_inv_hess = use_inv_hess
+        syssolver.fact_cache = fact_cache
+        return syssolver
     end
 end
 
-function load(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+function load(
+    syssolver::NaiveElimDenseSystemSolver{T},
+    solver::Solver{T},
+    ) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
 
-    system_solver.lhs_sub = T[
-        zeros(T, n, n)  model.A'        model.G'                  model.c;
-        -model.A        zeros(T, p, p)  zeros(T, p, q)            model.b;
-        -model.G        zeros(T, q, p)  Matrix(one(T) * I, q, q)  model.h;
-        -model.c'       -model.b'       -model.h'                 one(T);
-        ]
+    # TODO check for inefficiency, may need to implement more manually
+    dz(a, b) = zeros(T, a, b)
+    lhs_sub = hvcat((4, 3, 3, 4),
+        dz(n, n), model.A', model.G', model.c,
+        -model.A, dz(p, p + q), model.b,
+        -model.G, dz(q, p + q), model.h,
+        -model.c', -model.b', -model.h', 1)
+    @assert lhs_sub isa Matrix{T}
+    syssolver.lhs_sub = lhs_sub
 
-    load_matrix(system_solver.fact_cache, system_solver.lhs_sub)
+    load_matrix(syssolver.fact_cache, syssolver.lhs_sub)
 
-    setup_point_sub(system_solver, model)
+    setup_point_sub(syssolver, model)
 
-    return system_solver
+    return syssolver
 end
 
-function update_lhs(system_solver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
+function update_lhs(
+    syssolver::NaiveElimDenseSystemSolver{T},
+    solver::Solver{T},
+    ) where {T <: Real}
     model = solver.model
     (n, p) = (model.n, model.p)
-    lhs_sub = system_solver.lhs_sub
+    lhs_sub = syssolver.lhs_sub
 
     @inbounds for (cone_k, idxs_k) in zip(model.cones, model.cone_idxs)
         z_rows_k = (n + p) .+ idxs_k
         if Cones.use_dual_barrier(cone_k)
             # -G_k*x + mu*H_k*z_k + h_k*tau = zrhs_k + srhs_k
             @views copyto!(lhs_sub[z_rows_k, z_rows_k], Cones.hess(cone_k))
-        elseif system_solver.use_inv_hess
+        elseif syssolver.use_inv_hess
             # -G_k*x + (mu*H_k)\z_k + h_k*tau = zrhs_k + (mu*H_k)\srhs_k
-            Hi_k = @views copyto!(lhs_sub[z_rows_k, z_rows_k], Cones.inv_hess(cone_k))
+            Hi_k = @views copyto!(lhs_sub[z_rows_k, z_rows_k],
+                Cones.inv_hess(cone_k))
         else
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
-            @views Cones.hess_prod!(lhs_sub[z_rows_k, 1:n], model.G[idxs_k, :], cone_k)
+            @views Cones.hess_prod!(lhs_sub[z_rows_k, 1:n],
+                model.G[idxs_k, :], cone_k)
             @. @views lhs_sub[z_rows_k, 1:n] *= -1
-            @views Cones.hess_prod!(lhs_sub[z_rows_k, end], model.h[idxs_k], cone_k)
+            @views Cones.hess_prod!(lhs_sub[z_rows_k, end],
+                model.h[idxs_k], cone_k)
         end
     end
     tau = solver.point.tau[]
-    lhs_sub[end, end] = solver.mu / tau / tau # NOTE: mismatch when using NT for kaptau
+    # NOTE: mismatch when using NT for kaptau
+    lhs_sub[end, end] = solver.mu / tau / tau
 
-    solver.time_upfact += @elapsed update_fact(system_solver.fact_cache, system_solver.lhs_sub)
+    solver.time_upfact += @elapsed update_fact(syssolver.fact_cache,
+        syssolver.lhs_sub)
 
-    return system_solver
+    return syssolver
 end

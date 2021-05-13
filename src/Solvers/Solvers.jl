@@ -73,7 +73,7 @@ mutable struct Solver{T <: Real}
     init_use_indirect::Bool
     init_tol_qr::T
     stepper::Stepper{T}
-    system_solver::SystemSolver{T}
+    syssolver::SystemSolver{T}
 
     # current status of the solver object and info
     status::Status
@@ -174,9 +174,9 @@ mutable struct Solver{T <: Real}
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
         stepper::Stepper{T} = default_stepper(T),
-        system_solver::SystemSolver{T} = default_system_solver(T),
+        syssolver::SystemSolver{T} = default_syssolver(T),
         ) where {T <: Real}
-        if isa(system_solver, QRCholSystemSolver{T})
+        if isa(syssolver, QRCholSystemSolver{T})
             @assert preprocess # require preprocessing for QRCholSystemSolver # TODO only need primal eq preprocessing or reduction
         end
         if reduce
@@ -229,7 +229,7 @@ mutable struct Solver{T <: Real}
         solver.init_use_indirect = init_use_indirect
         solver.init_tol_qr = init_tol_qr
         solver.stepper = stepper
-        solver.system_solver = system_solver
+        solver.syssolver = syssolver
         solver.status = NotLoaded
 
         return solver
@@ -237,7 +237,7 @@ mutable struct Solver{T <: Real}
 end
 
 default_stepper(T) = CombinedStepper{T}()
-default_system_solver(T) = QRCholDenseSystemSolver{T}()
+default_syssolver(T) = QRCholDenseSystemSolver{T}()
 
 function solve(solver::Solver{T}) where {T <: Real}
     @assert solver.status == Loaded
@@ -328,7 +328,7 @@ function solve(solver::Solver{T}) where {T <: Real}
 
         stepper = solver.stepper
         load(stepper, solver)
-        solver.time_loadsys = @elapsed load(solver.system_solver, solver)
+        solver.time_loadsys = @elapsed load(solver.syssolver, solver)
 
         solver.verbose && print_header(stepper, solver)
         flush(stdout)
@@ -401,7 +401,7 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.solve_time = time() - start_time
 
     # free memory used by some system solvers
-    free_memory(solver.system_solver)
+    free_memory(solver.syssolver)
 
     if solver.verbose
         println("\nstatus is $(solver.status) after $(solver.num_iters) iterations
@@ -577,8 +577,8 @@ include("systemsolvers/common.jl")
 
 # release memory used by sparse system solvers
 free_memory(::SystemSolver) = nothing
-free_memory(system_solver::Union{NaiveSparseSystemSolver, SymIndefSparseSystemSolver}) =
-    free_memory(system_solver.fact_cache)
+free_memory(syssolver::Union{NaiveSparseSystemSolver, SymIndefSparseSystemSolver}) =
+    free_memory(syssolver.fact_cache)
 
 # verbose helpers
 function print_header(stepper::Stepper, solver::Solver)

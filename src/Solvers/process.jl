@@ -142,7 +142,8 @@ function find_initial_x(
     if !(AG_fact isa QRPivoted{T, Matrix{T}})
         yz_sub = yz_sub[AG_fact.rpivinv]
     end
-    @views residual = norm(A' * yz_sub[1:p] + G' * yz_sub[(p + 1):end] - model.c, Inf)
+    @views residual = norm(A' * yz_sub[1:p] + G' *
+        yz_sub[(p + 1):end] - model.c, Inf)
     if residual > solver.init_tol_qr
         if solver.verbose
             println("some dual equality constraints are inconsistent

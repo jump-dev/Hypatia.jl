@@ -8,8 +8,8 @@ import Hypatia
 ENV["OMP_NUM_THREADS"] = length(Sys.cpu_info())
 import Pardiso
 
-system_solver = Hypatia.Solvers.NaiveElimSparseSystemSolver{Float64}(fact_cache = Hypatia.PardisoNonSymCache())
-solver = Hypatia.Solvers.Solver{Float64}(system_solver)
+syssolver = Hypatia.Solvers.NaiveElimSparseSystemSolver{Float64}(fact_cache = Hypatia.PardisoNonSymCache())
+solver = Hypatia.Solvers.Solver{Float64}(syssolver)
 
 include("test/native.jl")
 nonnegative1(Float64, solver = solver)

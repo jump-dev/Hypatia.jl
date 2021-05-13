@@ -42,7 +42,7 @@ function test_instance_solver(
         solver = Solvers.Solver{T}(; options...)
         test_time = @elapsed eval(Symbol(inst_name))(T, solver = solver)
         push!(perf, (inst_name, string(T), type_name(solver.stepper),
-            type_name(solver.system_solver), solver.init_use_indirect,
+            type_name(solver.syssolver), solver.init_use_indirect,
             solver.preprocess, solver.reduce, test_time,
             string(Solvers.get_status(solver))))
         @printf("%8.2e seconds\n", test_time)
@@ -54,7 +54,7 @@ perf = DataFrames.DataFrame(
     inst_name = String[],
     real_T = String[],
     stepper = String[],
-    system_solver = String[],
+    syssolver = String[],
     init_use_indirect = Bool[],
     preprocess = Bool[],
     reduce = Bool[],
@@ -80,7 +80,7 @@ end
     println("\nstarting no preprocess tests")
     for inst_name in inst_cones_few, T in diff_reals
         options = (; default_options..., preprocess = false, reduce = false,
-            system_solver = Solvers.SymIndefDenseSystemSolver{T}())
+            syssolver = Solvers.SymIndefDenseSystemSolver{T}())
         test_instance_solver(inst_name, T, options)
     end
 end
@@ -90,7 +90,7 @@ end
     for inst_name in inst_indirect, T in diff_reals
         options = (; default_options..., init_use_indirect = true,
             preprocess = false, reduce = false,
-            system_solver = Solvers.SymIndefIndirectSystemSolver{T}(),
+            syssolver = Solvers.SymIndefIndirectSystemSolver{T}(),
             tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4,
             tol_infeas = 1e-6)
         test_instance_solver(inst_name, T, options)
@@ -99,7 +99,7 @@ end
 
 @testset "system solvers tests" begin
     println("\nstarting system solvers tests")
-    system_solvers = [
+    syssolvers = [
         (Solvers.NaiveDenseSystemSolver, diff_reals),
         (Solvers.NaiveSparseSystemSolver, [Float64,]),
         (Solvers.NaiveElimDenseSystemSolver, diff_reals),
@@ -108,11 +108,11 @@ end
         (Solvers.SymIndefSparseSystemSolver, [Float64,]),
         (Solvers.QRCholDenseSystemSolver, all_reals),
         ]
-    for inst_name in inst_minimal, (system_solver, real_types) in system_solvers,
+    for inst_name in inst_minimal, (syssolver, real_types) in syssolvers,
         T in real_types
-        options = (; default_options...,
-            system_solver = system_solver{T}(), reduce = false)
-        test_instance_solver(inst_name, T, options, string_nameof(system_solver))
+        options = (; default_options..., syssolver = syssolver{T}(),
+            reduce = false)
+        test_instance_solver(inst_name, T, options, string_nameof(syssolver))
     end
 end
 

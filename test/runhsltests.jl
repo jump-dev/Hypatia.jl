@@ -28,7 +28,7 @@ end
 @testset "SymIndefSparse tests: $inst_name, $T" for inst_name in inst_cones_many,
     T in blas_reals
     inst_function = eval(Symbol(inst_name))
-    inst_function(T, solver = Solvers.Solver{T}(system_solver =
+    inst_function(T, solver = Solvers.Solver{T}(syssolver =
         Solvers.SymIndefSparseSystemSolver{T}(
         fact_cache = Hypatia.HSLSymCache{T}()); options...))
 end
