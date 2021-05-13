@@ -120,15 +120,12 @@ function update_feas(cone::EpiNormSpectral{T}) where T
     return cone.is_feas
 end
 
-# TODO is there a faster way to check u >= nuc_norm, eg thru a cholesky?
-function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: BlasReal}
+function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: Real}
     u = cone.dual_point[1]
-
     if u > eps(T)
-        W = @views vec_copy_to!(zero(cone.W), cone.dual_point[2:end])
-        return (u - sum(svdvals(W)) > eps(T))
+        W = @views vec_copy_to!(cone.tempd1d2, cone.dual_point[2:end])
+        return (u - sum(svdvals!(W)) > eps(T))
     end
-
     return false
 end
 

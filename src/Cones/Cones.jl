@@ -10,7 +10,6 @@ import LinearAlgebra.HermOrSym
 import LinearAlgebra.BlasReal
 import PolynomialRoots
 using SparseArrays
-import SuiteSparse.CHOLMOD
 import Hypatia.RealOrComplex
 import Hypatia.DenseSymCache
 import Hypatia.DensePosDefCache

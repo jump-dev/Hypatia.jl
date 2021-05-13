@@ -1,7 +1,5 @@
 #=
 MathOptInterface wrapper of Hypatia solver
-
-TODO generalize all code for T <: Real
 =#
 
 mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
@@ -64,22 +62,30 @@ MOI.get(opt::Optimizer, ::MOI.RawSolver) = opt.solver
 
 MOI.is_empty(opt::Optimizer) = (opt.solver.status == Solvers.NotLoaded)
 
-function MOI.empty!(opt::Optimizer)
-    opt.solver.status = Solvers.NotLoaded
-    return
-end
+MOI.empty!(opt::Optimizer) = (opt.solver.status = Solvers.NotLoaded)
 
-MOI.supports(::Optimizer{T}, ::Union{
-    MOI.ObjectiveSense,
-    MOI.ObjectiveFunction{MOI.SingleVariable},
-    MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}}},
+MOI.supports(
+    ::Optimizer{T},
+    ::Union{
+        MOI.ObjectiveSense,
+        MOI.ObjectiveFunction{MOI.SingleVariable},
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}},
+        },
     ) where {T <: Real} = true
 
-MOI.supports_constraint(::Optimizer{T},
+MOI.supports_constraint(
+    ::Optimizer{T},
     ::Type{<:Union{MOI.SingleVariable, MOI.ScalarAffineFunction{T}}},
-    ::Type{<:Union{MOI.EqualTo{T}, MOI.GreaterThan{T}, MOI.LessThan{T}, MOI.Interval{T}}},
+    ::Type{<:Union{
+        MOI.EqualTo{T},
+        MOI.GreaterThan{T},
+        MOI.LessThan{T},
+        MOI.Interval{T},
+        }},
     ) where {T <: Real} = true
-MOI.supports_constraint(::Optimizer{T},
+
+MOI.supports_constraint(
+    ::Optimizer{T},
     ::Type{<:Union{MOI.VectorOfVariables, MOI.VectorAffineFunction{T}}},
     ::Type{<:SupportedCones{T}},
     ) where {T <: Real} = true
@@ -524,7 +530,11 @@ MOI.get(opt::Optimizer, ::MOI.Silent) = !opt.solver.verbose
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
 MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Real) = (opt.solver.time_limit = value)
 MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, ::Nothing) = (opt.solver.time_limit = Inf)
-MOI.get(opt::Optimizer, ::MOI.TimeLimitSec) = (isfinite(opt.solver.time_limit) ? opt.solver.time_limit : nothing)
+
+function MOI.get(opt::Optimizer, ::MOI.TimeLimitSec)
+    isfinite(opt.solver.time_limit) && return opt.solver.time_limit
+    return nothing
+end
 
 function MOI.get(opt::Optimizer, ::MOI.SolveTime)
     if opt.solver.status in (:NotLoaded, :Loaded)
@@ -601,10 +611,23 @@ end
 
 MOI.get(opt::Optimizer, ::MOI.ResultCount) = 1
 
-MOI.get(opt::Optimizer, ::MOI.VariablePrimal, vi::MOI.VariableIndex) = opt.x[vi.value]
-MOI.get(opt::Optimizer, a::MOI.VariablePrimal, vi::Vector{MOI.VariableIndex}) = MOI.get.(opt, a, vi)
+MOI.get(
+    opt::Optimizer,
+    ::MOI.VariablePrimal,
+    vi::MOI.VariableIndex,
+    ) = opt.x[vi.value]
 
-function MOI.get(opt::Optimizer, ::MOI.ConstraintDual, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
+MOI.get(
+    opt::Optimizer,
+    a::MOI.VariablePrimal,
+    vi::Vector{MOI.VariableIndex},
+    ) = MOI.get.(opt, a, vi)
+
+function MOI.get(
+    opt::Optimizer,
+    ::MOI.ConstraintDual,
+    ci::MOI.ConstraintIndex{F, S},
+    ) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
     # scalar set
     i = ci.value
     if i <= opt.num_eq_constrs
@@ -616,7 +639,12 @@ function MOI.get(opt::Optimizer, ::MOI.ConstraintDual, ci::MOI.ConstraintIndex{F
         return opt.z[opt.constr_offset_cone[i] + 1]
     end
 end
-function MOI.get(opt::Optimizer, ::MOI.ConstraintDual, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
+
+function MOI.get(
+    opt::Optimizer,
+    ::MOI.ConstraintDual,
+    ci::MOI.ConstraintIndex{F, S},
+    ) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
     # vector set
     i = ci.value
     if i <= opt.num_eq_constrs
@@ -630,9 +658,18 @@ function MOI.get(opt::Optimizer, ::MOI.ConstraintDual, ci::MOI.ConstraintIndex{F
         return opt.z[(os[i] + 1):os[i + 1]]
     end
 end
-MOI.get(opt::Optimizer, a::MOI.ConstraintDual, ci::Vector{MOI.ConstraintIndex}) = MOI.get.(opt, a, ci)
 
-function MOI.get(opt::Optimizer, ::MOI.ConstraintPrimal, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
+MOI.get(
+    opt::Optimizer,
+    a::MOI.ConstraintDual,
+    ci::Vector{MOI.ConstraintIndex},
+    ) = MOI.get.(opt, a, ci)
+
+function MOI.get(
+    opt::Optimizer,
+    ::MOI.ConstraintPrimal,
+    ci::MOI.ConstraintIndex{F, S},
+    ) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
     # scalar set
     i = ci.value
     if i <= opt.num_eq_constrs
@@ -644,7 +681,12 @@ function MOI.get(opt::Optimizer, ::MOI.ConstraintPrimal, ci::MOI.ConstraintIndex
         return opt.constr_prim_cone[opt.constr_offset_cone[i] + 1]
     end
 end
-function MOI.get(opt::Optimizer, ::MOI.ConstraintPrimal, ci::MOI.ConstraintIndex{F, S}) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
+
+function MOI.get(
+    opt::Optimizer,
+    ::MOI.ConstraintPrimal,
+    ci::MOI.ConstraintIndex{F, S},
+    ) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
     # vector set
     i = ci.value
     if i <= opt.num_eq_constrs
@@ -658,4 +700,9 @@ function MOI.get(opt::Optimizer, ::MOI.ConstraintPrimal, ci::MOI.ConstraintIndex
         return opt.constr_prim_cone[(os[i] + 1):os[i + 1]]
     end
 end
-MOI.get(opt::Optimizer, a::MOI.ConstraintPrimal, ci::Vector{MOI.ConstraintIndex}) = MOI.get.(opt, a, ci)
+
+MOI.get(
+    opt::Optimizer,
+    a::MOI.ConstraintPrimal,
+    ci::Vector{MOI.ConstraintIndex},
+    ) = MOI.get.(opt, a, ci)
