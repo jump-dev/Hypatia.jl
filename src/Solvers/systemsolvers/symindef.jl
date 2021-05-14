@@ -123,7 +123,7 @@ function load(
     append!(Js, H_Js)
     append!(Vs, ones(T, hess_nz_total))
 
-    diag_pert = T(Hypatia.diag_min(syssolver.fact_cache))
+    diag_pert = T(diag_min(syssolver.fact_cache))
     append!(Is, 1:(n + p))
     append!(Js, 1:(n + p))
     append!(Vs, fill(diag_pert, n))
