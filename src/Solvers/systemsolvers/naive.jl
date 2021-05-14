@@ -119,7 +119,7 @@ function update_lhs(syssolver::NaiveSparseSystemSolver, solver::Solver)
         end
     end
     tau = solver.point.tau[]
-    # NOTE: mismatch when using NT for kaptau
+    #: mismatch when using NT for kaptau
     syssolver.lhs.nzval[syssolver.mtt_idx] = solver.mu / tau / tau
 
     solver.time_upfact += @elapsed update_fact(syssolver.fact_cache,
@@ -197,7 +197,7 @@ function update_lhs(syssolver::NaiveDenseSystemSolver, solver::Solver)
         copyto!(lhs_H_k, Cones.hess(cone_k))
     end
     tau = solver.point.tau[]
-    # NOTE: mismatch when using NT for kaptau
+    #: mismatch when using NT for kaptau
     syssolver.lhs[end, syssolver.tau_row] = solver.mu / tau / tau
 
     solver.time_upfact += @elapsed update_fact(syssolver.fact_cache,

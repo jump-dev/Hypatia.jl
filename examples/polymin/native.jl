@@ -69,7 +69,7 @@ function build_real(inst::PolyMinNative{T}) where {T <: Real}
         h = inst.interp_vals
     else
         c = inst.interp_vals
-        A = ones(T, 1, U) # NOTE can eliminate constraint and a variable
+        A = ones(T, 1, U) # can eliminate constraint and a variable
         b = T[1]
         if inst.use_wsos
             G = -one(T) * I

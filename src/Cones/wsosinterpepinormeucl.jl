@@ -133,7 +133,7 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
     point_views = cone.point_views
 
     # order the Ps by how long it takes to check feasibility, to improve efficiency
-    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # NOTE stochastic
+    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # stochastic
 
     cone.is_feas = true
     for k in cone.Ps_order
@@ -275,7 +275,7 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
             end
 
             # blocks (r, r2)
-            # NOTE for hess[idxs, idxs], UU are symmetric
+            # for hess[idxs, idxs], UU are symmetric
             @. UU = PΛiPs[r, 1] * PΛiPs[r, 1]'
             @. @views hess[idxs, idxs] += UU
             @. UU = PΛiPs[1, 1] * PΛiPs[r, r]

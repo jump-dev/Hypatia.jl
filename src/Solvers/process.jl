@@ -299,7 +299,7 @@ function find_initial_y(
         model.obj_offset += dot(cQ1, Rpib0)
 
         # [GQ1 GQ2] = G0 * Q
-        # NOTE very inefficient method used for sparse G * QRSparseQ
+        # very inefficient method used for sparse G * QRSparseQ
         # see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
         if model.G isa UniformScaling
             side = size(Ap_Q, 1)
@@ -359,7 +359,7 @@ function find_initial_y(
     return init_y
 end
 
-# NOTE (pivoted) QR factorizations are usually rank-revealing but may be unreliable
+# (pivoted) QR factorizations are usually rank-revealing but may be unreliable
 # see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
 # TODO could replace this with rank(qr_fact) when available for both dense and sparse
 get_rank_est(qr_fact::SuiteSparse.SPQR.QRSparse, init_tol_qr::Real) =

@@ -147,8 +147,8 @@ function load_matrix(cache::LAPACKSymCache{T}, A::Symmetric{T, <:AbstractMatrix{
     cache.copy_A = copy_A
     cache.AF = (copy_A ? zero(A) : A) # copy over A to new matrix or use A directly
     cache.ipiv = Vector{BlasInt}(undef, n)
-    cache.work = zeros(T, n) # NOTE this will be resized according to query
-    cache.lwork = BlasInt(-1) # NOTE -1 initiates a query for optimal size of work
+    cache.work = zeros(T, n) # this will be resized according to query
+    cache.lwork = BlasInt(-1) # -1 initiates a query for optimal size of work
     cache.info = Ref{BlasInt}()
     return cache
 end

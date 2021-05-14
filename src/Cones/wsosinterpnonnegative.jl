@@ -86,7 +86,7 @@ function update_feas(cone::WSOSInterpNonnegative)
     D = Diagonal(cone.point)
 
     # order the Ps by how long it takes to check feasibility, to improve efficiency
-    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # NOTE stochastic
+    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # stochastic
 
     cone.is_feas = true
     for k in cone.Ps_order
@@ -96,7 +96,7 @@ function update_feas(cone::WSOSInterpNonnegative)
             LLk = cone.tempLL[k]
 
             # Λ = Pk' * Diagonal(point) * Pk
-            @. LUk = Pk' * cone.point' # NOTE currently faster than mul!(LUk, Pk', D)
+            @. LUk = Pk' * cone.point' # currently faster than mul!(LUk, Pk', D)
             mul!(LLk, LUk, Pk)
 
             ΛFk = cone.ΛF[k] = cholesky!(Hermitian(LLk, :L), check = false)

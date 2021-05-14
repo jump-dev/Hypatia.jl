@@ -136,7 +136,7 @@ function rescale_affine(cone::SvecCone, vals::AbstractVector, idxs::AbstractVect
 end
 
 # Hypatia predefined cones
-# NOTE some are equivalent to above MOI predefined cones, but we define again for the sake of consistency
+# some are equivalent to above MOI predefined cones, but we define again for the sake of consistency
 
 export NonnegativeCone
 struct NonnegativeCone{T <: Real} <: MOI.AbstractVectorSet
@@ -532,4 +532,4 @@ const LinearCones{T <: Real} = Union{
     MOI.Nonpositives,
     }
 
-Base.copy(cone::HypatiaCones) = cone # NOTE maybe should deep copy the cone struct, but this is expensive
+Base.copy(cone::HypatiaCones) = cone # maybe should deep copy the cone struct, but this is expensive

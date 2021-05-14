@@ -133,7 +133,7 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}}
     function QRCholDenseSystemSolver{T}(;
         fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} =
-            DensePosDefCache{T}(), # NOTE or DenseSymCache{T}()
+            DensePosDefCache{T}(), # or DenseSymCache{T}()
         ) where {T <: Real}
         syssolver = new{T}()
         syssolver.fact_cache = fact_cache
@@ -158,7 +158,7 @@ function load(
     syssolver.hess_cones = sizehint!(Int[], num_cones)
     syssolver.sqrt_hess_cones = sizehint!(Int[], num_cones)
 
-    # NOTE very inefficient method used for sparse G * QRSparseQ
+    # very inefficient method used for sparse G * QRSparseQ
     # see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
     GQ = model.G * solver.Ap_Q
 

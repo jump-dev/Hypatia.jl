@@ -61,8 +61,8 @@ end
 
 
 # power in (1,2]
-# NOTE power 1 is homogeneous and just equal to trace of PSD matrix (a linear function)
-# NOTE for power 2, more efficient to use epipersquare on scaled lower triangle elements (since λ'λ = tr(X^2) = ||svec(X)||^2)
+# power 1 is homogeneous and just equal to trace of PSD matrix (a linear function)
+# for power 2, more efficient to use epipersquare on scaled lower triangle elements (since λ'λ = tr(X^2) = ||svec(X)||^2)
 struct Power12SSF <: SepSpectralFun
     p::Real
     Power12SSF(p::Real) = (@assert 1 < p <= 2; new(p))

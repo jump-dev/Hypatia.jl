@@ -14,7 +14,7 @@ import Hypatia.Solvers
 
 abstract type ExampleInstance{T <: Real} end
 
-# NOTE this is a workaround for randn's lack of support for BigFloat
+# this is a workaround for randn's lack of support for BigFloat
 Random.randn(R::Type{BigFloat}, dims::Vararg{Int, N} where N) = R.(randn(dims...))
 Random.randn(R::Type{Complex{BigFloat}}, dims::Vararg{Int, N} where N) =
     R.(randn(ComplexF64, dims...))

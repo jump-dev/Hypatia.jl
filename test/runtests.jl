@@ -12,7 +12,7 @@ test_files = [
     "native",
     "moi",
     "examples",
-    # NOTE require optional dependencies:
+    # require optional dependencies:
     # "pardiso",
     # "hsl",
     ]

@@ -110,7 +110,7 @@ function update_feas(cone::WSOSInterpPosSemidefTri)
     @assert !cone.feas_updated
 
     # order the Ps by how long it takes to check feasibility, to improve efficiency
-    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # NOTE stochastic
+    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # stochastic
 
     cone.is_feas = true
     for k in cone.Ps_order

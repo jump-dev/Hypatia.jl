@@ -32,7 +32,7 @@ function update_fact(cache::HSLSymCache, A::SparseMatrixCSC{<:HSL.Ma57Data, Int}
 end
 
 function inv_prod(cache::HSLSymCache, x::Vector{T}, A::SparseMatrixCSC{<:HSL.Ma57Data, Int}, b::Vector{T}) where {T <: BlasReal}
-    # NOTE MA57 only has the option to take iterative refinement steps for a single-column RHS
+    # MA57 only has the option to take iterative refinement steps for a single-column RHS
     ma57 = cache.ma57
     copyto!(x, b)
     HSL.ma57_solve!(ma57, x)
