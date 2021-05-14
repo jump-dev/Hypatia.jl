@@ -5,8 +5,8 @@ or an ellipsoid defined with l_1, l_infty, or l_2 ball constraints
 
 struct MaxVolumeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
-    epinormeucl_constr::Bool # add an L2 ball constraint, else don't add
-    epinorminf_constrs::Bool # add L1 and Linfty ball constraints, else don't add
+    epinormeucl_constr::Bool # add an L2 ball constraint
+    epinorminf_constrs::Bool # add L1 and Linfty ball constraints
 end
 
 function build(inst::MaxVolumeJuMP{T}) where {T <: Float64}

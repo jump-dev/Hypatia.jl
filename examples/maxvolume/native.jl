@@ -10,7 +10,7 @@ struct MaxVolumeNative{T <: Real} <: ExampleInstanceNative{T}
 end
 
 function build(inst::MaxVolumeNative{T}) where {T <: Real}
-    @assert inst.use_hypogeomean + inst.use_power + inst.use_epipersquare == 1
+    @assert xor(inst.use_hypogeomean, inst.use_power, inst.use_epipersquare)
     n = inst.n
 
     poly_hrep = Matrix{T}(I, n, n)

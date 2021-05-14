@@ -23,7 +23,7 @@ end
 function SemidefinitePolyJuMP{Float64}(
     matpoly::Symbol,
     args...)
-    return SemidefinitePolyJuMP{Float64}(get_semidefinitepoly_data(matpoly)..., args...)
+    return SemidefinitePolyJuMP{Float64}(get_psdpoly_data(matpoly)..., args...)
 end
 
 function build(inst::SemidefinitePolyJuMP{T}) where {T <: Float64}
@@ -35,9 +35,10 @@ function build(inst::SemidefinitePolyJuMP{T}) where {T <: Float64}
         side = size(H, 1)
         halfdeg = div(maximum(DP.maxdegree.(H)) + 1, 2)
         n = DP.nvariables(x)
-        dom = ModelUtilities.FreeDomain{Float64}(n)
+        dom = ModelUtilities.FreeDomain{T}(n)
         (U, pts, Ps) = ModelUtilities.interpolate(dom, halfdeg)
-        mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(side, U, Ps, inst.use_dual)
+        mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{T}(
+            side, U, Ps, inst.use_dual)
 
         rt2 = sqrt(2)
         H_svec = [H[i, j](pts[u, :]) for i in 1:side for j in 1:i for u in 1:U]
@@ -64,5 +65,6 @@ function build(inst::SemidefinitePolyJuMP{T}) where {T <: Float64}
 end
 
 function test_extra(inst::SemidefinitePolyJuMP{T}, model::JuMP.Model) where T
-    @test JuMP.termination_status(model) in (inst.is_feas ? (MOI.OPTIMAL,) : (MOI.INFEASIBLE, MOI.DUAL_INFEASIBLE))
+    @test JuMP.termination_status(model) in
+        (inst.is_feas ? (MOI.OPTIMAL,) : (MOI.INFEASIBLE, MOI.DUAL_INFEASIBLE))
 end

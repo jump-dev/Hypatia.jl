@@ -25,7 +25,7 @@ end
 function build(inst::DOptimalDesignJuMP{T}) where {T <: Float64}
     (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)
     @assert (p > q) && (n > q) && (n_max <= n)
-    @assert inst.logdet_obj + inst.geomean_obj + inst.rootdet_obj == 1
+    @assert xor(inst.logdet_obj, inst.geomean_obj, inst.rootdet_obj)
     V = randn(q, p)
 
     model = JuMP.Model()

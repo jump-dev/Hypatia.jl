@@ -1,6 +1,7 @@
 #=
 lower bound on relative entropy of entanglement (PPT relaxation)
-adapted from https://github.com/hfawzi/cvxquad/blob/master/examples/rel_entr_entanglement.m
+adapted from
+https://github.com/hfawzi/cvxquad/blob/master/examples/rel_entr_entanglement.m
 =#
 
 struct RelEntrEntanglementJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -26,7 +27,8 @@ function build(inst::RelEntrEntanglementJuMP{T}) where {T <: Float64}
 
     JuMP.@variable(model, y)
     JuMP.@objective(model, Min, y / log(T(2)))
-    JuMP.@constraint(model, vcat(y, tau_vec, rho_vec) in Hypatia.EpiTrRelEntropyTriCone{T}(1 + 2 * vec_dim))
+    JuMP.@constraint(model, vcat(y, tau_vec, rho_vec) in
+        Hypatia.EpiTrRelEntropyTriCone{T}(1 + 2 * vec_dim))
     pt = partial_transpose(Symmetric(Tau), 2, [na, nb])
     JuMP.@SDconstraint(model, Symmetric(pt) >= 0)
 

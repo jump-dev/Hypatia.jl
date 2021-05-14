@@ -17,7 +17,8 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
     (p, k, noise_ratio) = (inst.p, inst.k, inst.noise_ratio)
     @assert 0 < k <= p
 
-    signal_idxs = Distributions.sample(1:p, k, replace = false) # sample components that will carry the signal
+    # sample components that will carry the signal
+    signal_idxs = Distributions.sample(1:p, k, replace = false)
     if noise_ratio <= 0
         # noiseless model
         x = zeros(T, p)
@@ -34,7 +35,7 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
     end
 
     dimx = Cones.svec_length(p)
-    # x will be the svec (lower triangle, row-wise) of the matrix solution we seek
+    # x is the svec (lower triangle, row-wise) of the matrix solution
     c = Cones.smat_to_svec!(zeros(T, dimx), -sigma, sqrt(T(2)))
     b = T[1]
     A = zeros(T, 1, dimx)
@@ -77,7 +78,11 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
     return model
 end
 
-function test_extra(inst::SparsePCANative{T}, solve_stats::NamedTuple, ::NamedTuple) where T
+function test_extra(
+    inst::SparsePCANative{T},
+    solve_stats::NamedTuple,
+    ::NamedTuple,
+    ) where T
     @test solve_stats.status == Solvers.Optimal
     if solve_stats.status == Solvers.Optimal && iszero(inst.noise_ratio)
         # check objective value is correct

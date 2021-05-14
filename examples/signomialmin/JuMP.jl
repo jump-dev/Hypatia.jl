@@ -1,6 +1,7 @@
 #=
-signomial minimization problem
-see "Signomial and Polynomial Optimization via Relative Entropy and Partial Dualization" (2019) by Murray, Chandrasekaran, & Wierman
+signomial minimization problem adapted from
+"Signomial and Polynomial Optimization via Relative Entropy and Partial Dualization"
+(2019) by Murray, Chandrasekaran, & Wierman
 
 a signomial f = Sig(A, c) of variables
     x in R^n
@@ -20,7 +21,7 @@ a vector d in R^m belongs to SAGE cone C_SAGE(A) if
     exists C in R^{m, m} :
     d = sum_{k in [m]} C_{k, :}
     C_{k, :} in C_AGE(A, k)
-which is equivalent to the feasibility problem over C in R^{m, m} and V in R^{m, m-1}
+which is equivalent to the feasibility problem over C in R^{m, m}, V in R^{m, m-1}
     d = sum_{k in [m]} C_{k, :}
     for k in [m]:
         (A_{\k, :} - [1,...,1] * A_{k, :}')' * V_{k, :} == [0,...,0]
@@ -36,8 +37,12 @@ struct SignomialMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     gA::Vector
     obj_ub::Real
 end
-SignomialMinJuMP{Float64}(sig_name::Symbol) = SignomialMinJuMP{Float64}(signomialmin_data[sig_name]...)
-SignomialMinJuMP{Float64}(m::Int, n::Int) = SignomialMinJuMP{Float64}(signomialmin_random(m, n)...)
+
+SignomialMinJuMP{Float64}(sig_name::Symbol) =
+    SignomialMinJuMP{Float64}(signomialmin_data[sig_name]...)
+
+SignomialMinJuMP{Float64}(m::Int, n::Int) =
+    SignomialMinJuMP{Float64}(signomialmin_random(m, n)...)
 
 function build(inst::SignomialMinJuMP{T}) where {T <: Float64}
     (fc, fA, gc, gA) = (inst.fc, inst.fA, inst.gc, inst.gA)
@@ -104,8 +109,10 @@ function build(inst::SignomialMinJuMP{T}) where {T <: Float64}
     JuMP.@variable(model, C[1:m, 1:m])
     JuMP.@variable(model, V[1:m, 1:(m - 1)])
     JuMP.@constraint(model, [k in 1:m], d[k] == sum(C[:, k]))
-    JuMP.@constraint(model, [k in 1:m, i in 1:n], dot(A[notk[k], i] .- A[k, i], V[k, :]) == 0)
-    JuMP.@constraint(model, [k in 1:m], vcat(C[k, k] + sum(V[k, :]), C[k, notk[k]], V[k, :]) in MOI.RelativeEntropyCone(2m - 1))
+    JuMP.@constraint(model, [k in 1:m, i in 1:n],
+        dot(A[notk[k], i] .- A[k, i], V[k, :]) == 0)
+    JuMP.@constraint(model, [k in 1:m], vcat(C[k, k] +
+        sum(V[k, :]), C[k, notk[k]], V[k, :]) in MOI.RelativeEntropyCone(2m - 1))
 
     return model
 end
