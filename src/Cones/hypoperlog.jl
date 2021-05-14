@@ -56,12 +56,15 @@ function setup_extra_data(cone::HypoPerLog{T}) where {T <: Real}
     # cone.tempw = zeros(T, wdim)
 
 
+    # don't alloc here
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
     cone.wivzi = zeros(T, dim - 2)
     cone.tempw = zeros(T, dim - 2)
+
+
     return cone
 end
 
@@ -135,7 +138,7 @@ function update_hess_aux(cone::HypoPerLog)
     @. wivzi = vzi / w
 
 
-    @warn("don't store it in hessian")
+    # @warn("don't store it in hessian")
 
 
     @inbounds begin

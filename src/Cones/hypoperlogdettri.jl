@@ -80,9 +80,15 @@ function setup_extra_data(
     cone::HypoPerLogdetTri{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
+
+
+    # don't alloc here
+
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+
+
     d = cone.d
     cone.mat = zeros(R, d, d)
     cone.mat2 = zeros(R, d, d)
@@ -180,7 +186,7 @@ function update_hess_aux(cone::HypoPerLogdetTri)
 
 
 
-    @warn("don't store it in hessian")
+    # @warn("don't store it in hessian")
 
     @inbounds begin
         H[1, 1] = abs2(inv(z))
