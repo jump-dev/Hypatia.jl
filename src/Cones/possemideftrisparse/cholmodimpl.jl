@@ -47,8 +47,9 @@ mutable struct PSDSparseCholmodCache{T <: BlasReal, R <: RealOrComplex{T}} <:
         new{T, R}()
 end
 
-function setup_psdsparse_cache(cone::PosSemidefTriSparse{PSDSparseCholmod, T, R})
-    where {R <: RealOrComplex{T}} where {T <: BlasReal}
+function setup_psdsparse_cache(
+    cone::PosSemidefTriSparse{PSDSparseCholmod, T, R},
+    ) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     cone.cache = cache = PSDSparseCholmodCache{T, R}()
 
     # setup symbolic factorization
