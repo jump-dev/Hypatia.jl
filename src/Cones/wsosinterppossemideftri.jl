@@ -1,9 +1,14 @@
 #=
-interpolation-based weighted-sum-of-squares (multivariate) polynomial positive semidefinite cone parametrized by interpolation matrices Ps
-certifies that a polynomial valued R x R matrix is in the positive semidefinite cone for all x in the domain defined by Ps
+interpolation-based weighted-sum-of-squares (multivariate) polynomial positive
+semidefinite cone parametrized by interpolation matrices Ps
+certifies that a polynomial valued R x R matrix is in the positive semidefinite
+cone for all x in the domain defined by Ps
 
-dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
-and "Semidefinite Characterization of Sum-of-Squares Cones in Algebras" by D. Papp and F. Alizadeh
+dual barrier extended from
+"Sum-of-squares optimization without semidefinite programming"
+by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
+and "Semidefinite Characterization of Sum-of-Squares Cones in Algebras"
+by D. Papp and F. Alizadeh
 =#
 
 mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
@@ -68,7 +73,10 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::WSOSInterpPosSemidefTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.use_hess_prod_slow = cone.use_hess_prod_slow_updated = false)
+reset_data(cone::WSOSInterpPosSemidefTri) = (cone.feas_updated =
+    cone.grad_updated = cone.hess_updated = cone.inv_hess_updated =
+    cone.hess_fact_updated = cone.use_hess_prod_slow =
+    cone.use_hess_prod_slow_updated = false)
 
 function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     dim = cone.dim
@@ -90,7 +98,8 @@ function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.ΛFL = Vector{Any}(undef, K)
     cone.ΛFLP = [zeros(T, R * L, R * U) for L in Ls]
     cone.PΛiP = zeros(T, R * U, R * U)
-    cone.PΛiP_blocks_U = [view(cone.PΛiP, block_idxs(U, r), block_idxs(U, s)) for r in 1:R, s in 1:R]
+    cone.PΛiP_blocks_U = [view(cone.PΛiP, block_idxs(U, r), block_idxs(U, s))
+        for r in 1:R, s in 1:R]
     cone.Ps_times = zeros(K)
     cone.Ps_order = collect(1:K)
     return cone
@@ -120,13 +129,13 @@ function update_feas(cone::WSOSInterpPosSemidefTri)
             L = size(Pk, 2)
             Λ = cone.tempLRLR[k]
 
-            for p in 1:cone.R, q in 1:p
-                @. @views cone.tempU = cone.point[block_idxs(cone.U, svec_idx(p, q))]
+            @views for p in 1:cone.R, q in 1:p
+                @. cone.tempU = cone.point[block_idxs(cone.U, svec_idx(p, q))]
                 if p != q
                     cone.tempU .*= cone.rt2i
                 end
                 mul!(LU, Pk', Diagonal(cone.tempU)) # TODO check efficiency
-                @views mul!(Λ.data[block_idxs(L, p), block_idxs(L, q)], LU, Pk)
+                mul!(Λ.data[block_idxs(L, p), block_idxs(L, q)], LU, Pk)
             end
 
             ΛFLk = cone.ΛFL[k] = cholesky!(Λ, check = false)
@@ -159,7 +168,8 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
             block_L_p_idxs = block_idxs(L, p)
             @views ΛFLP_pp = ΛFLP[block_L_p_idxs, block_U_p_idxs]
             # ΛFLP_pp = ΛFL_pp \ P'
-            @views ldiv!(ΛFLP_pp, LowerTriangular(ΛFL[block_L_p_idxs, block_L_p_idxs]), cone.Ps[k]')
+            @views ldiv!(ΛFLP_pp, LowerTriangular(
+                ΛFL[block_L_p_idxs, block_L_p_idxs]), cone.Ps[k]')
             # to get off-diagonals in ΛFLP, subtract known blocks aggregated in ΛFLP_qp
             for q in (p + 1):R
                 block_L_q_idxs = block_idxs(L, q)
@@ -167,9 +177,11 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
                 ΛFLP_qp .= 0
                 for p2 in p:(q - 1)
                     block_L_p2_idxs = block_idxs(L, p2)
-                    @views mul!(ΛFLP_qp, ΛFL[block_L_q_idxs, block_L_p2_idxs], ΛFLP[block_L_p2_idxs, block_U_p_idxs], -1, 1)
+                    @views mul!(ΛFLP_qp, ΛFL[block_L_q_idxs, block_L_p2_idxs],
+                        ΛFLP[block_L_p2_idxs, block_U_p_idxs], -1, 1)
                 end
-                @views ldiv!(LowerTriangular(ΛFL[block_L_q_idxs, block_L_q_idxs]), ΛFLP_qp)
+                @views ldiv!(LowerTriangular(ΛFL[block_L_q_idxs,
+                    block_L_q_idxs]), ΛFLP_qp)
             end
         end
 
@@ -195,9 +207,11 @@ function update_hess(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
         # PΛiP = ΛFLP' * ΛFLP
         ΛFLP = cone.ΛFLP[k]
         for p in 1:R, q in p:R
-            # since ΛFLP is block lower triangular rows only from max(p,q) start making a nonzero contribution to the product
+            # since ΛFLP is block lower triangular rows only from max(p,q)
+            # start making a nonzero contribution to the product
             row_range = ((q - 1) * L + 1):(L * R)
-            @views mul!(PΛiP_blocks[p, q], ΛFLP[row_range, block_idxs(U, p)]', ΛFLP[row_range, block_idxs(U, q)])
+            @views mul!(PΛiP_blocks[p, q], ΛFLP[row_range, block_idxs(U, p)]',
+                ΛFLP[row_range, block_idxs(U, q)])
         end
         LinearAlgebra.copytri!(cone.PΛiP, 'U')
 
@@ -226,7 +240,11 @@ function update_hess(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     return cone.hess
 end
 
-function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpPosSemidefTri)
+function hess_prod_slow!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::WSOSInterpPosSemidefTri,
+    )
     cone.use_hess_prod_slow_updated || update_use_hess_prod_slow(cone)
     @assert cone.hess_updated
     cone.use_hess_prod_slow || return hess_prod!(prod, arr, cone)

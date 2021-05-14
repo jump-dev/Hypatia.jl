@@ -3,7 +3,9 @@ epigraph of perspective of (half) square function (AKA rotated second-order cone
 (u in R, v in R_+, w in R^n) : u >= v*1/2*norm_2(w/v)^2
 note v*1/2*norm_2(w/v)^2 = 1/2*sum_i(w_i^2)/v
 
-barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
+barrier from
+"Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
+by Nesterov & Todd
 -log(2*u*v - norm_2(w)^2)
 =#
 
@@ -45,7 +47,9 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.sqrt_hess_prod_updated = cone.inv_sqrt_hess_prod_updated = false)
+reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = cone.sqrt_hess_prod_updated =
+    cone.inv_sqrt_hess_prod_updated = false)
 
 use_sqrt_hess_oracles(cone::EpiPerSquare) = true
 
@@ -137,7 +141,11 @@ function update_inv_hess(cone::EpiPerSquare)
     return cone.inv_hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
+function hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::EpiPerSquare,
+    )
     u = cone.point[1]
     v = cone.point[2]
     w = @view cone.point[3:end]
@@ -156,7 +164,11 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerS
     return prod
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
+function inv_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::EpiPerSquare,
+    )
     @assert cone.is_feas
 
     @inbounds @views for j in 1:size(prod, 2)
@@ -199,7 +211,11 @@ function update_inv_sqrt_hess_prod(cone::EpiPerSquare)
     return
 end
 
-function sqrt_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
+function sqrt_hess_prod!(
+    prod::AbstractVecOrMat{T},
+    arr::AbstractVecOrMat{T},
+    cone::EpiPerSquare{T},
+    ) where {T <: Real}
     if !cone.sqrt_hess_prod_updated
         update_sqrt_hess_prod(cone)
     end
@@ -217,7 +233,11 @@ function sqrt_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, co
     return prod
 end
 
-function inv_sqrt_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::EpiPerSquare{T}) where {T <: Real}
+function inv_sqrt_hess_prod!(
+    prod::AbstractVecOrMat{T},
+    arr::AbstractVecOrMat{T},
+    cone::EpiPerSquare{T},
+    ) where {T <: Real}
     if !cone.inv_sqrt_hess_prod_updated
         update_inv_sqrt_hess_prod(cone)
     end

@@ -1,5 +1,6 @@
 #=
-interpolation-based weighted-sum-of-squares polynomial ell-1 norm cone parametrized by interpolation matrices Ps
+interpolation-based weighted-sum-of-squares polynomial ell-1 norm cone parametrized
+by interpolation matrices Ps
 certifies that u(x) <= sum(abs.(w(x))) for all x in the domain described by input Ps
 u(x), w_1(x), ...,  w_R(x) are polynomials with U coefficients
 =#
@@ -44,8 +45,12 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     tempUU2::Matrix{T}
     tempURU::Matrix{T}
     tempURU2::Matrix{T}
-    PΛiPs1::Vector{Vector{Matrix{T}}} # for each (2, 2)-block pertaining to (lambda_1, lambda_i), P * inv(Λ)[1, 1] * Ps = P * inv(Λ)i[2, 2] * Ps
-    PΛiPs2::Vector{Vector{Matrix{T}}} # for each (2, 2)-block pertaining to (lambda_1, lambda_i), P * inv(Λ)[2, 1] * Ps = P * inv(Λ)[1, 2]' * Ps
+    # for each (2, 2)-block pertaining to (lambda_1, lambda_i),
+    # P * inv(Λ)[1, 1] * Ps = P * inv(Λ)i[2, 2] * Ps
+    PΛiPs1::Vector{Vector{Matrix{T}}}
+    # for each (2, 2)-block pertaining to (lambda_1, lambda_i),
+    # P * inv(Λ)[2, 1] * Ps = P * inv(Λ)[1, 2]' * Ps
+    PΛiPs2::Vector{Vector{Matrix{T}}}
     ΛLiPs11::Vector{Vector{Matrix{T}}}
     ΛLiPs12::Vector{Vector{Matrix{T}}}
     ΛLiP_dir11::Vector{Vector{Matrix{T}}}
@@ -96,10 +101,12 @@ function setup_extra_data(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     load_matrix(cone.hess_fact_cache, cone.hess)
     Ls = [size(Pk, 2) for Pk in cone.Ps]
     cone.mats = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
-    cone.matfact = [[cholesky(hcat([one(T)])) for _ in 1:R] for _ in cone.Ps] # TODO preallocate better
+    # TODO preallocate better
+    cone.matfact = [[cholesky(hcat([one(T)])) for _ in 1:R] for _ in cone.Ps]
     cone.hess_edge_blocks = [zeros(T, U, U) for _ in 1:(R - 1)]
     cone.hess_diag_blocks = [zeros(T, U, U) for _ in 1:R]
-    cone.hess_diag_facts = Any[cholesky(hcat([one(T)])) for _ in 1:(R - 1)] # TODO preallocate better
+    # TODO preallocate better
+    cone.hess_diag_facts = Any[cholesky(hcat([one(T)])) for _ in 1:(R - 1)]
     cone.hess_diags = [zeros(T, U, U) for _ in 1:R - 1]
     cone.ΛLi_Λ = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
     cone.Λ11 = [zeros(T, L, L) for L in Ls]
@@ -130,7 +137,9 @@ function setup_extra_data(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     return cone
 end
 
-reset_data(cone::WSOSInterpEpiNormOne) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
+reset_data(cone::WSOSInterpEpiNormOne) = (cone.feas_updated = cone.grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
+    cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
 
 use_sqrt_hess_oracles(::WSOSInterpEpiNormOne) = false # Hessian is block sparse
 
@@ -198,8 +207,6 @@ function update_feas(cone::WSOSInterpEpiNormOne)
     cone.feas_updated = true
     return cone.is_feas
 end
-
-is_dual_feas(::WSOSInterpEpiNormOne) = true
 
 function update_grad(cone::WSOSInterpEpiNormOne)
     @assert cone.is_feas
@@ -305,7 +312,11 @@ function update_hess_prod(cone::WSOSInterpEpiNormOne)
     return prod
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpEpiNormOne)
+function hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::WSOSInterpEpiNormOne,
+    )
     if !cone.hess_prod_updated
         update_hess_prod(cone)
     end
@@ -320,7 +331,8 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInt
         arr_r = arr[idxs, :]
         mul!(prod[1:U, :], edge_r, arr_r, true, true)
         mul!(prod[idxs, :], edge_r, arr[1:U, :])
-        mul!(prod[idxs, :], Symmetric(cone.hess_diag_blocks[r + 1], :U), arr_r, true, true)
+        mul!(prod[idxs, :], Symmetric(cone.hess_diag_blocks[r + 1], :U), arr_r,
+            true, true)
     end
 
     return prod
@@ -344,18 +356,19 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where T
         diag_r = cone.hess_diags[r1]
 
         copyto!(diag_r, cone.hess_diag_blocks[r])
-        r_fact = hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U), check = false)
+        S = Symmetric(diag_r, :U)
+        r_fact = hess_diag_facts[r1] = cholesky!(S, check = false)
         if !isposdef(r_fact)
             # attempt recovery NOTE can do what hessian factorization fallback does
             copyto!(diag_r, cone.hess_diag_blocks[r])
             increase_diag!(diag_r)
-            r_fact = hess_diag_facts[r1] = cholesky!(Symmetric(diag_r, :U), check = false)
+            r_fact = hess_diag_facts[r1] = cholesky!(S, check = false)
             if !isposdef(r_fact)
                 copyto!(diag_r, cone.hess_diag_blocks[r])
                 if T <: BlasReal # TODO refac
-                    hess_diag_facts[r1] = bunchkaufman!(Symmetric(diag_r, :U), true)
+                    hess_diag_facts[r1] = bunchkaufman!(S, true)
                 else
-                    hess_diag_facts[r1] = lu!(Symmetric(diag_r, :U))
+                    hess_diag_facts[r1] = lu!(S)
                 end
             end
         end
@@ -369,18 +382,19 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where T
     end
 
     copyto!(schur_backup, schur)
-    s_fact = cone.hess_schur_fact = cholesky!(Symmetric(schur_backup, :U), check = false)
+    S = Symmetric(schur_backup, :U)
+    s_fact = cone.hess_schur_fact = cholesky!(S, check = false)
     if !isposdef(s_fact)
         # attempt recovery NOTE: can do what hessian factorization fallback
         copyto!(schur_backup, schur)
         increase_diag!(schur_backup)
-        s_fact = cone.hess_schur_fact = cholesky!(Symmetric(schur_backup, :U), check = false)
+        s_fact = cone.hess_schur_fact = cholesky!(S, check = false)
         if !isposdef(s_fact)
             copyto!(schur_backup, schur)
             if T <: BlasReal # TODO refac
-                cone.hess_schur_fact = bunchkaufman!(Symmetric(schur_backup, :U), true)
+                cone.hess_schur_fact = bunchkaufman!(S, true)
             else
-                cone.hess_schur_fact = lu!(Symmetric(schur_backup, :U))
+                cone.hess_schur_fact = lu!(S)
             end
         end
     end
@@ -389,7 +403,11 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where T
     return
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpEpiNormOne)
+function inv_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::WSOSInterpEpiNormOne,
+    )
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
     end
@@ -457,11 +475,12 @@ function correction(cone::WSOSInterpEpiNormOne, dir::AbstractVector)
 
         @views ΛLiP_dir22 = mul!(LUk, Λ11LiP, Diagonal(dir[1:U]))
         @views for r in 2:R
+            D = Diagonal(dir[block_idxs(U, r)])
             mul!(ΛLiP_dir11[r - 1], ΛLiPs11[r - 1], Diagonal(dir[1:U]))
-            mul!(ΛLiP_dir11[r - 1], ΛLiPs12[r - 1], Diagonal(dir[block_idxs(U, r)]), true, true)
-            mul!(ΛLiP_dir12[r - 1], ΛLiPs11[r - 1], Diagonal(dir[block_idxs(U, r)]))
+            mul!(ΛLiP_dir11[r - 1], ΛLiPs12[r - 1], D, true, true)
+            mul!(ΛLiP_dir12[r - 1], ΛLiPs11[r - 1], D)
             mul!(ΛLiP_dir12[r - 1], ΛLiPs12[r - 1], Diagonal(dir[1:U]), true, true)
-            mul!(ΛLiP_dir21[r - 1], Λ11LiP, Diagonal(dir[block_idxs(U, r)]))
+            mul!(ΛLiP_dir21[r - 1], Λ11LiP, D)
         end
 
         ΛLiP_dir22_Λ11LiP = ΛLiP_dir22 * Λ11LiP'
@@ -480,7 +499,8 @@ function correction(cone::WSOSInterpEpiNormOne, dir::AbstractVector)
 
             mul!(LLk, ΛLiP_dir22, ΛLiPs12[s]')
             mul!(corr_half[s][(L + 1):(2 * L), 1:U], LLk, ΛLiPs11[s], true, true)
-            mul!(corr_half[s][(L + 1):(2 * L), (U + 1):(2 * U)], LLk, ΛLiPs12[s], true, true)
+            mul!(corr_half[s][(L + 1):(2 * L), (U + 1):(2 * U)], LLk, ΛLiPs12[s],
+                true, true)
 
             mul!(LLk, ΛLiP_dir11[s], Λ11LiP')
             mul!(corr_half[s][1:L, 1:U], LLk, Λ11LiP, true, true)

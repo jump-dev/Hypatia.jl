@@ -1,10 +1,14 @@
 #=
-interpolation-based weighted-sum-of-squares (multivariate) polynomial epinormeucl (AKA second-order cone) parametrized by interpolation matrices Ps
+interpolation-based weighted-sum-of-squares (multivariate) polynomial epinormeucl
+(AKA second-order cone) parametrized by interpolation matrices Ps
 certifies that u(x)^2 <= sum(w_i(x)^2) for all x in the domain described by input Ps
 u(x), w_1(x), ...,  w_R(x) are polynomials with U coefficients
 
-dual barrier extended from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
-and "Semidefinite Characterization of Sum-of-Squares Cones in Algebras" by D. Papp and F. Alizadeh
+dual barrier extended from
+"Sum-of-squares optimization without semidefinite programming"
+by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
+and "Semidefinite Characterization of Sum-of-Squares Cones in Algebras"
+by D. Papp and F. Alizadeh
 -logdet(schur(Lambda)) - logdet(Lambda_11)
 note that if schur(M) = A - B * inv(D) * C then
 logdet(schur) = logdet(M) - logdet(D) = logdet(Lambda) - (R - 1) * logdet(Lambda_11)
@@ -111,7 +115,8 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.PΛiPs = [zeros(T, R * U, R * U) for _ in eachindex(Ls)]
     cone.Λ11LiP = [zeros(T, L, U) for L in Ls]
     cone.PΛ11iP = [zeros(T, U, U) for _ in eachindex(Ps)]
-    cone.PΛiP_blocks_U = [[view(PΛiPk, block_idxs(U, r), block_idxs(U, s)) for r in 1:R, s in 1:R] for PΛiPk in cone.PΛiPs]
+    cone.PΛiP_blocks_U = [[view(PΛiPk, block_idxs(U, r), block_idxs(U, s))
+        for r in 1:R, s in 1:R] for PΛiPk in cone.PΛiPs]
     cone.Λfact = Vector{Any}(undef, K)
     cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
     cone.Ps_times = zeros(K)
@@ -192,7 +197,8 @@ function update_grad(cone::WSOSInterpEpiNormEucl)
         matLiP = cone.matLiP[k]
         ΛLi_Λ = cone.ΛLi_Λ[k]
 
-        ldiv!(Λ11LiP, cone.Λfact[k].L, Pk') # TODO may be more efficient to do ldiv(fact.U', B) than ldiv(fact.L, B) here and elsewhere since the factorizations are of symmetric :U matrices
+        ldiv!(Λ11LiP, cone.Λfact[k].L, Pk') # TODO may be more efficient to do
+        # ldiv(fact.U', B) than ldiv(fact.L, B) here and elsewhere since the factorizations are of symmetric :U matrices
 
         # prep PΛiP halves
         ldiv!(matLiP, matfact[k].L, Pk')
@@ -331,24 +337,29 @@ function correction(cone::WSOSInterpEpiNormEucl, dir::AbstractVector)
         corr_half = cone.tempLRUR[k]
         corr_half .= 0
 
-        # get ΛLiP * D * PΛiP where D is diagonalized dir scattered in an arrow and ΛLiP is half an arrow
+        # get ΛLiP * D * PΛiP where D is diagonalized dir scattered in an arrow
+        # and ΛLiP is half an arrow
         # ΛLiP * D is an arrow matrix but row edge doesn't equal column edge
         @views scaled_diag = mul!(cone.tempLU[k], Λ11LiP, Diagonal(dir[1:U]))
         @views scaled_pt = mul!(cone.tempLU2[k], matLiP, Diagonal(dir[1:U]))
         @views for r in 2:R
-            mul!(scaled_pt, ΛLiP_edge[r - 1], Diagonal(dir[block_idxs(U, r)]), true, true)
+            mul!(scaled_pt, ΛLiP_edge[r - 1], Diagonal(dir[block_idxs(U, r)]),
+                true, true)
             mul!(scaled_row[r - 1], matLiP, Diagonal(dir[block_idxs(U, r)]))
-            mul!(scaled_row[r - 1], ΛLiP_edge[r - 1], Diagonal(dir[1:U]), true, true)
+            mul!(scaled_row[r - 1], ΛLiP_edge[r - 1], Diagonal(dir[1:U]),
+                true, true)
             mul!(scaled_col[r - 1], Λ11LiP, Diagonal(dir[block_idxs(U, r)]))
         end
 
-        # ΛLiP is half an arrow, multiplying an arrow by its transpose gives another arrow
+        # ΛLiP is half an arrow, multiplying arrow by its transpose gives arrow
         @views mul!(ΛLiP_D_ΛLiPt_col[1:L, :], scaled_pt, matLiP')
         @views for r in 2:R
-            mul!(ΛLiP_D_ΛLiPt_col[1:L, :], scaled_row[r - 1], ΛLiP_edge[r - 1]', true, true)
+            mul!(ΛLiP_D_ΛLiPt_col[1:L, :], scaled_row[r - 1], ΛLiP_edge[r - 1]',
+                true, true)
             mul!(ΛLiP_D_ΛLiPt_row[r - 1], scaled_row[r - 1], Λ11LiP')
             mul!(ΛLiP_D_ΛLiPt_col[block_idxs(L, r), :], scaled_col[r - 1], matLiP')
-            mul!(ΛLiP_D_ΛLiPt_col[block_idxs(L, r), :], scaled_diag, ΛLiP_edge[r - 1]', true, true)
+            mul!(ΛLiP_D_ΛLiPt_col[block_idxs(L, r), :], scaled_diag,
+                ΛLiP_edge[r - 1]', true, true)
             mul!(ΛLiP_D_ΛLiPt_diag, scaled_diag, Λ11LiP')
         end
 
@@ -361,8 +372,10 @@ function correction(cone::WSOSInterpEpiNormEucl, dir::AbstractVector)
         # multiply by ΛLiP
         mul!(corr_half, ΛLiP_D_ΛLiPt_col, ΛLiP_edge_ctgs)
         @views for r in 2:R
-            mul!(corr_half[1:L, block_idxs(U, r)], ΛLiP_D_ΛLiPt_row[r - 1], Λ11LiP, true, true)
-            mul!(corr_half[block_idxs(L, r), block_idxs(U, r)], ΛLiP_D_ΛLiPt_diag, Λ11LiP, true, true)
+            mul!(corr_half[1:L, block_idxs(U, r)], ΛLiP_D_ΛLiPt_row[r - 1],
+                Λ11LiP, true, true)
+            mul!(corr_half[block_idxs(L, r), block_idxs(U, r)], ΛLiP_D_ΛLiPt_diag,
+                Λ11LiP, true, true)
         end
 
         @views for u in 1:U

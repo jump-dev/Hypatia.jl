@@ -1,20 +1,25 @@
 #=
 dense-Cholesky-based implementation
 
-NOTE currently we do not restrict the sparsity pattern to be chordal here (at the cost of not being able to obtain "closed form" hess sqrt and inv hess oracles)
+NOTE currently we do not restrict the sparsity pattern to be chordal here (at the
+cost of not being able to obtain "closed form" hess sqrt and inv hess oracles)
 =#
 
 struct PSDSparseDense <: PSDSparseImpl end
 
-mutable struct PSDSparseDenseCache{T <: Real, R <: RealOrComplex{T}} <: PSDSparseCache{T, R}
+mutable struct PSDSparseDenseCache{T <: Real, R <: RealOrComplex{T}} <:
+    PSDSparseCache{T, R}
     mat::Matrix{R}
     mat2::Matrix{R}
     inv_mat::Matrix{R}
     fact_mat
-    PSDSparseDenseCache{T, R}() where {T <: Real, R <: RealOrComplex{T}} = new{T, R}()
+    PSDSparseDenseCache{T, R}() where {T <: Real, R <: RealOrComplex{T}} = 
+        new{T, R}()
 end
 
-function setup_psdsparse_cache(cone::PosSemidefTriSparse{PSDSparseDense, T, R}) where {T, R}
+function setup_psdsparse_cache(
+    cone::PosSemidefTriSparse{PSDSparseDense, T, R},
+    ) where {T, R}
     cone.cache = cache = PSDSparseDenseCache{T, R}()
     cache.mat = zeros(R, cone.side, cone.side)
     cache.mat2 = zero(cache.mat)
@@ -46,7 +51,9 @@ function update_grad(cone::PosSemidefTriSparse{PSDSparseDense})
     return cone.grad
 end
 
-function update_hess(cone::PosSemidefTriSparse{PSDSparseDense, T, T}) where {T <: Real}
+function update_hess(
+    cone::PosSemidefTriSparse{PSDSparseDense, T, T},
+    ) where {T <: Real}
     @assert cone.grad_updated
     rt2 = cone.rt2
     H = cone.hess.data
@@ -72,7 +79,9 @@ function update_hess(cone::PosSemidefTriSparse{PSDSparseDense, T, T}) where {T <
     return cone.hess
 end
 
-function update_hess(cone::PosSemidefTriSparse{PSDSparseDense, T, Complex{T}}) where {T <: Real}
+function update_hess(
+    cone::PosSemidefTriSparse{PSDSparseDense, T, Complex{T}},
+    ) where {T <: Real}
     @assert cone.grad_updated
     rt2 = cone.rt2
     H = cone.hess.data
@@ -126,7 +135,11 @@ function update_hess(cone::PosSemidefTriSparse{PSDSparseDense, T, Complex{T}}) w
     return cone.hess
 end
 
-function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTriSparse{PSDSparseDense})
+function hess_prod_slow!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::PosSemidefTriSparse{PSDSparseDense},
+    )
     cone.use_hess_prod_slow_updated || update_use_hess_prod_slow(cone)
     @assert cone.hess_updated
     cone.use_hess_prod_slow || return hess_prod!(prod, arr, cone)
@@ -144,7 +157,10 @@ function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Po
     return prod
 end
 
-function correction(cone::PosSemidefTriSparse{PSDSparseDense}, dir::AbstractVector)
+function correction(
+    cone::PosSemidefTriSparse{PSDSparseDense},
+    dir::AbstractVector,
+    )
     @assert is_feas(cone)
     cache = cone.cache
 

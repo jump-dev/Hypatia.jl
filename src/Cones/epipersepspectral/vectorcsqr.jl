@@ -45,7 +45,10 @@ function setup_csqr_cache(cone::EpiPerSepSpectral{VectorCSqr{T}}) where T
     return
 end
 
-function set_initial_point(arr::AbstractVector, cone::EpiPerSepSpectral{<:VectorCSqr})
+function set_initial_point(
+    arr::AbstractVector,
+    cone::EpiPerSepSpectral{<:VectorCSqr},
+    )
     (arr[1], arr[2], w0) = get_initial_point(cone.d, cone.h)
     @views fill!(arr[3:end], w0)
     return arr
@@ -301,7 +304,10 @@ function update_correction_aux(cone::EpiPerSepSpectral{<:VectorCSqr})
     cone.correction_aux_updated = true
 end
 
-function correction(cone::EpiPerSepSpectral{VectorCSqr{T}}, dir::AbstractVector{T}) where T
+function correction(
+    cone::EpiPerSepSpectral{VectorCSqr{T}},
+    dir::AbstractVector{T},
+    ) where T
     cone.correction_aux_updated || update_correction_aux(cone)
     v = cone.point[2]
     w = cone.w_view

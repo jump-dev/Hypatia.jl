@@ -2,7 +2,9 @@
 nonnegative orthant cone:
 w in R^n : w_i >= 0
 
-barrier from "Self-Scaled Barriers and Interior-Point Methods for Convex Programming" by Nesterov & Todd
+barrier from
+"Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
+by Nesterov & Todd
 -sum_i(log(u_i))
 =#
 
@@ -36,7 +38,8 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false)
+reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = false)
 
 use_sqrt_hess_oracles(cone::Nonnegative) = true
 
@@ -84,25 +87,41 @@ function update_inv_hess(cone::Nonnegative)
     return cone.inv_hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+function hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::Nonnegative,
+    )
     @assert cone.is_feas
     @. prod = arr / cone.point / cone.point
     return prod
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+function inv_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::Nonnegative,
+    )
     @assert cone.is_feas
     @. prod = arr * cone.point * cone.point
     return prod
 end
 
-function sqrt_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+function sqrt_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::Nonnegative,
+    )
     @assert cone.is_feas
     @. prod = arr / cone.point
     return prod
 end
 
-function inv_sqrt_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
+function inv_sqrt_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::Nonnegative,
+    )
     @assert cone.is_feas
     @. prod = arr * cone.point
     return prod
@@ -122,7 +141,12 @@ hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 
-function in_neighborhood(cone::Nonnegative{T}, rtmu::T, max_nbhd::T) where {T <: Real}
+function in_neighborhood(
+    cone::Nonnegative{T},
+    rtmu::T,
+    max_nbhd::T,
+    ) where {T <: Real}
     mu_nbhd = rtmu * max_nbhd
-    return all(abs(si * zi - rtmu) < mu_nbhd for (si, zi) in zip(cone.point, cone.dual_point))
+    return all(abs(si * zi - rtmu) < mu_nbhd for (si, zi) in
+        zip(cone.point, cone.dual_point))
 end

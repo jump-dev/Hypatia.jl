@@ -51,7 +51,8 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
             @assert ishermitian(A_i)
         end
         @assert side > 0
-        @assert div(side * (side + 1), 2) >= dim # TODO necessary to ensure linear independence of As (but not sufficient)
+        # necessary to ensure linear independence of As (but not sufficient)
+        @assert div(side * (side + 1), 2) >= dim
         @assert isposdef(first(As))
         cone = new{T}()
         cone.use_dual_barrier = use_dual
@@ -63,7 +64,9 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::LinMatrixIneq) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.use_hess_prod_slow = cone.use_hess_prod_slow_updated = false)
+reset_data(cone::LinMatrixIneq) = (cone.feas_updated = cone.grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
+    cone.use_hess_prod_slow = cone.use_hess_prod_slow_updated = false)
 
 # TODO only allocate the fields we use
 function setup_extra_data(cone::LinMatrixIneq{T}) where {T <: Real}
@@ -76,13 +79,17 @@ end
 
 get_nu(cone::LinMatrixIneq) = cone.side
 
-function set_initial_point(arr::AbstractVector, cone::LinMatrixIneq{T}) where {T <: Real}
+function set_initial_point(
+    arr::AbstractVector,
+    cone::LinMatrixIneq{T},
+    ) where {T <: Real}
     arr .= 0
     arr[1] = 1
     return arr
 end
 
-lmi_fact(arr::AbstractSparseMatrix) = cholesky(Hermitian(arr), shift=false, check=false)
+lmi_fact(arr::AbstractSparseMatrix) = cholesky(Hermitian(arr),
+    shift=false, check=false)
 lmi_fact(arr::AbstractMatrix) = cholesky!(Hermitian(arr), check=false)
 
 function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
@@ -99,7 +106,8 @@ end
 function update_grad(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert cone.is_feas
 
-    sumAinvAs = cone.sumAinvAs = [Hermitian(cone.fact.L \ (cone.fact.L \ A_i)') for A_i in cone.As]
+    sumAinvAs = cone.sumAinvAs = [Hermitian(cone.fact.L \ (cone.fact.L \ A_i)')
+        for A_i in cone.As]
     @inbounds for (i, mat_i) in enumerate(sumAinvAs)
         cone.grad[i] = -tr(mat_i)
     end
@@ -121,7 +129,11 @@ function update_hess(cone::LinMatrixIneq)
     return cone.hess
 end
 
-function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::LinMatrixIneq)
+function hess_prod_slow!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::LinMatrixIneq,
+    )
     cone.use_hess_prod_slow_updated || update_use_hess_prod_slow(cone)
     @assert cone.hess_updated
     cone.use_hess_prod_slow || return hess_prod!(prod, arr, cone)
