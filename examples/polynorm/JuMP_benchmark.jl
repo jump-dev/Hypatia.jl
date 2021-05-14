@@ -67,7 +67,12 @@ polynorm_l1_n_d_ms = [
     ],
     ]
 
-polynorm_insts(use_l1::Bool, use_norm_cone::Bool, use_wsos::Bool, d_factors::Vector{Int}) = [
+polynorm_insts(
+    use_l1::Bool,
+    use_norm_cone::Bool,
+    use_wsos::Bool,
+    d_factors::Vector{Int},
+    ) = [
     [(n, d, f * d, m, use_l1, use_norm_cone, use_wsos) for (n, d, m) in ndms]
     for f in d_factors
     for ndms in (use_l1 ? polynorm_l1_n_d_ms : polynorm_l2_n_d_ms)

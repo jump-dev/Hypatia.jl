@@ -1,7 +1,5 @@
 #=
 sets of native test instances
-
-TODO add more preprocessing tests and primal or dual infeasible tests
 =#
 
 inst_preproc = [

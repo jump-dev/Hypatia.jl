@@ -1,12 +1,12 @@
 #=
 find maximum volume hypercube with edges parallel to the axes inside a polyhedron
-or an ellipsoid defined with l_1, l_infty, or l_2 ball constraints (different to native.jl)
+or an ellipsoid defined with l_1, l_infty, or l_2 ball constraints
 =#
 
 struct MaxVolumeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
-    epinormeucl_constr::Bool # add an L2 ball constraint, else don't add
-    epinorminf_constrs::Bool # add L1 and Linfty ball constraints, else don't add
+    epinormeucl_constr::Bool # add an L2 ball constraint
+    epinorminf_constrs::Bool # add L1 and Linfty ball constraints
 end
 
 function build(inst::MaxVolumeJuMP{T}) where {T <: Float64}
@@ -21,16 +21,17 @@ function build(inst::MaxVolumeJuMP{T}) where {T <: Float64}
 
     model = JuMP.Model()
     JuMP.@variable(model, t)
-    JuMP.@variable(model, end_pts[1:n])
+    JuMP.@variable(model, x[1:n])
     JuMP.@objective(model, Max, t)
-    JuMP.@constraint(model, vcat(t, end_pts) in MOI.GeometricMeanCone(n + 1))
+    JuMP.@constraint(model, vcat(t, x) in MOI.GeometricMeanCone(n + 1))
 
     if inst.epinormeucl_constr
-        JuMP.@constraint(model, vcat(gamma, A * end_pts) in JuMP.SecondOrderCone())
+        JuMP.@constraint(model, vcat(gamma, A * x) in JuMP.SecondOrderCone())
     end
     if inst.epinorminf_constrs
-        JuMP.@constraint(model, vcat(gamma, A * end_pts) in MOI.NormInfinityCone(n + 1))
-        JuMP.@constraint(model, vcat(sqrt(n) * gamma, A * end_pts) in MOI.NormOneCone(n + 1))
+        JuMP.@constraint(model, vcat(gamma, A * x) in MOI.NormInfinityCone(n + 1))
+        JuMP.@constraint(model, vcat(sqrt(n) * gamma, A * x) in
+            MOI.NormOneCone(n + 1))
     end
 
     return model

@@ -6,7 +6,8 @@ st. sum(x) = 1
     Qₖ + y I + sumᵢ xᵢ Pₖᵢ ⪰ 0, ∀k = 1..K
 where Qₖ ≺ 0, Pₖᵢ ∈ 𝕊ˢ
 
-formulations: PSD, sparse PSD (sparse Pₖᵢ, with sparse or dense chol), LMI (sparse or dense Pₖᵢ)
+formulations: PSD, sparse PSD (sparse Pₖᵢ, with sparse or dense chol),
+LMI (sparse or dense Pₖᵢ)
 =#
 
 using SparseArrays
@@ -19,11 +20,11 @@ struct SparseLMIJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_psd::Bool # use PSD cone
     use_linmatrixineq::Bool # use linmatrixineq cone
     use_sparsepsd::Bool # use sparsePSD cone
-    use_cholmod_impl::Bool # use sparsePSD cone with CHOLMOD implementation, else dense implementation
+    use_cholmod_impl::Bool # use sparsePSD cone with CHOLMOD, else dense impl
 end
 
 function build(inst::SparseLMIJuMP{T}) where {T <: Float64}
-    @assert (inst.use_psd + inst.use_sparsepsd + inst.use_linmatrixineq) == 1
+    @assert xor(inst.use_psd, inst.use_sparsepsd, inst.use_linmatrixineq)
     (num_lmis, side_Ps, num_Ps) = (inst.num_lmis, inst.side_Ps, inst.num_Ps)
 
     function rand_symm()
@@ -52,19 +53,22 @@ function build(inst::SparseLMIJuMP{T}) where {T <: Float64}
 
     if inst.use_psd || inst.use_sparsepsd
         for k in 1:num_lmis
-            Sk = Symmetric(Qs[k] + y * matI + sum(x[i] * Ps[k, i] for i in 1:num_Ps))
+            Sk = Symmetric(Qs[k] + y * matI +
+                sum(x[i] * Ps[k, i] for i in 1:num_Ps))
             if inst.use_psd
                 JuMP.@constraint(model, Sk in JuMP.PSDCone())
             else
-                impl = (inst.use_cholmod_impl ? Cones.PSDSparseCholmod : Cones.PSDSparseDense)
-                cone = Hypatia.PosSemidefTriSparseCone{impl, Float64, Float64}
+                impl = (inst.use_cholmod_impl ? Cones.PSDSparseCholmod :
+                    Cones.PSDSparseDense)
+                cone = Hypatia.PosSemidefTriSparseCone{impl, T, T}
                 (row_idxs, col_idxs, vals) = findnz(sparse(LowerTriangular(Sk)))
-                JuMP.@constraint(model, vals in cone(side_Ps, row_idxs, col_idxs, false))
+                JuMP.@constraint(model, vals in cone(
+                    side_Ps, row_idxs, col_idxs, false))
             end
         end
     elseif inst.use_linmatrixineq
-        JuMP.@constraint(model, [k in 1:num_lmis],
-            vcat(y, x, 1) in Hypatia.LinMatrixIneqCone{Float64}([matI, Ps[k, :]..., Qs[k]]))
+        JuMP.@constraint(model, [k in 1:num_lmis], vcat(y, x, 1) in
+            Hypatia.LinMatrixIneqCone{T}([matI, Ps[k, :]..., Qs[k]]))
     else
         error()
     end

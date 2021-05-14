@@ -13,7 +13,8 @@ dual (over z,y):
     c + A'y + G'z == 0   (x)
                 z in K*  (s)
 ```
-where K is a convex cone defined as a Cartesian product of recognized primitive cones, and K* is its dual cone.
+where K is a convex cone defined as a Cartesian product of recognized proper
+cones, and K* is its dual cone.
 An objective offset can be provided as the keyword arg `obj_offset` (default 0).
 
 The primal-dual optimality conditions are:

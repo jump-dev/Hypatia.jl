@@ -15,7 +15,7 @@ struct DensityEstNative{T <: Real} <: ExampleInstanceNative{T}
     deg::Int
     use_wsos::Bool # use WSOS cone formulation, else PSD formulation
     hypogeomean_obj::Bool # use geomean objective, else sum of logs objective
-    use_hypogeomean::Bool # use hypogeomean cone if applicable, else 3-dim entropy formulation
+    use_hypogeomean::Bool # use hypogeomean cone, else 3-dim entropy formulation
 end
 function DensityEstNative{T}(
     dataset_name::Symbol,
@@ -26,7 +26,8 @@ function DensityEstNative{T}(
     ) where {T <: Real}
     X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
     X = convert(Matrix{T}, X)
-    return DensityEstNative{T}(dataset_name, X, deg, use_wsos, hypogeomean_obj, use_hypogeomean)
+    return DensityEstNative{T}(dataset_name, X, deg, use_wsos,
+        hypogeomean_obj, use_hypogeomean)
 end
 function DensityEstNative{T}(num_obs::Int, n::Int, args...) where {T <: Real}
     X = randn(T, num_obs, n)
@@ -36,7 +37,7 @@ end
 function build(inst::DensityEstNative{T}) where {T <: Real}
     X = inst.X
     (num_obs, n) = size(X)
-    domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n)) # domain is unit box [-1,1]^n
+    domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n)) # domain is unit box
 
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)
@@ -46,8 +47,8 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
 
     # setup interpolation
     halfdeg = div(inst.deg + 1, 2)
-    (U, _, Ps, V, w) = ModelUtilities.interpolate(domain, halfdeg, calc_V = true, calc_w = true)
-    # TODO maybe incorporate this interp-basis transform into MU, and do something smarter for uni/bi-variate
+    (U, _, Ps, V, w) = ModelUtilities.interpolate(domain, halfdeg,
+        calc_V = true, calc_w = true)
     F = qr!(Array(V'), Val(true))
     V_X = ModelUtilities.make_chebyshev_vandermonde(X, 2halfdeg)
     X_pts_polys = (F \ V_X')'
@@ -62,7 +63,8 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
         push!(cones, Cones.WSOSInterpNonnegative{T, T}(U, Ps))
     else
         # U polynomial coefficient variables plus PSD variables
-        # there are length(Ps) new PSD variables, we will store them scaled, lower triangle, row-wise
+        # there are length(Ps) new PSD variables:
+        # store them scaled, lower triangle, row-wise
         psd_var_list = Matrix{T}[]
         nonneg_cone_size = 0
         for i in eachindex(Ps)
@@ -83,7 +85,8 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
             # relevant columns (not rows) in A need to be scaled by sqrt(2) also
             for k in 1:L
                 for l in 1:(k - 1)
-                    psd_var_list[i][:, idx] = Ps[i][:, k] .* Ps[i][:, l] * sqrt(T(2))
+                    psd_var_list[i][:, idx] = Ps[i][:, k] .*
+                        Ps[i][:, l] * sqrt(T(2))
                     idx += 1
                 end
                 psd_var_list[i][:, idx] = Ps[i][:, k] .* Ps[i][:, k]
@@ -112,7 +115,7 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
             num_ext_geom_vars = 1 + num_obs
             ext_offset = 2 + U + num_psd_vars
             h_likl = zeros(T, 3 * num_obs + 2)
-            # order of variables: hypograph u, U f(obs) vars, psd vars, geomean ext vars (y, z)
+            # order: hypograph u, U f(obs) vars, psd vars, geomean ext vars (y, z)
             G_likl = zeros(T, 3 * num_obs + 2, ext_offset + num_obs)
             # y >= u, e'z >= 0
             G_likl[1, 1] = 1
@@ -143,7 +146,8 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
         end
     end
 
-    # extended formulation variables for hypogeomean cone are added after psd ones, so psd vars were already accounted for in hypogeomean_obj && !use_hypogeomean path
+    # extended formulation variables for hypogeomean are added after psd ones, so
+    # psd vars already accounted for in hypogeomean_obj && !use_hypogeomean path
     if !inst.hypogeomean_obj || inst.use_hypogeomean
         G_likl = hcat(G_likl, zeros(T, size(G_likl, 1), num_psd_vars))
         num_ext_geom_vars = 0
@@ -165,7 +169,8 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
         A[1:U, (num_hypo_vars + U) .+ (1:num_psd_vars)] = A_psd
         A[U + 1, num_hypo_vars .+ (1:U)] = w
         G = zeros(T, num_psd_vars + size(G_likl, 1), size(G_likl, 2))
-        G[1:num_psd_vars, (num_hypo_vars + U) .+ (1:num_psd_vars)] = Diagonal(-I, num_psd_vars)
+        G[1:num_psd_vars, (num_hypo_vars + U) .+ (1:num_psd_vars)] =
+            Diagonal(-I, num_psd_vars)
         G[(num_psd_vars + 1):end, :] = G_likl
     end
 

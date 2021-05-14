@@ -1,5 +1,4 @@
 
-# NOTE an extender is needed if use_wsos = false
 insts = Dict()
 insts["minimal"] = [
     ((4, true),),

@@ -4,9 +4,9 @@ cblib_dir = joinpath(ENV["HOME"], "cblib/cblib.zib.de/download/all")
 if !isdir(cblib_dir)
     @warn("CBLIB download folder not found")
     cblib_dir = joinpath(@__DIR__, "cblib_data")
-    cblib_diverse_few = String[]
+    cblib_diverse = String[]
 else
-    cblib_diverse_few = [
+    cblib_diverse = [
         "expdesign_D_8_4", # psd, exp
         "port_12_9_3_a_1", # psd, soc, exp
         "tls4", # soc
@@ -23,8 +23,8 @@ end
 relaxed_tols = (default_tol_relax = 1000,)
 insts = Dict()
 insts["minimal"] = [(("expdesign_D_8_4",), nothing, relaxed_tols)]
-insts["fast"] = [((inst,), nothing, relaxed_tols) for inst in cblib_diverse_few[2:end]]
-insts["various"] = [((inst,), nothing, relaxed_tols) for inst in cblib_diverse_few]
+insts["fast"] = [((inst,), nothing, relaxed_tols) for inst in cblib_diverse]
+insts["various"] = insts["fast"]
 return (CBLIBJuMP, insts)
 
 # other sets:

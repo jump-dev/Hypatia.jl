@@ -45,8 +45,10 @@ function Point(
 
     point.z_views = [view(point.z, idxs) for idxs in model.cone_idxs]
     point.s_views = [view(point.s, idxs) for idxs in model.cone_idxs]
-    point.dual_views = [Cones.use_dual_barrier(cone_k) ? point.s_views[k] : point.z_views[k] for (k, cone_k) in enumerate(model.cones)]
-    point.primal_views = [Cones.use_dual_barrier(cone_k) ? point.z_views[k] : point.s_views[k] for (k, cone_k) in enumerate(model.cones)]
+    point.dual_views = [Cones.use_dual_barrier(cone_k) ? point.s_views[k] :
+        point.z_views[k] for (k, cone_k) in enumerate(model.cones)]
+    point.primal_views = [Cones.use_dual_barrier(cone_k) ? point.z_views[k] :
+        point.s_views[k] for (k, cone_k) in enumerate(model.cones)]
 
     return point
 end

@@ -68,10 +68,11 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     dir_nocorr = stepper.dir_nocorr
 
     # update linear system solver factorization
-    solver.time_upsys += @elapsed update_lhs(solver.system_solver, solver)
+    solver.time_upsys += @elapsed update_lhs(solver.syssolver, solver)
 
     # decide whether to predict or center
-    is_pred = ((stepper.cent_count > 3) || all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))) # TODO tune, make option
+    is_pred = ((stepper.cent_count > 3) ||
+        all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))) # TODO tune, make option
     stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
     rhs_fun_nocorr = (is_pred ? update_rhs_pred : update_rhs_cent)
 
@@ -92,7 +93,8 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         if stepper.use_curve_search
             # do single curve search with correction
             stepper.uncorr_only = false
-            solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
+            solver.time_search += @elapsed alpha =
+                search_alpha(point, model, stepper)
             if iszero(alpha)
                 # try not using correction
                 @warn("very small alpha in curve search; trying without correction")
@@ -106,11 +108,13 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             # do two line searches, first for uncorrected alpha, then for corrected alpha
             try_nocorr = false
             stepper.uncorr_only = true
-            solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
+            solver.time_search += @elapsed alpha =
+                search_alpha(point, model, stepper)
             stepper.uncorr_alpha = alpha
             if !iszero(alpha)
                 stepper.uncorr_only = false
-                solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
+                solver.time_search += @elapsed alpha =
+                    search_alpha(point, model, stepper)
                 if iszero(alpha)
                     # use uncorrected direction
                     stepper.uncorr_only = true
@@ -165,14 +169,16 @@ function update_cone_points(
     @. cand += alpha * dir_nocorr
     if !stepper.uncorr_only
         dir_corr = (ztsk_only ? stepper.dir_corr.ztsk : stepper.dir_corr.vec)
-        corr_factor = (stepper.use_curve_search ? abs2(alpha) : alpha * stepper.uncorr_alpha)
+        corr_factor = (stepper.use_curve_search ? abs2(alpha) :
+            alpha * stepper.uncorr_alpha)
         @. cand += corr_factor * dir_corr
     end
 
     return
 end
 
-print_header_more(stepper::PredOrCentStepper, solver::Solver) = @printf("%5s %9s", "step", "alpha")
+print_header_more(stepper::PredOrCentStepper, solver::Solver) =
+    @printf("%5s %9s", "step", "alpha")
 
 function print_iteration_more(stepper::PredOrCentStepper, solver::Solver)
     step = (iszero(stepper.cent_count) ? "pred" : "cent")

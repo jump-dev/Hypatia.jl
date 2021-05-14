@@ -14,7 +14,11 @@ include("interpolate.jl")
 include("complex.jl")
 
 # utilities for in-place vector and matrix rescalings for svec form
-function vec_to_svec!(arr::AbstractVecOrMat{T}; rt2 = sqrt(T(2)), incr::Int = 1) where T
+function vec_to_svec!(
+    arr::AbstractVecOrMat{T};
+    rt2 = sqrt(T(2)),
+    incr::Int = 1,
+    ) where T
     n = size(arr, 1)
     @assert iszero(rem(n, incr))
     side = round(Int, sqrt(0.25 + 2 * div(n, incr)) - 0.5)
@@ -29,7 +33,11 @@ function vec_to_svec!(arr::AbstractVecOrMat{T}; rt2 = sqrt(T(2)), incr::Int = 1)
     return arr
 end
 
-function svec_to_vec!(arr::AbstractVecOrMat{T}; rt2 = sqrt(T(2)), incr::Int = 1) where T
+function svec_to_vec!(
+    arr::AbstractVecOrMat{T};
+    rt2 = sqrt(T(2)),
+    incr::Int = 1,
+    ) where T
     n = size(arr, 1)
     @assert iszero(rem(n, incr))
     side = round(Int, sqrt(0.25 + 2 * div(n, incr)) - 0.5)

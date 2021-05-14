@@ -14,6 +14,8 @@ TODO
 - maybe allow passing more options to CHOLMOD
 =#
 
+import SuiteSparse.CHOLMOD
+
 struct PSDSparseCholmod <: PSDSparseImpl end
 
 mutable struct PSDSparseCholmodCache{T <: BlasReal, R <: RealOrComplex{T}} <: PSDSparseCache{T, R}

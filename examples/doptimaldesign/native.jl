@@ -18,10 +18,10 @@ end
 function build(inst::DOptimalDesignNative{T}) where {T <: Real}
     (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)
     @assert (p > q) && (n > q) && (n_max <= n)
-    @assert inst.logdet_obj + inst.geomean_obj + inst.rootdet_obj == 1
+    @assert xor(inst.logdet_obj, inst.geomean_obj, inst.rootdet_obj)
     V = randn(T, q, p)
 
-    # constraints on upper bound of number of trials and nonnegativity of numbers of trials
+    # upper bound and nonnegativity of numbers of trials
     if inst.use_epinorminf
         h_norminf = vcat(T(n_max) / 2, fill(-T(n_max) / 2, p))
         G_norminf = vcat(zeros(T, 1, p), -Matrix{T}(I, p, p))
@@ -36,7 +36,8 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
     A = ones(T, 1, p)
     b = T[n]
 
-    if (inst.logdet_obj && inst.use_logdet) || (inst.rootdet_obj && inst.use_rootdet)
+    if (inst.logdet_obj && inst.use_logdet) ||
+        (inst.rootdet_obj && inst.use_rootdet)
         # maximize the hypograph variable of the cone
         c = vcat(-one(T), zeros(T, p))
 
@@ -84,7 +85,8 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
     end
 
     if inst.geomean_obj
-        # auxiliary matrix variable has pq elements stored row-major, auxiliary lower triangular variable has svec_length(q) elements, also stored row-major
+        # auxiliary matrix variable has pq elements stored row-major, auxiliary
+        # lower tri variable has svec_length(q) elements, also stored row-major
         pq = p * q
         qq = q ^ 2
         num_trivars = Cones.svec_length(q)
@@ -96,7 +98,8 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
         row_idx = 1
         for i in 1:q
             col_offset = sum(1:(i - 1)) + 1
-            A_lowertri[row_idx:(row_idx + i - 1), col_offset:(col_offset + i - 1)] = -Matrix{T}(-I, i, i)
+            A_lowertri[row_idx:(row_idx + i - 1),
+                col_offset:(col_offset + i - 1)] = -Matrix{T}(-I, i, i)
             for j in 1:q
                 for k in 1:p
                     # columns index (k, j)
@@ -124,21 +127,25 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
         for i in 1:p
             push!(cones, Cones.EpiNormEucl{T}(q + 1))
             G_soc_epi[epi_idx, i] = -sqrt(T(q))
-            G_soc[(epi_idx + 1):(epi_idx + q), col_idx:(col_idx + q - 1)] = Matrix{T}(-I, q, q)
+            G_soc[(epi_idx + 1):(epi_idx + q), col_idx:(col_idx + q - 1)] =
+                Matrix{T}(-I, q, q)
             epi_idx += q + 1
             col_idx += q
         end
+        zero1 = zeros(T, size(G_norminf, 1), pq + num_trivars)
+        zero2 = zeros(T, pq + p, num_trivars)
         G = [
-            zeros(T, size(G_norminf, 1))    G_norminf    zeros(T, size(G_norminf, 1), pq + num_trivars);
+            zeros(T, size(G_norminf, 1))    G_norminf    zero1;
             -one(T)    zeros(T, 1, p + pq + num_trivars); # geomean
             zeros(T, q, 1 + p + pq)    G_geo; # geomean
-            zeros(T, pq + p)    G_soc_epi    G_soc    zeros(T, pq + p, num_trivars); # epinormeucl
+            zeros(T, pq + p)    G_soc_epi    G_soc    zero2; # epinormeucl
             ]
         h = vcat(h_norminf, zeros(T, p + 1 + q + pq))
     end
 
-    if (inst.rootdet_obj && !inst.use_rootdet) || (inst.logdet_obj && !inst.use_logdet)
-        # extended formulations require an upper triangular matrix of additional variables
+    if (inst.rootdet_obj && !inst.use_rootdet) ||
+        (inst.logdet_obj && !inst.use_logdet)
+        # extended formulations require an upper tri matrix of additional vars
         # we will store this matrix row-major
         num_trivars = Cones.svec_length(q)
         # vectorized dimension of extended psd matrix

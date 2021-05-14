@@ -73,7 +73,7 @@ mutable struct Solver{T <: Real}
     init_use_indirect::Bool
     init_tol_qr::T
     stepper::Stepper{T}
-    system_solver::SystemSolver{T}
+    syssolver::SystemSolver{T}
 
     # current status of the solver object and info
     status::Status
@@ -87,7 +87,7 @@ mutable struct Solver{T <: Real}
     time_unproc::Float64 # unprocess final point
     time_loadsys::Float64 # initialize/load system solver
     time_upsys::Float64 # update LHS and factorization etc for directions solving
-    time_upfact::Float64 # update inner sparse/dense factorization for directions solving only
+    time_upfact::Float64 # update inner factorization for directions solving only
     time_uprhs::Float64 # update RHSs for directions
     time_getdir::Float64 # solve for directions
     time_search::Float64 # searches for alpha parameters
@@ -174,9 +174,9 @@ mutable struct Solver{T <: Real}
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
         stepper::Stepper{T} = default_stepper(T),
-        system_solver::SystemSolver{T} = default_system_solver(T),
+        syssolver::SystemSolver{T} = default_syssolver(T),
         ) where {T <: Real}
-        if isa(system_solver, QRCholSystemSolver{T})
+        if isa(syssolver, QRCholSystemSolver{T})
             @assert preprocess # require preprocessing for QRCholSystemSolver # TODO only need primal eq preprocessing or reduction
         end
         if reduce
@@ -209,7 +209,8 @@ mutable struct Solver{T <: Real}
         if isnothing(tol_illposed)
             tol_illposed = default_tol_tight / 100
         end
-        @assert min(tol_rel_opt, tol_abs_opt, tol_feas, tol_infeas, tol_illposed, tol_slow) >= 0
+        @assert min(tol_rel_opt, tol_abs_opt, tol_feas,
+            tol_infeas, tol_illposed, tol_slow) >= 0
 
         solver = new{T}()
 
@@ -228,7 +229,7 @@ mutable struct Solver{T <: Real}
         solver.init_use_indirect = init_use_indirect
         solver.init_tol_qr = init_tol_qr
         solver.stepper = stepper
-        solver.system_solver = system_solver
+        solver.syssolver = syssolver
         solver.status = NotLoaded
 
         return solver
@@ -236,7 +237,7 @@ mutable struct Solver{T <: Real}
 end
 
 default_stepper(T) = CombinedStepper{T}()
-default_system_solver(T) = QRCholDenseSystemSolver{T}()
+default_syssolver(T) = QRCholDenseSystemSolver{T}()
 
 function solve(solver::Solver{T}) where {T <: Real}
     @assert solver.status == Loaded
@@ -279,7 +280,10 @@ function solve(solver::Solver{T}) where {T <: Real}
     # preprocess and find initial point
     orig_model = solver.orig_model
     result = solver.result = Point(orig_model)
-    model = solver.model = Models.Model{T}(orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h, orig_model.cones, obj_offset = orig_model.obj_offset) # copy original model to solver.model, which may be modified
+    # copy original model to solver.model, which may be modified
+    model = solver.model = Models.Model{T}(
+        orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h,
+        orig_model.cones, obj_offset = orig_model.obj_offset)
     (init_z, init_s) = initialize_cone_point(solver.orig_model)
 
     solver.time_rescale = @elapsed solver.used_rescaling = rescale_data(solver)
@@ -303,7 +307,8 @@ function solve(solver::Solver{T}) where {T <: Real}
         point.kap[] = one(T)
         calc_mu(solver)
         if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
-            @warn("initial mu is $(solver.mu) but should be 1 (this could indicate a problem with cone barrier oracles)")
+            @warn("initial mu is $(solver.mu) but should be 1 (this could " *
+                "indicate a problem with cone barrier oracles)")
         end
         Cones.load_point.(model.cones, point.primal_views)
         Cones.load_dual_point.(model.cones, point.dual_views)
@@ -323,7 +328,7 @@ function solve(solver::Solver{T}) where {T <: Real}
 
         stepper = solver.stepper
         load(stepper, solver)
-        solver.time_loadsys = @elapsed load(solver.system_solver, solver)
+        solver.time_loadsys = @elapsed load(solver.syssolver, solver)
 
         solver.verbose && print_header(stepper, solver)
         flush(stdout)
@@ -354,7 +359,10 @@ function solve(solver::Solver{T}) where {T <: Real}
             if expect_improvement(stepper)
                 if improv < solver.tol_slow
                     if solver.prev_is_slow && solver.prev2_is_slow
-                        solver.verbose && println("slow progress in consecutive iterations; terminating")
+                        if solver.verbose
+                            println("slow progress in consecutive " *
+                                "iterations; terminating")
+                        end
                         solver.status = SlowProgress
                         break
                     else
@@ -367,15 +375,17 @@ function solve(solver::Solver{T}) where {T <: Real}
                 end
             end
 
-            solver.res_norm_cutoff = T(1e-4) * max(solver.x_norm_res, solver.y_norm_res, solver.z_norm_res, solver.tau_feas)
+            solver.res_norm_cutoff = T(1e-4) * max(solver.x_norm_res,
+                solver.y_norm_res, solver.z_norm_res, solver.tau_feas)
             solver.worst_dir_res = 0
 
             step(stepper, solver) || break
             flush(stdout)
             calc_mu(solver)
 
-            if point.tau[] <= zero(T) || point.kap[] <= zero(T) || solver.mu <= zero(T)
-                @warn("numerical failure: tau is $(point.tau[]), kappa is $(point.kap[]), mu is $(solver.mu); terminating")
+            if min(point.tau[], point.kap[], solver.mu) <= 0
+                @warn("numerical failure: tau is $(point.tau[]), " *
+                    "kappa is $(point.kap[]), mu is $(solver.mu); terminating")
                 solver.status = NumericalFailure
                 break
             end
@@ -391,9 +401,12 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.solve_time = time() - start_time
 
     # free memory used by some system solvers
-    free_memory(solver.system_solver)
+    free_memory(solver.syssolver)
 
-    solver.verbose && println("\nstatus is $(solver.status) after $(solver.num_iters) iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
+    if solver.verbose
+        println("\nstatus is $(solver.status) after $(solver.num_iters) " *
+            "iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
+    end
     flush(stdout)
 
     return solver
@@ -401,7 +414,8 @@ end
 
 function calc_mu(solver::Solver{T}) where {T <: Real}
     point = solver.point
-    solver.mu = (dot(point.z, point.s) + point.tau[] * point.kap[]) / (solver.model.nu + 1)
+    solver.mu = (dot(point.z, point.s) + point.tau[] * point.kap[]) /
+        (solver.model.nu + 1)
     return solver.mu
 end
 
@@ -445,7 +459,8 @@ function calc_convergence_params(solver::Solver{T}) where {T <: Real}
 
     # check improvement
     improv = zero(T)
-    for (curr, prev) in ((x_feas, solver.x_feas), (y_feas, solver.y_feas), (z_feas, solver.z_feas), (tau_feas, solver.tau_feas))
+    for (curr, prev) in ((x_feas, solver.x_feas), (y_feas, solver.y_feas),
+        (z_feas, solver.z_feas), (tau_feas, solver.tau_feas))
         if isnan(prev) || isnan(curr)
             continue
         end
@@ -473,7 +488,8 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
 
     is_feas = (max(solver.x_feas, solver.y_feas, solver.z_feas) <= solver.tol_feas)
     is_abs_opt = (solver.gap <= solver.tol_abs_opt)
-    is_rel_opt = (min(solver.gap / tau, abs(primal_obj_t - dual_obj_t)) <= solver.tol_rel_opt * max(tau, min(abs(primal_obj_t), abs(dual_obj_t))))
+    is_rel_opt = (min(solver.gap / tau, abs(primal_obj_t - dual_obj_t)) <=
+        solver.tol_rel_opt * max(tau, min(abs(primal_obj_t), abs(dual_obj_t))))
     if is_feas && (is_abs_opt || is_rel_opt)
         solver.verbose && println("optimal solution found; terminating")
         solver.status = Optimal
@@ -488,7 +504,8 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
         return true
     end
 
-    if primal_obj_t < -eps(T) && max(solver.y_norm_res_t, solver.z_norm_res_t) <= solver.tol_infeas * -primal_obj_t
+    if primal_obj_t < -eps(T) && max(solver.y_norm_res_t, solver.z_norm_res_t) <=
+        solver.tol_infeas * -primal_obj_t
         solver.verbose && println("dual infeasibility detected; terminating")
         solver.status = DualInfeasible
         solver.primal_obj = primal_obj_t
@@ -497,7 +514,8 @@ function check_convergence(solver::Solver{T}) where {T <: Real}
     end
 
     # TODO experiment with ill-posedness check
-    if solver.mu <= solver.tol_illposed && tau <= solver.tol_illposed * min(one(T), solver.point.kap[])
+    if solver.mu <= solver.tol_illposed && tau <=
+        solver.tol_illposed * min(one(T), solver.point.kap[])
         solver.verbose && println("ill-posedness detected; terminating")
         solver.status = IllPosed
         return true
@@ -559,7 +577,8 @@ include("systemsolvers/common.jl")
 
 # release memory used by sparse system solvers
 free_memory(::SystemSolver) = nothing
-free_memory(system_solver::Union{NaiveSparseSystemSolver, SymIndefSparseSystemSolver}) = free_memory(system_solver.fact_cache)
+free_memory(syssolver::Union{NaiveSparseSystemSolver, SymIndefSparseSystemSolver}) =
+    free_memory(syssolver.fact_cache)
 
 # verbose helpers
 function print_header(stepper::Stepper, solver::Solver)
@@ -579,13 +598,15 @@ end
 print_header_more(stepper::Stepper, solver::Solver) = nothing
 
 function print_iteration(stepper::Stepper, solver::Solver)
-    @printf("%5d %12.4e %12.4e |%9.2e ", solver.num_iters, solver.primal_obj, solver.dual_obj, solver.gap)
+    @printf("%5d %12.4e %12.4e |%9.2e ", solver.num_iters, solver.primal_obj,
+        solver.dual_obj, solver.gap)
     if iszero(solver.model.p)
         @printf("%9.2e %9.2e ", solver.x_feas, solver.z_feas)
     else
         @printf("%9.2e %9.2e %9.2e ", solver.x_feas, solver.y_feas, solver.z_feas)
     end
-    @printf("|%9.2e %9.2e %9.2e |", solver.point.tau[], solver.point.kap[], solver.mu)
+    @printf("|%9.2e %9.2e %9.2e |", solver.point.tau[], solver.point.kap[],
+        solver.mu)
 
     if !iszero(solver.num_iters)
         @printf("%9.2e ", solver.worst_dir_res)

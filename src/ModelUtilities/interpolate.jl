@@ -1,10 +1,12 @@
 #=
 utilities for polynomial interpolation on real canonical domains
 
-TODO put unused domains into polymin example (note ball and ellipse require GSL or SpecialFunctions dependency)
+TODO put unused domains into polymin example
+(note ball and ellipse require GSL or SpecialFunctions dependency)
 =#
 
-interp_sample(dom::FreeDomain{T}, npts::Int) where {T <: Real} = interp_sample(Box{T}(-ones(T, dom.n), ones(T, dom.n)), npts)
+interp_sample(dom::FreeDomain{T}, npts::Int) where {T <: Real} =
+    interp_sample(Box{T}(-ones(T, dom.n), ones(T, dom.n)), npts)
 
 get_weights(::FreeDomain{T}, ::AbstractMatrix{T}) where {T <: Real} = Vector{T}[]
 
@@ -23,7 +25,8 @@ function interp_sample(dom::Box{T}, npts::Int) where {T <: Real}
 end
 
 function get_weights(dom::Box{T}, pts::AbstractMatrix{T}) where {T <: Real}
-    @views g = [(pts[:, i] .- dom.l[i]) .* (dom.u[i] .- pts[:, i]) for i in 1:size(pts, 2)]
+    @views g = [(pts[:, i] .- dom.l[i]) .* (dom.u[i] .- pts[:, i]) for
+        i in 1:size(pts, 2)]
     @assert all(all(gi .>= 0) for gi in g)
     return g
 end
@@ -115,9 +118,10 @@ function interpolate(
 end
 
 # slow but high-quality hyperrectangle/box point selections
-wsos_box_params(dom::Domain, n::Int, d::Int, calc_V::Bool, calc_w::Bool) = error("non-sampling based interpolation methods are only available for box domains")
+wsos_box_params(dom::Domain, n::Int, d::Int, calc_V::Bool, calc_w::Bool) =
+    error("non-sampling based interpolation methods are only available for box domains")
 
-# difference with sampling functions is that P0 is always formed using points in [-1, 1]
+# unlike sampling functions, P0 is always formed using points in [-1, 1]
 function wsos_box_params(
     dom::Box{T},
     n::Int,
@@ -125,13 +129,15 @@ function wsos_box_params(
     calc_V::Bool,
     calc_w::Bool,
     ) where {T <: Real}
-    # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
+    # n could be larger than dimension of dom if original was SemiFreeDomain
     (U, pts, P0, P0sub, V, w) = wsos_box_params(T, n, d, calc_V, calc_w)
 
     # TODO refactor/cleanup below
     # scale and shift points, get WSOS matrices
-    pscale = [T(0.5) * (dom.u[mod(j - 1, get_dimension(dom)) + 1] - dom.l[mod(j - 1, get_dimension(dom)) + 1]) for j in 1:n]
-    pshift = [T(0.5) * (dom.u[mod(j - 1, get_dimension(dom)) + 1] + dom.l[mod(j - 1, get_dimension(dom)) + 1]) for j in 1:n]
+    pscale = [T(0.5) * (dom.u[mod(j - 1, get_dimension(dom)) + 1] -
+        dom.l[mod(j - 1, get_dimension(dom)) + 1]) for j in 1:n]
+    pshift = [T(0.5) * (dom.u[mod(j - 1, get_dimension(dom)) + 1] +
+        dom.l[mod(j - 1, get_dimension(dom)) + 1]) for j in 1:n]
     @views Wtsfun = (j -> sqrt.(1 .- abs2.(pts[:, j])) * pscale[j])
     PWts = Matrix{T}[Wtsfun(j) .* P0sub for j in 1:get_dimension(dom)]
     trpts = pts .* pscale' .+ pshift'
@@ -151,7 +157,13 @@ function wsos_box_params(
     return (U = U, pts = pts, Ps = Matrix{T}[P0,], V = V, w = w)
 end
 
-function wsos_box_params(T::Type{<:Real}, n::Int, d::Int, calc_V::Bool, calc_w::Bool)
+function wsos_box_params(
+    T::Type{<:Real},
+    n::Int,
+    d::Int,
+    calc_V::Bool,
+    calc_w::Bool,
+    )
     if n == 1
         return cheb2_data(T, d, calc_V, calc_w)
     elseif n == 2
@@ -188,7 +200,8 @@ function calc_univariate_chebyshev(
     @. @views ug[:, 1] = 0
     @. @views ug[:, 2] = 1
     for t in 3:(d + 1)
-        @. @views ug[:, t] = 2 * (u[:, t - 1] + pts_i * ug[:, t - 1]) - ug[:, t - 2]
+        @. @views ug[:, t] = 2 * (u[:, t - 1] + pts_i *
+            ug[:, t - 1]) - ug[:, t - 2]
     end
 
     if !calc_hessian
@@ -200,7 +213,8 @@ function calc_univariate_chebyshev(
     uh = zero(u)
     @. @views uh[:, 1:2] = 0
     for t in 3:(d + 1)
-        @. @views uh[:, t] = 2 * (2 * ug[:, t - 1] + pts_i * uh[:, t - 1]) - uh[:, t - 2]
+        @. @views uh[:, t] = 2 * (2 * ug[:, t - 1] + pts_i *
+            uh[:, t - 1]) - uh[:, t - 2]
     end
 
     return (u, ug, uh)
@@ -234,7 +248,9 @@ function cheb2_data(
         wa = T[2 / T(1 - j^2) for j in 0:2:(U - 1)]
         @views append!(wa, wa[div(U, 2):-1:2])
         tempconst = pi / T(length(wa)) * 2 * im
-        w = [abs(sum(wa[j] * exp(tempconst * (i - 1) * j) for j in eachindex(wa)) / length(wa)) for i in eachindex(wa)] # inverse fft
+        # inverse FFT
+        w = [abs(sum(wa[j] * exp(tempconst * (i - 1) * j) for
+            j in eachindex(wa)) / length(wa)) for i in eachindex(wa)]
         w[1] /= 2
         push!(w, w[1])
     else
@@ -361,7 +377,7 @@ function make_wsos_arrays(
     n = size(candidate_pts, 2)
     (V, keep_pts, w) = choose_interp_pts(candidate_pts, d, calc_w)
     pts = candidate_pts[keep_pts, :]
-    P0 = V[:, 1:get_L(n, d)] # subset of polynomial evaluations up to total degree d
+    P0 = V[:, 1:get_L(n, d)] # subset of poly evaluations up to total degree d
     Lsub = get_L(n, div(2d - get_degree(dom), 2))
     P0sub = view(P0, :, 1:Lsub)
     return (pts, P0, P0sub, V, w)
@@ -382,7 +398,8 @@ function wsos_sample_params(
     return (U = U, pts = pts, Ps = Matrix{T}[P0, PWts...], V = V, w = w)
 end
 
-n_deg_exponents(n::Int, deg::Int) = [xp for t in 0:deg for xp in Combinatorics.multiexponents(n, t)]
+n_deg_exponents(n::Int, deg::Int) = [xp for t in 0:deg for
+    xp in Combinatorics.multiexponents(n, t)]
 
 # indices of points to keep and quadrature weights at those points
 function choose_interp_pts(
@@ -397,7 +414,9 @@ function choose_interp_pts(
 
     if !calc_w && size(candidate_pts, 1) == U && U > 35_000
         # large matrix and don't need to perform QR procedure, so don't
-        # TODO this is hacky; later the interpolate function and functions it calls should take options (and have better defaults) for whether to perform the QR or not
+        # TODO this is hacky; later the interpolate function and functions it
+        # calls should take options (and have better defaults) for whether to
+        # perform the QR or not
         return (V, 1:U, T[])
     end
 
@@ -421,7 +440,7 @@ function choose_interp_pts(
     return (V, keep_pts, T[])
 end
 
-# construct vandermonde with rows corresponding to points and columns to Chebyshev polys
+# make Vandermonde with rows corresponding to points and columns to Chebyshev polys
 function make_chebyshev_vandermonde(pts::Matrix{T}, deg::Int) where {T <: Real}
     n = size(pts, 2)
     expos = n_deg_exponents(n, deg)
@@ -429,7 +448,10 @@ function make_chebyshev_vandermonde(pts::Matrix{T}, deg::Int) where {T <: Real}
     return make_product_vandermonde(univ_chebs, expos)
 end
 
-function make_product_vandermonde(u::Vector{Matrix{T}}, expos::Vector) where {T <: Real}
+function make_product_vandermonde(
+    u::Vector{Matrix{T}},
+    expos::Vector,
+    ) where {T <: Real}
     npts = size(u[1], 1)
     n = length(u)
     V = zeros(T, npts, length(expos))

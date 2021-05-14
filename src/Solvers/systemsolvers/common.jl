@@ -16,20 +16,20 @@ function get_directions(
     stepper::Stepper{T},
     solver::Solver{T},
     use_nt::Bool;
-    min_impr_tol::T = T(0.5) # improvement tolerance for slow progress in iterative refinement
+    min_impr_tol::T = T(0.5) # improvement tolerance for iterative refinement
     ) where {T <: Real}
     rhs = stepper.rhs
     dir = stepper.dir
     dir_temp = stepper.dir_temp
     res = stepper.temp
-    system_solver = solver.system_solver
+    syssolver = solver.syssolver
     res_norm_cutoff = solver.res_norm_cutoff
     max_ref_steps = solver.max_ref_steps
 
     tau = solver.point.tau[]
     tau_scal = (use_nt ? solver.point.kap[] : solver.mu / tau) / tau
 
-    solve_system(system_solver, solver, dir, rhs, tau_scal)
+    solve_system(syssolver, solver, dir, rhs, tau_scal)
 
     iszero(max_ref_steps) && return dir
 
@@ -46,7 +46,7 @@ function get_directions(
 
         for i in 1:max_ref_steps
             # compute refined direction
-            solve_system(system_solver, solver, dir, res, tau_scal)
+            solve_system(syssolver, solver, dir, res, tau_scal)
             axpby!(true, dir_temp, -1, dir.vec)
 
             # compute residual
@@ -66,7 +66,7 @@ function get_directions(
 
             (res_norm < res_norm_cutoff) && break
             is_curr_slow = (res_norm > min_impr_tol * prev_res_norm)
-            is_prev_slow && is_curr_slow && break # last two iter ref steps made little progress, so stop
+            is_prev_slow && is_curr_slow && break # slow progress
 
             prev_res_norm = res_norm
             is_prev_slow = is_curr_slow
@@ -130,27 +130,29 @@ include("symindef.jl")
 include("qrchol.jl")
 
 function solve_inner_system(
-    system_solver::Union{NaiveElimSparseSystemSolver, SymIndefSparseSystemSolver},
+    syssolver::Union{NaiveElimSparseSystemSolver, SymIndefSparseSystemSolver},
     sol::Point,
     rhs::Point,
     )
-    inv_prod(system_solver.fact_cache, sol.vec, system_solver.lhs_sub, rhs.vec)
+    inv_prod(syssolver.fact_cache, sol.vec, syssolver.lhs_sub, rhs.vec)
     return sol
 end
 
 function solve_inner_system(
-    system_solver::Union{NaiveElimDenseSystemSolver, SymIndefDenseSystemSolver},
+    syssolver::Union{NaiveElimDenseSystemSolver, SymIndefDenseSystemSolver},
     sol::Point,
     rhs::Point,
     )
     copyto!(sol.vec, rhs.vec)
-    inv_prod(system_solver.fact_cache, sol.vec)
+    inv_prod(syssolver.fact_cache, sol.vec)
     return sol
 end
 
 # reduce to 4x4 subsystem
 function solve_system(
-    system_solver::Union{NaiveElimSystemSolver{T}, SymIndefSystemSolver{T}, QRCholSystemSolver{T}},
+    syssolver::Union{
+        NaiveElimSystemSolver{T}, SymIndefSystemSolver{T}, QRCholSystemSolver{T}
+        },
     solver::Solver{T},
     sol::Point{T},
     rhs::Point{T},
@@ -158,7 +160,7 @@ function solve_system(
     ) where {T <: Real}
     model = solver.model
 
-    solve_subsystem4(system_solver, solver, sol, rhs, tau_scal)
+    solve_subsystem4(syssolver, solver, sol, rhs, tau_scal)
     tau = sol.tau[]
 
     # lift to get s and kap
@@ -174,24 +176,24 @@ end
 
 # reduce to 3x3 subsystem
 function solve_subsystem4(
-    system_solver::Union{SymIndefSystemSolver{T}, QRCholSystemSolver{T}},
+    syssolver::Union{SymIndefSystemSolver{T}, QRCholSystemSolver{T}},
     solver::Solver{T},
     sol::Point{T},
     rhs::Point{T},
     tau_scal::T,
     ) where {T <: Real}
     model = solver.model
-    rhs_sub = system_solver.rhs_sub
-    sol_sub = system_solver.sol_sub
+    rhs_sub = syssolver.rhs_sub
+    sol_sub = syssolver.sol_sub
 
     @. rhs_sub.x = rhs.x
     @. rhs_sub.y = -rhs.y
-    setup_rhs3(system_solver, model, rhs, sol, rhs_sub)
+    setup_rhs3(syssolver, model, rhs, sol, rhs_sub)
 
-    solve_subsystem3(system_solver, solver, sol_sub, rhs_sub)
+    solve_subsystem3(syssolver, solver, sol_sub, rhs_sub)
 
     # lift to get tau
-    sol_const = system_solver.sol_const
+    sol_const = syssolver.sol_const
     tau_num = rhs.tau[] + rhs.kap[] + dot_obj(model, sol_sub)
     tau_denom = tau_scal - dot_obj(model, sol_const)
     sol_tau = tau_num / tau_denom
@@ -204,17 +206,17 @@ function solve_subsystem4(
 end
 
 function setup_point_sub(
-    system_solver::Union{QRCholSystemSolver{T}, SymIndefSystemSolver{T}},
+    syssolver::Union{QRCholSystemSolver{T}, SymIndefSystemSolver{T}},
     model::Models.Model{T},
     ) where {T <: Real}
     (n, p, q) = (model.n, model.p, model.q)
     dim_sub = n + p + q
     z_start = model.n + model.p
 
-    sol_sub = system_solver.sol_sub = Point{T}()
-    rhs_sub = system_solver.rhs_sub = Point{T}()
-    rhs_const = system_solver.rhs_const = Point{T}()
-    sol_const = system_solver.sol_const = Point{T}()
+    sol_sub = syssolver.sol_sub = Point{T}()
+    rhs_sub = syssolver.rhs_sub = Point{T}()
+    rhs_const = syssolver.rhs_const = Point{T}()
+    sol_const = syssolver.sol_const = Point{T}()
     for point_sub in (sol_sub, rhs_sub, rhs_const, sol_const)
         point_sub.vec = zeros(T, dim_sub)
         @views point_sub.x = point_sub.vec[1:n]
@@ -229,4 +231,5 @@ function setup_point_sub(
     return nothing
 end
 
-dot_obj(model::Models.Model, point::Point) = dot(model.c, point.x) + dot(model.b, point.y) + dot(model.h, point.z)
+dot_obj(model::Models.Model, point::Point) = dot(model.c, point.x) +
+    dot(model.b, point.y) + dot(model.h, point.z)

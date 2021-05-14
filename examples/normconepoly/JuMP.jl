@@ -1,5 +1,6 @@
 #=
-check a sufficient condition for pointwise membership of vector valued polynomials in the epinormone/epinormeucl cone
+check a sufficient condition for pointwise membership of vector valued
+polynomials in the epinormone/epinormeucl cone
 =#
 
 struct NormConePoly{T <: Real} <: ExampleInstanceJuMP{T}
@@ -11,13 +12,14 @@ end
 
 function build(inst::NormConePoly{T}) where {T <: Float64}
     halfdeg = div(inst.deg + 1, 2)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{Float64}(1), halfdeg)
+    (U, pts, Ps) = ModelUtilities.interpolate(
+        ModelUtilities.FreeDomain{T}(1), halfdeg)
     vals = normconepoly_data[inst.polys_name].(pts)
     l = length(vals[1])
     if inst.use_L2
-        cone = Hypatia.WSOSInterpEpiNormEuclCone{Float64}(l, U, Ps)
+        cone = Hypatia.WSOSInterpEpiNormEuclCone{T}(l, U, Ps)
     else
-        cone = Hypatia.WSOSInterpEpiNormOneCone{Float64}(l, U, Ps)
+        cone = Hypatia.WSOSInterpEpiNormOneCone{T}(l, U, Ps)
     end
 
     model = JuMP.Model()
@@ -27,7 +29,8 @@ function build(inst::NormConePoly{T}) where {T <: Float64}
 end
 
 function test_extra(inst::NormConePoly{T}, model::JuMP.Model) where T
-    @test JuMP.termination_status(model) == (inst.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
+    @test JuMP.termination_status(model) ==
+        (inst.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 
 normconepoly_data = Dict(

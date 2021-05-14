@@ -1,6 +1,6 @@
 #=
 find parameter of convexity mu for a given polynomial p(x)
-ie the largest mu such that p(x) - mu/2*||x||^2 is convex everywhere on given domain
+ie the largest mu such that p(x) - mu/2*||x||^2 is convex on given domain
 see https://en.wikipedia.org/wiki/Convex_function#Strongly_convex_functions
 =#
 
@@ -34,12 +34,14 @@ function build(inst::MuConvexityJuMP{T}) where {T <: Float64}
     if inst.use_matrixwsos
         d = div(maximum(DP.maxdegree.(H)) + 1, 2)
         (U, pts, Ps) = ModelUtilities.interpolate(dom, d)
-        mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{Float64}(n, U, Ps)
+        mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{T}(n, U, Ps)
         H_interp = [H[i, j](x => pts[u, :]) for i in 1:n for j in 1:i for u in 1:U]
-        JuMP.@constraint(model, ModelUtilities.vec_to_svec!(H_interp, rt2 = sqrt(2), incr = U) in mat_wsos_cone)
+        JuMP.@constraint(model, ModelUtilities.vec_to_svec!(H_interp,
+            rt2 = sqrt(2), incr = U) in mat_wsos_cone)
     else
         PolyJuMP.setpolymodule!(model, SumOfSquares)
-        JuMP.@constraint(model, H in JuMP.PSDCone(), domain = get_domain_inequalities(dom, x))
+        JuMP.@constraint(model, H in JuMP.PSDCone(), domain =
+            get_domain_inequalities(dom, x))
     end
 
     return model
@@ -55,7 +57,9 @@ function test_extra(inst::MuConvexityJuMP{T}, model::JuMP.Model) where T
 end
 
 # construct domain inequalities for SumOfSquares models from Hypatia domains
-bss() = SAS.BasicSemialgebraicSet{Float64, DynamicPolynomials.Polynomial{true, Float64}}()
+bss() = SAS.BasicSemialgebraicSet{Float64,
+    DynamicPolynomials.Polynomial{true, Float64}}()
+
 function get_domain_inequalities(dom::ModelUtilities.Box, x)
     box = bss()
     for (xi, ui, li) in zip(x, dom.u, dom.l)
@@ -63,6 +67,7 @@ function get_domain_inequalities(dom::ModelUtilities.Box, x)
     end
     return box
 end
+
 get_domain_inequalities(dom::ModelUtilities.FreeDomain, x) = bss()
 
 muconvexity_data = Dict(

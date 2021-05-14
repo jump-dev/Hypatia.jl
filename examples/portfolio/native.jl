@@ -2,7 +2,7 @@
 maximize expected returns subject to risk constraints
 
 TODO
-- add entropic ball constraint using entropy cone (and optional extended formulation)
+- add entropic ball constraint using entropy cone
 - describe formulation and options
 =#
 
@@ -10,8 +10,8 @@ using SparseArrays
 
 struct PortfolioNative{T <: Real} <: ExampleInstanceNative{T}
     num_stocks::Int
-    epinormeucl_constr::Bool # add L2 ball constraints, else don't add
-    epinorminf_constrs::Bool # add Linfty ball constraints, else don't add
+    epinormeucl_constr::Bool # add L2 ball constraints
+    epinorminf_constrs::Bool # add Linfty ball constraints
     use_epinorminf::Bool # use epinorminf cone, else nonnegative cones
 end
 
@@ -48,7 +48,8 @@ function build(inst::PortfolioNative{T}) where {T <: Real}
 
     if inst.epinorminf_constrs
         if inst.use_epinorminf
-            add_ball_constr(Cones.EpiNormInf{T, T}(num_stocks + 1, use_dual = true), gamma * sqrt(T(num_stocks)))
+            add_ball_constr(Cones.EpiNormInf{T, T}(num_stocks + 1,
+                use_dual = true), gamma * sqrt(T(num_stocks)))
             add_ball_constr(Cones.EpiNormInf{T, T}(num_stocks + 1), gamma)
         else
             c = vcat(c, zeros(T, 2 * num_stocks))
@@ -65,7 +66,8 @@ function build(inst::PortfolioNative{T}) where {T <: Real}
                 -sigma_half    padding;
                 ]
             b = vcat(b, zeros(T, num_stocks))
-            h = vcat(h, zeros(T, 2 * num_stocks), gamma * sqrt(T(num_stocks)), gamma * ones(T, 2 * num_stocks))
+            h = vcat(h, zeros(T, 2 * num_stocks), gamma * sqrt(T(num_stocks)),
+                gamma * ones(T, 2 * num_stocks))
             push!(cones, Cones.Nonnegative{T}(4 * num_stocks + 1))
             cone_offset += 4 * num_stocks + 1
         end

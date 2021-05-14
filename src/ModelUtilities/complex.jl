@@ -1,7 +1,7 @@
 #=
 utilities for polynomial interpolation on complex domains
 
-TODO make interface for complex and real interpolation consistent and use dispatch
+TODO make interface for complex and real interpolation consistent, use dispatch
 =#
 
 function interpolate(
@@ -14,15 +14,18 @@ function interpolate(
     use_QR::Bool = false,
     ) where {T <: Real}
     # generate interpolation
-    # TODO use more numerically-stable basis for columns, and evaluate in a more numerically stable way by multiplying the columns
+    # TODO use more numerically-stable basis for columns, and evaluate in a more
+    # numerically stable way by multiplying the columns
     L = binomial(n + halfdeg, n)
     U = L^2
     L_basis = [a for t in 0:halfdeg for a in Combinatorics.multiexponents(n, t)]
     mon_pow(z, ex) = prod(z[i]^ex[i] for i in eachindex(ex))
-    V_basis = [z -> mon_pow(z, L_basis[k]) * mon_pow(conj(z), L_basis[l]) for l in eachindex(L_basis) for k in eachindex(L_basis)]
+    V_basis = [z -> mon_pow(z, L_basis[k]) * mon_pow(conj(z), L_basis[l]) for
+        l in eachindex(L_basis) for k in eachindex(L_basis)]
     @assert length(V_basis) == U
 
-    # sample from domain (inefficient for general domains, only samples from unit box and checks feasibility)
+    # sample from domain (inefficient for general domains, only samples from
+    # unit box and checks feasibility)
     num_samples = sample_factor * U
     samples = Vector{Vector{Complex{T}}}(undef, num_samples)
     k = 0
@@ -35,7 +38,8 @@ function interpolate(
         end
     end
 
-    # select subset of points to maximize |det(V)| in heuristic QR-based procedure (analogous to real case)
+    # select subset of points to maximize abs(det(V)) in heuristic QR-based
+    # procedure (analogous to real case)
     V = [b(z) for z in samples, b in V_basis]
     VF = qr(Matrix(transpose(V)), Val(true))
     keep = VF.p[1:U]
@@ -50,7 +54,8 @@ function interpolate(
     Ps = [P0]
     for i in eachindex(gs)
         gi = gs[i].(points)
-        Pi = Diagonal(sqrt.(gi)) * P0[:, 1:binomial(n + halfdeg - g_halfdegs[i], n)]
+        @views P0i = P0[:, 1:binomial(n + halfdeg - g_halfdegs[i], n)]
+        Pi = Diagonal(sqrt.(gi)) * P0i
         if use_QR
             Pi = Matrix(qr(Pi).Q)
         end

@@ -1,8 +1,9 @@
 #=
 see description in native.jl
 
-allows objective to minimize frobenius norm or nuclear norm of residual matrix, plus regularization
-similar to https://arxiv.org/ftp/arxiv/papers/1405/1405.1207.pdf
+allows objective to minimize frobenius norm or nuclear norm of residual matrix,
+plus regularization; similar to
+https://arxiv.org/ftp/arxiv/papers/1405/1405.1207.pdf
 =#
 
 using SparseArrays
@@ -45,7 +46,8 @@ end
 
 function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64}
     (Y, X) = (inst.Y, inst.X)
-    @assert min(inst.lam_fro, inst.lam_nuc, inst.lam_las, inst.lam_glr, inst.lam_glc) >= 0
+    @assert min(inst.lam_fro, inst.lam_nuc, inst.lam_las,
+        inst.lam_glr, inst.lam_glc) >= 0
     (data_n, data_m) = size(Y)
     data_p = size(X, 2)
     @assert size(X, 1) == data_n
@@ -57,40 +59,48 @@ function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64}
     loss_mat = Y - X * A
 
     if inst.nuc_obj
-        JuMP.@constraint(model, vcat(loss, vec(loss_mat')) in MOI.NormNuclearCone(data_m, data_n))
+        JuMP.@constraint(model, vcat(loss, vec(loss_mat')) in
+            MOI.NormNuclearCone(data_m, data_n))
     else
         if data_n > data_p
             # dimension reduction via QR
             F = qr(X, Val(true))
-            loss_mat = (F.Q' * Y)[1:data_p, :] - F.R[1:data_p, 1:data_p] * F.P' * A
+            loss_mat = (F.Q' * Y)[1:data_p, :] - F.R[1:data_p, 1:data_p] *
+                F.P' * A
         end
-        JuMP.@constraint(model, vcat(loss, 1, vec(loss_mat) / sqrt(data_n)) in JuMP.RotatedSecondOrderCone())
+        JuMP.@constraint(model, vcat(loss, 1, vec(loss_mat) / sqrt(data_n)) in
+            JuMP.RotatedSecondOrderCone())
     end
 
     obj = one(T) * loss
     if !iszero(inst.lam_fro)
         JuMP.@variable(model, t_fro)
-        JuMP.@constraint(model, vcat(t_fro, inst.lam_fro * vec(A)) in JuMP.SecondOrderCone())
+        JuMP.@constraint(model, vcat(t_fro, inst.lam_fro * vec(A)) in
+            JuMP.SecondOrderCone())
         obj += t_fro
     end
     if !iszero(inst.lam_nuc)
         JuMP.@variable(model, t_nuc)
-        JuMP.@constraint(model, vcat(t_nuc, inst.lam_nuc * vec(A)) in MOI.NormNuclearCone(data_p, data_m))
+        JuMP.@constraint(model, vcat(t_nuc, inst.lam_nuc * vec(A)) in
+            MOI.NormNuclearCone(data_p, data_m))
         obj += t_nuc
     end
     if !iszero(inst.lam_las)
         JuMP.@variable(model, t_las)
-        JuMP.@constraint(model, vcat(t_las, inst.lam_las * vec(A)) in MOI.NormOneCone(data_p * data_m + 1))
+        JuMP.@constraint(model, vcat(t_las, inst.lam_las * vec(A)) in
+            MOI.NormOneCone(data_p * data_m + 1))
         obj += t_las
     end
     if !iszero(inst.lam_glr)
         JuMP.@variable(model, t_glr[1:data_p])
-        JuMP.@constraint(model, [i = 1:data_p], vcat(t_glr[i], inst.lam_glr * A[i, :]) in JuMP.SecondOrderCone())
+        JuMP.@constraint(model, [i = 1:data_p], vcat(t_glr[i],
+            inst.lam_glr * A[i, :]) in JuMP.SecondOrderCone())
         obj += sum(t_glr)
     end
     if !iszero(inst.lam_glc)
         JuMP.@variable(model, t_glc[1:data_m])
-        JuMP.@constraint(model, [i = 1:data_m], vcat(t_glc[i], inst.lam_glc * A[:, i]) in JuMP.SecondOrderCone())
+        JuMP.@constraint(model, [i = 1:data_m], vcat(t_glc[i],
+            inst.lam_glc * A[:, i]) in JuMP.SecondOrderCone())
         obj += sum(t_glc)
     end
     JuMP.@objective(model, Min, obj)

@@ -1,7 +1,8 @@
 #=
 regularized matrix regression problems
 
-min 1/(2n) * ||Y - X * A||_fro^2 + lam_fro * ||A||_fro + lam_nuc * ||A||_nuc + lam_lass * ||A||_las + lam_glr * ||A||_glr + lamb_glc * ||A||_glc
+min 1/(2n) * ||Y - X * A||_fro^2 + lam_fro * ||A||_fro + lam_nuc * ||A||_nuc +
+    lam_lass * ||A||_las + lam_glr * ||A||_glr + lamb_glc * ||A||_glc
 - X is n x p
 - Y is n x m
 - A (variable) is p x m
@@ -53,7 +54,8 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
     (Y, X) = (inst.Y, inst.X)
     is_complex = inst.is_complex
     R = eltype(Y)
-    @assert min(inst.lam_fro, inst.lam_nuc, inst.lam_las, inst.lam_glr, inst.lam_glc) >= 0
+    @assert min(inst.lam_fro, inst.lam_nuc, inst.lam_las,
+        inst.lam_glr, inst.lam_glc) >= 0
     (data_n, data_m) = size(Y)
     data_p = size(X, 2)
     @assert size(X, 1) == data_n
@@ -63,26 +65,30 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
     data_pm = data_p * data_m
     data_nm = data_n * data_m
     # n is number of samples, m is number of responses, p is number of predictors
-    # data_A (p * m) is matrix variable of coefficients, data_Y (n * m) is response matrix, data_X (n * p) is design matrix
+    # data_A (p * m) is matrix variable of coefficients, data_Y (n * m) is
+    # response matrix, data_X (n * p) is design matrix
     model_n = 1 + R_dim * data_pm
     model_p = 0
 
-    # loss function is 1/(2n) * ||Y - X * A||_fro^2, which we formulate with epipersquare
-    # ||Y - X * A||^2 = tr((Y - X * A)' * (Y - X * A)) = tr((Y' - A' * X') * (Y - X * A))
+    # loss function is 1/(2n) * ||Y - X * A||_fro^2
+    # ||Y - X * A||^2 = tr((Y - X * A)' * (Y - X * A))
+    # = tr((Y' - A' * X') * (Y - X * A))
     # = tr(A' * X' * X * A + Y' * Y - A' * X' * Y - Y' * X * A)
     # = tr(A' * X' * X * A) - 2 * tr(Y' * X * A) + tr(Y' * Y)
     # = sum(abs2, X * A) - 2 * dot(X' * Y, A) + sum(abs2, Y)
     # use EpiNormEucl for the sum(abs2, X * A) part
-    # z >= ||Z||^2 is equivalent to (z, 1/2, vec(Z)) in EpiPerSquare is equivalent to ((z + 1/2)/sqrt(2), (z - 1/2)/sqrt(2), vec(Z)) in EpiNormEucl
+    # z >= ||Z||^2 is equivalent to (z, 1/2, vec(Z)) in EpiPerSquare is
+    # equivalent to ((z + 1/2)/sqrt(2), (z - 1/2)/sqrt(2), vec(Z)) in EpiNormEucl
     if data_n > data_p
         # more samples than predictors: overdetermined
-        # sum(abs2, X * A) = sum(abs2, cholesky(X' * X).U * A) = sum(abs2, qr(X).R * A)
+        # sum(abs2, X * A) = sum(abs2, cholesky(X' * X).U * A) =
+        # sum(abs2, qr(X).R * A)
         # so can get a lower dimensional sum of squared terms
         Qhalf = qr(X).R
         # (Qhalf * A)_k,j = sum_k2 (Qhalf_k,k2 * A_k2,j)
         model_q = 2 + R_dim * data_pm
     else
-        # fewer (or equal) samples than predictors: underdetermined (or exactly determined)
+        # fewer (or equal) samples than predictors
         # X * A is already low dimensional
         Qhalf = X
         # (X * A)_i,j = sum_k2 (X_i,k2 * A_k2,j)
@@ -135,9 +141,10 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
     # list of optional regularizers (group lasso handled separately below)
     reg_cone_dim = 1 + R_dim * data_pm
     lams = [
-        (inst.lam_fro, Cones.EpiNormEucl{T}(reg_cone_dim)), # frobenius norm (vector L2 norm)
-        (inst.lam_las, Cones.EpiNormInf{T, R}(reg_cone_dim, use_dual = true)), # vector lasso / L1 norm (dual to Linf norm)
-        (inst.lam_nuc, Cones.EpiNormSpectral{T, R}(data_m, data_p, use_dual = true)), # nuclear norm (dual to spectral norm)
+        (inst.lam_fro, Cones.EpiNormEucl{T}(reg_cone_dim)),
+        (inst.lam_las, Cones.EpiNormInf{T, R}(reg_cone_dim, use_dual = true)),
+        (inst.lam_nuc, Cones.EpiNormSpectral{T, R}(
+            data_m, data_p, use_dual = true)),
         ]
 
     for (lam, cone) in lams
@@ -149,7 +156,7 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
         push!(model_c, lam)
 
         if cone isa Cones.EpiNormSpectral{T, R}
-            # permute identity because need transpose of data_A since data_p >= data_m
+            # permute identity: need transpose of data_A since data_p >= data_m
             iden_mat = zeros(T, R_dim * data_pm, R_dim * data_pm)
             for j in 1:data_m, k in 1:data_p
                 if is_complex
@@ -169,7 +176,8 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
         model_G = T[
             model_G  zeros(T, model_q, 1);
             zeros(T, 1, model_n)  -one(T);
-            zeros(T, R_dim * data_pm, 1)  iden_mat  zeros(T, R_dim * data_pm, model_n - R_dim * data_pm);
+            zeros(T, R_dim * data_pm, 1)  iden_mat  zeros(T, R_dim * data_pm,
+                model_n - R_dim * data_pm);
             ]
         append!(model_h, zeros(reg_cone_dim))
 
@@ -213,7 +221,8 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
         model_n += data_p
         model_q += q_glr
 
-        append!(cones, Cones.Cone{T}[Cones.EpiNormEucl{T}(1 + R_dim * data_m) for k in 1:data_p])
+        append!(cones, Cones.Cone{T}[Cones.EpiNormEucl{T}(
+            1 + R_dim * data_m) for k in 1:data_p])
     end
 
     # column group lasso regularizer (one lambda for all columns)
@@ -250,14 +259,20 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
         model_n += data_m
         model_q += q_glc
 
-        append!(cones, Cones.Cone{T}[Cones.EpiNormEucl{T}(1 + R_dim * data_p) for k in 1:data_m])
+        append!(cones, Cones.Cone{T}[Cones.EpiNormEucl{T}(1 + R_dim * data_p)
+            for k in 1:data_m])
     end
 
-    model = Models.Model{T}(model_c, zeros(T, 0, model_n), zeros(T, 0), model_G, model_h, cones)
+    model = Models.Model{T}(model_c, zeros(T, 0, model_n), zeros(T, 0),
+        model_G, model_h, cones)
     return model
 end
 
-function test_extra(inst::MatrixRegressionNative{T}, solve_stats::NamedTuple, solution::NamedTuple) where T
+function test_extra(
+    inst::MatrixRegressionNative{T},
+    solve_stats::NamedTuple,
+    solution::NamedTuple,
+    ) where T
     @test solve_stats.status == Solvers.Optimal
     if solve_stats.status == Solvers.Optimal
         # check objective value is correct

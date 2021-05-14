@@ -101,7 +101,8 @@ time_all = time()
 @testset "$ex_name" for ex_name in eval(Symbol(mod_type, "_example_names"))
 
 include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
-(ex_type, ex_insts) = include(joinpath(examples_dir, ex_name, mod_type * "_test.jl"))
+(ex_type, ex_insts) = include(joinpath(
+    examples_dir, ex_name, mod_type * "_test.jl"))
 ex_type_T = ex_type{Float64}
 
 for inst_set in instance_sets, (step_name, stepper) in stepper_options
@@ -112,12 +113,14 @@ for inst_set in instance_sets, (step_name, stepper) in stepper_options
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue
 
-    info_perf = (; inst_set, :example => ex_name, :model_type => mod_type, :real_T => Float64, :solver_options => (step_name,))
+    info_perf = (; inst_set, :example => ex_name, :model_type => mod_type,
+        :real_T => Float64, :solver_options => (step_name,))
     new_default_options = (; default_options..., stepper = stepper)
 
     println("\nstarting $ex_type $inst_set tests")
     @testset "$ex_type $inst_set" begin
-        run_instance_set(inst_subset, ex_type_T, info_perf, new_default_options, script_verbose, perf, results_path)
+        run_instance_set(inst_subset, ex_type_T, info_perf, new_default_options,
+            script_verbose, perf, results_path)
     end
 end
 
