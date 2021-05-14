@@ -123,11 +123,11 @@ function load(
     append!(Js, H_Js)
     append!(Vs, ones(T, hess_nz_total))
 
-    pert = T(syssolver.fact_cache.diag_pert) # TODO change where this is stored
+    diag_pert = T(Hypatia.diag_min(syssolver.fact_cache))
     append!(Is, 1:(n + p))
     append!(Js, 1:(n + p))
-    append!(Vs, fill(pert, n))
-    append!(Vs, fill(-pert, p))
+    append!(Vs, fill(diag_pert, n))
+    append!(Vs, fill(-diag_pert, p))
 
     # integer type supported by the sparse system solver library to be used
     Ti = int_type(syssolver.fact_cache)

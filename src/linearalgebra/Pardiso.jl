@@ -1,5 +1,6 @@
 #=
 utilities for Pardiso
+only works with Float64
 
 TODO add to docs following example:
 ```julia
@@ -16,7 +17,7 @@ nonnegative1(Float64, solver = solver)
 ```
 =#
 
-mutable struct PardisoNonSymCache{T <: Real} <: SparseNonSymCache{T}
+mutable struct PardisoNonSymCache{Float64} <: SparseNonSymCache{Float64}
     analyzed::Bool
     pardiso::Pardiso.MKLPardisoSolver
     function PardisoNonSymCache{Float64}()
@@ -27,29 +28,26 @@ mutable struct PardisoNonSymCache{T <: Real} <: SparseNonSymCache{T}
         return cache
     end
 end
-PardisoNonSymCache{T}() where {T <: Real} = error("PardisoNonSymCache only works with real type Float64")
-PardisoNonSymCache() = PardisoNonSymCache{Float64}()
 
-mutable struct PardisoSymCache{T <: Real} <: SparseSymCache{T}
+mutable struct PardisoSymCache{Float64} <: SparseSymCache{Float64}
     analyzed::Bool
     pardiso::Pardiso.MKLPardisoSolver
-    diag_pert::Float64
-    function PardisoSymCache{Float64}(; diag_pert::Float64 = 0.0)
+    function PardisoSymCache{Float64}()
         cache = new{Float64}()
         cache.analyzed = false
         cache.pardiso = Pardiso.MKLPardisoSolver()
         Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_SYM_INDEF)
-        cache.diag_pert = diag_pert
         return cache
     end
 end
-PardisoSymCache{T}(; diag_pert = 0.0) where {T <: Real} = error("PardisoNonSymCache only works with real type Float64")
-PardisoSymCache(; diag_pert = 0.0) = PardisoSymCache{Float64}(diag_pert = diag_pert)
 
 PardisoSparseCache = Union{PardisoSymCache{Float64}, PardisoNonSymCache{Float64}}
 int_type(::PardisoSparseCache) = Int32
 
-function update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int32})
+function update_fact(
+    cache::PardisoSparseCache{Float64},
+    A::SparseMatrixCSC{Float64, Int32},
+    )
     pardiso = cache.pardiso
 
     if !cache.analyzed
@@ -67,7 +65,12 @@ function update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int3
     return
 end
 
-function inv_prod(cache::PardisoSparseCache, x::Vector{Float64}, A::SparseMatrixCSC{Float64, Int32}, b::Vector{Float64})
+function inv_prod(
+    cache::PardisoSparseCache{Float64},
+    x::Vector{Float64},
+    A::SparseMatrixCSC{Float64, Int32},
+    b::Vector{Float64},
+    )
     pardiso = cache.pardiso
 
     Pardiso.set_phase!(pardiso, Pardiso.SOLVE_ITERATIVE_REFINE)
@@ -76,7 +79,7 @@ function inv_prod(cache::PardisoSparseCache, x::Vector{Float64}, A::SparseMatrix
     return x
 end
 
-function free_memory(cache::PardisoSparseCache)
+function free_memory(cache::PardisoSparseCache{Float64})
     Pardiso.set_phase!(cache.pardiso, Pardiso.RELEASE_ALL)
     Pardiso.pardiso(cache.pardiso)
     return

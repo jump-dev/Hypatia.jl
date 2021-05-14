@@ -7,11 +7,11 @@ using Printf
 using Hypatia
 
 test_files = [
-    "modelutilities",
-    "cone",
+    # "modelutilities",
+    # "cone",
     "native",
-    "moi",
-    "examples",
+    # "moi",
+    # "examples",
     # require optional dependencies:
     # "pardiso",
     # "hsl",

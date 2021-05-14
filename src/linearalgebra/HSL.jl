@@ -1,5 +1,6 @@
 #=
-utilities for HSL 
+utilities for HSL
+only works with Float64 and Float32
 =#
 
 import LinearAlgebra.BlasReal
@@ -7,20 +8,19 @@ import LinearAlgebra.BlasReal
 mutable struct HSLSymCache{T <: BlasReal} <: SparseSymCache{T}
     analyzed::Bool
     ma57::HSL.Ma57{T}
-    diag_pert
-    function HSLSymCache{T}(; diag_pert = zero(T)) where {T <: BlasReal}
+    function HSLSymCache{T}() where {T <: BlasReal}
         cache = new{T}()
         cache.analyzed = false
-        cache.diag_pert = diag_pert
         return cache
     end
 end
-HSLSymCache{T}() where {T <: Real} = error("HSLSymCache only works with real type Float64 or Float32")
-HSLSymCache() = HSLSymCache{Float64}()
 
 int_type(::HSLSymCache) = Int
 
-function update_fact(cache::HSLSymCache, A::SparseMatrixCSC{<:HSL.Ma57Data, Int})
+function update_fact(
+    cache::HSLSymCache{T},
+    A::SparseMatrixCSC{T, Int}
+    ) where {T <: BlasReal}
     if !cache.analyzed
         cache.ma57 = HSL.Ma57(A)
         cache.analyzed = true
@@ -31,7 +31,12 @@ function update_fact(cache::HSLSymCache, A::SparseMatrixCSC{<:HSL.Ma57Data, Int}
     return
 end
 
-function inv_prod(cache::HSLSymCache, x::Vector{T}, A::SparseMatrixCSC{<:HSL.Ma57Data, Int}, b::Vector{T}) where {T <: BlasReal}
+function inv_prod(
+    cache::HSLSymCache{T},
+    x::Vector{T},
+    A::SparseMatrixCSC{T, Int},
+    b::Vector{T},
+    ) where {T <: BlasReal}
     # MA57 only has the option to take iterative refinement steps for a single-column RHS
     ma57 = cache.ma57
     copyto!(x, b)
