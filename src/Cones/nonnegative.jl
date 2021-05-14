@@ -43,14 +43,6 @@ reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated =
 
 use_sqrt_hess_oracles(cone::Nonnegative) = true
 
-# TODO only allocate the fields we use
-function setup_extra_data(cone::Nonnegative{T}) where {T <: Real}
-    dim = cone.dim
-    cone.hess = Diagonal(zeros(T, dim))
-    cone.inv_hess = Diagonal(zeros(T, dim))
-    return cone
-end
-
 get_nu(cone::Nonnegative) = cone.dim
 
 set_initial_point(arr::AbstractVector, cone::Nonnegative) = (arr .= 1)
@@ -71,17 +63,23 @@ function update_grad(cone::Nonnegative)
     return cone.grad
 end
 
-function update_hess(cone::Nonnegative)
-    if !cone.grad_updated
-        update_grad(cone)
+function update_hess(cone::Nonnegative{T}) where T
+    cone.grad_updated || update_grad(cone)
+    if !isdefined(cone, :hess)
+        cone.hess = Diagonal(zeros(T, cone.dim))
     end
+
     @. cone.hess.diag = abs2(cone.grad)
     cone.hess_updated = true
     return cone.hess
 end
 
-function update_inv_hess(cone::Nonnegative)
+function update_inv_hess(cone::Nonnegative{T}) where T
     @assert cone.is_feas
+    if !isdefined(cone, :inv_hess)
+        cone.inv_hess = Diagonal(zeros(T, cone.dim))
+    end
+
     @. cone.inv_hess.diag = abs2(cone.point)
     cone.inv_hess_updated = true
     return cone.inv_hess

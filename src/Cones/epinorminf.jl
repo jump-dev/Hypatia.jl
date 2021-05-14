@@ -64,7 +64,6 @@ reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated =
 
 use_sqrt_hess_oracles(cone::EpiNormInf) = false
 
-# TODO only allocate the fields we use
 function setup_extra_data(
     cone::EpiNormInf{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -171,25 +170,46 @@ function update_hess_aux(cone::EpiNormInf{T}) where {T <: Real}
     return
 end
 
+function alloc_hess(cone::EpiNormInf{T, T}) where {T <: Real}
+    # initialize sparse idxs for upper triangle of Hessian
+    dim = cone.dim
+    nnz_tri = 2 * dim - 1
+    I = Vector{Int}(undef, nnz_tri)
+    J = Vector{Int}(undef, nnz_tri)
+    idxs1 = 1:dim
+    @views I[idxs1] .= 1
+    @views J[idxs1] .= idxs1
+    idxs2 = (dim + 1):(2 * dim - 1)
+    @views I[idxs2] .= 2:dim
+    @views J[idxs2] .= 2:dim
+    V = ones(T, nnz_tri)
+    cone.hess = Symmetric(sparse(I, J, V, dim, dim), :U)
+    return
+end
+
+function alloc_hess(cone::EpiNormInf{T, Complex{T}}) where {T <: Real}
+    # initialize sparse idxs for upper triangle of Hessian
+    dim = cone.dim
+    nnz_tri = 2 * dim - 1 + cone.n
+    I = Vector{Int}(undef, nnz_tri)
+    J = Vector{Int}(undef, nnz_tri)
+    idxs1 = 1:dim
+    @views I[idxs1] .= 1
+    @views J[idxs1] .= idxs1
+    idxs2 = (dim + 1):(2 * dim - 1)
+    @views I[idxs2] .= 2:dim
+    @views J[idxs2] .= 2:dim
+    idxs3 = (2 * dim):nnz_tri
+    @views I[idxs3] .= 2:2:dim
+    @views J[idxs3] .= 3:2:dim
+    V = ones(T, nnz_tri)
+    cone.hess = Symmetric(sparse(I, J, V, dim, dim), :U)
+    return
+end
+
 function update_hess(cone::EpiNormInf{T, T}) where {T <: Real}
     cone.hess_aux_updated || update_hess_aux(cone)
-    dim = cone.dim
-
-    if !isdefined(cone, :hess)
-        # initialize sparse idxs for upper triangle of Hessian
-        nnz_tri = 2 * dim - 1
-        I = Vector{Int}(undef, nnz_tri)
-        J = Vector{Int}(undef, nnz_tri)
-        idxs1 = 1:dim
-        @views I[idxs1] .= 1
-        @views J[idxs1] .= idxs1
-        idxs2 = (dim + 1):(2 * dim - 1)
-        @views I[idxs2] .= 2:dim
-        @views J[idxs2] .= 2:dim
-        V = ones(T, nnz_tri)
-
-        cone.hess = Symmetric(sparse(I, J, V, dim, dim), :U)
-    end
+    isdefined(cone, :hess) || alloc_hess(cone)
 
     # modify nonzeros of upper triangle of Hessian
     nzval = cone.hess.data.nzval
@@ -207,26 +227,7 @@ end
 
 function update_hess(cone::EpiNormInf{T, Complex{T}}) where {T <: Real}
     cone.hess_aux_updated || update_hess_aux(cone)
-    dim = cone.dim
-
-    if !isdefined(cone, :hess)
-        # initialize sparse idxs for upper triangle of Hessian
-        nnz_tri = 2 * dim - 1 + cone.n
-        I = Vector{Int}(undef, nnz_tri)
-        J = Vector{Int}(undef, nnz_tri)
-        idxs1 = 1:dim
-        @views I[idxs1] .= 1
-        @views J[idxs1] .= idxs1
-        idxs2 = (dim + 1):(2 * dim - 1)
-        @views I[idxs2] .= 2:dim
-        @views J[idxs2] .= 2:dim
-        idxs3 = (2 * dim):nnz_tri
-        @views I[idxs3] .= 2:2:dim
-        @views J[idxs3] .= 3:2:dim
-        V = ones(T, nnz_tri)
-
-        cone.hess = Symmetric(sparse(I, J, V, dim, dim), :U)
-    end
+    isdefined(cone, :hess) || alloc_hess(cone)
 
     # modify nonzeros of upper triangle of Hessian
     nzval = cone.hess.data.nzval
@@ -322,9 +323,7 @@ end
 
 function update_inv_hess(cone::EpiNormInf{T}) where {T <: Real}
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-    if !isdefined(cone, :inv_hess)
-        cone.inv_hess = Symmetric(zeros(T, cone.dim, cone.dim), :U)
-    end
+    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
     Hi = cone.inv_hess.data
     wden = cone.wden
     u = cone.point[1]

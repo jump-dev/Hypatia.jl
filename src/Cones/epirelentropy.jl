@@ -140,9 +140,8 @@ end
 
 function update_hess(cone::EpiRelEntropy{T}) where T
     @assert cone.grad_updated
-    if !isdefined(cone, :hess)
-        cone.hess = Symmetric(zeros(T, cone.dim, cone.dim), :U)
-    end
+    isdefined(cone, :hess) || alloc_hess(cone)
+    H = cone.hess.data
     u = cone.point[1]
     v_idxs = cone.v_idxs
     w_idxs = cone.w_idxs
@@ -153,7 +152,6 @@ function update_hess(cone::EpiRelEntropy{T}) where T
     sigma = cone.sigma
     tau = cone.tau
     g = cone.grad
-    H = cone.hess.data
 
     # H_u_u, H_u_v, H_u_w parts
     H[1, 1] = abs2(g[1])
@@ -220,30 +218,32 @@ function update_inv_hess_aux(cone::EpiRelEntropy{T}) where T
     return
 end
 
+function alloc_inv_hess(cone::EpiRelEntropy{T}) where T
+    # initialize sparse idxs for upper triangle of inverse Hessian
+    dim = cone.dim
+    w_dim = cone.w_dim
+    nnz_tri = 2 * dim - 1 + w_dim
+    I = Vector{Int}(undef, nnz_tri)
+    J = Vector{Int}(undef, nnz_tri)
+    idxs1 = 1:dim
+    @views I[idxs1] .= 1
+    @views J[idxs1] .= idxs1
+    idxs2 = (dim + 1):(2 * dim - 1)
+    @views I[idxs2] .= 2:dim
+    @views J[idxs2] .= 2:dim
+    idxs3 = (2 * dim):nnz_tri
+    @views I[idxs3] .= 1 .+ (1:w_dim)
+    @views J[idxs3] .= (1 + w_dim) .+ (1:w_dim)
+    V = ones(T, nnz_tri)
+    cone.inv_hess = Symmetric(sparse(I, J, V, dim, dim), :U)
+    return
+end
+
 # updates for nonzero values in the inverse Hessian
 function update_inv_hess(cone::EpiRelEntropy{T}) where T
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-    dim = cone.dim
+    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
     w_dim = cone.w_dim
-
-    if !isdefined(cone, :inv_hess)
-        # initialize sparse idxs for upper triangle of inverse Hessian
-        nnz_tri = 2 * dim - 1 + w_dim
-        I = Vector{Int}(undef, nnz_tri)
-        J = Vector{Int}(undef, nnz_tri)
-        idxs1 = 1:dim
-        @views I[idxs1] .= 1
-        @views J[idxs1] .= idxs1
-        idxs2 = (dim + 1):(2 * dim - 1)
-        @views I[idxs2] .= 2:dim
-        @views J[idxs2] .= 2:dim
-        idxs3 = (2 * dim):nnz_tri
-        @views I[idxs3] .= 1 .+ (1:w_dim)
-        @views J[idxs3] .= (1 + w_dim) .+ (1:w_dim)
-        V = ones(T, nnz_tri)
-
-        cone.inv_hess = Symmetric(sparse(I, J, V, dim, dim), :U)
-    end
 
     # modify nonzeros of upper triangle of inverse Hessian
     nzval = cone.inv_hess.data.nzval

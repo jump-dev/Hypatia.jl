@@ -62,16 +62,12 @@ reset_data(cone::DoublyNonnegativeTri) = (cone.feas_updated = cone.grad_updated 
     cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 function setup_extra_data(cone::DoublyNonnegativeTri{T}) where {T <: Real}
-    dim = cone.dim
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
     cone.mat = zeros(T, cone.side, cone.side)
     cone.mat2 = zero(cone.mat)
     cone.mat3 = zero(cone.mat)
     cone.mat4 = zero(cone.mat)
     cone.inv_vec = zeros(T, length(cone.offdiag_idxs))
-    return cone
+    return
 end
 
 get_nu(cone::DoublyNonnegativeTri) = cone.dim
@@ -162,6 +158,7 @@ end
 
 function update_hess(cone::DoublyNonnegativeTri)
     @assert cone.grad_updated
+    isdefined(cone, :hess) || alloc_hess(cone)
     H = cone.hess.data
 
     symm_kron(H, cone.inv_mat, cone.rt2)

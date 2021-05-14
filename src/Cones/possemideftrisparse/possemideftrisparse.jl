@@ -88,17 +88,6 @@ reset_data(cone::PosSemidefTriSparse) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
     cone.use_hess_prod_slow = cone.use_hess_prod_slow_updated = false)
 
-function setup_extra_data(
-    cone::PosSemidefTriSparse{<:PSDSparseImpl, T, <:RealOrComplex{T}},
-    ) where {T <: Real}
-    dim = cone.dim
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
-    setup_psdsparse_cache(cone)
-    return cone
-end
-
 get_nu(cone::PosSemidefTriSparse) = cone.side
 
 function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse)

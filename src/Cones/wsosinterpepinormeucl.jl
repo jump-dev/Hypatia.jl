@@ -87,15 +87,11 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
 end
 
 function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
-    dim = cone.dim
     U = cone.U
     R = cone.R
     Ps = cone.Ps
     K = length(Ps)
     Ls = [size(Pk, 2) for Pk in cone.Ps]
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
     cone.mat = [zeros(T, L, L) for L in Ls]
     cone.matfact = Vector{Any}(undef, K)
     cone.ΛLi_Λ = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
@@ -225,14 +221,15 @@ end
 
 function update_hess(cone::WSOSInterpEpiNormEucl)
     @assert cone.grad_updated
+    isdefined(cone, :hess) || alloc_hess(cone)
+    H = cone.hess.data
     U = cone.U
     R = cone.R
     R2 = R - 2
-    hess = cone.hess.data
     UU = cone.tempUU
     matfact = cone.matfact
 
-    hess .= 0
+    H .= 0
     @inbounds for k in eachindex(cone.Ps)
         PΛiPs = cone.PΛiP_blocks_U[k]
         PΛ11iP = cone.PΛ11iP[k]
@@ -257,45 +254,45 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
         copytri!(cone.PΛiPs[k], 'L')
 
         for i in 1:U, k in 1:i
-            hess[k, i] -= abs2(PΛ11iP[k, i]) * R2
+            H[k, i] -= abs2(PΛ11iP[k, i]) * R2
         end
 
-        @. @views hess[1:U, 1:U] += abs2(PΛiPs[1, 1])
+        @. @views H[1:U, 1:U] += abs2(PΛiPs[1, 1])
         for r in 2:R
             idxs = block_idxs(U, r)
             for s in 1:(r - 1)
                 # block (1,1)
                 @. UU = abs2(PΛiPs[r, s])
-                @. @views hess[1:U, 1:U] += UU
-                @. @views hess[1:U, 1:U] += UU'
+                @. @views H[1:U, 1:U] += UU
+                @. @views H[1:U, 1:U] += UU'
                 # blocks (1,r)
-                @. @views hess[1:U, idxs] += PΛiPs[s, 1] * PΛiPs[s, r]
+                @. @views H[1:U, idxs] += PΛiPs[s, 1] * PΛiPs[s, r]
             end
             # block (1,1)
-            @. @views hess[1:U, 1:U] += abs2(PΛiPs[r, r])
+            @. @views H[1:U, 1:U] += abs2(PΛiPs[r, r])
             # blocks (1,r)
-            @. @views hess[1:U, idxs] += PΛiPs[r, 1] * PΛiPs[r, r]
+            @. @views H[1:U, idxs] += PΛiPs[r, 1] * PΛiPs[r, r]
             # blocks (1,r)
             for s in (r + 1):R
-                @. @views hess[1:U, idxs] += PΛiPs[s, 1] * PΛiPs[s, r]
+                @. @views H[1:U, idxs] += PΛiPs[s, 1] * PΛiPs[s, r]
             end
 
             # blocks (r, r2)
-            # for hess[idxs, idxs], UU are symmetric
+            # for H[idxs, idxs], UU are symmetric
             @. UU = PΛiPs[r, 1] * PΛiPs[r, 1]'
-            @. @views hess[idxs, idxs] += UU
+            @. @views H[idxs, idxs] += UU
             @. UU = PΛiPs[1, 1] * PΛiPs[r, r]
-            @. @views hess[idxs, idxs] += UU
+            @. @views H[idxs, idxs] += UU
             for r2 in (r + 1):R
                 idxs2 = block_idxs(U, r2)
                 @. UU = PΛiPs[r, 1] * PΛiPs[r2, 1]'
-                @. @views hess[idxs, idxs2] += UU
+                @. @views H[idxs, idxs2] += UU
                 @. UU = PΛiPs[1, 1] * PΛiPs[r2, r]'
-                @. @views hess[idxs, idxs2] += UU
+                @. @views H[idxs, idxs2] += UU
             end
         end
     end
-    @. @views hess[:, (U + 1):cone.dim] *= 2
+    @. @views H[:, (U + 1):cone.dim] *= 2
 
     cone.hess_updated = true
     return cone.hess

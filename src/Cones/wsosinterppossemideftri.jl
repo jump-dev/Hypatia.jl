@@ -79,14 +79,10 @@ reset_data(cone::WSOSInterpPosSemidefTri) = (cone.feas_updated =
     cone.use_hess_prod_slow_updated = false)
 
 function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
-    dim = cone.dim
     U = cone.U
     R = cone.R
     Ps = cone.Ps
     K = length(Ps)
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
     cone.rt2 = sqrt(T(2))
     cone.rt2i = inv(cone.rt2)
     cone.tempU = zeros(T, U)
@@ -196,10 +192,11 @@ end
 
 function update_hess(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     @assert cone.grad_updated
+    isdefined(cone, :hess) || alloc_hess(cone)
+    H = cone.hess.data
     R = cone.R
     U = cone.U
     PΛiP_blocks = cone.PΛiP_blocks_U
-    H = cone.hess.data
     H .= 0
 
     @inbounds for k in eachindex(cone.Ps)

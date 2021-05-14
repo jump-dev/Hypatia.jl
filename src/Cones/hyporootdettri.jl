@@ -75,9 +75,15 @@ function setup_extra_data(
     cone::HypoRootdetTri{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
+
+
+    # don't alloc here
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     load_matrix(cone.hess_fact_cache, cone.hess)
+
+
+
     d = cone.d
     cone.mat = zeros(R, d, d)
     cone.mat2 = zeros(R, d, d)
@@ -167,6 +173,9 @@ function update_hess(cone::HypoRootdetTri)
     Huwconst = -sigma / z
     sckron = sigma + 1
     dot_const = cone.dot_const
+
+
+    # @warn("don't store it in hessian")
 
     @inbounds begin
         H[1, 1] = inv(z) / z

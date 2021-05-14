@@ -86,7 +86,7 @@ function spawn_instance(
         include(joinpath(examples_dir, "common_JuMP.jl"))
         include(joinpath(examples_dir, ex_name, "JuMP.jl"))
         flush(stdout); flush(stderr)
-        return nothing
+        return
     end
     println("running compile instance")
     original_stdout = stdout
@@ -94,7 +94,7 @@ function spawn_instance(
     @fetchfrom worker begin
         run_instance(ex_type, compile_inst, extender, NamedTuple(), solver[2], default_options = solver[3], test = false)
         flush(stdout); flush(stderr)
-        return nothing
+        return
     end
     redirect_stdout(original_stdout)
     close(out_wr)

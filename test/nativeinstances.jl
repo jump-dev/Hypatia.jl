@@ -5,6 +5,7 @@ native test instances
 using Test
 import Random
 using LinearAlgebra
+import LinearAlgebra.BlasReal
 using SparseArrays
 using LinearMaps
 import GenericLinearAlgebra.svdvals
@@ -769,6 +770,9 @@ function linmatrixineq3(T; options...)
         ]
 
     for As in As_list
+        if !(T <: BlasReal) && any(a -> a isa SparseMatrixCSC, As)
+            continue # can only use sparse with BlasReal
+        end
         tol = test_tol(T)
         c = T[1]
         A = zeros(T, 0, 1)
@@ -1989,12 +1993,12 @@ function epipersepspectral_vector3(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        val = 5 * Cones.h_val([2, 3] ./ 5, h_fun)
+        val = 5 * Cones.h_val([2, 3] ./ T(5), h_fun)
         @test r.primal_obj ≈ val atol=tol rtol=tol
-        @test r.s ≈ [val, 5, 2, 3] atol=tol rtol=tol
+        @test r.s ≈ T[val, 5, 2, 3] atol=tol rtol=tol
         @test r.z[1] ≈ 1 atol=tol rtol=tol
         @test r.z[3:4] ≈ -Cones.h_der1(zeros(T, 2),
-            [2, 3] ./ 5, h_fun) atol=tol rtol=tol
+            [2, 3] ./ T(5), h_fun) atol=tol rtol=tol
         @test r.z[2] ≈ Cones.h_conj(r.z[3:4], h_fun) atol=tol rtol=tol
     end
 end
@@ -2019,9 +2023,9 @@ function epipersepspectral_vector4(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        val = 5 * Cones.h_conj(w ./ 5, h_fun)
+        val = 5 * Cones.h_conj(w ./ T(5), h_fun)
         @test r.primal_obj ≈ val atol=tol rtol=tol
-        @test r.s ≈ [5, val, w...] atol=tol rtol=tol
+        @test r.s ≈ T[5, val, w...] atol=tol rtol=tol
         @test r.z[2] ≈ 1 atol=tol rtol=tol
         @test r.z[1] ≈ Cones.h_val(r.z[3:4], h_fun) atol=tol rtol=tol
     end
@@ -2516,9 +2520,7 @@ function wsosinterpepinormone2(T; options...)
 end
 
 function wsosinterpepinormone3(T; options...)
-    if !(T <: LinearAlgebra.BlasReal)
-        return # calc_w only works with BlasReal
-    end
+    (T <: BlasReal) || return # calc_w only works with BlasReal
     # max: w'f: 5x^2 >= abs(f(x)) + abs(3x^2) on [-1, 1], soln is +/- 2x^2
     tol = test_tol(T)
     (U, pts, Ps, _, w) = ModelUtilities.interpolate(ModelUtilities.Box{T}(
@@ -2588,9 +2590,7 @@ function wsosinterpepinormeucl2(T; options...)
 end
 
 function wsosinterpepinormeucl3(T; options...)
-    if !(T <: LinearAlgebra.BlasReal)
-        return # calc_w only works with BlasReal
-    end
+    (T <: BlasReal) || return # calc_w only works with BlasReal
     # max: w'f: 25x^4 >= f(x)^2 + 9x^4 on [-1, 1], soln is +/- 4x^2
     tol = test_tol(T)
     (U, pts, Ps, _, w) = ModelUtilities.interpolate(ModelUtilities.Box{T}(

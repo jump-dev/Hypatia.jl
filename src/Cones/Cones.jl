@@ -68,6 +68,8 @@ function setup_data(cone::Cone{T}) where {T <: Real}
     return cone
 end
 
+setup_extra_data(cone::Cone) = nothing
+
 load_point(
     cone::Cone{T},
     point::AbstractVector{T},
@@ -89,10 +91,30 @@ is_dual_feas(cone::Cone) = true # use neighborhood check for dual feasibility
 
 grad(cone::Cone) = (cone.grad_updated ? cone.grad : update_grad(cone))
 
-hess(cone::Cone) = (cone.hess_updated ? cone.hess : update_hess(cone))
+function hess(cone::Cone)
+    cone.hess_updated && return cone.hess
+    return update_hess(cone)
+end
 
-inv_hess(cone::Cone) = (cone.inv_hess_updated ? cone.inv_hess :
-    update_inv_hess(cone))
+function inv_hess(cone::Cone)
+    cone.inv_hess_updated && return cone.inv_hess
+    return update_inv_hess(cone)
+end
+
+function alloc_hess(cone::Cone{T}) where {T <: Real}
+    dim = dimension(cone)
+    cone.hess = Symmetric(zeros(T, dim, dim), :U)
+    if hasfield(typeof(cone), :hess_fact_cache)
+        load_matrix(cone.hess_fact_cache, cone.hess)
+    end
+    return
+end
+
+function alloc_inv_hess(cone::Cone{T}) where {T <: Real}
+    dim = dimension(cone)
+    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+    return
+end
 
 # fallbacks
 
@@ -158,6 +180,7 @@ function update_hess_fact(cone::Cone{T}) where {T <: Real}
 end
 
 function update_inv_hess(cone::Cone)
+    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
     update_hess_fact(cone)
     invert(cone.hess_fact_cache, cone.inv_hess)
     cone.inv_hess_updated = true

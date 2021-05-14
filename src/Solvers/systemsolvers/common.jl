@@ -228,7 +228,7 @@ function setup_point_sub(
     @. rhs_const.y = model.b
     @. rhs_const.z = model.h
 
-    return nothing
+    return
 end
 
 dot_obj(model::Models.Model, point::Point) = dot(model.c, point.x) +

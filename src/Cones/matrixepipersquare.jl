@@ -75,14 +75,9 @@ reset_data(cone::MatrixEpiPerSquare) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
     cone.hess_aux_updated = false)
 
-# TODO only allocate the fields we use
 function setup_extra_data(
     cone::MatrixEpiPerSquare{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
-    dim = cone.dim
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
     (d1, d2) = (cone.d1, cone.d2)
     cone.U = Hermitian(zeros(R, d1, d1), :U)
     cone.W = zeros(R, d1, d2)
@@ -189,13 +184,14 @@ end
 
 function update_hess(cone::MatrixEpiPerSquare)
     cone.hess_aux_updated || update_hess_aux(cone)
+    isdefined(cone, :hess) || alloc_hess(cone)
+    H = cone.hess.data
     d1 = cone.d1
     d2 = cone.d2
     U_idxs = cone.U_idxs
     v_idx = cone.v_idx
     W_idxs = cone.W_idxs
     v = cone.point[v_idx]
-    H = cone.hess.data
     tempd2d2 = cone.tempd2d2
     ZiUZi = cone.ZiUZi
     tempd1d1 = cone.tempd1d1

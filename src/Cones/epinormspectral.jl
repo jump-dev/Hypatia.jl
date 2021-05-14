@@ -80,9 +80,6 @@ function setup_extra_data(
     cone::EpiNormSpectral{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
     (d1, d2) = (cone.d1, cone.d2)
     cone.W = zeros(R, d1, d2)
     cone.Z = zeros(R, d1, d1)
@@ -175,12 +172,13 @@ end
 
 function update_hess(cone::EpiNormSpectral)
     cone.hess_aux_updated || update_hess_aux(cone)
+    isdefined(cone, :hess) || alloc_hess(cone)
+    H = cone.hess.data
     d1 = cone.d1
     d2 = cone.d2
     Zi = cone.Zi
     tau = cone.tau
     WtauI = cone.WtauI
-    H = cone.hess.data
 
     # H_W_W part
     # TODO parallelize loops

@@ -53,16 +53,6 @@ reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated =
 
 use_sqrt_hess_oracles(cone::EpiPerSquare) = true
 
-# TODO only allocate the fields we use
-function setup_extra_data(cone::EpiPerSquare{T}) where {T <: Real}
-    dim = cone.dim
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.sqrt_hess_vec = zeros(T, dim)
-    cone.inv_sqrt_hess_vec = zeros(T, dim)
-    return cone
-end
-
 get_nu(cone::EpiPerSquare) = 2
 
 function set_initial_point(arr::AbstractVector, cone::EpiPerSquare)
@@ -115,6 +105,7 @@ end
 
 function update_hess(cone::EpiPerSquare)
     @assert cone.grad_updated
+    isdefined(cone, :hess) || alloc_hess(cone)
     H = cone.hess.data
 
     mul!(H, cone.grad, cone.grad')
@@ -130,12 +121,14 @@ end
 
 function update_inv_hess(cone::EpiPerSquare)
     @assert cone.is_feas
+    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
+    Hi = cone.inv_hess.data
 
-    mul!(cone.inv_hess.data, cone.point, cone.point')
+    mul!(Hi, cone.point, cone.point')
     @inbounds for j in 3:cone.dim
-        cone.inv_hess.data[j, j] += cone.dist
+        Hi[j, j] += cone.dist
     end
-    cone.inv_hess.data[1, 2] -= cone.dist
+    Hi[1, 2] -= cone.dist
 
     cone.inv_hess_updated = true
     return cone.inv_hess
@@ -182,9 +175,12 @@ function inv_hess_prod!(
     return prod
 end
 
-function update_sqrt_hess_prod(cone::EpiPerSquare)
+function update_sqrt_hess_prod(cone::EpiPerSquare{T}) where T
     @assert cone.is_feas
     @assert !cone.sqrt_hess_prod_updated
+    if !isdefined(cone, :sqrt_hess_vec)
+        cone.sqrt_hess_vec = zeros(T, cone.dim)
+    end
 
     rtdist = cone.rtdist = sqrt(cone.dist)
     cone.denom = 2 * rtdist + cone.point[1] + cone.point[2]
@@ -197,9 +193,12 @@ function update_sqrt_hess_prod(cone::EpiPerSquare)
     return
 end
 
-function update_inv_sqrt_hess_prod(cone::EpiPerSquare)
+function update_inv_sqrt_hess_prod(cone::EpiPerSquare{T}) where T
     @assert cone.is_feas
     @assert !cone.inv_sqrt_hess_prod_updated
+    if !isdefined(cone, :inv_sqrt_hess_vec)
+        cone.inv_sqrt_hess_vec = zeros(T, cone.dim)
+    end
 
     rtdist = cone.rtdist = sqrt(cone.dist)
     cone.denom = 2 * rtdist + cone.point[1] + cone.point[2]
