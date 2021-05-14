@@ -71,9 +71,6 @@ function setup_extra_data(
     cone::WSOSInterpNonnegative{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
     Ls = [size(Pk, 2) for Pk in cone.Ps]
     cone.tempLL = [zeros(R, L, L) for L in Ls]
     cone.tempLL2 = [zeros(R, L, L) for L in Ls]
@@ -137,6 +134,7 @@ end
 
 function update_hess(cone::WSOSInterpNonnegative)
     @assert cone.grad_updated
+    isdefined(cone, :hess) || alloc_hess(cone)
     UU = cone.tempUU
 
     cone.hess .= 0

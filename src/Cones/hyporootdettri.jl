@@ -168,6 +168,9 @@ function update_hess(cone::HypoRootdetTri)
     sckron = sigma + 1
     dot_const = cone.dot_const
 
+
+    @warn("don't store it in hessian")
+
     @inbounds begin
         H[1, 1] = inv(z) / z
         @. @views H[1, 2:end] = Huwconst * Wi_vec

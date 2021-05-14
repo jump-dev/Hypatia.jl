@@ -386,7 +386,7 @@ function postprocess(solver::Solver{T}) where {T <: Real}
         tau = point.tau[]
         if tau <= 0
             result.vec .= NaN
-            return nothing
+            return
         end
     end
 
@@ -449,5 +449,5 @@ function postprocess(solver::Solver{T}) where {T <: Real}
         result.x ./= solver.c_scale
     end
 
-    return nothing
+    return
 end

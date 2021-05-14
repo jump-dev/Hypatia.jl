@@ -85,7 +85,7 @@ function setup_point_sub(
         point_sub.z_views = [view(point_sub.vec, z_start .+ idxs) for
             idxs in model.cone_idxs]
     end
-    return nothing
+    return
 end
 
 #=

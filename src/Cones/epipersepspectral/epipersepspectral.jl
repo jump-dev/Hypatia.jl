@@ -39,7 +39,7 @@ mutable struct EpiPerSepSpectral{Q <: ConeOfSquares, T <: Real} <: Cone{T}
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
 
-    w_view
+    w_view::SubArray{T, 1}
     cache::CSqrCache{T}
 
     function EpiPerSepSpectral{Q, T}(
@@ -63,14 +63,7 @@ reset_data(cone::EpiPerSepSpectral) = (cone.feas_updated = cone.grad_updated =
     cone.inv_hess_aux_updated = cone.correction_updated =
     cone.correction_aux_updated = false)
 
-use_sqrt_hess_oracles(cone::EpiPerSepSpectral) = false
-
-function setup_extra_data(
-    cone::EpiPerSepSpectral{<:ConeOfSquares{T}},
-    ) where {T <: Real}
-    dim = cone.dim
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
+function setup_extra_data(cone::EpiPerSepSpectral{<:ConeOfSquares})
     @views cone.w_view = cone.point[3:end]
     setup_csqr_cache(cone)
     return cone

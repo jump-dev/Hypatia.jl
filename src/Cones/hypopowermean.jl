@@ -53,11 +53,7 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
 end
 
 function setup_extra_data(cone::HypoPowerMean{T}) where {T <: Real}
-    dim = cone.dim
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
-    cone.tempw = zeros(T, dim - 1)
+    cone.tempw = zeros(T, cone.dim - 1)
     return cone
 end
 
@@ -124,6 +120,8 @@ end
 
 function update_hess(cone::HypoPowerMean)
     @assert cone.grad_updated
+    isdefined(cone, :hess) || alloc_hess(cone)
+    H = cone.hess.data
     u = cone.point[1]
     @views w = cone.point[2:end]
     alpha = cone.alpha
@@ -131,7 +129,6 @@ function update_hess(cone::HypoPowerMean)
     aw = alpha ./ w # TODO
     wwprodu = cone.wprod / z
     wwprodum1 = wwprodu - 1
-    H = cone.hess.data
 
     H[1, 1] = abs2(cone.grad[1])
     @inbounds for j in eachindex(w)

@@ -68,15 +68,6 @@ reset_data(cone::LinMatrixIneq) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
     cone.use_hess_prod_slow = cone.use_hess_prod_slow_updated = false)
 
-# TODO only allocate the fields we use
-function setup_extra_data(cone::LinMatrixIneq{T}) where {T <: Real}
-    dim = cone.dim
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
-    return cone
-end
-
 get_nu(cone::LinMatrixIneq) = cone.side
 
 function set_initial_point(
@@ -118,8 +109,9 @@ end
 
 function update_hess(cone::LinMatrixIneq)
     @assert cone.grad_updated
-    sumAinvAs = cone.sumAinvAs
+    isdefined(cone, :hess) || alloc_hess(cone)
     H = cone.hess.data
+    sumAinvAs = cone.sumAinvAs
 
     @inbounds for i in 1:cone.dim, j in i:cone.dim
         H[i, j] = real(dot(sumAinvAs[i], sumAinvAs[j]'))

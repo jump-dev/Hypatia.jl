@@ -222,7 +222,7 @@ function make_table_tex(ex_name, ex_params, ex_df_wide, inst_solvers)
     end
     close(ex_tex)
 
-    return nothing
+    return
 end
 
 function transform_plot_cols(ex_df_wide, inst_solver)
@@ -256,7 +256,7 @@ function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
         end
     end
 
-    return nothing
+    return
 end
 
 # run

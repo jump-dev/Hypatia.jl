@@ -33,7 +33,7 @@ function setup_rhs3(
             axpby!(-1, rhs_s_k, -1, rhs_sub_z_k)
         end
     end
-    return nothing
+    return
 end
 
 function solve_subsystem3(

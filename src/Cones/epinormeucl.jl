@@ -45,14 +45,6 @@ reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated =
 
 use_sqrt_hess_oracles(cone::EpiNormEucl) = true
 
-# TODO only allocate the fields we use
-function setup_extra_data(cone::EpiNormEucl{T}) where {T <: Real}
-    dim = cone.dim
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    return cone
-end
-
 get_nu(cone::EpiNormEucl) = 2
 
 function set_initial_point(
@@ -105,6 +97,7 @@ end
 
 function update_hess(cone::EpiNormEucl)
     @assert cone.grad_updated
+    isdefined(cone, :hess) || alloc_hess(cone)
 
     mul!(cone.hess.data, cone.grad, cone.grad')
     inv_dist = inv(cone.dist)
@@ -119,6 +112,7 @@ end
 
 function update_inv_hess(cone::EpiNormEucl)
     @assert cone.is_feas
+    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
 
     mul!(cone.inv_hess.data, cone.point, cone.point')
     @inbounds for j in eachindex(cone.grad)

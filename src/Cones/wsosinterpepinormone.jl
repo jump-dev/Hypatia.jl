@@ -91,14 +91,10 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
 end
 
 function setup_extra_data(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
-    dim = cone.dim
     U = cone.U
     R = cone.R
     Ps = cone.Ps
     K = length(Ps)
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
     Ls = [size(Pk, 2) for Pk in cone.Ps]
     cone.mats = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
     # TODO preallocate better
@@ -250,12 +246,12 @@ function update_grad(cone::WSOSInterpEpiNormOne)
 end
 
 function update_hess(cone::WSOSInterpEpiNormOne)
-    if !cone.hess_prod_updated
-        update_hess_prod(cone)
-    end
-    U = cone.U
+    cone.hess_prod_updated || update_hess_prod(cone)
+    isdefined(cone, :hess) || alloc_hess(cone)
     H = cone.hess.data
+    U = cone.U
     H .= 0
+
     @. @views H[1:U, 1:U] = cone.hess_diag_blocks[1]
     @inbounds for r in 1:(cone.R - 1)
         idxs = block_idxs(U, r + 1)

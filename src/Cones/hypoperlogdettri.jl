@@ -178,6 +178,10 @@ function update_hess_aux(cone::HypoPerLogdetTri)
     Wi_vec = cone.Wi_vec
     dlzi = (d - cone.lwv) / z
 
+
+
+    @warn("don't store it in hessian")
+
     @inbounds begin
         H[1, 1] = abs2(inv(z))
         H[1, 2] = H[2, 1] = dlzi / z

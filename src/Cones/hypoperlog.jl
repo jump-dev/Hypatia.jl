@@ -2,10 +2,7 @@
 (closure of) hypograph of perspective of sum of logarithms
 (u in R, v in R_+, w in R_+^d) : u <= v*sum(log.(w/v))
 
-barrier modified from
-"Primal-Dual Interior-Point Methods for Domain-Driven Formulations"
-by Karimi & Tuncel, 2019
--log(sum_i v*log(w_i/v) - u) - sum_i log(w_i) - log(v)
+barrier is -log(sum_i v*log(w_i/v) - u) - sum_i log(w_i) - log(v)
 =#
 
 mutable struct HypoPerLog{T <: Real} <: Cone{T}
@@ -54,6 +51,11 @@ reset_data(cone::HypoPerLog) = (cone.feas_updated = cone.grad_updated =
     cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
 
 function setup_extra_data(cone::HypoPerLog{T}) where {T <: Real}
+    # wdim = cone.dim - 2
+    # cone.wivzi = zeros(T, wdim)
+    # cone.tempw = zeros(T, wdim)
+
+
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -131,6 +133,10 @@ function update_hess_aux(cone::HypoPerLog)
     vzi = v / z
     wivzi = cone.wivzi
     @. wivzi = vzi / w
+
+
+    @warn("don't store it in hessian")
+
 
     @inbounds begin
         H[1, 1] = abs2(inv(z))

@@ -533,7 +533,7 @@ MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, ::Nothing) = (opt.solver.time_limit 
 
 function MOI.get(opt::Optimizer, ::MOI.TimeLimitSec)
     isfinite(opt.solver.time_limit) && return opt.solver.time_limit
-    return nothing
+    return
 end
 
 function MOI.get(opt::Optimizer, ::MOI.SolveTime)

@@ -24,7 +24,7 @@ struct SparseLMIJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 function build(inst::SparseLMIJuMP{T}) where {T <: Float64}
-    @assert xor(inst.use_psd, inst.use_sparsepsd, inst.use_linmatrixineq)
+    @assert +(inst.use_psd, inst.use_sparsepsd, inst.use_linmatrixineq) == 1
     (num_lmis, side_Ps, num_Ps) = (inst.num_lmis, inst.side_Ps, inst.num_Ps)
 
     function rand_symm()

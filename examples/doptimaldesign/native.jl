@@ -18,7 +18,7 @@ end
 function build(inst::DOptimalDesignNative{T}) where {T <: Real}
     (q, p, n, n_max) = (inst.q, inst.p, inst.n, inst.n_max)
     @assert (p > q) && (n > q) && (n_max <= n)
-    @assert xor(inst.logdet_obj, inst.geomean_obj, inst.rootdet_obj)
+    @assert +(inst.logdet_obj, inst.geomean_obj, inst.rootdet_obj) == 1
     V = randn(T, q, p)
 
     # upper bound and nonnegativity of numbers of trials

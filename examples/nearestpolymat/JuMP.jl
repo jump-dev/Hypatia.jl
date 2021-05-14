@@ -15,7 +15,7 @@ end
 
 function build(inst::NearestPolyMatJuMP{T}) where {T <: Float64}
     (n, halfdeg, R) = (inst.n, inst.halfdeg, inst.R)
-    @assert xor(inst.use_wsos, inst.use_matrixwsos, inst.use_sdp)
+    @assert +(inst.use_wsos, inst.use_matrixwsos, inst.use_sdp) == 1
     U = binomial(n + 2 * halfdeg, n)
     L = binomial(n + halfdeg, n)
     svec_dim = div(R * (R + 1), 2)

@@ -81,11 +81,7 @@ mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
 end
 
 function setup_extra_data(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
-    dim = cone.dim
     vw_dim = cone.vw_dim
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
     d = cone.d
     cone.rt2 = sqrt(T(2))
     cone.V = zeros(T, d, d)
@@ -195,6 +191,8 @@ end
 
 function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     @assert cone.grad_updated
+    isdefined(cone, :hess) || alloc_hess(cone)
+    H = cone.hess.data
     d = cone.d
     rt2 = cone.rt2
     V_idxs = cone.V_idxs
@@ -204,7 +202,6 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     (W_vals, W_vecs) = cone.W_fact
     Vi = cone.Vi
     Wi = cone.Wi
-    H = cone.hess.data
 
     diff_mat!(cone.diff_mat_W, W_vals, cone.W_vals_log)
     diff_mat_V = Hermitian(cone.diff_mat_V, :U)

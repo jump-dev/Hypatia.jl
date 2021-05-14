@@ -60,12 +60,7 @@ end
 
 dimension(cone::GeneralizedPower) = length(cone.alpha) + cone.n
 
-# TODO only allocate the fields we use
 function setup_extra_data(cone::GeneralizedPower{T}) where {T <: Real}
-    dim = cone.dim
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
     m = length(cone.alpha)
     cone.aui = zeros(T, m)
     cone.auiproduuw = zeros(T, m)
@@ -134,13 +129,14 @@ end
 
 function update_hess(cone::GeneralizedPower)
     @assert cone.grad_updated
+    isdefined(cone, :hess) || alloc_hess(cone)
+    H = cone.hess.data
     m = length(cone.alpha)
     @views u = cone.point[1:m]
     @views w = cone.point[(m + 1):end]
     aui = cone.aui
     auiproduuw = cone.auiproduuw
     g = cone.grad
-    H = cone.hess.data
 
     produuwm1 = 1 - cone.produuw
     @inbounds for j in 1:m

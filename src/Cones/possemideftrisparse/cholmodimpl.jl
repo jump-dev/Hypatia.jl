@@ -47,7 +47,7 @@ mutable struct PSDSparseCholmodCache{T <: BlasReal, R <: RealOrComplex{T}} <:
         new{T, R}()
 end
 
-function setup_psdsparse_cache(
+function setup_extra_data(
     cone::PosSemidefTriSparse{PSDSparseCholmod, T, R},
     ) where {R <: RealOrComplex{T}} where {T <: BlasReal}
     cone.cache = cache = PSDSparseCholmodCache{T, R}()
@@ -285,6 +285,7 @@ end
 # for each column in identity, get hess prod to build explicit hess
 function update_hess(cone::PosSemidefTriSparse{PSDSparseCholmod})
     @assert cone.grad_updated
+    isdefined(cone, :hess) || alloc_hess(cone)
     cache = cone.cache
     temp_blocks = cache.temp_blocks
     rt2 = cone.rt2

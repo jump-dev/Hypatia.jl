@@ -50,11 +50,7 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
 end
 
 function setup_extra_data(cone::HypoGeoMean{T}) where {T <: Real}
-    dim = cone.dim
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
-    wdim = dim - 1
+    wdim = cone.dim - 1
     cone.tempw = zeros(T, wdim)
     cone.iwdim = inv(T(wdim))
     return cone
@@ -113,6 +109,8 @@ end
 
 function update_hess(cone::HypoGeoMean)
     @assert cone.grad_updated
+    isdefined(cone, :hess) || alloc_hess(cone)
+    H = cone.hess.data
     u = cone.point[1]
     @views w = cone.point[2:end]
     z = cone.z
@@ -120,7 +118,6 @@ function update_hess(cone::HypoGeoMean)
     wgeoz = iwdim * cone.wgeo / z
     wgeozm1 = wgeoz - iwdim
     constww = wgeoz * (1 + wgeozm1) + 1
-    H = cone.hess.data
 
     H[1, 1] = abs2(cone.grad[1])
     @inbounds for j in eachindex(w)
@@ -169,13 +166,14 @@ end
 
 function update_inv_hess(cone::HypoGeoMean{T}) where T
     @assert !cone.inv_hess_updated
+    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
+    Hi = cone.inv_hess.data
     u = cone.point[1]
     @views w = cone.point[2:end]
     wdim = length(w)
     wgeoid = cone.wgeo * cone.iwdim
     denom = cone.dim * cone.wgeo - wdim * u
     zd2 = wdim * cone.z / denom
-    Hi = cone.inv_hess.data
 
     Hi[1, 1] = cone.wgeo * (cone.dim * wgeoid - 2 * u) + abs2(u)
     @inbounds for j in eachindex(w)
