@@ -1,10 +1,12 @@
 #=
-epigraph of matrix spectral norm (operator norm associated with standard Euclidean norm; i.e. maximum singular value)
+epigraph of matrix spectral norm (operator norm associated with standard
+Euclidean norm; i.e. maximum singular value)
 (u in R, W in R^{d1,d2}) : u >= opnorm(W)
 note d1 <= d2 is enforced WLOG since opnorm(W) = opnorm(W')
 W is vectorized column-by-column (i.e. vec(W) in Julia)
 
-barrier from "Interior-Point Polynomial Algorithms in Convex Programming" by Nesterov & Nemirovskii 1994
+barrier from "Interior-Point Polynomial Algorithms in Convex Programming"
+by Nesterov & Nemirovskii 1994
 -logdet(u*I_d1 - W*W'/u) - log(u)
 = -logdet(u^2*I_d1 - W*W') + (d1 - 1) log(u)
 =#
@@ -69,10 +71,14 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.hess_fact_updated = false)
+reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated =
+    cone.hess_fact_updated = false)
 
 # TODO only allocate the fields we use
-function setup_extra_data(cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function setup_extra_data(
+    cone::EpiNormSpectral{T, R},
+    ) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -96,7 +102,10 @@ end
 
 get_nu(cone::EpiNormSpectral) = cone.d1 + 1
 
-function set_initial_point(arr::AbstractVector, cone::EpiNormSpectral{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function set_initial_point(
+    arr::AbstractVector,
+    cone::EpiNormSpectral{T, R},
+    ) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
     arr[1] = sqrt(T(get_nu(cone)))
     return arr
@@ -134,7 +143,7 @@ function update_grad(cone::EpiNormSpectral)
     u = cone.point[1]
 
     ldiv!(cone.tau, cone.fact_Z, cone.W)
-    cone.Zi = Hermitian(inv(cone.fact_Z), :U) # TODO only need trace of inverse here, which we can get from the cholesky factor - if cheap, don't do the inverse until needed in the hessian
+    cone.Zi = Hermitian(inv(cone.fact_Z), :U)
     cone.grad[1] = -u * tr(cone.Zi)
     @views vec_copy_to!(cone.grad[2:end], cone.tau)
     cone.grad .*= 2
@@ -155,7 +164,8 @@ function update_hess_aux(cone::EpiNormSpectral)
     ldiv!(cone.fact_Z, Zitau)
     @. cone.HuW = -4 * u * Zitau
     cone.trZi2 = sum(abs2, cone.Zi)
-    cone.Huu = 4 * abs2(u) * cone.trZi2 + (cone.grad[1] - 2 * (cone.d1 - 1) / u) / u
+    cone.Huu = 4 * abs2(u) * cone.trZi2 + (cone.grad[1] - 2 *
+        (cone.d1 - 1) / u) / u
     copyto!(WtauI, I)
     mul!(WtauI, cone.W', tau, true, true)
 
@@ -201,7 +211,11 @@ function update_hess(cone::EpiNormSpectral)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormSpectral)
+function hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::EpiNormSpectral,
+    )
     cone.hess_aux_updated || update_hess_aux(cone)
     u = cone.point[1]
     W = cone.W
@@ -276,7 +290,8 @@ function correction(cone::EpiNormSpectral, dir::AbstractVector)
 
     trZi3 = sum(abs2, ldiv!(tempd1d1, cone.fact_Z.L, Zi))
     @. tempd1d2b += 3 * tempd1d2c
-    corr[1] = -real(dot(W_dir, tempd1d2b)) - u * u_dir * (6 * cone.trZi2 - 8 * u * trZi3 * u) * u_dir - (cone.d1 - 1) * abs2(u_dir / u) / u
+    corr[1] = -real(dot(W_dir, tempd1d2b)) - u * u_dir * (6 * cone.trZi2 -
+        8 * u * trZi3 * u) * u_dir - (cone.d1 - 1) * abs2(u_dir / u) / u
 
     return corr
 end

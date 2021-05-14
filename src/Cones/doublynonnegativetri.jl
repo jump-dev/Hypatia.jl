@@ -51,13 +51,15 @@ mutable struct DoublyNonnegativeTri{T <: Real} <: Cone{T}
         cone.rt2 = sqrt(T(2))
         cone.side = side = round(Int, sqrt(0.25 + 2 * dim) - 0.5)
         @assert side * (side + 1) == 2 * dim
-        cone.offdiag_idxs = vcat([div(i * (i - 1), 2) .+ (1:(i - 1)) for i in 2:side]...)
+        cone.offdiag_idxs = vcat([div(i * (i - 1), 2) .+
+            (1:(i - 1)) for i in 2:side]...)
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
 
-reset_data(cone::DoublyNonnegativeTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
+reset_data(cone::DoublyNonnegativeTri) = (cone.feas_updated = cone.grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 function setup_extra_data(cone::DoublyNonnegativeTri{T}) where {T <: Real}
     dim = cone.dim
@@ -74,7 +76,10 @@ end
 
 get_nu(cone::DoublyNonnegativeTri) = cone.dim
 
-function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegativeTri{T}) where T
+function set_initial_point(
+    arr::AbstractVector{T},
+    cone::DoublyNonnegativeTri{T},
+    ) where T
     side = cone.side
 
     # for small side dimension, use closed-form solutions
@@ -98,9 +103,11 @@ function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegativeTri{T}
                 temp = d - (d - n) * abs2(offd_real)
                 if temp > sqrt(eps(T))
                     ond_try = sqrt(temp / n)
-                    denom = abs2(ond_try) + (n - 2) / cone.rt2 * ond_try * offd_real - (n - 1) * abs2(offd_real) / 2
+                    denom = abs2(ond_try) + (n - 2) / cone.rt2 * ond_try *
+                        offd_real - (n - 1) * abs2(offd_real) / 2
                     # check s = -g(s) conditions
-                    if ond_try * cone.rt2 + (n - 2) * offd_real ≈ ond_try * denom * cone.rt2 && denom ≈ abs2(offd_real) * (denom + 1)
+                    if ond_try * cone.rt2 + (n - 2) * offd_real ≈ ond_try *
+                        denom * cone.rt2 && denom ≈ abs2(offd_real) * (denom + 1)
                         (on_diag, off_diag) = (ond_try, offd_real)
                         found_soln = true
                         break
@@ -109,7 +116,8 @@ function set_initial_point(arr::AbstractVector{T}, cone::DoublyNonnegativeTri{T}
             end
         end
         if !found_soln
-            @warn("initial point inaccurate for DoublyNonnegativeTri cone dimension $(cone.dim)")
+            @warn("initial point inaccurate for DoublyNonnegativeTri " *
+                "cone dimension $(cone.dim)")
         end
     end
 
@@ -165,7 +173,11 @@ function update_hess(cone::DoublyNonnegativeTri)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::DoublyNonnegativeTri)
+function hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::DoublyNonnegativeTri,
+    )
     @assert is_feas(cone)
 
     @inbounds for i in 1:size(arr, 2)
@@ -176,8 +188,8 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::DoublyN
         smat_to_svec!(view(prod, :, i), cone.mat3, cone.rt2)
     end
     offdiags = cone.offdiag_idxs
-    @views point_offdiags = cone.point[offdiags]
-    @. @views prod[offdiags, :] += arr[offdiags, :] / point_offdiags / point_offdiags
+    @views s_off = cone.point[offdiags]
+    @. @views prod[offdiags, :] += arr[offdiags, :] / s_off / s_off
 
     return prod
 end
@@ -191,8 +203,8 @@ function correction(cone::DoublyNonnegativeTri, dir::AbstractVector)
     mul!(cone.mat3, S, S') # TODO use outer prod function
     smat_to_svec!(cone.correction, cone.mat3, cone.rt2)
     offdiags = cone.offdiag_idxs
-    @views point_offdiags = cone.point[offdiags]
-    @. @views cone.correction[offdiags] += abs2(dir[offdiags] / point_offdiags) / point_offdiags
+    @views s_off = cone.point[offdiags]
+    @. @views cone.correction[offdiags] += abs2(dir[offdiags] / s_off) / s_off
 
     return cone.correction
 end

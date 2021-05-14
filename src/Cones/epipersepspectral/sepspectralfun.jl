@@ -1,12 +1,12 @@
 #=
 suitable univariate convex functions defined on ℝ₊₊ and associated oracles
 - h_val evaluates (sum of) h
-- h_conj_dom_pos is true if domain of convex conjugate of h is ℝ₊₊, otherwise domain is ℝ
+- h_conj_dom_pos is true if domain of conjugate of h is ℝ₊₊, else domain is ℝ
 - h_conj evaluates the convex conjugate of (sum of) h
 - h_der1/h_der2/h_der3 evaluate 1st/2nd/3rd derivatives of h pointwise
 - get_initial_point gives initial point for u,v,λ_i
 
-TODO derive central initial points for get_initial_point and return correct real type
+TODO derive central initial points for get_initial_point and return correct real
 =#
 
 # inverse: x^-1
@@ -61,8 +61,9 @@ end
 
 
 # power in (1,2]
-# NOTE power 1 is homogeneous and just equal to trace of PSD matrix (a linear function)
-# NOTE for power 2, more efficient to use epipersquare on scaled lower triangle elements (since λ'λ = tr(X^2) = ||svec(X)||^2)
+# power 1 is homogeneous and just equal to trace of PSD matrix (a linear function)
+# for power 2, more efficient to use epipersquare on scaled lower triangle
+# (since λ'λ = tr(X^2) = ||svec(X)||^2)
 struct Power12SSF <: SepSpectralFun
     p::Real
     Power12SSF(p::Real) = (@assert 1 < p <= 2; new(p))

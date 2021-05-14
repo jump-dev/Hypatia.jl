@@ -3,7 +3,8 @@ generalized power cone parametrized by alpha in R_++^n in unit simplex interior
 (u in R_++^m, w in R^n) : prod_i(u_i^alpha_i) => norm_2(w)
 where sum_i(alpha_i) = 1, alpha_i > 0
 
-barrier from "On self-concordant barriers for generalized power cones" by Roy & Xiao 2018
+barrier from "On self-concordant barriers for generalized power cones"
+by Roy & Xiao 2018
 -log(prod_i((u_i)^(2 * alpha_i)) - norm_2(w)^2) - sum_i((1 - alpha_i)*log(u_i))
 =#
 
@@ -87,7 +88,8 @@ function update_feas(cone::GeneralizedPower{T}) where {T <: Real}
     @views u = cone.point[1:m]
 
     if all(>(eps(T)), u)
-        @inbounds cone.produ = exp(2 * sum(cone.alpha[i] * log(u[i]) for i in eachindex(cone.alpha)))
+        @inbounds cone.produ = exp(2 * sum(cone.alpha[i] * log(u[i])
+            for i in eachindex(cone.alpha)))
         @views cone.produw = cone.produ - sum(abs2, cone.point[(m + 1):end])
         cone.is_feas = (cone.produw > eps(T))
     else
@@ -104,7 +106,8 @@ function is_dual_feas(cone::GeneralizedPower{T}) where {T <: Real}
     @views u = cone.dual_point[1:m]
 
     if all(>(eps(T)), u)
-        @inbounds p = exp(2 * sum(alpha[i] * log(u[i] / alpha[i]) for i in eachindex(alpha)))
+        @inbounds p = exp(2 * sum(alpha[i] * log(u[i] / alpha[i])
+            for i in eachindex(alpha)))
         @views w = cone.dual_point[(m + 1):end]
         return (p - sum(abs2, w) > eps(T))
     end
@@ -164,7 +167,11 @@ function update_hess(cone::GeneralizedPower)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::GeneralizedPower)
+function hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::GeneralizedPower,
+    )
     @assert cone.grad_updated
     m = length(cone.alpha)
     @views u = cone.point[1:m]
@@ -209,7 +216,8 @@ function correction(cone::GeneralizedPower, dir::AbstractVector)
     @. udu = u_dir / u
     audu = dot(alpha, udu)
     const8 = 2 * produuw - 1
-    const1 = 2 * const8 * abs2(audu) + sum(ai * udui * udui for (ai, udui) in zip(alpha, udu))
+    const1 = 2 * const8 * abs2(audu) + sum(ai * udui * udui
+        for (ai, udui) in zip(alpha, udu))
     const15 = wwd / produw
     const10 = sum(abs2, w_dir) + wwd * const15
 
@@ -225,7 +233,8 @@ function correction(cone::GeneralizedPower, dir::AbstractVector)
     u_corr ./= u
 
     const2 = -2 * const12 * audu
-    const6 = 2 * const2 * const15 + const12 * const1 - 2 / produw * const10 / produw
+    const6 = 2 * const2 * const15 + const12 * const1 -
+        2 / produw * const10 / produw
     const7 = const2 - 2 / produw * wwd / produw
     @. w_corr = const7 * w_dir + const6 * w
 

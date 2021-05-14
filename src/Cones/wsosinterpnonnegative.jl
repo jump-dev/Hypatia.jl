@@ -1,10 +1,14 @@
 #=
-interpolation-based weighted-sum-of-squares (multivariate) polynomial cone parametrized by interpolation matrices Ps
+interpolation-based weighted-sum-of-squares (multivariate) polynomial cone
+parametrized by interpolation matrices Ps
 
-definition and dual barrier from "Sum-of-squares optimization without semidefinite programming" by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
+definition and dual barrier from
+"Sum-of-squares optimization without semidefinite programming"
+by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
 
 TODO
-in complex case, can maybe compute Lambda fast in feas check by taking sqrt of point and doing outer product
+in complex case, can maybe compute Lambda fast in feas check by taking sqrt of
+point and doing outer product
 =#
 
 mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
@@ -59,9 +63,13 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     end
 end
 
-reset_data(cone::WSOSInterpNonnegative) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.use_hess_prod_slow = cone.use_hess_prod_slow_updated = false)
+reset_data(cone::WSOSInterpNonnegative) = (cone.feas_updated = cone.grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
+    cone.use_hess_prod_slow = cone.use_hess_prod_slow_updated = false)
 
-function setup_extra_data(cone::WSOSInterpNonnegative{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function setup_extra_data(
+    cone::WSOSInterpNonnegative{T, R},
+    ) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -86,7 +94,7 @@ function update_feas(cone::WSOSInterpNonnegative)
     D = Diagonal(cone.point)
 
     # order the Ps by how long it takes to check feasibility, to improve efficiency
-    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # NOTE stochastic
+    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # stochastic
 
     cone.is_feas = true
     for k in cone.Ps_order
@@ -96,7 +104,7 @@ function update_feas(cone::WSOSInterpNonnegative)
             LLk = cone.tempLL[k]
 
             # Λ = Pk' * Diagonal(point) * Pk
-            @. LUk = Pk' * cone.point' # NOTE currently faster than mul!(LUk, Pk', D)
+            @. LUk = Pk' * cone.point' # currently faster than mul!(LUk, Pk', D)
             mul!(LLk, LUk, Pk)
 
             ΛFk = cone.ΛF[k] = cholesky!(Hermitian(LLk, :L), check = false)
@@ -143,7 +151,11 @@ function update_hess(cone::WSOSInterpNonnegative)
     return cone.hess
 end
 
-function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::WSOSInterpNonnegative)
+function hess_prod_slow!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::WSOSInterpNonnegative,
+    )
     cone.use_hess_prod_slow_updated || update_use_hess_prod_slow(cone)
     @assert cone.hess_updated
     cone.use_hess_prod_slow || return hess_prod!(prod, arr, cone)

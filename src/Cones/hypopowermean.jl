@@ -1,9 +1,11 @@
 #=
-hypograph of power mean (product of powers) parametrized by alpha in R_+^n on unit simplex
+hypograph of power mean (product of powers) parametrized by alpha in R_+^n
+on unit simplex
 (u in R, w in R_+^n) : u <= prod_i(w_i^alpha_i)
 where sum_i(alpha_i) = 1, alpha_i >= 0
 
-barrier from "Constructing self-concordant barriers for convex cones" by Yu. Nesterov
+barrier from "Constructing self-concordant barriers for convex cones"
+by Yu. Nesterov
 -log(prod_i(w_i^alpha_i) - u) - sum_i(log(w_i))
 =#
 
@@ -82,7 +84,8 @@ function update_feas(cone::HypoPowerMean{T}) where T
     alpha = cone.alpha
 
     if all(>(eps(T)), w)
-        @inbounds cone.wprod = exp(sum(alpha[i] * log(w[i]) for i in eachindex(alpha)))
+        @inbounds cone.wprod = exp(sum(alpha[i] * log(w[i])
+            for i in eachindex(alpha)))
         cone.z = cone.wprod - u
         cone.is_feas = (cone.z > eps(T))
     else
@@ -99,7 +102,8 @@ function is_dual_feas(cone::HypoPowerMean{T}) where T
     alpha = cone.alpha
 
     @inbounds if u < -eps(T) && all(>(eps(T)), w)
-        return (exp(sum(alpha[i] * log(w[i] / alpha[i]) for i in eachindex(alpha))) + u > eps(T))
+        return (exp(sum(alpha[i] * log(w[i] / alpha[i])
+            for i in eachindex(alpha))) + u > eps(T))
     end
 
     return false
@@ -147,7 +151,11 @@ function update_hess(cone::HypoPowerMean)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPowerMean)
+function hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::HypoPowerMean,
+    )
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -192,7 +200,8 @@ function correction(cone::HypoPowerMean, dir::AbstractVector)
     awdw2 = sum(alpha[i] * abs2(wdw[i]) for i in eachindex(alpha))
     corr[1] = (abs2(udz) + const6 * awdw + (const1 * awdw + piz * awdw2) / 2) / -z
     const2 = piz * (1 - piz)
-    const3 = (const6 * u_dir / z + const2 * awdw2 - u / z * const1 * awdw) / -2 - udz * const1
+    const3 = (const6 * u_dir / z + const2 * awdw2 - u / z * const1 * awdw) / -2 -
+        udz * const1
     const4 = const2 * awdw + udz * piz
     const5 = const2 + piz * u / z
 
@@ -208,7 +217,8 @@ function correction(cone::HypoPowerMean, dir::AbstractVector)
     return corr
 end
 
-# see analysis in https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
+# see analysis in
+# https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
 function get_central_ray_hypopowermean(alpha::Vector{<:Real})
     wdim = length(alpha)
     # predict each w_i given alpha_i and n

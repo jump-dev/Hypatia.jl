@@ -86,7 +86,7 @@ function check_cone_points(
     end
 
     # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
-    sortperm!(cone_order, step_searcher.cone_times, initialized = true) # NOTE stochastic
+    sortperm!(cone_order, step_searcher.cone_times, initialized = true) # stochastic
 
     rtmu = sqrt(mu_cand)
     irtmu = inv(rtmu)

@@ -8,7 +8,7 @@ import Random.randn
 using LinearAlgebra
 using SparseArrays
 import ForwardDiff
-import GenericLinearAlgebra.eigen # NOTE needed by ForwardDiff currently for test_barrier
+import GenericLinearAlgebra.eigen # needed by ForwardDiff currently for test_barrier
 import Hypatia
 import Hypatia.ModelUtilities
 import Hypatia.Cones

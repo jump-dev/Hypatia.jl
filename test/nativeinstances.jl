@@ -752,7 +752,7 @@ function linmatrixineq3(T; options...)
     diag1 = Diagonal([1, 1])
     diag2 = Diagonal([1, -1])
 
-    # NOTE not all combinations work due to missing methods in LinearAlgebra
+    # not all combinations work due to missing methods in LinearAlgebra
     As_list = [
         [dense1, dense2],
         # [dense1, sparse2],

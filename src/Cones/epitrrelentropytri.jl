@@ -3,7 +3,8 @@ epigraph of the relative entropy cone
 (u in R, V in S_+^d, W in S_+^d) : u >= tr(W * (log(W) - log(V)))
 
 derivatives for quantum relative entropy function adapted from
-"Long-Step Path-Following Algorithm in Quantum Information Theory: Some Numerical Aspects and Applications"
+"Long-Step Path-Following Algorithm in Quantum Information Theory:
+Some Numerical Aspects and Applications"
 by L. Faybusovich and C. Zhou
 
 uses the log-homogeneous but not self-concordant barrier
@@ -116,7 +117,10 @@ end
 
 get_nu(cone::EpiTrRelEntropyTri) = 2 * cone.d + 1
 
-function set_initial_point(arr::AbstractVector, cone::EpiTrRelEntropyTri{T}) where {T <: Real}
+function set_initial_point(
+    arr::AbstractVector,
+    cone::EpiTrRelEntropyTri{T},
+    ) where {T <: Real}
     arr .= 0
     # at the initial point V and W are diagonal, equivalent to epirelentropy
     (arr[1], v, w) = get_central_ray_epirelentropy(cone.d)
@@ -156,8 +160,6 @@ function update_feas(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     cone.feas_updated = true
     return cone.is_feas
 end
-
-is_dual_feas(::EpiTrRelEntropyTri) = true
 
 function update_grad(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     @assert cone.is_feas
@@ -210,7 +212,8 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     diff_tensor_V = diff_tensor!(cone.diff_tensor_V, diff_mat_V, V_vals)
 
     W_similar = cone.W_similar
-    dz_sqr_dV_sqr = hess_tr_logm!(cone.dz_sqr_dV_sqr, V_vecs, W_similar, diff_tensor_V, rt2)
+    dz_sqr_dV_sqr = hess_tr_logm!(cone.dz_sqr_dV_sqr, V_vecs, W_similar,
+        diff_tensor_V, rt2)
     @. dz_sqr_dV_sqr *= -1
     @views Hvv = H[V_idxs, V_idxs]
     symm_kron(Hvv, Vi, rt2)
@@ -218,14 +221,16 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     mul!(Hvv, dzdV, dzdV', true, true)
     @. Hvv += dz_sqr_dV_sqr / z
 
-    dz_sqr_dW_sqr = grad_logm!(cone.dz_sqr_dW_sqr, W_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_W, rt2)
+    dz_sqr_dW_sqr = grad_logm!(cone.dz_sqr_dW_sqr, W_vecs, cone.matsdim1,
+        cone.matsdim2, cone.tempsdim, diff_mat_W, rt2)
     @views Hww = H[W_idxs, W_idxs]
     symm_kron(Hww, Wi, rt2)
     dzdW = cone.dzdW
     mul!(Hww, dzdW, dzdW', true, true)
     @. Hww += dz_sqr_dW_sqr / z
 
-    dz_sqr_dW_dV = grad_logm!(cone.dz_sqr_dW_dV, V_vecs, cone.matsdim1, cone.matsdim2, cone.tempsdim, diff_mat_V, rt2)
+    dz_sqr_dW_dV = grad_logm!(cone.dz_sqr_dW_dV, V_vecs, cone.matsdim1,
+        cone.matsdim2, cone.tempsdim, diff_mat_V, rt2)
     @views Hvw = H[V_idxs, W_idxs]
     @. Hvw = -dz_sqr_dW_dV / z
     mul!(Hvw, dzdV, dzdW', true, true)
@@ -263,8 +268,10 @@ function correction(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
     u_dir = dir[1]
     @views v_dir = dir[V_idxs]
     @views w_dir = dir[W_idxs]
-    @views V_dir = Symmetric(svec_to_smat!(zeros(T, d, d), dir[V_idxs], cone.rt2), :U)
-    @views W_dir = Symmetric(svec_to_smat!(zeros(T, d, d), dir[W_idxs], cone.rt2), :U)
+    @views V_dir = Symmetric(svec_to_smat!(
+        zeros(T, d, d), dir[V_idxs], cone.rt2), :U)
+    @views W_dir = Symmetric(svec_to_smat!(
+        zeros(T, d, d), dir[W_idxs], cone.rt2), :U)
     V_dir_similar = V_vecs' * V_dir * V_vecs
     W_dir_similar = W_vecs' * W_dir * W_vecs
 
@@ -272,17 +279,25 @@ function correction(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
     diff_tensor!(diff_tensor_W, diff_mat_W, W_vals)
 
     VW_dir_similar = V_vecs' * W_dir * V_vecs
-    diff_dot_V_VV = [V_dir_similar[:, q]' * Diagonal(diff_tensor_V[:, p, q]) * V_dir_similar[:, p] for p in 1:d, q in 1:d]
+    diff_dot_V_VV = [V_dir_similar[:, q]' * Diagonal(diff_tensor_V[:, p, q]) *
+        V_dir_similar[:, p] for p in 1:d, q in 1:d]
     d2logV_dV2_VV = V_vecs * diff_dot_V_VV * V_vecs'
-    diff_dot_V_VW = [V_dir_similar[:, q]' * Diagonal(diff_tensor_V[:, p, q]) * VW_dir_similar[:, p] for p in 1:d, q in 1:d]
-    diff_dot_W_WW = [W_dir_similar[:, q]' * Diagonal(diff_tensor_W[:, p, q]) * W_dir_similar[:, p] for p in 1:d, q in 1:d]
+    diff_dot_V_VW = [V_dir_similar[:, q]' * Diagonal(diff_tensor_V[:, p, q]) *
+        VW_dir_similar[:, p] for p in 1:d, q in 1:d]
+    diff_dot_W_WW = [W_dir_similar[:, q]' * Diagonal(diff_tensor_W[:, p, q]) *
+        W_dir_similar[:, p] for p in 1:d, q in 1:d]
 
-    dlogV_dV_dw = Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * w_dir, cone.rt2), :U)
-    dlogV_dV_dv = Symmetric(svec_to_smat!(zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U)
-    dlogW_dW_dw = Symmetric(svec_to_smat!(zeros(T, d, d), dlogW_dW * w_dir, cone.rt2), :U)
-    dz_sqr_dV_sqr_dv = Symmetric(svec_to_smat!(zeros(T, d, d), dz_sqr_dV_sqr * v_dir, cone.rt2), :U)
+    dlogV_dV_dw = Symmetric(svec_to_smat!(
+        zeros(T, d, d), dlogV_dV * w_dir, cone.rt2), :U)
+    dlogV_dV_dv = Symmetric(svec_to_smat!(
+        zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U)
+    dlogW_dW_dw = Symmetric(svec_to_smat!(
+        zeros(T, d, d), dlogW_dW * w_dir, cone.rt2), :U)
+    dz_sqr_dV_sqr_dv = Symmetric(svec_to_smat!(
+        zeros(T, d, d), dz_sqr_dV_sqr * v_dir, cone.rt2), :U)
     const0 = (u_dir + dot(dzdV, v_dir) + dot(dzdW, w_dir)) / z
-    const1 = abs2(const0) + (dot(v_dir, dz_sqr_dV_sqr, v_dir) / 2 + dot(w_dir, dlogW_dW, w_dir) / 2 - dot(v_dir, dlogV_dV, w_dir)) / z
+    const1 = abs2(const0) + (dot(v_dir, dz_sqr_dV_sqr, v_dir) / 2 +
+        dot(w_dir, dlogW_dW, w_dir) / 2 - dot(v_dir, dlogV_dV, w_dir)) / z
 
     # u
     corr[1] = const1
@@ -303,7 +318,8 @@ function correction(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
     rdiv!(V_dir_similar, Diagonal(sqrt_vals))
     ldiv!(Diagonal(V_vals), V_dir_similar)
     V_part_2a = V_dir_similar * V_dir_similar'
-    V_part_2 = V_vecs * (diff_dot_V_VW + diff_dot_V_VW' + d3WlogVdV + V_part_2a * z) * V_vecs'
+    V_part_2 = V_vecs * (diff_dot_V_VW + diff_dot_V_VW' +
+        d3WlogVdV + V_part_2a * z) * V_vecs'
     V_corr = V_part_1 + V_part_2
     @views smat_to_svec!(corr[V_idxs], V_corr, cone.rt2)
     @. @views corr[V_idxs] += dzdV * const1
@@ -335,7 +351,8 @@ function diff_mat!(
         (vj, lvj) = (vals[j], log_vals[j])
         for i in 1:(j - 1)
             (vi, lvi) = (vals[i], log_vals[i])
-            mat[i, j] = (abs(vi - vj) < rteps ? inv((vi + vj) / 2) : (lvi - lvj) / (vi - vj))
+            mat[i, j] = (abs(vi - vj) < rteps ? inv((vi + vj) / 2) :
+                (lvi - lvj) / (vi - vj))
         end
         mat[j, j] = inv(vj)
     end
@@ -373,7 +390,11 @@ function diff_tensor!(
     return diff_tensor
 end
 
-function diff_quad!(diff_quad::Matrix{T}, diff_tensor::Array{T, 3}, V_vals::Vector{T}) where T
+function diff_quad!(
+    diff_quad::Matrix{T},
+    diff_tensor::Array{T, 3},
+    V_vals::Vector{T},
+    ) where T
     rteps = sqrt(eps(T))
     d = length(V_vals)
     idx1 = 1
@@ -381,7 +402,8 @@ function diff_quad!(diff_quad::Matrix{T}, diff_tensor::Array{T, 3}, V_vals::Vect
         idx2 = 1
         for l in 1:d, k in 1:d
             (vi, vj, vk, vl) = (V_vals[i], V_vals[j], V_vals[k], V_vals[l])
-            if (abs(vi - vj) < rteps) && (abs(vi - vk) < rteps) && (abs(vi - vl) < rteps)
+            if (abs(vi - vj) < rteps) && (abs(vi - vk) < rteps) &&
+                (abs(vi - vl) < rteps)
                 t = inv(vi^3) / 3 # fourth derivative divided by 3!
             elseif (abs(vi - vl) < rteps) && (abs(vi - vk) < rteps)
                 t = (diff_tensor[i, i, i] - diff_tensor[i, i, j]) / (vi - vj)
@@ -421,7 +443,8 @@ function hess_tr_logm!(mat, vecs, mat_inner, diff_tensor, rt2::T) where T
     end
     temp = Symmetric(zeros(T, d^2, d^2), :U)
     for j in 1:d, i in 1:j
-        temp.data[block_idxs(d, i), block_idxs(d, j)] = vecs * Diagonal(X[:, i, j]) * vecs'
+        temp.data[block_idxs(d, i), block_idxs(d, j)] = vecs *
+            Diagonal(X[:, i, j]) * vecs'
     end
 
     mat .= 0
@@ -458,7 +481,8 @@ function symm_kron_nonsymm(
             row_idx = 1
             for j in 1:side
                 for i in 1:(j - 1)
-                    H[row_idx, col_idx] = mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k]
+                    H[row_idx, col_idx] = mat[i, k] * mat[j, l] +
+                        mat[i, l] * mat[j, k]
                     row_idx += 1
                 end
                 H[row_idx, col_idx] = rt2 * mat[j, k] * mat[j, l]

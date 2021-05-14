@@ -2,7 +2,9 @@
 (closure of) hypograph of perspective of sum of logarithms
 (u in R, v in R_+, w in R_+^d) : u <= v*sum(log.(w/v))
 
-barrier modified from "Primal-Dual Interior-Point Methods for Domain-Driven Formulations" by Karimi & Tuncel, 2019
+barrier modified from
+"Primal-Dual Interior-Point Methods for Domain-Driven Formulations"
+by Karimi & Tuncel, 2019
 -log(sum_i v*log(w_i/v) - u) - sum_i log(w_i) - log(v)
 =#
 
@@ -47,7 +49,9 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::HypoPerLog) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
+reset_data(cone::HypoPerLog) = (cone.feas_updated = cone.grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated =
+    cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
 
 function setup_extra_data(cone::HypoPerLog{T}) where {T <: Real}
     dim = cone.dim
@@ -164,7 +168,11 @@ function update_hess(cone::HypoPerLog)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLog)
+function hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::HypoPerLog,
+    )
     if !cone.hess_aux_updated
         update_hess_aux(cone)
     end
@@ -239,7 +247,11 @@ function update_inv_hess(cone::HypoPerLog)
     return cone.inv_hess
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLog)
+function inv_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::HypoPerLog,
+    )
     if !cone.inv_hess_aux_updated
         update_inv_hess_aux(cone)
     end
@@ -258,7 +270,8 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hyp
         dot_i = dot(vwvden, arr_w)
         @. @views prod[3:end, i] = (dot_i + z * arr_w * w) * wzvi
     end
-    @inbounds @views mul!(prod[3:end, :], Hi[1:2, 3:end]', arr[1:2, :], true, true)
+    @inbounds @views mul!(prod[3:end, :], Hi[1:2, 3:end]', arr[1:2, :],
+        true, true)
 
     return prod
 end
@@ -290,13 +303,16 @@ function correction(cone::HypoPerLog{T}, dir::AbstractVector{T}) where {T <: Rea
     const7 = 2 * lwvd - d
     const8 = 2 * ((u_dir - lwvd * v_dir) * vz + v_dir) / z
     const9 = v * sum2wdw + 2 * (const1 + vwdw * (const5 + vwdw)) / z
-    const10 = ((v_dir * (-2 * u_dir + v_dir * const7) - 2 * const1 / z * v) / z + 2 * const8 * vwdw) / z - abs2(vz) * const3
+    const10 = ((v_dir * (-2 * u_dir + v_dir * const7) - 2 * const1 / z * v) / z +
+        2 * const8 * vwdw) / z - abs2(vz) * const3
     const11 = -abs2(vz) * sumwdw + const8
     const12 = -2 * (vz + 1)
 
     corr[1] = (const9 + v_dir * (v_dir * d / v - sumwdw)) / z / z
 
-    corr[2] = ((-lwvd * const9 - d * v_dir * (const5 + const4) / v + sumwdw * (v_dir * const7 - u_dir)) / z + const3) / z - abs2(v_dir / v) * (d * inv(z) + 2 / v)
+    corr[2] = ((-lwvd * const9 - d * v_dir * (const5 + const4) / v + sumwdw *
+        (v_dir * const7 - u_dir)) / z + const3) / z - abs2(v_dir / v) *
+        (d * inv(z) + 2 / v)
 
     @. w_corr = const11 .+ const12 * wdw
     w_corr .*= wdw
@@ -308,7 +324,8 @@ function correction(cone::HypoPerLog{T}, dir::AbstractVector{T}) where {T <: Rea
     return corr
 end
 
-# see analysis in https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
+# see analysis in
+# https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
 function get_central_ray_hypoperlog(d::Int)
     if d <= 10
         # lookup points where x = f'(x)

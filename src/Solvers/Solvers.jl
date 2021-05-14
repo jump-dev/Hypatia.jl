@@ -16,6 +16,7 @@ import Hypatia.Cones
 import Hypatia.Models
 import Hypatia.SparseNonSymCache
 import Hypatia.SparseSymCache
+import Hypatia.diag_min
 import Hypatia.update_fact
 import Hypatia.inv_prod
 import Hypatia.free_memory

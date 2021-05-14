@@ -71,10 +71,14 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-reset_data(cone::MatrixEpiPerSquare) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.hess_aux_updated = false)
+reset_data(cone::MatrixEpiPerSquare) = (cone.feas_updated = cone.grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
+    cone.hess_aux_updated = false)
 
 # TODO only allocate the fields we use
-function setup_extra_data(cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function setup_extra_data(
+    cone::MatrixEpiPerSquare{T, R},
+    ) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -98,7 +102,10 @@ end
 
 get_nu(cone::MatrixEpiPerSquare) = cone.d1 + 1
 
-function set_initial_point(arr::AbstractVector, cone::MatrixEpiPerSquare{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function set_initial_point(
+    arr::AbstractVector,
+    cone::MatrixEpiPerSquare{T, R},
+    ) where {R <: RealOrComplex{T}} where {T <: Real}
     incr = (cone.is_complex ? 2 : 1)
     arr .= 0
     k = 1
@@ -133,7 +140,8 @@ function is_dual_feas(cone::MatrixEpiPerSquare{T}) where T
     v = cone.dual_point[cone.v_idx]
 
     if v > eps(T)
-        @views svec_to_smat!(cone.tempd1d1b, cone.dual_point[cone.U_idxs], cone.rt2)
+        @views svec_to_smat!(cone.tempd1d1b, cone.dual_point[cone.U_idxs],
+            cone.rt2)
         F = cholesky!(Hermitian(cone.tempd1d1b, :U), check = false)
         isposdef(F) || return false
         @views W = vec_copy_to!(cone.tempd1d2, cone.dual_point[cone.W_idxs])
@@ -164,7 +172,7 @@ function update_grad(cone::MatrixEpiPerSquare)
     return cone.grad
 end
 
-function update_hess_aux(cone::MatrixEpiPerSquare) # TODO here and in other cones these are misleading names since also needed for just hess
+function update_hess_aux(cone::MatrixEpiPerSquare)
     @assert cone.grad_updated
     ZiUZi = cone.ZiUZi
 
@@ -272,7 +280,11 @@ function update_hess(cone::MatrixEpiPerSquare)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::MatrixEpiPerSquare)
+function hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::MatrixEpiPerSquare,
+    )
     cone.hess_aux_updated || update_hess_aux(cone)
     U_idxs = cone.U_idxs
     v_idx = cone.v_idx
@@ -304,7 +316,8 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::MatrixE
 
         copyto!(tempd1d1, ZiUZi)
         axpby!(-2, cone.Zi.data, 2 * v2, tempd1d1.data)
-        prod[v_idx, i] = real(dot(tempd1d1, temp_U)) - 4 * real(dot(cone.U, temp_U3)) + cone.Hvv * v_arr
+        prod[v_idx, i] = real(dot(tempd1d1, temp_U)) - 4 *
+            real(dot(cone.U, temp_U3)) + cone.Hvv * v_arr
         axpby!(-v2, temp_U2.data, v_arr, tempd1d1.data)
         smat_to_svec!(U_prod, tempd1d1, cone.rt2)
     end
@@ -366,16 +379,20 @@ function correction(cone::MatrixEpiPerSquare, dir::AbstractVector)
     ZiUZiWdWZiWI = ZiUZi * WdWtZiWI + ZiWdWZiUZi2 * W
     vZiUZiUdZi2 = v * ZiUZiUdZi2 - ZiUdZi
 
-    Utemp = vd2 * (-vd2 * ZiUZi2v + ZiWdWZi2 - v2 * (ZiUZiWdWZi + ZiWdWZiUZi2 - 2 * vZiUZiUdZi2)) + v2 * (ZiWdWZi * WdWZi + WdWZi' * ZiWdWZi2 + ZiWdWtZiWI * ZiWd' + v2 * (v2 * ZiUd * ZiUdZi - ZiUdZiWdWZi - ZiUdZiWdWZi'))
+    Utemp = vd2 * (-vd2 * ZiUZi2v + ZiWdWZi2 - v2 * (ZiUZiWdWZi + ZiWdWZiUZi2 -
+        2 * vZiUZiUdZi2)) + v2 * (ZiWdWZi * WdWZi + WdWZi' * ZiWdWZi2 +
+        ZiWdWtZiWI * ZiWd' + v2 * (v2 * ZiUd * ZiUdZi - ZiUdZiWdWZi - ZiUdZiWdWZi'))
     smat_to_svec!(U_corr, Utemp, cone.rt2)
 
     v_Wd_dot = -4 * (v * ZiUZiUdZiW + vdZiUZiUZiW) + ZiUZiWdWZiWI + 2 * ZiUdZiW
-    corr[v_idx] = v_dir * (-8 * dot(ZiUZi2v, U_dir) + v_dir * (8 * real(dot(ZiUZiUZi, U)) - (d1 - 1) / v / v / v)) +
+    corr[v_idx] = v_dir * (-8 * dot(ZiUZi2v, U_dir) + v_dir *
+        (8 * real(dot(ZiUZiUZi, U)) - (d1 - 1) / v / v / v)) +
         4 * v * real(dot(vZiUZiUdZi2, U_dir)) + 2 * real(dot(v_Wd_dot, W_dir))
 
     Wtemp = 4 * v_dir * (ZiUdZiW - v2 * ZiUZiUdZiW + ZiUZiWdWZiWI - vdZiUZiUZiW) +
-        4 * v * (ZiUdZiW * WdZiW + ZiWdWZi * UdZiW + WdWZi' * ZiUdZiW + ZiUdZi * WdWtZiWI - v2 * ZiUd * ZiUdZiW) +
-        -2 * (ZiW * WdZiW * WdZiW + WdWZi' * ZiWdWtZiWI + ZiWdWtZiWI * WdZiW + ZiWd * WdZiW' * WtZiWI)
+        4 * v * (ZiUdZiW * WdZiW + ZiWdWZi * UdZiW + WdWZi' * ZiUdZiW +
+        ZiUdZi * WdWtZiWI - v2 * ZiUd * ZiUdZiW) + -2 * (ZiW * WdZiW * WdZiW +
+        WdWZi' * ZiWdWtZiWI + ZiWdWtZiWI * WdZiW + ZiWd * WdZiW' * WtZiWI)
     vec_copy_to!(W_corr, Wtemp)
 
     return corr

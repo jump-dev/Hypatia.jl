@@ -1,5 +1,6 @@
 #=
-hypograph of the root determinant of a (row-wise lower triangle) symmetric positive definite matrix with side dimension d
+hypograph of the root determinant of a (row-wise lower triangle) symmetric
+positive definite matrix with side dimension d
 (u in R, W in S_n+) : u <= det(W)^(1/n)
 
 SC barrier from correspondence with A. Nemirovski
@@ -70,7 +71,9 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-function setup_extra_data(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function setup_extra_data(
+    cone::HypoRootdetTri{T, R},
+    ) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -87,7 +90,10 @@ end
 
 get_nu(cone::HypoRootdetTri) = (cone.d + 1)
 
-function set_initial_point(arr::AbstractVector{T}, cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function set_initial_point(
+    arr::AbstractVector{T},
+    cone::HypoRootdetTri{T, R},
+    ) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
     d = cone.d
     const1 = sqrt(T(5d^2 + 2d + 1))
@@ -124,12 +130,15 @@ function is_dual_feas(cone::HypoRootdetTri{T}) where T
     if u < -eps(T)
         @views svec_to_smat!(cone.mat2, cone.dual_point[2:end], cone.rt2)
         fact = cholesky!(Hermitian(cone.mat2, :U), check = false)
-        return isposdef(fact) && (logdet(fact) - cone.d * log(-u / cone.d) > eps(T))
+        return isposdef(fact) && (logdet(fact) -
+            cone.d * log(-u / cone.d) > eps(T))
     end
     return false
 end
 
-function update_grad(cone::HypoRootdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function update_grad(
+    cone::HypoRootdetTri{T, R},
+    ) where {R <: RealOrComplex{T}} where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
     g = cone.grad
@@ -177,7 +186,11 @@ function update_hess(cone::HypoRootdetTri)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
+function hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::HypoRootdetTri,
+    )
     @assert cone.grad_updated
     Wi_vec = cone.Wi_vec
     z = cone.z
@@ -237,7 +250,11 @@ function update_inv_hess(cone::HypoRootdetTri)
     return cone.inv_hess
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoRootdetTri)
+function inv_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::HypoRootdetTri,
+    )
     @views w = cone.point[2:end]
     svec_to_smat!(cone.W, w, cone.rt2)
     W = Hermitian(cone.W, :U)
@@ -302,7 +319,8 @@ function correction(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where T
     vec_skron2 = smat_to_svec!(cone.tempw, skron2, cone.rt2)
 
     @. w_corr += scal6 * vec_skron2
-    corr[1] = (sigma * (dot(vec_skron2, w_dir) - (scal2 + 4 * udz) * dot_Wi_S) + 2 * abs2(udz)) / z
+    corr[1] = (sigma * (dot(vec_skron2, w_dir) - (scal2 + 4 * udz) * dot_Wi_S) +
+        2 * abs2(udz)) / z
     corr ./= -2
 
     return corr

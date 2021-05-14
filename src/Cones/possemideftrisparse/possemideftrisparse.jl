@@ -15,7 +15,8 @@ abstract type PSDSparseImpl end
 # cache for implementation
 abstract type PSDSparseCache{T <: Real, R <: RealOrComplex{T}} end
 
-mutable struct PosSemidefTriSparse{I <: PSDSparseImpl, T <: Real, R <: RealOrComplex{T}} <: Cone{T}
+mutable struct PosSemidefTriSparse{I <: PSDSparseImpl, T <: Real,
+    R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
     side::Int
@@ -83,9 +84,13 @@ mutable struct PosSemidefTriSparse{I <: PSDSparseImpl, T <: Real, R <: RealOrCom
     end
 end
 
-reset_data(cone::PosSemidefTriSparse) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = cone.use_hess_prod_slow = cone.use_hess_prod_slow_updated = false)
+reset_data(cone::PosSemidefTriSparse) = (cone.feas_updated = cone.grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
+    cone.use_hess_prod_slow = cone.use_hess_prod_slow_updated = false)
 
-function setup_extra_data(cone::PosSemidefTriSparse{<:PSDSparseImpl, T, <:RealOrComplex{T}}) where {T <: Real}
+function setup_extra_data(
+    cone::PosSemidefTriSparse{<:PSDSparseImpl, T, <:RealOrComplex{T}},
+    ) where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)

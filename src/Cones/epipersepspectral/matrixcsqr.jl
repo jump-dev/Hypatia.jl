@@ -69,7 +69,10 @@ function setup_csqr_cache(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R
     return
 end
 
-function set_initial_point(arr::AbstractVector, cone::EpiPerSepSpectral{<:MatrixCSqr})
+function set_initial_point(
+    arr::AbstractVector,
+    cone::EpiPerSepSpectral{<:MatrixCSqr},
+    )
     (arr[1], arr[2], w0) = get_initial_point(cone.d, cone.h)
     @views fill!(arr[3:end], 0)
     incr = (cone.cache.is_complex ? 2 : 1)
@@ -438,13 +441,17 @@ function update_correction_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
             t = (Δh[i, k] - Δh[j, k]) / denom_ij
         end
 
-        Δ2h[i, svec_idx(k, j)] = Δ2h[j, svec_idx(k, i)] = Δ2h[k, svec_idx(j, i)] = t
+        Δ2h[i, svec_idx(k, j)] = Δ2h[j, svec_idx(k, i)] =
+            Δ2h[k, svec_idx(j, i)] = t
     end
 
     cone.correction_aux_updated = true
 end
 
-function correction(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}, dir::AbstractVector{T}) where T
+function correction(
+    cone::EpiPerSepSpectral{<:MatrixCSqr{T}},
+    dir::AbstractVector{T},
+    ) where T
     cone.correction_aux_updated || update_correction_aux(cone)
     d = cone.d
     v = cone.point[2]

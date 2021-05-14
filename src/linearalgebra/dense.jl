@@ -3,17 +3,38 @@ helpers for dense factorizations and linear solves
 =#
 
 import LinearAlgebra.BlasReal
-import LinearAlgebra.BlasFloat
 import LinearAlgebra.BlasInt
 import LinearAlgebra.BLAS.@blasfunc
 import LinearAlgebra.LAPACK.liblapack
 
-# outer product B = alpha * A' * A + beta * B
-outer_prod(A::AbstractMatrix{T}, B::AbstractMatrix{T}, alpha::Real, beta::Real) where {T <: LinearAlgebra.BlasReal} = BLAS.syrk!('U', 'T', alpha, A, beta, B)
-outer_prod(A::AbstractMatrix{Complex{T}}, B::AbstractMatrix{Complex{T}}, alpha::Real, beta::Real) where {T <: LinearAlgebra.BlasReal} = BLAS.herk!('U', 'C', alpha, A, beta, B)
-outer_prod(A::AbstractMatrix{R}, B::AbstractMatrix{R}, alpha::Real, beta::Real) where {R <: RealOrComplex} = mul!(B, A', A, alpha, beta)
+# helpers for symmetric outer product (upper triangle only)
+# B = alpha * A' * A + beta * B
 
-# ensure diagonal terms in symm/herm that should be PSD are not too small
+outer_prod(
+    A::Matrix{T},
+    B::Matrix{T},
+    alpha::Real,
+    beta::Real,
+    ) where {T <: LinearAlgebra.BlasReal} =
+    BLAS.syrk!('U', 'T', alpha, A, beta, B)
+
+outer_prod(
+    A::AbstractMatrix{Complex{T}},
+    B::AbstractMatrix{Complex{T}},
+    alpha::Real,
+    beta::Real,
+    ) where {T <: LinearAlgebra.BlasReal} =
+    BLAS.herk!('U', 'C', alpha, A, beta, B)
+
+outer_prod(
+    A::AbstractMatrix{R},
+    B::AbstractMatrix{R},
+    alpha::Real,
+    beta::Real,
+    ) where {R <: RealOrComplex} =
+    mul!(B, A', A, alpha, beta)
+
+# ensure diagonal terms in symm/herm are not too small
 function increase_diag!(A::Matrix{<:RealOrComplex{T}}) where {T <: Real}
     diag_pert = 1 + T(1e-5)
     diag_min = 10eps(T)
@@ -147,8 +168,8 @@ function load_matrix(cache::LAPACKSymCache{T}, A::Symmetric{T, <:AbstractMatrix{
     cache.copy_A = copy_A
     cache.AF = (copy_A ? zero(A) : A) # copy over A to new matrix or use A directly
     cache.ipiv = Vector{BlasInt}(undef, n)
-    cache.work = zeros(T, n) # NOTE this will be resized according to query
-    cache.lwork = BlasInt(-1) # NOTE -1 initiates a query for optimal size of work
+    cache.work = zeros(T, n) # this will be resized according to query
+    cache.lwork = BlasInt(-1) # -1 initiates a query for optimal size of work
     cache.info = Ref{BlasInt}()
     return cache
 end

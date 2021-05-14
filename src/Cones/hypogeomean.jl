@@ -1,9 +1,11 @@
 #=
-hypograph of generalized geomean (product of powers) parametrized by alpha in R_+^n on unit simplex
+hypograph of generalized geomean (product of powers) parametrized by alpha
+in R_+^n on unit simplex
 (u in R, w in R_+^n) : u <= prod_i(w_i^alpha_i)
 where sum_i(alpha_i) = 1, alpha_i >= 0
 
-barrier from "Constructing self-concordant barriers for convex cones" by Yu. Nesterov
+barrier from "Constructing self-concordant barriers for convex cones"
+by Yu. Nesterov
 -log(prod_i(w_i^alpha_i) - u) - sum_i(log(w_i))
 =#
 
@@ -137,7 +139,11 @@ function update_hess(cone::HypoGeoMean)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where T
+function hess_prod!(
+    prod::AbstractVecOrMat{T},
+    arr::AbstractVecOrMat{T},
+    cone::HypoGeoMean{T},
+    ) where T
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -188,7 +194,11 @@ function update_inv_hess(cone::HypoGeoMean{T}) where T
     return cone.inv_hess
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat{T}, arr::AbstractVecOrMat{T}, cone::HypoGeoMean{T}) where T
+function inv_hess_prod!(
+    prod::AbstractVecOrMat{T},
+    arr::AbstractVecOrMat{T},
+    cone::HypoGeoMean{T},
+    ) where T
     u = cone.point[1]
     @views w = cone.point[2:end]
     wdim = length(w)
@@ -233,7 +243,8 @@ function correction(cone::HypoGeoMean, dir::AbstractVector)
     corr[1] = (abs2(udz) + const6 * awdw + (const1 * awdw + piz * awdw2) / 2) / -z
 
     const2 = piz * (1 - piz)
-    const3 = iwdim * ((const6 * udz + const2 * awdw2 - uz * const1 * awdw) / -2 - udz * const1)
+    const3 = iwdim * ((const6 * udz + const2 * awdw2 -
+        uz * const1 * awdw) / -2 - udz * const1)
     const4 = -iwdim * (const2 * awdw + udz * piz)
     const5 = iwdim * (piz + iwdim * (const2 + piz * uz)) + 1
     @inbounds for (j, wdwj) in enumerate(wdw)

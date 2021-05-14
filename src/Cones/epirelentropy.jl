@@ -1,8 +1,10 @@
 #=
-(closure of) epigraph of sum of perspectives of entropies (AKA vector relative entropy cone)
+(closure of) epigraph of sum of perspectives of entropies
+(AKA vector relative entropy cone)
 (u in R, v in R_+^n, w in R_+^n) : u >= sum_i w_i*log(w_i/v_i)
 
-barrier from "Primal-Dual Interior-Point Methods for Domain-Driven Formulations" by Karimi & Tuncel, 2019
+barrier from "Primal-Dual Interior-Point Methods for Domain-Driven Formulations"
+by Karimi & Tuncel, 2019
 -log(u - sum_i w_i*log(w_i/v_i)) - sum_i (log(v_i) + log(w_i))
 =#
 
@@ -57,9 +59,10 @@ mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiRelEntropy) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_aux_updated = false)
+reset_data(cone::EpiRelEntropy) = (cone.feas_updated = cone.grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_aux_updated = false)
 
-use_sqrt_hess_oracles(cone::EpiRelEntropy) = false # TODO remove in favor of BHB oracles
+use_sqrt_hess_oracles(cone::EpiRelEntropy) = false
 
 # TODO only allocate the fields we use
 function setup_extra_data(cone::EpiRelEntropy{T}) where {T <: Real}
@@ -262,7 +265,11 @@ function update_inv_hess(cone::EpiRelEntropy{T}) where T
     return cone.inv_hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelEntropy)
+function hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::EpiRelEntropy,
+    )
     @assert cone.grad_updated
     v_idxs = cone.v_idxs
     w_idxs = cone.w_idxs
@@ -290,7 +297,11 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelE
     return prod
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiRelEntropy)
+function inv_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::EpiRelEntropy,
+    )
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
 
     @inbounds @views begin
@@ -333,7 +344,8 @@ function correction(cone::EpiRelEntropy, dir::AbstractVector)
     @. wdw = w_dir / w
     @. vdv = v_dir / v
     const0 = (u_dir + dot(w, vdv)) / z + dot(tau, w_dir)
-    const1 = abs2(const0) + sum(w[i] * abs2(vdv[i]) + w_dir[i] * (wdw[i] - 2 * vdv[i]) for i in eachindex(w)) / (2 * z)
+    const1 = abs2(const0) + sum(w[i] * abs2(vdv[i]) + w_dir[i] *
+        (wdw[i] - 2 * vdv[i]) for i in eachindex(w)) / (2 * z)
     corr[1] = const1 / z
 
     # v
@@ -353,12 +365,21 @@ function correction(cone::EpiRelEntropy, dir::AbstractVector)
 end
 
 # TODO remove this in favor of new hess_nz_count etc functions that directly use uu, uw, ww etc
-inv_hess_nz_count(cone::EpiRelEntropy) = 3 * cone.dim - 2 + 2 * cone.w_dim
-inv_hess_nz_count_tril(cone::EpiRelEntropy) = 2 * cone.dim - 1 + cone.w_dim
-inv_hess_nz_idxs_col(cone::EpiRelEntropy, j::Int) = (j == 1 ? (1:cone.dim) : (j <= (1 + cone.w_dim) ? [1, j, j + cone.w_dim] : [1, j - cone.w_dim, j]))
-inv_hess_nz_idxs_col_tril(cone::EpiRelEntropy, j::Int) = (j == 1 ? (1:cone.dim) : (j <= (1 + cone.w_dim) ? [j, j + cone.w_dim] : [j]))
+inv_hess_nz_count(cone::EpiRelEntropy) =
+    3 * cone.dim - 2 + 2 * cone.w_dim
 
-# see analysis in https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
+inv_hess_nz_count_tril(cone::EpiRelEntropy) =
+    2 * cone.dim - 1 + cone.w_dim
+
+inv_hess_nz_idxs_col(cone::EpiRelEntropy, j::Int) =
+    (j == 1 ? (1:cone.dim) : (j <= (1 + cone.w_dim) ?
+    [1, j, j + cone.w_dim] : [1, j - cone.w_dim, j]))
+
+inv_hess_nz_idxs_col_tril(cone::EpiRelEntropy, j::Int) =
+    (j == 1 ? (1:cone.dim) : (j <= (1 + cone.w_dim) ? [j, j + cone.w_dim] : [j]))
+
+# see analysis in
+# https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
 function get_central_ray_epirelentropy(w_dim::Int)
     if w_dim <= 10
         return central_rays_epirelentropy[w_dim, :]

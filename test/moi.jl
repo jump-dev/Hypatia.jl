@@ -65,7 +65,7 @@ function test_moi(T::Type{<:Real}; solver_options...)
     end
 
     if T == Float64
-        # NOTE test other real types, waiting for https://github.com/jump-dev/MathOptInterface.jl/issues/841
+        # test other real types, waiting for https://github.com/jump-dev/MathOptInterface.jl/issues/841
         @testset "unit tests" begin
             MOIT.unittest(optimizer, config, unit_exclude)
         end

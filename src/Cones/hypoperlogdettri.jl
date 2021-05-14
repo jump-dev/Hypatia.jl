@@ -1,5 +1,6 @@
 #=
-(closure of) hypograph of perspective of (natural) log of determinant of a (row-wise lower triangle) symmetric positive define matrix with side dimension d
+(closure of) hypograph of perspective of (natural) log of determinant of a
+(row-wise lower triangle) symmetric positive define matrix with side dimension d
 (u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
 (see equivalent MathOptInterface LogDetConeTriangle definition)
 
@@ -71,9 +72,13 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated = cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
+reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated =
+    cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
 
-function setup_extra_data(cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function setup_extra_data(
+    cone::HypoPerLogdetTri{T, R},
+    ) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
@@ -90,7 +95,10 @@ end
 
 get_nu(cone::HypoPerLogdetTri) = cone.d + 2
 
-function set_initial_point(arr::AbstractVector{T}, cone::HypoPerLogdetTri{T, R}) where {R <: RealOrComplex{T}} where {T <: Real}
+function set_initial_point(
+    arr::AbstractVector{T},
+    cone::HypoPerLogdetTri{T, R},
+    ) where {R <: RealOrComplex{T}} where {T <: Real}
     arr .= 0
     # central point data are the same as for hypoperlog
     (arr[1], arr[2], w) = get_central_ray_hypoperlog(cone.d)
@@ -132,7 +140,8 @@ function is_dual_feas(cone::HypoPerLogdetTri{T}) where T
         v = cone.dual_point[2]
         @views svec_to_smat!(cone.mat2, cone.dual_point[3:end], cone.rt2)
         fact = cholesky!(Hermitian(cone.mat2, :U), check = false)
-        return isposdef(fact) && (v - u * (logdet(fact) + cone.d * (1 - log(-u))) > eps(T))
+        return isposdef(fact) &&
+            (v - u * (logdet(fact) + cone.d * (1 - log(-u))) > eps(T))
     end
     return false
 end
@@ -210,7 +219,11 @@ function update_hess(cone::HypoPerLogdetTri)
     return cone.hess
 end
 
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdetTri)
+function hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::HypoPerLogdetTri,
+    )
     if !cone.hess_aux_updated
         update_hess_aux(cone)
     end
@@ -231,7 +244,8 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         ldiv!(cone.fact_W, cone.mat2)
         @views smat_to_svec!(prod[3:end, i], cone.mat2, cone.rt2)
     end
-    @inbounds @views mul!(prod[3:end, :], H[1:2, 3:end]', arr[1:2, :], true, (z + v) / z)
+    @inbounds @views mul!(prod[3:end, :], H[1:2, 3:end]', arr[1:2, :],
+        true, (z + v) / z)
 
     return prod
 end
@@ -295,7 +309,11 @@ function update_inv_hess(cone::HypoPerLogdetTri)
     return cone.inv_hess
 end
 
-function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPerLogdetTri)
+function inv_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::HypoPerLogdetTri,
+    )
     if !cone.inv_hess_aux_updated
         update_inv_hess_aux(cone)
     end
@@ -320,7 +338,8 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Hyp
         const_i = const_w * dot(w, arr_w)
         @. prod_w += const_i * w
     end
-    @inbounds @views mul!(prod[3:end, :], Hi[1:2, 3:end]', arr[1:2, :], true, z / zv)
+    @inbounds @views mul!(prod[3:end, :], Hi[1:2, 3:end]', arr[1:2, :],
+        true, z / zv)
 
     return prod
 end
@@ -355,7 +374,8 @@ function correction(cone::HypoPerLogdetTri, dir::AbstractVector)
     const10 = 2 * (vz * udz + vdz * const6)
     const9 = -2 * abs2(vz) * dot_Wi_S + const10
     const7 = uuw_scal + uvw_scal * v_dir
-    const11 = -vz * (vz * dot_skron + 2 * (abs2(vz * dot_Wi_S) - dot_Wi_S * const10)) + u_dir * const7 + vvw_scal * v_dir
+    const11 = -vz * (vz * dot_skron + 2 * (abs2(vz * dot_Wi_S) - dot_Wi_S *
+        const10)) + u_dir * const7 + vvw_scal * v_dir
 
     @. w_corr = const11 * Wi_vec
     rdiv!(S, cone.fact_W.U)
@@ -371,8 +391,10 @@ function correction(cone::HypoPerLogdetTri, dir::AbstractVector)
     const3 = (2 * abs2(dlzi) + d / z / v) * vdz
     const5 = d / v / z
     const4 = dlzi * (2 * abs2(dlzi) + 3 * const5) - (const5 + 2 * inv(v) / v) / v
-    corr[1] = 2 * abs2(udz) / z + (2 * const2 + const3) * v_dir + (uuw_scal + const7) * dot_Wi_S + vz * t4awd
-    corr[2] = const4 * abs2(v_dir) + (2 * vvw_scal + uvw_scal * u_dir) * dot_Wi_S + u_dir * (const2 + 2 * const3) + const6 * t4awd
+    corr[1] = 2 * abs2(udz) / z + (2 * const2 + const3) * v_dir +
+        (uuw_scal + const7) * dot_Wi_S + vz * t4awd
+    corr[2] = const4 * abs2(v_dir) + (2 * vvw_scal + uvw_scal * u_dir) *
+        dot_Wi_S + u_dir * (const2 + 2 * const3) + const6 * t4awd
 
     corr ./= -2
 
