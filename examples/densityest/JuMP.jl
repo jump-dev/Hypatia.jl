@@ -29,7 +29,7 @@ end
 function build(inst::DensityEstJuMP{T}) where {T <: Float64}
     X = inst.X
     (num_obs, n) = size(X)
-    domain = PolyUtils.Box{T}(-ones(n), ones(n)) # domain is unit box
+    domain = PolyUtils.BoxDomain{T}(-ones(n), ones(n)) # domain is unit box
 
     # setup interpolation
     halfdeg = div(inst.deg + 1, 2)

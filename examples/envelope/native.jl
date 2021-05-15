@@ -17,7 +17,7 @@ end
 function build(inst::EnvelopeNative{T}) where {T <: Real}
     (n, num_polys) = (inst.n, inst.num_polys)
     @assert inst.rand_halfdeg <= inst.env_halfdeg
-    domain = PolyUtils.Box{T}(-ones(T, n), ones(T, n))
+    domain = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n))
 
     # generate interpolation
     (U, pts, Ps, _, w) = PolyUtils.interpolate(domain,

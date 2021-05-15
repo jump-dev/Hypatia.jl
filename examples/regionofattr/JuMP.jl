@@ -33,9 +33,9 @@ function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64}
     vT = DP.subs(v, t => 1.0)
 
     if inst.use_wsos
-        dom1 = PolyUtils.Box{T}([-1.0], [1.0]) # just state
-        dom2 = PolyUtils.Box{T}([-1.0, 0.0], [1.0, 1.0]) # state and time
-        dom3 = PolyUtils.Box{T}([-0.01], [0.01]) # state at the end
+        dom1 = PolyUtils.BoxDomain{T}([-1.0], [1.0]) # just state
+        dom2 = PolyUtils.BoxDomain{T}([-1.0, 0.0], [1.0, 1.0]) # state and time
+        dom3 = PolyUtils.BoxDomain{T}([-0.01], [0.01]) # state at the end
         halfdeg = div(deg + 1, 2)
         (U1, pts1, Ps1, _, quad_weights) =
             PolyUtils.interpolate(dom1, halfdeg, calc_w = true)

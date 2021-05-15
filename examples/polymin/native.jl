@@ -1,17 +1,18 @@
 #=
-polymin real: formulates and solves the real polynomial optimization problem for a given polynomial; see:
-D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programming.
+polynomial optimization problem
+see:
+D. Papp and S. Yildiz
+Sum-of-squares optimization without semidefinite programming
 
-polymin complex: minimizes a real-valued complex polynomial over a domain defined by real-valued complex polynomials
+real polynomials and real-valued complex polynomials
 
 TODO
-- generalize PolyUtils interpolation code for complex polynomials space
-- merge real and complex polyvars data
 - implement PSD formulation for complex case
 =#
 
 import Combinatorics
-include(joinpath(@__DIR__, "data.jl"))
+include(joinpath(@__DIR__, "data_real.jl"))
+include(joinpath(@__DIR__, "data_complex.jl"))
 
 struct PolyMinNative{T <: Real} <: ExampleInstanceNative{T}
     is_complex::Bool

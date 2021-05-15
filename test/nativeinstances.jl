@@ -2310,7 +2310,7 @@ end
 
 function wsosinterpnonnegative1(T; options...)
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         -zeros(T, 2), ones(T, 2)), 2)
     DynamicPolynomials.@polyvar x y
     fn = x ^ 4 + x ^ 2 * y ^ 2 + 4 * y ^ 2 + 4
@@ -2330,7 +2330,7 @@ end
 
 function wsosinterpnonnegative2(T; options...)
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         zeros(T, 2), fill(T(3), 2)), 2)
     DynamicPolynomials.@polyvar x y
     fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
@@ -2350,7 +2350,7 @@ end
 
 function wsosinterpnonnegative3(T; options...)
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         zeros(T, 2), fill(T(3), 2)), 2)
     DynamicPolynomials.@polyvar x y
     fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
@@ -2410,7 +2410,7 @@ end
 function wsosinterppossemideftri1(T; options...)
     # convexity parameter for (x + 1) ^ 2 * (x - 1) ^ 2
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
     fn = (x + 1) ^ 2 * (x - 1) ^ 2
@@ -2477,7 +2477,7 @@ end
 function wsosinterpepinormone1(T; options...)
     # min t(x) : t(x) >= abs(x ^ 2) on [-1, 1] where t(x) a constant
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1)
     @assert U == 3
     DynamicPolynomials.@polyvar x
@@ -2499,7 +2499,7 @@ end
 function wsosinterpepinormone2(T; options...)
     # min t(x) : t(x) >= abs(x ^ 2) + abs(x - 1) on [-1, 1] where t(x) a constant
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
     fn1 = x ^ 2
@@ -2523,7 +2523,7 @@ function wsosinterpepinormone3(T; options...)
     (T <: BlasReal) || return # calc_w only works with BlasReal
     # max: w'f: 5x^2 >= abs(f(x)) + abs(3x^2) on [-1, 1], soln is +/- 2x^2
     tol = test_tol(T)
-    (U, pts, Ps, _, w) = PolyUtils.interpolate(PolyUtils.Box{T}(
+    (U, pts, Ps, _, w) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1, calc_w = true)
     DynamicPolynomials.@polyvar x
     fn1 = 5x^2
@@ -2547,7 +2547,7 @@ end
 function wsosinterpepinormeucl1(T; options...)
     # min t(x) : t(x) ^ 2 >= x ^ 4 on [-1, 1] where t(x) a constant
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1)
     @assert U == 3
     DynamicPolynomials.@polyvar x
@@ -2569,7 +2569,7 @@ end
 function wsosinterpepinormeucl2(T; options...)
     # min t(x) : t(x) ^ 2 >= x ^ 4 + (x - 1) ^ 2 on [-1, 1] where t(x) a constant
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
     fn1 = x ^ 2
@@ -2593,7 +2593,7 @@ function wsosinterpepinormeucl3(T; options...)
     (T <: BlasReal) || return # calc_w only works with BlasReal
     # max: w'f: 25x^4 >= f(x)^2 + 9x^4 on [-1, 1], soln is +/- 4x^2
     tol = test_tol(T)
-    (U, pts, Ps, _, w) = PolyUtils.interpolate(PolyUtils.Box{T}(
+    (U, pts, Ps, _, w) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1, calc_w = true)
     DynamicPolynomials.@polyvar x
     fn1 = 5x^2

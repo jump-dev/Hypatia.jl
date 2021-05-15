@@ -298,7 +298,7 @@ end
 # real Ps for WSOS cones, use unit box domain
 function rand_interp(num_vars::Int, halfdeg::Int, T::Type{<:Real})
     Random.seed!(1)
-    domain = PolyUtils.Box{T}(-ones(T, num_vars), ones(T, num_vars))
+    domain = PolyUtils.BoxDomain{T}(-ones(T, num_vars), ones(T, num_vars))
     (d, _, Ps, _) = PolyUtils.interpolate(domain, halfdeg, sample = false)
     return (d, Ps)
 end

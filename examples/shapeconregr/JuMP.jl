@@ -52,7 +52,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64}
     (X, y, deg) = (inst.X, inst.y, inst.deg)
     n = size(X, 2)
     num_points = size(X, 1)
-    mono_dom = PolyUtils.Box{T}(-ones(size(X, 2)), ones(size(X, 2)))
+    mono_dom = PolyUtils.BoxDomain{T}(-ones(size(X, 2)), ones(size(X, 2)))
     conv_dom = mono_dom
     mono_profile = ones(Int, size(X, 2))
     conv_profile = 1

@@ -14,6 +14,7 @@ PolynomialRoots = "3a141323-8675-5d76-9d11-e1df1406c778"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
@@ -39,8 +40,7 @@ JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 PolyJuMP = "ddf597a6-d67e-5340-b84c-e37d84115374"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SemialgebraicSets = "8e049039-38e8-557d-ae3a-bc521ccf6204"
-SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 SumOfSquares = "4b9e565b-77fc-50a5-a571-1244f986bda1"
 
 [targets]
-test = ["CSV", "DataFrames", "DataStructures", "DelimitedFiles", "Distributions", "DynamicPolynomials", "ForwardDiff", "JuMP", "PolyJuMP", "Random", "SemialgebraicSets", "SpecialFunctions", "SumOfSquares"]
+test = ["CSV", "DataFrames", "DataStructures", "DelimitedFiles", "Distributions", "DynamicPolynomials", "ForwardDiff", "JuMP", "PolyJuMP", "Random", "SemialgebraicSets", "SumOfSquares"]

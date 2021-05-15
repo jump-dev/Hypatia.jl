@@ -37,7 +37,7 @@ end
 function build(inst::DensityEstNative{T}) where {T <: Real}
     X = inst.X
     (num_obs, n) = size(X)
-    domain = PolyUtils.Box{T}(-ones(T, n), ones(T, n)) # domain is unit box
+    domain = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n)) # domain is unit box
 
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)

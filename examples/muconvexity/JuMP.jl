@@ -60,7 +60,7 @@ end
 bss() = SAS.BasicSemialgebraicSet{Float64,
     DynamicPolynomials.Polynomial{true, Float64}}()
 
-function get_domain_inequalities(dom::PolyUtils.Box, x)
+function get_domain_inequalities(dom::PolyUtils.BoxDomain, x)
     box = bss()
     for (xi, ui, li) in zip(x, dom.u, dom.l)
         SAS.addinequality!(box, (-xi + ui) * (xi - li))
@@ -74,7 +74,7 @@ muconvexity_data = Dict(
     :poly1 => (x -> (x[1] + 1)^2 * (x[1] - 1)^2),
     :poly2 => (x -> sum(x .^ 4) - sum(x .^ 2)),
     :dom1 => PolyUtils.FreeDomain{Float64}(1),
-    :dom2 => PolyUtils.Box{Float64}([-1.0], [1.0]),
+    :dom2 => PolyUtils.BoxDomain{Float64}([-1.0], [1.0]),
     :dom3 => PolyUtils.FreeDomain{Float64}(3),
-    :dom4 => PolyUtils.Box{Float64}([-1.0, 0.0], [1.0, 2.0]),
+    :dom4 => PolyUtils.BoxDomain{Float64}([-1.0, 0.0], [1.0, 2.0]),
     )

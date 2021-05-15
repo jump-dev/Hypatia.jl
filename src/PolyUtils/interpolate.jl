@@ -1,81 +1,6 @@
 #=
 utilities for polynomial interpolation on real canonical domains
-
-TODO put unused domains into polymin example
-(note ball and ellipse require GSL or SpecialFunctions dependency)
 =#
-
-interp_sample(dom::FreeDomain{T}, npts::Int) where {T <: Real} =
-    interp_sample(Box{T}(-ones(T, dom.n), ones(T, dom.n)), npts)
-
-get_weights(::FreeDomain{T}, ::AbstractMatrix{T}) where {T <: Real} = Vector{T}[]
-
-# interp_sample(dom::SemiFreeDomain, npts::Int) = hcat(interp_sample(dom.restricted_halfregion, npts), interp_sample(dom.restricted_halfregion, npts))
-#
-# get_weights(dom::SemiFreeDomain, pts::Matrix{<:Real}) = get_weights(dom.restricted_halfregion, view(pts, :, 1:div(size(pts, 2), 2)))
-
-function interp_sample(dom::Box{T}, npts::Int) where {T <: Real}
-    dim = get_dimension(dom)
-    pts = rand(T, npts, dim) .- T(0.5)
-    shift = (dom.u + dom.l) .* T(0.5)
-    for i in 1:npts
-        @views pts[i, :] = pts[i, :] .* (dom.u - dom.l) + shift
-    end
-    return pts
-end
-
-function get_weights(dom::Box{T}, pts::AbstractMatrix{T}) where {T <: Real}
-    @views g = [(pts[:, i] .- dom.l[i]) .* (dom.u[i] .- pts[:, i]) for
-        i in 1:size(pts, 2)]
-    @assert all(all(gi .>= 0) for gi in g)
-    return g
-end
-
-# function interp_sample(dom::Ball{T}, npts::Int) where {T <: Real}
-#     dim = get_dimension(dom)
-#     pts = randn(T, npts, dim)
-#     norms = sum(abs2, pts, dims = 2)
-#     pts .*= dom.r ./ sqrt.(norms) # scale
-#     norms ./= 2
-#     pts .*= sf_gamma_inc_Q.(norms, dim / 2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
-#     for i in 1:dim
-#         pts[:, i] .+= dom.c[i] # shift
-#     end
-#     return pts
-# end
-#
-# function get_weights(dom::Ball{T}, pts::AbstractMatrix{T}) where {T <: Real}
-#     g = [abs2(dom.r) - sum((pts[j, :] - dom.c) .^ 2) for j in 1:size(pts, 1)]
-#     @assert all(g .>= 0)
-#     return [g]
-# end
-#
-# function interp_sample(dom::Ellipsoid{T}, npts::Int) where {T <: Real}
-#     dim = get_dimension(dom)
-#     pts = randn(T, npts, dim)
-#     norms = sum(abs2, pts, dims = 2)
-#     for i in 1:npts
-#         pts[i, :] ./= sqrt(norms[i]) # scale
-#     end
-#     norms ./= 2
-#     pts .*= sf_gamma_inc_Q.(norms, dim / 2) .^ inv(dim) # sf_gamma_inc_Q is the normalized incomplete gamma function
-#
-#     F_rotate_scale = cholesky(dom.Q).U
-#     for i in 1:npts
-#         pts[i, :] = F_rotate_scale \ pts[i, :] # rotate/scale
-#     end
-#     for i in 1:dim
-#         pts[:, i] .+= dom.c[i] # shift
-#     end
-#
-#     return pts
-# end
-#
-# function get_weights(dom::Ellipsoid{T}, pts::AbstractMatrix{T}) where {T <: Real}
-#     g = [1 - (pts[j, :] - dom.c)' * dom.Q * (pts[j, :] - dom.c) for j in 1:size(pts, 1)]
-#     @assert all(g .>= 0)
-#     return [g]
-# end
 
 get_L(n::Int, d::Int) = binomial(n + d, n)
 get_U(n::Int, d::Int) = binomial(n + 2d, n)
@@ -85,7 +10,7 @@ function interpolate(
     d::Int;
     calc_V::Bool = false,
     calc_w::Bool = false,
-    sample = nothing,
+    sample::Bool = !isa(dom, BoxDomain{T}),
     sample_factor::Int = 0,
     ) where {T <: Real}
     @assert d >= 1
@@ -93,7 +18,7 @@ function interpolate(
     U = binomial(n + 2d, n)
 
     if isnothing(sample)
-        sample = (!isa(dom, Box) || n >= 7 || prod_consec(n, d) > 35_000)
+        sample = (n >= 7 || prod_consec(n, d) > 35_000)
     end
 
     if sample
@@ -111,26 +36,52 @@ function interpolate(
                 end
             end
         end
-        return wsos_sample_params(dom, d, calc_w, sample_factor)
+        return interp_sample(dom, d, calc_w, sample_factor)
     else
-        return wsos_box_params(dom, n, d, calc_V, calc_w)
+        return interp_box(dom, n, d, calc_V, calc_w)
     end
 end
 
-# slow but high-quality hyperrectangle/box point selections
-wsos_box_params(dom::Domain, n::Int, d::Int, calc_V::Bool, calc_w::Bool) =
-    error("non-sampling based interpolation methods are only available for box domains")
+# sampling-based point selection for general domains
+function interp_sample(
+    dom::Domain{T},
+    d::Int,
+    calc_w::Bool,
+    sample_factor::Int,
+    ) where {T <: Real}
+    U = get_U(get_dimension(dom), d)
 
+    candidate_pts = interp_sample(dom, U * sample_factor)
+    (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, candidate_pts, d, calc_w)
+
+    g = get_weights(dom, pts)
+    PWts = Matrix{T}[sqrt.(gi) .* P0sub for gi in g]
+    Ps = Matrix{T}[P0, PWts...]
+
+    return (U = U, pts = pts, Ps = Ps, V = V, w = w)
+end
+
+# slow but high-quality hyperrectangle/box point selections
 # unlike sampling functions, P0 is always formed using points in [-1, 1]
-function wsos_box_params(
-    dom::Box{T},
+function interp_box(
+    dom::FreeDomain{T},
     n::Int,
     d::Int,
     calc_V::Bool,
     calc_w::Bool,
     ) where {T <: Real}
-    # n could be larger than dimension of dom if original was SemiFreeDomain
-    (U, pts, P0, P0sub, V, w) = wsos_box_params(T, n, d, calc_V, calc_w)
+    (U, pts, P0, P0sub, V, w) = interp_box(T, n, d, calc_V, calc_w)
+    return (U = U, pts = pts, Ps = Matrix{T}[P0,], V = V, w = w)
+end
+
+function interp_box(
+    dom::BoxDomain{T},
+    n::Int,
+    d::Int,
+    calc_V::Bool,
+    calc_w::Bool,
+    ) where {T <: Real}
+    (U, pts, P0, P0sub, V, w) = interp_box(T, n, d, calc_V, calc_w)
 
     # TODO refactor/cleanup below
     # scale and shift points, get WSOS matrices
@@ -145,19 +96,7 @@ function wsos_box_params(
     return (U = U, pts = trpts, Ps = Matrix{T}[P0, PWts...], V = V, w = w)
 end
 
-function wsos_box_params(
-    dom::FreeDomain{T},
-    n::Int,
-    d::Int,
-    calc_V::Bool,
-    calc_w::Bool,
-    ) where {T <: Real}
-    # n could be larger than the dimension of dom if the original domain was a SemiFreeDomain
-    (U, pts, P0, P0sub, V, w) = wsos_box_params(T, n, d, calc_V, calc_w)
-    return (U = U, pts = pts, Ps = Matrix{T}[P0,], V = V, w = w)
-end
-
-function wsos_box_params(
+function interp_box(
     T::Type{<:Real},
     n::Int,
     d::Int,
@@ -361,7 +300,7 @@ function approxfekete_data(
         end
     end
 
-    dom = Box{T}(-ones(T, n), ones(T, n))
+    dom = BoxDomain{T}(-ones(T, n), ones(T, n))
     (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, candidate_pts, d, calc_w)
 
     return (size(pts, 1), pts, P0, P0sub, V, w)
@@ -381,21 +320,6 @@ function make_wsos_arrays(
     Lsub = get_L(n, div(2d - get_degree(dom), 2))
     P0sub = view(P0, :, 1:Lsub)
     return (pts, P0, P0sub, V, w)
-end
-
-# sampling-based point selection for general domains
-function wsos_sample_params(
-    dom::Domain{T},
-    d::Int,
-    calc_w::Bool,
-    sample_factor::Int,
-    ) where {T <: Real}
-    U = get_U(get_dimension(dom), d)
-    candidate_pts = interp_sample(dom, U * sample_factor)
-    (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, candidate_pts, d, calc_w)
-    g = get_weights(dom, pts)
-    PWts = Matrix{T}[sqrt.(gi) .* P0sub for gi in g]
-    return (U = U, pts = pts, Ps = Matrix{T}[P0, PWts...], V = V, w = w)
 end
 
 n_deg_exponents(n::Int, deg::Int) = [xp for t in 0:deg for

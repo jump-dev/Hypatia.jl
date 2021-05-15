@@ -16,7 +16,6 @@ real_types = [
 @testset "$T" for T in real_types
     println("$T ...")
     test_time = @elapsed begin
-        test_svec_conversion(T)
         test_fekete_sample(T)
         test_cheb2_w(T)
     end
