@@ -35,8 +35,8 @@ function build(inst::SemidefinitePolyJuMP{T}) where {T <: Float64}
         side = size(H, 1)
         halfdeg = div(maximum(DP.maxdegree.(H)) + 1, 2)
         n = DP.nvariables(x)
-        dom = ModelUtilities.FreeDomain{T}(n)
-        (U, pts, Ps) = ModelUtilities.interpolate(dom, halfdeg)
+        dom = PolyUtils.FreeDomain{T}(n)
+        (U, pts, Ps) = PolyUtils.interpolate(dom, halfdeg)
         mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{T}(
             side, U, Ps, inst.use_dual)
 

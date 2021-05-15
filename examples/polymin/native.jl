@@ -5,7 +5,7 @@ D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programm
 polymin complex: minimizes a real-valued complex polynomial over a domain defined by real-valued complex polynomials
 
 TODO
-- generalize ModelUtilities interpolation code for complex polynomials space
+- generalize PolyUtils interpolation code for complex polynomials space
 - merge real and complex polyvars data
 - implement PSD formulation for complex case
 =#

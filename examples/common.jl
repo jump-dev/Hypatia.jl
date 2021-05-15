@@ -7,7 +7,7 @@ import Random
 using LinearAlgebra
 import LinearAlgebra.BlasReal
 import Hypatia
-import Hypatia.ModelUtilities
+import Hypatia.PolyUtils
 import Hypatia.Cones
 import Hypatia.Models
 import Hypatia.Solvers

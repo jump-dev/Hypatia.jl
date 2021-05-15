@@ -1,8 +1,8 @@
 #=
-utilities for constructing Hypatia native models and PolyJuMP.jl models
+utilities for constructing polynomial sum-of-squares models
 =#
 
-module ModelUtilities
+module PolyUtils
 
 include("domains.jl")
 

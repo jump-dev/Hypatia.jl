@@ -52,18 +52,18 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64}
     (X, y, deg) = (inst.X, inst.y, inst.deg)
     n = size(X, 2)
     num_points = size(X, 1)
-    mono_dom = ModelUtilities.Box{T}(-ones(size(X, 2)), ones(size(X, 2)))
+    mono_dom = PolyUtils.Box{T}(-ones(size(X, 2)), ones(size(X, 2)))
     conv_dom = mono_dom
     mono_profile = ones(Int, size(X, 2))
     conv_profile = 1
 
     # setup interpolation (not actually using FreeDomain, just need points here)
     halfdeg = div(deg + 1, 2)
-    free_dom = ModelUtilities.FreeDomain{T}(n)
-    (U, points, Ps, V) = ModelUtilities.interpolate(free_dom,
+    free_dom = PolyUtils.FreeDomain{T}(n)
+    (U, points, Ps, V) = PolyUtils.interpolate(free_dom,
         halfdeg, calc_V = true)
     F = qr!(Array(V'), Val(true)) # TODO reuse QR parts
-    V_X = ModelUtilities.make_chebyshev_vandermonde(X, 2halfdeg)
+    V_X = PolyUtils.make_chebyshev_vandermonde(X, 2halfdeg)
     X_points_polys = F \ V_X'
 
     model = JuMP.Model()
@@ -96,16 +96,16 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64}
     if inst.use_monotonicity
         gradient_halfdeg = div(deg, 2)
         (mono_U, mono_points, mono_Ps) =
-            ModelUtilities.interpolate(mono_dom, gradient_halfdeg)
-        univ_chebs_der = [ModelUtilities.calc_univariate_chebyshev(
+            PolyUtils.interpolate(mono_dom, gradient_halfdeg)
+        univ_chebs_der = [PolyUtils.calc_univariate_chebyshev(
             mono_points[:, i], 2halfdeg, calc_gradient = true) for i in 1:n]
 
         for j in 1:n
             iszero(mono_profile[j]) && continue
 
             univ_chebs_g = [univ_chebs_der[i][(i == j) ? 2 : 1] for i in 1:n]
-            V_g = ModelUtilities.make_product_vandermonde(univ_chebs_g,
-                ModelUtilities.n_deg_exponents(n, 2halfdeg))
+            V_g = PolyUtils.make_product_vandermonde(univ_chebs_g,
+                PolyUtils.n_deg_exponents(n, 2halfdeg))
             scal = inv(maximum(abs, V_g) / 10)
             if scal < 1e-7
                 @warn("model is numerically challenging to set up", maxlog = 1)
@@ -139,8 +139,8 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64}
     if inst.use_convexity && !iszero(conv_profile)
         hessian_halfdeg = div(deg - 1, 2)
         (conv_U, conv_points, conv_Ps) =
-            ModelUtilities.interpolate(conv_dom, hessian_halfdeg)
-        univ_chebs_der = [ModelUtilities.calc_univariate_chebyshev(
+            PolyUtils.interpolate(conv_dom, hessian_halfdeg)
+        univ_chebs_der = [PolyUtils.calc_univariate_chebyshev(
             conv_points[:, i], 2halfdeg, calc_gradient = true,
             calc_hessian = true) for i in 1:n]
 
@@ -150,8 +150,8 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64}
         V_Hs = Matrix{T}[]
         for i in 1:n, j in 1:i
             univ_chebs_H = [univ_chebs_der[k][deriv_num(i, j, k)] for k in 1:n]
-            V_H = ModelUtilities.make_product_vandermonde(univ_chebs_H,
-                ModelUtilities.n_deg_exponents(n, 2halfdeg))
+            V_H = PolyUtils.make_product_vandermonde(univ_chebs_H,
+                PolyUtils.n_deg_exponents(n, 2halfdeg))
             push!(V_Hs, V_H)
         end
         scal = inv(maximum(maximum(abs, V_H) for V_H in V_Hs))

@@ -21,10 +21,10 @@ end
 function build(inst::ContractionJuMP{T}) where {T <: Float64}
     delta = inst.delta
     n = 2
-    dom = ModelUtilities.FreeDomain{T}(n)
+    dom = PolyUtils.FreeDomain{T}(n)
 
     M_halfdeg = div(inst.M_deg + 1, 2)
-    (U_M, pts_M, Ps_M) = ModelUtilities.interpolate(dom, M_halfdeg)
+    (U_M, pts_M, Ps_M) = PolyUtils.interpolate(dom, M_halfdeg)
     lagrange_polys = get_lagrange_polys(pts_M, 2 * M_halfdeg)
     x = DP.variables(lagrange_polys)
 
@@ -46,7 +46,7 @@ function build(inst::ContractionJuMP{T}) where {T <: Float64}
     if inst.use_matrixwsos
         deg_R = maximum(DP.maxdegree.(R))
         d_R = div(deg_R + 1, 2)
-        (U_R, pts_R, Ps_R) = ModelUtilities.interpolate(dom, d_R)
+        (U_R, pts_R, Ps_R) = PolyUtils.interpolate(dom, d_R)
         M_gap = [M[i, j](pts_M[u, :]) - (i == j ? delta : 0.0)
             for i in 1:n for j in 1:i for u in 1:U_M]
         R_gap = [-R[i, j](pts_R[u, :]) - (i == j ? delta : 0.0)
@@ -95,7 +95,7 @@ function get_chebyshev_polys(x::Vector{DP.PolyVar{true}}, deg::Int)
     end
     n = length(x)
     u = get_chebyshev_univ(x, deg)
-    V = Vector{DP.Polynomial{true, Int}}(undef, ModelUtilities.get_L(n, deg))
+    V = Vector{DP.Polynomial{true, Int}}(undef, PolyUtils.get_L(n, deg))
     V[1] = DP.Monomial(1)
     col = 1
     for t in 1:deg, xp in Combinatorics.multiexponents(n, t)

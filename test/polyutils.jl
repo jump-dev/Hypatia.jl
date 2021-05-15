@@ -1,11 +1,11 @@
 #=
-tests for ModelUtilities module
+tests for PolyUtils module
 =#
 
 using Test
 import Random
 using LinearAlgebra
-import Hypatia.ModelUtilities
+import Hypatia.PolyUtils
 
 function test_svec_conversion(T::Type{<:Real})
     tol = 10eps(T)
@@ -37,13 +37,13 @@ function test_fekete_sample(T::Type{<:Real})
     Random.seed!(1)
     n = 3
     halfdeg = 2
-    box = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))
-    free = ModelUtilities.FreeDomain{T}(n)
+    box = PolyUtils.Box{T}(-ones(T, n), ones(T, n))
+    free = PolyUtils.FreeDomain{T}(n)
 
     for sample in (true, false)
-        (box_U, box_pts, box_Ps) = ModelUtilities.interpolate(
+        (box_U, box_pts, box_Ps) = PolyUtils.interpolate(
             box, halfdeg, sample = sample, sample_factor = 20)
-        (free_U, free_pts, free_Ps) = ModelUtilities.interpolate(
+        (free_U, free_pts, free_Ps) = PolyUtils.interpolate(
             free, halfdeg, sample = sample, sample_factor = 20)
 
         @test length(free_Ps) == 1
@@ -56,8 +56,8 @@ end
 
 function test_cheb2_w(T::Type{<:Real})
     for halfdeg in 1:4
-        (U, pts, Ps, V, w) = ModelUtilities.interpolate(
-            ModelUtilities.FreeDomain{T}(1), halfdeg,
+        (U, pts, Ps, V, w) = PolyUtils.interpolate(
+            PolyUtils.FreeDomain{T}(1), halfdeg,
             sample = false, calc_w = true)
 
         @test dot(w, [sum(pts[i, 1] ^ d for d in 0:(2halfdeg)) for i in 1:U]) ≈

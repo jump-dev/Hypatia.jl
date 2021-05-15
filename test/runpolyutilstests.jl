@@ -1,10 +1,10 @@
 #=
-run model utilities tests
+run polynomial utilities tests
 =#
 
 using Test
 using Printf
-include(joinpath(@__DIR__, "modelutilities.jl"))
+include(joinpath(@__DIR__, "polyutils.jl"))
 
 real_types = [
     Float64,
@@ -12,7 +12,7 @@ real_types = [
     BigFloat,
     ]
 
-@testset "model utilities tests" begin
+@testset "polynomial utilities tests" begin
 @testset "$T" for T in real_types
     println("$T ...")
     test_time = @elapsed begin

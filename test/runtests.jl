@@ -7,7 +7,7 @@ using Printf
 using Hypatia
 
 test_files = [
-    "modelutilities",
+    "polyutils",
     "cone",
     "native",
     "moi",

@@ -37,7 +37,7 @@ end
 function build(inst::DensityEstNative{T}) where {T <: Real}
     X = inst.X
     (num_obs, n) = size(X)
-    domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n)) # domain is unit box
+    domain = PolyUtils.Box{T}(-ones(T, n), ones(T, n)) # domain is unit box
 
     # rescale X to be in unit box
     minX = minimum(X, dims = 1)
@@ -47,10 +47,10 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
 
     # setup interpolation
     halfdeg = div(inst.deg + 1, 2)
-    (U, _, Ps, V, w) = ModelUtilities.interpolate(domain, halfdeg,
+    (U, _, Ps, V, w) = PolyUtils.interpolate(domain, halfdeg,
         calc_V = true, calc_w = true)
     F = qr!(Array(V'), Val(true))
-    V_X = ModelUtilities.make_chebyshev_vandermonde(X, 2halfdeg)
+    V_X = PolyUtils.make_chebyshev_vandermonde(X, 2halfdeg)
     X_pts_polys = (F \ V_X')'
 
     cones = Cones.Cone{T}[]

@@ -10,7 +10,7 @@ using SparseArrays
 import ForwardDiff
 import GenericLinearAlgebra.eigen # needed by ForwardDiff currently for test_barrier
 import Hypatia
-import Hypatia.ModelUtilities
+import Hypatia.PolyUtils
 import Hypatia.Cones
 import Hypatia.RealOrComplex
 
@@ -239,7 +239,7 @@ end
 
 logdet_pd(W::Hermitian) = logdet(cholesky!(copy(W)))
 
-# TODO maybe move to ModelUtilities
+# TODO maybe move to PolyUtils
 
 dim_vec(d::Int, ::Type{<:Real}) = d
 dim_vec(d::Int, ::Type{<:Complex}) = 2 * d
@@ -298,8 +298,8 @@ end
 # real Ps for WSOS cones, use unit box domain
 function rand_interp(num_vars::Int, halfdeg::Int, T::Type{<:Real})
     Random.seed!(1)
-    domain = ModelUtilities.Box{T}(-ones(T, num_vars), ones(T, num_vars))
-    (d, _, Ps, _) = ModelUtilities.interpolate(domain, halfdeg, sample = false)
+    domain = PolyUtils.Box{T}(-ones(T, num_vars), ones(T, num_vars))
+    (d, _, Ps, _) = PolyUtils.interpolate(domain, halfdeg, sample = false)
     return (d, Ps)
 end
 
@@ -308,7 +308,7 @@ function rand_interp(num_vars::Int, halfdeg::Int, R::Type{<:Complex{<:Real}})
     Random.seed!(1)
     gs = [z -> 1 - sum(abs2, z)]
     g_halfdegs = [1]
-    (points, Ps) = ModelUtilities.interpolate(
+    (points, Ps) = PolyUtils.interpolate(
         R, halfdeg, num_vars, gs, g_halfdegs)
     d = length(points)
     return (d, Ps)
