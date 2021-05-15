@@ -42,6 +42,7 @@ function search_alpha(
         alpha = step_searcher.alpha_sched[sched]
         # update ztsk only in stepper.temp
         update_stepper_points(alpha, point, stepper, true)
+
         # NOTE updates cone points and grad
         if check_cone_points(stepper.temp, step_searcher, model)
             step_searcher.prev_sched = sched
@@ -54,7 +55,8 @@ function search_alpha(
     return zero(T)
 end
 
-start_sched(stepper::Stepper, step_searcher::StepSearcher) = 1 # fallback starts at first alpha in schedule
+# fallback starts at first alpha in schedule
+start_sched(stepper::Stepper, step_searcher::StepSearcher) = 1
 
 function check_cone_points(
     cand::Point{T},
@@ -89,7 +91,8 @@ function check_cone_points(
         end
     end
 
-    # order the cones by how long it takes to check neighborhood condition and iterate in that order, to improve efficiency
+    # order the cones by how long it takes to check neighborhood condition and
+    # iterate in that order, to improve efficiency
     sortperm!(cone_order, step_searcher.cone_times, initialized = true) # stochastic
 
     rtmu = sqrt(mu_cand)
