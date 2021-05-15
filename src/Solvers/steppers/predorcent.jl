@@ -96,6 +96,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             stepper.uncorr_only = false
             solver.time_search += @elapsed alpha =
                 search_alpha(point, model, stepper)
+
             if iszero(alpha)
                 # try not using correction
                 @warn("very small alpha in curve search; trying without correction")
@@ -112,24 +113,28 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             solver.time_search += @elapsed alpha =
                 search_alpha(point, model, stepper)
             stepper.uncorr_alpha = alpha
+
             if !iszero(alpha)
                 stepper.uncorr_only = false
                 solver.time_search += @elapsed alpha =
                     search_alpha(point, model, stepper)
+
                 if iszero(alpha)
                     # use uncorrected direction
                     stepper.uncorr_only = true
                     alpha = stepper.uncorr_alpha
-                    # ignore updates to cone points from last search
+                    update_stepper_points(alpha, point, stepper, false)
+
+                    # load into cones again
                     Cones.load_point.(cones, point.primal_views)
                     Cones.load_dual_point.(cones, point.dual_views)
                     Cones.reset_data.(cones)
-                    # TODO save and copy from last uncorr candidate
+                    @assert all(Cones.is_feas, cones)
                     Cones.grad.(cones)
+                else
+                    update_stepper_points(alpha, point, stepper, false)
                 end
 
-                # step
-                update_stepper_points(alpha, point, stepper, false)
                 stepper.prev_alpha = alpha
                 return true
             end
