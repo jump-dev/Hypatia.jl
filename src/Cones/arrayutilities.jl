@@ -56,7 +56,7 @@ block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
 
 function vec_to_svec!(
     arr::AbstractVecOrMat{T};
-    scal::T = sqrt(T(2)),
+    scal::Real = sqrt(T(2)),
     incr::Int = 1,
     ) where T
     n = size(arr, 1)
@@ -80,7 +80,7 @@ svec_to_vec!(arr::AbstractVecOrMat{T}; incr::Int = 1) where T =
 function smat_to_svec!(
     vec::AbstractVector{T},
     mat::AbstractMatrix{T},
-    rt2::Number,
+    rt2::Real,
     ) where T
     k = 1
     m = size(mat, 1)
@@ -98,7 +98,7 @@ end
 function smat_to_svec!(
     vec::AbstractVector{T},
     mat::AbstractMatrix{Complex{T}},
-    rt2::Number,
+    rt2::Real,
     ) where T
     k = 1
     m = size(mat, 1)
@@ -120,7 +120,7 @@ end
 function svec_to_smat!(
     mat::AbstractMatrix{T},
     vec::AbstractVector{T},
-    rt2::Number,
+    rt2::Real,
     ) where T
     k = 1
     m = size(mat, 1)
@@ -138,7 +138,7 @@ end
 function svec_to_smat!(
     mat::AbstractMatrix{Complex{T}},
     vec::AbstractVector{T},
-    rt2::Number,
+    rt2::Real,
     ) where T
     k = 1
     m = size(mat, 1)

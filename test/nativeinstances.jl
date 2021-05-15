@@ -2244,7 +2244,7 @@ function epitrrelentropytri1(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ tr(W * log(W) - W * log(V)) atol=tol rtol=tol
+    @test r.primal_obj ≈ dot(W, log(W) - log(V)) atol=tol rtol=tol
 end
 
 function epitrrelentropytri2(T; options...)
@@ -2254,19 +2254,19 @@ function epitrrelentropytri2(T; options...)
     svec_dim = Cones.svec_length(side)
     cone_dim = 2 * svec_dim + 1
     c = vcat(zeros(T, svec_dim), -ones(T, svec_dim))
-    A = hcat(Matrix{T}(I, svec_dim, svec_dim), zeros(T, svec_dim, svec_dim))
+    A = Matrix{T}(I, svec_dim, 2 * svec_dim)
     b = zeros(T, svec_dim)
     b[[sum(1:i) for i in 1:side]] .= 1
     h = vcat(T(5), zeros(T, 2 * svec_dim))
-    G = vcat(zeros(T, 1, 2 * svec_dim),
-        Cones.vec_to_svec!(Diagonal(-one(T) * I, 2 * svec_dim)))
+    g_svec = Cones.vec_to_svec!(ones(T, svec_dim))
+    G = Diagonal(vcat(0, g_svec, g_svec))
     cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(cone_dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
     W = Hermitian(Cones.svec_to_smat!(zeros(T, side, side),
         r.s[(svec_dim + 2):end], rt2), :U)
-    @test tr(W * log(W)) ≈ T(5) atol=tol rtol=tol
+    @test dot(W, log(W)) ≈ T(5) atol=tol rtol=tol
 end
 
 function epitrrelentropytri3(T; options...)
