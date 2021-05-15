@@ -56,7 +56,7 @@ end
 # for hyperball and hyperellipse
 function ball_sample(dom::Domain{T}, npts::Int) where {T <: Real}
     dim = get_dimension(dom)
-    pts = randn(T, npts, dim)
+    pts = T.(randn(npts, dim)) # randn doesn't work with all real types
     norms = sum(abs2, pts, dims = 2)
     pts ./= sqrt.(norms) # scale
     norms ./= 2
