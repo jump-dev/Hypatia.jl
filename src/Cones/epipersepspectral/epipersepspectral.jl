@@ -65,7 +65,7 @@ reset_data(cone::EpiPerSepSpectral) = (cone.feas_updated = cone.grad_updated =
 
 use_sqrt_hess_oracles(cone::EpiPerSepSpectral) = false
 
-function setup_extra_data(cone::EpiPerSepSpectral)
+function setup_extra_data!(cone::EpiPerSepSpectral)
     @views cone.w_view = cone.point[3:end]
     setup_csqr_cache(cone)
     return cone

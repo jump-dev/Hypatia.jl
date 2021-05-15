@@ -76,7 +76,7 @@ reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated =
     cone.hess_fact_updated = false)
 
 # TODO only allocate the fields we use
-function setup_extra_data(
+function setup_extra_data!(
     cone::EpiNormSpectral{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
@@ -99,7 +99,7 @@ end
 
 get_nu(cone::EpiNormSpectral) = cone.d1 + 1
 
-function set_initial_point(
+function set_initial_point!(
     arr::AbstractVector,
     cone::EpiNormSpectral{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -172,7 +172,7 @@ end
 
 function update_hess(cone::EpiNormSpectral)
     cone.hess_aux_updated || update_hess_aux(cone)
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
     d1 = cone.d1
     d2 = cone.d2

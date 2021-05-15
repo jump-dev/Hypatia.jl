@@ -50,7 +50,7 @@ end
 
 svec_length(side::Int) = div(side * (side + 1), 2)
 
-svec(row::Int, col::Int) = (div((row - 1) * row, 2) + col)
+svec_idx(row::Int, col::Int) = (div((row - 1) * row, 2) + col)
 
 block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
 
@@ -242,7 +242,7 @@ function symm_kron!(
 end
 
 function spectral_kron_element!(
-    H::Matrix{T},
+    H::AbstractMatrix{T},
     i::Int,
     j::Int,
     a::T,
@@ -253,7 +253,7 @@ function spectral_kron_element!(
 end
 
 function spectral_kron_element!(
-    H::Matrix{T},
+    H::AbstractMatrix{T},
     i::Int,
     j::Int,
     a::Complex{T},

@@ -65,7 +65,7 @@ reset_data(cone::EpiRelEntropy) = (cone.feas_updated = cone.grad_updated =
 use_sqrt_hess_oracles(cone::EpiRelEntropy) = false
 
 # TODO only allocate the fields we use
-function setup_extra_data(cone::EpiRelEntropy{T}) where {T <: Real}
+function setup_extra_data!(cone::EpiRelEntropy{T}) where {T <: Real}
     w_dim = cone.w_dim
     cone.lwv = zeros(T, w_dim)
     cone.tau = zeros(T, w_dim)
@@ -82,7 +82,7 @@ end
 
 get_nu(cone::EpiRelEntropy) = cone.dim
 
-function set_initial_point(arr::AbstractVector, cone::EpiRelEntropy)
+function set_initial_point!(arr::AbstractVector, cone::EpiRelEntropy)
     (arr[1], v, w) = get_central_ray_epirelentropy(cone.w_dim)
     @views arr[cone.v_idxs] .= v
     @views arr[cone.w_idxs] .= w
@@ -140,7 +140,7 @@ end
 
 function update_hess(cone::EpiRelEntropy{T}) where T
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
     u = cone.point[1]
     v_idxs = cone.v_idxs
@@ -218,7 +218,7 @@ function update_inv_hess_aux(cone::EpiRelEntropy{T}) where T
     return
 end
 
-function alloc_inv_hess(cone::EpiRelEntropy{T}) where T
+function alloc_inv_hess!(cone::EpiRelEntropy{T}) where T
     # initialize sparse idxs for upper triangle of inverse Hessian
     dim = cone.dim
     w_dim = cone.w_dim
@@ -242,7 +242,7 @@ end
 # updates for nonzero values in the inverse Hessian
 function update_inv_hess(cone::EpiRelEntropy{T}) where T
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     w_dim = cone.w_dim
 
     # modify nonzeros of upper triangle of inverse Hessian

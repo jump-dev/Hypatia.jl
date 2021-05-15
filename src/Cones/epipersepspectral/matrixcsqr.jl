@@ -69,7 +69,7 @@ function setup_csqr_cache(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R
     return
 end
 
-function set_initial_point(
+function set_initial_point!(
     arr::AbstractVector,
     cone::EpiPerSepSpectral{<:MatrixCSqr},
     )
@@ -198,7 +198,7 @@ end
 
 function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     cone.hess_aux_updated || update_hess_aux(cone)
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     d = cone.d
     v = cone.point[2]
     H = cone.hess.data
@@ -334,7 +334,7 @@ end
 
 function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     Hi = cone.inv_hess.data
     cache = cone.cache
     viw_X = cache.viw_eigen.vectors

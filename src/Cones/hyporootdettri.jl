@@ -71,7 +71,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-function setup_extra_data(
+function setup_extra_data!(
     cone::HypoRootdetTri{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
@@ -96,7 +96,7 @@ end
 
 get_nu(cone::HypoRootdetTri) = (cone.d + 1)
 
-function set_initial_point(
+function set_initial_point!(
     arr::AbstractVector{T},
     cone::HypoRootdetTri{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}

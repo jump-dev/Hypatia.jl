@@ -530,10 +530,10 @@ function initialize_cone_point(model::Models.Model{T}) where {T <: Real}
     init_s = zeros(T, model.q)
 
     for (cone, idxs) in zip(model.cones, model.cone_idxs)
-        Cones.setup_data(cone)
+        Cones.setup_data!(cone)
         primal_k = view(Cones.use_dual_barrier(cone) ? init_z : init_s, idxs)
         dual_k = view(Cones.use_dual_barrier(cone) ? init_s : init_z, idxs)
-        Cones.set_initial_point(primal_k, cone)
+        Cones.set_initial_point!(primal_k, cone)
         Cones.load_point(cone, primal_k)
         @assert Cones.is_feas(cone)
         g = Cones.grad(cone)

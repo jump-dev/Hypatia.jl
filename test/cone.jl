@@ -30,11 +30,11 @@ function test_oracles(
     ) where {T <: Real}
     Random.seed!(1)
     dim = Cones.dimension(cone)
-    Cones.setup_data(cone)
+    Cones.setup_data!(cone)
     Cones.reset_data(cone)
 
     point = zeros(T, dim)
-    Cones.set_initial_point(point, cone)
+    Cones.set_initial_point!(point, cone)
     Cones.load_point(cone, point)
     @test Cones.is_feas(cone)
     @test cone.point == point
@@ -118,10 +118,10 @@ function test_barrier(
     ) where {T <: Real}
     Random.seed!(1)
     dim = Cones.dimension(cone)
-    Cones.setup_data(cone)
+    Cones.setup_data!(cone)
 
     point = zeros(T, dim)
-    Cones.set_initial_point(point, cone)
+    Cones.set_initial_point!(point, cone)
     perturb_scale(point, noise, scale)
 
     Cones.reset_data(cone)
@@ -160,11 +160,11 @@ function show_time_alloc(
     println("dimension: ", dim)
 
     println("setup_data")
-    @time Cones.setup_data(cone)
+    @time Cones.setup_data!(cone)
     Cones.reset_data(cone)
 
     point = zeros(T, dim)
-    Cones.set_initial_point(point, cone)
+    Cones.set_initial_point!(point, cone)
     Cones.load_point(cone, point)
     @assert Cones.is_feas(cone)
 

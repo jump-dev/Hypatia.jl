@@ -80,7 +80,7 @@ mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
     end
 end
 
-function setup_extra_data(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
+function setup_extra_data!(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     vw_dim = cone.vw_dim
     d = cone.d
     cone.rt2 = sqrt(T(2))
@@ -113,7 +113,7 @@ end
 
 get_nu(cone::EpiTrRelEntropyTri) = 2 * cone.d + 1
 
-function set_initial_point(
+function set_initial_point!(
     arr::AbstractVector,
     cone::EpiTrRelEntropyTri{T},
     ) where {T <: Real}
@@ -191,7 +191,7 @@ end
 
 function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
     d = cone.d
     rt2 = cone.rt2

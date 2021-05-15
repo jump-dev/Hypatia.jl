@@ -69,7 +69,7 @@ reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated =
 
 use_sqrt_hess_oracles(cone::PosSemidefTri) = true
 
-function setup_extra_data(
+function setup_extra_data!(
     cone::PosSemidefTri{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
     cone.mat = zeros(R, cone.side, cone.side)
@@ -81,7 +81,7 @@ end
 
 get_nu(cone::PosSemidefTri) = cone.side
 
-function set_initial_point(arr::AbstractVector, cone::PosSemidefTri)
+function set_initial_point!(arr::AbstractVector, cone::PosSemidefTri)
     incr = (cone.is_complex ? 2 : 1)
     arr .= 0
     k = 1
@@ -123,7 +123,7 @@ end
 
 function update_hess(cone::PosSemidefTri)
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     symm_kron!(cone.hess.data, cone.inv_mat, cone.rt2)
     cone.hess_updated = true
     return cone.hess
@@ -131,7 +131,7 @@ end
 
 function update_inv_hess(cone::PosSemidefTri)
     @assert is_feas(cone)
-    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     symm_kron!(cone.inv_hess.data, cone.mat, cone.rt2)
     cone.inv_hess_updated = true
     return cone.inv_hess

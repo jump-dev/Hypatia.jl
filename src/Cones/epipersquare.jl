@@ -55,7 +55,7 @@ use_sqrt_hess_oracles(cone::EpiPerSquare) = true
 
 get_nu(cone::EpiPerSquare) = 2
 
-function set_initial_point(arr::AbstractVector, cone::EpiPerSquare)
+function set_initial_point!(arr::AbstractVector, cone::EpiPerSquare)
     @views arr[1:2] .= 1
     @views arr[3:end] .= 0
     return arr
@@ -105,7 +105,7 @@ end
 
 function update_hess(cone::EpiPerSquare)
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
 
     mul!(H, cone.grad, cone.grad')
@@ -121,7 +121,7 @@ end
 
 function update_inv_hess(cone::EpiPerSquare)
     @assert cone.is_feas
-    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     Hi = cone.inv_hess.data
 
     mul!(Hi, cone.point, cone.point')

@@ -76,7 +76,7 @@ reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated =
     cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
 
-function setup_extra_data(
+function setup_extra_data!(
     cone::HypoPerLogdetTri{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
@@ -101,7 +101,7 @@ end
 
 get_nu(cone::HypoPerLogdetTri) = cone.d + 2
 
-function set_initial_point(
+function set_initial_point!(
     arr::AbstractVector{T},
     cone::HypoPerLogdetTri{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
