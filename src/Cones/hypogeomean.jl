@@ -49,7 +49,7 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     end
 end
 
-function setup_extra_data(cone::HypoGeoMean{T}) where {T <: Real}
+function setup_extra_data!(cone::HypoGeoMean{T}) where {T <: Real}
     wdim = cone.dim - 1
     cone.tempw = zeros(T, wdim)
     cone.iwdim = inv(T(wdim))
@@ -58,7 +58,7 @@ end
 
 get_nu(cone::HypoGeoMean) = cone.dim
 
-function set_initial_point(arr::AbstractVector{T}, cone::HypoGeoMean{T}) where T
+function set_initial_point!(arr::AbstractVector{T}, cone::HypoGeoMean{T}) where T
     wdim = cone.dim - 1
     c = sqrt(T(5 * wdim ^ 2 + 2 * wdim + 1))
     arr[1] = -sqrt((-c + 3 * wdim + 1) / T(2 * cone.dim))
@@ -109,7 +109,7 @@ end
 
 function update_hess(cone::HypoGeoMean)
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
     u = cone.point[1]
     @views w = cone.point[2:end]
@@ -166,7 +166,7 @@ end
 
 function update_inv_hess(cone::HypoGeoMean{T}) where T
     @assert !cone.inv_hess_updated
-    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     Hi = cone.inv_hess.data
     u = cone.point[1]
     @views w = cone.point[2:end]

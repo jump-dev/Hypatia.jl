@@ -67,7 +67,7 @@ reset_data(cone::WSOSInterpNonnegative) = (cone.feas_updated = cone.grad_updated
     cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
     cone.use_hess_prod_slow = cone.use_hess_prod_slow_updated = false)
 
-function setup_extra_data(
+function setup_extra_data!(
     cone::WSOSInterpNonnegative{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
     dim = cone.dim
@@ -84,7 +84,7 @@ function setup_extra_data(
     return cone
 end
 
-set_initial_point(arr::AbstractVector, cone::WSOSInterpNonnegative) = (arr .= 1)
+set_initial_point!(arr::AbstractVector, cone::WSOSInterpNonnegative) = (arr .= 1)
 
 function update_feas(cone::WSOSInterpNonnegative)
     @assert !cone.feas_updated
@@ -134,7 +134,7 @@ end
 
 function update_hess(cone::WSOSInterpNonnegative)
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     UU = cone.tempUU
 
     cone.hess .= 0

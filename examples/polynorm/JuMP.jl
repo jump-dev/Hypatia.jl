@@ -22,7 +22,7 @@ function build(inst::PolyNormJuMP{T}) where {T <: Float64}
     rand_U = binomial(n + 2 * rand_halfdeg, n)
     rand_coeffs = rand(-9:9, rand_U, num_polys)
     (U, pts, Ps, V, w) = PolyUtils.interpolate(dom, epi_halfdeg,
-        calc_V = true, calc_w = true)
+        calc_V = true, get_quadr = true)
     polys = V[:, 1:rand_U] * rand_coeffs
 
     model = JuMP.Model()

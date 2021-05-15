@@ -9,7 +9,7 @@ function interpolate(
     dom::Domain{T},
     d::Int;
     calc_V::Bool = false,
-    calc_w::Bool = false,
+    get_quadr::Bool = false,
     sample::Bool = !isa(dom, BoxDomain{T}),
     sample_factor::Int = 0,
     ) where {T <: Real}
@@ -31,14 +31,14 @@ function interpolate(
                 sample_factor = 2
             else
                 sample_factor = 1
-                if U > 35_000 && calc_w
+                if U > 35_000 && get_quadr
                     error("dimensions are too large to compute quadrature weights")
                 end
             end
         end
-        return interp_sample(dom, d, calc_w, sample_factor)
+        return interp_sample(dom, d, get_quadr, sample_factor)
     else
-        return interp_box(dom, n, d, calc_V, calc_w)
+        return interp_box(dom, n, d, calc_V, get_quadr)
     end
 end
 
@@ -46,13 +46,13 @@ end
 function interp_sample(
     dom::Domain{T},
     d::Int,
-    calc_w::Bool,
+    get_quadr::Bool,
     sample_factor::Int,
     ) where {T <: Real}
     U = get_U(get_dimension(dom), d)
 
-    candidate_pts = interp_sample(dom, U * sample_factor)
-    (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, candidate_pts, d, calc_w)
+    cand_pts = interp_sample(dom, U * sample_factor)
+    (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, cand_pts, d, get_quadr)
 
     g = get_weights(dom, pts)
     PWts = Matrix{T}[sqrt.(gi) .* P0sub for gi in g]
@@ -68,9 +68,9 @@ function interp_box(
     n::Int,
     d::Int,
     calc_V::Bool,
-    calc_w::Bool,
+    get_quadr::Bool,
     ) where {T <: Real}
-    (U, pts, P0, P0sub, V, w) = interp_box(T, n, d, calc_V, calc_w)
+    (U, pts, P0, P0sub, V, w) = interp_box(T, n, d, calc_V, get_quadr)
     return (U = U, pts = pts, Ps = Matrix{T}[P0,], V = V, w = w)
 end
 
@@ -79,9 +79,9 @@ function interp_box(
     n::Int,
     d::Int,
     calc_V::Bool,
-    calc_w::Bool,
+    get_quadr::Bool,
     ) where {T <: Real}
-    (U, pts, P0, P0sub, V, w) = interp_box(T, n, d, calc_V, calc_w)
+    (U, pts, P0, P0sub, V, w) = interp_box(T, n, d, calc_V, get_quadr)
 
     # TODO refactor/cleanup below
     # scale and shift points, get WSOS matrices
@@ -101,14 +101,14 @@ function interp_box(
     n::Int,
     d::Int,
     calc_V::Bool,
-    calc_w::Bool,
+    get_quadr::Bool,
     )
     if n == 1
-        return cheb2_data(T, d, calc_V, calc_w)
+        return cheb2_data(T, d, calc_V, get_quadr)
     elseif n == 2
-        return padua_data(T, d, calc_V, calc_w) # or approxfekete_data(n, d)
+        return padua_data(T, d, calc_V, get_quadr) # or approxfekete_data(n, d)
     elseif n > 2
-        return approxfekete_data(T, n, d, calc_w)
+        return approxfekete_data(T, n, d, get_quadr)
     end
 end
 
@@ -163,7 +163,7 @@ function cheb2_data(
     T::Type{<:Real},
     d::Int,
     calc_V::Bool,
-    calc_w::Bool,
+    get_quadr::Bool,
     )
     @assert d > 0
     U = get_U(1, d)
@@ -183,7 +183,7 @@ function cheb2_data(
     P0sub = view(P0, :, 1:get_L(1, d - 1))
 
     # weights for Clenshaw-Curtis quadrature at pts
-    if calc_w
+    if get_quadr
         wa = T[2 / T(1 - j^2) for j in 0:2:(U - 1)]
         @views append!(wa, wa[div(U, 2):-1:2])
         tempconst = pi / T(length(wa)) * 2 * im
@@ -203,7 +203,7 @@ function padua_data(
     T::Type{<:Real},
     d::Int,
     calc_V::Bool,
-    calc_w::Bool,
+    get_quadr::Bool,
     )
     @assert d > 0
     U = get_U(2, d)
@@ -234,7 +234,7 @@ function padua_data(
 
     # cubature weights at Padua points
     # even-degree Chebyshev polynomials on the subgrids
-    if calc_w
+    if get_quadr
         te1 = [cospi(T(i * j) / T(2d)) for i in 0:2:2d, j in 0:2:2d]
         to1 = [cospi(T(i * j) / T(2d)) for i in 0:2:2d, j in 1:2:2d]
         te2 = [cospi(T(i * j) / T(2d + 1)) for i in 0:2:2d, j in 0:2:(2d + 1)]
@@ -273,14 +273,14 @@ function approxfekete_data(
     T::Type{<:Real},
     n::Int,
     d::Int,
-    calc_w::Bool,
+    get_quadr::Bool,
     )
     @assert d > 0
     @assert n > 1
 
     # points in the initial interpolation grid
     npts = prod_consec(n, d)
-    candidate_pts = zeros(T, npts, n)
+    cand_pts = zeros(T, npts, n)
 
     for j in 1:n
         ig = prod_consec(n, d, j)
@@ -288,7 +288,7 @@ function approxfekete_data(
         i = 1
         l = 1
         while true
-            @views candidate_pts[i:(i + ig - 1), j] .= cs[l]
+            @views cand_pts[i:(i + ig - 1), j] .= cs[l]
             i += ig
             l += 1
             if l >= 2d + 1 + j
@@ -301,7 +301,7 @@ function approxfekete_data(
     end
 
     dom = BoxDomain{T}(-ones(T, n), ones(T, n))
-    (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, candidate_pts, d, calc_w)
+    (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, cand_pts, d, get_quadr)
 
     return (size(pts, 1), pts, P0, P0sub, V, w)
 end
@@ -309,13 +309,13 @@ end
 # TODO could merge this function and choose_interp_pts
 function make_wsos_arrays(
     dom::Domain{T},
-    candidate_pts::Matrix{T},
+    cand_pts::Matrix{T},
     d::Int,
-    calc_w::Bool,
+    get_quadr::Bool,
     ) where {T <: Real}
-    n = size(candidate_pts, 2)
-    (V, keep_pts, w) = choose_interp_pts(candidate_pts, d, calc_w)
-    pts = candidate_pts[keep_pts, :]
+    n = size(cand_pts, 2)
+    (V, keep_pts, w) = choose_interp_pts(cand_pts, d, get_quadr)
+    pts = cand_pts[keep_pts, :]
     P0 = V[:, 1:get_L(n, d)] # subset of poly evaluations up to total degree d
     Lsub = get_L(n, div(2d - get_degree(dom), 2))
     P0sub = view(P0, :, 1:Lsub)
@@ -327,16 +327,16 @@ n_deg_exponents(n::Int, deg::Int) = [xp for t in 0:deg for
 
 # indices of points to keep and quadrature weights at those points
 function choose_interp_pts(
-    candidate_pts::Matrix{T},
+    cand_pts::Matrix{T},
     d::Int,
-    calc_w::Bool,
+    get_quadr::Bool,
     ) where {T <: Real}
-    n = size(candidate_pts, 2)
+    n = size(cand_pts, 2)
     U = get_U(n, d)
 
-    V = make_chebyshev_vandermonde(candidate_pts, 2d)
+    V = make_chebyshev_vandermonde(cand_pts, 2d)
 
-    if !calc_w && size(candidate_pts, 1) == U && U > 35_000
+    if !get_quadr && size(cand_pts, 1) == U && U > 35_000
         # large matrix and don't need to perform QR procedure, so don't
         # TODO this is hacky; later the interpolate function and functions it
         # calls should take options (and have better defaults) for whether to
@@ -348,7 +348,7 @@ function choose_interp_pts(
     keep_pts = F.p[1:U]
     V = V[keep_pts, :]
 
-    if calc_w
+    if get_quadr
         n > 32 && @warn("quadrature weights not numerically stable for large n")
         m = zeros(T, U)
         for (col, xp) in enumerate(n_deg_exponents(n, 2d))

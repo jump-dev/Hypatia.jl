@@ -86,7 +86,7 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     end
 end
 
-function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
+function setup_extra_data!(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     U = cone.U
     R = cone.R
     Ps = cone.Ps
@@ -120,7 +120,7 @@ function setup_extra_data(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     return cone
 end
 
-function set_initial_point(arr::AbstractVector, cone::WSOSInterpEpiNormEucl)
+function set_initial_point!(arr::AbstractVector, cone::WSOSInterpEpiNormEucl)
     @views arr[1:cone.U] .= 1
     @views arr[(cone.U + 1):end] .= 0
     return arr
@@ -221,7 +221,7 @@ end
 
 function update_hess(cone::WSOSInterpEpiNormEucl)
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
     U = cone.U
     R = cone.R

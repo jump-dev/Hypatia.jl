@@ -45,7 +45,7 @@ function setup_csqr_cache(cone::EpiPerSepSpectral{VectorCSqr{T}}) where T
     return
 end
 
-function set_initial_point(
+function set_initial_point!(
     arr::AbstractVector,
     cone::EpiPerSepSpectral{<:VectorCSqr},
     )
@@ -111,7 +111,7 @@ end
 
 function update_hess(cone::EpiPerSepSpectral{<:VectorCSqr})
     cone.hess_aux_updated || update_hess_aux(cone)
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     v = cone.point[2]
     H = cone.hess.data
     cache = cone.cache
@@ -233,7 +233,7 @@ end
 
 function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr})
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     Hi = cone.inv_hess.data
     cache = cone.cache
     m = cache.m

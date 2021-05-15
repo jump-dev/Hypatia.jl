@@ -53,7 +53,7 @@ include("wsosinterpepinormeucl.jl")
 use_dual_barrier(cone::Cone) = cone.use_dual_barrier
 dimension(cone::Cone) = cone.dim
 
-function setup_data(cone::Cone{T}) where {T <: Real}
+function setup_data!(cone::Cone{T}) where {T <: Real}
     reset_data(cone)
     dim = dimension(cone)
     cone.point = zeros(T, dim)
@@ -64,11 +64,11 @@ function setup_data(cone::Cone{T}) where {T <: Real}
     end
     cone.vec1 = zeros(T, dim)
     cone.vec2 = zeros(T, dim)
-    setup_extra_data(cone)
+    setup_extra_data!(cone)
     return cone
 end
 
-setup_extra_data(cone::Cone) = nothing
+setup_extra_data!(cone::Cone) = nothing
 
 load_point(
     cone::Cone{T},
@@ -101,7 +101,7 @@ function inv_hess(cone::Cone)
     return update_inv_hess(cone)
 end
 
-function alloc_hess(cone::Cone{T}) where {T <: Real}
+function alloc_hess!(cone::Cone{T}) where {T <: Real}
     dim = dimension(cone)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
     if hasfield(typeof(cone), :hess_fact_cache)
@@ -110,7 +110,7 @@ function alloc_hess(cone::Cone{T}) where {T <: Real}
     return
 end
 
-function alloc_inv_hess(cone::Cone{T}) where {T <: Real}
+function alloc_inv_hess!(cone::Cone{T}) where {T <: Real}
     dim = dimension(cone)
     cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
     return
@@ -180,7 +180,7 @@ function update_hess_fact(cone::Cone{T}) where {T <: Real}
 end
 
 function update_inv_hess(cone::Cone)
-    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     update_hess_fact(cone)
     invert(cone.hess_fact_cache, cone.inv_hess)
     cone.inv_hess_updated = true
@@ -235,7 +235,6 @@ function in_neighborhood(
     cone::Cone{T},
     rtmu::T,
     max_nbhd::T;
-    # use_heuristic_neighborhood::Bool = false, # TODO make option to solver
     ) where {T <: Real}
     is_feas(cone) || return false
     g = grad(cone)
@@ -256,17 +255,14 @@ function in_neighborhood(
 
     # check neighborhood condition
     @. vec1 = cone.dual_point + rtmu * g
-    # if use_heuristic_neighborhood(cone)
-    #     nbhd = norm(vec1, Inf) / norm(g, Inf)
-    # else
-        vec2 = cone.vec2
-        inv_hess_prod!(vec2, vec1, cone)
-        nbhd_sqr = dot(vec2, vec1)
-        if nbhd_sqr < -tol * dim
-            return false
-        end
-        nbhd = sqrt(abs(nbhd_sqr))
-    # end
+    # nbhd = norm(vec1, Inf) / norm(g, Inf) # heuristic neighborhood
+    vec2 = cone.vec2
+    inv_hess_prod!(vec2, vec1, cone)
+    nbhd_sqr = dot(vec2, vec1)
+    if nbhd_sqr < -tol * dim
+        return false
+    end
+    nbhd = sqrt(abs(nbhd_sqr))
 
     return (nbhd < rtmu * max_nbhd)
 end

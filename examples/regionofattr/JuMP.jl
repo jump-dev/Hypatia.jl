@@ -38,7 +38,7 @@ function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64}
         dom3 = PolyUtils.BoxDomain{T}([-0.01], [0.01]) # state at the end
         halfdeg = div(deg + 1, 2)
         (U1, pts1, Ps1, _, quad_weights) =
-            PolyUtils.interpolate(dom1, halfdeg, calc_w = true)
+            PolyUtils.interpolate(dom1, halfdeg, get_quadr = true)
         (U2, pts2, Ps2) = PolyUtils.interpolate(dom2, halfdeg)
         (U3, pts3, Ps3) = PolyUtils.interpolate(dom3, halfdeg - 1)
         wsos_cone1 = Hypatia.WSOSInterpNonnegativeCone{T, T}(U1, Ps1)

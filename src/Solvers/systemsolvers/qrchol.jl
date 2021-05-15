@@ -58,10 +58,8 @@ function solve_subsystem3(
 
         if !isempty(syssolver.Q2div)
             mul!(syssolver.GQ1x, syssolver.GQ1, y)
-            block_hess_prod.(model.cones, syssolver.HGQ1x_k,
-                syssolver.GQ1x_k)
-            mul!(syssolver.Q2div, syssolver.GQ2', syssolver.HGQ1x,
-                -1, true)
+            block_hess_prod!.(syssolver.HGQ1x_k, syssolver.GQ1x_k, model.cones)
+            mul!(syssolver.Q2div, syssolver.GQ2', syssolver.HGQ1x, -1, true)
         end
     end
 
@@ -74,7 +72,7 @@ function solve_subsystem3(
     lmul!(solver.Ap_Q, x)
 
     mul!(syssolver.Gx, model.G, x)
-    block_hess_prod.(model.cones, syssolver.HGx_k, syssolver.Gx_k)
+    block_hess_prod!.(syssolver.HGx_k, syssolver.Gx_k, model.cones)
 
     @. z = syssolver.HGx - z
 
@@ -87,10 +85,10 @@ function solve_subsystem3(
     return sol_sub
 end
 
-function block_hess_prod(
-    cone_k::Cones.Cone{T},
+function block_hess_prod!(
     prod_k::AbstractVecOrMat{T},
     arr_k::AbstractVecOrMat{T},
+    cone_k::Cones.Cone{T},
     ) where {T <: Real}
     if Cones.use_dual_barrier(cone_k)
         Cones.inv_hess_prod!(prod_k, arr_k, cone_k)
@@ -288,7 +286,7 @@ function update_lhs(
     rhs_const = syssolver.rhs_const
     for (k, cone_k) in enumerate(model.cones)
         @inbounds @views h_k = model.h[model.cone_idxs[k]]
-        block_hess_prod(cone_k, rhs_const.z_views[k], h_k)
+        block_hess_prod!(rhs_const.z_views[k], h_k, cone_k)
     end
     solve_subsystem3(syssolver, solver, syssolver.sol_const, rhs_const)
 

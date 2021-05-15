@@ -150,9 +150,8 @@ end
 
 # reduce to 4x4 subsystem
 function solve_system(
-    syssolver::Union{
-        NaiveElimSystemSolver{T}, SymIndefSystemSolver{T}, QRCholSystemSolver{T}
-        },
+    syssolver::Union{NaiveElimSystemSolver{T}, SymIndefSystemSolver{T},
+        QRCholSystemSolver{T}},
     solver::Solver{T},
     sol::Point{T},
     rhs::Point{T},

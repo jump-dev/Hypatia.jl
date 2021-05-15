@@ -75,7 +75,7 @@ reset_data(cone::MatrixEpiPerSquare) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
     cone.hess_aux_updated = false)
 
-function setup_extra_data(
+function setup_extra_data!(
     cone::MatrixEpiPerSquare{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
     (d1, d2) = (cone.d1, cone.d2)
@@ -97,7 +97,7 @@ end
 
 get_nu(cone::MatrixEpiPerSquare) = cone.d1 + 1
 
-function set_initial_point(
+function set_initial_point!(
     arr::AbstractVector,
     cone::MatrixEpiPerSquare{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
@@ -184,7 +184,7 @@ end
 
 function update_hess(cone::MatrixEpiPerSquare)
     cone.hess_aux_updated || update_hess_aux(cone)
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
     d1 = cone.d1
     d2 = cone.d2
@@ -214,7 +214,7 @@ function update_hess(cone::MatrixEpiPerSquare)
             @inbounds for l in lstart:d1
                 term1 = Zi[l, j] * tempd2d2ik
                 term2 = ZiW[l, i] * ZiWjk
-                hess_element(H, r_idx, c_idx, term1, term2)
+                spectral_kron_element!(H, r_idx, c_idx, term1, term2)
                 c_idx += idx_incr
             end
         end
@@ -224,7 +224,7 @@ function update_hess(cone::MatrixEpiPerSquare)
 
     # H_U_U part
     @views H_U_U = H[U_idxs, U_idxs]
-    symm_kron(H_U_U, Zi, cone.rt2)
+    symm_kron!(H_U_U, Zi, cone.rt2)
     @. H_U_U *= 4 * abs2(v)
 
     # H_v_v part

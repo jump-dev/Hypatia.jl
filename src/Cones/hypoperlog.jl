@@ -50,7 +50,7 @@ reset_data(cone::HypoPerLog) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated =
     cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
 
-function setup_extra_data(cone::HypoPerLog{T}) where {T <: Real}
+function setup_extra_data!(cone::HypoPerLog{T}) where {T <: Real}
     # wdim = cone.dim - 2
     # cone.wivzi = zeros(T, wdim)
     # cone.tempw = zeros(T, wdim)
@@ -70,7 +70,7 @@ end
 
 get_nu(cone::HypoPerLog) = cone.dim
 
-function set_initial_point(arr::AbstractVector, cone::HypoPerLog)
+function set_initial_point!(arr::AbstractVector, cone::HypoPerLog)
     (arr[1], arr[2], w) = get_central_ray_hypoperlog(cone.dim - 2)
     @views arr[3:end] .= w
     return arr

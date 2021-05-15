@@ -2,6 +2,11 @@
 MathOptInterface wrapper of Hypatia solver
 =#
 
+const SV = MOI.SingleVariable
+const SAF = MOI.ScalarAffineFunction
+const VV = MOI.VectorOfVariables
+const VAF = MOI.VectorAffineFunction
+
 mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     use_dense_model::Bool # make the model use dense A and G data instead of sparse
 
@@ -35,7 +40,8 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
         opt.use_dense_model = use_dense_model
         if !haskey(solver_options, :syssolver)
             # choose default system solver based on use_dense_model
-            sstype = (use_dense_model ? Solvers.QRCholDenseSystemSolver : Solvers.SymIndefSparseSystemSolver)
+            sstype = (use_dense_model ? Solvers.QRCholDenseSystemSolver :
+                Solvers.SymIndefSparseSystemSolver)
             solver_options = (solver_options..., syssolver = sstype{T}())
         end
         if !haskey(solver_options, :preprocess)
@@ -48,7 +54,8 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
         end
         if !haskey(solver_options, :init_use_indirect)
             # only use indirect if not using dense model
-            solver_options = (solver_options..., init_use_indirect = !use_dense_model)
+            solver_options = (solver_options...,
+                init_use_indirect = !use_dense_model)
         end
         opt.solver = Solvers.Solver{T}(; solver_options...)
         return opt
@@ -68,14 +75,14 @@ MOI.supports(
     ::Optimizer{T},
     ::Union{
         MOI.ObjectiveSense,
-        MOI.ObjectiveFunction{MOI.SingleVariable},
-        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}},
+        MOI.ObjectiveFunction{SV},
+        MOI.ObjectiveFunction{SAF{T}},
         },
     ) where {T <: Real} = true
 
 MOI.supports_constraint(
     ::Optimizer{T},
-    ::Type{<:Union{MOI.SingleVariable, MOI.ScalarAffineFunction{T}}},
+    ::Type{<:Union{SV, SAF{T}}},
     ::Type{<:Union{
         MOI.EqualTo{T},
         MOI.GreaterThan{T},
@@ -86,7 +93,7 @@ MOI.supports_constraint(
 
 MOI.supports_constraint(
     ::Optimizer{T},
-    ::Type{<:Union{MOI.VectorOfVariables, MOI.VectorAffineFunction{T}}},
+    ::Type{<:Union{VV, VAF{T}}},
     ::Type{<:SupportedCones{T}},
     ) where {T <: Real} = true
 
@@ -111,9 +118,9 @@ function MOI.copy_to(
 
     # objective function
     F = MOI.get(src, MOI.ObjectiveFunctionType())
-    if F == MOI.SingleVariable
-        obj = MOI.ScalarAffineFunction{T}(MOI.get(src, MOI.ObjectiveFunction{F}()))
-    elseif F == MOI.ScalarAffineFunction{T}
+    if F == SV
+        obj = SAF{T}(MOI.get(src, MOI.ObjectiveFunction{F}()))
+    elseif F == SAF{T}
         obj = MOI.get(src, MOI.ObjectiveFunction{F}())
     else
         error("function type $F not supported")
@@ -144,62 +151,50 @@ function MOI.copy_to(
     (Icpe, Vcpe) = (Int[], T[]) # constraint set constants for opt.constr_prim_eq
     constr_offset_eq = Vector{Int}()
 
-    for ci in get_src_cons(MOI.SingleVariable, MOI.EqualTo{T})
+    for F in (SV, SAF{T}), ci in get_src_cons(F, MOI.EqualTo{T})
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{T}}(i)
-        push!(constr_offset_eq, p)
-        p += 1
-        push!(IA, p)
-        push!(JA, idx_map[get_con_fun(ci).variable].value)
-        push!(VA, -1)
-        push!(Ib, p)
-        push!(Vb, -get_con_set(ci).value)
-        push!(Icpe, p)
-        push!(Vcpe, get_con_set(ci).value)
-    end
-
-    for ci in get_src_cons(MOI.ScalarAffineFunction{T}, MOI.EqualTo{T})
-        i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, MOI.EqualTo{T}}(i)
+        idx_map[ci] = MOI.ConstraintIndex{F, MOI.EqualTo{T}}(i)
         push!(constr_offset_eq, p)
         p += 1
         fi = get_con_fun(ci)
-        for vt in fi.terms
+        si = get_con_set(ci)
+        if F == SV
             push!(IA, p)
-            push!(JA, idx_map[vt.variable_index].value)
-            push!(VA, -vt.coefficient)
+            push!(JA, idx_map[fi.variable].value)
+            push!(VA, -1)
+            push!(Vb, -si.value)
+        else
+            for vt in fi.terms
+                push!(IA, p)
+                push!(JA, idx_map[vt.variable_index].value)
+                push!(VA, -vt.coefficient)
+            end
+            push!(Vb, fi.constant - si.value)
         end
         push!(Ib, p)
-        push!(Vb, fi.constant - get_con_set(ci).value)
         push!(Icpe, p)
-        push!(Vcpe, get_con_set(ci).value)
+        push!(Vcpe, si.value)
     end
 
-    for ci in get_src_cons(MOI.VectorOfVariables, MOI.Zeros)
+    for F in (VV, VAF{T}), ci in get_src_cons(F, MOI.Zeros)
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.Zeros}(i)
+        idx_map[ci] = MOI.ConstraintIndex{F, MOI.Zeros}(i)
         push!(constr_offset_eq, p)
         fi = get_con_fun(ci)
         dim = MOI.output_dimension(fi)
-        append!(IA, (p + 1):(p + dim))
-        append!(JA, idx_map[vi].value for vi in fi.variables)
-        append!(VA, -ones(T, dim))
-        p += dim
-    end
-
-    for ci in get_src_cons(MOI.VectorAffineFunction{T}, MOI.Zeros)
-        i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{T}, MOI.Zeros}(i)
-        push!(constr_offset_eq, p)
-        fi = get_con_fun(ci)
-        dim = MOI.output_dimension(fi)
-        for vt in fi.terms
-            push!(IA, p + vt.output_index)
-            push!(JA, idx_map[vt.scalar_term.variable_index].value)
-            push!(VA, -vt.scalar_term.coefficient)
+        if F == VV
+            append!(IA, (p + 1):(p + dim))
+            append!(JA, idx_map[vi].value for vi in fi.variables)
+            append!(VA, -ones(T, dim))
+        else
+            for vt in fi.terms
+                push!(IA, p + vt.output_index)
+                push!(JA, idx_map[vt.scalar_term.variable_index].value)
+                push!(VA, -vt.scalar_term.coefficient)
+            end
+            append!(Ib, (p + 1):(p + dim))
+            append!(Vb, fi.constants)
         end
-        append!(Ib, (p + 1):(p + dim))
-        append!(Vb, fi.constants)
         p += dim
     end
 
@@ -222,125 +217,107 @@ function MOI.copy_to(
     nonneg_start = q
 
     # nonnegative-like constraints
-    for ci in get_src_cons(MOI.SingleVariable, MOI.GreaterThan{T})
+    for F in (SV, SAF{T}), ci in get_src_cons(F, MOI.GreaterThan{T})
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{T}}(i)
-        push!(constr_offset_cone, q)
-        q += 1
-        push!(IG, q)
-        push!(JG, idx_map[get_con_fun(ci).variable].value)
-        push!(VG, -1)
-        push!(Ih, q)
-        push!(Vh, -get_con_set(ci).lower)
-        push!(Vcpc, get_con_set(ci).lower)
-        push!(Icpc, q)
-    end
-
-    for ci in get_src_cons(MOI.ScalarAffineFunction{T}, MOI.GreaterThan{T})
-        i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, MOI.GreaterThan{T}}(i)
+        idx_map[ci] = MOI.ConstraintIndex{F, MOI.GreaterThan{T}}(i)
         push!(constr_offset_cone, q)
         q += 1
         fi = get_con_fun(ci)
-        for vt in fi.terms
+        si = get_con_set(ci)
+        if F == SV
             push!(IG, q)
-            push!(JG, idx_map[vt.variable_index].value)
-            push!(VG, -vt.coefficient)
-        end
-        push!(Ih, q)
-        push!(Vh, fi.constant - get_con_set(ci).lower)
-        push!(Vcpc, get_con_set(ci).lower)
-        push!(Icpc, q)
-    end
-
-    for ci in get_src_cons(MOI.VectorOfVariables, MOI.Nonnegatives)
-        i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.Nonnegatives}(i)
-        push!(constr_offset_cone, q)
-        for vj in get_con_fun(ci).variables
-            q += 1
-            push!(IG, q)
-            push!(JG, idx_map[vj].value)
+            push!(JG, idx_map[fi.variable].value)
             push!(VG, -1)
+            push!(Vh, -si.lower)
+        else
+            for vt in fi.terms
+                push!(IG, q)
+                push!(JG, idx_map[vt.variable_index].value)
+                push!(VG, -vt.coefficient)
+            end
+            push!(Vh, fi.constant - si.lower)
         end
+        push!(Ih, q)
+        push!(Vcpc, si.lower)
+        push!(Icpc, q)
     end
 
-    for ci in get_src_cons(MOI.VectorAffineFunction{T}, MOI.Nonnegatives)
+    for F in (VV, VAF{T}), ci in get_src_cons(F, MOI.Nonnegatives)
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{T}, MOI.Nonnegatives}(i)
+        idx_map[ci] = MOI.ConstraintIndex{F, MOI.Nonnegatives}(i)
         push!(constr_offset_cone, q)
         fi = get_con_fun(ci)
-        dim = MOI.output_dimension(fi)
-        for vt in fi.terms
-            push!(IG, q + vt.output_index)
-            push!(JG, idx_map[vt.scalar_term.variable_index].value)
-            push!(VG, -vt.scalar_term.coefficient)
+        if F == VV
+            for vj in fi.variables
+                q += 1
+                push!(IG, q)
+                push!(JG, idx_map[vj].value)
+                push!(VG, -1)
+            end
+        else
+            dim = MOI.output_dimension(fi)
+            for vt in fi.terms
+                push!(IG, q + vt.output_index)
+                push!(JG, idx_map[vt.scalar_term.variable_index].value)
+                push!(VG, -vt.scalar_term.coefficient)
+            end
+            append!(Ih, (q + 1):(q + dim))
+            append!(Vh, fi.constants)
+            q += dim
         end
-        append!(Ih, (q + 1):(q + dim))
-        append!(Vh, fi.constants)
-        q += dim
     end
 
     # nonpositive-like constraints
     nonpos_start = q
 
-    for ci in get_src_cons(MOI.SingleVariable, MOI.LessThan{T})
+    for F in (SV, SAF{T}), ci in get_src_cons(F, MOI.LessThan{T})
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{T}}(i)
-        push!(constr_offset_cone, q)
-        q += 1
-        push!(IG, q)
-        push!(JG, idx_map[get_con_fun(ci).variable].value)
-        push!(VG, 1)
-        push!(Ih, q)
-        push!(Vh, get_con_set(ci).upper)
-        push!(Vcpc, get_con_set(ci).upper)
-        push!(Icpc, q)
-    end
-
-    for ci in get_src_cons(MOI.ScalarAffineFunction{T}, MOI.LessThan{T})
-        i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, MOI.LessThan{T}}(i)
+        idx_map[ci] = MOI.ConstraintIndex{F, MOI.LessThan{T}}(i)
         push!(constr_offset_cone, q)
         q += 1
         fi = get_con_fun(ci)
-        for vt in fi.terms
+        si = get_con_set(ci)
+        if F == SV
             push!(IG, q)
-            push!(JG, idx_map[vt.variable_index].value)
-            push!(VG, vt.coefficient)
-        end
-        push!(Ih, q)
-        push!(Vh, -fi.constant + get_con_set(ci).upper)
-        push!(Vcpc, get_con_set(ci).upper)
-        push!(Icpc, q)
-    end
-
-    for ci in get_src_cons(MOI.VectorOfVariables, MOI.Nonpositives)
-        i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.VectorOfVariables, MOI.Nonpositives}(i)
-        push!(constr_offset_cone, q)
-        for vj in get_con_fun(ci).variables
-            q += 1
-            push!(IG, q)
-            push!(JG, idx_map[vj].value)
+            push!(JG, idx_map[fi.variable].value)
             push!(VG, 1)
+            push!(Vh, si.upper)
+        else
+            for vt in fi.terms
+                push!(IG, q)
+                push!(JG, idx_map[vt.variable_index].value)
+                push!(VG, vt.coefficient)
+            end
+            push!(Vh, -fi.constant + si.upper)
         end
+        push!(Ih, q)
+        push!(Vcpc, si.upper)
+        push!(Icpc, q)
     end
 
-    for ci in get_src_cons(MOI.VectorAffineFunction{T}, MOI.Nonpositives)
+    for F in (VV, VAF{T}), ci in get_src_cons(F, MOI.Nonpositives)
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.VectorAffineFunction{T}, MOI.Nonpositives}(i)
+        idx_map[ci] = MOI.ConstraintIndex{F, MOI.Nonpositives}(i)
         push!(constr_offset_cone, q)
         fi = get_con_fun(ci)
-        dim = MOI.output_dimension(fi)
-        for vt in fi.terms
-            push!(IG, q + vt.output_index)
-            push!(JG, idx_map[vt.scalar_term.variable_index].value)
-            push!(VG, vt.scalar_term.coefficient)
+        if F == VV
+            for vj in fi.variables
+                q += 1
+                push!(IG, q)
+                push!(JG, idx_map[vj].value)
+                push!(VG, 1)
+            end
+        else
+            dim = MOI.output_dimension(fi)
+            for vt in fi.terms
+                push!(IG, q + vt.output_index)
+                push!(JG, idx_map[vt.scalar_term.variable_index].value)
+                push!(VG, vt.scalar_term.coefficient)
+            end
+            append!(Ih, (q + 1):(q + dim))
+            append!(Vh, -fi.constants)
+            q += dim
         end
-        append!(Ih, (q + 1):(q + dim))
-        append!(Vh, -fi.constants)
-        q += dim
     end
 
     # single nonnegative cone
@@ -351,9 +328,9 @@ function MOI.copy_to(
 
     # build up one L_infinity norm cone from two-sided interval constraints
     interval_start = q
-    SV_interval_cons = get_src_cons(MOI.SingleVariable, MOI.Interval{T})
-    SAF_interval_cons = get_src_cons(MOI.ScalarAffineFunction{T}, MOI.Interval{T})
-    num_intervals = length(SV_interval_cons) + length(SAF_interval_cons)
+    SV_intvl = get_src_cons(SV, MOI.Interval{T})
+    SAF_intvl = get_src_cons(SAF{T}, MOI.Interval{T})
+    num_intervals = length(SV_intvl) + length(SAF_intvl)
     interval_scales = zeros(T, num_intervals)
 
     if num_intervals > 0
@@ -365,34 +342,9 @@ function MOI.copy_to(
     end
 
     interval_count = 0
-
-    for ci in SV_interval_cons
+    for (F, Cs) in ((SV, SV_intvl), (SAF{T}, SAF_intvl)), ci in Cs
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{T}}(i)
-        push!(constr_offset_cone, q)
-        q += 1
-
-        upper = get_con_set(ci).upper
-        lower = get_con_set(ci).lower
-        @assert isfinite(upper) && isfinite(lower)
-        @assert upper > lower
-        mid = (upper + lower) / T(2)
-        scal = 2 / (upper - lower)
-
-        push!(IG, q)
-        push!(JG, idx_map[get_con_fun(ci).variable].value)
-        push!(VG, -scal)
-        push!(Ih, q)
-        push!(Vh, -mid * scal)
-        push!(Vcpc, mid)
-        push!(Icpc, q)
-        interval_count += 1
-        interval_scales[interval_count] = scal
-    end
-
-    for ci in SAF_interval_cons
-        i += 1
-        idx_map[ci] = MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, MOI.Interval{T}}(i)
+        idx_map[ci] = MOI.ConstraintIndex{F, MOI.Interval{T}}(i)
         push!(constr_offset_cone, q)
         q += 1
 
@@ -404,13 +356,20 @@ function MOI.copy_to(
         scal = 2 / (upper - lower)
 
         fi = get_con_fun(ci)
-        for vt in fi.terms
+        if F == SV
             push!(IG, q)
-            push!(JG, idx_map[vt.variable_index].value)
-            push!(VG, -vt.coefficient * scal)
+            push!(JG, idx_map[fi.variable].value)
+            push!(VG, -scal)
+            push!(Vh, -mid * scal)
+        else
+            for vt in fi.terms
+                push!(IG, q)
+                push!(JG, idx_map[vt.variable_index].value)
+                push!(VG, -vt.coefficient * scal)
+            end
+            push!(Vh, (fi.constant - mid) * scal)
         end
         push!(Ih, q)
-        push!(Vh, (fi.constant - mid) * scal)
         push!(Vcpc, mid)
         push!(Icpc, q)
         interval_count += 1
@@ -443,14 +402,16 @@ function MOI.copy_to(
             push!(moi_other_cones, si)
             dim = MOI.output_dimension(fi)
 
-            if F == MOI.VectorOfVariables
+            if F == VV
                 JGi = (idx_map[vj].value for vj in fi.variables)
                 IGi = permute_affine(si, 1:dim)
                 VGi = rescale_affine(si, fill(-one(T), dim))
             else
-                JGi = (idx_map[vt.scalar_term.variable_index].value for vt in fi.terms)
+                JGi = (idx_map[vt.scalar_term.variable_index].value
+                    for vt in fi.terms)
                 IGi = permute_affine(si, [vt.output_index for vt in fi.terms])
-                VGi = rescale_affine(si, [-vt.scalar_term.coefficient for vt in fi.terms], IGi)
+                VGi = rescale_affine(si, [-vt.scalar_term.coefficient
+                    for vt in fi.terms], IGi)
                 Ihi = permute_affine(si, 1:dim)
                 Vhi = rescale_affine(si, fi.constants)
                 Ihi = q .+ Ihi
@@ -473,7 +434,8 @@ function MOI.copy_to(
     model_G = dropzeros!(sparse(IG, JG, VG, q, n))
     model_h = Vector(sparsevec(Ih, Vh, q))
 
-    opt.model = Models.Model{T}(model_c, model_A, model_b, model_G, model_h, cones; obj_offset = obj_offset)
+    opt.model = Models.Model{T}(model_c, model_A, model_b, model_G, model_h,
+        cones; obj_offset = obj_offset)
     if opt.use_dense_model # convert A and G to dense
         Models.densify!(opt.model)
     end
@@ -528,8 +490,10 @@ MOI.set(opt::Optimizer, ::MOI.Silent, value::Bool) = (opt.solver.verbose = !valu
 MOI.get(opt::Optimizer, ::MOI.Silent) = !opt.solver.verbose
 
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
-MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Real) = (opt.solver.time_limit = value)
-MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, ::Nothing) = (opt.solver.time_limit = Inf)
+MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Real) =
+    (opt.solver.time_limit = value)
+MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, ::Nothing) =
+    (opt.solver.time_limit = Inf)
 
 function MOI.get(opt::Optimizer, ::MOI.TimeLimitSec)
     isfinite(opt.solver.time_limit) && return opt.solver.time_limit
@@ -601,12 +565,15 @@ end
 
 function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
     raw_obj_val = Solvers.get_primal_obj(opt.solver)
-    return (opt.obj_sense == MOI.MAX_SENSE) ? -raw_obj_val : raw_obj_val
+    return ((opt.obj_sense == MOI.MAX_SENSE) ? -1 : 1) * raw_obj_val
 end
 
-function MOI.get(opt::Optimizer, ::Union{MOI.DualObjectiveValue, MOI.ObjectiveBound})
+function MOI.get(
+    opt::Optimizer,
+    ::Union{MOI.DualObjectiveValue, MOI.ObjectiveBound},
+    )
     raw_dual_obj_val = Solvers.get_dual_obj(opt.solver)
-    return (opt.obj_sense == MOI.MAX_SENSE) ? -raw_dual_obj_val : raw_dual_obj_val
+    return ((opt.obj_sense == MOI.MAX_SENSE) ? -1 : 1) * raw_dual_obj_val
 end
 
 MOI.get(opt::Optimizer, ::MOI.ResultCount) = 1

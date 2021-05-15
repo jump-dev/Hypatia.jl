@@ -90,7 +90,7 @@ reset_data(cone::PosSemidefTriSparse) = (cone.feas_updated = cone.grad_updated =
 
 get_nu(cone::PosSemidefTriSparse) = cone.side
 
-function set_initial_point(arr::AbstractVector, cone::PosSemidefTriSparse)
+function set_initial_point!(arr::AbstractVector, cone::PosSemidefTriSparse)
     idx = 1
     incr = (cone.is_complex ? 2 : 1)
     fill!(arr, 0)
