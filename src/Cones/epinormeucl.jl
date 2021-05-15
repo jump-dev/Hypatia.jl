@@ -47,7 +47,7 @@ use_sqrt_hess_oracles(cone::EpiNormEucl) = true
 
 get_nu(cone::EpiNormEucl) = 2
 
-function set_initial_point(
+function set_initial_point!(
     arr::AbstractVector,
     cone::EpiNormEucl{T},
     ) where {T <: Real}
@@ -97,7 +97,7 @@ end
 
 function update_hess(cone::EpiNormEucl)
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
 
     mul!(cone.hess.data, cone.grad, cone.grad')
     inv_dist = inv(cone.dist)
@@ -112,7 +112,7 @@ end
 
 function update_inv_hess(cone::EpiNormEucl)
     @assert cone.is_feas
-    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
 
     mul!(cone.inv_hess.data, cone.point, cone.point')
     @inbounds for j in eachindex(cone.grad)

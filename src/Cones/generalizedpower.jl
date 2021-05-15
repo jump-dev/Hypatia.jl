@@ -60,7 +60,7 @@ end
 
 dimension(cone::GeneralizedPower) = length(cone.alpha) + cone.n
 
-function setup_extra_data(cone::GeneralizedPower{T}) where {T <: Real}
+function setup_extra_data!(cone::GeneralizedPower{T}) where {T <: Real}
     m = length(cone.alpha)
     cone.aui = zeros(T, m)
     cone.auiproduuw = zeros(T, m)
@@ -70,7 +70,7 @@ end
 
 get_nu(cone::GeneralizedPower) = length(cone.alpha) + 1
 
-function set_initial_point(arr::AbstractVector, cone::GeneralizedPower)
+function set_initial_point!(arr::AbstractVector, cone::GeneralizedPower)
     m = length(cone.alpha)
     @. @views arr[1:m] = sqrt(1 + cone.alpha)
     @views arr[(m + 1):cone.dim] .= 0
@@ -129,7 +129,7 @@ end
 
 function update_hess(cone::GeneralizedPower)
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
     m = length(cone.alpha)
     @views u = cone.point[1:m]

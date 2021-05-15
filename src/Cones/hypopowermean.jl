@@ -52,14 +52,14 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     end
 end
 
-function setup_extra_data(cone::HypoPowerMean{T}) where {T <: Real}
+function setup_extra_data!(cone::HypoPowerMean{T}) where {T <: Real}
     cone.tempw = zeros(T, cone.dim - 1)
     return cone
 end
 
 get_nu(cone::HypoPowerMean) = cone.dim
 
-function set_initial_point(arr::AbstractVector{T}, cone::HypoPowerMean{T}) where T
+function set_initial_point!(arr::AbstractVector{T}, cone::HypoPowerMean{T}) where T
     # get closed form central ray if all powers are equal, else use fitting
     if all(isequal(inv(T(cone.dim - 1))), cone.alpha)
         n = cone.dim - 1
@@ -120,7 +120,7 @@ end
 
 function update_hess(cone::HypoPowerMean)
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
     u = cone.point[1]
     @views w = cone.point[2:end]

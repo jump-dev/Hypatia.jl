@@ -21,7 +21,7 @@ function build(inst::EnvelopeNative{T}) where {T <: Real}
 
     # generate interpolation
     (U, pts, Ps, _, w) = PolyUtils.interpolate(domain,
-        inst.env_halfdeg, calc_w = true)
+        inst.env_halfdeg, get_quadr = true)
 
     # generate random data
     L = binomial(n + inst.rand_halfdeg, n)

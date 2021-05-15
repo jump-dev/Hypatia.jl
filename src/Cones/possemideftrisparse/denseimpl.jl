@@ -17,7 +17,7 @@ mutable struct PSDSparseDenseCache{T <: Real, R <: RealOrComplex{T}} <:
         new{T, R}()
 end
 
-function setup_extra_data(
+function setup_extra_data!(
     cone::PosSemidefTriSparse{PSDSparseDense, T, R},
     ) where {T, R}
     cone.cache = cache = PSDSparseDenseCache{T, R}()
@@ -55,7 +55,7 @@ function update_hess(
     cone::PosSemidefTriSparse{PSDSparseDense, T, T},
     ) where {T <: Real}
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     rt2 = cone.rt2
     H = cone.hess.data
     fill!(H, 0)
@@ -84,7 +84,7 @@ function update_hess(
     cone::PosSemidefTriSparse{PSDSparseDense, T, Complex{T}},
     ) where {T <: Real}
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     rt2 = cone.rt2
     H = cone.hess.data
     fill!(H, 0)

@@ -70,7 +70,7 @@ reset_data(cone::LinMatrixIneq) = (cone.feas_updated = cone.grad_updated =
 
 get_nu(cone::LinMatrixIneq) = cone.side
 
-function set_initial_point(
+function set_initial_point!(
     arr::AbstractVector,
     cone::LinMatrixIneq{T},
     ) where {T <: Real}
@@ -109,7 +109,7 @@ end
 
 function update_hess(cone::LinMatrixIneq)
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
     sumAinvAs = cone.sumAinvAs
 

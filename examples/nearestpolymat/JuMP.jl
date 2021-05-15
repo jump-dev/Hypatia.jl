@@ -22,7 +22,7 @@ function build(inst::NearestPolyMatJuMP{T}) where {T <: Float64}
 
     domain = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n))
     (U, points, Ps, V, w) = PolyUtils.interpolate(domain, halfdeg,
-        calc_V = true, calc_w = true)
+        calc_V = true, get_quadr = true)
 
     model = JuMP.Model()
     JuMP.@variable(model, q_poly[1:(U * svec_dim)])

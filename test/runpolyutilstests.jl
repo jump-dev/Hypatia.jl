@@ -16,8 +16,9 @@ real_types = [
 @testset "$T" for T in real_types
     println("$T ...")
     test_time = @elapsed begin
-        test_fekete_sample(T)
-        test_cheb2_w(T)
+        test_interp_domain(T)
+        test_complex_interp(T)
+        test_quadrature(T)
     end
     @printf("%8.2e seconds\n", test_time)
 end

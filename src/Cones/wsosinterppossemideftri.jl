@@ -78,7 +78,7 @@ reset_data(cone::WSOSInterpPosSemidefTri) = (cone.feas_updated =
     cone.hess_fact_updated = cone.use_hess_prod_slow =
     cone.use_hess_prod_slow_updated = false)
 
-function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
+function setup_extra_data!(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     U = cone.U
     R = cone.R
     Ps = cone.Ps
@@ -101,7 +101,7 @@ function setup_extra_data(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     return cone
 end
 
-function set_initial_point(arr::AbstractVector, cone::WSOSInterpPosSemidefTri)
+function set_initial_point!(arr::AbstractVector, cone::WSOSInterpPosSemidefTri)
     arr .= 0
     block = 1
     @inbounds for i in 1:cone.R
@@ -192,7 +192,7 @@ end
 
 function update_hess(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
     R = cone.R
     U = cone.U

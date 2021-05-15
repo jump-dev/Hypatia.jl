@@ -80,7 +80,7 @@ mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
     end
 end
 
-function setup_extra_data(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
+function setup_extra_data!(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     vw_dim = cone.vw_dim
     d = cone.d
     cone.rt2 = sqrt(T(2))
@@ -113,7 +113,7 @@ end
 
 get_nu(cone::EpiTrRelEntropyTri) = 2 * cone.d + 1
 
-function set_initial_point(
+function set_initial_point!(
     arr::AbstractVector,
     cone::EpiTrRelEntropyTri{T},
     ) where {T <: Real}
@@ -191,7 +191,7 @@ end
 
 function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
     d = cone.d
     rt2 = cone.rt2
@@ -213,7 +213,7 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
         diff_tensor_V, rt2)
     @. dz_sqr_dV_sqr *= -1
     @views Hvv = H[V_idxs, V_idxs]
-    symm_kron(Hvv, Vi, rt2)
+    symm_kron!(Hvv, Vi, rt2)
     dzdV = cone.dzdV
     mul!(Hvv, dzdV, dzdV', true, true)
     @. Hvv += dz_sqr_dV_sqr / z
@@ -221,7 +221,7 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     dz_sqr_dW_sqr = grad_logm!(cone.dz_sqr_dW_sqr, W_vecs, cone.matsdim1,
         cone.matsdim2, cone.tempsdim, diff_mat_W, rt2)
     @views Hww = H[W_idxs, W_idxs]
-    symm_kron(Hww, Wi, rt2)
+    symm_kron!(Hww, Wi, rt2)
     dzdW = cone.dzdW
     mul!(Hww, dzdW, dzdW', true, true)
     @. Hww += dz_sqr_dW_sqr / z

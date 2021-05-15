@@ -64,7 +64,7 @@ reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated =
 
 use_sqrt_hess_oracles(cone::EpiNormInf) = false
 
-function setup_extra_data(
+function setup_extra_data!(
     cone::EpiNormInf{T, R},
     ) where {R <: RealOrComplex{T}} where {T <: Real}
     n = cone.n
@@ -87,7 +87,7 @@ end
 
 get_nu(cone::EpiNormInf) = cone.n + 1
 
-function set_initial_point(
+function set_initial_point!(
     arr::AbstractVector{T},
     cone::EpiNormInf{T},
     ) where {T <: Real}
@@ -144,7 +144,7 @@ function update_grad(
 end
 
 function update_hess_aux(cone::EpiNormInf{T}) where {T <: Real}
-    Cones.grad(cone)
+    @assert cone.grad_updated
     u = cone.point[1]
     w = cone.w
     uden = cone.uden
@@ -170,7 +170,7 @@ function update_hess_aux(cone::EpiNormInf{T}) where {T <: Real}
     return
 end
 
-function alloc_hess(cone::EpiNormInf{T, T}) where {T <: Real}
+function alloc_hess!(cone::EpiNormInf{T, T}) where {T <: Real}
     # initialize sparse idxs for upper triangle of Hessian
     dim = cone.dim
     nnz_tri = 2 * dim - 1
@@ -187,7 +187,7 @@ function alloc_hess(cone::EpiNormInf{T, T}) where {T <: Real}
     return
 end
 
-function alloc_hess(cone::EpiNormInf{T, Complex{T}}) where {T <: Real}
+function alloc_hess!(cone::EpiNormInf{T, Complex{T}}) where {T <: Real}
     # initialize sparse idxs for upper triangle of Hessian
     dim = cone.dim
     nnz_tri = 2 * dim - 1 + cone.n
@@ -209,7 +209,7 @@ end
 
 function update_hess(cone::EpiNormInf{T, T}) where {T <: Real}
     cone.hess_aux_updated || update_hess_aux(cone)
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
 
     # modify nonzeros of upper triangle of Hessian
     nzval = cone.hess.data.nzval
@@ -227,7 +227,7 @@ end
 
 function update_hess(cone::EpiNormInf{T, Complex{T}}) where {T <: Real}
     cone.hess_aux_updated || update_hess_aux(cone)
-    isdefined(cone, :hess) || alloc_hess(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
 
     # modify nonzeros of upper triangle of Hessian
     nzval = cone.hess.data.nzval
@@ -323,7 +323,7 @@ end
 
 function update_inv_hess(cone::EpiNormInf{T}) where {T <: Real}
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-    isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     Hi = cone.inv_hess.data
     wden = cone.wden
     u = cone.point[1]

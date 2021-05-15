@@ -1,5 +1,5 @@
 #=
-see README.md and LICENSE
+see README.md and LICENSE.md
 =#
 
 module Hypatia

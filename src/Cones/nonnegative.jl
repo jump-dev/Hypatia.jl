@@ -45,7 +45,7 @@ use_sqrt_hess_oracles(cone::Nonnegative) = true
 
 get_nu(cone::Nonnegative) = cone.dim
 
-set_initial_point(arr::AbstractVector, cone::Nonnegative) = (arr .= 1)
+set_initial_point!(arr::AbstractVector, cone::Nonnegative) = (arr .= 1)
 
 function update_feas(cone::Nonnegative{T}) where T
     @assert !cone.feas_updated
