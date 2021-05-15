@@ -1,5 +1,5 @@
 #=
-utilities for polynomial interpolation on complex domains
+utilities for complex polynomial interpolation
 
 TODO make interface for complex and real interpolation consistent, use dispatch
 =#

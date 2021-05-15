@@ -1,5 +1,5 @@
 #=
-utilities for polynomial interpolation on real canonical domains
+utilities for real polynomial interpolation
 =#
 
 get_L(n::Int, d::Int) = binomial(n + d, n)
