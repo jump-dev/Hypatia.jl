@@ -169,7 +169,8 @@ function symm_kron!(
             row_idx = 1
             for j in 1:side
                 for i in 1:(j - 1)
-                    H[row_idx, col_idx] = mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k]
+                    H[row_idx, col_idx] = mat[i, k] * mat[j, l] +
+                        mat[i, l] * mat[j, k]
                     row_idx += 1
                 end
                 H[row_idx, col_idx] = rt2 * mat[j, k] * mat[j, l]
