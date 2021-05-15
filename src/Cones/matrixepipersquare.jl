@@ -214,7 +214,7 @@ function update_hess(cone::MatrixEpiPerSquare)
             @inbounds for l in lstart:d1
                 term1 = Zi[l, j] * tempd2d2ik
                 term2 = ZiW[l, i] * ZiWjk
-                hess_element(H, r_idx, c_idx, term1, term2)
+                spectral_hess_element!(H, r_idx, c_idx, term1, term2)
                 c_idx += idx_incr
             end
         end
@@ -224,7 +224,7 @@ function update_hess(cone::MatrixEpiPerSquare)
 
     # H_U_U part
     @views H_U_U = H[U_idxs, U_idxs]
-    symm_kron(H_U_U, Zi, cone.rt2)
+    symm_kron!(H_U_U, Zi, cone.rt2)
     @. H_U_U *= 4 * abs2(v)
 
     # H_v_v part

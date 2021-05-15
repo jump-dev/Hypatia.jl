@@ -182,7 +182,7 @@ function update_hess(cone::HypoRootdetTri)
         @. @views H[1, 2:end] = Huwconst * Wi_vec
     end
 
-    @inbounds @views symm_kron(H[2:end, 2:end], cone.Wi, cone.rt2)
+    @inbounds @views symm_kron!(H[2:end, 2:end], cone.Wi, cone.rt2)
     @inbounds for j in eachindex(Wi_vec)
         j1 = 1 + j
         Wi_vecj = dot_const * Wi_vec[j]
@@ -246,7 +246,7 @@ function update_inv_hess(cone::HypoRootdetTri)
     Hi12const = rtdet / d
     @. @views Hi[1, 2:end] = Hi12const * w
 
-    @inbounds @views symm_kron(Hi[2:end, 2:end], W, cone.rt2)
+    @inbounds @views symm_kron!(Hi[2:end, 2:end], W, cone.rt2)
     @inbounds for j in eachindex(w)
         j1 = 1 + j
         scwj = scdot * w[j]

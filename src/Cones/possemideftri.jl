@@ -124,7 +124,7 @@ end
 function update_hess(cone::PosSemidefTri)
     @assert cone.grad_updated
     isdefined(cone, :hess) || alloc_hess(cone)
-    symm_kron(cone.hess.data, cone.inv_mat, cone.rt2)
+    symm_kron!(cone.hess.data, cone.inv_mat, cone.rt2)
     cone.hess_updated = true
     return cone.hess
 end
@@ -132,7 +132,7 @@ end
 function update_inv_hess(cone::PosSemidefTri)
     @assert is_feas(cone)
     isdefined(cone, :inv_hess) || alloc_inv_hess(cone)
-    symm_kron(cone.inv_hess.data, cone.mat, cone.rt2)
+    symm_kron!(cone.inv_hess.data, cone.mat, cone.rt2)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end

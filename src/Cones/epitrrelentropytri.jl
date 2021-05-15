@@ -213,7 +213,7 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
         diff_tensor_V, rt2)
     @. dz_sqr_dV_sqr *= -1
     @views Hvv = H[V_idxs, V_idxs]
-    symm_kron(Hvv, Vi, rt2)
+    symm_kron!(Hvv, Vi, rt2)
     dzdV = cone.dzdV
     mul!(Hvv, dzdV, dzdV', true, true)
     @. Hvv += dz_sqr_dV_sqr / z
@@ -221,7 +221,7 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     dz_sqr_dW_sqr = grad_logm!(cone.dz_sqr_dW_sqr, W_vecs, cone.matsdim1,
         cone.matsdim2, cone.tempsdim, diff_mat_W, rt2)
     @views Hww = H[W_idxs, W_idxs]
-    symm_kron(Hww, Wi, rt2)
+    symm_kron!(Hww, Wi, rt2)
     dzdW = cone.dzdW
     mul!(Hww, dzdW, dzdW', true, true)
     @. Hww += dz_sqr_dW_sqr / z

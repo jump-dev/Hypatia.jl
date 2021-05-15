@@ -216,7 +216,7 @@ function update_hess(cone::HypoPerLogdetTri)
     Wivzi = cone.tempw
     @. Wivzi = vzi * Wi_vec
 
-    @inbounds @views symm_kron(H[3:end, 3:end], cone.Wi, cone.rt2)
+    @inbounds @views symm_kron!(H[3:end, 3:end], cone.Wi, cone.rt2)
     @inbounds for j in eachindex(Wi_vec)
         j2 = 2 + j
         Wivzij = Wivzi[j]
@@ -306,7 +306,7 @@ function update_inv_hess(cone::HypoPerLogdetTri)
     wv = cone.tempw
     @. wv = w * v
 
-    @inbounds @views symm_kron(Hi[3:end, 3:end], W, cone.rt2)
+    @inbounds @views symm_kron!(Hi[3:end, 3:end], W, cone.rt2)
     @inbounds for j in eachindex(wv)
         j2 = 2 + j
         wvjden = wv[j] / zvden

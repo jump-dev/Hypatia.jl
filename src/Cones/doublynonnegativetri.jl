@@ -161,7 +161,7 @@ function update_hess(cone::DoublyNonnegativeTri)
     isdefined(cone, :hess) || alloc_hess(cone)
     H = cone.hess.data
 
-    symm_kron(H, cone.inv_mat, cone.rt2)
+    symm_kron!(H, cone.inv_mat, cone.rt2)
     for (inv_od, idx) in zip(cone.inv_vec, cone.offdiag_idxs)
         H[idx, idx] += abs2(inv_od)
     end
