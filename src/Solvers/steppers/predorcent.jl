@@ -66,13 +66,14 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     rhs = stepper.rhs
     dir = stepper.dir
     dir_nocorr = stepper.dir_nocorr
+    cones = model.cones
 
     # update linear system solver factorization
     solver.time_upsys += @elapsed update_lhs(solver.syssolver, solver)
 
     # decide whether to predict or center
     is_pred = ((stepper.cent_count > 3) ||
-        all(Cones.in_neighborhood.(model.cones, sqrt(solver.mu), T(0.05)))) # TODO tune, make option
+        all(Cones.in_neighborhood.(cones, sqrt(solver.mu), T(0.05)))) # TODO tune, make option
     stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
     rhs_fun_nocorr = (is_pred ? update_rhs_pred : update_rhs_cent)
 
@@ -100,7 +101,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
                 @warn("very small alpha in curve search; trying without correction")
             else
                 # step
-                update_cone_points(alpha, point, stepper, false)
+                update_stepper_points(alpha, point, stepper, false)
                 stepper.prev_alpha = alpha
                 return true
             end
@@ -119,10 +120,16 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
                     # use uncorrected direction
                     stepper.uncorr_only = true
                     alpha = stepper.uncorr_alpha
+                    # ignore updates to cone points from last search
+                    Cones.load_point.(cones, point.primal_views)
+                    Cones.load_dual_point.(cones, point.dual_views)
+                    Cones.reset_data.(cones)
+                    # TODO save and copy from last uncorr candidate
+                    Cones.grad.(cones)
                 end
 
                 # step
-                update_cone_points(alpha, point, stepper, false)
+                update_stepper_points(alpha, point, stepper, false)
                 stepper.prev_alpha = alpha
                 return true
             end
@@ -143,7 +150,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     end
 
     # step
-    update_cone_points(alpha, point, stepper, false)
+    update_stepper_points(alpha, point, stepper, false)
     stepper.prev_alpha = alpha
 
     return true
@@ -151,7 +158,7 @@ end
 
 expect_improvement(stepper::PredOrCentStepper) = iszero(stepper.cent_count)
 
-function update_cone_points(
+function update_stepper_points(
     alpha::T,
     point::Point{T},
     stepper::PredOrCentStepper{T},

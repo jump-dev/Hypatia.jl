@@ -111,7 +111,7 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     end
 
     # step
-    update_cone_points(alpha, point, stepper, false)
+    update_stepper_points(alpha, point, stepper, false)
     stepper.prev_alpha = alpha
 
     return true
@@ -119,7 +119,7 @@ end
 
 expect_improvement(stepper::CombinedStepper) = true
 
-function update_cone_points(
+function update_stepper_points(
     alpha::T,
     point::Point{T},
     stepper::CombinedStepper{T},

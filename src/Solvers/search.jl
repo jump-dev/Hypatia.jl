@@ -39,7 +39,9 @@ function search_alpha(
     sched = start_sched(stepper, step_searcher)
     while sched <= length(step_searcher.alpha_sched)
         alpha = step_searcher.alpha_sched[sched]
-        update_cone_points(alpha, point, stepper, true) # update ztsk only
+        # update ztsk only in stepper.temp
+        update_stepper_points(alpha, point, stepper, true)
+        # NOTE updates cone points and grad
         if check_cone_points(stepper.temp, step_searcher, model)
             step_searcher.prev_sched = sched
             return alpha
