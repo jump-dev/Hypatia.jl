@@ -2258,8 +2258,8 @@ function epitrrelentropytri2(T; options...)
     b = zeros(T, svec_dim)
     b[[sum(1:i) for i in 1:side]] .= 1
     h = vcat(T(5), zeros(T, 2 * svec_dim))
-    g_svec = Cones.vec_to_svec!(ones(T, svec_dim))
-    G = Diagonal(vcat(0, g_svec, g_svec))
+    g_svec = Cones.vec_to_svec!(-ones(T, svec_dim))
+    G = vcat(zeros(T, 2 * svec_dim)', Diagonal(vcat(g_svec, g_svec)))
     cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(cone_dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
@@ -2520,11 +2520,11 @@ function wsosinterpepinormone2(T; options...)
 end
 
 function wsosinterpepinormone3(T; options...)
-    (T <: BlasReal) || return # calc_w only works with BlasReal
+    (T <: BlasReal) || return # get_quadr only works with BlasReal
     # max: w'f: 5x^2 >= abs(f(x)) + abs(3x^2) on [-1, 1], soln is +/- 2x^2
     tol = test_tol(T)
     (U, pts, Ps, _, w) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
-        [-one(T)], [one(T)]), 1, calc_w = true)
+        [-one(T)], [one(T)]), 1, get_quadr = true)
     DynamicPolynomials.@polyvar x
     fn1 = 5x^2
     fn2 = 3x^2
@@ -2590,11 +2590,11 @@ function wsosinterpepinormeucl2(T; options...)
 end
 
 function wsosinterpepinormeucl3(T; options...)
-    (T <: BlasReal) || return # calc_w only works with BlasReal
+    (T <: BlasReal) || return # get_quadr only works with BlasReal
     # max: w'f: 25x^4 >= f(x)^2 + 9x^4 on [-1, 1], soln is +/- 4x^2
     tol = test_tol(T)
     (U, pts, Ps, _, w) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
-        [-one(T)], [one(T)]), 1, calc_w = true)
+        [-one(T)], [one(T)]), 1, get_quadr = true)
     DynamicPolynomials.@polyvar x
     fn1 = 5x^2
     fn2 = 3x^2

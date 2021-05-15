@@ -16,7 +16,7 @@ function build(inst::EnvelopeJuMP{T}) where {T <: Float64}
 
     # generate interpolation
     (U, pts, Ps, _, w) = PolyUtils.interpolate(domain, inst.env_halfdeg,
-        calc_w = true)
+        get_quadr = true)
 
     # generate random polynomials
     L = binomial(n + inst.rand_halfdeg, n)

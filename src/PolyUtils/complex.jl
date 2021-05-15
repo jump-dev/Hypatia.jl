@@ -11,7 +11,7 @@ function interpolate(
     gs::Vector,
     g_halfdegs::Vector{Int};
     sample_factor::Int = 10,
-    use_QR::Bool = false,
+    use_qr::Bool = false,
     ) where {T <: Real}
     # generate interpolation
     # TODO use more numerically-stable basis for columns, and evaluate in a more
@@ -48,7 +48,7 @@ function interpolate(
 
     # setup P matrices
     P0 = V[:, 1:L]
-    if use_QR
+    if use_qr
         P0 = Matrix(qr(P0).Q)
     end
     Ps = [P0]
@@ -56,7 +56,7 @@ function interpolate(
         gi = gs[i].(points)
         @views P0i = P0[:, 1:binomial(n + halfdeg - g_halfdegs[i], n)]
         Pi = Diagonal(sqrt.(gi)) * P0i
-        if use_QR
+        if use_qr
             Pi = Matrix(qr(Pi).Q)
         end
         push!(Ps, Pi)

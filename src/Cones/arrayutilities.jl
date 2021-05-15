@@ -56,7 +56,7 @@ block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
 
 function vec_to_svec!(
     arr::AbstractVecOrMat{T};
-    scal::Real = sqrt(T(2)),
+    rt2::Real = sqrt(T(2)),
     incr::Int = 1,
     ) where T
     n = size(arr, 1)
@@ -65,7 +65,7 @@ function vec_to_svec!(
     k = 1
     for i in 1:side
         @inbounds @views for j in 1:(i - 1)
-            @. arr[k:(k + incr - 1), :] *= scal
+            @. arr[k:(k + incr - 1), :] *= rt2
             k += incr
         end
         k += incr
@@ -75,7 +75,7 @@ function vec_to_svec!(
 end
 
 svec_to_vec!(arr::AbstractVecOrMat{T}; incr::Int = 1) where T =
-    vec_to_svec!(arr, scal = inv(sqrt(T(2))), incr = incr)
+    vec_to_svec!(arr, rt2 = inv(sqrt(T(2))), incr = incr)
 
 function smat_to_svec!(
     vec::AbstractVector{T},
