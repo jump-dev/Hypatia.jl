@@ -2,9 +2,6 @@
 definitions of domains for polynomials
 =#
 
-import SpecialFunctions: gamma_inc
-using LinearAlgebra
-
 abstract type Domain{T <: Real} end
 
 

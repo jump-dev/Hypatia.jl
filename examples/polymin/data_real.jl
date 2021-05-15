@@ -55,12 +55,14 @@ function real_poly_data(polyname::Symbol, T::Type{<:Real} = Float64)
         true_obj = 3
     elseif polyname == :goldsteinprice_ball
         DP.@polyvar x[1:2]
-        f = (1+(x[1]+x[2]+1)^2*(19-14x[1]+3x[1]^2-14x[2]+6x[1]*x[2]+3x[2]^2))*(30+(2x[1]-3x[2])^2*(18-32x[1]+12x[1]^2+48x[2]-36x[1]*x[2]+27x[2]^2))
+        f = (1+(x[1]+x[2]+1)^2*(19-14x[1]+3x[1]^2-14x[2]+6x[1]*x[2]+3x[2]^2))*
+            (30+(2x[1]-3x[2])^2*(18-32x[1]+12x[1]^2+48x[2]-36x[1]*x[2]+27x[2]^2))
         dom = BallDomain{T}(zeros(T, 2), 2*sqrt(T(2)))
         true_obj = 3
     elseif polyname == :goldsteinprice_ellipsoid
         DP.@polyvar x[1:2]
-        f = (1+(x[1]+x[2]+1)^2*(19-14x[1]+3x[1]^2-14x[2]+6x[1]*x[2]+3x[2]^2))*(30+(2x[1]-3x[2])^2*(18-32x[1]+12x[1]^2+48x[2]-36x[1]*x[2]+27x[2]^2))
+        f = (1+(x[1]+x[2]+1)^2*(19-14x[1]+3x[1]^2-14x[2]+6x[1]*x[2]+3x[2]^2))*
+            (30+(2x[1]-3x[2])^2*(18-32x[1]+12x[1]^2+48x[2]-36x[1]*x[2]+27x[2]^2))
         centers = zeros(T, 2)
         Q = Diagonal(T(0.25) * ones(T, 2))
         dom = EllipsoidDomain{T}(centers, Q)
@@ -112,12 +114,14 @@ function real_poly_data(polyname::Symbol, T::Type{<:Real} = Float64)
         true_obj = -36.71269068
     elseif polyname == :robinson
         DP.@polyvar x[1:2]
-        f = 1+x[1]^6+x[2]^6-x[1]^4*x[2]^2+x[1]^4-x[1]^2*x[2]^4+x[2]^4-x[1]^2+x[2]^2+3x[1]^2*x[2]^2
+        f = 1+x[1]^6+x[2]^6-x[1]^4*x[2]^2+x[1]^4-x[1]^2*x[2]^4+x[2]^4-x[1]^2+
+            x[2]^2+3x[1]^2*x[2]^2
         dom = BoxDomain{T}(-ones(T, 2), ones(T, 2))
         true_obj = 0.814814
     elseif polyname == :robinson_ball
         DP.@polyvar x[1:2]
-        f = 1+x[1]^6+x[2]^6-x[1]^4*x[2]^2+x[1]^4-x[1]^2*x[2]^4+x[2]^4-x[1]^2+x[2]^2+3x[1]^2*x[2]^2
+        f = 1+x[1]^6+x[2]^6-x[1]^4*x[2]^2+x[1]^4-x[1]^2*x[2]^4+x[2]^4-x[1]^2+
+            x[2]^2+3x[1]^2*x[2]^2
         dom = BallDomain{T}(zeros(T, 2), sqrt(T(2)))
         true_obj = 0.814814
     elseif polyname == :rosenbrock

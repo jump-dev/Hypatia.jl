@@ -7,7 +7,6 @@ insts["minimal"] = [
     ((:lotkavolterra, 3, true, true),),
     ((:motzkin_ellipsoid, 3, false, true),),
     ((:schwefel_ball, 2, false, false),),
-
     ]
 insts["fast"] = [
     ((1, 3, true, true),),
