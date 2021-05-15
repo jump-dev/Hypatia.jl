@@ -169,8 +169,8 @@ function symm_kron!(
             row_idx = 1
             for j in 1:side
                 for i in 1:(j - 1)
-                    H[row_idx, col_idx] = mat[i, k] * mat[j, l] +
-                        mat[i, l] * mat[j, k]
+                    H[row_idx, col_idx] =
+                        mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k]
                     row_idx += 1
                 end
                 H[row_idx, col_idx] = rt2 * mat[j, k] * mat[j, l]
@@ -197,59 +197,51 @@ function symm_kron!(
 end
 
 function symm_kron!(
-    H::Matrix{T},
+    H::AbstractMatrix{T},
     mat::AbstractMatrix{Complex{T}},
     rt2::T,
     ) where {T <: Real}
     side = size(mat, 1)
 
     col_idx = 1
-    for i in 1:side, j in 1:i
-        row_idx = 1
-        if i == j
-            @inbounds for i2 in 1:side, j2 in 1:i2
-                if i2 == j2
-                    H[row_idx, col_idx] = abs2(mat[i2, i])
-                    row_idx += 1
-                else
-                    c = rt2 * mat[i, i2] * mat[j2, j]
-                    H[row_idx, col_idx] = real(c)
-                    row_idx += 1
-                    H[row_idx, col_idx] = -imag(c)
-                    row_idx += 1
+    @inbounds for l in 1:side
+        for k in 1:(l - 1)
+            row_idx = 1
+            for j in 1:side
+                for i in 1:(j - 1)
+                    a = mat[i, k] * mat[l, j]
+                    b = mat[j, k] * mat[l, i]
+                    spectral_kron_element!(H, row_idx, col_idx, a, b)
+                    row_idx += 2
                 end
-                (row_idx > col_idx) && break
-            end
-            col_idx += 1
-        else
-            @inbounds for i2 in 1:side, j2 in 1:i2
-                if i2 == j2
-                    c = rt2 * mat[i2, i] * mat[j, j2]
-                    H[row_idx, col_idx] = real(c)
-                    H[row_idx, col_idx + 1] = -imag(c)
-                    row_idx += 1
-                else
-                    b1 = mat[i2, i] * mat[j, j2]
-                    b2 = mat[j2, i] * mat[j, i2]
-                    c1 = b1 + b2
-                    H[row_idx, col_idx] = real(c1)
-                    H[row_idx, col_idx + 1] = -imag(c1)
-                    row_idx += 1
-                    c2 = b1 - b2
-                    H[row_idx, col_idx] = imag(c2)
-                    H[row_idx, col_idx + 1] = real(c2)
-                    row_idx += 1
-                end
+                c = rt2 * mat[j, k] * mat[l, j]
+                H[row_idx, col_idx] = real(c)
+                H[row_idx, col_idx + 1] = imag(c)
+                row_idx += 1
                 (row_idx > col_idx) && break
             end
             col_idx += 2
         end
+
+        row_idx = 1
+        for j in 1:side
+            for i in 1:(j - 1)
+                c = rt2 * mat[i, l] * mat[l, j]
+                H[row_idx, col_idx] = real(c)
+                H[row_idx + 1, col_idx] = -imag(c)
+                row_idx += 2
+            end
+            H[row_idx, col_idx] = abs2(mat[j, l])
+            row_idx += 1
+            (row_idx > col_idx) && break
+        end
+        col_idx += 1
     end
 
     return H
 end
 
-function spectral_hess_element!(
+function spectral_kron_element!(
     H::Matrix{T},
     i::Int,
     j::Int,
@@ -260,18 +252,20 @@ function spectral_hess_element!(
     return H
 end
 
-function spectral_hess_element!(
+function spectral_kron_element!(
     H::Matrix{T},
     i::Int,
     j::Int,
     a::Complex{T},
     b::Complex{T},
     ) where {T <: Real}
+    apb = a + b
+    amb = a - b
     @inbounds begin
-        H[i, j] = real(a) + real(b)
-        H[i + 1, j] = imag(b) - imag(a)
-        H[i, j + 1] = imag(a) + imag(b)
-        H[i + 1, j + 1] = real(a) - real(b)
+        H[i, j] = real(apb)
+        H[i + 1, j] = -imag(amb)
+        H[i, j + 1] = imag(apb)
+        H[i + 1, j + 1] = real(amb)
     end
     return H
 end

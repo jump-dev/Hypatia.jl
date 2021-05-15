@@ -214,7 +214,7 @@ function update_hess(cone::MatrixEpiPerSquare)
             @inbounds for l in lstart:d1
                 term1 = Zi[l, j] * tempd2d2ik
                 term2 = ZiW[l, i] * ZiWjk
-                spectral_hess_element!(H, r_idx, c_idx, term1, term2)
+                spectral_kron_element!(H, r_idx, c_idx, term1, term2)
                 c_idx += idx_incr
             end
         end

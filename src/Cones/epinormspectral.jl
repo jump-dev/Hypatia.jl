@@ -193,7 +193,7 @@ function update_hess(cone::EpiNormSpectral)
             @inbounds for l in lstart:d1
                 term1 = Zi[l, j] * WtauIik
                 term2 = tau[l, i] * taujk
-                spectral_hess_element!(H, r_idx, c_idx, term1, term2)
+                spectral_kron_element!(H, r_idx, c_idx, term1, term2)
                 c_idx += idx_incr
             end
         end
