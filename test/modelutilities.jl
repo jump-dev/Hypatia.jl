@@ -13,22 +13,22 @@ function test_svec_conversion(T::Type{<:Real})
 
     vec = rand(T, 6)
     vec_copy = copy(vec)
-    ModelUtilities.vec_to_svec!(vec)
+    Cones.vec_to_svec!(vec)
     @test vec ≈ vec_copy .* [1, rt2, 1, rt2, rt2, 1] atol=tol rtol=tol
 
     copyto!(vec, vec_copy)
-    ModelUtilities.vec_to_svec!(vec, incr = 2)
+    Cones.vec_to_svec!(vec, incr = 2)
     @test vec ≈ vec_copy .* [1, 1, rt2, rt2, 1, 1] atol=tol rtol=tol
 
     mat = rand(T, 10, 3)
     mat_copy = copy(mat)
-    ModelUtilities.vec_to_svec!(mat)
+    Cones.vec_to_svec!(mat)
     @test mat ≈ mat_copy .* [1, rt2, 1, rt2, rt2, 1,
         rt2, rt2, rt2, 1] atol=tol rtol=tol
 
     mat = rand(T, 12, 3)
     mat_copy = copy(mat)
-    ModelUtilities.vec_to_svec!(mat, incr = 2)
+    Cones.vec_to_svec!(mat, incr = 2)
     @test mat ≈ mat_copy .* [1, 1, rt2, rt2, 1, 1, rt2,
         rt2, rt2, rt2, 1, 1] atol=tol rtol=tol
 end

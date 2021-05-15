@@ -167,7 +167,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64}
             if n == 1
                 conv_K = Hypatia.WSOSInterpNonnegativeCone{T, T}(conv_U, conv_Ps)
             else
-                ModelUtilities.vec_to_svec!(H_interp,
+                Cones.vec_to_svec!(H_interp,
                     rt2 = sqrt(T(2)), incr = conv_U)
                 conv_K = Hypatia.WSOSInterpPosSemidefTriCone{T}(n, conv_U, conv_Ps)
             end

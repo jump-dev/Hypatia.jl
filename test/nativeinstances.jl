@@ -2259,7 +2259,7 @@ function epitrrelentropytri2(T; options...)
     b[[sum(1:i) for i in 1:side]] .= 1
     h = vcat(T(5), zeros(T, 2 * svec_dim))
     G = vcat(zeros(T, 1, 2 * svec_dim),
-        ModelUtilities.vec_to_svec!(Diagonal(-one(T) * I, 2 * svec_dim)))
+        Cones.vec_to_svec!(Diagonal(-one(T) * I, 2 * svec_dim)))
     cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(cone_dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
@@ -2442,7 +2442,7 @@ function wsosinterppossemideftri2(T; options...)
     b = T[]
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
     h = T[H[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
-    ModelUtilities.vec_to_svec!(h, incr = U)
+    Cones.vec_to_svec!(h, incr = U)
     cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
@@ -2466,7 +2466,7 @@ function wsosinterppossemideftri3(T; options...)
     b = T[]
     h = T[M[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
     G = zeros(T, length(h), 0)
-    ModelUtilities.vec_to_svec!(h, incr = U)
+    Cones.vec_to_svec!(h, incr = U)
     cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)

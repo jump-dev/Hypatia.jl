@@ -94,7 +94,7 @@ function build_real(inst::PolyMinNative{T}) where {T <: Real}
                     @. @views G[offset + l, :] = -Pk[:, i] * Pk[:, j]
                     l += 1
                 end
-                @views ModelUtilities.vec_to_svec!(G[(offset + 1):(offset + dk), :], rt2 = sqrt(T(2)))
+                @views Cones.vec_to_svec!(G[(offset + 1):(offset + dk), :], rt2 = sqrt(T(2)))
                 offset += dk
             end
             if nonneg_cone_size > 0

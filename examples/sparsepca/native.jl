@@ -49,7 +49,7 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
         # l1 cone
         # double off-diagonals, which are already scaled by rt2
         Gl1vec = fill(-one(T), dimx)
-        ModelUtilities.vec_to_svec!(Gl1vec, rt2 = sqrt(T(2)))
+        Cones.vec_to_svec!(Gl1vec, rt2 = sqrt(T(2)))
         G = [
             sparse(-one(T) * I, dimx, dimx);
             spzeros(T, 1, dimx);
@@ -58,7 +58,7 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
         h = vcat(hpsd, T(k), zeros(T, dimx))
         push!(cones, Cones.EpiNormInf{T, T}(1 + dimx, use_dual = true))
     else
-        l1 = ModelUtilities.vec_to_svec!(ones(T, dimx), rt2 = sqrt(T(2)))
+        l1 = Cones.vec_to_svec!(ones(T, dimx), rt2 = sqrt(T(2)))
         G = [
             -I    spzeros(T, dimx, 2 * dimx);
             spzeros(T, 2 * dimx, dimx)    -I;

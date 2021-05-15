@@ -116,8 +116,8 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
                         num_unknown + num_W1_vars + W2_var_idx] = -1
                 end
             end
-            ModelUtilities.vec_to_svec!(G_norm, rt2 = rt2)
-            ModelUtilities.vec_to_svec!(h_norm, rt2 = rt2)
+            Cones.vec_to_svec!(G_norm, rt2 = rt2)
+            Cones.vec_to_svec!(h_norm, rt2 = rt2)
             cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(num_rows)]
             c_W1 = Cones.smat_to_svec!(zeros(T, num_W1_vars),
                 Diagonal(one(T) * I, m), rt2)
@@ -159,8 +159,8 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
                 idx += i
                 G_norm[offset + idx - 1, 1] = -1
             end
-            ModelUtilities.vec_to_svec!(G_norm, rt2 = rt2)
-            ModelUtilities.vec_to_svec!(h_norm, rt2 = rt2)
+            Cones.vec_to_svec!(G_norm, rt2 = rt2)
+            Cones.vec_to_svec!(h_norm, rt2 = rt2)
             cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(num_rows)]
             c = vcat(one(T), zeros(T, num_unknown))
         end
