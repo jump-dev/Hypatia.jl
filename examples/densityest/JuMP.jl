@@ -29,14 +29,14 @@ end
 function build(inst::DensityEstJuMP{T}) where {T <: Float64}
     X = inst.X
     (num_obs, n) = size(X)
-    domain = ModelUtilities.Box{T}(-ones(n), ones(n)) # domain is unit box
+    domain = PolyUtils.BoxDomain{T}(-ones(n), ones(n)) # domain is unit box
 
     # setup interpolation
     halfdeg = div(inst.deg + 1, 2)
-    (U, _, Ps, V, w) = ModelUtilities.interpolate(domain, halfdeg,
+    (U, _, Ps, V, w) = PolyUtils.interpolate(domain, halfdeg,
         calc_V = true, calc_w = true)
     F = qr!(Array(V'), Val(true))
-    V_X = ModelUtilities.make_chebyshev_vandermonde(X, 2 * halfdeg)
+    V_X = PolyUtils.make_chebyshev_vandermonde(X, 2 * halfdeg)
     X_pts_polys = F \ V_X'
 
     model = JuMP.Model()

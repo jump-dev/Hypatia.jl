@@ -28,7 +28,9 @@ Hypatia.jl is licensed under the **[MIT License]**.
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 
-Some code for polynomial interpolations (in the ModelUtilities module) and several sum-of-squares examples (in the examples folder) is adapted from the **[Alfonso]** and **[Chebfun]** packages in MATLAB (licenses below).
+Some code for polynomial interpolations (in the PolyUtils module) and several
+sum-of-squares examples (in the examples folder) is adapted from the
+**[Alfonso]** and **[Chebfun]** packages in MATLAB (licenses below).
 
 **[Alfonso]**:
 

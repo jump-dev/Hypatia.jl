@@ -21,7 +21,7 @@ function __init__()
 end
 
 # submodules
-include("ModelUtilities/ModelUtilities.jl")
+include("PolyUtils/PolyUtils.jl")
 include("Cones/Cones.jl")
 include("Models/Models.jl")
 include("Solvers/Solvers.jl")

@@ -13,7 +13,7 @@ import GenericLinearAlgebra.eigvals
 import GenericLinearAlgebra.eigen
 import DynamicPolynomials
 import Hypatia
-import Hypatia.ModelUtilities
+import Hypatia.PolyUtils
 import Hypatia.Cones
 import Hypatia.Cones.Cone
 import Hypatia.Solvers
@@ -2259,7 +2259,7 @@ function epitrrelentropytri2(T; options...)
     b[[sum(1:i) for i in 1:side]] .= 1
     h = vcat(T(5), zeros(T, 2 * svec_dim))
     G = vcat(zeros(T, 1, 2 * svec_dim),
-        ModelUtilities.vec_to_svec!(Diagonal(-one(T) * I, 2 * svec_dim)))
+        Cones.vec_to_svec!(Diagonal(-one(T) * I, 2 * svec_dim)))
     cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(cone_dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
@@ -2310,7 +2310,7 @@ end
 
 function wsosinterpnonnegative1(T; options...)
     tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         -zeros(T, 2), ones(T, 2)), 2)
     DynamicPolynomials.@polyvar x y
     fn = x ^ 4 + x ^ 2 * y ^ 2 + 4 * y ^ 2 + 4
@@ -2330,7 +2330,7 @@ end
 
 function wsosinterpnonnegative2(T; options...)
     tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         zeros(T, 2), fill(T(3), 2)), 2)
     DynamicPolynomials.@polyvar x y
     fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
@@ -2350,7 +2350,7 @@ end
 
 function wsosinterpnonnegative3(T; options...)
     tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         zeros(T, 2), fill(T(3), 2)), 2)
     DynamicPolynomials.@polyvar x y
     fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
@@ -2371,7 +2371,7 @@ function wsosinterpnonnegative4(T; options...)
     tol = test_tol(T)
     f = (z -> 1 + sum(abs2, z))
     gs = [z -> 1 - sum(abs2, z)]
-    (points, Ps) = ModelUtilities.interpolate(Complex{T}, 1, 2, gs, [1])
+    (points, Ps) = PolyUtils.interpolate(Complex{T}, 1, 2, gs, [1])
     U = length(points)
 
     c = T[-1]
@@ -2391,7 +2391,7 @@ function wsosinterpnonnegative5(T; options...)
     tol = test_tol(T)
     f = (z -> 1 + sum(abs2, z))
     gs = [z -> 1 - abs2(z[1]), z -> 1 - abs2(z[2])]
-    (points, Ps) = ModelUtilities.interpolate(Complex{T}, 2, 2, gs, [1, 1])
+    (points, Ps) = PolyUtils.interpolate(Complex{T}, 2, 2, gs, [1, 1])
     U = length(points)
 
     c = f.(points)
@@ -2410,7 +2410,7 @@ end
 function wsosinterppossemideftri1(T; options...)
     # convexity parameter for (x + 1) ^ 2 * (x - 1) ^ 2
     tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
     fn = (x + 1) ^ 2 * (x - 1) ^ 2
@@ -2432,7 +2432,7 @@ end
 function wsosinterppossemideftri2(T; options...)
     # convexity parameter for x[1] ^ 4 - 3 * x[2] ^ 2
     tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(2), 1)
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.FreeDomain{T}(2), 1)
     DynamicPolynomials.@polyvar x[1:2]
     fn = x[1] ^ 4 - 3 * x[2] ^ 2
     H = DynamicPolynomials.differentiate(fn, x, 2)
@@ -2442,7 +2442,7 @@ function wsosinterppossemideftri2(T; options...)
     b = T[]
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
     h = T[H[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
-    ModelUtilities.vec_to_svec!(h, incr = U)
+    Cones.vec_to_svec!(h, incr = U)
     cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
@@ -2453,7 +2453,7 @@ end
 
 function wsosinterppossemideftri3(T; options...)
     tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.FreeDomain{T}(1), 3)
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.FreeDomain{T}(1), 3)
     DynamicPolynomials.@polyvar x
     M = [
         (x + 2x^3)  1;
@@ -2466,7 +2466,7 @@ function wsosinterppossemideftri3(T; options...)
     b = T[]
     h = T[M[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
     G = zeros(T, length(h), 0)
-    ModelUtilities.vec_to_svec!(h, incr = U)
+    Cones.vec_to_svec!(h, incr = U)
     cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
@@ -2477,7 +2477,7 @@ end
 function wsosinterpepinormone1(T; options...)
     # min t(x) : t(x) >= abs(x ^ 2) on [-1, 1] where t(x) a constant
     tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1)
     @assert U == 3
     DynamicPolynomials.@polyvar x
@@ -2499,7 +2499,7 @@ end
 function wsosinterpepinormone2(T; options...)
     # min t(x) : t(x) >= abs(x ^ 2) + abs(x - 1) on [-1, 1] where t(x) a constant
     tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
     fn1 = x ^ 2
@@ -2523,7 +2523,7 @@ function wsosinterpepinormone3(T; options...)
     (T <: BlasReal) || return # calc_w only works with BlasReal
     # max: w'f: 5x^2 >= abs(f(x)) + abs(3x^2) on [-1, 1], soln is +/- 2x^2
     tol = test_tol(T)
-    (U, pts, Ps, _, w) = ModelUtilities.interpolate(ModelUtilities.Box{T}(
+    (U, pts, Ps, _, w) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1, calc_w = true)
     DynamicPolynomials.@polyvar x
     fn1 = 5x^2
@@ -2547,7 +2547,7 @@ end
 function wsosinterpepinormeucl1(T; options...)
     # min t(x) : t(x) ^ 2 >= x ^ 4 on [-1, 1] where t(x) a constant
     tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1)
     @assert U == 3
     DynamicPolynomials.@polyvar x
@@ -2569,7 +2569,7 @@ end
 function wsosinterpepinormeucl2(T; options...)
     # min t(x) : t(x) ^ 2 >= x ^ 4 + (x - 1) ^ 2 on [-1, 1] where t(x) a constant
     tol = test_tol(T)
-    (U, pts, Ps) = ModelUtilities.interpolate(ModelUtilities.Box{T}(
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
     fn1 = x ^ 2
@@ -2593,7 +2593,7 @@ function wsosinterpepinormeucl3(T; options...)
     (T <: BlasReal) || return # calc_w only works with BlasReal
     # max: w'f: 25x^4 >= f(x)^2 + 9x^4 on [-1, 1], soln is +/- 4x^2
     tol = test_tol(T)
-    (U, pts, Ps, _, w) = ModelUtilities.interpolate(ModelUtilities.Box{T}(
+    (U, pts, Ps, _, w) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
         [-one(T)], [one(T)]), 1, calc_w = true)
     DynamicPolynomials.@polyvar x
     fn1 = 5x^2

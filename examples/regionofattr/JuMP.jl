@@ -33,14 +33,14 @@ function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64}
     vT = DP.subs(v, t => 1.0)
 
     if inst.use_wsos
-        dom1 = ModelUtilities.Box{T}([-1.0], [1.0]) # just state
-        dom2 = ModelUtilities.Box{T}([-1.0, 0.0], [1.0, 1.0]) # state and time
-        dom3 = ModelUtilities.Box{T}([-0.01], [0.01]) # state at the end
+        dom1 = PolyUtils.BoxDomain{T}([-1.0], [1.0]) # just state
+        dom2 = PolyUtils.BoxDomain{T}([-1.0, 0.0], [1.0, 1.0]) # state and time
+        dom3 = PolyUtils.BoxDomain{T}([-0.01], [0.01]) # state at the end
         halfdeg = div(deg + 1, 2)
         (U1, pts1, Ps1, _, quad_weights) =
-            ModelUtilities.interpolate(dom1, halfdeg, calc_w = true)
-        (U2, pts2, Ps2) = ModelUtilities.interpolate(dom2, halfdeg)
-        (U3, pts3, Ps3) = ModelUtilities.interpolate(dom3, halfdeg - 1)
+            PolyUtils.interpolate(dom1, halfdeg, calc_w = true)
+        (U2, pts2, Ps2) = PolyUtils.interpolate(dom2, halfdeg)
+        (U3, pts3, Ps3) = PolyUtils.interpolate(dom3, halfdeg - 1)
         wsos_cone1 = Hypatia.WSOSInterpNonnegativeCone{T, T}(U1, Ps1)
         wsos_cone2 = Hypatia.WSOSInterpNonnegativeCone{T, T}(U2, Ps2)
         wsos_cone3 = Hypatia.WSOSInterpNonnegativeCone{T, T}(U3, Ps3)

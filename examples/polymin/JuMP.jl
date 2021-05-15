@@ -2,7 +2,7 @@
 see description in examples/polymin/native.jl
 =#
 
-include(joinpath(@__DIR__, "data.jl"))
+include(joinpath(@__DIR__, "data_real.jl"))
 
 struct PolyMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     interp_vals::Vector{T}

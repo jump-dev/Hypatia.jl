@@ -20,8 +20,8 @@ function build(inst::NearestPolyMatJuMP{T}) where {T <: Float64}
     L = binomial(n + halfdeg, n)
     svec_dim = div(R * (R + 1), 2)
 
-    domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))
-    (U, points, Ps, V, w) = ModelUtilities.interpolate(domain, halfdeg,
+    domain = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n))
+    (U, points, Ps, V, w) = PolyUtils.interpolate(domain, halfdeg,
         calc_V = true, calc_w = true)
 
     model = JuMP.Model()

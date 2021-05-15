@@ -27,7 +27,7 @@ function build(inst::StabilityNumber{T}) where {T <: Float64}
     X_vec = JuMP.AffExpr[X_lifted[i, j] for i in 1:side for j in 1:i]
     if inst.use_doublynonnegativetri
         cone_dim = length(X_vec)
-        X_scal = X_vec .* ModelUtilities.vec_to_svec!(ones(cone_dim))
+        X_scal = X_vec .* Cones.vec_to_svec!(ones(cone_dim))
         JuMP.@constraint(model, X_scal in
             Hypatia.DoublyNonnegativeTriCone{T}(cone_dim))
     else

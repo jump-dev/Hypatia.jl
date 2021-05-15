@@ -1,17 +1,18 @@
 #=
-polymin real: formulates and solves the real polynomial optimization problem for a given polynomial; see:
-D. Papp and S. Yildiz. Sum-of-squares optimization without semidefinite programming.
+polynomial optimization problem
+see:
+D. Papp and S. Yildiz
+Sum-of-squares optimization without semidefinite programming
 
-polymin complex: minimizes a real-valued complex polynomial over a domain defined by real-valued complex polynomials
+real polynomials and real-valued complex polynomials
 
 TODO
-- generalize ModelUtilities interpolation code for complex polynomials space
-- merge real and complex polyvars data
 - implement PSD formulation for complex case
 =#
 
 import Combinatorics
-include(joinpath(@__DIR__, "data.jl"))
+include(joinpath(@__DIR__, "data_real.jl"))
+include(joinpath(@__DIR__, "data_complex.jl"))
 
 struct PolyMinNative{T <: Real} <: ExampleInstanceNative{T}
     is_complex::Bool
@@ -94,7 +95,7 @@ function build_real(inst::PolyMinNative{T}) where {T <: Real}
                     @. @views G[offset + l, :] = -Pk[:, i] * Pk[:, j]
                     l += 1
                 end
-                @views ModelUtilities.vec_to_svec!(G[(offset + 1):(offset + dk), :], rt2 = sqrt(T(2)))
+                @views Cones.vec_to_svec!(G[(offset + 1):(offset + dk), :], rt2 = sqrt(T(2)))
                 offset += dk
             end
             if nonneg_cone_size > 0

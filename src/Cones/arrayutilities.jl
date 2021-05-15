@@ -2,6 +2,59 @@
 utilities for arrays
 =#
 
+vec_copy_to!(
+    v1::AbstractVecOrMat{T},
+    v2::AbstractVecOrMat{T},
+    ) where {T <: Real} = copyto!(v1, v2)
+
+vec_copy_to!(
+    v1::AbstractVecOrMat{T},
+    v2::AbstractVecOrMat{Complex{T}},
+    ) where {T <: Real} = cvec_to_rvec!(v1, v2)
+
+vec_copy_to!(
+    v1::AbstractVecOrMat{Complex{T}},
+    v2::AbstractVecOrMat{T},
+    ) where {T <: Real} = rvec_to_cvec!(v1, v2)
+
+function vec_to_svec!(
+    arr::AbstractVecOrMat{T};
+    rt2 = sqrt(T(2)),
+    incr::Int = 1,
+    ) where T
+    n = size(arr, 1)
+    @assert iszero(rem(n, incr))
+    side = round(Int, sqrt(0.25 + 2 * div(n, incr)) - 0.5)
+    k = 1
+    for i in 1:side
+        for j in 1:(i - 1)
+            @inbounds @. @views arr[k:(k + incr - 1), :] *= rt2
+            k += incr
+        end
+        k += incr
+    end
+    return arr
+end
+
+function svec_to_vec!(
+    arr::AbstractVecOrMat{T};
+    rt2 = sqrt(T(2)),
+    incr::Int = 1,
+    ) where T
+    n = size(arr, 1)
+    @assert iszero(rem(n, incr))
+    side = round(Int, sqrt(0.25 + 2 * div(n, incr)) - 0.5)
+    k = 1
+    for i in 1:side
+        for j in 1:(i - 1)
+            @inbounds @. @views arr[k:(k + incr - 1), :] /= rt2
+            k += incr
+        end
+        k += incr
+    end
+    return arr
+end
+
 svec_length(side::Int) = div(side * (side + 1), 2)
 
 svec_idx(row::Int, col::Int) = (div((row - 1) * row, 2) + col)
@@ -150,21 +203,6 @@ function cvec_to_rvec!(
     end
     return rvec
 end
-
-vec_copy_to!(
-    v1::AbstractVecOrMat{T},
-    v2::AbstractVecOrMat{T},
-    ) where {T <: Real} = copyto!(v1, v2)
-
-vec_copy_to!(
-    v1::AbstractVecOrMat{T},
-    v2::AbstractVecOrMat{Complex{T}},
-    ) where {T <: Real} = cvec_to_rvec!(v1, v2)
-
-vec_copy_to!(
-    v1::AbstractVecOrMat{Complex{T}},
-    v2::AbstractVecOrMat{T},
-    ) where {T <: Real} = rvec_to_cvec!(v1, v2)
 
 # kronecker utilities
 

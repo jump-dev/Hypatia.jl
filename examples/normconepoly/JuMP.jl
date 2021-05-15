@@ -12,8 +12,8 @@ end
 
 function build(inst::NormConePoly{T}) where {T <: Float64}
     halfdeg = div(inst.deg + 1, 2)
-    (U, pts, Ps) = ModelUtilities.interpolate(
-        ModelUtilities.FreeDomain{T}(1), halfdeg)
+    (U, pts, Ps) = PolyUtils.interpolate(
+        PolyUtils.FreeDomain{T}(1), halfdeg)
     vals = normconepoly_data[inst.polys_name].(pts)
     l = length(vals[1])
     if inst.use_L2

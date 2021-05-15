@@ -20,7 +20,7 @@ end
 
 function build(inst::MuConvexityJuMP{T}) where {T <: Float64}
     dom = muconvexity_data[inst.dom]
-    n = ModelUtilities.get_dimension(dom)
+    n = PolyUtils.get_dimension(dom)
     DP.@polyvar x[1:n]
     poly = muconvexity_data[inst.poly](x)
 
@@ -33,10 +33,10 @@ function build(inst::MuConvexityJuMP{T}) where {T <: Float64}
 
     if inst.use_matrixwsos
         d = div(maximum(DP.maxdegree.(H)) + 1, 2)
-        (U, pts, Ps) = ModelUtilities.interpolate(dom, d)
+        (U, pts, Ps) = PolyUtils.interpolate(dom, d)
         mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{T}(n, U, Ps)
         H_interp = [H[i, j](x => pts[u, :]) for i in 1:n for j in 1:i for u in 1:U]
-        JuMP.@constraint(model, ModelUtilities.vec_to_svec!(H_interp,
+        JuMP.@constraint(model, Cones.vec_to_svec!(H_interp,
             rt2 = sqrt(2), incr = U) in mat_wsos_cone)
     else
         PolyJuMP.setpolymodule!(model, SumOfSquares)
@@ -60,7 +60,7 @@ end
 bss() = SAS.BasicSemialgebraicSet{Float64,
     DynamicPolynomials.Polynomial{true, Float64}}()
 
-function get_domain_inequalities(dom::ModelUtilities.Box, x)
+function get_domain_inequalities(dom::PolyUtils.BoxDomain, x)
     box = bss()
     for (xi, ui, li) in zip(x, dom.u, dom.l)
         SAS.addinequality!(box, (-xi + ui) * (xi - li))
@@ -68,13 +68,13 @@ function get_domain_inequalities(dom::ModelUtilities.Box, x)
     return box
 end
 
-get_domain_inequalities(dom::ModelUtilities.FreeDomain, x) = bss()
+get_domain_inequalities(dom::PolyUtils.FreeDomain, x) = bss()
 
 muconvexity_data = Dict(
     :poly1 => (x -> (x[1] + 1)^2 * (x[1] - 1)^2),
     :poly2 => (x -> sum(x .^ 4) - sum(x .^ 2)),
-    :dom1 => ModelUtilities.FreeDomain{Float64}(1),
-    :dom2 => ModelUtilities.Box{Float64}([-1.0], [1.0]),
-    :dom3 => ModelUtilities.FreeDomain{Float64}(3),
-    :dom4 => ModelUtilities.Box{Float64}([-1.0, 0.0], [1.0, 2.0]),
+    :dom1 => PolyUtils.FreeDomain{Float64}(1),
+    :dom2 => PolyUtils.BoxDomain{Float64}([-1.0], [1.0]),
+    :dom3 => PolyUtils.FreeDomain{Float64}(3),
+    :dom4 => PolyUtils.BoxDomain{Float64}([-1.0, 0.0], [1.0, 2.0]),
     )

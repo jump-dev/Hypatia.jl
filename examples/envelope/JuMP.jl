@@ -12,10 +12,10 @@ end
 function build(inst::EnvelopeJuMP{T}) where {T <: Float64}
     n = inst.n
     @assert inst.rand_halfdeg <= inst.env_halfdeg
-    domain = ModelUtilities.Box{T}(-ones(T, n), ones(T, n))
+    domain = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n))
 
     # generate interpolation
-    (U, pts, Ps, _, w) = ModelUtilities.interpolate(domain, inst.env_halfdeg,
+    (U, pts, Ps, _, w) = PolyUtils.interpolate(domain, inst.env_halfdeg,
         calc_w = true)
 
     # generate random polynomials

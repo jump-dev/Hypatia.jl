@@ -9,9 +9,9 @@ import Hypatia.Solvers
 include(joinpath(@__DIR__, "moicones.jl"))
 include(joinpath(@__DIR__, "moi.jl"))
 
-@testset "MOI tests" begin
+@testset "MathOptInterface wrapper tests" begin
 
-@testset "MOI wrapper cone tests" begin
+@testset "MOI cone tests" begin
     println("starting MOI wrapper cone tests")
     real_types = [
         Float64,
