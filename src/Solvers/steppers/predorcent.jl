@@ -94,8 +94,8 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         if stepper.use_curve_search
             # do single curve search with correction
             stepper.uncorr_only = false
-            solver.time_search += @elapsed alpha =
-                search_alpha(point, model, stepper)
+            solver.time_search += @elapsed alpha = search_alpha(point, model,
+                stepper)
 
             if iszero(alpha)
                 # try not using correction
@@ -110,31 +110,27 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             # do two line searches, first for uncorrected alpha, then for corrected alpha
             try_nocorr = false
             stepper.uncorr_only = true
-            solver.time_search += @elapsed alpha =
-                search_alpha(point, model, stepper)
+            solver.time_search += @elapsed alpha = search_alpha(point, model,
+                stepper)
             stepper.uncorr_alpha = alpha
+            uncorr_sched = stepper.step_searcher.prev_sched
 
             if !iszero(alpha)
                 stepper.uncorr_only = false
-                solver.time_search += @elapsed alpha =
-                    search_alpha(point, model, stepper)
+                solver.time_search += @elapsed alpha = search_alpha(point,
+                    model, stepper)
 
                 if iszero(alpha)
-                    # use uncorrected direction
+                    # use uncorrected direction: start at alpha found
+                    # during uncorrected direction search
                     stepper.uncorr_only = true
-                    alpha = stepper.uncorr_alpha
-                    update_stepper_points(alpha, point, stepper, false)
-
-                    # load into cones again
-                    Cones.load_point.(cones, point.primal_views)
-                    Cones.load_dual_point.(cones, point.dual_views)
-                    Cones.reset_data.(cones)
-                    @assert all(Cones.is_feas, cones)
-                    Cones.grad.(cones)
-                else
-                    update_stepper_points(alpha, point, stepper, false)
+                    solver.time_search += @elapsed alpha = search_alpha(point,
+                        model, stepper, sched = uncorr_sched)
+                    # check alpha didn't decrease more
+                    @assert stepper.step_searcher.prev_sched == uncorr_sched
                 end
 
+                update_stepper_points(alpha, point, stepper, false)
                 stepper.prev_alpha = alpha
                 return true
             end

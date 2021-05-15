@@ -34,9 +34,10 @@ function search_alpha(
     point::Point{T},
     model::Models.Model{T},
     stepper::Stepper{T};
+    sched::Int = start_sched(stepper, stepper.step_searcher)
     ) where {T <: Real}
     step_searcher = stepper.step_searcher
-    sched = start_sched(stepper, step_searcher)
+
     while sched <= length(step_searcher.alpha_sched)
         alpha = step_searcher.alpha_sched[sched]
         # update ztsk only in stepper.temp
@@ -48,6 +49,7 @@ function search_alpha(
         end
         sched += 1
     end
+
     step_searcher.prev_sched = sched
     return zero(T)
 end
