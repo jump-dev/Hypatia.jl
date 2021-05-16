@@ -49,14 +49,6 @@ insts["fast"] = [
     ((:motzkin, 3, false, false),),
     ((:motzkin_ball, 3, false, false),),
     ]
-insts["slow"] = [
-    ((4, 5, true, true),),
-    ((4, 5, false, true),),
-    ((4, 5, false, false),),
-    ((2, 30, true, true),),
-    ((2, 30, false, true),),
-    ((2, 30, false, false),),
-    ]
 insts["various"] = [
     ((4, 5, true, true),),
     ((4, 5, true, false),),

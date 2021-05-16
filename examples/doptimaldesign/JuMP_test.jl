@@ -26,14 +26,6 @@ insts["fast"] = [
     ((25, 75, 125, 10, false, true, false),),
     ((25, 75, 125, 10, false, false, true),),
     ]
-insts["slow"] = [
-    ((25, 75, 125, 10, true, false, false), :SOCExpPSD),
-    ((25, 75, 125, 10, false, true, false), :ExpPSD),
-    ((25, 75, 125, 10, false, false, true), :ExpPSD),
-    ((100, 200, 200, 10, true, false, false),),
-    ((100, 200, 200, 10, false, true, false),),
-    ((100, 200, 200, 10, false, false, true),),
-    ]
 insts["various"] = [
     ((25, 45, 75, 10, true, false, false),),
     ((25, 45, 75, 10, true, false, false), :SOCExpPSD),

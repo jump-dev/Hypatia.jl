@@ -32,14 +32,6 @@ insts["fast"] = [
     ((100, false, true, false, false),),
     ((100, false, false, false, false),),
     ]
-insts["slow"] = [
-    ((100, false, true, true, false),),
-    ((100, false, false, true, false),),
-    ((100, true, true, true, true),),
-    ((100, true, false, true, true),),
-    ((100, true, true, false, false),),
-    ((100, true, false, false, false),),
-    ]
 insts["various"] = [
     ((50, false, true, true, true),),
     ((50, false, false, true, true),),

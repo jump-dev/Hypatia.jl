@@ -28,7 +28,6 @@ insts["fast"] = [
     ((250, 4, 6, true, true, true),),
     ((250, 4, 6, false, true, true),),
     ((250, 4, 6, true, false, true),),
-    # ((250, 4, 6, true, true, false),),
     ((200, 32, 2, true, true, true),),
     ((:iris, 4, true, true, true),),
     ((:iris, 5, true, true, true),),
@@ -39,19 +38,5 @@ insts["fast"] = [
     ((:cancer, 4, true, true, true),),
     ((:cancer, 4, false, true, true),),
     ((:cancer, 4, true, false, true),),
-    # ((:cancer, 4, true, true, false),),
     ]
-insts["slow"] = [
-    ((:cancer, 6, true, true, true),),
-    # ((:cancer, 6, false, true, true),),
-    ((:cancer, 6, true, false, true),),
-    ((:cancer, 6, true, true, false),),
-    ((500, 2, 60, true, true, true),),
-    ((1000, 3, 20, true, true, true),),
-    ((400, 5, 6, true, true, true),),
-    ((400, 5, 6, false, true, true),),
-    ((400, 5, 6, true, false, true),),
-    ((400, 5, 6, true, true, false),),
-    ]
-insts["various"] = Tuple[]
 return (DensityEstNative, insts)

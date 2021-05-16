@@ -19,10 +19,6 @@ insts["fast"] = [
     ((30, 30, false, false),),
     ((30, 30, false, true),),
     ]
-insts["slow"] = [
-    ((50, 50, false, false),),
-    ((50, 50, false, true),),
-    ]
 insts["various"] = [
     ((6, 6, true, true), nothing, relaxed_tols),
     ((6, 6, true, false), nothing, relaxed_tols),

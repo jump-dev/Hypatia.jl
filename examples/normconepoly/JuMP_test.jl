@@ -22,6 +22,5 @@ insts["fast"] = [
     ((:polys8, 2, false, false),),
     ((:polys9, 2, false, false),),
     ]
-insts["slow"] = Tuple[]
 insts["various"] = insts["fast"]
 return (NormConePoly, insts)

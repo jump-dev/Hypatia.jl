@@ -18,14 +18,6 @@ insts["fast"] = [
     ((400, false, true),),
     ((400, false, true), :SOCExpPSD),
     ]
-insts["slow"] = [
-    ((1000, true, false),),
-    ((1000, false, true),),
-    ((1000, false, true), :SOCExpPSD),
-    ((2000, true, false),),
-    ((2000, false, true), :SOCExpPSD),
-    ((3000, false, true),),
-    ]
 insts["various"] = [
     ((50, false, true), :SOCExpPSD),
     ((1000, true, false),),

@@ -7,7 +7,6 @@ insts["minimal"] = [
     ((1, 3, 2, true, false, true, false, false),),
     ((1, 3, 2, true, false, false, true, true),),
     ]
-insts["fast"] = []
-insts["slow"] = []
+# insts["fast"] = [] # TODO
 insts["various"] = insts["minimal"]
 return (SparseLMIJuMP, insts)
