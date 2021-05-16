@@ -26,6 +26,7 @@ LinearMaps = "2.7, 3"
 MathOptInterface = "0.9.14"
 PolynomialRoots = "1"
 Requires = "1"
+SpecialFunctions = "1.4"
 julia = "1.5"
 
 [extras]
