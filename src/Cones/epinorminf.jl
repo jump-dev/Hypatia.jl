@@ -153,12 +153,12 @@ function update_hess_aux(cone::EpiNormInf{T}) where {T <: Real}
         udenj = uden[j]
         invdenj = inv(cone.den[j])
         if cone.is_complex
-            (wdre, wdim) = reim(wdenj)
+            (wdre, w_dim) = reim(wdenj)
             cone.Hure[j] = -wdre * udenj
-            cone.Huim[j] = -wdim * udenj
+            cone.Huim[j] = -w_dim * udenj
             cone.Hrere[j] = abs2(wdre) + invdenj
-            cone.Himim[j] = abs2(wdim) + invdenj
-            cone.Hreim[j] = wdre * wdim
+            cone.Himim[j] = abs2(w_dim) + invdenj
+            cone.Hreim[j] = wdre * w_dim
         else
             cone.Hure[j] = -wdenj * udenj
             cone.Hrere[j] = abs2(wdenj) + invdenj

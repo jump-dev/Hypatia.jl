@@ -182,13 +182,12 @@ function dder3(cone::HypoPowerMean, dir::AbstractVector)
     u_dir = dir[1]
     @views w_dir = dir[2:end]
     dder3 = cone.dder3
-    @views wdder3 = dder3[2:end]
-    pi = cone.wprod # TODO rename
+    @views w_dder3 = dder3[2:end]
     z = cone.z
     alpha = cone.alpha
     wdw = cone.tempw
 
-    piz = pi / z
+    piz = cone.wprod / z
     @. wdw = w_dir / w
     udz = u_dir / z
     const6 = -2 * udz * piz
@@ -202,14 +201,14 @@ function dder3(cone::HypoPowerMean, dir::AbstractVector)
     const4 = const2 * awdw + udz * piz
     const5 = const2 + piz * u / z
 
-    @. wdder3 = piz + const5 * alpha
-    wdder3 .*= alpha
-    wdder3 .+= 1
-    wdder3 .*= wdw
-    @. wdder3 -= const4 * alpha
-    wdder3 .*= wdw
-    @. wdder3 += const3 * alpha
-    wdder3 ./= w
+    @. w_dder3 = piz + const5 * alpha
+    w_dder3 .*= alpha
+    w_dder3 .+= 1
+    w_dder3 .*= wdw
+    @. w_dder3 -= const4 * alpha
+    w_dder3 .*= wdw
+    @. w_dder3 += const3 * alpha
+    w_dder3 ./= w
 
     return dder3
 end
@@ -217,24 +216,24 @@ end
 # see analysis in
 # https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
 function get_central_ray_hypopowermean(alpha::Vector{<:Real})
-    wdim = length(alpha)
+    w_dim = length(alpha)
     # predict each w_i given alpha_i and n
-    w = zeros(wdim)
-    if wdim == 1
+    w = zeros(w_dim)
+    if w_dim == 1
         w .= 1.306563
-    elseif wdim == 2
+    elseif w_dim == 2
         @. w = 1.0049885 + 0.2986276 * alpha
-    elseif wdim <= 5
-        @. w = 1.0040142949 - 0.0004885108 * wdim + 0.3016645951 * alpha
-    elseif wdim <= 20
-        @. w = 1.001168 - 4.547017e-05 * wdim + 3.032880e-01 * alpha
-    elseif wdim <= 100
-        @. w = 1.000069 - 5.469926e-07 * wdim + 3.074084e-01 * alpha
+    elseif w_dim <= 5
+        @. w = 1.0040142949 - 0.0004885108 * w_dim + 0.3016645951 * alpha
+    elseif w_dim <= 20
+        @. w = 1.001168 - 4.547017e-05 * w_dim + 3.032880e-01 * alpha
+    elseif w_dim <= 100
+        @. w = 1.000069 - 5.469926e-07 * w_dim + 3.074084e-01 * alpha
     else
         @. w = 1 + 3.086535e-01 * alpha
     end
     # get u in closed form from w
     p = exp(sum(alpha[i] * log(w[i]) for i in eachindex(alpha)))
-    u = sum(p .- alpha .* p ./ (abs2.(w) .- 1)) / wdim
+    u = sum(p .- alpha .* p ./ (abs2.(w) .- 1)) / w_dim
     return [u, w]
 end

@@ -385,15 +385,15 @@ function get_central_ray_epirelentropy(w_dim::Int)
         return central_rays_epirelentropy[w_dim, :]
     end
     # use nonlinear fit for higher dimensions
-    rtwdim = sqrt(w_dim)
+    rtw_dim = sqrt(w_dim)
     if w_dim <= 20
-        u = 1.2023 / rtwdim - 0.015
-        v = 0.432 / rtwdim + 1.0125
-        w = -0.3057 / rtwdim + 0.972
+        u = 1.2023 / rtw_dim - 0.015
+        v = 0.432 / rtw_dim + 1.0125
+        w = -0.3057 / rtw_dim + 0.972
     else
-        u = 1.1513 / rtwdim - 0.0069
-        v = 0.4873 / rtwdim + 1.0008
-        w = -0.4247 / rtwdim + 0.9961
+        u = 1.1513 / rtw_dim - 0.0069
+        v = 0.4873 / rtw_dim + 1.0008
+        w = -0.4247 / rtw_dim + 0.9961
     end
     return [u, v, w]
 end

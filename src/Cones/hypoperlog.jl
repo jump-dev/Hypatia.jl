@@ -51,9 +51,9 @@ reset_data(cone::HypoPerLog) = (cone.feas_updated = cone.grad_updated =
     cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
 
 function setup_extra_data!(cone::HypoPerLog{T}) where {T <: Real}
-    # wdim = cone.dim - 2
-    # cone.wivzi = zeros(T, wdim)
-    # cone.tempw = zeros(T, wdim)
+    # w_dim = cone.dim - 2
+    # cone.wivzi = zeros(T, w_dim)
+    # cone.tempw = zeros(T, w_dim)
 
 
     # don't alloc here
