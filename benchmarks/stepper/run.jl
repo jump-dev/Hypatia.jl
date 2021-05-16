@@ -20,9 +20,9 @@ default_options = (
 porc = Solvers.PredOrCentStepper{Float64}
 comb = Solvers.CombinedStepper{Float64}
 stepper_options = [
-    "basic" => porc(use_correction = false, use_curve_search = false),
-    "toa" => porc(use_correction = true, use_curve_search = false),
-    "curve" => porc(use_correction = true, use_curve_search = true),
+    "basic" => porc(use_adjustment = false, use_curve_search = false),
+    "toa" => porc(use_adjustment = true, use_curve_search = false),
+    "curve" => porc(use_adjustment = true, use_curve_search = true),
     "comb" => comb(),
     "back" => comb(2),
     ]

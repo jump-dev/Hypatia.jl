@@ -414,8 +414,8 @@ function inv_hess_prod!(
     return prod
 end
 
-function update_correction_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
-    @assert !cone.correction_aux_updated
+function update_dder3_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
+    @assert !cone.dder3_aux_updated
     cone.hess_aux_updated || update_hess_aux(cone)
     d = cone.d
     cache = cone.cache
@@ -447,17 +447,17 @@ function update_correction_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
             Δ2h[k, svec_idx(j, i)] = t
     end
 
-    cone.correction_aux_updated = true
+    cone.dder3_aux_updated = true
 end
 
-function correction(
+function dder3(
     cone::EpiPerSepSpectral{<:MatrixCSqr{T}},
     dir::AbstractVector{T},
     ) where T
-    cone.correction_aux_updated || update_correction_aux(cone)
+    cone.dder3_aux_updated || update_dder3_aux(cone)
     d = cone.d
     v = cone.point[2]
-    corr = cone.correction
+    dder3 = cone.dder3
     cache = cone.cache
     ζi = cache.ζi
     viw_X = cache.viw_eigen.vectors
@@ -510,11 +510,11 @@ function correction(
     mul!(ξ_X, Hermitian(w_aux, :U), viw_X')
     mul!(w_aux, viw_X, ξ_X)
 
-    corr[1] = -c1
-    @inbounds corr[2] = c1 * σ - c2 + ξbξ + viq^2 / v
-    @views smat_to_svec!(corr[3:end], w_aux, cache.rt2)
+    dder3[1] = -c1
+    @inbounds dder3[2] = c1 * σ - c2 + ξbξ + viq^2 / v
+    @views smat_to_svec!(dder3[3:end], w_aux, cache.rt2)
 
-    return corr
+    return dder3
 end
 
 function eig_kron!(

@@ -10,14 +10,14 @@ mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     dir::Point{T}
     temp::Point{T}
     dir_cent::Point{T}
-    dir_centcorr::Point{T}
+    dir_centadj::Point{T}
     dir_pred::Point{T}
-    dir_predcorr::Point{T}
+    dir_predadj::Point{T}
     dir_temp::Vector{T}
 
     step_searcher::StepSearcher{T}
     cent_only::Bool
-    uncorr_only::Bool
+    unadj_only::Bool
 
     function CombinedStepper{T}(
         shift_alpha_sched::Int = 0, # TODO tune, maybe use heuristic based on how fast alpha search is compared to a full IPM iteration
@@ -38,12 +38,12 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.temp = Point(model)
     stepper.dir_cent = Point(model, ztsk_only = true)
     stepper.dir_pred = Point(model, ztsk_only = true)
-    stepper.dir_centcorr = Point(model, ztsk_only = true)
-    stepper.dir_predcorr = Point(model, ztsk_only = true)
+    stepper.dir_centadj = Point(model, ztsk_only = true)
+    stepper.dir_predadj = Point(model, ztsk_only = true)
     stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
 
     stepper.step_searcher = StepSearcher{T}(model)
-    stepper.uncorr_only = stepper.cent_only = false
+    stepper.unadj_only = stepper.cent_only = false
 
     return stepper
 end
@@ -54,49 +54,49 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     rhs = stepper.rhs
     dir = stepper.dir
     dir_cent = stepper.dir_cent
-    dir_centcorr = stepper.dir_centcorr
+    dir_centadj = stepper.dir_centadj
     dir_pred = stepper.dir_pred
-    dir_predcorr = stepper.dir_predcorr
+    dir_predadj = stepper.dir_predadj
 
     # update linear system solver factorization
     solver.time_upsys += @elapsed update_lhs(solver.syssolver, solver)
 
-    # calculate centering direction and correction
+    # calculate centering direction and adjustment
     solver.time_uprhs += @elapsed update_rhs_cent(solver, rhs)
     solver.time_getdir += @elapsed get_directions(stepper, solver, false)
     copyto!(dir_cent.vec, dir.vec)
-    solver.time_uprhs += @elapsed update_rhs_centcorr(solver, rhs, dir)
+    solver.time_uprhs += @elapsed update_rhs_centadj(solver, rhs, dir)
     solver.time_getdir += @elapsed get_directions(stepper, solver, false)
-    copyto!(dir_centcorr.vec, dir.vec)
+    copyto!(dir_centadj.vec, dir.vec)
 
-    # calculate affine/prediction direction and correction
+    # calculate affine/prediction direction and adjustment
     solver.time_uprhs += @elapsed update_rhs_pred(solver, rhs)
     solver.time_getdir += @elapsed get_directions(stepper, solver, true)
     copyto!(dir_pred.vec, dir.vec)
-    solver.time_uprhs += @elapsed update_rhs_predcorr(solver, rhs, dir)
+    solver.time_uprhs += @elapsed update_rhs_predadj(solver, rhs, dir)
     solver.time_getdir += @elapsed get_directions(stepper, solver, true)
-    copyto!(dir_predcorr.vec, dir.vec)
+    copyto!(dir_predadj.vec, dir.vec)
 
-    # search with combined directions and corrections
-    stepper.uncorr_only = stepper.cent_only = false
+    # search with combined directions and adjustments
+    stepper.unadj_only = stepper.cent_only = false
     solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
 
     if iszero(alpha)
         # recover
-        println("trying combined without correction")
-        stepper.uncorr_only = true
+        println("trying combined without adjustment")
+        stepper.unadj_only = true
         solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
 
         if iszero(alpha)
-            println("trying centering with correction")
+            println("trying centering with adjustment")
             stepper.cent_only = true
-            stepper.uncorr_only = false
+            stepper.unadj_only = false
             solver.time_search += @elapsed alpha =
                 search_alpha(point, model, stepper)
 
             if iszero(alpha)
-                println("trying centering without correction")
-                stepper.uncorr_only = true
+                println("trying centering without adjustment")
+                stepper.unadj_only = true
                 solver.time_search += @elapsed alpha =
                     search_alpha(point, model, stepper)
 
@@ -136,8 +136,8 @@ function update_stepper_points(
         dir_pred = stepper.dir_pred.vec
     end
 
-    if stepper.uncorr_only
-        # no correction
+    if stepper.unadj_only
+        # no adjustment
         if stepper.cent_only
             # centering
             @. cand += alpha * dir_cent
@@ -147,21 +147,21 @@ function update_stepper_points(
             @. cand += alpha * dir_pred + alpha_m1 * dir_cent
         end
     else
-        # correction
-        dir_centcorr = (ztsk_only ? stepper.dir_centcorr.ztsk :
-            stepper.dir_centcorr.vec)
+        # adjustment
+        dir_centadj = (ztsk_only ? stepper.dir_centadj.ztsk :
+            stepper.dir_centadj.vec)
         alpha_sqr = abs2(alpha)
         if stepper.cent_only
             # centering
-            @. cand += alpha * dir_cent + alpha_sqr * dir_centcorr
+            @. cand += alpha * dir_cent + alpha_sqr * dir_centadj
         else
             # combined
-            dir_predcorr = (ztsk_only ? stepper.dir_predcorr.ztsk :
-                stepper.dir_predcorr.vec)
+            dir_predadj = (ztsk_only ? stepper.dir_predadj.ztsk :
+                stepper.dir_predadj.vec)
             alpha_m1 = 1 - alpha
             alpha_m1sqr = abs2(alpha_m1)
-            @. cand += alpha * dir_pred + alpha_sqr * dir_predcorr +
-                alpha_m1 * dir_cent + alpha_m1sqr * dir_centcorr
+            @. cand += alpha * dir_pred + alpha_sqr * dir_predadj +
+                alpha_m1 * dir_cent + alpha_m1sqr * dir_centadj
         end
     end
 
@@ -178,9 +178,9 @@ print_header_more(stepper::CombinedStepper, solver::Solver) =
 
 function print_iteration_more(stepper::CombinedStepper, solver::Solver)
     if stepper.cent_only
-        step = (stepper.uncorr_only ? "cent" : "ce-c")
+        step = (stepper.unadj_only ? "cent" : "ce-a")
     else
-        step = (stepper.uncorr_only ? "comb" : "co-c")
+        step = (stepper.unadj_only ? "comb" : "co-a")
     end
     @printf("%5s %9.2e", step, stepper.prev_alpha)
     return

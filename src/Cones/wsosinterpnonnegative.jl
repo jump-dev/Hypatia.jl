@@ -20,7 +20,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -174,17 +174,17 @@ function hess_prod_slow!(
     return prod
 end
 
-function correction(cone::WSOSInterpNonnegative, dir::AbstractVector)
+function dder3(cone::WSOSInterpNonnegative, dir::AbstractVector)
     @assert cone.grad_updated
-    corr = cone.correction
-    corr .= 0
+    dder3 = cone.dder3
+    dder3 .= 0
     @inbounds for k in eachindex(cone.Ps)
         LUk = partial_lambda!(cone.tempLU[k], dir, cone.tempLL2[k], cone.ΛFLP[k])
         @views for j in 1:cone.dim
-            corr[j] += sum(abs2, LUk[:, j])
+            dder3[j] += sum(abs2, LUk[:, j])
         end
     end
-    return corr
+    return dder3
 end
 
 function partial_lambda!(

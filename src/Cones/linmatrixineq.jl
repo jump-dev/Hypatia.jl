@@ -13,7 +13,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -143,16 +143,16 @@ function hess_prod_slow!(
     return prod
 end
 
-function correction(cone::LinMatrixIneq, dir::AbstractVector)
+function dder3(cone::LinMatrixIneq, dir::AbstractVector)
     @assert cone.grad_updated
-    corr = cone.correction
+    dder3 = cone.dder3
     sumAinvAs = cone.sumAinvAs
 
     dir_mat = sum(d_i * mat_i for (d_i, mat_i) in zip(dir, sumAinvAs))
     Z = Hermitian(dir_mat * dir_mat')
     @inbounds for i in 1:cone.dim
-        corr[i] = real(dot(Z, sumAinvAs[i]))
+        dder3[i] = real(dot(Z, sumAinvAs[i]))
     end
 
-    return corr
+    return dder3
 end

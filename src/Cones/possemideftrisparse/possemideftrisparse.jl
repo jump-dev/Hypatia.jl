@@ -28,7 +28,7 @@ mutable struct PosSemidefTriSparse{I <: PSDSparseImpl, T <: Real,
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool

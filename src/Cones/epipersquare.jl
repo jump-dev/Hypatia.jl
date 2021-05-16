@@ -16,7 +16,7 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -254,10 +254,10 @@ function inv_sqrt_hess_prod!(
     return prod
 end
 
-function correction(cone::EpiPerSquare, dir::AbstractVector)
+function dder3(cone::EpiPerSquare, dir::AbstractVector)
     @assert cone.grad_updated
     dim = cone.dim
-    corr = cone.correction
+    dder3 = cone.dder3
     point = cone.point
     u = point[1]
     v = point[2]
@@ -267,14 +267,14 @@ function correction(cone::EpiPerSquare, dir::AbstractVector)
     @views w_dir = dir[3:end]
 
     jdotpd = u * v_dir + v * u_dir - dot(w, w_dir)
-    hess_prod!(corr, dir, cone)
-    dotdHd = -dot(dir, corr)
-    dotpHd = dot(point, corr)
-    corr .*= jdotpd
-    @. @views corr[3:end] += dotdHd * w + dotpHd * w_dir
-    corr[1] += -dotdHd * v - dotpHd * v_dir
-    corr[2] += -dotdHd * u - dotpHd * u_dir
-    corr ./= 2 * cone.dist
+    hess_prod!(dder3, dir, cone)
+    dotdHd = -dot(dir, dder3)
+    dotpHd = dot(point, dder3)
+    dder3 .*= jdotpd
+    @. @views dder3[3:end] += dotdHd * w + dotpHd * w_dir
+    dder3[1] += -dotdHd * v - dotpHd * v_dir
+    dder3[2] += -dotdHd * u - dotpHd * u_dir
+    dder3 ./= 2 * cone.dist
 
-    return corr
+    return dder3
 end

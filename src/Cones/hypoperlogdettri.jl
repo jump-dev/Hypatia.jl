@@ -21,7 +21,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -354,13 +354,13 @@ function inv_hess_prod!(
     return prod
 end
 
-function correction(cone::HypoPerLogdetTri, dir::AbstractVector)
+function dder3(cone::HypoPerLogdetTri, dir::AbstractVector)
     @assert cone.grad_updated
     u_dir = dir[1]
     v_dir = dir[2]
     @views w_dir = dir[3:end]
-    corr = cone.correction
-    @views w_corr = corr[3:end]
+    dder3 = cone.dder3
+    @views w_dder3 = dder3[3:end]
     v = cone.point[2]
     z = cone.z
     tempw = cone.tempw
@@ -387,26 +387,26 @@ function correction(cone::HypoPerLogdetTri, dir::AbstractVector)
     const11 = -vz * (vz * dot_skron + 2 * (abs2(vz * dot_Wi_S) - dot_Wi_S *
         const10)) + u_dir * const7 + vvw_scal * v_dir
 
-    @. w_corr = const11 * Wi_vec
+    @. w_dder3 = const11 * Wi_vec
     rdiv!(S, cone.fact_W.U)
     mul!(cone.mat3, S, S')
     vec_S2 = smat_to_svec!(tempw, cone.mat3, cone.rt2)
-    @. w_corr += const8 * vec_S2
+    @. w_dder3 += const8 * vec_S2
     skron2 = rdiv!(S, cone.fact_W.U')
     vec_skron2 = smat_to_svec!(tempw, skron2, cone.rt2)
     t4awd = (2 * vz * abs2(dot_Wi_S) + dot(vec_skron2, w_dir)) / z
-    @. w_corr += const9 * vec_skron2
+    @. w_dder3 += const9 * vec_skron2
 
     const2 = 2 * udz * dlzi / z
     const3 = (2 * abs2(dlzi) + d / z / v) * vdz
     const5 = d / v / z
     const4 = dlzi * (2 * abs2(dlzi) + 3 * const5) - (const5 + 2 * inv(v) / v) / v
-    corr[1] = 2 * abs2(udz) / z + (2 * const2 + const3) * v_dir +
+    dder3[1] = 2 * abs2(udz) / z + (2 * const2 + const3) * v_dir +
         (uuw_scal + const7) * dot_Wi_S + vz * t4awd
-    corr[2] = const4 * abs2(v_dir) + (2 * vvw_scal + uvw_scal * u_dir) *
+    dder3[2] = const4 * abs2(v_dir) + (2 * vvw_scal + uvw_scal * u_dir) *
         dot_Wi_S + u_dir * (const2 + 2 * const3) + const6 * t4awd
 
-    corr ./= -2
+    dder3 ./= -2
 
-    return corr
+    return dder3
 end

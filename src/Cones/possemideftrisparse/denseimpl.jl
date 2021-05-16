@@ -159,7 +159,7 @@ function hess_prod_slow!(
     return prod
 end
 
-function correction(
+function dder3(
     cone::PosSemidefTriSparse{PSDSparseDense},
     dir::AbstractVector,
     )
@@ -170,9 +170,9 @@ function correction(
     copytri!(Λ, 'L', cone.is_complex)
     ldiv!(cache.fact_mat.L, Λ)
     rdiv!(Λ, cache.fact_mat)
-    outer_prod_vec_sparse!(cone.correction, Λ, cone)
+    outer_prod_vec_sparse!(cone.dder3, Λ, cone)
 
-    return cone.correction
+    return cone.dder3
 end
 
 function outer_prod_vec_sparse!(

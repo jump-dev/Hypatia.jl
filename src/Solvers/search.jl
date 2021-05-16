@@ -20,7 +20,7 @@ mutable struct StepSearcher{T <: Real}
         step_searcher.cone_times = zeros(length(cones))
         step_searcher.cone_order = collect(1:length(cones))
         step_searcher.min_nbhd = T(0.01) # TODO tune
-        step_searcher.max_nbhd = T(0.99) # TODO tune, maybe should be different for cones without third order correction
+        step_searcher.max_nbhd = T(0.99) # TODO tune
         step_searcher.alpha_sched = T[ # TODO tune
             0.9999, 0.999, 0.99, 0.97, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5,
             0.3, 0.1, 0.05, 0.01, 0.005, 0.001, 0.0005]

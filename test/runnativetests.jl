@@ -118,12 +118,12 @@ end
 
 @testset "PredOrCentStepper tests" begin
     println("\nstarting PredOrCentStepper tests (with printing)")
-    use_corr_curv = [(false, false), (true, false), (true, true)]
-    for inst_name in inst_minimal, (corr, curv) in use_corr_curv, T in diff_reals
+    use_adj_curv = [(false, false), (true, false), (true, true)]
+    for inst_name in inst_minimal, (adj, curv) in use_adj_curv, T in diff_reals
         options = (; default_options..., verbose = true, stepper =
             Solvers.PredOrCentStepper{T}(
-            use_correction = corr, use_curve_search = curv))
-        test_instance_solver(inst_name, T, options, "corr=$corr curv=$curv")
+            use_adjustment = adj, use_curve_search = curv))
+        test_instance_solver(inst_name, T, options, "adj=$adj curv=$curv")
     end
 end
 

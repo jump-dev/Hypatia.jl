@@ -96,13 +96,13 @@ function test_oracles(
         @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
     end
 
-    # test correction oracle
-    if Cones.use_correction(cone)
-        @test -Cones.correction(cone, point) ≈ grad atol=tol rtol=tol
+    # test third order deriv oracle
+    if Cones.use_dder3(cone)
+        @test -Cones.dder3(cone, point) ≈ grad atol=tol rtol=tol
 
         dir = perturb_scale(zeros(T, dim), noise, one(T))
-        corr = Cones.correction(cone, dir)
-        @test dot(corr, point) ≈ dot(dir, hess * dir) atol=tol rtol=tol
+        dder3 = Cones.dder3(cone, dir)
+        @test dot(dder3, point) ≈ dot(dir, hess * dir) atol=tol rtol=tol
     end
 
     return
@@ -140,10 +140,10 @@ function test_barrier(
     prod_vec = zero(dir)
     @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
 
-    if Cones.use_correction(cone)
+    if Cones.use_dder3(cone)
         fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s ->
             ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), point)
-        @test -2 * Cones.correction(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
+        @test -2 * Cones.dder3(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
     end
 
     return
@@ -210,9 +210,9 @@ function show_time_alloc(
         @time Cones.inv_sqrt_hess_prod!(point2, point1, cone)
     end
 
-    if Cones.use_correction(cone)
-        println("correction")
-        @time Cones.correction(cone, point1)
+    if Cones.use_dder3(cone)
+        println("thdd")
+        @time Cones.dder3(cone, point1)
     end
 
     println("in_neighborhood")

@@ -21,7 +21,7 @@ mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -241,10 +241,10 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     return cone.hess
 end
 
-function correction(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
+function dder3(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
     @assert cone.hess_updated
     d = cone.d
-    corr = cone.correction
+    dder3 = cone.dder3
     V_idxs = cone.V_idxs
     W_idxs = cone.W_idxs
     z = cone.z
@@ -297,7 +297,7 @@ function correction(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
         dot(w_dir, dlogW_dW, w_dir) / 2 - dot(v_dir, dlogV_dV, w_dir)) / z
 
     # u
-    corr[1] = const1
+    dder3[1] = const1
 
     # v
     diff_quad = zeros(T, cone.vw_dim^2, cone.vw_dim^2)
@@ -317,9 +317,9 @@ function correction(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
     V_part_2a = V_dir_similar * V_dir_similar'
     V_part_2 = V_vecs * (diff_dot_V_VW + diff_dot_V_VW' +
         d3WlogVdV + V_part_2a * z) * V_vecs'
-    V_corr = V_part_1 + V_part_2
-    @views smat_to_svec!(corr[V_idxs], V_corr, cone.rt2)
-    @. @views corr[V_idxs] += dzdV * const1
+    V_dder3 = V_part_1 + V_part_2
+    @views smat_to_svec!(dder3[V_idxs], V_dder3, cone.rt2)
+    @. @views dder3[V_idxs] += dzdV * const1
 
     # w
     W_part_1 = const0 * (dlogW_dW_dw - dlogV_dV_dv) + d2logV_dV2_VV
@@ -328,13 +328,13 @@ function correction(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
     ldiv!(Diagonal(W_vals), W_dir_similar)
     W_part_2a = W_dir_similar * W_dir_similar'
     W_part_2 = W_vecs * (W_part_2a * z - diff_dot_W_WW) * W_vecs'
-    W_corr = W_part_1 + W_part_2
-    @views smat_to_svec!(corr[W_idxs], W_corr, cone.rt2)
-    @. @views corr[W_idxs] += dzdW * const1
+    W_dder3 = W_part_1 + W_part_2
+    @views smat_to_svec!(dder3[W_idxs], W_dder3, cone.rt2)
+    @. @views dder3[W_idxs] += dzdW * const1
 
-    @. corr /= z
+    @. dder3 /= z
 
-    return corr
+    return dder3
 end
 
 function diff_mat!(

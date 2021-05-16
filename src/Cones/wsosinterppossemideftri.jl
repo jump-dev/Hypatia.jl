@@ -22,7 +22,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -248,9 +248,9 @@ function hess_prod_slow!(
     return partial_prod!(prod, arr, false, cone)
 end
 
-function correction(cone::WSOSInterpPosSemidefTri, dir::AbstractVector)
+function dder3(cone::WSOSInterpPosSemidefTri, dir::AbstractVector)
     @assert cone.grad_updated
-    return partial_prod!(cone.correction, dir, true, cone)
+    return partial_prod!(cone.dder3, dir, true, cone)
 end
 
 # diagonal from each (i, j) block in mat1' * mat2
