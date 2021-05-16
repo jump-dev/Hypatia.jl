@@ -23,6 +23,7 @@ function setup_extra_data!(
     cone.cache = cache = PSDSparseDenseCache{T, R}()
     cache.mat = zeros(R, cone.side, cone.side)
     cache.mat2 = zero(cache.mat)
+    cache.inv_mat = zero(cache.mat)
     return
 end
 
@@ -43,7 +44,7 @@ function update_grad(cone::PosSemidefTriSparse{PSDSparseDense})
     @assert !cone.grad_updated && cone.is_feas
     cache = cone.cache
 
-    cache.inv_mat = inv(cache.fact_mat)
+    chol_inv!(cache.inv_mat, cache.fact_mat)
     smat_to_svec_sparse!(cone.grad, cache.inv_mat, cone)
     cone.grad .*= -1
 

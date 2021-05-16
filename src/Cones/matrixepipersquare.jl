@@ -82,6 +82,7 @@ function setup_extra_data!(
     cone.U = Hermitian(zeros(R, d1, d1), :U)
     cone.W = zeros(R, d1, d2)
     cone.Z = Hermitian(zeros(R, d1, d1), :U)
+    cone.Zi = Hermitian(zeros(R, d1, d1), :U)
     cone.ZiW = zeros(R, d1, d2)
     cone.ZiUZi = Hermitian(zeros(R, d1, d1), :U)
     cone.WtZiW = Hermitian(zeros(R, d2, d2), :U)
@@ -133,7 +134,6 @@ end
 
 function is_dual_feas(cone::MatrixEpiPerSquare{T}) where T
     v = cone.dual_point[cone.v_idx]
-
     if v > eps(T)
         @views svec_to_smat!(cone.tempd1d1b, cone.dual_point[cone.U_idxs],
             cone.rt2)
@@ -144,7 +144,6 @@ function is_dual_feas(cone::MatrixEpiPerSquare{T}) where T
         trLW = sum(abs2, LW)
         return (2 * v - trLW > eps(T))
     end
-
     return false
 end
 
@@ -155,7 +154,8 @@ function update_grad(cone::MatrixEpiPerSquare)
     dim = cone.dim
     v = cone.point[cone.v_idx]
 
-    Zi = cone.Zi = Hermitian(inv(cone.fact_Z), :U)
+    Zi = cone.Zi
+    chol_inv!(Zi.data, cone.fact_Z)
     @views smat_to_svec!(cone.grad[cone.U_idxs], Zi, cone.rt2)
     @views cone.grad[cone.U_idxs] .*= -2 * v
     cone.grad[cone.v_idx] = -2 * dot(Zi, U) + (cone.d1 - 1) / v

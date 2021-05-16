@@ -66,6 +66,7 @@ function setup_extra_data!(cone::DoublyNonnegativeTri{T}) where {T <: Real}
     cone.mat2 = zero(cone.mat)
     cone.mat3 = zero(cone.mat)
     cone.mat4 = zero(cone.mat)
+    cone.inv_mat = zero(cone.mat)
     cone.inv_vec = zeros(T, length(cone.offdiag_idxs))
     return
 end
@@ -146,7 +147,7 @@ end
 function update_grad(cone::DoublyNonnegativeTri)
     @assert cone.is_feas
 
-    cone.inv_mat = inv(cone.fact_mat) # TODO in-place
+    chol_inv!(cone.inv_mat, cone.fact_mat)
     smat_to_svec!(cone.grad, cone.inv_mat, cone.rt2)
     cone.grad .*= -1
     @. @views cone.inv_vec = inv(cone.point[cone.offdiag_idxs])
