@@ -540,7 +540,7 @@ function outer_L_prod(
     return F_block
 end
 
-function correction(
+function dder3(
     cone::PosSemidefTriSparse{PSDSparseCholmod},
     dir::AbstractVector,
     )
@@ -606,10 +606,10 @@ function correction(
     end
 
     _hess_step3(cone)
-    smat_to_svec_sparse!(cone.correction, cache.temp_blocks, cone)
-    cone.correction ./= 2
+    smat_to_svec_sparse!(cone.dder3, cache.temp_blocks, cone)
+    cone.dder3 ./= 2
 
-    return cone.correction
+    return cone.dder3
 end
 
 function svec_to_smat_sparse!(

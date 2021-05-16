@@ -15,7 +15,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -322,7 +322,7 @@ function hess_prod!(
 end
 
 # TODO reduce allocs
-function correction(cone::MatrixEpiPerSquare, dir::AbstractVector)
+function dder3(cone::MatrixEpiPerSquare, dir::AbstractVector)
     cone.hess_aux_updated || update_hess_aux(cone)
     d1 = cone.d1
     d2 = cone.d2
@@ -340,9 +340,9 @@ function correction(cone::MatrixEpiPerSquare, dir::AbstractVector)
     v_dir = dir[v_idx]
     @views W_dir = vec_copy_to!(zero(W), dir[W_idxs])
 
-    corr = cone.correction
-    U_corr = view(corr, U_idxs)
-    W_corr = view(corr, W_idxs)
+    dder3 = cone.dder3
+    U_dder3 = view(dder3, U_idxs)
+    W_dder3 = view(dder3, W_idxs)
 
     v2 = 2 * v
     vd2 = 2 * v_dir
@@ -378,10 +378,10 @@ function correction(cone::MatrixEpiPerSquare, dir::AbstractVector)
     Utemp = vd2 * (-vd2 * ZiUZi2v + ZiWdWZi2 - v2 * (ZiUZiWdWZi + ZiWdWZiUZi2 -
         2 * vZiUZiUdZi2)) + v2 * (ZiWdWZi * WdWZi + WdWZi' * ZiWdWZi2 +
         ZiWdWtZiWI * ZiWd' + v2 * (v2 * ZiUd * ZiUdZi - ZiUdZiWdWZi - ZiUdZiWdWZi'))
-    smat_to_svec!(U_corr, Utemp, cone.rt2)
+    smat_to_svec!(U_dder3, Utemp, cone.rt2)
 
     v_Wd_dot = -4 * (v * ZiUZiUdZiW + vdZiUZiUZiW) + ZiUZiWdWZiWI + 2 * ZiUdZiW
-    corr[v_idx] = v_dir * (-8 * dot(ZiUZi2v, U_dir) + v_dir *
+    dder3[v_idx] = v_dir * (-8 * dot(ZiUZi2v, U_dir) + v_dir *
         (8 * real(dot(ZiUZiUZi, U)) - (d1 - 1) / v / v / v)) +
         4 * v * real(dot(vZiUZiUdZi2, U_dir)) + 2 * real(dot(v_Wd_dot, W_dir))
 
@@ -389,7 +389,7 @@ function correction(cone::MatrixEpiPerSquare, dir::AbstractVector)
         4 * v * (ZiUdZiW * WdZiW + ZiWdWZi * UdZiW + WdWZi' * ZiUdZiW +
         ZiUdZi * WdWtZiWI - v2 * ZiUd * ZiUdZiW) + -2 * (ZiW * WdZiW * WdZiW +
         WdWZi' * ZiWdWtZiWI + ZiWdWtZiWI * WdZiW + ZiWd * WdZiW' * WtZiWI)
-    vec_copy_to!(W_corr, Wtemp)
+    vec_copy_to!(W_dder3, Wtemp)
 
-    return corr
+    return dder3
 end

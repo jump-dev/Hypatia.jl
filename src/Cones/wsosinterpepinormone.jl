@@ -16,7 +16,7 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -56,7 +56,7 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     ΛLiP_dir11::Vector{Vector{Matrix{T}}}
     ΛLiP_dir12::Vector{Vector{Matrix{T}}}
     ΛLiP_dir21::Vector{Vector{Matrix{T}}}
-    corr_half::Vector{Vector{Matrix}}
+    dder3_half::Vector{Vector{Matrix}}
     Λfact::Vector
     hess_edge_blocks::Vector{Matrix{T}}
     hess_diag_blocks::Vector{Matrix{T}}
@@ -125,7 +125,7 @@ function setup_extra_data!(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     cone.ΛLiP_dir11 = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.ΛLiP_dir12 = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.ΛLiP_dir21 = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
-    cone.corr_half = [[zeros(T, 2 * L, 2 * U) for _ in 1:(R - 1)] for L in Ls]
+    cone.dder3_half = [[zeros(T, 2 * L, 2 * U) for _ in 1:(R - 1)] for L in Ls]
     cone.Λfact = Vector{Any}(undef, K)
     cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
     cone.Ps_times = zeros(K)
@@ -434,10 +434,10 @@ function inv_hess_prod!(
     return prod
 end
 
-function correction(cone::WSOSInterpEpiNormOne, dir::AbstractVector)
+function dder3(cone::WSOSInterpEpiNormOne, dir::AbstractVector)
     @assert cone.grad_updated
-    corr = cone.correction
-    corr .= 0
+    dder3 = cone.dder3
+    dder3 .= 0
     R = cone.R
     U = cone.U
 
@@ -452,10 +452,10 @@ function correction(cone::WSOSInterpEpiNormOne, dir::AbstractVector)
         mul!(LLk, LUk, ΛFLPk')
         mul!(LUk, Hermitian(LLk), ΛFLPk)
         @views for u in 1:U
-            corr[u] += sum(abs2, LUk[:, u])
+            dder3[u] += sum(abs2, LUk[:, u])
         end
     end
-    @. @views corr[1:U] *= 2 - R
+    @. @views dder3[1:U] *= 2 - R
 
     @inbounds for k in eachindex(cone.Ps)
         L = size(cone.Ps[k], 2)
@@ -466,7 +466,7 @@ function correction(cone::WSOSInterpEpiNormOne, dir::AbstractVector)
         ΛLiP_dir11 = cone.ΛLiP_dir11[k]
         ΛLiP_dir12 = cone.ΛLiP_dir12[k]
         ΛLiP_dir21 = cone.ΛLiP_dir21[k]
-        corr_half = cone.corr_half[k]
+        dder3_half = cone.dder3_half[k]
         LLk = cone.tempLL[k]
 
         @views ΛLiP_dir22 = mul!(LUk, Λ11LiP, Diagonal(dir[1:U]))
@@ -482,43 +482,43 @@ function correction(cone::WSOSInterpEpiNormOne, dir::AbstractVector)
         ΛLiP_dir22_Λ11LiP = ΛLiP_dir22 * Λ11LiP'
         @views for s in 1:(R - 1)
             mul!(LLk, ΛLiP_dir11[s], ΛLiPs12[s]')
-            mul!(corr_half[s][1:L, 1:U], LLk, ΛLiPs12[s])
-            mul!(corr_half[s][1:L, (U + 1):(2 * U)], LLk, ΛLiPs11[s])
+            mul!(dder3_half[s][1:L, 1:U], LLk, ΛLiPs12[s])
+            mul!(dder3_half[s][1:L, (U + 1):(2 * U)], LLk, ΛLiPs11[s])
 
             mul!(LLk, ΛLiP_dir12[s], ΛLiPs12[s]')
-            mul!(corr_half[s][1:L, 1:U], LLk, ΛLiPs11[s], true, true)
-            mul!(corr_half[s][1:L, (U + 1):(2 * U)], LLk, ΛLiPs12[s], true, true)
+            mul!(dder3_half[s][1:L, 1:U], LLk, ΛLiPs11[s], true, true)
+            mul!(dder3_half[s][1:L, (U + 1):(2 * U)], LLk, ΛLiPs12[s], true, true)
 
             mul!(LLk, ΛLiP_dir21[s], ΛLiPs12[s]')
-            mul!(corr_half[s][(L + 1):(2 * L), 1:U], LLk, ΛLiPs12[s])
-            mul!(corr_half[s][(L + 1):(2 * L), (U + 1):(2 * U)], LLk, ΛLiPs11[s])
+            mul!(dder3_half[s][(L + 1):(2 * L), 1:U], LLk, ΛLiPs12[s])
+            mul!(dder3_half[s][(L + 1):(2 * L), (U + 1):(2 * U)], LLk, ΛLiPs11[s])
 
             mul!(LLk, ΛLiP_dir22, ΛLiPs12[s]')
-            mul!(corr_half[s][(L + 1):(2 * L), 1:U], LLk, ΛLiPs11[s], true, true)
-            mul!(corr_half[s][(L + 1):(2 * L), (U + 1):(2 * U)], LLk, ΛLiPs12[s],
+            mul!(dder3_half[s][(L + 1):(2 * L), 1:U], LLk, ΛLiPs11[s], true, true)
+            mul!(dder3_half[s][(L + 1):(2 * L), (U + 1):(2 * U)], LLk, ΛLiPs12[s],
                 true, true)
 
             mul!(LLk, ΛLiP_dir11[s], Λ11LiP')
-            mul!(corr_half[s][1:L, 1:U], LLk, Λ11LiP, true, true)
+            mul!(dder3_half[s][1:L, 1:U], LLk, Λ11LiP, true, true)
             mul!(LLk, ΛLiP_dir12[s], Λ11LiP')
-            mul!(corr_half[s][1:L, (U + 1):(2 * U)], LLk, Λ11LiP, true, true)
+            mul!(dder3_half[s][1:L, (U + 1):(2 * U)], LLk, Λ11LiP, true, true)
             mul!(LLk, ΛLiP_dir21[s], Λ11LiP')
-            mul!(corr_half[s][(L + 1):(2 * L), 1:U], LLk, Λ11LiP, true, true)
+            mul!(dder3_half[s][(L + 1):(2 * L), 1:U], LLk, Λ11LiP, true, true)
         end
         mul!(LLk, ΛLiP_dir22, Λ11LiP')
         mul!(LUk, LLk, Λ11LiP)
 
         idx = U + 1
         @views for s in 1:(R - 1)
-            @. corr_half[s][(L + 1):(2 * L), (U + 1):(2 * U)] += LUk
+            @. dder3_half[s][(L + 1):(2 * L), (U + 1):(2 * U)] += LUk
             for u in 1:U
-                corr[u] += sum(abs2, corr_half[s][:, u])
-                corr[u] += sum(abs2, corr_half[s][:, U + u])
-                corr[idx] += 2 * dot(corr_half[s][:, U + u], corr_half[s][:, u])
+                dder3[u] += sum(abs2, dder3_half[s][:, u])
+                dder3[u] += sum(abs2, dder3_half[s][:, U + u])
+                dder3[idx] += 2 * dot(dder3_half[s][:, U + u], dder3_half[s][:, u])
                 idx += 1
             end
         end
     end
 
-    return corr
+    return dder3
 end

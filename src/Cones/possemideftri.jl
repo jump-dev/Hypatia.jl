@@ -23,7 +23,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -208,14 +208,14 @@ function inv_sqrt_hess_prod!(
     return prod
 end
 
-function correction(cone::PosSemidefTri, dir::AbstractVector)
+function dder3(cone::PosSemidefTri, dir::AbstractVector)
     @assert cone.grad_updated
 
     S = copytri!(svec_to_smat!(cone.mat4, dir, cone.rt2), 'U', cone.is_complex)
     ldiv!(cone.fact_mat, S)
     rdiv!(S, cone.fact_mat.U)
     mul!(cone.mat3, S, S') # TODO use outer prod function
-    smat_to_svec!(cone.correction, cone.mat3, cone.rt2)
+    smat_to_svec!(cone.dder3, cone.mat3, cone.rt2)
 
-    return cone.correction
+    return cone.dder3
 end

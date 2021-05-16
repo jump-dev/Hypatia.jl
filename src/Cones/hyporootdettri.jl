@@ -3,7 +3,7 @@ hypograph of the root determinant of a (row-wise lower triangle) symmetric
 positive definite matrix with side dimension d
 (u in R, W in S_n+) : u <= det(W)^(1/n)
 
-SC barrier from correspondence with A. Nemirovski
+SC barrier from dder3espondence with A. Nemirovski
 -(5 / 3) ^ 2 * (log(det(W) ^ (1 / n) - u) + logdet(W))
 
 TODO
@@ -20,7 +20,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -295,12 +295,12 @@ function inv_hess_prod!(
     return prod
 end
 
-function correction(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where T
+function dder3(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where T
     @assert cone.grad_updated
     u_dir = dir[1]
     @views w_dir = dir[2:end]
-    corr = cone.correction
-    @views w_corr = corr[2:end]
+    dder3 = cone.dder3
+    @views w_dder3 = dder3[2:end]
     sigma = cone.sigma
     z = cone.z
     Wi_vec = cone.Wi_vec
@@ -312,8 +312,8 @@ function correction(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where T
 
     rdiv!(S, cone.fact_W.U)
     mul!(cone.mat2, S, S')
-    @views smat_to_svec!(w_corr, cone.mat2, cone.rt2)
-    w_corr .*= -2 * (sigma + 1)
+    @views smat_to_svec!(w_dder3, cone.mat2, cone.rt2)
+    w_dder3 .*= -2 * (sigma + 1)
 
     ssigma = inv(T(cone.d)) - sigma
     scal1 = sigma * ssigma
@@ -322,15 +322,15 @@ function correction(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where T
     scal4 = 2 * udz * sigma
     scal5 = scal1 * (dot_skron - scal2 * dot_Wi_S) - scal4 * (scal2 + udz)
     scal6 = 2 * dot_Wi_S * scal1 + scal4
-    @. w_corr += scal5 * Wi_vec
+    @. w_dder3 += scal5 * Wi_vec
 
     skron2 = rdiv!(S, cone.fact_W.U')
     vec_skron2 = smat_to_svec!(cone.tempw, skron2, cone.rt2)
 
-    @. w_corr += scal6 * vec_skron2
-    corr[1] = (sigma * (dot(vec_skron2, w_dir) - (scal2 + 4 * udz) * dot_Wi_S) +
+    @. w_dder3 += scal6 * vec_skron2
+    dder3[1] = (sigma * (dot(vec_skron2, w_dir) - (scal2 + 4 * udz) * dot_Wi_S) +
         2 * abs2(udz)) / z
-    corr ./= -2
+    dder3 ./= -2
 
-    return corr
+    return dder3
 end

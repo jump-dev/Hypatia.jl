@@ -21,7 +21,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -239,14 +239,14 @@ function hess_prod!(
     return prod
 end
 
-function correction(cone::EpiNormSpectral, dir::AbstractVector)
+function dder3(cone::EpiNormSpectral, dir::AbstractVector)
     @assert cone.hess_aux_updated
 
     u = cone.point[1]
     W = cone.W
     u_dir = dir[1]
     @views W_dir = vec_copy_to!(cone.tempd1d2, dir[2:end])
-    corr = cone.correction
+    dder3 = cone.dder3
 
     Zi = cone.Zi
     tau = cone.tau
@@ -284,12 +284,12 @@ function correction(cone::EpiNormSpectral, dir::AbstractVector)
     tempd1d2b .+= tempd1d2c
 
     axpby!(-2 * u_dir, tempd1d2b, -2, tempd1d2d)
-    @views vec_copy_to!(corr[2:end], tempd1d2d)
+    @views vec_copy_to!(dder3[2:end], tempd1d2d)
 
     trZi3 = sum(abs2, ldiv!(tempd1d1, cone.fact_Z.L, Zi))
     @. tempd1d2b += 3 * tempd1d2c
-    corr[1] = -real(dot(W_dir, tempd1d2b)) - u * u_dir * (6 * cone.trZi2 -
+    dder3[1] = -real(dot(W_dir, tempd1d2b)) - u * u_dir * (6 * cone.trZi2 -
         8 * u * trZi3 * u) * u_dir - (cone.d1 - 1) * abs2(u_dir / u) / u
 
-    return corr
+    return dder3
 end

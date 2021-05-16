@@ -16,7 +16,7 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
 
@@ -219,13 +219,13 @@ function inv_hess_prod!(
     return prod
 end
 
-function correction(cone::HypoGeoMean, dir::AbstractVector)
+function dder3(cone::HypoGeoMean, dir::AbstractVector)
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
     u_dir = dir[1]
     @views w_dir = dir[2:end]
-    corr = cone.correction
+    dder3 = cone.dder3
     z = cone.z
     wdw = cone.tempw
     iwdim = cone.iwdim
@@ -238,7 +238,7 @@ function correction(cone::HypoGeoMean, dir::AbstractVector)
     awdw = iwdim * sum(wdw)
     const1 = awdw * piz * (2 * piz - 1)
     awdw2 = iwdim * sum(abs2, wdw)
-    corr[1] = (abs2(udz) + const6 * awdw + (const1 * awdw + piz * awdw2) / 2) / -z
+    dder3[1] = (abs2(udz) + const6 * awdw + (const1 * awdw + piz * awdw2) / 2) / -z
 
     const2 = piz * (1 - piz)
     const3 = iwdim * ((const6 * udz + const2 * awdw2 -
@@ -246,8 +246,8 @@ function correction(cone::HypoGeoMean, dir::AbstractVector)
     const4 = -iwdim * (const2 * awdw + udz * piz)
     const5 = iwdim * (piz + iwdim * (const2 + piz * uz)) + 1
     @inbounds for (j, wdwj) in enumerate(wdw)
-        corr[j + 1] = ((const4 + const5 * wdwj) * wdwj + const3) / w[j]
+        dder3[j + 1] = ((const4 + const5 * wdwj) * wdwj + const3) / w[j]
     end
 
-    return corr
+    return dder3
 end

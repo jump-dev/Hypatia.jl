@@ -17,7 +17,7 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -175,14 +175,14 @@ function hess_prod!(
     return prod
 end
 
-function correction(cone::HypoPowerMean, dir::AbstractVector)
+function dder3(cone::HypoPowerMean, dir::AbstractVector)
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
     u_dir = dir[1]
     @views w_dir = dir[2:end]
-    corr = cone.correction
-    @views wcorr = corr[2:end]
+    dder3 = cone.dder3
+    @views wdder3 = dder3[2:end]
     pi = cone.wprod # TODO rename
     z = cone.z
     alpha = cone.alpha
@@ -195,23 +195,23 @@ function correction(cone::HypoPowerMean, dir::AbstractVector)
     awdw = dot(alpha, wdw)
     const1 = awdw * piz * (2 * piz - 1)
     awdw2 = sum(alpha[i] * abs2(wdw[i]) for i in eachindex(alpha))
-    corr[1] = (abs2(udz) + const6 * awdw + (const1 * awdw + piz * awdw2) / 2) / -z
+    dder3[1] = (abs2(udz) + const6 * awdw + (const1 * awdw + piz * awdw2) / 2) / -z
     const2 = piz * (1 - piz)
     const3 = (const6 * u_dir / z + const2 * awdw2 - u / z * const1 * awdw) / -2 -
         udz * const1
     const4 = const2 * awdw + udz * piz
     const5 = const2 + piz * u / z
 
-    @. wcorr = piz + const5 * alpha
-    wcorr .*= alpha
-    wcorr .+= 1
-    wcorr .*= wdw
-    @. wcorr -= const4 * alpha
-    wcorr .*= wdw
-    @. wcorr += const3 * alpha
-    wcorr ./= w
+    @. wdder3 = piz + const5 * alpha
+    wdder3 .*= alpha
+    wdder3 .+= 1
+    wdder3 .*= wdw
+    @. wdder3 -= const4 * alpha
+    wdder3 .*= wdw
+    @. wdder3 += const3 * alpha
+    wdder3 ./= w
 
-    return corr
+    return dder3
 end
 
 # see analysis in

@@ -26,7 +26,7 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -298,10 +298,10 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
     return cone.hess
 end
 
-function correction(cone::WSOSInterpEpiNormEucl, dir::AbstractVector)
+function dder3(cone::WSOSInterpEpiNormEucl, dir::AbstractVector)
     @assert cone.hess_updated
-    corr = cone.correction
-    corr .= 0
+    dder3 = cone.dder3
+    dder3 .= 0
     R = cone.R
     U = cone.U
 
@@ -315,10 +315,10 @@ function correction(cone::WSOSInterpEpiNormEucl, dir::AbstractVector)
         mul!(LLk, LUk, ΛFLPk')
         mul!(LUk, Hermitian(LLk), ΛFLPk)
         @views for u in 1:U
-            corr[u] += sum(abs2, LUk[:, u])
+            dder3[u] += sum(abs2, LUk[:, u])
         end
     end
-    @. @views corr[1:U] *= 2 - R
+    @. @views dder3[1:U] *= 2 - R
 
     @inbounds for k in eachindex(cone.Ps)
         L = size(cone.Ps[k], 2)
@@ -331,8 +331,8 @@ function correction(cone::WSOSInterpEpiNormEucl, dir::AbstractVector)
         ΛLiP_D_ΛLiPt_row = cone.tempLL_vec[k]
         ΛLiP_D_ΛLiPt_col = cone.tempLL_vec2[k]
         ΛLiP_D_ΛLiPt_diag = cone.tempLL[k]
-        corr_half = cone.tempLRUR[k]
-        corr_half .= 0
+        dder3_half = cone.tempLRUR[k]
+        dder3_half .= 0
 
         # get ΛLiP * D * PΛiP where D is diagonalized dir scattered in an arrow
         # and ΛLiP is half an arrow
@@ -367,25 +367,25 @@ function correction(cone::WSOSInterpEpiNormEucl, dir::AbstractVector)
         end
 
         # multiply by ΛLiP
-        mul!(corr_half, ΛLiP_D_ΛLiPt_col, ΛLiP_edge_ctgs)
+        mul!(dder3_half, ΛLiP_D_ΛLiPt_col, ΛLiP_edge_ctgs)
         @views for r in 2:R
-            mul!(corr_half[1:L, block_idxs(U, r)], ΛLiP_D_ΛLiPt_row[r - 1],
+            mul!(dder3_half[1:L, block_idxs(U, r)], ΛLiP_D_ΛLiPt_row[r - 1],
                 Λ11LiP, true, true)
-            mul!(corr_half[block_idxs(L, r), block_idxs(U, r)], ΛLiP_D_ΛLiPt_diag,
+            mul!(dder3_half[block_idxs(L, r), block_idxs(U, r)], ΛLiP_D_ΛLiPt_diag,
                 Λ11LiP, true, true)
         end
 
         @views for u in 1:U
-            corr[u] += sum(abs2, corr_half[:, u])
+            dder3[u] += sum(abs2, dder3_half[:, u])
             idx = U + u
             for r in 2:R
-                corr[idx] += 2 * dot(corr_half[:, idx], corr_half[:, u])
-                corr[u] += sum(abs2, corr_half[:, idx])
+                dder3[idx] += 2 * dot(dder3_half[:, idx], dder3_half[:, u])
+                dder3[u] += sum(abs2, dder3_half[:, idx])
                 idx += U
             end
         end
 
     end
 
-    return corr
+    return dder3
 end

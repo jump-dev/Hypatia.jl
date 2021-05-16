@@ -17,7 +17,7 @@ mutable struct DoublyNonnegativeTri{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -191,17 +191,17 @@ function hess_prod!(
     return prod
 end
 
-function correction(cone::DoublyNonnegativeTri, dir::AbstractVector)
+function dder3(cone::DoublyNonnegativeTri, dir::AbstractVector)
     @assert cone.grad_updated
 
     S = copytri!(svec_to_smat!(cone.mat4, dir, cone.rt2), 'U')
     ldiv!(cone.fact_mat, S)
     rdiv!(S, cone.fact_mat.U)
     mul!(cone.mat3, S, S') # TODO use outer prod function
-    smat_to_svec!(cone.correction, cone.mat3, cone.rt2)
+    smat_to_svec!(cone.dder3, cone.mat3, cone.rt2)
     offdiags = cone.offdiag_idxs
     @views s_off = cone.point[offdiags]
-    @. @views cone.correction[offdiags] += abs2(dir[offdiags] / s_off) / s_off
+    @. @views cone.dder3[offdiags] += abs2(dir[offdiags] / s_off) / s_off
 
-    return cone.correction
+    return cone.dder3
 end

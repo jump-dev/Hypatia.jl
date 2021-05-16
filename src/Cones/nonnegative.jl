@@ -15,7 +15,7 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -125,9 +125,9 @@ function inv_sqrt_hess_prod!(
     return prod
 end
 
-function correction(cone::Nonnegative, dir::AbstractVector)
-    @. cone.correction = abs2(dir / cone.point) / cone.point
-    return cone.correction
+function dder3(cone::Nonnegative, dir::AbstractVector)
+    @. cone.dder3 = abs2(dir / cone.point) / cone.point
+    return cone.dder3
 end
 
 hess_nz_count(cone::Nonnegative) = cone.dim

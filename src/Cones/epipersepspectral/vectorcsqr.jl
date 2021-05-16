@@ -299,21 +299,21 @@ function inv_hess_prod!(
     return prod
 end
 
-function update_correction_aux(cone::EpiPerSepSpectral{<:VectorCSqr})
-    @assert !cone.correction_aux_updated
+function update_dder3_aux(cone::EpiPerSepSpectral{<:VectorCSqr})
+    @assert !cone.dder3_aux_updated
     cone.hess_aux_updated || update_hess_aux(cone)
     h_der3(cone.cache.∇3h, cone.cache.viw, cone.h)
-    cone.correction_aux_updated = true
+    cone.dder3_aux_updated = true
 end
 
-function correction(
+function dder3(
     cone::EpiPerSepSpectral{VectorCSqr{T}},
     dir::AbstractVector{T},
     ) where T
-    cone.correction_aux_updated || update_correction_aux(cone)
+    cone.dder3_aux_updated || update_dder3_aux(cone)
     v = cone.point[2]
     w = cone.w_view
-    corr = cone.correction
+    dder3 = cone.dder3
     cache = cone.cache
     ζi = cache.ζi
     viw = cache.viw
@@ -343,9 +343,9 @@ function correction(
     w_aux .*= ζiχ + viq
     @. w_aux += c2 * ∇3h * ξ * ξ
 
-    corr[1] = -c1
-    corr[2] = c1 * σ - dot(viw, w_aux) + (ξbξ + viq^2) / v
-    @. corr[3:end] = c1 * ∇h + w_aux + abs2(r * wi) * wi
+    dder3[1] = -c1
+    dder3[2] = c1 * σ - dot(viw, w_aux) + (ξbξ + viq^2) / v
+    @. dder3[3:end] = c1 * ∇h + w_aux + abs2(r * wi) * wi
 
-    return corr
+    return dder3
 end

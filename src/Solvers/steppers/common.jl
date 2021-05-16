@@ -22,8 +22,8 @@ function update_rhs_pred(
     return rhs
 end
 
-# update the prediction RHS with a correction
-function update_rhs_predcorr(
+# update the prediction RHS with adjustment
+function update_rhs_predadj(
     solver::Solver{T},
     rhs::Point{T},
     dir::Point{T},
@@ -33,23 +33,21 @@ function update_rhs_predcorr(
     rteps = sqrt(eps(T))
     irtrtmu = inv(sqrt(sqrt(solver.mu)))
     for (k, cone_k) in enumerate(solver.model.cones)
-        Cones.use_correction(cone_k) || continue
+        Cones.use_adjustment(cone_k) || continue
         H_prim_dir_k = cone_k.vec1
         prim_k_scal = cone_k.vec2
         prim_dir_k = dir.primal_views[k]
 
         @. prim_k_scal = irtrtmu * prim_dir_k
         Cones.hess_prod_slow!(H_prim_dir_k, prim_dir_k, cone_k)
-        corr_k = Cones.correction(cone_k, prim_k_scal)
+        dder3_k = Cones.dder3(cone_k, prim_k_scal)
 
-        # only use correction if it nearly satisfies an identity
-        dot1 = dot(corr_k, cone_k.point)
+        # only use third order deriv if it nearly satisfies an identity
+        dot1 = dot(dder3_k, cone_k.point)
         dot2 = irtrtmu * dot(prim_k_scal, H_prim_dir_k)
-        corr_viol = abs(dot1 - dot2) / (rteps + abs(dot2))
-        if corr_viol < T(1e-4) # TODO tune
-            @. rhs.s_views[k] = H_prim_dir_k + corr_k
-        # else
-        #     @warn("pred corr viol: $corr_viol")
+        dder3_viol = abs(dot1 - dot2) / (rteps + abs(dot2))
+        if dder3_viol < T(1e-4) # TODO tune
+            @. rhs.s_views[k] = H_prim_dir_k + dder3_k
         end
     end
 
@@ -85,8 +83,8 @@ function update_rhs_cent(
     return rhs
 end
 
-# update the centering RHS with a correction
-function update_rhs_centcorr(
+# update the centering RHS with adjustment
+function update_rhs_centadj(
     solver::Solver{T},
     rhs::Point{T},
     dir::Point{T},
@@ -96,23 +94,21 @@ function update_rhs_centcorr(
     rteps = sqrt(eps(T))
     irtrtmu = inv(sqrt(sqrt(solver.mu)))
     for (k, cone_k) in enumerate(solver.model.cones)
-        Cones.use_correction(cone_k) || continue
+        Cones.use_adjustment(cone_k) || continue
         H_prim_dir_k_scal = cone_k.vec1
         prim_k_scal = cone_k.vec2
         prim_dir_k = dir.primal_views[k]
 
         @. prim_k_scal = irtrtmu * prim_dir_k
         Cones.hess_prod_slow!(H_prim_dir_k_scal, prim_k_scal, cone_k)
-        corr_k = Cones.correction(cone_k, prim_k_scal)
+        dder3_k = Cones.dder3(cone_k, prim_k_scal)
 
-        # only use correction if it nearly satisfies an identity
-        dot1 = dot(corr_k, cone_k.point)
+        # only use third order deriv if it nearly satisfies an identity
+        dot1 = dot(dder3_k, cone_k.point)
         dot2 = dot(prim_k_scal, H_prim_dir_k_scal)
-        corr_viol = abs(dot1 - dot2) / (rteps + abs(dot2))
-        if corr_viol < T(1e-4) # TODO tune
-            rhs.s_views[k] .= corr_k
-        # else
-        #     @warn("cent corr viol: $corr_viol")
+        dder3_viol = abs(dot1 - dot2) / (rteps + abs(dot2))
+        if dder3_viol < T(1e-4) # TODO tune
+            rhs.s_views[k] .= dder3_k
         end
     end
 
