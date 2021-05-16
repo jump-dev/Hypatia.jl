@@ -17,10 +17,9 @@ insts["fast"] = [
     ((4, 2, 3, 5, true, true, false),),
     ((4, 2, 3, 5, true, false, true),),
     ]
-insts["slow"] = [
+insts["various"] = vcat(insts["fast"], [
     ((4, 2, 3, 5, false, true, false),),
     ((4, 2, 3, 5, false, false, true),),
     ((4, 2, 3, 5, false, false, false),),
-    ]
-insts["various"] = vcat(insts["fast"], insts["slow"])
+    ])
 return (PolyNormJuMP, insts)

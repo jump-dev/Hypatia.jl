@@ -63,13 +63,4 @@ insts["fast"] = [
     ((false, :motzkin, 3, false, false),),
     ((false, :motzkin_ball, 3, false, false),),
     ]
-insts["slow"] = [
-    ((false, 4, 5, true, true),),
-    ((false, 4, 5, false, true),),
-    ((false, 4, 5, false, false),),
-    ((false, 2, 30, true, true),),
-    ((false, 2, 30, false, true),),
-    ((false, 2, 30, false, false),),
-    ]
-insts["various"] = Tuple[]
 return (PolyMinNative, insts)

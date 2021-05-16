@@ -23,12 +23,6 @@ insts["fast"] = [
     ((20, 3),),
     ((20, 3), :SOCExpPSD),
     ]
-insts["slow"] = [
-    ((10, 10),),
-    ((10, 10), :SOCExpPSD),
-    ((20, 6),),
-    ((40, 3),),
-    ]
 insts["various"] = [
     ((:motzkin2,),),
     ((:motzkin3,),),

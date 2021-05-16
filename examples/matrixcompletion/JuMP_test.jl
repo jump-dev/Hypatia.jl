@@ -13,13 +13,6 @@ insts["fast"] = [
     ((5, 3), :ExpPSD),
     ((5, 3), :SOCExpPSD),
     ]
-insts["slow"] = [
-    ((2, 12), :SOCExpPSD),
-    ((10, 14),),
-    ((10, 14), :SOCExpPSD),
-    ((2, 40),),
-    ((10, 18),),
-    ]
 insts["various"] = [
     ((10, 20),),
     ((10, 20), :ExpPSD),

@@ -7,9 +7,6 @@ insts["minimal"] = [
 insts["fast"] = [
     ((3,), :SOCExpPSD),
     ]
-insts["slow"] = [
-    ((4,), :SOCExpPSD),
-    ]
 insts["various"] = [
     ((3,), :SOCExpPSD),
     ((4,), :SOCExpPSD, relaxed_tols),

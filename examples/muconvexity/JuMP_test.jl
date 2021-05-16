@@ -13,6 +13,5 @@ insts["fast"] = [
     ((:poly2, :dom3, false, -2), :SOCExpPSD),
     ((:poly2, :dom4, false, -2), :SOCExpPSD),
     ]
-insts["slow"] = Tuple[]
 insts["various"] = insts["fast"]
 return (MuConvexityJuMP, insts)

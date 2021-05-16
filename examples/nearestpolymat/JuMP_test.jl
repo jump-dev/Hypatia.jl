@@ -13,10 +13,6 @@ insts["fast"] = [
     ((1, 2, 3, false, true, false),),
     ((1, 2, 3, true, false, false),),
     ]
-insts["slow"] = [
-    ((4, 2, 5, false, true, false),),
-    ((4, 2, 5, true, false, false),),
-    ]
 insts["various"] = [
     ((4, 2, 5, false, false, true),),
     ((4, 2, 5, false, true, false),),

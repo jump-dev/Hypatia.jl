@@ -16,7 +16,6 @@ insts["fast"] = [
     ((30, 10, true, 10),),
     ((30, 10, false, 10),),
     ]
-insts["slow"] = Tuple[]
 insts["various"] = [
     ((10, 3, true, 10),),
     ((10, 3, false, 10),),

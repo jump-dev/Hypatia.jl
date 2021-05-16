@@ -10,7 +10,6 @@ insts["fast"] = [
     ((20, Cones.NegEntropySSF()),),
     ((25, Cones.Power12SSF(1.5)),),
     ]
-insts["slow"] = []
 insts["various"] = [
     ((20, Cones.InvSSF()),),
     ((20, Cones.NegLogSSF()),),

@@ -13,6 +13,5 @@ insts["fast"] = [
     ((4.0, 2, 1e-3, true, false),),
     ((4.0, 2, 1e-3, false, false), :SOCExpPSD),
     ]
-insts["slow"] = Tuple[]
 insts["various"] = vcat(insts["minimal"], insts["fast"])
 return (ContractionJuMP, insts)

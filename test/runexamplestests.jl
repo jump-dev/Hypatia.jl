@@ -28,7 +28,6 @@ instance_sets = [
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
     # ("fast", Float64, 60),
-    # ("slow", Float64, 120),
     # ("various", Float64, 120),
     ]
 
