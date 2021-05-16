@@ -36,7 +36,7 @@ end
 
 function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
-    if stepper.use_adjustment && !any(Cones.use_adjustment, model.cones)
+    if stepper.use_adjustment && !any(Cones.use_dder3, model.cones)
         # model has no cones that use third order deriv
         stepper.use_adjustment = false
     end
