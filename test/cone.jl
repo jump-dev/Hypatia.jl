@@ -97,7 +97,7 @@ function test_oracles(
     end
 
     # test third order deriv oracle
-    if Cones.use_adjustment(cone)
+    if Cones.use_dder3(cone)
         @test -Cones.dder3(cone, point) ≈ grad atol=tol rtol=tol
 
         dir = perturb_scale(zeros(T, dim), noise, one(T))
@@ -140,7 +140,7 @@ function test_barrier(
     prod_vec = zero(dir)
     @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
 
-    if Cones.use_adjustment(cone)
+    if Cones.use_dder3(cone)
         fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s ->
             ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), point)
         @test -2 * Cones.dder3(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
@@ -210,7 +210,7 @@ function show_time_alloc(
         @time Cones.inv_sqrt_hess_prod!(point2, point1, cone)
     end
 
-    if Cones.use_adjustment(cone)
+    if Cones.use_dder3(cone)
         println("thdd")
         @time Cones.dder3(cone, point1)
     end

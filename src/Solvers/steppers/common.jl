@@ -33,7 +33,7 @@ function update_rhs_predadj(
     rteps = sqrt(eps(T))
     irtrtmu = inv(sqrt(sqrt(solver.mu)))
     for (k, cone_k) in enumerate(solver.model.cones)
-        Cones.use_adjustment(cone_k) || continue
+        Cones.use_dder3(cone_k) || continue
         H_prim_dir_k = cone_k.vec1
         prim_k_scal = cone_k.vec2
         prim_dir_k = dir.primal_views[k]
@@ -94,7 +94,7 @@ function update_rhs_centadj(
     rteps = sqrt(eps(T))
     irtrtmu = inv(sqrt(sqrt(solver.mu)))
     for (k, cone_k) in enumerate(solver.model.cones)
-        Cones.use_adjustment(cone_k) || continue
+        Cones.use_dder3(cone_k) || continue
         H_prim_dir_k_scal = cone_k.vec1
         prim_k_scal = cone_k.vec2
         prim_dir_k = dir.primal_views[k]

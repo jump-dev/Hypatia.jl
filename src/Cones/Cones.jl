@@ -133,7 +133,7 @@ function use_sqrt_hess_oracles(cone::Cone)
     return (cone.hess_fact_cache isa DensePosDefCache)
 end
 
-use_adjustment(::Cone) = true
+use_dder3(::Cone) = true
 
 update_hess_aux(cone::Cone) = nothing
 
