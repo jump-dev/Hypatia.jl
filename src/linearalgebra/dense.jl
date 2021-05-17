@@ -33,6 +33,17 @@ function chol_inv!(
 end
 
 
+# helpers for updating symmetric/Hermitian eigendecomposition
+
+update_eigen!(X::Matrix{<:BlasFloat}) = LAPACK.syev!('V', 'U', X)[1]
+
+function update_eigen!(X::Matrix{<:RealOrComplex{<:Real}})
+    F = eigen(Hermitian(X, :U))
+    copyto!(X, F.vectors)
+    return F.values
+end
+
+
 # helpers for symmetric outer product (upper triangle only)
 # B = alpha * A' * A + beta * B
 

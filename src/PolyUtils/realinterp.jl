@@ -18,7 +18,7 @@ function interpolate(
     U = binomial(n + 2d, n)
 
     if isnothing(sample)
-        sample = (!isa(dom, Box) || n >= 7 || prod_consec(n, d) > 35_000)
+        sample = (!isa(dom, BoxDomain) || n >= 7 || prod_consec(n, d) > 35_000)
     end
 
     if sample

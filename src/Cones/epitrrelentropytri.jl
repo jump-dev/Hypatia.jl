@@ -133,21 +133,27 @@ function update_feas(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     @assert !cone.feas_updated
     point = cone.point
     vw_dim = cone.vw_dim
-    @views V = Hermitian(svec_to_smat!(cone.V, point[cone.V_idxs], cone.rt2), :U)
-    @views W = Hermitian(svec_to_smat!(cone.W, point[cone.W_idxs], cone.rt2), :U)
+    V = Hermitian(cone.V, :U)
+    W = Hermitian(cone.W, :U)
+    for (X, idxs) in zip((V, W), (cone.V_idxs, cone.W_idxs))
+        @views svec_to_smat!(X.data, point[idxs], cone.rt2)
+    end
 
+    # TODO try cholesky to check posdef of V,W before eigen
+    # TODO use LAPACK syev! instead of syevr! for efficiency
     cone.is_feas = false
-    (V_vals, V_vecs) = cone.V_fact = eigen(V)
+    cone.V_fact = eigen(V)
     if isposdef(cone.V_fact)
-        (W_vals, W_vecs) = cone.W_fact = eigen(W)
+        cone.W_fact = eigen(W)
         if isposdef(cone.W_fact)
-            @. cone.V_vals_log = log(V_vals)
-            @. cone.W_vals_log = log(W_vals)
-            mul!(cone.mat, V_vecs, Diagonal(cone.V_vals_log))
-            V_log = mul!(cone.V_log, cone.mat, V_vecs')
-            mul!(cone.mat, W_vecs, Diagonal(cone.W_vals_log))
-            W_log = mul!(cone.W_log, cone.mat, W_vecs')
-            @. cone.WV_log = W_log - V_log
+            for (fact, vals_log, X_log) in zip((cone.V_fact, cone.W_fact),
+                (cone.V_vals_log, cone.W_vals_log), (cone.V_log, cone.W_log))
+                (vals, vecs) = fact
+                @. vals_log = log(vals)
+                mul!(cone.mat, vecs, Diagonal(vals_log))
+                mul!(X_log, cone.mat, vecs')
+            end
+            @. cone.WV_log = cone.W_log - cone.V_log
             cone.z = point[1] - dot(W, Hermitian(cone.WV_log, :U))
             cone.is_feas = (cone.z > 0)
         end
