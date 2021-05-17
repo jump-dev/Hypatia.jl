@@ -132,21 +132,19 @@ end
 function update_feas(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     @assert !cone.feas_updated
     point = cone.point
-    vw_dim = cone.vw_dim
-    V = Hermitian(cone.V, :U)
-    W = Hermitian(cone.W, :U)
-    for (X, idxs) in zip((V, W), (cone.V_idxs, cone.W_idxs))
-        @views svec_to_smat!(X.data, point[idxs], cone.rt2)
-    end
 
-    # TODO try cholesky to check posdef of V,W before eigen
-    # TODO use LAPACK syev! instead of syevr! for efficiency
     cone.is_feas = false
-    cone.V_fact = eigen(V)
-    if isposdef(cone.V_fact)
-        cone.W_fact = eigen(W)
-        if isposdef(cone.W_fact)
-            for (fact, vals_log, X_log) in zip((cone.V_fact, cone.W_fact),
+    for (X, idxs) in zip((cone.V, cone.W), (cone.V_idxs, cone.W_idxs))
+        @views svec_to_smat!(X, point[idxs], cone.rt2)
+    end
+    VH = Hermitian(cone.V, :U)
+    WH = Hermitian(cone.W, :U)
+    if isposdef(VH) && isposdef(WH)
+        # TODO use LAPACK syev! instead of syevr! for efficiency
+        V_fact = cone.V_fact = eigen(VH)
+        W_fact = cone.W_fact = eigen(WH)
+        if isposdef(V_fact) && isposdef(W_fact)
+            for (fact, vals_log, X_log) in zip((V_fact, W_fact),
                 (cone.V_vals_log, cone.W_vals_log), (cone.V_log, cone.W_log))
                 (vals, vecs) = fact
                 @. vals_log = log(vals)
@@ -154,7 +152,7 @@ function update_feas(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
                 mul!(X_log, cone.mat, vecs')
             end
             @. cone.WV_log = cone.W_log - cone.V_log
-            cone.z = point[1] - dot(W, Hermitian(cone.WV_log, :U))
+            cone.z = point[1] - dot(WH, Hermitian(cone.WV_log, :U))
             cone.is_feas = (cone.z > 0)
         end
     end
@@ -172,7 +170,6 @@ function update_grad(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     W = Hermitian(cone.W, :U)
     z = cone.z
     (V_vals, V_vecs) = cone.V_fact
-    (W_vals, W_vecs) = cone.W_fact
     Vi = cone.Vi = inv(cone.V_fact)
     Wi = cone.Wi = inv(cone.W_fact)
 
