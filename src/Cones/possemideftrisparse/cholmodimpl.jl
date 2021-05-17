@@ -458,7 +458,7 @@ function _hess_step2(
         L_pr_block = cache.L_pr_blocks[k]
 
         @views temp_block_n = temp_block[idxs_n, :]
-        copytri!(temp_block_n, 'L', cone.is_complex)
+        copytri!(temp_block_n, 'L', true)
         @views L_n = LowerTriangular(cache.L_blocks[k][idxs_n, :])
         if save_L_pr
             @views copyto!(L_pr_block[idxs_n, :], temp_block_n)

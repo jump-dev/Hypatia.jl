@@ -23,6 +23,7 @@ function setup_extra_data!(
     cone.cache = cache = PSDSparseDenseCache{T, R}()
     cache.mat = zeros(R, cone.side, cone.side)
     cache.mat2 = zero(cache.mat)
+    cache.inv_mat = zero(cache.mat)
     return
 end
 
@@ -43,7 +44,7 @@ function update_grad(cone::PosSemidefTriSparse{PSDSparseDense})
     @assert !cone.grad_updated && cone.is_feas
     cache = cone.cache
 
-    cache.inv_mat = inv(cache.fact_mat)
+    chol_inv!(cache.inv_mat, cache.fact_mat)
     smat_to_svec_sparse!(cone.grad, cache.inv_mat, cone)
     cone.grad .*= -1
 
@@ -150,7 +151,7 @@ function hess_prod_slow!(
 
     @inbounds @views for j in 1:size(arr, 2)
         Λ = svec_to_smat_sparse!(cache.mat2, arr[:, j], cone)
-        copytri!(Λ, 'L', cone.is_complex)
+        copytri!(Λ, 'L', true)
         ldiv!(cache.fact_mat, Λ)
         rdiv!(Λ, cache.fact_mat)
         smat_to_svec_sparse!(prod[:, j], Λ, cone)
@@ -167,7 +168,7 @@ function dder3(
     cache = cone.cache
 
     Λ = svec_to_smat_sparse!(cache.mat2, dir, cone)
-    copytri!(Λ, 'L', cone.is_complex)
+    copytri!(Λ, 'L', true)
     ldiv!(cache.fact_mat.L, Λ)
     rdiv!(Λ, cache.fact_mat)
     outer_prod_vec_sparse!(cone.dder3, Λ, cone)

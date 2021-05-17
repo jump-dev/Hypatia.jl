@@ -39,7 +39,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     mat3::Matrix{R}
     mat4::Matrix{R}
     inv_mat::Matrix{R}
-    fact_mat
+    fact_mat::Cholesky{R}
 
     function PosSemidefTri{T, R}(
         dim::Int;
@@ -76,6 +76,7 @@ function setup_extra_data!(
     cone.mat2 = zero(cone.mat)
     cone.mat3 = zero(cone.mat)
     cone.mat4 = zero(cone.mat)
+    cone.inv_mat = zero(cone.mat)
     return cone
 end
 
@@ -112,10 +113,10 @@ end
 function update_grad(cone::PosSemidefTri)
     @assert cone.is_feas
 
-    cone.inv_mat = inv(cone.fact_mat)
+    chol_inv!(cone.inv_mat, cone.fact_mat)
     smat_to_svec!(cone.grad, cone.inv_mat, cone.rt2)
     cone.grad .*= -1
-    copytri!(cone.mat, 'U', cone.is_complex)
+    copytri!(cone.mat, 'U', true)
 
     cone.grad_updated = true
     return cone.grad
@@ -146,7 +147,7 @@ function hess_prod!(
 
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
-        copytri!(cone.mat4, 'U', cone.is_complex)
+        copytri!(cone.mat4, 'U', true)
         rdiv!(cone.mat4, cone.fact_mat)
         ldiv!(cone.fact_mat, cone.mat4)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
@@ -181,7 +182,7 @@ function sqrt_hess_prod!(
 
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
-        copytri!(cone.mat4, 'U', cone.is_complex)
+        copytri!(cone.mat4, 'U', true)
         rdiv!(cone.mat4, cone.fact_mat.U)
         ldiv!(cone.fact_mat.U', cone.mat4)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
@@ -199,7 +200,7 @@ function inv_sqrt_hess_prod!(
 
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
-        copytri!(cone.mat4, 'U', cone.is_complex)
+        copytri!(cone.mat4, 'U', true)
         rmul!(cone.mat4, cone.fact_mat.U')
         lmul!(cone.fact_mat.U, cone.mat4)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
@@ -211,7 +212,7 @@ end
 function dder3(cone::PosSemidefTri, dir::AbstractVector)
     @assert cone.grad_updated
 
-    S = copytri!(svec_to_smat!(cone.mat4, dir, cone.rt2), 'U', cone.is_complex)
+    S = copytri!(svec_to_smat!(cone.mat4, dir, cone.rt2), 'U', true)
     ldiv!(cone.fact_mat, S)
     rdiv!(S, cone.fact_mat.U)
     mul!(cone.mat3, S, S') # TODO use outer prod function

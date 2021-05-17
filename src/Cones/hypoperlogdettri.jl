@@ -245,7 +245,7 @@ function hess_prod!(
     @inbounds @views mul!(prod[1:2, :], H[1:2, :], arr)
     @inbounds for i in 1:size(arr, 2)
         @views svec_to_smat!(cone.mat2, arr[3:end, i], cone.rt2)
-        copytri!(cone.mat2, 'U', cone.is_complex)
+        copytri!(cone.mat2, 'U', true)
         rdiv!(cone.mat2, cone.fact_W)
         const_i = tr(cone.mat2) * const_diag
         for j in 1:cone.d
@@ -341,7 +341,7 @@ function inv_hess_prod!(
         @views arr_w = arr[3:end, i]
         @views prod_w = prod[3:end, i]
         svec_to_smat!(cone.mat2, arr_w, cone.rt2)
-        copytri!(cone.mat2, 'U', cone.is_complex)
+        copytri!(cone.mat2, 'U', true)
         mul!(cone.mat3, cone.mat2, W)
         mul!(cone.mat2, W, cone.mat3)
         smat_to_svec!(prod_w, cone.mat2, cone.rt2)
@@ -372,7 +372,7 @@ function dder3(cone::HypoPerLogdetTri, dir::AbstractVector)
     vdz = v_dir / z
 
     dot_Wi_S = dot(Wi_vec, w_dir)
-    S = copytri!(svec_to_smat!(cone.mat2, w_dir, cone.rt2), 'U', cone.is_complex)
+    S = copytri!(svec_to_smat!(cone.mat2, w_dir, cone.rt2), 'U', true)
     ldiv!(cone.fact_W, S)
     dot_skron = real(dot(S, S'))
 

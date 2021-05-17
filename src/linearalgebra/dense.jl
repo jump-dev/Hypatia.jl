@@ -3,9 +3,46 @@ helpers for dense factorizations and linear solves
 =#
 
 import LinearAlgebra.BlasReal
+import LinearAlgebra.BlasFloat
 import LinearAlgebra.BlasInt
 import LinearAlgebra.BLAS.@blasfunc
 import LinearAlgebra.LAPACK.liblapack
+import LinearAlgebra.copytri!
+
+# helpers for in-place Cholesky inverse
+
+function chol_inv!(
+    mat::Matrix{R},
+    fact::Cholesky{R},
+    ) where {R <: BlasFloat}
+    copyto!(mat, fact.factors)
+    LAPACK.potri!(fact.uplo, mat)
+    copytri!(mat, fact.uplo, true)
+    return mat
+end
+
+function chol_inv!(
+    mat::Matrix{R},
+    fact::Cholesky{R},
+    ) where {R <: RealOrComplex{<:Real}}
+    # this is how Julia computes the inverse, but it could be implemented better
+    copyto!(mat, I)
+    ldiv!(fact, mat)
+    copytri!(mat, fact.uplo, true) # exactly symmetrize
+    return mat
+end
+
+
+# helpers for updating symmetric/Hermitian eigendecomposition
+
+update_eigen!(X::Matrix{<:BlasFloat}) = LAPACK.syev!('V', 'U', X)[1]
+
+function update_eigen!(X::Matrix{<:RealOrComplex{<:Real}})
+    F = eigen(Hermitian(X, :U))
+    copyto!(X, F.vectors)
+    return F.values
+end
+
 
 # helpers for symmetric outer product (upper triangle only)
 # B = alpha * A' * A + beta * B

@@ -38,7 +38,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     W::Matrix{R}
     Z::Matrix{R}
     fact_Z
-    Zi::Hermitian{R, Matrix{R}}
+    Zi::Matrix{R}
     tau::Matrix{R}
     HuW::Matrix{R}
     Huu::T
@@ -83,6 +83,7 @@ function setup_extra_data!(
     (d1, d2) = (cone.d1, cone.d2)
     cone.W = zeros(R, d1, d2)
     cone.Z = zeros(R, d1, d1)
+    cone.Zi = zeros(R, d1, d1)
     cone.tau = zeros(R, d1, d2)
     cone.HuW = zeros(R, d1, d2)
     cone.WtauI = zeros(R, d2, d2)
@@ -140,8 +141,8 @@ function update_grad(cone::EpiNormSpectral)
     u = cone.point[1]
 
     ldiv!(cone.tau, cone.fact_Z, cone.W)
-    cone.Zi = Hermitian(inv(cone.fact_Z), :U)
-    cone.grad[1] = -u * tr(cone.Zi)
+    chol_inv!(cone.Zi, cone.fact_Z)
+    cone.grad[1] = -u * tr(Hermitian(cone.Zi, :U))
     @views vec_copy_to!(cone.grad[2:end], cone.tau)
     cone.grad .*= 2
     cone.grad[1] += (cone.d1 - 1) / u
@@ -248,7 +249,7 @@ function dder3(cone::EpiNormSpectral, dir::AbstractVector)
     @views W_dir = vec_copy_to!(cone.tempd1d2, dir[2:end])
     dder3 = cone.dder3
 
-    Zi = cone.Zi
+    Zi = Hermitian(cone.Zi, :U)
     tau = cone.tau
     Zitau = cone.Zitau
     WtauI = cone.WtauI
