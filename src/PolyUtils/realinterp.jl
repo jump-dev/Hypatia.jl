@@ -10,7 +10,7 @@ function interpolate(
     d::Int;
     calc_V::Bool = false,
     get_quadr::Bool = false,
-    sample::Bool = !isa(dom, BoxDomain{T}),
+    sample = nothing,
     sample_factor::Int = 0,
     ) where {T <: Real}
     @assert d >= 1
@@ -18,7 +18,7 @@ function interpolate(
     U = binomial(n + 2d, n)
 
     if isnothing(sample)
-        sample = (n >= 7 || prod_consec(n, d) > 35_000)
+        sample = (!isa(dom, Box) || n >= 7 || prod_consec(n, d) > 35_000)
     end
 
     if sample

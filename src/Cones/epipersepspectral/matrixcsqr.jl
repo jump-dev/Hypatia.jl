@@ -481,7 +481,7 @@ function dder3(
     @views svec_to_smat!(r_X, dir[3:end], cache.rt2)
     mul!(ξ_X, Hermitian(r_X, :U), viw_X)
     mul!(r_X, viw_X', ξ_X)
-    LinearAlgebra.copytri!(r_X, 'U', cache.is_complex)
+    LinearAlgebra.copytri!(r_X, 'U', true)
 
     viq = vi * q
     D = Diagonal(viw_λ)
