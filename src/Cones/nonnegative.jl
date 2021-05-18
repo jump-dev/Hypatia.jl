@@ -1,21 +1,17 @@
-#=
-nonnegative orthant cone:
-w in R^n : w_i >= 0
+"""
+$(TYPEDEF)
 
-barrier from
-"Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
-by Nesterov & Todd
--sum_i(log(u_i))
-=#
+Nonnegative cone of dimension `dim`.
 
+    $(FUNCTIONNAME){T}(dim::Int)
+"""
 mutable struct Nonnegative{T <: Real} <: Cone{T}
-    use_dual_barrier::Bool
     dim::Int
 
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -26,17 +22,15 @@ mutable struct Nonnegative{T <: Real} <: Cone{T}
     hess::Diagonal{T, Vector{T}}
     inv_hess::Diagonal{T, Vector{T}}
 
-    function Nonnegative{T}(
-        dim::Int;
-        use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
-        ) where {T <: Real}
+    function Nonnegative{T}(dim::Int) where {T <: Real}
         @assert dim >= 1
         cone = new{T}()
-        cone.use_dual_barrier = use_dual
         cone.dim = dim
         return cone
     end
 end
+
+use_dual_barrier(::Nonnegative) = false
 
 reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = false)
@@ -125,9 +119,9 @@ function inv_sqrt_hess_prod!(
     return prod
 end
 
-function correction(cone::Nonnegative, dir::AbstractVector)
-    @. cone.correction = abs2(dir / cone.point) / cone.point
-    return cone.correction
+function dder3(cone::Nonnegative, dir::AbstractVector)
+    @. cone.dder3 = abs2(dir / cone.point) / cone.point
+    return cone.dder3
 end
 
 hess_nz_count(cone::Nonnegative) = cone.dim

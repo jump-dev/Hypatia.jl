@@ -1,18 +1,12 @@
-#=
-epigraph of the relative entropy cone
-(u in R, V in S_+^d, W in S_+^d) : u >= tr(W * (log(W) - log(V)))
+# TODO reduce allocations, generalize for complex, don't use symm_kron_nonsymm
 
-derivatives for quantum relative entropy function adapted from
-"Long-Step Path-Following Algorithm in Quantum Information Theory:
-Some Numerical Aspects and Applications"
-by L. Faybusovich and C. Zhou
+"""
+$(TYPEDEF)
 
-uses the log-homogeneous but not self-concordant barrier
--log(u - tr(W * log(W) - W * log(V))) - logdet(W) - logdet(V)
+Epigraph of matrix relative entropy cone of dimension `dim` in svec format.
 
-TODO reduce allocations
-=#
-
+    $(FUNCTIONNAME){T}(dim::Int, use_dual::Bool = false)
+"""
 mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
@@ -21,7 +15,7 @@ mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -132,23 +126,27 @@ end
 function update_feas(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     @assert !cone.feas_updated
     point = cone.point
-    vw_dim = cone.vw_dim
-    @views V = Hermitian(svec_to_smat!(cone.V, point[cone.V_idxs], cone.rt2), :U)
-    @views W = Hermitian(svec_to_smat!(cone.W, point[cone.W_idxs], cone.rt2), :U)
 
     cone.is_feas = false
-    (V_vals, V_vecs) = cone.V_fact = eigen(V)
-    if isposdef(cone.V_fact)
-        (W_vals, W_vecs) = cone.W_fact = eigen(W)
-        if isposdef(cone.W_fact)
-            @. cone.V_vals_log = log(V_vals)
-            @. cone.W_vals_log = log(W_vals)
-            mul!(cone.mat, V_vecs, Diagonal(cone.V_vals_log))
-            V_log = mul!(cone.V_log, cone.mat, V_vecs')
-            mul!(cone.mat, W_vecs, Diagonal(cone.W_vals_log))
-            W_log = mul!(cone.W_log, cone.mat, W_vecs')
-            @. cone.WV_log = W_log - V_log
-            cone.z = point[1] - dot(W, Hermitian(cone.WV_log, :U))
+    for (X, idxs) in zip((cone.V, cone.W), (cone.V_idxs, cone.W_idxs))
+        @views svec_to_smat!(X, point[idxs], cone.rt2)
+    end
+    VH = Hermitian(cone.V, :U)
+    WH = Hermitian(cone.W, :U)
+    if isposdef(VH) && isposdef(WH)
+        # TODO use LAPACK syev! instead of syevr! for efficiency
+        V_fact = cone.V_fact = eigen(VH)
+        W_fact = cone.W_fact = eigen(WH)
+        if isposdef(V_fact) && isposdef(W_fact)
+            for (fact, vals_log, X_log) in zip((V_fact, W_fact),
+                (cone.V_vals_log, cone.W_vals_log), (cone.V_log, cone.W_log))
+                (vals, vecs) = fact
+                @. vals_log = log(vals)
+                mul!(cone.mat, vecs, Diagonal(vals_log))
+                mul!(X_log, cone.mat, vecs')
+            end
+            @. cone.WV_log = cone.W_log - cone.V_log
+            cone.z = point[1] - dot(WH, Hermitian(cone.WV_log, :U))
             cone.is_feas = (cone.z > 0)
         end
     end
@@ -166,7 +164,6 @@ function update_grad(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     W = Hermitian(cone.W, :U)
     z = cone.z
     (V_vals, V_vecs) = cone.V_fact
-    (W_vals, W_vecs) = cone.W_fact
     Vi = cone.Vi = inv(cone.V_fact)
     Wi = cone.Wi = inv(cone.W_fact)
 
@@ -241,10 +238,10 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     return cone.hess
 end
 
-function correction(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
+function dder3(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
     @assert cone.hess_updated
     d = cone.d
-    corr = cone.correction
+    dder3 = cone.dder3
     V_idxs = cone.V_idxs
     W_idxs = cone.W_idxs
     z = cone.z
@@ -297,7 +294,7 @@ function correction(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
         dot(w_dir, dlogW_dW, w_dir) / 2 - dot(v_dir, dlogV_dV, w_dir)) / z
 
     # u
-    corr[1] = const1
+    dder3[1] = const1
 
     # v
     diff_quad = zeros(T, cone.vw_dim^2, cone.vw_dim^2)
@@ -317,9 +314,9 @@ function correction(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
     V_part_2a = V_dir_similar * V_dir_similar'
     V_part_2 = V_vecs * (diff_dot_V_VW + diff_dot_V_VW' +
         d3WlogVdV + V_part_2a * z) * V_vecs'
-    V_corr = V_part_1 + V_part_2
-    @views smat_to_svec!(corr[V_idxs], V_corr, cone.rt2)
-    @. @views corr[V_idxs] += dzdV * const1
+    V_dder3 = V_part_1 + V_part_2
+    @views smat_to_svec!(dder3[V_idxs], V_dder3, cone.rt2)
+    @. @views dder3[V_idxs] += dzdV * const1
 
     # w
     W_part_1 = const0 * (dlogW_dW_dw - dlogV_dV_dv) + d2logV_dV2_VV
@@ -328,13 +325,13 @@ function correction(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where T
     ldiv!(Diagonal(W_vals), W_dir_similar)
     W_part_2a = W_dir_similar * W_dir_similar'
     W_part_2 = W_vecs * (W_part_2a * z - diff_dot_W_WW) * W_vecs'
-    W_corr = W_part_1 + W_part_2
-    @views smat_to_svec!(corr[W_idxs], W_corr, cone.rt2)
-    @. @views corr[W_idxs] += dzdW * const1
+    W_dder3 = W_part_1 + W_part_2
+    @views smat_to_svec!(dder3[W_idxs], W_dder3, cone.rt2)
+    @. @views dder3[W_idxs] += dzdW * const1
 
-    @. corr /= z
+    @. dder3 /= z
 
-    return corr
+    return dder3
 end
 
 function diff_mat!(

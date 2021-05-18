@@ -1,16 +1,11 @@
-#=
-(closure of) hypograph of perspective of (natural) log of determinant of a
-(row-wise lower triangle) symmetric positive define matrix with side dimension d
-(u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
-(see equivalent MathOptInterface LogDetConeTriangle definition)
+"""
+$(TYPEDEF)
 
-barrier analogous to hypoperlog cone
--log(v*logdet(W/v) - u) - logdet(W) - log(v)
+Hypograph of perspective function of real symmetric or complex Hermitian
+log-determinant cone of dimension `dim` in svec format.
 
-TODO
-- describe complex case
-=#
-
+    $(FUNCTIONNAME){T, R}(dim::Int, use_dual::Bool = false)
+"""
 mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
@@ -21,7 +16,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -363,7 +358,7 @@ function inv_hess_prod!(
     return prod
 end
 
-function correction(cone::HypoPerLogdetTri, dir::AbstractVector)
+function dder3(cone::HypoPerLogdetTri, dir::AbstractVector)
     @assert cone.grad_updated
     p = dir[1]
     q = dir[2]
@@ -408,5 +403,5 @@ function correction(cone::HypoPerLogdetTri, dir::AbstractVector)
     @. w_aux += c1 * v * Wi + wirwirwi
     @views smat_to_svec!(corr[3:end], w_aux, cone.rt2)
 
-    return corr
+    return dder3
 end

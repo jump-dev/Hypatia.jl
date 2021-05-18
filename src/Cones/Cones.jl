@@ -1,9 +1,9 @@
-#=
-functions and caches for cones
-=#
-
+"""
+Proper cone definitions, oracles, and utilities.
+"""
 module Cones
 
+using DocStringExtensions
 using LinearAlgebra
 import LinearAlgebra.copytri!
 import LinearAlgebra.HermOrSym
@@ -11,6 +11,8 @@ import LinearAlgebra.BlasReal
 import PolynomialRoots
 using SparseArrays
 import Hypatia.RealOrComplex
+import Hypatia.chol_inv!
+import Hypatia.update_eigen!
 import Hypatia.DenseSymCache
 import Hypatia.DensePosDefCache
 import Hypatia.load_matrix
@@ -59,8 +61,8 @@ function setup_data!(cone::Cone{T}) where {T <: Real}
     cone.point = zeros(T, dim)
     cone.dual_point = zeros(T, dim)
     cone.grad = zeros(T, dim)
-    if hasproperty(cone, :correction)
-        cone.correction = zeros(T, dim)
+    if hasproperty(cone, :dder3)
+        cone.dder3 = zeros(T, dim)
     end
     cone.vec1 = zeros(T, dim)
     cone.vec2 = zeros(T, dim)
@@ -133,7 +135,7 @@ function use_sqrt_hess_oracles(cone::Cone)
     return (cone.hess_fact_cache isa DensePosDefCache)
 end
 
-use_correction(::Cone) = true
+use_dder3(::Cone) = true
 
 update_hess_aux(cone::Cone) = nothing
 

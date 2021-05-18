@@ -458,7 +458,7 @@ function _hess_step2(
         L_pr_block = cache.L_pr_blocks[k]
 
         @views temp_block_n = temp_block[idxs_n, :]
-        copytri!(temp_block_n, 'L', cone.is_complex)
+        copytri!(temp_block_n, 'L', true)
         @views L_n = LowerTriangular(cache.L_blocks[k][idxs_n, :])
         if save_L_pr
             @views copyto!(L_pr_block[idxs_n, :], temp_block_n)
@@ -540,7 +540,7 @@ function outer_L_prod(
     return F_block
 end
 
-function correction(
+function dder3(
     cone::PosSemidefTriSparse{PSDSparseCholmod},
     dir::AbstractVector,
     )
@@ -606,10 +606,10 @@ function correction(
     end
 
     _hess_step3(cone)
-    smat_to_svec_sparse!(cone.correction, cache.temp_blocks, cone)
-    cone.correction ./= 2
+    smat_to_svec_sparse!(cone.dder3, cache.temp_blocks, cone)
+    cone.dder3 ./= 2
 
-    return cone.correction
+    return cone.dder3
 end
 
 function svec_to_smat_sparse!(

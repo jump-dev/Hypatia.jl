@@ -2,23 +2,26 @@
 utilities for real polynomial interpolation
 =#
 
-get_L(n::Int, d::Int) = binomial(n + d, n)
-get_U(n::Int, d::Int) = binomial(n + 2d, n)
+"""
+$(TYPEDSIGNATURES)
 
+Compute interpolation data for a weighted sum-of-squares conic constraint on a
+domain.
+"""
 function interpolate(
     dom::Domain{T},
     d::Int;
     calc_V::Bool = false,
     get_quadr::Bool = false,
-    sample::Bool = !isa(dom, BoxDomain{T}),
+    sample = nothing,
     sample_factor::Int = 0,
     ) where {T <: Real}
     @assert d >= 1
-    n = get_dimension(dom)
+    n = dimension(dom)
     U = binomial(n + 2d, n)
 
     if isnothing(sample)
-        sample = (n >= 7 || prod_consec(n, d) > 35_000)
+        sample = (!isa(dom, BoxDomain) || n >= 7 || prod_consec(n, d) > 35_000)
     end
 
     if sample
@@ -42,6 +45,9 @@ function interpolate(
     end
 end
 
+get_L(n::Int, d::Int) = binomial(n + d, n)
+get_U(n::Int, d::Int) = binomial(n + 2d, n)
+
 # sampling-based point selection for general domains
 function interp_sample(
     dom::Domain{T},
@@ -49,12 +55,12 @@ function interp_sample(
     get_quadr::Bool,
     sample_factor::Int,
     ) where {T <: Real}
-    U = get_U(get_dimension(dom), d)
+    U = get_U(dimension(dom), d)
 
-    cand_pts = interp_sample(dom, U * sample_factor)
+    cand_pts = sample(dom, U * sample_factor)
     (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, cand_pts, d, get_quadr)
 
-    g = get_weights(dom, pts)
+    g = weights(dom, pts)
     PWts = Matrix{T}[sqrt.(gi) .* P0sub for gi in g]
     Ps = Matrix{T}[P0, PWts...]
 
@@ -85,12 +91,12 @@ function interp_box(
 
     # TODO refactor/cleanup below
     # scale and shift points, get WSOS matrices
-    pscale = [T(0.5) * (dom.u[mod(j - 1, get_dimension(dom)) + 1] -
-        dom.l[mod(j - 1, get_dimension(dom)) + 1]) for j in 1:n]
-    pshift = [T(0.5) * (dom.u[mod(j - 1, get_dimension(dom)) + 1] +
-        dom.l[mod(j - 1, get_dimension(dom)) + 1]) for j in 1:n]
+    pscale = [T(0.5) * (dom.u[mod(j - 1, dimension(dom)) + 1] -
+        dom.l[mod(j - 1, dimension(dom)) + 1]) for j in 1:n]
+    pshift = [T(0.5) * (dom.u[mod(j - 1, dimension(dom)) + 1] +
+        dom.l[mod(j - 1, dimension(dom)) + 1]) for j in 1:n]
     @views Wtsfun = (j -> sqrt.(1 .- abs2.(pts[:, j])) * pscale[j])
-    PWts = Matrix{T}[Wtsfun(j) .* P0sub for j in 1:get_dimension(dom)]
+    PWts = Matrix{T}[Wtsfun(j) .* P0sub for j in 1:dimension(dom)]
     trpts = pts .* pscale' .+ pshift'
 
     return (U = U, pts = trpts, Ps = Matrix{T}[P0, PWts...], V = V, w = w)
@@ -317,7 +323,7 @@ function make_wsos_arrays(
     (V, keep_pts, w) = choose_interp_pts(cand_pts, d, get_quadr)
     pts = cand_pts[keep_pts, :]
     P0 = V[:, 1:get_L(n, d)] # subset of poly evaluations up to total degree d
-    Lsub = get_L(n, div(2d - get_degree(dom), 2))
+    Lsub = get_L(n, div(2d - degree(dom), 2))
     P0sub = view(P0, :, 1:Lsub)
     return (pts, P0, P0sub, V, w)
 end

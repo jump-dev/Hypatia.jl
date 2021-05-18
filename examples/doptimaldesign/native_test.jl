@@ -28,12 +28,4 @@ insts["fast"] = [
     ((25, 75, 125, 5, true, false, false, false, false, true),),
     ((25, 75, 125, 5, false, true, false, false, false, true),),
     ]
-insts["slow"] = [
-    ((100, 200, 200, 10, true, false, false, true, true, true),),
-    ((100, 200, 200, 10, false, true, false, true, true, true),),
-    ((100, 200, 200, 10, false, false, true, true, true, true),),
-    ((100, 200, 200, 10, true, false, false, false, false, true),),
-    ((100, 200, 200, 10, false, true, false, false, false, true),),
-    ]
-insts["various"] = Tuple[]
 return (DOptimalDesignNative, insts)

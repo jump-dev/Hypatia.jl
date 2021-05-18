@@ -1,12 +1,10 @@
-#=
-epigraph of L-infinity norm
-(u in R, w in R^n) : u >= norm_inf(w)
+"""
+$(TYPEDEF)
 
-barrier from "Barrier Functions in Interior Point Methods" by Osman Guler
--sum_i(log(u - w_i^2/u)) - log(u)
-= -sum_i(log(u^2 - w_i^2)) + (n - 1)log(u)
-=#
+Epigraph of real or complex infinity norm cone of dimension `dim`.
 
+    $(FUNCTIONNAME){T, R}(dim::Int, use_dual::Bool = false)
+"""
 mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
@@ -16,7 +14,7 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -153,12 +151,12 @@ function update_hess_aux(cone::EpiNormInf{T}) where {T <: Real}
         udenj = uden[j]
         invdenj = inv(cone.den[j])
         if cone.is_complex
-            (wdre, wdim) = reim(wdenj)
+            (wdre, w_dim) = reim(wdenj)
             cone.Hure[j] = -wdre * udenj
-            cone.Huim[j] = -wdim * udenj
+            cone.Huim[j] = -w_dim * udenj
             cone.Hrere[j] = abs2(wdre) + invdenj
-            cone.Himim[j] = abs2(wdim) + invdenj
-            cone.Hreim[j] = wdre * wdim
+            cone.Himim[j] = abs2(w_dim) + invdenj
+            cone.Hreim[j] = wdre * w_dim
         else
             cone.Hure[j] = -wdenj * udenj
             cone.Hrere[j] = abs2(wdenj) + invdenj
@@ -407,18 +405,18 @@ function inv_hess_prod!(
     return prod
 end
 
-function correction(
+function dder3(
     cone::EpiNormInf{T},
     dir::AbstractVector{T},
     ) where {T <: Real}
     @assert cone.grad_updated
     u = cone.point[1]
     udir = dir[1]
-    corr = cone.correction
+    dder3 = cone.dder3
 
     u3 = T(1.5) / u
     udu = udir / u
-    corr[1] = -udir * sum(z * (u3 - z) * z for z in cone.uden) * udir -
+    dder3[1] = -udir * sum(z * (u3 - z) * z for z in cone.uden) * udir -
         udu * (cone.n - 1) / u * udu
 
     @inbounds for i in 1:cone.n
@@ -444,12 +442,12 @@ function correction(
             imimwrereim = wdeniim * uimimre * dire
             imimwimimre = wdenire * uimimim * diim
 
-            corr[1] += (2 * (uuwre * dire + uuwim * diim) + uimimrere * dire +
+            dder3[1] += (2 * (uuwre * dire + uuwim * diim) + uimimrere * dire +
                 uimimimim * diim + 2 * uimimimre * diim * dire) / deni
-            corr[2i] = (udir * (2 * (uimimrere + uimimimre * diim) + uuwre) +
+            dder3[2i] = (udir * (2 * (uimimrere + uimimimre * diim) + uuwre) +
                 (abs2(dire) * imimwrerere + diim *
                 (2 * imimwrereim + imimwimimre))) / deni
-            corr[2i + 1] = (udir * (2 * (uimimimim + uimimimre * dire) + uuwim) +
+            dder3[2i + 1] = (udir * (2 * (uimimimim + uimimimre * dire) + uuwim) +
                 (abs2(diim) * imimwimimim + dire *
                 (2 * imimwimimre + imimwrereim))) / deni
         else
@@ -458,13 +456,13 @@ function correction(
             uimim = 1 + wdeni * wi
             uimim2 = -udeni * uimim * di
 
-            corr[1] += di * (2 * uuw + uimim2) / deni
-            corr[1 + i] = (udir * (uuw + 2 * uimim2) +
+            dder3[1] += di * (2 * uuw + uimim2) / deni
+            dder3[1 + i] = (udir * (uuw + 2 * uimim2) +
                 di * wdeni * (2 + uimim) * di) / deni
         end
     end
 
-    return corr
+    return dder3
 end
 
 # TODO remove this in favor of new hess_nz_count etc functions

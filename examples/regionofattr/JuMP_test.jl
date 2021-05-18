@@ -9,10 +9,9 @@ insts["fast"] = [
     ((6, false), :SOCExpPSD),
     ((8, true),),
     ]
-insts["slow"] = [
+insts["various"] = vcat(insts["fast"], [
     ((8, false), :SOCExpPSD),
     ((10, true),),
     ((10, false), :SOCExpPSD),
-    ]
-insts["various"] = vcat(insts["fast"], insts["slow"])
+    ])
 return (RegionOfAttrJuMP, insts)

@@ -1,10 +1,10 @@
-#=
-(closure of) hypograph of perspective of sum of logarithms
-(u in R, v in R_+, w in R_+^d) : u <= v*sum(log.(w/v))
+"""
+$(TYPEDEF)
 
-barrier is -log(sum_i v*log(w_i/v) - u) - sum_i log(w_i) - log(v)
-=#
+Hypograph of perspective function of sum-log cone of dimension `dim`.
 
+    $(FUNCTIONNAME){T}(dim::Int, use_dual::Bool = false)
+"""
 mutable struct HypoPerLog{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
@@ -12,7 +12,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -51,9 +51,9 @@ reset_data(cone::HypoPerLog) = (cone.feas_updated = cone.grad_updated =
     cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
 
 function setup_extra_data!(cone::HypoPerLog{T}) where {T <: Real}
-    # wdim = cone.dim - 2
-    # cone.wivzi = zeros(T, wdim)
-    # cone.tempw = zeros(T, wdim)
+    # w_dim = cone.dim - 2
+    # cone.wivzi = zeros(T, w_dim)
+    # cone.tempw = zeros(T, w_dim)
 
 
     # don't alloc here
@@ -285,15 +285,15 @@ function inv_hess_prod!(
     return prod
 end
 
-function correction(cone::HypoPerLog{T}, dir::AbstractVector{T}) where {T <: Real}
+function dder3(cone::HypoPerLog{T}, dir::AbstractVector{T}) where {T <: Real}
     u = cone.point[1]
     v = cone.point[2]
     @views w = cone.point[3:end]
     u_dir = dir[1]
     v_dir = dir[2]
     @views w_dir = dir[3:end]
-    corr = cone.correction
-    @views w_corr = corr[3:end]
+    dder3 = cone.dder3
+    @views w_dder3 = dder3[3:end]
 
     d = length(w)
     z = cone.z
@@ -317,20 +317,20 @@ function correction(cone::HypoPerLog{T}, dir::AbstractVector{T}) where {T <: Rea
     const11 = -abs2(vz) * sumwdw + const8
     const12 = -2 * (vz + 1)
 
-    corr[1] = (const9 + v_dir * (v_dir * d / v - sumwdw)) / z / z
+    dder3[1] = (const9 + v_dir * (v_dir * d / v - sumwdw)) / z / z
 
-    corr[2] = ((-lwvd * const9 - d * v_dir * (const5 + const4) / v + sumwdw *
+    dder3[2] = ((-lwvd * const9 - d * v_dir * (const5 + const4) / v + sumwdw *
         (v_dir * const7 - u_dir)) / z + const3) / z - abs2(v_dir / v) *
         (d * inv(z) + 2 / v)
 
-    @. w_corr = const11 .+ const12 * wdw
-    w_corr .*= wdw
-    w_corr .+= const10
-    w_corr ./= w
+    @. w_dder3 = const11 .+ const12 * wdw
+    w_dder3 .*= wdw
+    w_dder3 .+= const10
+    w_dder3 ./= w
 
-    corr ./= -2
+    dder3 ./= -2
 
-    return corr
+    return dder3
 end
 
 # see analysis in

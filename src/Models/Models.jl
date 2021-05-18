@@ -1,37 +1,16 @@
-#=
-functions and types for linear objective conic problems of the form:
-
-primal (over x,s):
-```
-  min  c'x :          duals
-    b - Ax == 0       (y)
-    h - Gx == s in K  (z)
-```
-dual (over z,y):
-```
-  max  -b'y - h'z :      duals
-    c + A'y + G'z == 0   (x)
-                z in K*  (s)
-```
-where K is a convex cone defined as a Cartesian product of recognized proper
-cones, and K* is its dual cone.
-An objective offset can be provided as the keyword arg `obj_offset` (default 0).
-
-The primal-dual optimality conditions are:
-```
-         b - Ax == 0
-         h - Gx == s
-  c + A'y + G'z == 0
-            s'z == 0
-              s in K
-              z in K*
-```
-=#
-
+"""
+Conic models and utilities.
+"""
 module Models
 
+using DocStringExtensions
 import Hypatia.Cones
 
+"""
+$(TYPEDEF)
+
+Conic model corresponding to Hypatia's primal general conic form.
+"""
 mutable struct Model{T <: Real}
     n::Int
     p::Int

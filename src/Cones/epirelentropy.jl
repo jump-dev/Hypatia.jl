@@ -1,13 +1,10 @@
-#=
-(closure of) epigraph of sum of perspectives of entropies
-(AKA vector relative entropy cone)
-(u in R, v in R_+^n, w in R_+^n) : u >= sum_i w_i*log(w_i/v_i)
+"""
+$(TYPEDEF)
 
-barrier from "Primal-Dual Interior-Point Methods for Domain-Driven Formulations"
-by Karimi & Tuncel, 2019
--log(u - sum_i w_i*log(w_i/v_i)) - sum_i (log(v_i) + log(w_i))
-=#
+Epigraph of vector relative entropy cone of dimension `dim`.
 
+    $(FUNCTIONNAME){T}(dim::Int, use_dual::Bool = false)
+"""
 mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
@@ -18,7 +15,7 @@ mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -64,7 +61,6 @@ reset_data(cone::EpiRelEntropy) = (cone.feas_updated = cone.grad_updated =
 
 use_sqrt_hess_oracles(cone::EpiRelEntropy) = false
 
-# TODO only allocate the fields we use
 function setup_extra_data!(cone::EpiRelEntropy{T}) where {T <: Real}
     w_dim = cone.w_dim
     cone.lwv = zeros(T, w_dim)
@@ -323,7 +319,7 @@ function inv_hess_prod!(
     return prod
 end
 
-function correction(cone::EpiRelEntropy, dir::AbstractVector)
+function dder3(cone::EpiRelEntropy, dir::AbstractVector)
     @assert cone.grad_updated
     tau = cone.tau
     z = cone.z
@@ -334,9 +330,9 @@ function correction(cone::EpiRelEntropy, dir::AbstractVector)
     u_dir = dir[1]
     @views v_dir = dir[v_idxs]
     @views w_dir = dir[w_idxs]
-    corr = cone.correction
-    @views v_corr = corr[v_idxs]
-    @views w_corr = corr[w_idxs]
+    dder3 = cone.dder3
+    @views v_dder3 = dder3[v_idxs]
+    @views w_dder3 = dder3[w_idxs]
     wdw = cone.temp1
     vdv = cone.temp2
 
@@ -346,22 +342,22 @@ function correction(cone::EpiRelEntropy, dir::AbstractVector)
     const0 = (u_dir + dot(w, vdv)) / z + dot(tau, w_dir)
     const1 = abs2(const0) + sum(w[i] * abs2(vdv[i]) + w_dir[i] *
         (wdw[i] - 2 * vdv[i]) for i in eachindex(w)) / (2 * z)
-    corr[1] = const1 / z
+    dder3[1] = const1 / z
 
     # v
-    v_corr .= const1
-    @. v_corr += (const0 + vdv) * vdv - i2z * wdw * w_dir
-    @. v_corr *= w
-    @. v_corr += (z * vdv - w_dir) * vdv + (-const0 + i2z * w_dir) * w_dir
-    @. v_corr /= v
-    @. v_corr /= z
+    v_dder3 .= const1
+    @. v_dder3 += (const0 + vdv) * vdv - i2z * wdw * w_dir
+    @. v_dder3 *= w
+    @. v_dder3 += (z * vdv - w_dir) * vdv + (-const0 + i2z * w_dir) * w_dir
+    @. v_dder3 /= v
+    @. v_dder3 /= z
 
     # w
-    @. w_corr = const1 * tau
-    @. w_corr += ((const0 - w * vdv / z) / z + (inv(w) + i2z) * wdw) * wdw
-    @. w_corr += (-const0 + w_dir / z - vdv / 2) / z * vdv
+    @. w_dder3 = const1 * tau
+    @. w_dder3 += ((const0 - w * vdv / z) / z + (inv(w) + i2z) * wdw) * wdw
+    @. w_dder3 += (-const0 + w_dir / z - vdv / 2) / z * vdv
 
-    return corr
+    return dder3
 end
 
 # TODO remove this in favor of new hess_nz_count etc functions that directly use uu, uw, ww etc
@@ -385,15 +381,15 @@ function get_central_ray_epirelentropy(w_dim::Int)
         return central_rays_epirelentropy[w_dim, :]
     end
     # use nonlinear fit for higher dimensions
-    rtwdim = sqrt(w_dim)
+    rtw_dim = sqrt(w_dim)
     if w_dim <= 20
-        u = 1.2023 / rtwdim - 0.015
-        v = 0.432 / rtwdim + 1.0125
-        w = -0.3057 / rtwdim + 0.972
+        u = 1.2023 / rtw_dim - 0.015
+        v = 0.432 / rtw_dim + 1.0125
+        w = -0.3057 / rtw_dim + 0.972
     else
-        u = 1.1513 / rtwdim - 0.0069
-        v = 0.4873 / rtwdim + 1.0008
-        w = -0.4247 / rtwdim + 0.9961
+        u = 1.1513 / rtw_dim - 0.0069
+        v = 0.4873 / rtw_dim + 1.0008
+        w = -0.4247 / rtw_dim + 0.9961
     end
     return [u, v, w]
 end

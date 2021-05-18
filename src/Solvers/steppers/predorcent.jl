@@ -3,7 +3,7 @@ predict or center stepper
 =#
 
 mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
-    use_correction::Bool
+    use_adjustment::Bool
     use_curve_search::Bool
     prev_alpha::T
     cent_count::Int
@@ -11,24 +11,24 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     rhs::Point{T}
     dir::Point{T}
     temp::Point{T}
-    dir_nocorr::Point{T}
-    dir_corr::Point{T}
+    dir_noadj::Point{T}
+    dir_adj::Point{T}
     dir_temp::Vector{T}
 
     step_searcher::StepSearcher{T}
-    uncorr_only::Bool
-    uncorr_alpha::T
+    unadj_only::Bool
+    unadj_alpha::T
 
     function PredOrCentStepper{T}(;
-        use_correction::Bool = true,
+        use_adjustment::Bool = true,
         use_curve_search::Bool = true,
         ) where {T <: Real}
         stepper = new{T}()
         if use_curve_search
-            # can only use curve search if using correction
-            @assert use_correction
+            # can only use curve search if using adjustment
+            @assert use_adjustment
         end
-        stepper.use_correction = use_correction
+        stepper.use_adjustment = use_adjustment
         stepper.use_curve_search = use_curve_search
         return stepper
     end
@@ -36,9 +36,9 @@ end
 
 function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
-    if stepper.use_correction && !any(Cones.use_correction, model.cones)
-        # model has no cones that use correction
-        stepper.use_correction = false
+    if stepper.use_adjustment && !any(Cones.use_dder3, model.cones)
+        # model has no cones that use third order deriv
+        stepper.use_adjustment = false
     end
 
     stepper.prev_alpha = one(T)
@@ -47,15 +47,15 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     stepper.rhs = Point(model)
     stepper.dir = Point(model)
     stepper.temp = Point(model)
-    stepper.dir_nocorr = Point(model, ztsk_only = true) # TODO probably don't need this AND dir
-    if stepper.use_correction
-        stepper.dir_corr = Point(model, ztsk_only = true)
+    stepper.dir_noadj = Point(model, ztsk_only = true) # TODO probably don't need this AND dir
+    if stepper.use_adjustment
+        stepper.dir_adj = Point(model, ztsk_only = true)
     end
     stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
 
     stepper.step_searcher = StepSearcher{T}(model)
-    stepper.uncorr_only = false
-    stepper.uncorr_alpha = 0
+    stepper.unadj_only = false
+    stepper.unadj_alpha = 0
 
     return stepper
 end
@@ -65,7 +65,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     model = solver.model
     rhs = stepper.rhs
     dir = stepper.dir
-    dir_nocorr = stepper.dir_nocorr
+    dir_noadj = stepper.dir_noadj
     cones = model.cones
 
     # update linear system solver factorization
@@ -75,31 +75,31 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     is_pred = ((stepper.cent_count > 3) ||
         all(Cones.in_neighborhood.(cones, sqrt(solver.mu), T(0.05)))) # TODO tune, make option
     stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
-    rhs_fun_nocorr = (is_pred ? update_rhs_pred : update_rhs_cent)
+    rhs_fun_noadj = (is_pred ? update_rhs_pred : update_rhs_cent)
 
-    # get uncorrected direction
-    solver.time_uprhs += @elapsed rhs_fun_nocorr(solver, rhs)
+    # get unadjusted direction
+    solver.time_uprhs += @elapsed rhs_fun_noadj(solver, rhs)
     solver.time_getdir += @elapsed get_directions(stepper, solver, is_pred)
-    copyto!(dir_nocorr.vec, dir.vec) # TODO maybe instead of copying, pass in the dir point we want into the directions function
-    try_nocorr = true
+    copyto!(dir_noadj.vec, dir.vec) # TODO maybe instead of copying, pass in the dir point we want into the directions function
+    try_noadj = true
 
-    if stepper.use_correction
-        # get correction direction
-        rhs_fun_corr = (is_pred ? update_rhs_predcorr : update_rhs_centcorr)
-        dir_corr = stepper.dir_corr
-        solver.time_uprhs += @elapsed rhs_fun_corr(solver, rhs, dir)
+    if stepper.use_adjustment
+        # get adjustment direction
+        rhs_fun_adj = (is_pred ? update_rhs_predadj : update_rhs_centadj)
+        dir_adj = stepper.dir_adj
+        solver.time_uprhs += @elapsed rhs_fun_adj(solver, rhs, dir)
         solver.time_getdir += @elapsed get_directions(stepper, solver, is_pred)
-        copyto!(dir_corr.vec, dir.vec)
+        copyto!(dir_adj.vec, dir.vec)
 
         if stepper.use_curve_search
-            # do single curve search with correction
-            stepper.uncorr_only = false
+            # do single curve search with adjustment
+            stepper.unadj_only = false
             solver.time_search += @elapsed alpha = search_alpha(point, model,
                 stepper)
 
             if iszero(alpha)
-                # try not using correction
-                @warn("very small alpha in curve search; trying without correction")
+                # try not using adjustment
+                @warn("very small alpha in curve search; trying without adjustment")
             else
                 # step
                 update_stepper_points(alpha, point, stepper, false)
@@ -107,27 +107,27 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
                 return true
             end
         else
-            # do two line searches, first for uncorrected alpha, then for corrected alpha
-            try_nocorr = false
-            stepper.uncorr_only = true
+            # do two line searches, first for unadjusted alpha, then for corrected alpha
+            try_noadj = false
+            stepper.unadj_only = true
             solver.time_search += @elapsed alpha = search_alpha(point, model,
                 stepper)
-            stepper.uncorr_alpha = alpha
-            uncorr_sched = stepper.step_searcher.prev_sched
+            stepper.unadj_alpha = alpha
+            unadj_sched = stepper.step_searcher.prev_sched
 
             if !iszero(alpha)
-                stepper.uncorr_only = false
+                stepper.unadj_only = false
                 solver.time_search += @elapsed alpha = search_alpha(point,
                     model, stepper)
 
                 if iszero(alpha)
-                    # use uncorrected direction: start at alpha found
-                    # during uncorrected direction search
-                    stepper.uncorr_only = true
+                    # use unadjusted direction: start at alpha found
+                    # during unadjusted direction search
+                    stepper.unadj_only = true
                     solver.time_search += @elapsed alpha = search_alpha(point,
-                        model, stepper, sched = uncorr_sched)
+                        model, stepper, sched = unadj_sched)
                     # check alpha didn't decrease more
-                    @assert stepper.step_searcher.prev_sched == uncorr_sched
+                    @assert stepper.step_searcher.prev_sched == unadj_sched
                 end
 
                 update_stepper_points(alpha, point, stepper, false)
@@ -137,9 +137,9 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         end
     end
 
-    if try_nocorr
-        # do line search in uncorrected direction
-        stepper.uncorr_only = true
+    if try_noadj
+        # do line search in unadjusted direction
+        stepper.unadj_only = true
         solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
     end
 
@@ -168,18 +168,18 @@ function update_stepper_points(
     if ztsk_only
         cand = stepper.temp.ztsk
         copyto!(cand, point.ztsk)
-        dir_nocorr = stepper.dir_nocorr.ztsk
+        dir_noadj = stepper.dir_noadj.ztsk
     else
         cand = point.vec
-        dir_nocorr = stepper.dir_nocorr.vec
+        dir_noadj = stepper.dir_noadj.vec
     end
 
-    @. cand += alpha * dir_nocorr
-    if !stepper.uncorr_only
-        dir_corr = (ztsk_only ? stepper.dir_corr.ztsk : stepper.dir_corr.vec)
-        corr_factor = (stepper.use_curve_search ? abs2(alpha) :
-            alpha * stepper.uncorr_alpha)
-        @. cand += corr_factor * dir_corr
+    @. cand += alpha * dir_noadj
+    if !stepper.unadj_only
+        dir_adj = (ztsk_only ? stepper.dir_adj.ztsk : stepper.dir_adj.vec)
+        adj_factor = (stepper.use_curve_search ? abs2(alpha) :
+            alpha * stepper.unadj_alpha)
+        @. cand += adj_factor * dir_adj
     end
 
     return

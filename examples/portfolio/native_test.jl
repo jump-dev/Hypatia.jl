@@ -16,10 +16,4 @@ insts["fast"] = [
     ((200, false, true, true),),
     ((200, false, true, false),),
     ]
-insts["slow"] = [
-    ((3000, true, false, true),),
-    ((3000, false, true, true),),
-    ((3000, false, true, false),),
-    ]
-insts["various"] = Tuple[]
 return (PortfolioNative, insts)

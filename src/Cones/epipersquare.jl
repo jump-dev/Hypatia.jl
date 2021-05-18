@@ -1,22 +1,18 @@
-#=
-epigraph of perspective of (half) square function (AKA rotated second-order cone)
-(u in R, v in R_+, w in R^n) : u >= v*1/2*norm_2(w/v)^2
-note v*1/2*norm_2(w/v)^2 = 1/2*sum_i(w_i^2)/v
+"""
+$(TYPEDEF)
 
-barrier from
-"Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
-by Nesterov & Todd
--log(2*u*v - norm_2(w)^2)
-=#
+Epigraph of perspective function of halved squared Euclidean norm (AKA rotated
+second-order) cone of dimension `dim`.
 
+    $(FUNCTIONNAME){T}(dim::Int)
+"""
 mutable struct EpiPerSquare{T <: Real} <: Cone{T}
-    use_dual_barrier::Bool
     dim::Int
 
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -35,17 +31,15 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     sqrt_hess_vec::Vector{T}
     inv_sqrt_hess_vec::Vector{T}
 
-    function EpiPerSquare{T}(
-        dim::Int;
-        use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
-        ) where {T <: Real}
+    function EpiPerSquare{T}(dim::Int) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
-        cone.use_dual_barrier = use_dual
         cone.dim = dim
         return cone
     end
 end
+
+use_dual_barrier(::EpiPerSquare) = false
 
 reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.sqrt_hess_prod_updated =
@@ -254,10 +248,10 @@ function inv_sqrt_hess_prod!(
     return prod
 end
 
-function correction(cone::EpiPerSquare, dir::AbstractVector)
+function dder3(cone::EpiPerSquare, dir::AbstractVector)
     @assert cone.grad_updated
     dim = cone.dim
-    corr = cone.correction
+    dder3 = cone.dder3
     point = cone.point
     u = point[1]
     v = point[2]
@@ -267,14 +261,14 @@ function correction(cone::EpiPerSquare, dir::AbstractVector)
     @views w_dir = dir[3:end]
 
     jdotpd = u * v_dir + v * u_dir - dot(w, w_dir)
-    hess_prod!(corr, dir, cone)
-    dotdHd = -dot(dir, corr)
-    dotpHd = dot(point, corr)
-    corr .*= jdotpd
-    @. @views corr[3:end] += dotdHd * w + dotpHd * w_dir
-    corr[1] += -dotdHd * v - dotpHd * v_dir
-    corr[2] += -dotdHd * u - dotpHd * u_dir
-    corr ./= 2 * cone.dist
+    hess_prod!(dder3, dir, cone)
+    dotdHd = -dot(dir, dder3)
+    dotpHd = dot(point, dder3)
+    dder3 .*= jdotpd
+    @. @views dder3[3:end] += dotdHd * w + dotpHd * w_dir
+    dder3[1] += -dotdHd * v - dotpHd * v_dir
+    dder3[2] += -dotdHd * u - dotpHd * u_dir
+    dder3 ./= 2 * cone.dist
 
-    return corr
+    return dder3
 end

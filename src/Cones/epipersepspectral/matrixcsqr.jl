@@ -10,10 +10,8 @@ vector_dim(::Type{<:MatrixCSqr{T, Complex{T}} where {T <: Real}}, d::Int) = d^2
 mutable struct MatrixCSqrCache{T <: Real, R <: RealOrComplex{T}} <: CSqrCache{T}
     is_complex::Bool
     rt2::T
-    # TODO check if we need both w and viw
-    w::Matrix{R}
-    viw::Matrix{R}
-    viw_eigen
+    viw_X::Matrix{R}
+    viw_λ::Vector{T}
     w_λ::Vector{T}
     w_λi::Vector{T}
     ϕ::T
@@ -26,7 +24,6 @@ mutable struct MatrixCSqrCache{T <: Real, R <: RealOrComplex{T}} <: CSqrCache{T}
     Δh::Matrix{T}
     Δ2h::Matrix{T}
     θ::Matrix{T}
-
     # TODO try delete some aux fields
     wd::Vector{T}
     wT::Matrix{T}
@@ -48,8 +45,7 @@ function setup_csqr_cache(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R
     cache.is_complex = (R <: Complex{T})
     cache.rt2 = sqrt(T(2))
     d = cone.d
-    cache.w = zeros(R, d, d)
-    cache.viw = zeros(R, d, d)
+    cache.viw_X = zeros(R, d, d)
     cache.w_λ = zeros(T, d)
     cache.w_λi = zeros(T, d)
     cache.∇h = zeros(T, d)
@@ -92,17 +88,13 @@ function update_feas(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
 
     cone.is_feas = false
     if v > eps(T)
-        w = cache.w
+        w = viw_X = cache.viw_X
         svec_to_smat!(w, cone.w_view, cache.rt2)
         w_chol = cholesky!(Hermitian(w, :U), check = false)
         if isposdef(w_chol)
             svec_to_smat!(w, cone.w_view, cache.rt2)
-            viw = cache.viw
-            @. viw = w / v
-            # TODO other options? eigen(A; permute::Bool=true, scale::Bool=true, sortby)
-            # TODO in-place and dispatch to GLA or LAPACK.geevx! directly for efficiency
-            viw_eigen = cache.viw_eigen = eigen(Hermitian(viw, :U))
-            viw_λ = viw_eigen.values
+            w ./= v
+            viw_λ = cache.viw_λ = update_eigen!(viw_X)
             if all(>(eps(T)), viw_λ)
                 cache.ϕ = h_val(viw_λ, cone.h)
                 cache.ζ = cone.point[1] - v * cache.ϕ
@@ -143,8 +135,8 @@ function update_grad(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     grad = cone.grad
     cache = cone.cache
     ζi = cache.ζi = inv(cache.ζ)
-    viw_λ = cache.viw_eigen.values
-    viw_X = cache.viw_eigen.vectors
+    viw_λ = cache.viw_λ
+    viw_X = cache.viw_X
     ∇h = cache.∇h
     h_der1(∇h, viw_λ, cone.h)
     cache.σ = cache.ϕ - dot(viw_λ, ∇h)
@@ -166,7 +158,7 @@ function update_hess_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     @assert !cone.hess_aux_updated
     @assert cone.grad_updated
     cache = cone.cache
-    viw_λ = cache.viw_eigen.values
+    viw_λ = cache.viw_λ
     w_λi = cache.w_λi
     ∇h = cache.∇h
     ∇2h = cache.∇2h
@@ -206,8 +198,8 @@ function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     rt2 = cache.rt2
     ζi = cache.ζi
     σ = cache.σ
-    viw_X = cache.viw_eigen.vectors
-    viw_λ = cache.viw_eigen.values
+    viw_X = cache.viw_X
+    viw_λ = cache.viw_λ
     ∇h = cache.∇h
     ∇2h = cache.∇2h
     wd = cache.wd
@@ -260,8 +252,8 @@ function hess_prod!(
     cache = cone.cache
     ζi = cache.ζi
     σ = cache.σ
-    viw_X = cache.viw_eigen.vectors
-    viw_λ = cache.viw_eigen.values
+    viw_X = cache.viw_X
+    viw_λ = cache.viw_λ
     w_λi = cache.w_λi
     ∇h = cache.∇h
     Δh = cache.Δh
@@ -304,8 +296,8 @@ function update_inv_hess_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     v = cone.point[2]
     cache = cone.cache
     σ = cache.σ
-    viw_X = cache.viw_eigen.vectors
-    viw_λ = cache.viw_eigen.values
+    viw_X = cache.viw_X
+    viw_λ = cache.viw_λ
     ∇h = cache.∇h
     wd = cache.wd
     α = cache.α
@@ -337,7 +329,7 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     Hi = cone.inv_hess.data
     cache = cone.cache
-    viw_X = cache.viw_eigen.vectors
+    viw_X = cache.viw_X
     c4 = cache.c4
     wT = cache.wT
     w1 = cache.w1
@@ -378,7 +370,7 @@ function inv_hess_prod!(
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     d = cone.d
     cache = cone.cache
-    viw_X = cache.viw_eigen.vectors
+    viw_X = cache.viw_X
     α = cache.α
     γ = cache.γ
     c0 = cache.c0
@@ -414,12 +406,12 @@ function inv_hess_prod!(
     return prod
 end
 
-function update_correction_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
-    @assert !cone.correction_aux_updated
+function update_dder3_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
+    @assert !cone.dder3_aux_updated
     cone.hess_aux_updated || update_hess_aux(cone)
     d = cone.d
     cache = cone.cache
-    viw_λ = cache.viw_eigen.values
+    viw_λ = cache.viw_λ
     ∇3h = cache.∇3h
     Δh = cache.Δh
     Δ2h = cache.Δ2h
@@ -447,21 +439,21 @@ function update_correction_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
             Δ2h[k, svec_idx(j, i)] = t
     end
 
-    cone.correction_aux_updated = true
+    cone.dder3_aux_updated = true
 end
 
-function correction(
+function dder3(
     cone::EpiPerSepSpectral{<:MatrixCSqr{T}},
     dir::AbstractVector{T},
     ) where T
-    cone.correction_aux_updated || update_correction_aux(cone)
+    cone.dder3_aux_updated || update_dder3_aux(cone)
     d = cone.d
     v = cone.point[2]
-    corr = cone.correction
+    dder3 = cone.dder3
     cache = cone.cache
     ζi = cache.ζi
-    viw_X = cache.viw_eigen.vectors
-    viw_λ = cache.viw_eigen.values
+    viw_X = cache.viw_X
+    viw_λ = cache.viw_λ
     w_λi = cache.w_λi
     σ = cache.σ
     ∇h = cache.∇h
@@ -481,7 +473,7 @@ function correction(
     @views svec_to_smat!(r_X, dir[3:end], cache.rt2)
     mul!(ξ_X, Hermitian(r_X, :U), viw_X)
     mul!(r_X, viw_X', ξ_X)
-    LinearAlgebra.copytri!(r_X, 'U', cache.is_complex)
+    LinearAlgebra.copytri!(r_X, 'U', true)
 
     viq = vi * q
     D = Diagonal(viw_λ)
@@ -510,11 +502,11 @@ function correction(
     mul!(ξ_X, Hermitian(w_aux, :U), viw_X')
     mul!(w_aux, viw_X, ξ_X)
 
-    corr[1] = -c1
-    @inbounds corr[2] = c1 * σ - c2 + ξbξ + viq^2 / v
-    @views smat_to_svec!(corr[3:end], w_aux, cache.rt2)
+    dder3[1] = -c1
+    @inbounds dder3[2] = c1 * σ - c2 + ξbξ + viq^2 / v
+    @views smat_to_svec!(dder3[3:end], w_aux, cache.rt2)
 
-    return corr
+    return dder3
 end
 
 function eig_kron!(
@@ -530,7 +522,7 @@ function eig_kron!(
     w2 = cache.w2
     w3 = cache.w3
     V = cache.w4
-    copyto!(V, cache.viw_eigen.vectors') # allows column slices
+    copyto!(V, cache.viw_X') # allows column slices
 
     col_idx = 1
     @inbounds for j in 1:d

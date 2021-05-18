@@ -1,21 +1,17 @@
-#=
-epigraph of Euclidean (2-)norm (AKA second-order cone)
-(u in R, w in R^n) : u >= norm_2(w)
+"""
+$(TYPEDEF)
 
-barrier from
-"Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
-by Nesterov & Todd
--log(u^2 - norm_2(w)^2)
-=#
+Epigraph of Euclidean norm (AKA second-order) cone of dimension `dim`.
 
+    $(FUNCTIONNAME){T}(dim::Int)
+"""
 mutable struct EpiNormEucl{T <: Real} <: Cone{T}
-    use_dual_barrier::Bool
     dim::Int
 
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -28,17 +24,15 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
 
     dist::T
 
-    function EpiNormEucl{T}(
-        dim::Int;
-        use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
-        ) where {T <: Real}
+    function EpiNormEucl{T}(dim::Int) where {T <: Real}
         @assert dim >= 2
         cone = new{T}()
-        cone.use_dual_barrier = use_dual
         cone.dim = dim
         return cone
     end
 end
+
+use_dual_barrier(::EpiNormEucl) = false
 
 reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = false)
@@ -211,10 +205,10 @@ function inv_sqrt_hess_prod!(
     return prod
 end
 
-function correction(cone::EpiNormEucl, dir::AbstractVector)
+function dder3(cone::EpiNormEucl, dir::AbstractVector)
     @assert cone.grad_updated
     dim = cone.dim
-    corr = cone.correction
+    dder3 = cone.dder3
     point = cone.point
     u = point[1]
     u_dir = dir[1]
@@ -222,13 +216,13 @@ function correction(cone::EpiNormEucl, dir::AbstractVector)
     @views w_dir = dir[2:end]
 
     jdotpd = u * u_dir - dot(w, w_dir)
-    hess_prod!(corr, dir, cone)
-    dotdHd = -dot(dir, corr)
-    dotpHd = dot(point, corr)
-    corr .*= jdotpd
-    @. @views corr[2:end] += dotdHd * w + dotpHd * w_dir
-    corr[1] += -dotdHd * u - dotpHd * u_dir
-    corr ./= 2 * cone.dist
+    hess_prod!(dder3, dir, cone)
+    dotdHd = -dot(dir, dder3)
+    dotpHd = dot(point, dder3)
+    dder3 .*= jdotpd
+    @. @views dder3[2:end] += dotdHd * w + dotpHd * w_dir
+    dder3[1] += -dotdHd * u - dotpHd * u_dir
+    dder3 ./= 2 * cone.dist
 
-    return corr
+    return dder3
 end

@@ -6,7 +6,7 @@ suitable univariate convex functions defined on ℝ₊₊ and associated oracles
 - h_der1/h_der2/h_der3 evaluate 1st/2nd/3rd derivatives of h pointwise
 - get_initial_point gives initial point for u,v,λ_i
 
-TODO derive central initial points for get_initial_point and return correct real
+TODO derive central initial points for get_initial_point and use real type
 =#
 
 # inverse: x^-1

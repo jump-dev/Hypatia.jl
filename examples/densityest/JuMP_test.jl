@@ -30,13 +30,6 @@ insts["fast"] = [
     ((:iris, 6, true, true, true),),
     ((:cancer, 4, true, true, true),),
     ]
-insts["slow"] = [
-    ((500, 2, 50, true, true, true),),
-    ((1000, 3, 16, true, true, true),),
-    ((200, 6, 4, false, true, true),),
-    ((500, 6, 6, true, true, true),),
-    ((500, 4, 6, true, false, true),),
-    ]
 insts["various"] = [
     ((50, 2, 16, true, false, false),),
     ((50, 2, 16, true, false, false), :ExpPSD),

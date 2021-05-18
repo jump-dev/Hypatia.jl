@@ -1,13 +1,11 @@
-#=
-generalized power cone parametrized by alpha in R_++^n in unit simplex interior
-(u in R_++^m, w in R^n) : prod_i(u_i^alpha_i) => norm_2(w)
-where sum_i(alpha_i) = 1, alpha_i > 0
+"""
+$(TYPEDEF)
 
-barrier from "On self-concordant barriers for generalized power cones"
-by Roy & Xiao 2018
--log(prod_i((u_i)^(2 * alpha_i)) - norm_2(w)^2) - sum_i((1 - alpha_i)*log(u_i))
-=#
+Generalized power cone parametrized by powers `alpha` in the unit simplex and
+dimension `d` of the normed variables.
 
+    $(FUNCTIONNAME){T}(alpha::Vector{T}, d::Int, use_dual::Bool = false)
+"""
 mutable struct GeneralizedPower{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
@@ -17,7 +15,7 @@ mutable struct GeneralizedPower{T <: Real} <: Cone{T}
     point::Vector{T}
     dual_point::Vector{T}
     grad::Vector{T}
-    correction::Vector{T}
+    dder3::Vector{T}
     vec1::Vector{T}
     vec2::Vector{T}
     feas_updated::Bool
@@ -194,13 +192,13 @@ function hess_prod!(
     return prod
 end
 
-function correction(cone::GeneralizedPower, dir::AbstractVector)
+function dder3(cone::GeneralizedPower, dir::AbstractVector)
     m = length(cone.alpha)
     @views u = cone.point[1:m]
     @views w = cone.point[(m + 1):end]
-    corr = cone.correction
-    @views u_corr = corr[1:m]
-    @views w_corr = corr[(m + 1):end]
+    dder3 = cone.dder3
+    @views u_dder3 = dder3[1:m]
+    @views w_dder3 = dder3[(m + 1):end]
     @views u_dir = dir[1:m]
     @views w_dir = dir[(m + 1):end]
     alpha = cone.alpha
@@ -221,18 +219,18 @@ function correction(cone::GeneralizedPower, dir::AbstractVector)
     const12 = -2 * produuw / produw
     const13 = const11 * const1 + const12 * (2 * wwd * const8 * audu - const10)
     const14 = const11 * 2 * audu + const12 * wwd
-    @. u_corr = const14 .+ const8 * udu
-    u_corr .*= alpha
-    u_corr .+= udu
-    u_corr .*= udu
-    @. u_corr += const13 * alpha
-    u_corr ./= u
+    @. u_dder3 = const14 .+ const8 * udu
+    u_dder3 .*= alpha
+    u_dder3 .+= udu
+    u_dder3 .*= udu
+    @. u_dder3 += const13 * alpha
+    u_dder3 ./= u
 
     const2 = -2 * const12 * audu
     const6 = 2 * const2 * const15 + const12 * const1 -
         2 / produw * const10 / produw
     const7 = const2 - 2 / produw * wwd / produw
-    @. w_corr = const7 * w_dir + const6 * w
+    @. w_dder3 = const7 * w_dir + const6 * w
 
-    return cone.correction
+    return cone.dder3
 end
