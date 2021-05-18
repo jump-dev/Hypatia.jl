@@ -127,7 +127,7 @@ function real_poly_data(polyname::Symbol, T::Type{<:Real} = Float64)
     elseif polyname == :rosenbrock
         DP.@polyvar x[1:2]
         f = (1-x[1])^2+100*(x[1]^2-x[2])^2
-        dom = BoxDomain{T}(fill(-5, 2), fill(10, 3))
+        dom = BoxDomain{T}(fill(-5, 2), fill(10, 2))
         true_obj = 0
     elseif polyname == :rosenbrock_ball
         DP.@polyvar x[1:2]
