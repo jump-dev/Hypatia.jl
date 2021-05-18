@@ -293,7 +293,7 @@ function inv_hess_prod!(
 
         prod[1, j] = cu + dot(α, r)
         prod[2, j] = cv
-        @. prod[3:end, j] = p * α + cv * γ + m * r
+        @. @views prod[3:end, j] = p * α + cv * γ + m * r
     end
 
     return prod
