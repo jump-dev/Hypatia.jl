@@ -378,13 +378,13 @@ function dder3(cone::HypoPerLogdetTri, dir::AbstractVector)
     viq2 = abs2(viq)
     w_aux = cone.mat5
 
-    r_X = copytri!(svec_to_smat!(cone.mat3, r, cone.rt2), 'U', cone.is_complex)
+    r_X = copytri!(svec_to_smat!(cone.mat3, r, cone.rt2), 'U', true)
     c0 = dot(Wi, r_X)
     ∇ϕr = c0 * v
     χ = -p + σ * q + ∇ϕr
 
     rwi = rdiv!(r_X, cone.fact_W)
-    rwi_sqr = dot(rwi, rwi')
+    rwi_sqr = real(dot(rwi, rwi'))
     L_rwi = ldiv!(cone.fact_W.U', rwi)
     wirwirwi = mul!(cone.mat4, L_rwi', L_rwi)
     wirwi = ldiv!(cone.fact_W.U, L_rwi)
@@ -394,7 +394,7 @@ function dder3(cone::HypoPerLogdetTri, dir::AbstractVector)
     # tau of TOO
     ζiχ = ζi * χ
     @. w_aux *= -ζiχ - viq
-    w_aux += v * (viq2 * Wi - 2 * viq * wirwi + wirwirwi) / ζ
+    @. w_aux += v * (viq2 * Wi - 2 * viq * wirwi + wirwirwi) / ζ
 
     ∇2ϕξξ = -viq2 * d + 2 * viq * c0 - rwi_sqr
     c1 = ζi * (abs2(ζiχ) - v * ∇2ϕξξ * ζi / 2)
