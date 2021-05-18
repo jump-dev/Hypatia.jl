@@ -20,7 +20,7 @@ end
 
 function build(inst::MuConvexityJuMP{T}) where {T <: Float64}
     dom = muconvexity_data[inst.dom]
-    n = PolyUtils.get_dimension(dom)
+    n = PolyUtils.dimension(dom)
     DP.@polyvar x[1:n]
     poly = muconvexity_data[inst.poly](x)
 
