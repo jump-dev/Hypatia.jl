@@ -31,7 +31,7 @@ mutable struct Model{T <: Real}
         b::Vector{T},
         G,
         h::Vector{T},
-        cones::Vector{Cones.Cone{T}};
+        cones::Vector{<:Cones.Cone{T}};
         obj_offset::T = zero(T),
         ) where {T <: Real}
         model = new{T}()
