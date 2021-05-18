@@ -26,5 +26,3 @@ jobs:
       - name: Push changes
         run: |
             git push --force origin gh-pages-new:gh-pages
-
-    © 2021 GitHub, Inc.
