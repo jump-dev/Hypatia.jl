@@ -83,19 +83,19 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
 
     if iszero(alpha)
         # recover
-        println("trying combined without adjustment")
+        solver.verbose && println("trying combined without adjustment")
         stepper.unadj_only = true
         solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
 
         if iszero(alpha)
-            println("trying centering with adjustment")
+            solver.verbose && println("trying centering with adjustment")
             stepper.cent_only = true
             stepper.unadj_only = false
             solver.time_search += @elapsed alpha =
                 search_alpha(point, model, stepper)
 
             if iszero(alpha)
-                println("trying centering without adjustment")
+                solver.verbose && println("trying centering without adjustment")
                 stepper.unadj_only = true
                 solver.time_search += @elapsed alpha =
                     search_alpha(point, model, stepper)

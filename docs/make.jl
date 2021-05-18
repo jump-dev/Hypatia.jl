@@ -4,8 +4,12 @@ using Hypatia
 
 makedocs(
     sitename = "Hypatia",
-    format = Documenter.HTML(),
-    modules = [Hypatia]
+    format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
+    modules = [Hypatia],
+    pages = [
+        "Home" => "index.md",
+        "API" => "api.md"
+        ],
     )
 
 deploydocs(
