@@ -1,14 +1,11 @@
-#=
-hypograph of power mean (product of powers) parametrized by alpha in R_+^n
-on unit simplex
-(u in R, w in R_+^n) : u <= prod_i(w_i^alpha_i)
-where sum_i(alpha_i) = 1, alpha_i >= 0
+"""
+$(TYPEDEF)
 
-barrier from "Constructing self-concordant barriers for convex cones"
-by Yu. Nesterov
--log(prod_i(w_i^alpha_i) - u) - sum_i(log(w_i))
-=#
+Hypograph of weighted power mean cone parametrized by powers `alpha` in the unit
+simplex.
 
+    $(FUNCTIONNAME){T}(alpha::Vector{T}, use_dual::Bool = false)
+"""
 mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int

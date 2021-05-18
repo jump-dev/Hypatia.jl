@@ -1,10 +1,10 @@
-#=
-(closure of) hypograph of perspective of sum of logarithms
-(u in R, v in R_+, w in R_+^d) : u <= v*sum(log.(w/v))
+"""
+$(TYPEDEF)
 
-barrier is -log(sum_i v*log(w_i/v) - u) - sum_i log(w_i) - log(v)
-=#
+Hypograph of perspective function of sum-log cone of dimension `dim`.
 
+    $(FUNCTIONNAME){T}(dim::Int, use_dual::Bool = false)
+"""
 mutable struct HypoPerLog{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int

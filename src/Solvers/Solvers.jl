@@ -1,9 +1,9 @@
-#=
-functions and caches for interior point algorithms
-=#
-
+"""
+Interior point algorithms for conic models.
+"""
 module Solvers
 
+using DocStringExtensions
 using Printf
 using LinearAlgebra
 using SparseArrays

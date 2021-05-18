@@ -1,13 +1,11 @@
-#=
-generalized power cone parametrized by alpha in R_++^n in unit simplex interior
-(u in R_++^m, w in R^n) : prod_i(u_i^alpha_i) => norm_2(w)
-where sum_i(alpha_i) = 1, alpha_i > 0
+"""
+$(TYPEDEF)
 
-barrier from "On self-concordant barriers for generalized power cones"
-by Roy & Xiao 2018
--log(prod_i((u_i)^(2 * alpha_i)) - norm_2(w)^2) - sum_i((1 - alpha_i)*log(u_i))
-=#
+Generalized power cone parametrized by powers `alpha` in the unit simplex and
+dimension `d` of the normed variables.
 
+    $(FUNCTIONNAME){T}(alpha::Vector{T}, d::Int, use_dual::Bool = false)
+"""
 mutable struct GeneralizedPower{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int

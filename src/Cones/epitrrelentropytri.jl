@@ -1,18 +1,12 @@
-#=
-epigraph of the relative entropy cone
-(u in R, V in S_+^d, W in S_+^d) : u >= tr(W * (log(W) - log(V)))
+# TODO reduce allocations, generalize for complex, don't use symm_kron_nonsymm
 
-derivatives for quantum relative entropy function adapted from
-"Long-Step Path-Following Algorithm in Quantum Information Theory:
-Some Numerical Aspects and Applications"
-by L. Faybusovich and C. Zhou
+"""
+$(TYPEDEF)
 
-uses the log-homogeneous but not self-concordant barrier
--log(u - tr(W * log(W) - W * log(V))) - logdet(W) - logdet(V)
+Epigraph of matrix relative entropy cone of dimension `dim` in svec format.
 
-TODO reduce allocations
-=#
-
+    $(FUNCTIONNAME){T}(dim::Int, use_dual::Bool = false)
+"""
 mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int

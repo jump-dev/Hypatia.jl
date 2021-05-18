@@ -1,9 +1,11 @@
-#=
-TODO
-- write description
-- assumes first A matrix is PSD (eg identity)
-=#
+"""
+$(TYPEDEF)
 
+Linear matrix inequality cone parametrized by list of real symmetric or complex
+Hermitian matrices `mats` of equal dimension.
+
+    $(FUNCTIONNAME){T}(mats::Vector, use_dual::Bool = false)
+"""
 mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int

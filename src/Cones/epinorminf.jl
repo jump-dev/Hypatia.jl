@@ -1,12 +1,10 @@
-#=
-epigraph of L-infinity norm
-(u in R, w in R^n) : u >= norm_inf(w)
+"""
+$(TYPEDEF)
 
-barrier from "Barrier Functions in Interior Point Methods" by Osman Guler
--sum_i(log(u - w_i^2/u)) - log(u)
-= -sum_i(log(u^2 - w_i^2)) + (n - 1)log(u)
-=#
+Epigraph of real or complex infinity norm cone of dimension `dim`.
 
+    $(FUNCTIONNAME){T, R}(dim::Int, use_dual::Bool = false)
+"""
 mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int

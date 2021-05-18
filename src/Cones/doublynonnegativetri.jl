@@ -1,13 +1,11 @@
-#=
-smat(w) in S_+^d intersected with w in R_+^(sdim(d))
+"""
+$(TYPEDEF)
 
-barrier -logdet(W) - sum(log(W_ij) for i in 1:n, j in 1:(i-1))
-where W = smat(w)
+Real symmetric doubly nonnegative cone (intersection of nonnegative and positive
+semidefinite cones) of dimension `dim` in svec format.
 
-TODO
-- improve description
-=#
-
+    $(FUNCTIONNAME){T}(dim::Int, use_dual::Bool = false)
+"""
 mutable struct DoublyNonnegativeTri{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int

@@ -7,6 +7,11 @@ const SAF = MOI.ScalarAffineFunction
 const VV = MOI.VectorOfVariables
 const VAF = MOI.VectorAffineFunction
 
+"""
+$(TYPEDEF)
+
+A MathOptInterface optimizer type for Hypatia.
+"""
 mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     use_dense_model::Bool # make the model use dense A and G data instead of sparse
 

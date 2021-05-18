@@ -1,20 +1,12 @@
-#=
-row-wise lower triangle of positive semidefinite matrix cone (scaled "svec" form)
-W \in S^n : 0 >= eigmin(W)
+"""
+$(TYPEDEF)
 
-NOTE on-diagonal (real) elements have one slot in the vector and below diagonal
-(complex) elements have two consecutive slots in the vector
-barrier from
-"Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
-by Nesterov & Todd
--logdet(W)
+Real symmetric or complex Hermitian positive semidefinite cone of dimension
+`dim` in svec format.
 
-TODO
-- describe hermitian complex PSD cone
-=#
-
+    $(FUNCTIONNAME){T, R}(dim::Int)
+"""
 mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
-    use_dual_barrier::Bool
     dim::Int
     side::Int
     is_complex::Bool
@@ -41,13 +33,9 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_mat::Matrix{R}
     fact_mat::Cholesky{R}
 
-    function PosSemidefTri{T, R}(
-        dim::Int;
-        use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
-        ) where {R <: RealOrComplex{T}} where {T <: Real}
+    function PosSemidefTri{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 1
         cone = new{T, R}()
-        cone.use_dual_barrier = use_dual
         cone.dim = dim # real vector dimension
         cone.rt2 = sqrt(T(2))
         if R <: Complex
@@ -63,6 +51,8 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         return cone
     end
 end
+
+use_dual_barrier(::PosSemidefTri) = false
 
 reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = false)

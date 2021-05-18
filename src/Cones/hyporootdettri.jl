@@ -1,15 +1,11 @@
-#=
-hypograph of the root determinant of a (row-wise lower triangle) symmetric
-positive definite matrix with side dimension d
-(u in R, W in S_n+) : u <= det(W)^(1/n)
+"""
+$(TYPEDEF)
 
-SC barrier from dder3espondence with A. Nemirovski
--(5 / 3) ^ 2 * (log(det(W) ^ (1 / n) - u) + logdet(W))
+Hypograph of real symmetric or complex Hermitian root-determinant cone of
+dimension `dim` in svec format.
 
-TODO
-- describe complex case
-=#
-
+    $(FUNCTIONNAME){T, R}(dim::Int, use_dual::Bool = false)
+"""
 mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int

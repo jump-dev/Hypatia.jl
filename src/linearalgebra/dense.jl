@@ -95,7 +95,11 @@ mutable struct LAPACKNonSymCache{T <: BlasReal} <: DenseNonSymCache{T}
     LAPACKNonSymCache{T}() where {T <: BlasReal} = new{T}()
 end
 
-function load_matrix(cache::LAPACKNonSymCache{T}, A::Matrix{T}; copy_A::Bool = true) where {T <: BlasReal}
+function load_matrix(
+    cache::LAPACKNonSymCache{T},
+    A::Matrix{T};
+    copy_A::Bool = true,
+    ) where {T <: BlasReal}
     LinearAlgebra.require_one_based_indexing(A)
     LinearAlgebra.chkstride1(A)
     n = LinearAlgebra.checksquare(A)
@@ -121,7 +125,7 @@ for (getrf, elty) in [(:dgetrf_, :Float64), (:sgetrf_, :Float32)]
                 cache.ipiv, cache.info)
 
             if cache.info[] < 0
-                throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK call"))
+                throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK"))
             elseif 0 < cache.info[] <= n
                 # @warn("factorization failed: #$(cache.info[])")
                 return false
@@ -161,7 +165,11 @@ mutable struct LUNonSymCache{T <: Real} <: DenseNonSymCache{T}
     LUNonSymCache{T}() where {T <: Real} = new{T}()
 end
 
-function load_matrix(cache::LUNonSymCache{T}, A::AbstractMatrix{T}; copy_A::Bool = true) where {T <: Real}
+function load_matrix(
+    cache::LUNonSymCache{T},
+    A::AbstractMatrix{T};
+    copy_A::Bool = true,
+    ) where {T <: Real}
     n = LinearAlgebra.checksquare(A)
     cache.copy_A = copy_A
     cache.AF = (copy_A ? zero(A) : A) # copy over A to new matrix or use A directly
@@ -174,7 +182,8 @@ function update_fact(cache::LUNonSymCache{T}, A::AbstractMatrix{T}) where {T <: 
     return issuccess(cache.fact)
 end
 
-inv_prod(cache::LUNonSymCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, prod)
+inv_prod(cache::LUNonSymCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} =
+    ldiv!(cache.fact, prod)
 
 # default to LAPACKNonSymCache for BlasReals, otherwise generic LUNonSymCache
 DenseNonSymCache{T}() where {T <: BlasReal} = LAPACKNonSymCache{T}()
@@ -198,7 +207,11 @@ mutable struct LAPACKSymCache{T <: BlasReal} <: DenseSymCache{T}
     LAPACKSymCache{T}() where {T <: BlasReal} = new{T}()
 end
 
-function load_matrix(cache::LAPACKSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: BlasReal}
+function load_matrix(
+    cache::LAPACKSymCache{T},
+    A::Symmetric{T, <:AbstractMatrix{T}};
+    copy_A::Bool = true,
+    ) where {T <: BlasReal}
     LinearAlgebra.require_one_based_indexing(A.data)
     LinearAlgebra.chkstride1(A.data)
     n = LinearAlgebra.checksquare(A.data)
@@ -214,7 +227,10 @@ end
 # wrap LAPACK functions
 for (sytrf_rook, elty) in [(:dsytrf_rook_, :Float64), (:ssytrf_rook_, :Float32)]
     @eval begin
-        function update_fact(cache::LAPACKSymCache{$elty}, A::Symmetric{$elty, <:AbstractMatrix{$elty}})
+        function update_fact(
+            cache::LAPACKSymCache{$elty},
+            A::Symmetric{$elty, <:AbstractMatrix{$elty}},
+            )
             n = LinearAlgebra.checksquare(A)
             cache.copy_A && copyto!(cache.AF, A)
             AF = cache.AF.data
@@ -233,7 +249,7 @@ for (sytrf_rook, elty) in [(:dsytrf_rook_, :Float64), (:ssytrf_rook_, :Float32)]
             end
 
             if cache.info[] < 0
-                throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK call"))
+                throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK"))
             elseif 0 < cache.info[] <= n
                 # @warn("factorization failed: #$(cache.info[])")
                 return false
@@ -248,7 +264,10 @@ end
 
 for (sytri_rook, elty) in [(:dsytri_rook_, :Float64), (:ssytri_rook_, :Float32)]
     @eval begin
-        function invert(cache::LAPACKSymCache{$elty}, X::Symmetric{$elty, Matrix{$elty}})
+        function invert(
+            cache::LAPACKSymCache{$elty},
+            X::Symmetric{$elty, Matrix{$elty}},
+            )
             copyto!(X.data, cache.AF.data)
 
             # call dsytri_rook( uplo, n, a, lda, ipiv, work, info )
@@ -291,26 +310,37 @@ mutable struct LUSymCache{T <: Real} <: DenseSymCache{T}
     LUSymCache{T}() where {T <: Real} = new{T}()
 end
 
-function load_matrix(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: Real}
+function load_matrix(
+    cache::LUSymCache{T},
+    A::Symmetric{T, <:AbstractMatrix{T}};
+    copy_A::Bool = true,
+    ) where {T <: Real}
     n = size(A, 1)
     cache.copy_A = copy_A
     cache.AF = (copy_A ? zero(A) : A) # copy over A (symmetric) to new matrix or use A directly
     return cache
 end
 
-function update_fact(cache::LUSymCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
+function update_fact(
+    cache::LUSymCache{T},
+    A::Symmetric{T, <:AbstractMatrix{T}},
+    ) where {T <: Real}
     cache.copy_A && copyto!(cache.AF, A)
     cache.fact = lu!(cache.AF, check = false) # no generic symmetric indefinite factorization so fallback LU of symmetric matrix
     return issuccess(cache.fact)
 end
 
-function invert(cache::LUSymCache{T}, X::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
+function invert(
+    cache::LUSymCache{T},
+    X::Symmetric{T, <:AbstractMatrix{T}},
+    ) where {T <: Real}
     copyto!(X.data, I)
     ldiv!(cache.fact, X.data) # just ldiv an identity matrix - LinearAlgebra currently does the same
     return X
 end
 
-inv_prod(cache::LUSymCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, prod)
+inv_prod(cache::LUSymCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} =
+    ldiv!(cache.fact, prod)
 
 # default to LAPACKSymCache for BlasReals, otherwise generic LUSymCache
 DenseSymCache{T}() where {T <: BlasReal} = LAPACKSymCache{T}()
@@ -329,7 +359,11 @@ mutable struct LAPACKPosDefCache{T <: BlasReal} <: DensePosDefCache{T}
     LAPACKPosDefCache{T}() where {T <: BlasReal} = new{T}()
 end
 
-function load_matrix(cache::LAPACKPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: BlasReal}
+function load_matrix(
+    cache::LAPACKPosDefCache{T},
+    A::Symmetric{T, <:AbstractMatrix{T}};
+    copy_A::Bool = true,
+    ) where {T <: BlasReal}
     LinearAlgebra.require_one_based_indexing(A.data)
     LinearAlgebra.chkstride1(A.data)
     n = LinearAlgebra.checksquare(A.data)
@@ -342,7 +376,10 @@ end
 # wrap LAPACK functions
 for (potrf, elty) in [(:dpotrf_, :Float64), (:spotrf_, :Float32)]
     @eval begin
-        function update_fact(cache::LAPACKPosDefCache{$elty}, A::Symmetric{$elty, <:AbstractMatrix{$elty}})
+        function update_fact(
+            cache::LAPACKPosDefCache{$elty},
+            A::Symmetric{$elty, <:AbstractMatrix{$elty}},
+            )
             n = size(cache.AF, 1)
             cache.copy_A && copyto!(cache.AF, A)
             AF = cache.AF.data
@@ -355,7 +392,7 @@ for (potrf, elty) in [(:dpotrf_, :Float64), (:spotrf_, :Float32)]
                 cache.info)
 
             if cache.info[] < 0
-                throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK call"))
+                throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK"))
             elseif 0 < cache.info[] <= n
                 # @warn("factorization failed: #$(cache.info[])")
                 return false
@@ -371,7 +408,10 @@ end
 
 for (potri, elty) in [(:dpotri_, :Float64), (:spotri_, :Float32)]
     @eval begin
-        function invert(cache::LAPACKPosDefCache{$elty}, X::Symmetric{$elty, Matrix{$elty}})
+        function invert(
+            cache::LAPACKPosDefCache{$elty},
+            X::Symmetric{$elty, Matrix{$elty}},
+            )
             copyto!(X.data, cache.AF.data)
 
             # call dpotri( uplo, n, a, lda, info )
@@ -388,7 +428,10 @@ end
 
 for (potrs, elty) in [(:dpotrs_, :Float64), (:spotrs_, :Float32)]
     @eval begin
-        function inv_prod(cache::LAPACKPosDefCache{$elty}, X::AbstractVecOrMat{$elty})
+        function inv_prod(
+            cache::LAPACKPosDefCache{$elty},
+            X::AbstractVecOrMat{$elty},
+            )
             LinearAlgebra.require_one_based_indexing(X)
             LinearAlgebra.chkstride1(X)
             AF = cache.AF.data
@@ -412,14 +455,21 @@ mutable struct CholPosDefCache{T <: Real} <: DensePosDefCache{T}
     CholPosDefCache{T}() where {T <: Real} = new{T}()
 end
 
-function load_matrix(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}; copy_A::Bool = true) where {T <: Real}
+function load_matrix(
+    cache::CholPosDefCache{T},
+    A::Symmetric{T, <:AbstractMatrix{T}};
+    copy_A::Bool = true,
+    ) where {T <: Real}
     n = LinearAlgebra.checksquare(A)
     cache.copy_A = copy_A
     cache.AF = (copy_A ? zero(A) : A) # copy over A (symmetric) to new matrix or use A directly
     return cache
 end
 
-function update_fact(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
+function update_fact(
+    cache::CholPosDefCache{T},
+    A::Symmetric{T, <:AbstractMatrix{T}},
+    ) where {T <: Real}
     cache.copy_A && copyto!(cache.AF, A)
     cache.fact = cholesky!(cache.AF, check = false)
     if !issuccess(cache.fact) && cache.copy_A # fallback to LU of symmetric matrix
@@ -429,17 +479,27 @@ function update_fact(cache::CholPosDefCache{T}, A::Symmetric{T, <:AbstractMatrix
     return issuccess(cache.fact)
 end
 
-function invert(cache::CholPosDefCache{T}, X::Symmetric{T, <:AbstractMatrix{T}}) where {T <: Real}
+function invert(
+    cache::CholPosDefCache{T},
+    X::Symmetric{T, <:AbstractMatrix{T}},
+    ) where {T <: Real}
     copyto!(X.data, I)
     ldiv!(cache.fact, X.data) # just ldiv an identity matrix - LinearAlgebra currently does the same
     return X
 end
 
-inv_prod(cache::CholPosDefCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(cache.fact, prod)
+inv_prod(cache::CholPosDefCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} =
+    ldiv!(cache.fact, prod)
 
-sqrt_prod(cache::Union{LAPACKPosDefCache{T}, CholPosDefCache{T}}, prod::AbstractVecOrMat{T}) where {T <: Real} = lmul!(UpperTriangular(cache.AF.data), prod)
+sqrt_prod(
+    cache::Union{LAPACKPosDefCache{T}, CholPosDefCache{T}},
+    prod::AbstractVecOrMat{T},
+    ) where {T <: Real} = lmul!(UpperTriangular(cache.AF.data), prod)
 
-inv_sqrt_prod(cache::Union{LAPACKPosDefCache{T}, CholPosDefCache{T}}, prod::AbstractVecOrMat{T}) where {T <: Real} = ldiv!(UpperTriangular(cache.AF.data)', prod)
+inv_sqrt_prod(
+    cache::Union{LAPACKPosDefCache{T}, CholPosDefCache{T}},
+    prod::AbstractVecOrMat{T},
+    ) where {T <: Real} = ldiv!(UpperTriangular(cache.AF.data)', prod)
 
 # default to LAPACKPosDefCache for BlasReals, otherwise generic CholPosDefCache
 DensePosDefCache{T}() where {T <: BlasReal} = LAPACKPosDefCache{T}()

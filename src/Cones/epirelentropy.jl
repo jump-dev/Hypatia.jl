@@ -1,13 +1,10 @@
-#=
-(closure of) epigraph of sum of perspectives of entropies
-(AKA vector relative entropy cone)
-(u in R, v in R_+^n, w in R_+^n) : u >= sum_i w_i*log(w_i/v_i)
+"""
+$(TYPEDEF)
 
-barrier from "Primal-Dual Interior-Point Methods for Domain-Driven Formulations"
-by Karimi & Tuncel, 2019
--log(u - sum_i w_i*log(w_i/v_i)) - sum_i (log(v_i) + log(w_i))
-=#
+Epigraph of vector relative entropy cone of dimension `dim`.
 
+    $(FUNCTIONNAME){T}(dim::Int, use_dual::Bool = false)
+"""
 mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
@@ -64,7 +61,6 @@ reset_data(cone::EpiRelEntropy) = (cone.feas_updated = cone.grad_updated =
 
 use_sqrt_hess_oracles(cone::EpiRelEntropy) = false
 
-# TODO only allocate the fields we use
 function setup_extra_data!(cone::EpiRelEntropy{T}) where {T <: Real}
     w_dim = cone.w_dim
     cone.lwv = zeros(T, w_dim)

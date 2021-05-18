@@ -1,16 +1,11 @@
-#=
-(closure of) hypograph of perspective of (natural) log of determinant of a
-(row-wise lower triangle) symmetric positive define matrix with side dimension d
-(u in R, v in R_+, w in S_+) : u <= v*logdet(W/v)
-(see equivalent MathOptInterface LogDetConeTriangle definition)
+"""
+$(TYPEDEF)
 
-barrier analogous to hypoperlog cone
--log(v*logdet(W/v) - u) - logdet(W) - log(v)
+Hypograph of perspective function of real symmetric or complex Hermitian
+log-determinant cone of dimension `dim` in svec format.
 
-TODO
-- describe complex case
-=#
-
+    $(FUNCTIONNAME){T, R}(dim::Int, use_dual::Bool = false)
+"""
 mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
