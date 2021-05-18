@@ -379,7 +379,7 @@ function dder3(cone::HypoPerLogdetTri, dir::AbstractVector)
     w_aux = cone.mat5
 
     r_X = copytri!(svec_to_smat!(cone.mat3, r, cone.rt2), 'U', true)
-    c0 = dot(Wi, r_X)
+    c0 = dot(Wi, Hermitian(r_X, :U))
     ∇ϕr = c0 * v
     χ = -p + σ * q + ∇ϕr
 
