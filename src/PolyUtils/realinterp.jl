@@ -60,7 +60,7 @@ function interp_sample(
     cand_pts = sample(dom, U * sample_factor)
     (pts, P0, P0sub, V, w) = make_wsos_arrays(dom, cand_pts, d, get_quadr)
 
-    g = get_weights(dom, pts)
+    g = weights(dom, pts)
     PWts = Matrix{T}[sqrt.(gi) .* P0sub for gi in g]
     Ps = Matrix{T}[P0, PWts...]
 
@@ -323,7 +323,7 @@ function make_wsos_arrays(
     (V, keep_pts, w) = choose_interp_pts(cand_pts, d, get_quadr)
     pts = cand_pts[keep_pts, :]
     P0 = V[:, 1:get_L(n, d)] # subset of poly evaluations up to total degree d
-    Lsub = get_L(n, div(2d - get_degree(dom), 2))
+    Lsub = get_L(n, div(2d - degree(dom), 2))
     P0sub = view(P0, :, 1:Lsub)
     return (pts, P0, P0sub, V, w)
 end
