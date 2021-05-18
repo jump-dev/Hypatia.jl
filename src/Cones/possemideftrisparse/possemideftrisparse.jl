@@ -15,6 +15,14 @@ abstract type PSDSparseImpl end
 # cache for implementation
 abstract type PSDSparseCache{T <: Real, R <: RealOrComplex{T}} end
 
+"""
+$(TYPEDEF)
+
+Real symmetric or complex Hermitian sparse positive semidefinite cone of side
+dimension `side` and sparse row and column indices `rows`, `cols` in svec format.
+
+    $(FUNCTIONNAME){T, R}(side::Int, rows::Vector{Int}, cols::Vector{Int}, use_dual::Bool = false)
+"""
 mutable struct PosSemidefTriSparse{I <: PSDSparseImpl, T <: Real,
     R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool

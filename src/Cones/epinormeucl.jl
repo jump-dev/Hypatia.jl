@@ -1,15 +1,11 @@
-#=
-epigraph of Euclidean (2-)norm (AKA second-order cone)
-(u in R, w in R^n) : u >= norm_2(w)
+"""
+$(TYPEDEF)
 
-barrier from
-"Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
-by Nesterov & Todd
--log(u^2 - norm_2(w)^2)
-=#
+Epigraph of Euclidean norm (AKA second-order) cone of dimension `dim`.
 
+    $(FUNCTIONNAME){T}(dim::Int)
+"""
 mutable struct EpiNormEucl{T <: Real} <: Cone{T}
-    use_dual_barrier::Bool
     dim::Int
 
     point::Vector{T}
@@ -28,17 +24,15 @@ mutable struct EpiNormEucl{T <: Real} <: Cone{T}
 
     dist::T
 
-    function EpiNormEucl{T}(
-        dim::Int;
-        use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
-        ) where {T <: Real}
+    function EpiNormEucl{T}(dim::Int) where {T <: Real}
         @assert dim >= 2
         cone = new{T}()
-        cone.use_dual_barrier = use_dual
         cone.dim = dim
         return cone
     end
 end
+
+use_dual_barrier(::EpiNormEucl) = false
 
 reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = false)

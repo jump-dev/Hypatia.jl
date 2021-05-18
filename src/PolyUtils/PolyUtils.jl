@@ -1,9 +1,9 @@
-#=
-utilities for constructing polynomial sum-of-squares models
-=#
-
+"""
+Utilities for constructing interpolant-basis polynomial sum-of-squares models.
+"""
 module PolyUtils
 
+using DocStringExtensions
 using LinearAlgebra
 import Combinatorics
 import SpecialFunctions: gamma_inc

@@ -1,16 +1,12 @@
-#=
-epigraph of perspective of (half) square function (AKA rotated second-order cone)
-(u in R, v in R_+, w in R^n) : u >= v*1/2*norm_2(w/v)^2
-note v*1/2*norm_2(w/v)^2 = 1/2*sum_i(w_i^2)/v
+"""
+$(TYPEDEF)
 
-barrier from
-"Self-Scaled Barriers and Interior-Point Methods for Convex Programming"
-by Nesterov & Todd
--log(2*u*v - norm_2(w)^2)
-=#
+Epigraph of perspective function of halved squared Euclidean norm (AKA rotated
+second-order) cone of dimension `dim`.
 
+    $(FUNCTIONNAME){T}(dim::Int)
+"""
 mutable struct EpiPerSquare{T <: Real} <: Cone{T}
-    use_dual_barrier::Bool
     dim::Int
 
     point::Vector{T}
@@ -35,17 +31,15 @@ mutable struct EpiPerSquare{T <: Real} <: Cone{T}
     sqrt_hess_vec::Vector{T}
     inv_sqrt_hess_vec::Vector{T}
 
-    function EpiPerSquare{T}(
-        dim::Int;
-        use_dual::Bool = false, # TODO self-dual so maybe remove this option/field?
-        ) where {T <: Real}
+    function EpiPerSquare{T}(dim::Int) where {T <: Real}
         @assert dim >= 3
         cone = new{T}()
-        cone.use_dual_barrier = use_dual
         cone.dim = dim
         return cone
     end
 end
+
+use_dual_barrier(::EpiPerSquare) = false
 
 reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.sqrt_hess_prod_updated =

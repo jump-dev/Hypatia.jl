@@ -1,9 +1,9 @@
-#=
-functions and caches for cones
-=#
-
+"""
+Proper cone definitions, oracles, and utilities.
+"""
 module Cones
 
+using DocStringExtensions
 using LinearAlgebra
 import LinearAlgebra.copytri!
 import LinearAlgebra.HermOrSym

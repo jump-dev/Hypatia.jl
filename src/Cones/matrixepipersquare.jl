@@ -1,9 +1,12 @@
-#=
-matrix epigraph of matrix square
+"""
+$(TYPEDEF)
 
-(U, v, W) in (S_+^d1, R_+, R^(d1, d2)) such that 2 * U * v - W * W' in S_+^d1
-=#
+Matrix epigraph of perspective function of real or complex matrix outer product
+for a matrix (stacked column-wise) of `nrows` rows and `ncols` columns with
+`nrows ≤ ncols`.
 
+    $(FUNCTIONNAME){T, R}(nrows::Int, ncols::Int, use_dual::Bool = false)
+"""
 mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int

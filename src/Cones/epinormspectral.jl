@@ -1,16 +1,12 @@
-#=
-epigraph of matrix spectral norm (operator norm associated with standard
-Euclidean norm; i.e. maximum singular value)
-(u in R, W in R^{d1,d2}) : u >= opnorm(W)
-note d1 <= d2 is enforced WLOG since opnorm(W) = opnorm(W')
-W is vectorized column-by-column (i.e. vec(W) in Julia)
+"""
+$(TYPEDEF)
 
-barrier from "Interior-Point Polynomial Algorithms in Convex Programming"
-by Nesterov & Nemirovskii 1994
--logdet(u*I_d1 - W*W'/u) - log(u)
-= -logdet(u^2*I_d1 - W*W') + (d1 - 1) log(u)
-=#
+Epigraph of real or complex matrix spectral norm (i.e. maximum singular value)
+for a matrix (stacked column-wise) of `nrows` rows and `ncols` columns with
+`nrows ≤ ncols`.
 
+    $(FUNCTIONNAME){T, R}(nrows::Int, ncols::Int, use_dual::Bool = false)
+"""
 mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int

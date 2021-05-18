@@ -1,9 +1,9 @@
-#=
-see README.md and LICENSE.md
-=#
-
+"""
+A Julia package for generic conic optimization with interior point algorithms.
+"""
 module Hypatia
 
+using DocStringExtensions
 const RealOrComplex{T <: Real} = Union{T, Complex{T}}
 
 # linear algebra helpers

@@ -5,7 +5,32 @@
 
 Hypatia is a highly-customizable open source interior point solver for generic conic optimization problems, written in Julia.
 For more information, please see our [working paper](https://arxiv.org/abs/2005.01136) and our [cones reference](https://github.com/chriscoey/Hypatia.jl/wiki/files/coneref.pdf).
-We plan to set up proper documentation in this repo soon.
+
+primal (over x,s):
+```
+  min  c'x :          duals
+    b - Ax == 0       (y)
+    h - Gx == s in K  (z)
+```
+dual (over z,y):
+```
+  max  -b'y - h'z :      duals
+    c + A'y + G'z == 0   (x)
+                z in K*  (s)
+```
+where K is a convex cone defined as a Cartesian product of recognized proper
+cones, and K* is its dual cone.
+An objective offset can be provided as the keyword arg `obj_offset` (default 0).
+
+The primal-dual optimality conditions are:
+```
+         b - Ax == 0
+         h - Gx == s
+  c + A'y + G'z == 0
+            s'z == 0
+              s in K
+              z in K*
+```
 
 Hypatia is an experimental solver and a work in progress, and may not run with older releases of Julia.
 If you have trouble using Hypatia or wish to make improvements, please submit an issue or contribute a PR.
