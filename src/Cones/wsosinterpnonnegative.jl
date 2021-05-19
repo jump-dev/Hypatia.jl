@@ -140,7 +140,7 @@ function update_hess(cone::WSOSInterpNonnegative)
 
     cone.hess .= 0
     @inbounds for k in eachindex(cone.Ps)
-        outer_prod(cone.ΛFLP[k], UU, true, false)
+        outer_prod!(cone.ΛFLP[k], UU, true, false)
         for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UU[i, j])
         end

@@ -27,7 +27,7 @@ import Hypatia.DensePosDefCache
 import Hypatia.load_matrix
 import Hypatia.invert
 import Hypatia.increase_diag!
-import Hypatia.outer_prod
+import Hypatia.outer_prod!
 
 RealOrNothing = Union{Real, Nothing}
 
