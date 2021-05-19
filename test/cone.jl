@@ -772,20 +772,20 @@ function test_barrier(C::Type{Cones.WSOSInterpPosSemidefTri{T}}) where T
     ds = 3
     invrt2 = inv(sqrt(T(2)))
     function barrier(s)
-        function ldlamP(P)
+        function ldΛP(P)
             dt = size(P, 2)
-            lam = similar(s, ds * dt, ds * dt)
+            Λ = similar(s, ds * dt, ds * dt)
             for i in 1:ds, j in 1:i
                 sij = s[Cones.block_idxs(d, Cones.svec_idx(i, j))]
-                lamij = P' * Diagonal(sij) * P
+                Λij = P' * Diagonal(sij) * P
                 if i != j
-                    lamij .*= invrt2
+                    Λij .*= invrt2
                 end
-                lam[Cones.block_idxs(dt, i), Cones.block_idxs(dt, j)] = lamij
+                Λ[Cones.block_idxs(dt, i), Cones.block_idxs(dt, j)] = Λij
             end
-            return -logdet_pd(Hermitian(lam, :L))
+            return -logdet_pd(Hermitian(Λ, :L))
         end
-        return sum(ldlamP, Ps)
+        return sum(ldΛP, Ps)
     end
     test_barrier(C(ds, d, Ps), barrier)
 end
@@ -807,17 +807,17 @@ function test_barrier(C::Type{Cones.WSOSInterpEpiNormEucl{T}}) where T
     ds = 2
     invrt2 = inv(sqrt(T(2)))
     function barrier(s)
-        function ldlamP(P)
-            lam = P' * Diagonal(s[1:d]) * P
-            lam1fact = cholesky(Hermitian(lam, :L))
-            PL1 = lam1fact.L \ P'
+        function ldΛP(P)
+            Λ = P' * Diagonal(s[1:d]) * P
+            Λ1fact = cholesky(Hermitian(Λ, :L))
+            PL1 = Λ1fact.L \ P'
             for i in 1:ds
-                lamLi = PL1 * Diagonal(s[Cones.block_idxs(d, 1 + i)]) * P
-                lam -= lamLi' * lamLi
+                ΛLi = PL1 * Diagonal(s[Cones.block_idxs(d, 1 + i)]) * P
+                Λ -= ΛLi' * ΛLi
             end
-            return -logdet(lam1fact) - logdet_pd(Hermitian(lam))
+            return -logdet(Λ1fact) - logdet_pd(Hermitian(Λ))
         end
-        return sum(ldlamP, Ps)
+        return sum(ldΛP, Ps)
     end
     test_barrier(C(1 + ds, d, Ps), barrier)
 end
@@ -839,16 +839,15 @@ function test_barrier(C::Type{Cones.WSOSInterpEpiNormOne{T}}) where T
     ds = 2
     invrt2 = inv(sqrt(T(2)))
     function barrier(s)
-        function ldlamP(P)
-            lam = P' * Diagonal(s[1:d]) * P
-            lam1fact = cholesky(Hermitian(lam, :L))
-            PL1 = lam1fact.L \ P'
-            si = s[Cones.block_idxs(d, 1 + i)]
-            lamLs = [PL1 * Diagonal(si) * P for i in 1:ds]
-            lams = [Hermitian(lam - lamLi' * lamLi) for lamLi in lamLs]
-            return -logdet(lam1fact) - sum(logdet_pd, lams)
+        function ldΛP(P)
+            Λ = P' * Diagonal(s[1:d]) * P
+            Λ1fact = cholesky(Hermitian(Λ, :L))
+            PL1 = Λ1fact.L \ P'
+            ΛLs = [PL1 * Diagonal(s[Cones.block_idxs(d, 1 + i)]) * P for i in 1:ds]
+            Λs = [Hermitian(Λ - ΛLi' * ΛLi) for ΛLi in ΛLs]
+            return -logdet(Λ1fact) - sum(logdet_pd, Λs)
         end
-        return sum(ldlamP, Ps)
+        return sum(ldΛP, Ps)
     end
     test_barrier(C(1 + ds, d, Ps), barrier)
 end

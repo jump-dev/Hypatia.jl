@@ -2027,7 +2027,7 @@ function epipersepspectral_matrix1(T; options...)
     rt2 = sqrt(T(2))
     for d in [1, 3], is_complex in [false, true]
         R = (is_complex ? Complex{T} : T)
-        dim = 2 + Cones.svec_length(R, side)
+        dim = 2 + Cones.svec_length(R, d)
         W = rand(R, d, d)
         W = W * W' + I
         c = T[1]
@@ -2057,7 +2057,7 @@ function epipersepspectral_matrix2(T; options...)
     rt2 = sqrt(T(2))
     for d in [1, 3], is_complex in [false, true]
         R = (is_complex ? Complex{T} : T)
-        dim = 2 + Cones.svec_length(R, side)
+        dim = 2 + Cones.svec_length(R, d)
         c = T[1]
         A = zeros(T, 0, 1)
         b = T[]
@@ -2089,7 +2089,7 @@ function epipersepspectral_matrix3(T; options...)
     rt2 = sqrt(T(2))
     for d in [2, 4], is_complex in [false, true]
         R = (is_complex ? Complex{T} : T)
-        dim = 2 + Cones.svec_length(R, side)
+        dim = 2 + Cones.svec_length(R, d)
         c = zeros(T, dim)
         c[1] = 1
         A = zeros(T, 1, dim)
