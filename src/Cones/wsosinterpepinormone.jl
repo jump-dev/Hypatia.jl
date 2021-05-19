@@ -1,10 +1,12 @@
-#=
-interpolation-based weighted-sum-of-squares polynomial ell-1 norm cone parametrized
-by interpolation matrices Ps
-certifies that u(x) <= sum(abs.(w(x))) for all x in the domain described by input Ps
-u(x), w_1(x), ...,  w_R(x) are polynomials with U coefficients
-=#
+"""
+$(TYPEDEF)
 
+Interpolant-basis weighted sum-of-squares polynomial (of dimension `U`) epigraph
+of `ℓ₁` norm (of dimension `R`) cone, parametrized by vector of matrices `Ps`
+derived from interpolant basis and polynomial domain constraints.
+
+    $(FUNCTIONNAME){T}(R::Int, U::Int, Ps::Vector{Matrix{T}}, use_dual::Bool = false)
+"""
 mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int

@@ -5,8 +5,8 @@ utilities for arrays
 """
 $(SIGNATURES)
 
-Compute the number of elements in the real vectorization of a real or complex
-vector of length `len::Int`.
+The dimension of the real vectorization of a real or complex vector of length
+`len::Int`.
 """
 vec_length(::Type{<:Real}, len::Int) = len
 
@@ -65,16 +65,16 @@ end
 """
 $(SIGNATURES)
 
-Compute the number of elements in the triangle of a real symmetric matrix with
-side dimension `side::Int`.
+The dimension of the vectorized triangle of a real symmetric matrix with side
+dimension `side::Int`.
 """
 svec_length(side::Int) = div(side * (side + 1), 2)
 
 """
 $(SIGNATURES)
 
-Compute the number of elements in the real vectorized triangle of a real
-symmetric or complex Hermitian matrix with side dimension `side::Int`.
+The dimension of the real vectorized triangle of a real symmetric or complex
+Hermitian matrix with side dimension `side::Int`.
 """
 svec_length(::Type{<:Real}, side::Int) = svec_length(side)
 
@@ -83,8 +83,8 @@ svec_length(::Type{<:Complex}, side::Int) = side^2
 """
 $(SIGNATURES)
 
-Compute the side dimension of a real symmetric matrix from the length `len::Int`
-of its vectorized triangle.
+The side dimension of a real symmetric matrix with vectorized triangle length
+`len::Int`.
 """
 function svec_side(len::Int)
     side = round(Int, sqrt(0.25 + 2 * len) - 0.5)
@@ -95,8 +95,8 @@ end
 """
 $(SIGNATURES)
 
-Compute the side dimension of a real symmetric or complex Hermitian matrix from
-the length `len::Int` of its real vectorized triangle.
+The side dimension of a real symmetric or complex Hermitian matrix with real
+vectorized triangle length  `len::Int`.
 """
 svec_side(::Type{<:Real}, len::Int) = svec_side(len)
 
@@ -110,7 +110,7 @@ end
 """
 $(SIGNATURES)
 
-Compute the index in the vectorized triangle of a symmetric matrix for element
+The index in the vectorized triangle of a symmetric matrix for element
 (`row::Int`, `col::Int`).
 """
 svec_idx(row::Int, col::Int) = (svec_length(row - 1) + col)
@@ -118,8 +118,8 @@ svec_idx(row::Int, col::Int) = (svec_length(row - 1) + col)
 """
 $(SIGNATURES)
 
-Compute the indices corresponding to block `block::Int` in a vector of blocks
-with equal length `incr::Int`.
+The indices corresponding to block `block::Int` in a vector of blocks with equal
+length `incr::Int`.
 """
 block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
 

@@ -1,9 +1,15 @@
-#=
-matrix cone of squares, i.e. 𝕊₊ᵈ for d ≥ 1, with rank d
-=#
+"""
+$(TYPEDEF)
 
+Real symmetric or complex Hermitian positive semidefinite cone of squares.
+"""
 struct MatrixCSqr{T <: Real, R <: RealOrComplex{T}} <: ConeOfSquares{T} end
 
+"""
+$(TYPEDSIGNATURES)
+
+The rank of the matrix cone of squares, equal to the side dimension of the matrix.
+"""
 vector_dim(::Type{<:MatrixCSqr{<:Real, R}}, d::Int) where R = svec_length(R, d)
 
 mutable struct MatrixCSqrCache{T <: Real, R <: RealOrComplex{T}} <: CSqrCache{T}

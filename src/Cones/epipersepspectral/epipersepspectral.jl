@@ -1,19 +1,32 @@
-#=
-(closure of) epigraph of perspective of trace of a generic separable spectral
-function h over a cone of squares Q on a Jordan algebra:
-    (u, v, w) in ℝ × ℝ₊₊ × Q :
-    u ≥ v h(w / v) = ∑ᵢ v h(λᵢ(w / v))
-=#
+"""
+$(TYPEDEF)
 
-# type of cone of squares on a Jordan algebra
+A cone of squares on a Jordan algebra.
+"""
 abstract type ConeOfSquares{T <: Real} end
 
-# cache for cone of squares oracles implementation
+"""
+$(TYPEDEF)
+
+A cache for a cone of squares implementation.
+"""
 abstract type CSqrCache{T <: Real} end
 
-# suitable univariate matrix monotone function
+"""
+$(TYPEDEF)
+
+A univariate convex function defined on positive reals.
+"""
 abstract type SepSpectralFun end
 
+"""
+$(TYPEDEF)
+
+Epigraph of perspective function of a convex separable spectral function `h`
+over a cone of squares `Q` on a Jordan algebra with rank `d`.
+
+    $(FUNCTIONNAME){Q, T}(h::Hypatia.Cones.SepSpectralFun, d::Int, use_dual::Bool = false)
+"""
 mutable struct EpiPerSepSpectral{Q <: ConeOfSquares, T <: Real} <: Cone{T}
     h::SepSpectralFun
     use_dual_barrier::Bool

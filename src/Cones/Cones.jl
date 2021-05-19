@@ -26,6 +26,11 @@ import Hypatia.outer_prod
 
 include("arrayutilities.jl")
 
+"""
+$(TYPEDEF)
+
+A proper cone.
+"""
 abstract type Cone{T <: Real} end
 
 include("nonnegative.jl")

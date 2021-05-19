@@ -1,12 +1,4 @@
 #=
-CHOLMOD-based implementation
-NOTE only implemented for BLAS real types (Float32 and Float64)
-because implementation calls SuiteSparse.CHOLMOD
-
-see "Logarithmic barriers for sparse matrix cones"
-by Andersen, Dahl, Vandenberghe (2012)
-barrier is -logdet(dense(W))
-
 NOTE currently we do not restrict the sparsity pattern to be chordal here (at the
 cost of not being able to obtain "closed form" hess sqrt and inv hess oracles)
 
@@ -19,6 +11,13 @@ TODO
 
 import SuiteSparse.CHOLMOD
 
+"""
+$(TYPEDEF)
+
+CHOLMOD sparse Cholesky-based implementation for the sparse positive semidefinite
+cone [`PosSemidefTriSparse`](@ref). Note only BLAS floating point types are
+supported.
+"""
 struct PSDSparseCholmod <: PSDSparseImpl end
 
 mutable struct PSDSparseCholmodCache{T <: BlasReal, R <: RealOrComplex{T}} <:

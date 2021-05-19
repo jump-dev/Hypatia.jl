@@ -1,10 +1,9 @@
-#=
-dense-Cholesky-based implementation
+"""
+$(TYPEDEF)
 
-NOTE currently we do not restrict the sparsity pattern to be chordal here (at the
-cost of not being able to obtain "closed form" hess sqrt and inv hess oracles)
-=#
-
+Dense Cholesky-based implementation for the sparse positive semidefinite
+cone [`PosSemidefTriSparse`](@ref).
+"""
 struct PSDSparseDense <: PSDSparseImpl end
 
 mutable struct PSDSparseDenseCache{T <: Real, R <: RealOrComplex{T}} <:
