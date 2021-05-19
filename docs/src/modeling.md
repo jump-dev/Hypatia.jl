@@ -5,11 +5,12 @@ Pages = ["modeling.md"]
 Depth = 4
 ```
 
-A proper cone is a ...
+Any convex optimization problem may be represented as a conic problem that minimizes a linear function over the intersection of an affine subspace with a Cartesian product of primitive proper cones (i.e. irreducible, closed, convex, pointed, and full-dimensional conic sets).
+An advantage of using conic form is that a conic problem, if well-posed, has a very simple and easily checkable certificate of optimality, primal infeasibility, or dual infeasibility.
 
 ### Conic form
 
-The primal conic form over variable ``x \in \mathbb{R}^n`` is:
+Hypatia's primal conic form over variable ``x \in \mathbb{R}^n`` is:
 ```math
 \begin{aligned}
 \min \quad c'x &:
@@ -35,6 +36,7 @@ where ``\mathcal{K}^*`` is the dual cone of ``\mathcal{K}``.
 
 ### Model interface
 
+See [Models module](@ref) for Hypatia's model type.
 A model specifies the data in the primal conic form above:
 - ``\mathcal{K}`` is a vector of Hypatia cones,
 - ``c \in \mathbb{R}^n``, ``b \in \mathbb{R}^p``, ``h \in \mathbb{R}^q`` are vectors,
@@ -43,7 +45,7 @@ An objective offset can be specified using the keyword arg `obj_offset` (the def
 
 ### Predefined cones
 
-list ...
+See [Cones module](@ref) for a list of Hypatia's predefined cone types.
 
 ### Generic cone interface
 
