@@ -8,11 +8,14 @@ makedocs(
     modules = [Hypatia],
     pages = [
         "Home" => "index.md",
-        "API" => "api.md"
+        "Modeling" => "modeling.md",
+        "Solving" => "solving.md",
+        "API" => "api.md",
         ],
     )
 
 deploydocs(
     repo = "github.com/chriscoey/Hypatia.jl.git",
+    target = "build",
     push_preview = true,
     )
