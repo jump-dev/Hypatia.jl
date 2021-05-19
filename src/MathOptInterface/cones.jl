@@ -27,13 +27,15 @@ cone_from_moi(::Type{T}, cone::MOI.NormSpectralCone) where {T <: Real} =
     Cones.EpiNormSpectral{T, T}(extrema((cone.row_dim, cone.column_dim))...)
 
 cone_from_moi(::Type{T}, cone::MOI.NormNuclearCone) where {T <: Real} =
-    Cones.EpiNormSpectral{T, T}(extrema((cone.row_dim, cone.column_dim))..., use_dual = true)
+    Cones.EpiNormSpectral{T, T}(extrema((cone.row_dim, cone.column_dim))...,
+    use_dual = true)
 
 cone_from_moi(::Type{T}, cone::MOI.PowerCone{T}) where {T <: Real} =
     Cones.GeneralizedPower{T}(T[cone.exponent, 1 - cone.exponent], 1)
 
 cone_from_moi(::Type{T}, cone::MOI.DualPowerCone{T}) where {T <: Real} =
-    Cones.GeneralizedPower{T}(T[cone.exponent, 1 - cone.exponent], 1, use_dual = true)
+    Cones.GeneralizedPower{T}(T[cone.exponent, 1 - cone.exponent], 1,
+    use_dual = true)
 
 cone_from_moi(::Type{T}, cone::MOI.GeometricMeanCone) where {T <: Real} =
     (l = MOI.dimension(cone) - 1; Cones.HypoGeoMean{T}(1 + l))
@@ -58,7 +60,8 @@ needs_untransform(::MOI.AbstractVectorSet) = false
 untransform_affine(::MOI.AbstractVectorSet, vals::AbstractVector) = nothing
 permute_affine(::MOI.AbstractVectorSet, idxs::AbstractVector) = idxs
 rescale_affine(::MOI.AbstractVectorSet, vals::AbstractVector) = vals
-rescale_affine(::MOI.AbstractVectorSet, vals::AbstractVector, ::AbstractVector) = vals
+rescale_affine(::MOI.AbstractVectorSet, vals::AbstractVector, ::AbstractVector) =
+    vals
 
 # transformations (transposition of matrix) for MOI rectangular matrix cones with matrix of more rows than columns
 
@@ -130,7 +133,8 @@ function rescale_affine(cone::SvecCone, vals::AbstractVector, idxs::AbstractVect
     rt2 = sqrt(eltype(vals)(2))
     for i in eachindex(vals)
         shifted_idx = idxs[i] - scal_start
-        if shifted_idx > 0 && !MOI.Utilities.is_diagonal_vectorized_index(shifted_idx)
+        if shifted_idx > 0 && !MOI.Utilities.is_diagonal_vectorized_index(
+            shifted_idx)
             vals[i] *= rt2
         end
     end
@@ -192,7 +196,8 @@ MOI.dimension(cone::PosSemidefTriSparseCone{<:Cones.PSDSparseImpl, T, Complex{T}
     (2 * length(cone.row_idxs) - cone.side)
 
 cone_from_moi(::Type{T}, cone::PosSemidefTriSparseCone{I, T, R}) where {I <: Cones.PSDSparseImpl, T <: Real, R <: RealOrComplex{T}} =
-    Cones.PosSemidefTriSparse{I, T, R}(cone.side, cone.row_idxs, cone.col_idxs, use_dual = cone.use_dual)
+    Cones.PosSemidefTriSparse{I, T, R}(cone.side, cone.row_idxs, cone.col_idxs,
+    use_dual = cone.use_dual)
 
 export LinMatrixIneqCone
 struct LinMatrixIneqCone{T <: Real} <: MOI.AbstractVectorSet
@@ -200,7 +205,8 @@ struct LinMatrixIneqCone{T <: Real} <: MOI.AbstractVectorSet
     use_dual::Bool
 end
 
-LinMatrixIneqCone{T}(As::Vector) where {T <: Real} = LinMatrixIneqCone{T}(As, false)
+LinMatrixIneqCone{T}(As::Vector) where {T <: Real} =
+    LinMatrixIneqCone{T}(As, false)
 
 MOI.dimension(cone::LinMatrixIneqCone) = length(cone.As)
 
@@ -251,9 +257,8 @@ end
 EpiNormSpectralCone{T, R}(n::Int, m::Int) where {T <: Real, R <: RealOrComplex{T}} =
     EpiNormSpectralCone{T, R}(n, m, false)
 
-MOI.dimension(cone::EpiNormSpectralCone{T, T} where {T <: Real}) = 1 + cone.n * cone.m
-
-MOI.dimension(cone::EpiNormSpectralCone{T, Complex{T}} where {T <: Real}) = 1 + 2 * cone.n * cone.m
+MOI.dimension(cone::EpiNormSpectralCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
+    1 + Cones.vec_length(R, cone.n * cone.m)
 
 cone_from_moi(::Type{T}, cone::EpiNormSpectralCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
     Cones.EpiNormSpectral{T, R}(cone.n, cone.m, use_dual = cone.use_dual)
@@ -268,11 +273,8 @@ end
 MatrixEpiPerSquareCone{T, R}(n::Int, m::Int) where {T <: Real, R <: RealOrComplex{T}} =
     MatrixEpiPerSquareCone{T, R}(n, m, false)
 
-MOI.dimension(cone::MatrixEpiPerSquareCone{T, T} where {T <: Real}) =
-    Cones.svec_length(cone.n) + 1 + cone.n * cone.m
-
-MOI.dimension(cone::MatrixEpiPerSquareCone{T, Complex{T}} where {T <: Real}) =
-    cone.n ^ 2 + 1 + 2 * cone.n * cone.m
+MOI.dimension(cone::MatrixEpiPerSquareCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
+    Cones.svec_length(R, cone.n) + 1 + Cones.vec_length(R, cone.n * cone.m)
 
 cone_from_moi(::Type{T}, cone::MatrixEpiPerSquareCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
     Cones.MatrixEpiPerSquare{T, R}(cone.n, cone.m, use_dual = cone.use_dual)
@@ -368,7 +370,8 @@ struct EpiPerSepSpectralCone{T <: Real} <: MOI.AbstractVectorSet
     use_dual::Bool
 end
 
-EpiPerSepSpectralCone{T}(h::Cones.SepSpectralFun, Q::Type{<:Cones.ConeOfSquares{T}}, d::Int) where {T <: Real} =
+EpiPerSepSpectralCone{T}(h::Cones.SepSpectralFun, Q::Type{<:Cones.ConeOfSquares{T}},
+    d::Int) where {T <: Real} =
     EpiPerSepSpectralCone{T}(h, Q, d, false)
 
 MOI.dimension(cone::EpiPerSepSpectralCone) = 2 + Cones.vector_dim(cone.Q, cone.d)
@@ -432,7 +435,8 @@ WSOSInterpPosSemidefTriCone{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <
 MOI.dimension(cone::WSOSInterpPosSemidefTriCone) = cone.U * Cones.svec_length(cone.R)
 
 cone_from_moi(::Type{T}, cone::WSOSInterpPosSemidefTriCone{T}) where {T <: Real} =
-    Cones.WSOSInterpPosSemidefTri{T}(cone.R, cone.U, cone.Ps, use_dual = cone.use_dual)
+    Cones.WSOSInterpPosSemidefTri{T}(cone.R, cone.U, cone.Ps,
+    use_dual = cone.use_dual)
 
 export WSOSInterpEpiNormOneCone
 struct WSOSInterpEpiNormOneCone{T <: Real} <: MOI.AbstractVectorSet

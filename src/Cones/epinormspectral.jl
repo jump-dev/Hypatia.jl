@@ -59,7 +59,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
         cone.is_complex = (R <: Complex)
-        cone.dim = (cone.is_complex ? 2 * d1 * d2 + 1 : d1 * d2 + 1)
+        cone.dim = 1 + vec_length(R, d1 * d2)
         cone.d1 = d1
         cone.d2 = d2
         cone.hess_fact_cache = hess_fact_cache

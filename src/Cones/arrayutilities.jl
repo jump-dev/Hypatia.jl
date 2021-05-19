@@ -5,6 +5,16 @@ utilities for arrays
 """
 $(SIGNATURES)
 
+Compute the number of elements in the real vectorization of a real or complex
+vector of length `len::Int`.
+"""
+vec_length(::Type{<:Real}, len::Int) = len
+
+vec_length(::Type{<:Complex}, len::Int) = len + len
+
+"""
+$(SIGNATURES)
+
 Copy a vector in-place.
 """
 vec_copyto!(
@@ -50,7 +60,7 @@ function vec_copyto!(
     return cvec
 end
 
-# symmetric/svec rescalings
+# symmetric/Hermitian matrices and svec rescalings
 
 """
 $(SIGNATURES)
@@ -58,11 +68,17 @@ $(SIGNATURES)
 Compute the number of elements in the triangle of a real symmetric matrix with
 side dimension `side::Int`.
 """
-function svec_length(side::Int)
-    (len, r) = divrem(side * (side + 1), 2)
-    @assert iszero(r)
-    return len
-end
+svec_length(side::Int) = div(side * (side + 1), 2)
+
+"""
+$(SIGNATURES)
+
+Compute the number of elements in the real vectorized triangle of a real
+symmetric or complex Hermitian matrix with side dimension `side::Int`.
+"""
+svec_length(::Type{<:Real}, side::Int) = svec_length(side)
+
+svec_length(::Type{<:Complex}, side::Int) = side^2
 
 """
 $(SIGNATURES)
@@ -75,6 +91,21 @@ function svec_side(len::Int)
     @assert side * (side + 1) == 2 * len
     return side
 end
+
+"""
+$(SIGNATURES)
+
+Compute the side dimension of a real symmetric or complex Hermitian matrix from
+the length `len::Int` of its real vectorized triangle.
+"""
+svec_side(::Type{<:Real}, len::Int) = svec_side(len)
+
+function svec_side(::Type{<:Complex}, len::Int)
+    side = isqrt(len)
+    @assert side^2 == len
+    return side
+end
+
 
 """
 $(SIGNATURES)

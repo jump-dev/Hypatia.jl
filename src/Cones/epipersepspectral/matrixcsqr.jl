@@ -4,8 +4,7 @@ matrix cone of squares, i.e. 𝕊₊ᵈ for d ≥ 1, with rank d
 
 struct MatrixCSqr{T <: Real, R <: RealOrComplex{T}} <: ConeOfSquares{T} end
 
-vector_dim(::Type{<:MatrixCSqr{T, T} where {T <: Real}}, d::Int) = svec_length(d)
-vector_dim(::Type{<:MatrixCSqr{T, Complex{T}} where {T <: Real}}, d::Int) = d^2
+vector_dim(::Type{<:MatrixCSqr{<:Real, R}}, d::Int) where R = svec_length(R, d)
 
 mutable struct MatrixCSqrCache{T <: Real, R <: RealOrComplex{T}} <: CSqrCache{T}
     is_complex::Bool

@@ -239,33 +239,21 @@ end
 
 logdet_pd(W::Hermitian) = logdet(cholesky!(copy(W)))
 
-# TODO maybe move to PolyUtils
+new_vec(w::Vector, dw::Int, T::Type{<:Real}) = copy(w)
 
-dim_vec(d::Int, ::Type{<:Real}) = d
-dim_vec(d::Int, ::Type{<:Complex}) = 2 * d
-
-dim_herm(d::Int, ::Type{<:Real}) = Cones.svec_length(d)
-dim_herm(d::Int, ::Type{<:Complex}) = d^2
-
-function new_vec(w::Vector, dw::Int, T::Type{<:Real})
-    @assert length(w) == dw
-    return w
-end
 function new_vec(w::Vector, dw::Int, R::Type{Complex{T}}) where {T <: Real}
-    @assert length(w) == 2 * dw
     wR = zeros(Complex{eltype(w)}, dw)
     Cones.vec_copyto!(wR, w)
     return wR
 end
 
-function new_mat_herm(w::Vector, dW::Int, T::Type{<:Real})
-    @assert length(w) == dim_herm(dW, T)
+function new_herm(w::Vector, dW::Int, T::Type{<:Real})
     W = similar(w, dW, dW)
     Cones.svec_to_smat!(W, w, sqrt(T(2)))
     return Hermitian(W, :U)
 end
-function new_mat_herm(w::Vector, dW::Int, R::Type{Complex{T}}) where {T <: Real}
-    @assert length(w) == dim_herm(dW, R)
+
+function new_herm(w::Vector, dW::Int, R::Type{Complex{T}}) where {T <: Real}
     W = zeros(Complex{eltype(w)}, dW, dW)
     Cones.svec_to_smat!(W, w, sqrt(T(2)))
     return Hermitian(W, :U)
@@ -335,18 +323,18 @@ show_time_alloc(C::Type{<:Cones.Nonnegative}) = show_time_alloc(C(9))
 # PosSemidefTri
 function test_oracles(C::Type{Cones.PosSemidefTri{T, R}}) where {T, R}
     for dW in [1, 2, 3, 5]
-        test_oracles(C(dim_herm(dW, R)))
+        test_oracles(C(Cones.svec_length(R, dW)))
     end
 end
 
 function test_barrier(C::Type{Cones.PosSemidefTri{T, R}}) where {T, R}
     dW = 3
-    barrier(s) = -logdet_pd(Hermitian(new_mat_herm(s, dW, R), :U))
-    test_barrier(C(dim_herm(dW, R)), barrier)
+    barrier(s) = -logdet_pd(Hermitian(new_herm(s, dW, R), :U))
+    test_barrier(C(Cones.svec_length(R, dW)), barrier)
 end
 
 show_time_alloc(C::Type{Cones.PosSemidefTri{T, R}}) where {T, R} =
-    show_time_alloc(C(dim_herm(4, R)))
+    show_time_alloc(C(Cones.svec_length(R, 4)))
 
 
 # DoublyNonnegativeTri
@@ -363,7 +351,7 @@ end
 function test_barrier(C::Type{Cones.DoublyNonnegativeTri{T}}) where T
     dW = 3
     function barrier(s)
-        W = new_mat_herm(s, dW, T)
+        W = new_herm(s, dW, T)
         offdiags = vcat([Cones.svec_length(i - 1) .+ (1:(i - 1)) for i in 2:dW]...)
         return -logdet_pd(Hermitian(W, :U)) - sum(log, s[offdiags])
     end
@@ -442,7 +430,7 @@ show_time_alloc(C::Type{Cones.LinMatrixIneq{T}}) where T =
 # EpiNormInf
 function test_oracles(C::Type{Cones.EpiNormInf{T, R}}) where {T, R}
     for dw in [1, 2, 5]
-        test_oracles(C(1 + dim_vec(dw, R)))
+        test_oracles(C(1 + Cones.vec_length(R, dw)))
     end
 end
 
@@ -453,7 +441,7 @@ function test_barrier(C::Type{Cones.EpiNormInf{T, R}}) where {T, R}
         w = new_vec(s[2:end], dw, R)
         return -sum(log(abs2(u) - abs2(wi)) for wi in w) + (dw - 1) * log(u)
     end
-    test_barrier(C(1 + dim_vec(dw, R)), barrier)
+    test_barrier(C(1 + Cones.vec_length(R, dw)), barrier)
 end
 
 show_time_alloc(C::Type{<:Cones.EpiNormInf}) = show_time_alloc(C(9))
@@ -524,9 +512,9 @@ end
 
 function test_barrier(C::Type{Cones.MatrixEpiPerSquare{T, R}}) where {T, R}
     (dr, ds) = (2, 2)
-    du = dim_herm(dr, R)
+    du = Cones.svec_length(R, dr)
     function barrier(s)
-        U = new_mat_herm(s[1:du], dr, R)
+        U = new_herm(s[1:du], dr, R)
         v = s[du + 1]
         W = reshape(new_vec(s[(du + 2):end], dr * ds, R), dr, ds)
         return -logdet_pd(Hermitian(2 * v * U - W * W', :U)) + (dr - 1) * log(v)
@@ -605,7 +593,7 @@ show_time_alloc(C::Type{<:Cones.HypoGeoMean}) = show_time_alloc(C(9))
 # HypoRootdetTri
 function test_oracles(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R}
     for dW in [1, 2, 4]
-        test_oracles(C(1 + dim_herm(dW, R)))
+        test_oracles(C(1 + Cones.svec_length(R, dW)))
     end
 end
 
@@ -613,14 +601,14 @@ function test_barrier(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R}
     dW = 3
     function barrier(s)
         (u, w) = (s[1], s[2:end])
-        logdet_W = logdet_pd(new_mat_herm(w, dW, R))
+        logdet_W = logdet_pd(new_herm(w, dW, R))
         return -log(exp(logdet_W / dW) - u) - logdet_W
     end
-    test_barrier(C(1 + dim_herm(dW, R)), barrier)
+    test_barrier(C(1 + Cones.svec_length(R, dW)), barrier)
 end
 
 show_time_alloc(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R} =
-    show_time_alloc(C(1 + dim_herm(3, R)))
+    show_time_alloc(C(1 + Cones.svec_length(R, 3)))
 
 
 # HypoPerLog
@@ -647,10 +635,10 @@ show_time_alloc(C::Type{<:Cones.HypoPerLog}) = show_time_alloc(C(9))
 # HypoPerLogdetTri
 function test_oracles(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R}
     for dW in [1, 2, 4]
-        test_oracles(C(2 + dim_herm(dW, R)), init_tol = 1e-4)
+        test_oracles(C(2 + Cones.svec_length(R, dW)), init_tol = 1e-4)
     end
     for dW in [8, 12]
-        test_oracles(C(2 + dim_herm(dW, R)), init_tol = 1e-1, init_only = true)
+        test_oracles(C(2 + Cones.svec_length(R, dW)), init_tol = 1e-1, init_only = true)
     end
 end
 
@@ -658,14 +646,14 @@ function test_barrier(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R}
     dW = 3
     function barrier(s)
         (u, v, w) = (s[1], s[2], s[3:end])
-        W = new_mat_herm(w, dW, R)
+        W = new_herm(w, dW, R)
         return -log(v * logdet_pd(W / v) - u) - log(v) - logdet_pd(W)
     end
-    test_barrier(C(2 + dim_herm(dW, R)), barrier)
+    test_barrier(C(2 + Cones.svec_length(R, dW)), barrier)
 end
 
 show_time_alloc(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R} =
-    show_time_alloc(C(2 + dim_herm(3, R)))
+    show_time_alloc(C(2 + Cones.svec_length(R, 3)))
 
 
 # EpiPerSepSpectral
@@ -690,7 +678,7 @@ function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}}}
     for h_fun in sep_spectral_funs
         function barrier(s)
             (u, v, w) = (s[1], s[2], s[3:end])
-            Wλ = eigen(new_mat_herm(w, dW, R)).values
+            Wλ = eigen(new_herm(w, dW, R)).values
             return -log(u - v * Cones.h_val(Wλ ./ v, h_fun)) - log(v) - sum(log, Wλ)
         end
         test_barrier(C(h_fun, dW), barrier)
@@ -743,8 +731,8 @@ function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T}}) where T
     dw = Cones.svec_length(dW)
     function barrier(s)
         (u, v, w) = (s[1], s[1 .+ (1:dw)], s[(2 + dw):end])
-        V = new_mat_herm(v, dW, T)
-        W = new_mat_herm(w, dW, T)
+        V = new_herm(v, dW, T)
+        W = new_herm(w, dW, T)
         return -log(u - dot(W, log(W) - log(V))) - logdet_pd(V) - logdet_pd(W)
     end
     test_barrier(C(1 + 2 * dw), barrier, tol = 1e8 * eps(T))

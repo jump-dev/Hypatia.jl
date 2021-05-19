@@ -52,15 +52,8 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone.use_dual_barrier = use_dual
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
-        if R <: Complex
-            d = isqrt(dim - 1) # real lower triangle and imaginary under diagonal
-            @assert d^2 == dim - 1
-            cone.is_complex = true
-        else
-            d = svec_side(dim - 1)
-            cone.is_complex = false
-        end
-        cone.d = d
+        cone.is_complex = (R <: Complex)
+        cone.d = svec_side(R, dim - 1)
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end

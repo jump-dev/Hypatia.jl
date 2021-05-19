@@ -62,8 +62,8 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
         cone.is_complex = (R <: Complex)
-        cone.v_idx = (cone.is_complex ? d1 ^ 2 + 1 : svec_length(d1) + 1)
-        cone.dim = cone.v_idx + (cone.is_complex ? 2 : 1) * d1 * d2
+        cone.v_idx = 1 + svec_length(R, d1)
+        cone.dim = cone.v_idx + vec_length(R, d1 * d2)
         cone.d1 = d1
         cone.d2 = d2
         cone.rt2 = sqrt(T(2))

@@ -617,6 +617,7 @@ function svec_to_smat_sparse!(
     vec::AbstractVector{T},
     cone::PosSemidefTriSparse{PSDSparseCholmod, T, T},
     ) where {T <: BlasReal}
+    @assert length(vec) == length(cone.row_idxs)
     for b in blocks
         b .= 0
     end
@@ -635,6 +636,7 @@ function smat_to_svec_sparse!(
     blocks::Vector{Matrix{T}},
     cone::PosSemidefTriSparse{PSDSparseCholmod, T, T},
     ) where {T <: BlasReal}
+    @assert length(vec) == length(cone.row_idxs)
     @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.cache.map_blocks)
         vec_i = blocks[super][row_idx, col_idx]
         if scal
@@ -663,6 +665,7 @@ function svec_to_smat_sparse!(
             idx += 1
         end
     end
+    @assert idx == length(vec) + 1
     return blocks
 end
 
@@ -684,5 +687,6 @@ function smat_to_svec_sparse!(
             idx += 1
         end
     end
+    @assert idx == length(vec) + 1
     return vec
 end
