@@ -112,14 +112,16 @@ needs_untransform(::SvecCone) = true
 
 function untransform_affine(cone::SvecCone, vals::AbstractVector)
     @views svec_vals = vals[svec_offset(cone):end]
-    Cones.svec_to_vec!(svec_vals)
+    T = eltype(vals)
+    Cones.scale_svec!(svec_vals, inv(sqrt(T(2))))
     return vals
 end
 
 function rescale_affine(cone::SvecCone, vals::AbstractVector)
     vals = collect(vals)
     @views svec_vals = vals[svec_offset(cone):end]
-    Cones.vec_to_svec!(svec_vals)
+    T = eltype(vals)
+    Cones.scale_svec!(svec_vals, sqrt(T(2)))
     return vals
 end
 

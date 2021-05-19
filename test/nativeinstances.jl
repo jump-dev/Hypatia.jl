@@ -1075,10 +1075,10 @@ function epinormspectral1(T; options...)
             @test r.status == Solvers.Optimal
 
             S = zeros(R, Xn, Xm)
-            @views Cones.vec_copy_to!(S, r.s[2:end])
+            @views Cones.vec_copyto!(S, r.s[2:end])
             prim_svdvals = svdvals(S)
             Z = zero(S)
-            @views Cones.vec_copy_to!(Z, r.z[2:end])
+            @views Cones.vec_copyto!(Z, r.z[2:end])
             dual_svdvals = svdvals(Z)
             if use_dual
                 @test sum(prim_svdvals) ≈ r.s[1] atol=tol rtol=tol
@@ -1103,7 +1103,7 @@ function epinormspectral2(T; options...)
         end
         mat = rand(R, Xn, Xm)
         c = zeros(T, dim)
-        Cones.vec_copy_to!(c, mat)
+        Cones.vec_copyto!(c, mat)
         c .*= -1
         A = zeros(T, 0, dim)
         b = T[]
@@ -1195,7 +1195,7 @@ function matrixepipersquare1(T; options...)
         @views Cones.smat_to_svec!(h[1:(per_idx - 1)],
             Matrix{R}(I, Xn, Xn), sqrt(T(2)))
         W = rand(R, Xn, Xm)
-        @views Cones.vec_copy_to!(h[(per_idx + 1):end], W)
+        @views Cones.vec_copyto!(h[(per_idx + 1):end], W)
         WWt = Hermitian(W * W')
         dual_epi = tr(WWt) / 2
         primal_epi = svdvals(WWt)[1] / 2
@@ -1237,7 +1237,7 @@ function matrixepipersquare2(T; options...)
         U = Hermitian(U_half * U_half')
         @views Cones.smat_to_svec!(h[1:(per_idx - 1)], U.data, sqrt(T(2)))
         W = rand(R, Xn, Xm)
-        @views Cones.vec_copy_to!(h[(per_idx + 1):end], W)
+        @views Cones.vec_copyto!(h[(per_idx + 1):end], W)
 
         for use_dual in (false, true)
             cones = Cone{T}[Cones.MatrixEpiPerSquare{T, R}(Xn, Xm,
@@ -2258,7 +2258,7 @@ function epitrrelentropytri2(T; options...)
     b = zeros(T, svec_dim)
     b[[sum(1:i) for i in 1:side]] .= 1
     h = vcat(T(5), zeros(T, 2 * svec_dim))
-    g_svec = Cones.vec_to_svec!(-ones(T, svec_dim))
+    g_svec = Cones.scale_svec!(-ones(T, svec_dim), sqrt(T(2)))
     G = vcat(zeros(T, 2 * svec_dim)', Diagonal(vcat(g_svec, g_svec)))
     cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(cone_dim)]
 
@@ -2442,7 +2442,7 @@ function wsosinterppossemideftri2(T; options...)
     b = T[]
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
     h = T[H[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
-    Cones.vec_to_svec!(h, incr = U)
+    Cones.scale_svec!(h, sqrt(T(2)), incr = U)
     cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
@@ -2466,7 +2466,7 @@ function wsosinterppossemideftri3(T; options...)
     b = T[]
     h = T[M[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
     G = zeros(T, length(h), 0)
-    Cones.vec_to_svec!(h, incr = U)
+    Cones.scale_svec!(h, sqrt(T(2)), incr = U)
     cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)

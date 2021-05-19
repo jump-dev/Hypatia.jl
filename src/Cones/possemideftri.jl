@@ -43,8 +43,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
             @assert side^2 == dim
             cone.is_complex = true
         else
-            side = round(Int, sqrt(0.25 + 2 * dim) - 0.5) # real lower triangle
-            @assert side * (side + 1) == 2 * dim
+            side = svec_side(dim)
             cone.is_complex = false
         end
         cone.side = side

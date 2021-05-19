@@ -2,39 +2,26 @@
 utilities for arrays
 =#
 
-# real and complex vectors
+"""
+$(SIGNATURES)
 
-vec_copy_to!(
+Copy a vector in-place.
+"""
+vec_copyto!(
     v1::AbstractVecOrMat{T},
     v2::AbstractVecOrMat{T},
-    ) where {T <: Real} = copyto!(v1, v2)
+    ) where T = copyto!(v1, v2)
 
-vec_copy_to!(
-    v1::AbstractVecOrMat{T},
-    v2::AbstractVecOrMat{Complex{T}},
-    ) where {T <: Real} = cvec_to_rvec!(v1, v2)
+"""
+$(SIGNATURES)
 
-vec_copy_to!(
-    v1::AbstractVecOrMat{Complex{T}},
-    v2::AbstractVecOrMat{T},
-    ) where {T <: Real} = rvec_to_cvec!(v1, v2)
-
-function rvec_to_cvec!(
-    cvec::AbstractVecOrMat{Complex{T}},
-    rvec::AbstractVecOrMat{T},
-    ) where T
-    k = 1
-    @inbounds for i in eachindex(cvec)
-        cvec[i] = Complex(rvec[k], rvec[k + 1])
-        k += 2
-    end
-    return cvec
-end
-
-function cvec_to_rvec!(
+Copy a complex vector to a real vector in-place.
+"""
+function vec_copyto!(
     rvec::AbstractVecOrMat{T},
     cvec::AbstractVecOrMat{Complex{T}},
     ) where T
+    @assert length(rvec) == 2 * length(cvec)
     k = 1
     @inbounds for i in eachindex(cvec)
         ci = cvec[i]
@@ -45,27 +32,86 @@ function cvec_to_rvec!(
     return rvec
 end
 
+"""
+$(SIGNATURES)
+
+Copy a real vector to a complex vector in-place.
+"""
+function vec_copyto!(
+    cvec::AbstractVecOrMat{Complex{T}},
+    rvec::AbstractVecOrMat{T},
+    ) where T
+    @assert length(rvec) == 2 * length(cvec)
+    k = 1
+    @inbounds for i in eachindex(cvec)
+        cvec[i] = Complex(rvec[k], rvec[k + 1])
+        k += 2
+    end
+    return cvec
+end
 
 # symmetric/svec rescalings
 
-svec_length(side::Int) = div(side * (side + 1), 2)
+"""
+$(SIGNATURES)
 
-svec_idx(row::Int, col::Int) = (div((row - 1) * row, 2) + col)
+Compute the number of elements in the triangle of a real symmetric matrix with
+side dimension `side::Int`.
+"""
+function svec_length(side::Int)
+    (len, r) = divrem(side * (side + 1), 2)
+    @assert iszero(r)
+    return len
+end
 
+"""
+$(SIGNATURES)
+
+Compute the side dimension of a real symmetric matrix from the length `len::Int`
+of its vectorized triangle.
+"""
+function svec_side(len::Int)
+    side = round(Int, sqrt(0.25 + 2 * len) - 0.5)
+    @assert side * (side + 1) == 2 * len
+    return side
+end
+
+"""
+$(SIGNATURES)
+
+Compute the index in the vectorized triangle of a symmetric matrix for element
+(`row::Int`, `col::Int`).
+"""
+svec_idx(row::Int, col::Int) = (svec_length(row - 1) + col)
+
+"""
+$(SIGNATURES)
+
+Compute the indices corresponding to block `block::Int` in a vector of blocks
+with equal length `incr::Int`.
+"""
 block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
 
-function vec_to_svec!(
-    arr::AbstractVecOrMat{T};
-    rt2::Real = sqrt(T(2)),
+"""
+$(SIGNATURES)
+
+Rescale the elements corresponding to off-diagonals in `arr::AbstractVecOrMat`,
+with scaling `scal::Real` and default block increment `incr::Int = 1`.
+"""
+function scale_svec!(
+    arr::AbstractVecOrMat,
+    scal::Real;
     incr::Int = 1,
-    ) where T
+    )
+    @assert incr > 0
     n = size(arr, 1)
-    @assert iszero(rem(n, incr))
-    side = round(Int, sqrt(0.25 + 2 * div(n, incr)) - 0.5)
+    (d, r) = divrem(n, incr)
+    @assert iszero(r)
+    side = svec_side(d)
     k = 1
     for i in 1:side
-        @inbounds @views for j in 1:(i - 1)
-            @. arr[k:(k + incr - 1), :] *= rt2
+        for j in 1:(i - 1)
+            @inbounds @views @. arr[k:(k + incr - 1), :] *= scal
             k += incr
         end
         k += incr
@@ -74,9 +120,11 @@ function vec_to_svec!(
     return arr
 end
 
-svec_to_vec!(arr::AbstractVecOrMat{T}; incr::Int = 1) where T =
-    vec_to_svec!(arr, rt2 = inv(sqrt(T(2))), incr = incr)
+"""
+$(SIGNATURES)
 
+Copy a real symmetric matrix upper triangle to a svec-scaled vector in-place.
+"""
 function smat_to_svec!(
     vec::AbstractVector{T},
     mat::AbstractMatrix{T},
@@ -84,6 +132,7 @@ function smat_to_svec!(
     ) where T
     k = 1
     m = size(mat, 1)
+    @assert m == size(mat, 2)
     for j in 1:m, i in 1:j
         @inbounds if i == j
             vec[k] = mat[i, j]
@@ -92,9 +141,16 @@ function smat_to_svec!(
         end
         k += 1
     end
+    @assert k == length(vec) + 1
     return vec
 end
 
+"""
+$(SIGNATURES)
+
+Copy a complex Hermitian matrix upper triangle to a svec-scaled real vector
+in-place.
+"""
 function smat_to_svec!(
     vec::AbstractVector{T},
     mat::AbstractMatrix{Complex{T}},
@@ -102,6 +158,7 @@ function smat_to_svec!(
     ) where T
     k = 1
     m = size(mat, 1)
+    @assert m == size(mat, 2)
     for j in 1:m, i in 1:j
         @inbounds if i == j
             vec[k] = real(mat[i, j])
@@ -114,9 +171,15 @@ function smat_to_svec!(
             k += 1
         end
     end
+    @assert k == length(vec) + 1
     return vec
 end
 
+"""
+$(SIGNATURES)
+
+Copy a svec-scaled vector to a real symmetric matrix upper triangle in-place.
+"""
 function svec_to_smat!(
     mat::AbstractMatrix{T},
     vec::AbstractVector{T},
@@ -124,6 +187,7 @@ function svec_to_smat!(
     ) where T
     k = 1
     m = size(mat, 1)
+    @assert m == size(mat, 2)
     for j in 1:m, i in 1:j
         @inbounds if i == j
             mat[i, j] = vec[k]
@@ -132,9 +196,16 @@ function svec_to_smat!(
         end
         k += 1
     end
+    @assert k == length(vec) + 1
     return mat
 end
 
+"""
+$(SIGNATURES)
+
+Copy a svec-scaled real vector to a complex Hermitian matrix upper triangle
+in-place.
+"""
 function svec_to_smat!(
     mat::AbstractMatrix{Complex{T}},
     vec::AbstractVector{T},
@@ -142,6 +213,7 @@ function svec_to_smat!(
     ) where T
     k = 1
     m = size(mat, 1)
+    @assert m == size(mat, 2)
     @inbounds for j in 1:m, i in 1:j
         if i == j
             mat[i, j] = vec[k]
@@ -151,13 +223,19 @@ function svec_to_smat!(
             k += 2
         end
     end
+    @assert k == length(vec) + 1
     return mat
 end
 
-# kronecker utilities
+# Kronecker utilities
 
+"""
+$(SIGNATURES)
+
+Compute the real symmetric Kronecker product of a matrix in-place.
+"""
 function symm_kron!(
-    H::AbstractMatrix{T},
+    skr::AbstractMatrix{T},
     mat::AbstractMatrix{T},
     rt2::T,
     ) where {T <: Real}
@@ -169,11 +247,11 @@ function symm_kron!(
             row_idx = 1
             for j in 1:side
                 for i in 1:(j - 1)
-                    H[row_idx, col_idx] =
+                    skr[row_idx, col_idx] =
                         mat[i, k] * mat[j, l] + mat[i, l] * mat[j, k]
                     row_idx += 1
                 end
-                H[row_idx, col_idx] = rt2 * mat[j, k] * mat[j, l]
+                skr[row_idx, col_idx] = rt2 * mat[j, k] * mat[j, l]
                 row_idx += 1
                 (row_idx > col_idx) && break
             end
@@ -183,21 +261,26 @@ function symm_kron!(
         row_idx = 1
         for j in 1:side
             for i in 1:(j - 1)
-                H[row_idx, col_idx] = rt2 * mat[i, l] * mat[j, l]
+                skr[row_idx, col_idx] = rt2 * mat[i, l] * mat[j, l]
                 row_idx += 1
             end
-            H[row_idx, col_idx] = abs2(mat[j, l])
+            skr[row_idx, col_idx] = abs2(mat[j, l])
             row_idx += 1
             (row_idx > col_idx) && break
         end
         col_idx += 1
     end
 
-    return H
+    return skr
 end
 
+"""
+$(SIGNATURES)
+
+Compute the complex Hermitian Kronecker product of a matrix in-place.
+"""
 function symm_kron!(
-    H::AbstractMatrix{T},
+    skr::AbstractMatrix{T},
     mat::AbstractMatrix{Complex{T}},
     rt2::T,
     ) where {T <: Real}
@@ -211,12 +294,12 @@ function symm_kron!(
                 for i in 1:(j - 1)
                     a = mat[i, k] * mat[l, j]
                     b = mat[j, k] * mat[l, i]
-                    spectral_kron_element!(H, row_idx, col_idx, a, b)
+                    spectral_kron_element!(skr, row_idx, col_idx, a, b)
                     row_idx += 2
                 end
                 c = rt2 * mat[j, k] * mat[l, j]
-                H[row_idx, col_idx] = real(c)
-                H[row_idx, col_idx + 1] = imag(c)
+                skr[row_idx, col_idx] = real(c)
+                skr[row_idx, col_idx + 1] = imag(c)
                 row_idx += 1
                 (row_idx > col_idx) && break
             end
@@ -227,33 +310,43 @@ function symm_kron!(
         for j in 1:side
             for i in 1:(j - 1)
                 c = rt2 * mat[i, l] * mat[l, j]
-                H[row_idx, col_idx] = real(c)
-                H[row_idx + 1, col_idx] = -imag(c)
+                skr[row_idx, col_idx] = real(c)
+                skr[row_idx + 1, col_idx] = -imag(c)
                 row_idx += 2
             end
-            H[row_idx, col_idx] = abs2(mat[j, l])
+            skr[row_idx, col_idx] = abs2(mat[j, l])
             row_idx += 1
             (row_idx > col_idx) && break
         end
         col_idx += 1
     end
 
-    return H
+    return skr
 end
 
+"""
+$(SIGNATURES)
+
+Compute an element of the real spectral Kronecker in-place.
+"""
 function spectral_kron_element!(
-    H::AbstractMatrix{T},
+    skr::AbstractMatrix{T},
     i::Int,
     j::Int,
     a::T,
     b::T,
     ) where {T <: Real}
-    @inbounds H[i, j] = a + b
-    return H
+    @inbounds skr[i, j] = a + b
+    return skr
 end
 
+"""
+$(SIGNATURES)
+
+Compute an element of the complex spectral Kronecker in-place.
+"""
 function spectral_kron_element!(
-    H::AbstractMatrix{T},
+    skr::AbstractMatrix{T},
     i::Int,
     j::Int,
     a::Complex{T},
@@ -262,10 +355,10 @@ function spectral_kron_element!(
     apb = a + b
     amb = a - b
     @inbounds begin
-        H[i, j] = real(apb)
-        H[i + 1, j] = -imag(amb)
-        H[i, j + 1] = imag(apb)
-        H[i + 1, j + 1] = real(amb)
+        skr[i, j] = real(apb)
+        skr[i + 1, j] = -imag(amb)
+        skr[i, j + 1] = imag(apb)
+        skr[i + 1, j + 1] = real(amb)
     end
-    return H
+    return skr
 end

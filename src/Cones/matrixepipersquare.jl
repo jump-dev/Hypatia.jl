@@ -122,7 +122,7 @@ function update_feas(cone::MatrixEpiPerSquare{T}) where T
 
     if v > eps(T)
         @views U = svec_to_smat!(cone.U.data, cone.point[cone.U_idxs], cone.rt2)
-        @views W = vec_copy_to!(cone.W, cone.point[cone.W_idxs])
+        @views W = vec_copyto!(cone.W, cone.point[cone.W_idxs])
         copyto!(cone.Z.data, U)
         mul!(cone.Z.data, cone.W, cone.W', -1, 2 * v)
         cone.fact_Z = cholesky!(cone.Z, check = false)
@@ -142,7 +142,7 @@ function is_dual_feas(cone::MatrixEpiPerSquare{T}) where T
             cone.rt2)
         F = cholesky!(Hermitian(cone.tempd1d1b, :U), check = false)
         isposdef(F) || return false
-        @views W = vec_copy_to!(cone.tempd1d2, cone.dual_point[cone.W_idxs])
+        @views W = vec_copyto!(cone.tempd1d2, cone.dual_point[cone.W_idxs])
         LW = ldiv!(F.U', W)
         trLW = sum(abs2, LW)
         return (2 * v - trLW > eps(T))
@@ -163,7 +163,7 @@ function update_grad(cone::MatrixEpiPerSquare)
     @views cone.grad[cone.U_idxs] .*= -2 * v
     cone.grad[cone.v_idx] = -2 * dot(Zi, U) + (cone.d1 - 1) / v
     ldiv!(cone.ZiW, cone.fact_Z, W)
-    @views vec_copy_to!(cone.grad[cone.W_idxs], cone.ZiW)
+    @views vec_copyto!(cone.grad[cone.W_idxs], cone.ZiW)
     @. @views cone.grad[cone.W_idxs] *= 2
 
     cone.grad_updated = true
@@ -267,7 +267,7 @@ function update_hess(cone::MatrixEpiPerSquare)
     @. @views H[U_idxs, W_idxs] *= -2 * v
 
     # H_v_W part
-    @views vec_copy_to!(H[v_idx, W_idxs], cone.ZiUZiW)
+    @views vec_copyto!(H[v_idx, W_idxs], cone.ZiUZiW)
     @. @views H[v_idx, W_idxs] *= -4
 
     # H_U_v part
@@ -298,7 +298,7 @@ function hess_prod!(
 
     @inbounds for i in 1:size(arr, 2)
         @views svec_to_smat!(temp_U.data, arr[U_idxs, i], cone.rt2)
-        @views vec_copy_to!(temp_W, arr[W_idxs, i])
+        @views vec_copyto!(temp_W, arr[W_idxs, i])
         v_arr = arr[v_idx, i]
         @views U_prod = prod[U_idxs, i]
         @views W_prod = prod[W_idxs, i]
@@ -311,7 +311,7 @@ function hess_prod!(
 
         copyto!(tempd1d1, temp_U2)
         axpy!(-2 * v_arr, ZiUZi.data, tempd1d1.data)
-        vec_copy_to!(W_prod, mul!(temp_W, tempd1d1, cone.W, 2, 2))
+        vec_copyto!(W_prod, mul!(temp_W, tempd1d1, cone.W, 2, 2))
 
         copyto!(tempd1d1, ZiUZi)
         axpby!(-2, cone.Zi.data, 2 * v2, tempd1d1.data)
@@ -341,7 +341,7 @@ function dder3(cone::MatrixEpiPerSquare, dir::AbstractVector)
 
     @views U_dir = Hermitian(svec_to_smat!(zero(U.data), dir[U_idxs], cone.rt2))
     v_dir = dir[v_idx]
-    @views W_dir = vec_copy_to!(zero(W), dir[W_idxs])
+    @views W_dir = vec_copyto!(zero(W), dir[W_idxs])
 
     dder3 = cone.dder3
     U_dder3 = view(dder3, U_idxs)
@@ -392,7 +392,7 @@ function dder3(cone::MatrixEpiPerSquare, dir::AbstractVector)
         4 * v * (ZiUdZiW * WdZiW + ZiWdWZi * UdZiW + WdWZi' * ZiUdZiW +
         ZiUdZi * WdWtZiWI - v2 * ZiUd * ZiUdZiW) + -2 * (ZiW * WdZiW * WdZiW +
         WdWZi' * ZiWdWtZiWI + ZiWdWtZiWI * WdZiW + ZiWd * WdZiW' * WtZiWI)
-    vec_copy_to!(W_dder3, Wtemp)
+    vec_copyto!(W_dder3, Wtemp)
 
     return dder3
 end

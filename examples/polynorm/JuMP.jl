@@ -51,7 +51,7 @@ function build(inst::PolyNormJuMP{T}) where {T <: Float64}
             Hypatia.WSOSInterpNonnegativeCone{T, T}(U, Ps))
     else
         R = num_polys + 1
-        svec_dim = div(R * (R + 1), 2)
+        svec_dim = Cones.svec_length(R)
         polyvec = zeros(JuMP.AffExpr, svec_dim * U)
         polyvec[1:U] .= f
 

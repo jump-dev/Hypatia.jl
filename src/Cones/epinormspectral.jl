@@ -110,7 +110,7 @@ function update_feas(cone::EpiNormSpectral{T}) where T
     u = cone.point[1]
 
     if u > eps(T)
-        @views vec_copy_to!(cone.W, cone.point[2:end])
+        @views vec_copyto!(cone.W, cone.point[2:end])
         copyto!(cone.Z, abs2(u) * I)
         mul!(cone.Z, cone.W, cone.W', -1, true)
         cone.fact_Z = cholesky!(Hermitian(cone.Z, :U), check = false)
@@ -126,7 +126,7 @@ end
 function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: Real}
     u = cone.dual_point[1]
     if u > eps(T)
-        W = @views vec_copy_to!(cone.tempd1d2, cone.dual_point[2:end])
+        W = @views vec_copyto!(cone.tempd1d2, cone.dual_point[2:end])
         return (u - sum(svdvals!(W)) > eps(T))
     end
     return false
@@ -139,7 +139,7 @@ function update_grad(cone::EpiNormSpectral)
     ldiv!(cone.tau, cone.fact_Z, cone.W)
     chol_inv!(cone.Zi, cone.fact_Z)
     cone.grad[1] = -u * tr(Hermitian(cone.Zi, :U))
-    @views vec_copy_to!(cone.grad[2:end], cone.tau)
+    @views vec_copyto!(cone.grad[2:end], cone.tau)
     cone.grad .*= 2
     cone.grad[1] += (cone.d1 - 1) / u
 
@@ -199,7 +199,7 @@ function update_hess(cone::EpiNormSpectral)
     H .*= 2
 
     # H_u_W and H_u_u parts
-    @views vec_copy_to!(H[1, 2:end], cone.HuW)
+    @views vec_copyto!(H[1, 2:end], cone.HuW)
     H[1, 1] = cone.Huu
 
     cone.hess_updated = true
@@ -219,7 +219,7 @@ function hess_prod!(
 
     @inbounds for j in 1:size(prod, 2)
         arr_1j = arr[1, j]
-        @views vec_copy_to!(tempd1d2, arr[2:end, j])
+        @views vec_copyto!(tempd1d2, arr[2:end, j])
         prod[1, j] = cone.Huu * arr_1j + real(dot(cone.HuW, tempd1d2))
         mul!(tempd1d1, tempd1d2, W')
         @inbounds for k in 1:cone.d1
@@ -230,7 +230,7 @@ function hess_prod!(
         end
         mul!(tempd1d2, Hermitian(tempd1d1, :U), cone.tau, 2, 2)
         ldiv!(cone.fact_Z, tempd1d2)
-        @views vec_copy_to!(prod[2:end, j], tempd1d2)
+        @views vec_copyto!(prod[2:end, j], tempd1d2)
     end
 
     return prod
@@ -242,7 +242,7 @@ function dder3(cone::EpiNormSpectral, dir::AbstractVector)
     u = cone.point[1]
     W = cone.W
     u_dir = dir[1]
-    @views W_dir = vec_copy_to!(cone.tempd1d2, dir[2:end])
+    @views W_dir = vec_copyto!(cone.tempd1d2, dir[2:end])
     dder3 = cone.dder3
 
     Zi = Hermitian(cone.Zi, :U)
@@ -281,7 +281,7 @@ function dder3(cone::EpiNormSpectral, dir::AbstractVector)
     tempd1d2b .+= tempd1d2c
 
     axpby!(-2 * u_dir, tempd1d2b, -2, tempd1d2d)
-    @views vec_copy_to!(dder3[2:end], tempd1d2d)
+    @views vec_copyto!(dder3[2:end], tempd1d2d)
 
     trZi3 = sum(abs2, ldiv!(tempd1d1, cone.fact_Z.L, Zi))
     @. tempd1d2b += 3 * tempd1d2c

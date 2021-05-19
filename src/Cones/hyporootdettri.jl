@@ -57,8 +57,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
             @assert d^2 == dim - 1
             cone.is_complex = true
         else
-            d = round(Int, sqrt(0.25 + 2 * (dim - 1)) - 0.5)
-            @assert d * (d + 1) == 2 * (dim - 1)
+            d = svec_side(dim - 1)
             cone.is_complex = false
         end
         cone.d = d

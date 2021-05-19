@@ -26,8 +26,8 @@ function build(inst::EntanglementAssisted{T}) where {T <: Float64}
     ne = inst.ne
     @assert nb * ne == ampl_dim
     rt2 = sqrt(T(2))
-    sa = div(ampl_dim * (ampl_dim + 1), 2)
-    sb = div(nb * (nb + 1), 2)
+    sa = Cones.svec_length(ampl_dim)
+    sb = Cones.svec_length(nb)
 
     model = JuMP.Model()
     JuMP.@variables(model, begin

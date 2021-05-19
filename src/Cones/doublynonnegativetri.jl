@@ -47,10 +47,9 @@ mutable struct DoublyNonnegativeTri{T <: Real} <: Cone{T}
         cone.use_dual_barrier = use_dual
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
-        cone.side = side = round(Int, sqrt(0.25 + 2 * dim) - 0.5)
-        @assert side * (side + 1) == 2 * dim
-        cone.offdiag_idxs = vcat([div(i * (i - 1), 2) .+
-            (1:(i - 1)) for i in 2:side]...)
+        cone.side = side = svec_side(dim)
+        cone.offdiag_idxs = vcat(
+            [svec_length(i - 1) .+ (1:(i - 1)) for i in 2:side]...)
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end

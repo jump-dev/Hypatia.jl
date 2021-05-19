@@ -131,7 +131,7 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
     model_c = zeros(T, model_n)
     mXpY = -X' * Y
     if is_complex
-        @views Cones.cvec_to_rvec!(model_c[2:end], vec(mXpY))
+        @views Cones.vec_copyto!(model_c[2:end], vec(mXpY))
     else
         model_c[2:end] .= vec(mXpY)
     end
@@ -279,7 +279,7 @@ function test_extra(
         (Y, X) = (inst.Y, inst.X)
         A_opt = zeros(eltype(Y), size(X, 2), size(Y, 2))
         A_len = length(A_opt) * (inst.is_complex ? 2 : 1)
-        @views Cones.vec_copy_to!(A_opt, solution.x[1 .+ (1:A_len)])
+        @views Cones.vec_copyto!(A_opt, solution.x[1 .+ (1:A_len)])
         loss = (sum(abs2, X * A_opt) / 2 - real(dot(X' * Y, A_opt))) / size(Y, 1)
         obj_result = loss +
             inst.lam_fro * norm(vec(A_opt), 2) +

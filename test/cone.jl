@@ -254,7 +254,7 @@ end
 function new_vec(w::Vector, dw::Int, R::Type{Complex{T}}) where {T <: Real}
     @assert length(w) == 2 * dw
     wR = zeros(Complex{eltype(w)}, dw)
-    Cones.rvec_to_cvec!(wR, w)
+    Cones.vec_copyto!(wR, w)
     return wR
 end
 
@@ -364,7 +364,7 @@ function test_barrier(C::Type{Cones.DoublyNonnegativeTri{T}}) where T
     dW = 3
     function barrier(s)
         W = new_mat_herm(s, dW, T)
-        offdiags = vcat([div(i * (i - 1), 2) .+ (1:(i - 1)) for i in 2:dW]...)
+        offdiags = vcat([Cones.svec_length(i - 1) .+ (1:(i - 1)) for i in 2:dW]...)
         return -logdet_pd(Hermitian(W, :U)) - sum(log, s[offdiags])
     end
     test_barrier(C(Cones.svec_length(dW)), barrier)

@@ -1,5 +1,5 @@
 #=
-nearest correlation matrix, in the quantum relative entropy sense, adapted from 
+nearest correlation matrix, in the quantum relative entropy sense, adapted from
 https://github.com/hfawzi/cvxquad/blob/master/examples/nearest_correlation_matrix.m
 =#
 
@@ -11,7 +11,7 @@ function build(inst::NearestCorrelationJuMP{T}) where {T <: Float64}
     side = inst.side
     M = randn(T, side, side)
     M = M * M'
-    vec_dim = div(side * (side + 1), 2)
+    vec_dim = Cones.svec_length(side)
     m_vec = zeros(T, vec_dim)
     Cones.smat_to_svec!(m_vec, M, sqrt(T(2)))
 
