@@ -1,28 +1,35 @@
-# Hypatia API
+## API
+
+```@contents
+Pages = ["api.md"]
+Depth = 4
+```
+
+### Hypatia
 
 ```@autodocs
 Modules = [Hypatia]
 ```
 
-## Cones module
+### Cones module
 
 ```@autodocs
 Modules = [Hypatia.Cones]
 ```
 
-## Models module
+### Models module
 
 ```@autodocs
 Modules = [Hypatia.Models]
 ```
 
-## Solvers module
+### Solvers module
 
 ```@autodocs
 Modules = [Hypatia.Solvers]
 ```
 
-## PolyUtils module
+### PolyUtils module
 
 ```@autodocs
 Modules = [Hypatia.PolyUtils]
