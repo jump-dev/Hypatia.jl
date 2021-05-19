@@ -3,6 +3,13 @@
 Hypatia is a highly-customizable interior point solver for generic conic optimization problems, written in Julia.
 It is licensed under the MIT License; see [LICENSE](https://github.com/chriscoey/Hypatia.jl/blob/master/LICENSE.md).
 
+To use Hypatia, install [Julia](https://github.com/JuliaLang/julia), then at the Julia REPL, type:
+```julia
+julia> using Pkg; Pkg.add("Hypatia")
+
+julia> using Hypatia
+```
+
 To learn how to model and solve conic problems with Hypatia, see the many applied examples in the [examples folder](https://github.com/chriscoey/Hypatia.jl/tree/master/examples).
 For more information about conic optimization, Hypatia's algorithms, and proper cones, please see our [working paper](https://arxiv.org/abs/2005.01136) and our [cones reference](https://github.com/chriscoey/Hypatia.jl/wiki/files/coneref.pdf).
 Hypatia is an experimental solver and a work in progress, and may not run with older releases of Julia.
@@ -51,7 +58,7 @@ Defining a new cone automatically defines its dual cone (through the `use_dual` 
 A model specifies the data in the primal conic form above:
 - ``\mathcal{K}`` is a vector of Hypatia cones,
 - ``c \in \mathbb{R}^n``, ``b \in \mathbb{R}^p``, ``h \in \mathbb{R}^q`` are vectors,
--  ``A \in \mathbb{R}^{p \times n}`` and ``G \in \mathbb{R}^{p \times n}`` are linear operators.
+-  ``A \in \mathbb{R}^{p \times n}`` and ``G \in \mathbb{R}^{q \times n}`` are linear operators.
 An objective offset can be specified using the keyword arg `obj_offset` (the default is 0).
 
 ## Solver interface
