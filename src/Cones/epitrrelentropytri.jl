@@ -64,11 +64,12 @@ mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim > 2
+        @assert isodd(dim)
         cone = new{T}()
         cone.use_dual_barrier = use_dual
         cone.dim = dim
         cone.vw_dim = div(dim - 1, 2)
-        cone.d = round(Int, sqrt(0.25 + 2 * cone.vw_dim) - 0.5)
+        cone.d = svec_side(cone.vw_dim)
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end

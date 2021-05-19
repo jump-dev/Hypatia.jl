@@ -225,7 +225,7 @@ function update_lhs(
                 idx += q_k
             end
             @views HGQ2_sub = syssolver.HGQ2[1:(idx - 1), :]
-            outer_prod(HGQ2_sub, lhs, true, false)
+            outer_prod!(HGQ2_sub, lhs, true, false)
         end
 
         for k in inv_hess_cones
@@ -246,7 +246,7 @@ function update_lhs(
                 idx += q_k
             end
             @views HGQ2_sub = syssolver.HGQ2[1:(idx - 1), :]
-            outer_prod(HGQ2_sub, lhs, true, true)
+            outer_prod!(HGQ2_sub, lhs, true, true)
         end
 
         for k in hess_cones

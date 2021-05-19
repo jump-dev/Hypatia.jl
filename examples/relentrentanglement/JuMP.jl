@@ -15,7 +15,7 @@ function build(inst::RelEntrEntanglementJuMP{T}) where {T <: Float64}
     Rho = randn(T, side, side)
     Rho = Rho * Rho'
     Rho = Symmetric(Rho / tr(Rho))
-    vec_dim = div(side * (side + 1), 2)
+    vec_dim = Cones.svec_length(side)
     rho_vec = zeros(T, vec_dim)
     Cones.smat_to_svec!(rho_vec, Rho, sqrt(T(2)))
 

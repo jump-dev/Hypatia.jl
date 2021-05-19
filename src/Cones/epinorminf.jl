@@ -97,7 +97,7 @@ end
 function update_feas(cone::EpiNormInf{T}) where T
     @assert !cone.feas_updated
     u = cone.point[1]
-    @views vec_copy_to!(cone.w, cone.point[2:end])
+    @views vec_copyto!(cone.w, cone.point[2:end])
 
     cone.is_feas = (u > eps(T) && u - norm(cone.w, Inf) > eps(T))
 
@@ -135,7 +135,7 @@ function update_grad(
     @. cone.uden = u / den
     @. cone.wden = w / den
     cone.grad[1] = (cone.n - 1) / u - sum(cone.uden)
-    @views vec_copy_to!(cone.grad[2:end], cone.wden)
+    @views vec_copyto!(cone.grad[2:end], cone.wden)
 
     cone.grad_updated = true
     return cone.grad

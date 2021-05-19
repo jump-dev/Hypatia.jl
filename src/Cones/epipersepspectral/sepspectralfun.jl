@@ -9,7 +9,11 @@ suitable univariate convex functions defined on ℝ₊₊ and associated oracles
 TODO derive central initial points for get_initial_point and use real type
 =#
 
-# inverse: x^-1
+"""
+$(TYPEDEF)
+
+The inverse function ``x \\to x^{-1}``.
+"""
 struct InvSSF <: SepSpectralFun end
 
 h_val(xs::Vector, ::InvSSF) = sum(inv, xs)
@@ -25,8 +29,11 @@ function get_initial_point(d::Int, ::InvSSF)
     return (2d, 1, 1)
 end
 
+"""
+$(TYPEDEF)
 
-# negative logarithm: -log(x)
+The negative logarithm function ``x \\to - \\log(x)``.
+"""
 struct NegLogSSF <: SepSpectralFun end
 
 h_val(xs::Vector, ::NegLogSSF) = -sum(log, xs)
@@ -42,8 +49,11 @@ function get_initial_point(d::Int, ::NegLogSSF)
     return (1, 1, 1)
 end
 
+"""
+$(TYPEDEF)
 
-# negative entropy: x * log(x)
+The negative entropy function ``x \\to x \\log(x)``.
+"""
 struct NegEntropySSF <: SepSpectralFun end
 
 h_val(xs::Vector, ::NegEntropySSF) = sum(x * log(x) for x in xs)
@@ -59,11 +69,13 @@ function get_initial_point(d::Int, ::NegEntropySSF)
     return (1, 1, 1)
 end
 
+"""
+$(TYPEDEF)
 
-# power in (1,2]
-# power 1 is homogeneous and just equal to trace of PSD matrix (a linear function)
-# for power 2, more efficient to use epipersquare on scaled lower triangle
-# (since λ'λ = tr(X^2) = ||svec(X)||^2)
+The power function ``x \\to x^p`` parametrized by ``p \\in (1, 2]``. Note for
+``p = 2``, it is more efficient to use [`EpiPerSquare`](@ref) on the scaled
+triangle.
+"""
 struct Power12SSF <: SepSpectralFun
     p::Real
     Power12SSF(p::Real) = (@assert 1 < p <= 2; new(p))

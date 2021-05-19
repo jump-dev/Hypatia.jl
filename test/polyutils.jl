@@ -10,7 +10,8 @@ import Hypatia.PolyUtils.interpolate
 
 function test_interp_domain(T::Type{<:Real})
     Random.seed!(1)
-    @testset "domain interpolation n = $n" for n in 1:3
+    @testset "domain interpolation n = $n, halfdeg = $halfdeg" for (n, halfdeg) in
+        ((1, 5), (2, 2), (3, 1))
         free_dom = PolyUtils.FreeDomain{T}(n)
         box_dom = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n))
         ball_dom = PolyUtils.BallDomain{T}(ones(T, n), one(T))
@@ -18,7 +19,7 @@ function test_interp_domain(T::Type{<:Real})
         Q = Symmetric(Q * Q')
         ellip_dom = PolyUtils.EllipsoidDomain{T}(ones(T, n), Q)
 
-        for sample in (true, false), halfdeg in 1:2
+        for sample in (true, false)
             interp_options = (; sample = sample, sample_factor = 10)
 
             free = interpolate(free_dom, halfdeg; interp_options...)
@@ -44,7 +45,7 @@ end
 
 function test_complex_interp(T::Type{<:Real})
     @testset "complex interp n = $n, halfdeg = $halfdeg, use_qr = $use_qr" for
-        n in 1:3, halfdeg in 1:2, use_qr in (false, true)
+        (n, halfdeg) in ((1, 3), (2, 2), (3, 1)), use_qr in (false, true)
         gs = [z -> 1 - sum(abs2, z)]
         (pts, Ps) = interpolate(Complex{T}, halfdeg, n, gs, [1], use_qr = use_qr)
         @test length(Ps) == 2
@@ -66,7 +67,8 @@ function test_quadrature(T::Type{<:Real})
     end
 
     # multivariate box
-    @testset "quadrature n = $n, halfdeg = $halfdeg" for n in 1:4, halfdeg in 1:2
+    @testset "quadrature n = $n, halfdeg = $halfdeg" for (n, halfdeg) in
+        ((1, 5), (2, 2), (3, 1))
         box_dom = PolyUtils.BoxDomain{T}(fill(-1, n), fill(3, n))
         box = interpolate(box_dom, halfdeg, sample = false, get_quadr = true)
         @test sum(box.w) ≈ 2^n

@@ -1,5 +1,5 @@
 #=
-definitions of domains for polynomials
+definitions of real domains for polynomials
 =#
 
 """
@@ -10,28 +10,28 @@ Real domains for polynomial constraints.
 abstract type Domain{T <: Real} end
 
 """
-$(TYPEDSIGNATURES)
+$(SIGNATURES)
 
 Dimension of a domain.
 """
 function dimension(dom::Domain)::Int end
 
 """
-$(TYPEDSIGNATURES)
+$(SIGNATURES)
 
 Sample `npts` points from the interior of the domain.
 """
 function sample(dom::Domain, npts::Int)::Matrix end
 
 """
-$(TYPEDSIGNATURES)
+$(SIGNATURES)
 
 Degree of a polynomial constraints defining a domain.
 """
 function degree(dom::Domain)::Int end
 
 """
-$(TYPEDSIGNATURES)
+$(SIGNATURES)
 
 Evaluations of the polynomial domain constraints at the points.
 """

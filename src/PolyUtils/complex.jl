@@ -4,6 +4,12 @@ utilities for complex polynomial interpolation
 TODO make interface for complex and real interpolation consistent, use dispatch
 =#
 
+"""
+$(SIGNATURES)
+
+Compute interpolation data for a complex weighted sum-of-squares conic constraint
+on a domain.
+"""
 function interpolate(
     R::Type{Complex{T}},
     halfdeg::Int,

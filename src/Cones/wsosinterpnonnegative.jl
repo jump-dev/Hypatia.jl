@@ -1,16 +1,17 @@
 #=
-interpolation-based weighted-sum-of-squares (multivariate) polynomial cone
-parametrized by interpolation matrices Ps
-
-definition and dual barrier from
-"Sum-of-squares optimization without semidefinite programming"
-by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
-
-TODO
-in complex case, can maybe compute Lambda fast in feas check by taking sqrt of
+TODO in complex case, can maybe compute Lambda fast in feas check by taking sqrt of
 point and doing outer product
 =#
 
+"""
+$(TYPEDEF)
+
+Interpolant-basis weighted sum-of-squares polynomial cone of dimension `U`, for
+real or real-valued complex polynomials , parametrized by vector of matrices
+`Ps` derived from interpolant basis and polynomial domain constraints.
+
+    $(FUNCTIONNAME){T, R}(U::Int, Ps::Vector{Matrix{R}}, use_dual::Bool = false)
+"""
 mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
@@ -139,7 +140,7 @@ function update_hess(cone::WSOSInterpNonnegative)
 
     cone.hess .= 0
     @inbounds for k in eachindex(cone.Ps)
-        outer_prod(cone.ΛFLP[k], UU, true, false)
+        outer_prod!(cone.ΛFLP[k], UU, true, false)
         for j in 1:cone.dim, i in 1:j
             cone.hess.data[i, j] += abs2(UU[i, j])
         end

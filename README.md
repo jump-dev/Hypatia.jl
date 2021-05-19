@@ -1,4 +1,4 @@
-<img src="https://github.com/chriscoey/Hypatia.jl/wiki/hypatia_logo.png" alt="Hypatia logo" width="380"/>
+<img src="https://github.com/chriscoey/Hypatia.jl/wiki/hypatia_logo.png" alt="Hypatia logo" width="360"/>
 
 [![Build Status](https://github.com/chriscoey/Hypatia.jl/workflows/CI/badge.svg)](https://github.com/chriscoey/Hypatia.jl/actions?query=workflow%3ACI+branch%3Amaster)
 [![codecov](https://codecov.io/gh/chriscoey/Hypatia.jl/branch/master/graph/badge.svg?token=x7G2wQeKJF)](https://codecov.io/gh/chriscoey/Hypatia.jl)
@@ -9,6 +9,13 @@
 
 Hypatia is a highly-customizable interior point solver for generic conic optimization problems, written in Julia.
 It is licensed under the MIT License; see [LICENSE](https://github.com/chriscoey/Hypatia.jl/blob/master/LICENSE.md).
+
+To use Hypatia, install [Julia](https://github.com/JuliaLang/julia), then at the Julia REPL, type:
+```julia
+julia> using Pkg; Pkg.add("Hypatia")
+
+julia> using Hypatia
+```
 
 To learn how to model and solve conic problems with Hypatia, see the many applied examples in the [examples folder](https://github.com/chriscoey/Hypatia.jl/tree/master/examples).
 For more information about conic optimization, Hypatia's algorithms, and proper cones, please see our [working paper](https://arxiv.org/abs/2005.01136) and our [cones reference](https://github.com/chriscoey/Hypatia.jl/wiki/files/coneref.pdf).

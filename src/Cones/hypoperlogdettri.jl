@@ -52,16 +52,8 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone.use_dual_barrier = use_dual
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
-        if R <: Complex
-            d = isqrt(dim - 2) # real lower triangle and imaginary under diagonal
-            @assert d^2 == dim - 2
-            cone.is_complex = true
-        else
-            d = round(Int, sqrt(0.25 + 2 * (dim - 2)) - 0.5)
-            @assert d * (d + 1) == 2 * (dim - 2)
-            cone.is_complex = false
-        end
-        cone.d = d
+        cone.is_complex = (R <: Complex)
+        cone.d = svec_side(R, dim - 2)
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end

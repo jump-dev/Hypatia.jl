@@ -1,9 +1,15 @@
-#=
-vector cone of squares, i.e. ℝ₊ᵈ for d ≥ 1, with rank d
-=#
+"""
+$(TYPEDEF)
 
+Real vector cone of squares.
+"""
 struct VectorCSqr{T <: Real} <: ConeOfSquares{T} end
 
+"""
+$(TYPEDSIGNATURES)
+
+The rank of the vector cone of squares, equal to the vector length.
+"""
 vector_dim(::Type{<:VectorCSqr}, d::Int) = d
 
 mutable struct VectorCSqrCache{T <: Real} <: CSqrCache{T}

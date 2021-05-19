@@ -1,20 +1,12 @@
-#=
-interpolation-based weighted-sum-of-squares (multivariate) polynomial epinormeucl
-(AKA second-order cone) parametrized by interpolation matrices Ps
-certifies that u(x)^2 <= sum(w_i(x)^2) for all x in the domain described by input Ps
-u(x), w_1(x), ...,  w_R(x) are polynomials with U coefficients
+"""
+$(TYPEDEF)
 
-dual barrier extended from
-"Sum-of-squares optimization without semidefinite programming"
-by D. Papp and S. Yildiz, available at https://arxiv.org/abs/1712.01792
-and "Semidefinite Characterization of Sum-of-Squares Cones in Algebras"
-by D. Papp and F. Alizadeh
--logdet(schur(Lambda)) - logdet(Lambda_11)
-note that if schur(M) = A - B * inv(D) * C then
-logdet(schur) = logdet(M) - logdet(D) = logdet(Lambda) - (R - 1) * logdet(Lambda_11)
-since our D is an (R - 1) x (R - 1) block diagonal matrix
-=#
+Interpolant-basis weighted sum-of-squares polynomial (of dimension `U`) epigraph
+of `ℓ₂` norm (of dimension `R`) cone, parametrized by vector of matrices `Ps`
+derived from interpolant basis and polynomial domain constraints.
 
+    $(FUNCTIONNAME){T}(R::Int, U::Int, Ps::Vector{Matrix{T}}, use_dual::Bool = false)
+"""
 mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
