@@ -33,32 +33,116 @@ A proper cone.
 """
 abstract type Cone{T <: Real} end
 
-include("nonnegative.jl")
-include("possemideftri.jl")
-include("doublynonnegativetri.jl")
-include("possemideftrisparse/possemideftrisparse.jl")
-include("linmatrixineq.jl")
-include("epinorminf.jl")
-include("epinormeucl.jl")
-include("epipersquare.jl")
-include("epinormspectral.jl")
-include("matrixepipersquare.jl")
-include("generalizedpower.jl")
-include("hypopowermean.jl")
-include("hypogeomean.jl")
-include("hyporootdettri.jl")
-include("hypoperlog.jl")
-include("hypoperlogdettri.jl")
-include("epipersepspectral/epipersepspectral.jl")
-include("epirelentropy.jl")
-include("epitrrelentropytri.jl")
-include("wsosinterpnonnegative.jl")
-include("wsosinterppossemideftri.jl")
-include("wsosinterpepinormone.jl")
-include("wsosinterpepinormeucl.jl")
+"""
+$(SIGNATURES)
 
-use_dual_barrier(cone::Cone) = cone.use_dual_barrier
-dimension(cone::Cone) = cone.dim
+The real vector dimension of the cone.
+"""
+dimension(cone::Cone)::Int = cone.dim
+
+"""
+$(SIGNATURES)
+
+The barrier parameter ``\\nu`` of the cone.
+"""
+get_nu(cone::Cone)::Real = cone.nu
+
+"""
+$(SIGNATURES)
+
+Set the array equal to the initial interior point for the cone.
+"""
+function set_initial_point!(arr::AbstractVector, cone::Cone) end
+
+"""
+$(SIGNATURES)
+
+Returns true if and only if the currently-loaded primal point is strictly
+feasible for the cone.
+"""
+is_feas(cone::Cone)::Bool = (cone.feas_updated ? cone.is_feas : update_feas(cone))
+
+"""
+$(SIGNATURES)
+
+Returns false only if the currently-loaded dual point is outside the interior of
+the cone's dual cone.
+"""
+is_dual_feas(cone::Cone)::Bool = true
+
+"""
+$(SIGNATURES)
+
+The gradient of the cone's barrier function at the currently-loaded primal point.
+"""
+grad(cone::Cone) = (cone.grad_updated ? cone.grad : update_grad(cone))
+
+"""
+$(SIGNATURES)
+
+The Hessian (symmetric positive definite) of the cone's barrier function at the
+currently-loaded primal point.
+"""
+function hess(cone::Cone)
+    cone.hess_updated && return cone.hess
+    return update_hess(cone)
+end
+
+"""
+$(SIGNATURES)
+
+The inverse Hessian (symmetric positive definite) of the cone's barrier function
+at the currently-loaded primal point.
+"""
+function inv_hess(cone::Cone)
+    cone.inv_hess_updated && return cone.inv_hess
+    return update_inv_hess(cone)
+end
+
+"""
+$(SIGNATURES)
+
+Compute the product of the Hessian of the cone's barrier function at the
+currently-loaded primal point with a vector or array, in-place.
+"""
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+    cone.hess_updated || update_hess(cone)
+    mul!(prod, cone.hess, arr)
+    return prod
+end
+
+"""
+$(SIGNATURES)
+
+Compute the product of the inverse Hessian of the cone's barrier function at the
+currently-loaded primal point with a vector or array, in-place.
+"""
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
+    update_hess_fact(cone)
+    copyto!(prod, arr)
+    inv_prod(cone.hess_fact_cache, prod)
+    return prod
+end
+
+"""
+$(SIGNATURES)
+
+Returns true if and only if the oracle for the third-order directional
+derivative oracle [`dder3`](@ref) can be computed.
+"""
+use_dder3(::Cone)::Bool = true
+
+"""
+$(SIGNATURES)
+
+Compute the third-order directional derivative, in the direction `dir`, the
+cone's barrier function at the currently-loaded primal point.
+"""
+function dder3(cone::Cone, dir::AbstractVector) end
+
+# other oracles and helpers
+
+use_dual_barrier(cone::Cone)::Bool = cone.use_dual_barrier
 
 function setup_data!(cone::Cone{T}) where {T <: Real}
     reset_data(cone)
@@ -93,21 +177,6 @@ load_dual_point(
     point::AbstractVector,
     ) = copyto!(cone.dual_point, point)
 
-is_feas(cone::Cone) = (cone.feas_updated ? cone.is_feas : update_feas(cone))
-is_dual_feas(cone::Cone) = true # use neighborhood check for dual feasibility
-
-grad(cone::Cone) = (cone.grad_updated ? cone.grad : update_grad(cone))
-
-function hess(cone::Cone)
-    cone.hess_updated && return cone.hess
-    return update_hess(cone)
-end
-
-function inv_hess(cone::Cone)
-    cone.inv_hess_updated && return cone.inv_hess
-    return update_inv_hess(cone)
-end
-
 function alloc_hess!(cone::Cone{T}) where {T <: Real}
     dim = dimension(cone)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
@@ -123,15 +192,11 @@ function alloc_inv_hess!(cone::Cone{T}) where {T <: Real}
     return
 end
 
-# fallbacks
-
 # hessian_cache(T::Type{<:BlasReal}) = DenseSymCache{T}() # BunchKaufman for BlasReal
 hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}()
 
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
-
-get_nu(cone::Cone) = cone.nu
 
 function use_sqrt_hess_oracles(cone::Cone)
     if !cone.hess_fact_updated
@@ -140,15 +205,29 @@ function use_sqrt_hess_oracles(cone::Cone)
     return (cone.hess_fact_cache isa DensePosDefCache)
 end
 
-use_dder3(::Cone) = true
-
-update_hess_aux(cone::Cone) = nothing
-
-function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
-    cone.hess_updated || update_hess(cone)
-    mul!(prod, cone.hess, arr)
+function sqrt_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::Cone,
+    )
+    update_hess_fact(cone)
+    copyto!(prod, arr)
+    sqrt_prod(cone.hess_fact_cache, prod)
     return prod
 end
+
+function inv_sqrt_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::Cone,
+    )
+    update_hess_fact(cone)
+    copyto!(prod, arr)
+    inv_sqrt_prod(cone.hess_fact_cache, prod)
+    return prod
+end
+
+update_hess_aux(cone::Cone) = nothing
 
 function update_use_hess_prod_slow(cone::Cone{T}) where {T <: Real}
     cone.hess_updated || update_hess(cone)
@@ -192,39 +271,6 @@ function update_inv_hess(cone::Cone)
     invert(cone.hess_fact_cache, cone.inv_hess)
     cone.inv_hess_updated = true
     return cone.inv_hess
-end
-
-function inv_hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::Cone,
-    )
-    update_hess_fact(cone)
-    copyto!(prod, arr)
-    inv_prod(cone.hess_fact_cache, prod)
-    return prod
-end
-
-function sqrt_hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::Cone,
-    )
-    update_hess_fact(cone)
-    copyto!(prod, arr)
-    sqrt_prod(cone.hess_fact_cache, prod)
-    return prod
-end
-
-function inv_sqrt_hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::Cone,
-    )
-    update_hess_fact(cone)
-    copyto!(prod, arr)
-    inv_sqrt_prod(cone.hess_fact_cache, prod)
-    return prod
 end
 
 # number of nonzeros in the Hessian and inverse
@@ -273,5 +319,29 @@ function in_neighborhood(
 
     return (nbhd < rtmu * max_nbhd)
 end
+
+include("nonnegative.jl")
+include("possemideftri.jl")
+include("doublynonnegativetri.jl")
+include("possemideftrisparse/possemideftrisparse.jl")
+include("linmatrixineq.jl")
+include("epinorminf.jl")
+include("epinormeucl.jl")
+include("epipersquare.jl")
+include("epinormspectral.jl")
+include("matrixepipersquare.jl")
+include("generalizedpower.jl")
+include("hypopowermean.jl")
+include("hypogeomean.jl")
+include("hyporootdettri.jl")
+include("hypoperlog.jl")
+include("hypoperlogdettri.jl")
+include("epipersepspectral/epipersepspectral.jl")
+include("epirelentropy.jl")
+include("epitrrelentropytri.jl")
+include("wsosinterpnonnegative.jl")
+include("wsosinterppossemideftri.jl")
+include("wsosinterpepinormone.jl")
+include("wsosinterpepinormeucl.jl")
 
 end

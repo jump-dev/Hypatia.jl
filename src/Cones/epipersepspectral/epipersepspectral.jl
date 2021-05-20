@@ -5,11 +5,7 @@ A cone of squares on a Jordan algebra.
 """
 abstract type ConeOfSquares{T <: Real} end
 
-"""
-$(TYPEDEF)
-
-A cache for a cone of squares implementation.
-"""
+# a cache for a cone of squares implementation
 abstract type CSqrCache{T <: Real} end
 
 """

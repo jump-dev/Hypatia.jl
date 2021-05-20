@@ -1,5 +1,7 @@
 #=
-experiment design optimizes a function of the information matrix
+choose the frequency of experiments to minimize a given convex spectral function
+of the information matrix and satisfy an experiment budget constraint and other
+side constraints
 
 adapted from Boyd and Vandenberghe, "Convex Optimization", section 7.5
 

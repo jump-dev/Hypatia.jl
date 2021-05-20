@@ -144,31 +144,52 @@ end
 # Hypatia predefined cones
 # some are equivalent to above MOI predefined cones, but we define again for the sake of consistency
 
-export NonnegativeCone
+"""
+$(TYPEDEF)
+
+See [`Cones.Nonnegative`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct NonnegativeCone{T <: Real} <: MOI.AbstractVectorSet
     dim::Int
 end
+export NonnegativeCone
 
 MOI.dimension(cone::NonnegativeCone) = cone.dim
 
 cone_from_moi(::Type{T}, cone::NonnegativeCone{T}) where {T <: Real} =
     Cones.Nonnegative{T}(cone.dim)
 
-export PosSemidefTriCone
+"""
+$(TYPEDEF)
+
+See [`Cones.PosSemidefTri`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct PosSemidefTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     dim::Int
 end
+export PosSemidefTriCone
 
 MOI.dimension(cone::PosSemidefTriCone) = cone.dim
 
 cone_from_moi(::Type{T}, cone::PosSemidefTriCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
     Cones.PosSemidefTri{T, R}(cone.dim)
 
-export DoublyNonnegativeTriCone
+"""
+$(TYPEDEF)
+
+See [`Cones.DoublyNonnegativeTri`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct DoublyNonnegativeTriCone{T <: Real} <: MOI.AbstractVectorSet
     dim::Int
     use_dual::Bool
 end
+export DoublyNonnegativeTriCone
 
 DoublyNonnegativeTriCone{T}(dim::Int) where {T <: Real} =
     DoublyNonnegativeTriCone{T}(dim, false)
@@ -178,13 +199,20 @@ MOI.dimension(cone::DoublyNonnegativeTriCone where {T <: Real}) = cone.dim
 cone_from_moi(::Type{T}, cone::DoublyNonnegativeTriCone{T}) where {T <: Real} =
     Cones.DoublyNonnegativeTri{T}(cone.dim, use_dual = cone.use_dual)
 
-export PosSemidefTriSparseCone
+"""
+$(TYPEDEF)
+
+See [`Cones.PosSemidefTriSparse`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct PosSemidefTriSparseCone{I <: Cones.PSDSparseImpl, T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     side::Int
     row_idxs::Vector{Int}
     col_idxs::Vector{Int}
     use_dual::Bool
 end
+export PosSemidefTriSparseCone
 
 PosSemidefTriSparseCone{I, T, R}(side::Int, row_idxs::Vector{Int}, col_idxs::Vector{Int}) where {I <: Cones.PSDSparseImpl, T <: Real, R <: RealOrComplex{T}} =
     PosSemidefTriSparseCone{I, T, R}(side, row_idxs, col_idxs, false)
@@ -199,11 +227,18 @@ cone_from_moi(::Type{T}, cone::PosSemidefTriSparseCone{I, T, R}) where {I <: Con
     Cones.PosSemidefTriSparse{I, T, R}(cone.side, cone.row_idxs, cone.col_idxs,
     use_dual = cone.use_dual)
 
-export LinMatrixIneqCone
+"""
+$(TYPEDEF)
+
+See [`Cones.LinMatrixIneq`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct LinMatrixIneqCone{T <: Real} <: MOI.AbstractVectorSet
     As::Vector
     use_dual::Bool
 end
+export LinMatrixIneqCone
 
 LinMatrixIneqCone{T}(As::Vector) where {T <: Real} =
     LinMatrixIneqCone{T}(As, false)
@@ -213,46 +248,74 @@ MOI.dimension(cone::LinMatrixIneqCone) = length(cone.As)
 cone_from_moi(::Type{T}, cone::LinMatrixIneqCone{T}) where {T <: Real} =
     Cones.LinMatrixIneq{T}(cone.As, use_dual = cone.use_dual)
 
-export EpiNormInfinityCone
-struct EpiNormInfinityCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
+"""
+$(TYPEDEF)
+
+See [`Cones.EpiNormInf`](@ref).
+
+$(TYPEDFIELDS)
+"""
+struct EpiNormInfCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     dim::Int
     use_dual::Bool
 end
+export EpiNormInfCone
 
-EpiNormInfinityCone{T, R}(dim::Int) where {T <: Real, R <: RealOrComplex{T}} =
-    EpiNormInfinityCone{T, R}(dim, false)
+EpiNormInfCone{T, R}(dim::Int) where {T <: Real, R <: RealOrComplex{T}} =
+    EpiNormInfCone{T, R}(dim, false)
 
-MOI.dimension(cone::EpiNormInfinityCone) = cone.dim
+MOI.dimension(cone::EpiNormInfCone) = cone.dim
 
-cone_from_moi(::Type{T}, cone::EpiNormInfinityCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
+cone_from_moi(::Type{T}, cone::EpiNormInfCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
     Cones.EpiNormInf{T, R}(cone.dim, use_dual = cone.use_dual)
 
-export EpiNormEuclCone
+"""
+$(TYPEDEF)
+
+See [`Cones.EpiNormEucl`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct EpiNormEuclCone{T <: Real} <: MOI.AbstractVectorSet
     dim::Int
 end
+export EpiNormEuclCone
 
 MOI.dimension(cone::EpiNormEuclCone) = cone.dim
 
 cone_from_moi(::Type{T}, cone::EpiNormEuclCone{T}) where {T <: Real} =
     Cones.EpiNormEucl{T}(cone.dim)
 
-export EpiPerSquareCone
+"""
+$(TYPEDEF)
+
+See [`Cones.EpiPerSquare`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct EpiPerSquareCone{T <: Real} <: MOI.AbstractVectorSet
     dim::Int
 end
+export EpiPerSquareCone
 
 MOI.dimension(cone::EpiPerSquareCone) = cone.dim
 
 cone_from_moi(::Type{T}, cone::EpiPerSquareCone{T}) where {T <: Real} =
     Cones.EpiPerSquare{T}(cone.dim)
 
-export EpiNormSpectralCone
+"""
+$(TYPEDEF)
+
+See [`Cones.EpiNormSpectral`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct EpiNormSpectralCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     n::Int
     m::Int
     use_dual::Bool
 end
+export EpiNormSpectralCone
 
 EpiNormSpectralCone{T, R}(n::Int, m::Int) where {T <: Real, R <: RealOrComplex{T}} =
     EpiNormSpectralCone{T, R}(n, m, false)
@@ -263,12 +326,19 @@ MOI.dimension(cone::EpiNormSpectralCone{T, R}) where {T <: Real, R <: RealOrComp
 cone_from_moi(::Type{T}, cone::EpiNormSpectralCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
     Cones.EpiNormSpectral{T, R}(cone.n, cone.m, use_dual = cone.use_dual)
 
-export MatrixEpiPerSquareCone
+"""
+$(TYPEDEF)
+
+See [`Cones.MatrixEpiPerSquare`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct MatrixEpiPerSquareCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     n::Int
     m::Int
     use_dual::Bool
 end
+export MatrixEpiPerSquareCone
 
 MatrixEpiPerSquareCone{T, R}(n::Int, m::Int) where {T <: Real, R <: RealOrComplex{T}} =
     MatrixEpiPerSquareCone{T, R}(n, m, false)
@@ -279,12 +349,19 @@ MOI.dimension(cone::MatrixEpiPerSquareCone{T, R}) where {T <: Real, R <: RealOrC
 cone_from_moi(::Type{T}, cone::MatrixEpiPerSquareCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
     Cones.MatrixEpiPerSquare{T, R}(cone.n, cone.m, use_dual = cone.use_dual)
 
-export GeneralizedPowerCone
+"""
+$(TYPEDEF)
+
+See [`Cones.GeneralizedPower`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct GeneralizedPowerCone{T <: Real} <: MOI.AbstractVectorSet
     alpha::Vector{T}
     n::Int
     use_dual::Bool
 end
+export GeneralizedPowerCone
 
 GeneralizedPowerCone{T}(alpha::Vector{T}, n::Int) where {T <: Real} =
     GeneralizedPowerCone{T}(alpha, n, false)
@@ -294,11 +371,18 @@ MOI.dimension(cone::GeneralizedPowerCone) = length(cone.alpha) + cone.n
 cone_from_moi(::Type{T}, cone::GeneralizedPowerCone{T}) where {T <: Real} =
     Cones.GeneralizedPower{T}(cone.alpha, cone.n, use_dual = cone.use_dual)
 
-export HypoPowerMeanCone
+"""
+$(TYPEDEF)
+
+See [`Cones.HypoPowerMean`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct HypoPowerMeanCone{T <: Real} <: MOI.AbstractVectorSet
     alpha::Vector{T}
     use_dual::Bool
 end
+export HypoPowerMeanCone
 
 HypoPowerMeanCone{T}(alpha::Vector{T}) where {T <: Real} =
     HypoPowerMeanCone{T}(alpha, false)
@@ -308,11 +392,18 @@ MOI.dimension(cone::HypoPowerMeanCone) = 1 + length(cone.alpha)
 cone_from_moi(::Type{T}, cone::HypoPowerMeanCone{T}) where {T <: Real} =
     Cones.HypoPowerMean{T}(cone.alpha, use_dual = cone.use_dual)
 
-export HypoGeoMeanCone
+"""
+$(TYPEDEF)
+
+See [`Cones.HypoGeoMean`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct HypoGeoMeanCone{T <: Real} <: MOI.AbstractVectorSet
     dim::Int
     use_dual::Bool
 end
+export HypoGeoMeanCone
 
 HypoGeoMeanCone{T}(dim::Int) where {T <: Real} = HypoGeoMeanCone{T}(dim, false)
 
@@ -321,11 +412,18 @@ MOI.dimension(cone::HypoGeoMeanCone) = cone.dim
 cone_from_moi(::Type{T}, cone::HypoGeoMeanCone{T}) where {T <: Real} =
     Cones.HypoGeoMean{T}(cone.dim, use_dual = cone.use_dual)
 
-export HypoRootdetTriCone
+"""
+$(TYPEDEF)
+
+See [`Cones.HypoRootdetTri`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct HypoRootdetTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     dim::Int
     use_dual::Bool
 end
+export HypoRootdetTriCone
 
 HypoRootdetTriCone{T, R}(dim::Int) where {T <: Real, R <: RealOrComplex{T}} =
     HypoRootdetTriCone{T, R}(dim, false)
@@ -335,11 +433,18 @@ MOI.dimension(cone::HypoRootdetTriCone where {T <: Real}) = cone.dim
 cone_from_moi(::Type{T}, cone::HypoRootdetTriCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
     Cones.HypoRootdetTri{T, R}(cone.dim, use_dual = cone.use_dual)
 
-export HypoPerLogCone
+"""
+$(TYPEDEF)
+
+See [`Cones.HypoPerLog`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct HypoPerLogCone{T <: Real} <: MOI.AbstractVectorSet
     dim::Int
     use_dual::Bool
 end
+export HypoPerLogCone
 
 HypoPerLogCone{T}(dim::Int) where {T <: Real} = HypoPerLogCone{T}(dim, false)
 
@@ -348,11 +453,18 @@ MOI.dimension(cone::HypoPerLogCone) = cone.dim
 cone_from_moi(::Type{T}, cone::HypoPerLogCone{T}) where {T <: Real} =
     Cones.HypoPerLog{T}(cone.dim, use_dual = cone.use_dual)
 
-export HypoPerLogdetTriCone
+"""
+$(TYPEDEF)
+
+See [`Cones.HypoPerLogdetTri`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct HypoPerLogdetTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     dim::Int
     use_dual::Bool
 end
+export HypoPerLogdetTriCone
 
 HypoPerLogdetTriCone{T, R}(dim::Int) where {T <: Real, R <: RealOrComplex{T}} =
     HypoPerLogdetTriCone{T, R}(dim, false)
@@ -362,13 +474,20 @@ MOI.dimension(cone::HypoPerLogdetTriCone) = cone.dim
 cone_from_moi(::Type{T}, cone::HypoPerLogdetTriCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
     Cones.HypoPerLogdetTri{T, R}(cone.dim, use_dual = cone.use_dual)
 
-export EpiPerSepSpectralCone
+"""
+$(TYPEDEF)
+
+See [`Cones.EpiPerSepSpectral`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct EpiPerSepSpectralCone{T <: Real} <: MOI.AbstractVectorSet
     h::Cones.SepSpectralFun
     Q::Type{<:Cones.ConeOfSquares{T}}
     d::Int
     use_dual::Bool
 end
+export EpiPerSepSpectralCone
 
 EpiPerSepSpectralCone{T}(h::Cones.SepSpectralFun, Q::Type{<:Cones.ConeOfSquares{T}},
     d::Int) where {T <: Real} =
@@ -379,11 +498,18 @@ MOI.dimension(cone::EpiPerSepSpectralCone) = 2 + Cones.vector_dim(cone.Q, cone.d
 cone_from_moi(::Type{T}, cone::EpiPerSepSpectralCone{T}) where {T <: Real} =
     Cones.EpiPerSepSpectral{cone.Q, T}(cone.h, cone.d, use_dual = cone.use_dual)
 
-export EpiRelEntropyCone
+"""
+$(TYPEDEF)
+
+See [`Cones.EpiRelEntropy`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct EpiRelEntropyCone{T <: Real} <: MOI.AbstractVectorSet
     dim::Int
     use_dual::Bool
 end
+export EpiRelEntropyCone
 
 EpiRelEntropyCone{T}(dim::Int) where {T <: Real} = EpiRelEntropyCone{T}(dim, false)
 
@@ -392,11 +518,18 @@ MOI.dimension(cone::EpiRelEntropyCone) = cone.dim
 cone_from_moi(::Type{T}, cone::EpiRelEntropyCone{T}) where {T <: Real} =
     Cones.EpiRelEntropy{T}(cone.dim, use_dual = cone.use_dual)
 
-export EpiTrRelEntropyTriCone
+"""
+$(TYPEDEF)
+
+See [`Cones.EpiTrRelEntropyTri`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct EpiTrRelEntropyTriCone{T <: Real} <: MOI.AbstractVectorSet
     dim::Int
     use_dual::Bool
 end
+export EpiTrRelEntropyTriCone
 
 EpiTrRelEntropyTriCone{T}(dim::Int) where {T <: Real} =
     EpiTrRelEntropyTriCone{T}(dim, false)
@@ -406,12 +539,19 @@ MOI.dimension(cone::EpiTrRelEntropyTriCone where {T <: Real}) = cone.dim
 cone_from_moi(::Type{T}, cone::EpiTrRelEntropyTriCone{T}) where {T <: Real} =
     Cones.EpiTrRelEntropyTri{T}(cone.dim, use_dual = cone.use_dual)
 
-export WSOSInterpNonnegativeCone
+"""
+$(TYPEDEF)
+
+See [`Cones.WSOSInterpNonnegative`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct WSOSInterpNonnegativeCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     U::Int
     Ps::Vector{Matrix{R}}
     use_dual::Bool
 end
+export WSOSInterpNonnegativeCone
 
 WSOSInterpNonnegativeCone{T, R}(U::Int, Ps::Vector{Matrix{R}}) where {T <: Real, R <: RealOrComplex{T}} =
     WSOSInterpNonnegativeCone{T, R}(U, Ps, false)
@@ -421,13 +561,20 @@ MOI.dimension(cone::WSOSInterpNonnegativeCone) = cone.U
 cone_from_moi(::Type{T}, cone::WSOSInterpNonnegativeCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
     Cones.WSOSInterpNonnegative{T, R}(cone.U, cone.Ps, use_dual = cone.use_dual)
 
-export WSOSInterpPosSemidefTriCone
+"""
+$(TYPEDEF)
+
+See [`Cones.WSOSInterpPosSemidefTri`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct WSOSInterpPosSemidefTriCone{T <: Real} <: MOI.AbstractVectorSet
     R::Int
     U::Int
     Ps::Vector{Matrix{T}}
     use_dual::Bool
 end
+export WSOSInterpPosSemidefTriCone
 
 WSOSInterpPosSemidefTriCone{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} =
     WSOSInterpPosSemidefTriCone{T}(R, U, Ps, false)
@@ -438,13 +585,20 @@ cone_from_moi(::Type{T}, cone::WSOSInterpPosSemidefTriCone{T}) where {T <: Real}
     Cones.WSOSInterpPosSemidefTri{T}(cone.R, cone.U, cone.Ps,
     use_dual = cone.use_dual)
 
-export WSOSInterpEpiNormOneCone
+"""
+$(TYPEDEF)
+
+See [`Cones.WSOSInterpEpiNormOne`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct WSOSInterpEpiNormOneCone{T <: Real} <: MOI.AbstractVectorSet
     R::Int
     U::Int
     Ps::Vector{Matrix{T}}
     use_dual::Bool
 end
+export WSOSInterpEpiNormOneCone
 
 WSOSInterpEpiNormOneCone{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} =
     WSOSInterpEpiNormOneCone{T}(R, U, Ps, false)
@@ -454,13 +608,20 @@ MOI.dimension(cone::WSOSInterpEpiNormOneCone) = cone.U * cone.R
 cone_from_moi(::Type{T}, cone::WSOSInterpEpiNormOneCone{T}) where {T <: Real} =
     Cones.WSOSInterpEpiNormOne{T}(cone.R, cone.U, cone.Ps, use_dual = cone.use_dual)
 
-export WSOSInterpEpiNormEuclCone
+"""
+$(TYPEDEF)
+
+See [`Cones.WSOSInterpEpiNormEucl`](@ref).
+
+$(TYPEDFIELDS)
+"""
 struct WSOSInterpEpiNormEuclCone{T <: Real} <: MOI.AbstractVectorSet
     R::Int
     U::Int
     Ps::Vector{Matrix{T}}
     use_dual::Bool
 end
+export WSOSInterpEpiNormEuclCone
 
 WSOSInterpEpiNormEuclCone{T}(R::Int, U::Int, Ps::Vector{Matrix{T}}) where {T <: Real} =
     WSOSInterpEpiNormEuclCone{T}(R, U, Ps, false)
@@ -480,8 +641,8 @@ const HypatiaCones{T <: Real} = Union{
     PosSemidefTriSparseCone{<:Cones.PSDSparseImpl, T, T},
     PosSemidefTriSparseCone{<:Cones.PSDSparseImpl, T, Complex{T}},
     LinMatrixIneqCone{T},
-    EpiNormInfinityCone{T, T},
-    EpiNormInfinityCone{T, Complex{T}},
+    EpiNormInfCone{T, T},
+    EpiNormInfCone{T, Complex{T}},
     EpiNormEuclCone{T},
     EpiPerSquareCone{T},
     EpiNormSpectralCone{T, T},

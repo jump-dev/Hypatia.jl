@@ -7,6 +7,8 @@ const SAF = MOI.ScalarAffineFunction
 const VV = MOI.VectorOfVariables
 const VAF = MOI.VectorAffineFunction
 
+export Optimizer
+
 """
 $(TYPEDEF)
 

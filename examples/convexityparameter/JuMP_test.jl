@@ -14,4 +14,4 @@ insts["fast"] = [
     ((:poly2, :dom4, false, -2), :SOCExpPSD),
     ]
 insts["various"] = insts["fast"]
-return (MuConvexityJuMP, insts)
+return (ConvexityParameterJuMP, insts)

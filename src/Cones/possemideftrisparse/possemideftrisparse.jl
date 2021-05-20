@@ -6,12 +6,7 @@ An implementation type for the sparse positive semidefinite cone
 """
 abstract type PSDSparseImpl end
 
-"""
-$(TYPEDEF)
-
-A cache for an implementation for the sparse positive semidefinite cone
-[`PosSemidefTriSparse`](@ref).
-"""
+# a cache for an implementation for the sparse positive semidefinite cone
 abstract type PSDSparseCache{T <: Real, R <: RealOrComplex{T}} end
 
 """

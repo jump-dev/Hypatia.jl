@@ -20,4 +20,4 @@ insts["various"] = [
     ((2, 30, 2, 40),),
     ((8, 3, 3, 3),),
     ]
-return (EnvelopeJuMP, insts)
+return (PolyEnvelopeJuMP, insts)

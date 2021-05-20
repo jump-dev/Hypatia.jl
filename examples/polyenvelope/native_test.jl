@@ -16,4 +16,4 @@ insts["fast"] = [
     ((10, 1, 3, 1, true),),
     ((10, 1, 3, 1, false),),
     ]
-return (EnvelopeNative, insts)
+return (PolyEnvelopeNative, insts)

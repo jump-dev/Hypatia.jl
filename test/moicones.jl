@@ -202,13 +202,13 @@ function test_moi_cones(T::Type{<:Real})
         @test hyp_cone.As == As
     end
 
-    @testset "EpiNormInfinity" begin
-        moi_cone = Hypatia.EpiNormInfinityCone{T, T}(3)
+    @testset "EpiNormInf" begin
+        moi_cone = Hypatia.EpiNormInfCone{T, T}(3)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
         @test hyp_cone isa Cones.EpiNormInf{T, T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
 
-        moi_cone = Hypatia.EpiNormInfinityCone{T, Complex{T}}(5)
+        moi_cone = Hypatia.EpiNormInfCone{T, Complex{T}}(5)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
         @test hyp_cone isa Cones.EpiNormInf{T, Complex{T}}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 5

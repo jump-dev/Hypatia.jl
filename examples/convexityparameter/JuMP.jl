@@ -11,18 +11,18 @@ const SAS = SemialgebraicSets
 import SumOfSquares
 import PolyJuMP
 
-struct MuConvexityJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+struct ConvexityParameterJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     poly::Symbol
     dom::Symbol
     use_matrixwsos::Bool # use wsosinterpposemideftricone, else PSD formulation
     true_mu::Real # optional true value of parameter for testing only
 end
 
-function build(inst::MuConvexityJuMP{T}) where {T <: Float64}
-    dom = muconvexity_data[inst.dom]
+function build(inst::ConvexityParameterJuMP{T}) where {T <: Float64}
+    dom = convexityparameter_data[inst.dom]
     n = PolyUtils.dimension(dom)
     DP.@polyvar x[1:n]
-    poly = muconvexity_data[inst.poly](x)
+    poly = convexityparameter_data[inst.poly](x)
 
     model = JuMP.Model()
     JuMP.@variable(model, mu)
@@ -47,7 +47,7 @@ function build(inst::MuConvexityJuMP{T}) where {T <: Float64}
     return model
 end
 
-function test_extra(inst::MuConvexityJuMP{T}, model::JuMP.Model) where T
+function test_extra(inst::ConvexityParameterJuMP{T}, model::JuMP.Model) where T
     @test JuMP.termination_status(model) == MOI.OPTIMAL
     if JuMP.termination_status(model) == MOI.OPTIMAL && !isnan(inst.true_mu)
         # check objective value is correct
@@ -70,7 +70,7 @@ end
 
 get_domain_inequalities(dom::PolyUtils.FreeDomain, x) = bss()
 
-muconvexity_data = Dict(
+convexityparameter_data = Dict(
     :poly1 => (x -> (x[1] + 1)^2 * (x[1] - 1)^2),
     :poly2 => (x -> sum(x .^ 4) - sum(x .^ 2)),
     :dom1 => PolyUtils.FreeDomain{Float64}(1),

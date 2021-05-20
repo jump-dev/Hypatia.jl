@@ -1,6 +1,6 @@
 #=
-estimate a covariance matrix (PSD) minimizing a given convex spectral function
-and satisfying some prior information
+estimate a covariance matrix that satisfies some given prior information and
+minimizes a given convex spectral function
 
 p ∈ 𝕊ᵈ is the covariance variable
 minimize    f(p)                    (note: enforces p ⪰ 0)
