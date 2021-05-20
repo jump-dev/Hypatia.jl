@@ -1,17 +1,16 @@
-## Solving conic models
-
-```@contents
-Pages = ["solving.md"]
-Depth = 4
-```
+# Solving conic models
 
 Hypatia can be accessed through a low-level native Julia interface or through open-source modeling tools such as [JuMP](https://github.com/jump-dev/JuMP.jl) and [Convex.jl](https://github.com/jump-dev/Convex.jl).
 The native interface is more expressive, allowing Hypatia to solve conic models expressed with generic real floating point types and structured matrices or linear operators, for example.
 However, it is typically sufficient and more convenient to use JuMP.
 
-### Native interface
+## Native interface
 
-Hypatia's native solver interface provides low-level functions for solving models and querying solve information and conic certificates.
+```@meta
+CurrentModule = Hypatia.Solvers
+```
+
+Hypatia's [`Solvers`](@ref) module provides a [`Solver`](@ref) type with low-level functions for solving models and querying solve information and conic certificates; see [Solvers module](@ref).
 
 Below is a simple example of a spectral norm optimization problem:
 ```julia
@@ -71,9 +70,14 @@ julia> Solvers.get_x(solver)
  0.6377366379371803537625028513405673487028387050401566067448589228065218202592247
 ```
 
-### MathOptInterface and JuMP
+## MathOptInterface and JuMP
+
+```@meta
+CurrentModule = Hypatia
+```
 
 [JuMP](https://github.com/jump-dev/JuMP.jl) is generally more user-friendly than Hypatia's native interface, though it may make sense to try the more-expressive native interface for large dense or structured models.
+Hypatia exports MathOptInterface wrappers for Hypatia's solver (see [`Optimizer`](@ref)) and predefined cones (see [MathOptInterface cones](@ref)).
 
 Below is a simple example from D-optimal experiment design:
 

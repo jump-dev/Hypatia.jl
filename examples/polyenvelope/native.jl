@@ -6,7 +6,7 @@ available at https://arxiv.org/abs/1712.01792
 
 using SparseArrays
 
-struct EnvelopeNative{T <: Real} <: ExampleInstanceNative{T}
+struct PolyEnvelopeNative{T <: Real} <: ExampleInstanceNative{T}
     n::Int
     rand_halfdeg::Int
     num_polys::Int
@@ -14,7 +14,7 @@ struct EnvelopeNative{T <: Real} <: ExampleInstanceNative{T}
     primal_wsos::Bool # use primal formulation, else use dual
 end
 
-function build(inst::EnvelopeNative{T}) where {T <: Real}
+function build(inst::PolyEnvelopeNative{T}) where {T <: Real}
     (n, num_polys) = (inst.n, inst.num_polys)
     @assert inst.rand_halfdeg <= inst.env_halfdeg
     domain = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n))

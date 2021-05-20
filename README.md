@@ -5,9 +5,7 @@
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://chriscoey.github.io/Hypatia.jl/stable)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://chriscoey.github.io/Hypatia.jl/dev)
 
----
-
-Hypatia is a highly-customizable interior point solver for generic conic optimization problems, written in Julia.
+Hypatia is a highly-customizable interior point solver for generic conic optimization problems, written in [Julia](https://julialang.org/).
 It is licensed under the MIT License; see [LICENSE](https://github.com/chriscoey/Hypatia.jl/blob/master/LICENSE.md).
 
 See Hypatia's [documentation](https://chriscoey.github.io/Hypatia.jl/dev) for a description of Hypatia's conic form, predefined cones, generic cone interface, and interfaces.
@@ -16,7 +14,7 @@ For more information about Hypatia's algorithms and cones, please see our [worki
 
 ### Installation
 
-To use Hypatia, install [Julia](https://github.com/JuliaLang/julia), then at the Julia REPL, type:
+To use Hypatia, install [Julia](https://julialang.org/downloads/), then at the Julia REPL, type:
 ```julia
 julia> using Pkg; Pkg.add("Hypatia")
 
@@ -55,7 +53,7 @@ termination_status(model)
 objective_value(model)
 value.(x)
 ```
-See our [experiment design](https://github.com/chriscoey/Hypatia.jl/blob/master/examples/experimentdesign/JuMP.jl) and [D-optimal design](https://github.com/chriscoey/Hypatia.jl/blob/master/examples/doptimaldesign/JuMP.jl) examples for more information and references for this example.
+See our [D-optimal design](https://github.com/chriscoey/Hypatia.jl/blob/master/examples/doptimaldesign/JuMP.jl) example for more information and references.
 
 Many more examples using the native interface or JuMP can be found in the [examples folder](https://github.com/chriscoey/Hypatia.jl/tree/master/examples).
 
@@ -64,6 +62,7 @@ Many more examples using the native interface or JuMP can be found in the [examp
 Comments, questions, suggestions, and improvements/extensions to the code or documentation are welcomed.
 Please reach out on [Discourse](https://discourse.julialang.org/c/domain/opt), or submit an issue or contribute a PR on our [Github repo](https://github.com/chriscoey/Hypatia.jl).
 If contributing code, try to maintain consistent style and add docstrings or comments for clarity.
+New examples are welcomed and should be implemented similarly to the [existing examples](https://github.com/chriscoey/Hypatia.jl/tree/master/examples).
 
 ### Acknowledgements
 

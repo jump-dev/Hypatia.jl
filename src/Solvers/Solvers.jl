@@ -57,6 +57,11 @@ abstract type Stepper{T <: Real} end
 
 abstract type SystemSolver{T <: Real} end
 
+"""
+$(TYPEDEF)
+
+Hypatia's interior point solver type. See source for options and defaults.
+"""
 mutable struct Solver{T <: Real}
     # main options
     verbose::Bool

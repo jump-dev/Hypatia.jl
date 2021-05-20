@@ -1,15 +1,15 @@
 #=
-see description in examples/envelope/native.jl
+see description in examples/polyenvelope/native.jl
 =#
 
-struct EnvelopeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
+struct PolyEnvelopeJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
     rand_halfdeg::Int
     num_polys::Int
     env_halfdeg::Int
 end
 
-function build(inst::EnvelopeJuMP{T}) where {T <: Float64}
+function build(inst::PolyEnvelopeJuMP{T}) where {T <: Float64}
     n = inst.n
     @assert inst.rand_halfdeg <= inst.env_halfdeg
     domain = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n))

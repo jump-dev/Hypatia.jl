@@ -260,11 +260,7 @@ end
 
 # Kronecker utilities
 
-"""
-$(SIGNATURES)
-
-Compute the real symmetric Kronecker product of a matrix in-place.
-"""
+# compute the real symmetric Kronecker product of a matrix in-place
 function symm_kron!(
     skr::AbstractMatrix{T},
     mat::AbstractMatrix{T},
@@ -305,11 +301,7 @@ function symm_kron!(
     return skr
 end
 
-"""
-$(SIGNATURES)
-
-Compute the complex Hermitian Kronecker product of a matrix in-place.
-"""
+# compute the complex Hermitian Kronecker product of a matrix in-place
 function symm_kron!(
     skr::AbstractMatrix{T},
     mat::AbstractMatrix{Complex{T}},
@@ -355,11 +347,7 @@ function symm_kron!(
     return skr
 end
 
-"""
-$(SIGNATURES)
-
-Compute an element of the real spectral Kronecker in-place.
-"""
+# compute an element of the real spectral Kronecker in-place
 function spectral_kron_element!(
     skr::AbstractMatrix{T},
     i::Int,
@@ -371,11 +359,7 @@ function spectral_kron_element!(
     return skr
 end
 
-"""
-$(SIGNATURES)
-
-Compute an element of the complex spectral Kronecker in-place.
-"""
+# compute an element of the complex spectral Kronecker in-place
 function spectral_kron_element!(
     skr::AbstractMatrix{T},
     i::Int,
