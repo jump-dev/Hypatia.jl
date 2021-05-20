@@ -47,7 +47,7 @@ end
 # helpers for symmetric outer product (upper triangle only)
 # B = alpha * A' * A + beta * B
 
-outer_prod(
+outer_prod!(
     A::Matrix{T},
     B::Matrix{T},
     alpha::Real,
@@ -55,7 +55,7 @@ outer_prod(
     ) where {T <: LinearAlgebra.BlasReal} =
     BLAS.syrk!('U', 'T', alpha, A, beta, B)
 
-outer_prod(
+outer_prod!(
     A::AbstractMatrix{Complex{T}},
     B::AbstractMatrix{Complex{T}},
     alpha::Real,
@@ -63,7 +63,7 @@ outer_prod(
     ) where {T <: LinearAlgebra.BlasReal} =
     BLAS.herk!('U', 'C', alpha, A, beta, B)
 
-outer_prod(
+outer_prod!(
     A::AbstractMatrix{R},
     B::AbstractMatrix{R},
     alpha::Real,

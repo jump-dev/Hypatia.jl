@@ -18,7 +18,7 @@ function build(inst::NearestPolyMatJuMP{T}) where {T <: Float64}
     @assert +(inst.use_wsos, inst.use_matrixwsos, inst.use_sdp) == 1
     U = binomial(n + 2 * halfdeg, n)
     L = binomial(n + halfdeg, n)
-    svec_dim = div(R * (R + 1), 2)
+    svec_dim = Cones.svec_length(R)
 
     domain = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n))
     (U, points, Ps, V, w) = PolyUtils.interpolate(domain, halfdeg,

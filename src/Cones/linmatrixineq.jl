@@ -54,7 +54,7 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
         end
         @assert side > 0
         # necessary to ensure linear independence of As (but not sufficient)
-        @assert div(side * (side + 1), 2) >= dim
+        @assert svec_length(side) >= dim
         @assert isposdef(first(As))
         cone = new{T}()
         cone.use_dual_barrier = use_dual

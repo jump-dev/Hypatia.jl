@@ -107,6 +107,7 @@ ex_type_T = ex_type{Float64}
 
 for inst_set in instance_sets, (step_name, stepper) in stepper_options
     if inst_set == "compile"
+        haskey(ex_insts, "various") || continue
         ex_insts["compile"] = ex_insts["various"]
     end
     haskey(ex_insts, inst_set) || continue

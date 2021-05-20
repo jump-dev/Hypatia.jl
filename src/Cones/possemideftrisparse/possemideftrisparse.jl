@@ -1,25 +1,25 @@
-#=
-svec-scaled sparse positive semidefinite matrix cone
-mat(w) PSD
+"""
+$(TYPEDEF)
 
-specified with ordered lists of row and column indices for elements in lower triangle
-must include all diagonal elements
-dual cone is cone of PSD-completable matrices with the given sparsity pattern
-real symmetric or complex Hermitian cases
-NOTE in complex Hermitian case, on-diagonal (real) elements have one slot in the vector and below diagonal (complex) elements have two consecutive slots in the vector, but row and column indices are not repeated
-=#
-
-# implementation type for sparse PSD factorizations etc
+An implementation type for the sparse positive semidefinite cone
+[`PosSemidefTriSparse`](@ref).
+"""
 abstract type PSDSparseImpl end
 
-# cache for implementation
+"""
+$(TYPEDEF)
+
+A cache for an implementation for the sparse positive semidefinite cone
+[`PosSemidefTriSparse`](@ref).
+"""
 abstract type PSDSparseCache{T <: Real, R <: RealOrComplex{T}} end
 
 """
 $(TYPEDEF)
 
 Real symmetric or complex Hermitian sparse positive semidefinite cone of side
-dimension `side` and sparse row and column indices `rows`, `cols` in svec format.
+dimension `side` and sparse lower triangle row and column indices `rows`, `cols`
+in svec format. Note all diagonal elements must be present.
 
     $(FUNCTIONNAME){T, R}(side::Int, rows::Vector{Int}, cols::Vector{Int}, use_dual::Bool = false)
 """

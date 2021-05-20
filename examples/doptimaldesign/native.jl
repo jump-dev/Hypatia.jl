@@ -55,7 +55,7 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
             end
             l += 1
         end
-        Cones.vec_to_svec!(G_detcone, rt2 = sqrt(T(2)))
+        Cones.scale_svec!(G_detcone, sqrt(T(2)))
         @assert l - 1 == dimvec
 
         if inst.logdet_obj
@@ -180,7 +180,7 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
             G_psd[l, p + diag_idx(i)] = -1
             l += 1
         end
-        Cones.vec_to_svec!(G_psd, rt2 = sqrt(T(2)))
+        Cones.scale_svec!(G_psd, sqrt(T(2)))
 
         h_psd = zeros(T, dimvec)
         push!(cones, Cones.PosSemidefTri{T, T}(dimvec))

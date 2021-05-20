@@ -40,13 +40,13 @@ function build(inst::SemidefinitePolyJuMP{T}) where {T <: Float64}
         mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{T}(
             side, U, Ps, inst.use_dual)
 
-        rt2 = sqrt(2)
+        rt2 = sqrt(T(2))
         H_svec = [H[i, j](pts[u, :]) for i in 1:side for j in 1:i for u in 1:U]
-        Cones.vec_to_svec!(H_svec, rt2 = rt2, incr = U)
+        Cones.scale_svec!(H_svec, rt2, incr = U)
         if inst.use_dual
             JuMP.@variable(model, z[i in 1:side, 1:i, 1:U])
             z_svec = [1.0 * z[i, j, u] for i in 1:side for j in 1:i for u in 1:U]
-            Cones.vec_to_svec!(z_svec, rt2 = rt2, incr = U)
+            Cones.scale_svec!(z_svec, rt2, incr = U)
             JuMP.@constraint(model, z_svec in mat_wsos_cone)
             JuMP.@objective(model, Min, dot(z_svec, H_svec))
         else

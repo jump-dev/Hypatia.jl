@@ -597,8 +597,7 @@ function possemideftrisparse3(T; options...)
             R = (is_complex ? Complex{T} : T)
             rand_mat_L = tril!(sprand(R, side, side, inv(sqrt(side))) + I)
             (row_idxs, col_idxs, vals) = findnz(rand_mat_L)
-            dim = (is_complex ? side + 2 *
-                (length(row_idxs) - side) : length(row_idxs))
+            dim = (is_complex ? (2 * length(row_idxs) - side) : length(row_idxs))
             c = zeros(T, dim)
             A = zeros(T, 1, dim)
             idx = 1
@@ -1056,10 +1055,8 @@ function epinormspectral1(T; options...)
     Random.seed!(1)
     (Xn, Xm) = (3, 4)
     for is_complex in (false, true)
-        dim = Xn * Xm
-        if is_complex
-            dim *= 2
-        end
+        R = (is_complex ? Complex{T} : T)
+        dim = Cones.vec_length(R, Xn * Xm)
         c = vcat(one(T), zeros(T, dim))
         A = hcat(zeros(T, dim, 1), Matrix{T}(I, dim, dim))
         b = rand(T, dim)
@@ -1067,7 +1064,6 @@ function epinormspectral1(T; options...)
         h = vcat(zero(T), rand(T, dim))
 
         for use_dual in (false, true)
-            R = (is_complex ? Complex{T} : T)
             cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm,
                 use_dual = use_dual)]
 
@@ -1075,10 +1071,10 @@ function epinormspectral1(T; options...)
             @test r.status == Solvers.Optimal
 
             S = zeros(R, Xn, Xm)
-            @views Cones.vec_copy_to!(S, r.s[2:end])
+            @views Cones.vec_copyto!(S, r.s[2:end])
             prim_svdvals = svdvals(S)
             Z = zero(S)
-            @views Cones.vec_copy_to!(Z, r.z[2:end])
+            @views Cones.vec_copyto!(Z, r.z[2:end])
             dual_svdvals = svdvals(Z)
             if use_dual
                 @test sum(prim_svdvals) ≈ r.s[1] atol=tol rtol=tol
@@ -1097,13 +1093,10 @@ function epinormspectral2(T; options...)
     (Xn, Xm) = (3, 4)
     for is_complex in (false, true)
         R = (is_complex ? Complex{T} : T)
-        dim = Xn * Xm
-        if is_complex
-            dim *= 2
-        end
+        dim = Cones.vec_length(R, Xn * Xm)
         mat = rand(R, Xn, Xm)
         c = zeros(T, dim)
-        Cones.vec_copy_to!(c, mat)
+        Cones.vec_copyto!(c, mat)
         c .*= -1
         A = zeros(T, 0, dim)
         b = T[]
@@ -1127,10 +1120,8 @@ end
 function epinormspectral3(T; options...)
     tol = test_tol(T)
     for is_complex in (false, true), (Xn, Xm) in ((1, 1), (1, 3), (2, 2), (3, 4))
-        dim = Xn * Xm
-        if is_complex
-            dim *= 2
-        end
+        R = (is_complex ? Complex{T} : T)
+        dim = Cones.vec_length(R, Xn * Xm)
         c = fill(-one(T), dim)
         A = zeros(T, 0, dim)
         b = T[]
@@ -1138,7 +1129,6 @@ function epinormspectral3(T; options...)
         h = zeros(T, dim + 1)
 
         for use_dual in (false, true)
-            R = (is_complex ? Complex{T} : T)
             cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm,
                 use_dual = use_dual)]
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
@@ -1184,8 +1174,8 @@ function matrixepipersquare1(T; options...)
     Random.seed!(1)
     for is_complex in (false, true), (Xn, Xm) in [(1, 1), (1, 3), (2, 2), (2, 3)]
         R = (is_complex ? Complex{T} : T)
-        per_idx = (is_complex ? Xn ^ 2 + 1 : Cones.svec_length(Xn) + 1)
-        dim = per_idx + (is_complex ? 2 : 1) * Xn * Xm
+        per_idx = 1 + Cones.svec_length(R, Xn)
+        dim = per_idx + Cones.vec_length(R, Xn * Xm)
         c = T[1]
         A = zeros(T, 0, 1)
         b = T[]
@@ -1195,7 +1185,7 @@ function matrixepipersquare1(T; options...)
         @views Cones.smat_to_svec!(h[1:(per_idx - 1)],
             Matrix{R}(I, Xn, Xn), sqrt(T(2)))
         W = rand(R, Xn, Xm)
-        @views Cones.vec_copy_to!(h[(per_idx + 1):end], W)
+        @views Cones.vec_copyto!(h[(per_idx + 1):end], W)
         WWt = Hermitian(W * W')
         dual_epi = tr(WWt) / 2
         primal_epi = svdvals(WWt)[1] / 2
@@ -1225,8 +1215,8 @@ function matrixepipersquare2(T; options...)
     (Xn, Xm) = (2, 3)
     for is_complex in (false, true)
         R = (is_complex ? Complex{T} : T)
-        per_idx = (is_complex ? Xn ^ 2 + 1 : Cones.svec_length(Xn) + 1)
-        dim = per_idx + (is_complex ? 2 : 1) * Xn * Xm
+        per_idx = 1 + Cones.svec_length(R, Xn)
+        dim = per_idx + Cones.vec_length(R, Xn * Xm)
         c = T[1]
         A = zeros(T, 0, 1)
         b = T[]
@@ -1237,7 +1227,7 @@ function matrixepipersquare2(T; options...)
         U = Hermitian(U_half * U_half')
         @views Cones.smat_to_svec!(h[1:(per_idx - 1)], U.data, sqrt(T(2)))
         W = rand(R, Xn, Xm)
-        @views Cones.vec_copy_to!(h[(per_idx + 1):end], W)
+        @views Cones.vec_copyto!(h[(per_idx + 1):end], W)
 
         for use_dual in (false, true)
             cones = Cone{T}[Cones.MatrixEpiPerSquare{T, R}(Xn, Xm,
@@ -1261,8 +1251,8 @@ function matrixepipersquare3(T; options...)
     (Xn, Xm) = (3, 4)
     for is_complex in (false, true)
         R = (is_complex ? Complex{T} : T)
-        per_idx = (is_complex ? Xn ^ 2 + 1 : Cones.svec_length(Xn) + 1)
-        W_dim = (is_complex ? 2 : 1) * Xn * Xm
+        per_idx = 1 + Cones.svec_length(R, Xn)
+        W_dim = Cones.vec_length(R, Xn * Xm)
         dim = per_idx + W_dim
         c = ones(T, W_dim)
         A = zeros(T, 0, W_dim)
@@ -1597,8 +1587,8 @@ function hyporootdettri1(T; options...)
     Random.seed!(1)
     side = 3
     for is_complex in (false, true)
-        dim = (is_complex ? 1 + side^2 : 1 + Cones.svec_length(side))
         R = (is_complex ? Complex{T} : T)
+        dim = 1 + Cones.svec_length(R, side)
         c = T[-1]
         A = zeros(T, 0, 1)
         b = T[]
@@ -1628,8 +1618,8 @@ function hyporootdettri2(T; options...)
     Random.seed!(1)
     side = 4
     for is_complex in (false, true)
-        dim = (is_complex ? 1 + side^2 : 1 + Cones.svec_length(side))
         R = (is_complex ? Complex{T} : T)
+        dim = 1 + Cones.svec_length(R, side)
         c = T[1]
         A = zeros(T, 0, 1)
         b = T[]
@@ -1660,8 +1650,8 @@ function hyporootdettri3(T; options...)
     Random.seed!(1)
     side = 3
     for is_complex in (false, true)
-        dim = (is_complex ? 1 + side^2 : 1 + Cones.svec_length(side))
         R = (is_complex ? Complex{T} : T)
+        dim = 1 + Cones.svec_length(R, side)
         c = T[-1]
         A = zeros(T, 0, 1)
         b = T[]
@@ -1825,8 +1815,8 @@ function hypoperlogdettri1(T; options...)
     Random.seed!(1)
     side = 4
     for is_complex in (false, true)
-        dim = (is_complex ? 2 + side^2 : 2 + Cones.svec_length(side))
         R = (is_complex ? Complex{T} : T)
+        dim = 2 + Cones.svec_length(R, side)
         c = T[-1, 0]
         A = T[0 1]
         b = T[1]
@@ -1857,8 +1847,8 @@ function hypoperlogdettri2(T; options...)
     Random.seed!(1)
     side = 2
     for is_complex in (false, true)
-        dim = (is_complex ? 2 + side^2 : 2 + Cones.svec_length(side))
         R = (is_complex ? Complex{T} : T)
+        dim = 2 + Cones.svec_length(R, side)
         c = T[0, 1]
         A = T[1 0]
         b = T[-1]
@@ -1889,8 +1879,8 @@ function hypoperlogdettri3(T; options...)
     Random.seed!(1)
     side = 3
     for is_complex in (false, true)
-        dim = (is_complex ? 2 + side^2 : 2 + Cones.svec_length(side))
         R = (is_complex ? Complex{T} : T)
+        dim = 2 + Cones.svec_length(R, side)
         c = T[-1, 0]
         A = T[0 1]
         b = T[0]
@@ -2037,15 +2027,15 @@ function epipersepspectral_matrix1(T; options...)
     rt2 = sqrt(T(2))
     for d in [1, 3], is_complex in [false, true]
         R = (is_complex ? Complex{T} : T)
-        cone_dim = 2 + (is_complex ? d^2 : Cones.svec_length(d))
+        dim = 2 + Cones.svec_length(R, d)
         W = rand(R, d, d)
         W = W * W' + I
         c = T[1]
         A = zeros(T, 0, 1)
         b = T[]
-        G = zeros(T, cone_dim, 1)
+        G = zeros(T, dim, 1)
         G[1, 1] = -1
-        h = zeros(T, cone_dim)
+        h = zeros(T, dim)
         h[2] = 1
         @views Cones.smat_to_svec!(h[3:end], W, rt2)
 
@@ -2067,13 +2057,13 @@ function epipersepspectral_matrix2(T; options...)
     rt2 = sqrt(T(2))
     for d in [1, 3], is_complex in [false, true]
         R = (is_complex ? Complex{T} : T)
-        cone_dim = 2 + (is_complex ? d^2 : Cones.svec_length(d))
+        dim = 2 + Cones.svec_length(R, d)
         c = T[1]
         A = zeros(T, 0, 1)
         b = T[]
-        G = zeros(T, cone_dim, 1)
+        G = zeros(T, dim, 1)
         G[2, 1] = -1
-        h = zeros(T, cone_dim)
+        h = zeros(T, dim)
         h[1] = 1
 
         for h_fun in sep_spectral_funs
@@ -2099,14 +2089,14 @@ function epipersepspectral_matrix3(T; options...)
     rt2 = sqrt(T(2))
     for d in [2, 4], is_complex in [false, true]
         R = (is_complex ? Complex{T} : T)
-        cone_dim = 2 + (is_complex ? d^2 : Cones.svec_length(d))
-        c = zeros(T, cone_dim)
+        dim = 2 + Cones.svec_length(R, d)
+        c = zeros(T, dim)
         c[1] = 1
-        A = zeros(T, 1, cone_dim)
+        A = zeros(T, 1, dim)
         A[1, 2] = 1
         b = zeros(T, 1)
-        G = Matrix{T}(-I, cone_dim, cone_dim)
-        h = zeros(T, cone_dim)
+        G = Matrix{T}(-I, dim, dim)
+        h = zeros(T, dim)
 
         for h_fun in sep_spectral_funs
             cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}, T}(
@@ -2228,7 +2218,7 @@ function epitrrelentropytri1(T; options...)
     rt2 = sqrt(T(2))
     side = 4
     svec_dim = Cones.svec_length(side)
-    cone_dim = 2 * svec_dim + 1
+    dim = 2 * svec_dim + 1
     c = T[1]
     A = zeros(T, 0, 1)
     b = T[]
@@ -2238,9 +2228,9 @@ function epitrrelentropytri1(T; options...)
     V = V * V'
     h = vcat(zero(T), Cones.smat_to_svec!(zeros(T, svec_dim), V, rt2),
         Cones.smat_to_svec!(zeros(T, svec_dim), W, rt2))
-    G = zeros(T, cone_dim, 1)
+    G = zeros(T, dim, 1)
     G[1, 1] = -1
-    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(cone_dim)]
+    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
@@ -2252,15 +2242,15 @@ function epitrrelentropytri2(T; options...)
     rt2 = sqrt(T(2))
     side = 3
     svec_dim = Cones.svec_length(side)
-    cone_dim = 2 * svec_dim + 1
+    dim = 2 * svec_dim + 1
     c = vcat(zeros(T, svec_dim), -ones(T, svec_dim))
     A = Matrix{T}(I, svec_dim, 2 * svec_dim)
     b = zeros(T, svec_dim)
     b[[sum(1:i) for i in 1:side]] .= 1
     h = vcat(T(5), zeros(T, 2 * svec_dim))
-    g_svec = Cones.vec_to_svec!(-ones(T, svec_dim))
+    g_svec = Cones.scale_svec!(-ones(T, svec_dim), sqrt(T(2)))
     G = vcat(zeros(T, 2 * svec_dim)', Diagonal(vcat(g_svec, g_svec)))
-    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(cone_dim)]
+    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
@@ -2274,13 +2264,13 @@ function epitrrelentropytri3(T; options...)
     rt2 = sqrt(T(2))
     side = 3
     svec_dim = Cones.svec_length(side)
-    cone_dim = 2 * svec_dim + 1
+    dim = 2 * svec_dim + 1
     c = vcat(zeros(T, svec_dim + 1), ones(T, svec_dim))
     A = hcat(one(T), zeros(T, 1, 2 * svec_dim))
     b = [zero(T)]
-    h = zeros(T, cone_dim)
-    G = Diagonal(-one(T) * I, cone_dim)
-    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(cone_dim)]
+    h = zeros(T, dim)
+    G = Diagonal(-one(T) * I, dim)
+    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
@@ -2294,18 +2284,18 @@ function epitrrelentropytri4(T; options...)
     rt2 = sqrt(T(2))
     side = 3
     svec_dim = Cones.svec_length(side)
-    cone_dim = 2 * svec_dim + 1
+    dim = 2 * svec_dim + 1
     c = vcat(zero(T), ones(T, svec_dim), zeros(T, svec_dim))
     A = hcat(one(T), zeros(T, 1, 2 * svec_dim))
     b = [zero(T)]
-    h = zeros(T, cone_dim)
-    G = Diagonal(-one(T) * I, cone_dim)
-    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(cone_dim)]
+    h = zeros(T, dim)
+    G = Diagonal(-one(T) * I, dim)
+    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
     @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
-    @test r.s ≈ zeros(T, cone_dim) atol=tol rtol=tol
+    @test r.s ≈ zeros(T, dim) atol=tol rtol=tol
 end
 
 function wsosinterpnonnegative1(T; options...)
@@ -2442,7 +2432,7 @@ function wsosinterppossemideftri2(T; options...)
     b = T[]
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
     h = T[H[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
-    Cones.vec_to_svec!(h, incr = U)
+    Cones.scale_svec!(h, sqrt(T(2)), incr = U)
     cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
@@ -2466,7 +2456,7 @@ function wsosinterppossemideftri3(T; options...)
     b = T[]
     h = T[M[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
     G = zeros(T, length(h), 0)
-    Cones.vec_to_svec!(h, incr = U)
+    Cones.scale_svec!(h, sqrt(T(2)), incr = U)
     cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)

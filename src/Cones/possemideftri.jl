@@ -33,21 +33,15 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_mat::Matrix{R}
     fact_mat::Cholesky{R}
 
-    function PosSemidefTri{T, R}(dim::Int) where {R <: RealOrComplex{T}} where {T <: Real}
+    function PosSemidefTri{T, R}(
+        dim::Int,
+        ) where {R <: RealOrComplex{T}} where {T <: Real}
         @assert dim >= 1
         cone = new{T, R}()
-        cone.dim = dim # real vector dimension
+        cone.dim = dim
         cone.rt2 = sqrt(T(2))
-        if R <: Complex
-            side = isqrt(dim) # real lower triangle and imaginary under diagonal
-            @assert side^2 == dim
-            cone.is_complex = true
-        else
-            side = round(Int, sqrt(0.25 + 2 * dim) - 0.5) # real lower triangle
-            @assert side * (side + 1) == 2 * dim
-            cone.is_complex = false
-        end
-        cone.side = side
+        cone.is_complex = (R <: Complex)
+        cone.side = svec_side(R, dim)
         return cone
     end
 end

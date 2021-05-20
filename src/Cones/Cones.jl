@@ -22,10 +22,15 @@ import Hypatia.sqrt_prod
 import Hypatia.inv_sqrt_prod
 import Hypatia.invert
 import Hypatia.increase_diag!
-import Hypatia.outer_prod
+import Hypatia.outer_prod!
 
 include("arrayutilities.jl")
 
+"""
+$(TYPEDEF)
+
+A proper cone.
+"""
 abstract type Cone{T <: Real} end
 
 include("nonnegative.jl")

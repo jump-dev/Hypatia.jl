@@ -21,7 +21,7 @@ function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     p0 = randn(T, d, d)
     p0 = p0 * p0' + I / 2
     p0 ./= tr(p0)
-    vec_dim = div(d * (d + 1), 2)
+    vec_dim = Cones.svec_length(d)
     p0_vec = zeros(T, vec_dim)
     Cones.smat_to_svec!(p0_vec, p0, sqrt(T(2)))
 

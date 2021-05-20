@@ -3,10 +3,10 @@ utilities for real polynomial interpolation
 =#
 
 """
-$(TYPEDSIGNATURES)
+$(SIGNATURES)
 
-Compute interpolation data for a weighted sum-of-squares conic constraint on a
-domain.
+Compute interpolation data for a real weighted sum-of-squares conic constraint
+on a domain.
 """
 function interpolate(
     dom::Domain{T},

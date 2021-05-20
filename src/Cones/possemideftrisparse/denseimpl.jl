@@ -1,10 +1,9 @@
-#=
-dense-Cholesky-based implementation
+"""
+$(TYPEDEF)
 
-NOTE currently we do not restrict the sparsity pattern to be chordal here (at the
-cost of not being able to obtain "closed form" hess sqrt and inv hess oracles)
-=#
-
+Dense Cholesky-based implementation for the sparse positive semidefinite
+cone [`PosSemidefTriSparse`](@ref).
+"""
 struct PSDSparseDense <: PSDSparseImpl end
 
 mutable struct PSDSparseDenseCache{T <: Real, R <: RealOrComplex{T}} <:
@@ -181,6 +180,7 @@ function outer_prod_vec_sparse!(
     mat::AbstractMatrix{T},
     cone::PosSemidefTriSparse{PSDSparseDense, T, T},
     ) where {T <: Real}
+    @assert length(vec) == length(cone.row_idxs)
     @inbounds for (idx, (i, j)) in enumerate(zip(cone.row_idxs, cone.col_idxs))
         @views x = dot(mat[:, i], mat[:, j])
         if i != j
@@ -209,6 +209,7 @@ function outer_prod_vec_sparse!(
             idx += 2
         end
     end
+    @assert idx == length(vec) + 1
     return vec
 end
 
@@ -217,6 +218,7 @@ function svec_to_smat_sparse!(
     vec::AbstractVector{T},
     cone::PosSemidefTriSparse{PSDSparseDense, T, T},
     ) where {T <: Real}
+    @assert length(vec) == length(cone.row_idxs)
     fill!(mat, 0)
     @inbounds for (idx, (i, j)) in enumerate(zip(cone.row_idxs, cone.col_idxs))
         x = vec[idx]
@@ -244,6 +246,7 @@ function svec_to_smat_sparse!(
             idx += 2
         end
     end
+    @assert idx == length(vec) + 1
     return mat
 end
 
@@ -252,6 +255,7 @@ function smat_to_svec_sparse!(
     mat::AbstractMatrix{T},
     cone::PosSemidefTriSparse{PSDSparseDense, T, T},
     ) where {T <: Real}
+    @assert length(vec) == length(cone.row_idxs)
     fill!(vec, 0)
     @inbounds for (idx, (i, j)) in enumerate(zip(cone.row_idxs, cone.col_idxs))
         x = mat[i, j]
@@ -282,5 +286,6 @@ function smat_to_svec_sparse!(
             idx += 2
         end
     end
+    @assert idx == length(vec) + 1
     return vec
 end

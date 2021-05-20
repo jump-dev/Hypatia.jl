@@ -33,12 +33,11 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Min, epi)
 
-    vec_dim = div(q * (q + 1), 2)
+    vec_dim = Cones.svec_length(q)
     Q = V * diagm(x) * V' # information matrix
     Q_vec = zeros(JuMP.AffExpr, vec_dim)
     Cones.smat_to_svec!(Q_vec, Q, sqrt(T(2)))
-    f_cone = Hypatia.EpiPerSepSpectralCone{T}(inst.ssf,
-        Cones.MatrixCSqr{T, T}, q)
+    f_cone = Hypatia.EpiPerSepSpectralCone{T}(inst.ssf, Cones.MatrixCSqr{T, T}, q)
     JuMP.@constraint(model, vcat(epi, 1, Q_vec) in f_cone)
 
     return model
