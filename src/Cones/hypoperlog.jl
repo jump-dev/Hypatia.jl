@@ -26,6 +26,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
 
+    α::T
     ϕ::T
     ζ::T
     σ::T
@@ -119,8 +120,7 @@ function update_grad(cone::HypoPerLog)
 
     g[1] = inv(ζ)
     g[2] = -cone.σ / ζ - inv(v)
-    ζvζi = -(ζ + v) / ζ
-    @inbounds @. @views g[3:end] = ζvζi / w
+    @inbounds @. @views g[3:end] = -(ζ + v) / ζ / w
 
     cone.grad_updated = true
     return cone.grad
@@ -184,12 +184,11 @@ function hess_prod!(
         p = arr[1, j]
         q = arr[2, j]
         @. @views r = arr[3:end, j]
-        @views prod_w = prod[3:end, j]
 
         @. r /= w
         c0 = sum(r)
-        ∇ϕrζi = v * c0 / ζ
-        c1 = ((-p + σ * q) / ζ + ∇ϕrζi) / ζ
+        # ∇ϕ[r] = v * c0
+        c1 = (v * c0 - p + σ * q) / ζ / ζ
         c2 = (q * d / v - c0) / ζ
         @. r /= w
         prod[1, j] = -c1
@@ -218,6 +217,8 @@ function update_inv_hess_aux(cone::HypoPerLog)
     cone.c0 = c0
     cone.c4 = c4
     cone.Hiuu = Hiuu
+    # α is a scaling of w
+    cone.α = v * ζ / ζv
 
     cone.inv_hess_aux_updated = true
     return
@@ -231,8 +232,6 @@ function update_inv_hess(cone::HypoPerLog)
     ζ = cone.ζ
     ζv = ζ + v
     ζζv = ζ / ζv
-    wζvi = cone.tempw1
-    @. wζvi = w / ζv
     c0 = cone.c0
     c4 = cone.c4
     Hi[1, 1] = cone.Hiuu
@@ -241,9 +240,8 @@ function update_inv_hess(cone::HypoPerLog)
 
     γ_vec = cone.tempw1
     @. γ_vec = w / ζv
-    α_const = v * ζζv
     @inbounds @views begin
-        @. Hi[1, 3:end] = (α_const + c0 * c4 / ζv) * w
+        @. Hi[1, 3:end] = (cone.α + c0 * c4 / ζv) * w
         @. Hi[2, 3:end] = c4 * w / ζv
         mul!(Hi[3:end, 3:end], γ_vec, γ_vec', c4, true)
         for j in eachindex(w)
@@ -269,18 +267,17 @@ function inv_hess_prod!(
     ζi = inv(ζ)
     c0 = cone.c0
     c4 = cone.c4
-    α_const = v / (v * ζi + 1)
+    α = cone.α
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
         q = arr[2, j]
         @views r = arr[3:end, j]
-        @views prod_w = prod[3:end, j]
         rw_const = dot(r, w)
         qγr = q + rw_const / ζv
         cv = c4 * (c0 * p + qγr)
-        prod[1, j] = cone.Hiuu * p + c4 * c0 * qγr + rw_const * α_const
+        prod[1, j] = cone.Hiuu * p + c4 * c0 * qγr + rw_const * α
         prod[2, j] = cv
-        @. @views prod[3:end, j] = (p * α_const + cv / ζv) * w + w * r * w * ζ / ζv
+        @. @views prod[3:end, j] = (p * α + cv / ζv) * w + w * r * w * ζ / ζv
     end
 
     return prod

@@ -36,6 +36,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     mat4::Matrix{R}
     mat5::Matrix{R}
     fact_W
+    α::T
     ϕ::T
     σ::T
     ζ::T
@@ -206,11 +207,11 @@ function update_hess(cone::HypoPerLogdetTri)
 
     @inbounds begin
         # Huw
-        H13const = -v / ζ / ζ
+        H13const = -v * ζi2
         @. @views H[1, 3:end] = H13const * Wi_vec
 
         # Hvw
-        H23const = ((cone.ϕ - d) * v / ζ - 1) / ζ
+        H23const = (σ * v / ζ - 1) / ζ
         @. @views H[2, 3:end] = H23const * Wi_vec
     end
 
@@ -247,8 +248,8 @@ function hess_prod!(
         @views r_X = svec_to_smat!(cone.mat2, arr[3:end, j], cone.rt2)
 
         c0 = dot(Wi, Hermitian(r_X, :U))
-        ∇ϕr = c0 * v
-        c1 = ζi * (-p + σ * q + ∇ϕr) * ζi
+        # ∇ϕr = c0 * v
+        c1 = ζi * (c0 * v - p + σ * q) * ζi
         c2 = (q * cone.d / v - c0) / ζ
 
         copytri!(r_X, 'U', true)
@@ -287,6 +288,8 @@ function update_inv_hess_aux(cone::HypoPerLogdetTri)
     cone.c0 = c0
     cone.c4 = c4
     cone.Hiuu = Hiuu
+    # α is a scaling of w
+    cone.α = v * ζ / ζv
 
     cone.inv_hess_aux_updated = true
     return
@@ -310,9 +313,8 @@ function update_inv_hess(cone::HypoPerLogdetTri)
     Hi[1, 1] = cone.Hiuu
     Hi[1, 2] = c0 * c4
     Hi[2, 2] = c4
-    α_const = v * ζζv
     @inbounds @views begin
-        @. Hi[1, 3:end] = (α_const + c0 * c4 / ζv) * w
+        @. Hi[1, 3:end] = (cone.α + c0 * c4 / ζv) * w
         @. Hi[2, 3:end] = c4 * w / ζv
         symm_kron!(Hi[3:end, 3:end], W, cone.rt2)
         @. Hi[3:end, 3:end] *= ζζv
@@ -336,24 +338,24 @@ function inv_hess_prod!(
     ζi = cone.ζi
     c0 = cone.c0
     c4 = cone.c4
-    α_const = v / (v * ζi + 1)
+    α = cone.α
     w_aux = cone.mat3
     w_prod = cone.mat4
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
         q = arr[2, j]
         @views r = arr[3:end, j]
-        @views R = svec_to_smat!(cone.mat4, arr[3:end, j], cone.rt2)
-        copytri!(R, 'U', true)
+        @views r_X = svec_to_smat!(cone.mat4, arr[3:end, j], cone.rt2)
+        copytri!(r_X, 'U', true)
         @views prod_w = prod[3:end, j]
-        rw_const = dot(Hermitian(R, :U), W)
+        rw_const = dot(Hermitian(r_X, :U), W)
         qγr = q + rw_const / ζv
         cv = c4 * (c0 * p + qγr)
-        prod[1, j] = cone.Hiuu * p + c4 * c0 * qγr + rw_const * α_const
+        prod[1, j] = cone.Hiuu * p + c4 * c0 * qγr + rw_const * α
         prod[2, j] = cv
-        mul!(w_aux, W, R)
+        mul!(w_aux, W, r_X)
         mul!(w_prod, w_aux, W, ζ / ζv, false)
-        @. w_prod += (p * α_const + cv / ζv) * W
+        @. w_prod += (p * α + cv / ζv) * W
         @views smat_to_svec!(prod[3:end, j], w_prod, cone.rt2)
     end
 
@@ -380,8 +382,8 @@ function dder3(cone::HypoPerLogdetTri, dir::AbstractVector)
 
     r_X = copytri!(svec_to_smat!(cone.mat3, r, cone.rt2), 'U', true)
     c0 = dot(Wi, Hermitian(r_X, :U))
-    ∇ϕr = c0 * v
-    χ = -p + σ * q + ∇ϕr
+    # ∇ϕr = c0 * v
+    χ = c0 * v - p + σ * q
 
     rwi = rdiv!(r_X, cone.fact_W)
     rwi_sqr = real(dot(rwi, rwi'))
