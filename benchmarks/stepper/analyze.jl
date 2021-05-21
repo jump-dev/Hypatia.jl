@@ -79,13 +79,17 @@ function extra_stats(all_df)
     CSV.write(joinpath(csv_dir, "basicbackconv.csv"),
         select(two_solver_conv, :solve_time, :improvement))
 
-    # only used to get list of cones manually
-    ex_df = combine(groupby(basic_df, :example),
-        :cone_types => (x -> union(eval.(Meta.parse.(x)))) => :cones,
-        :cone_types => length => :num_instances,
-        )
-
-    CSV.write(joinpath(stats_dir, "examplestats.csv"), ex_df)
+    # update examplestats.csv with unique cones and instance count for each example
+    exstats = open(joinpath(stats_dir, "examplestats.csv"), "w")
+    println(exstats, "example,num_instances,cones")
+    for g in groupby(basic_df, :example, sort = true)
+        ex = first(g).example
+        n = nrow(g)
+        cone_lists = [eval(Meta.parse.(x)) for x in g[!, :cone_types]]
+        cones = unique(vcat(cone_lists...))
+        println(exstats, "$ex,$n,$cones")
+    end
+    close(exstats)
 
     # count instances with non-default solver options
     nondef = filter!(!ismissing, basic_df[!, :nondefaults])
@@ -221,7 +225,7 @@ function make_agg_tables(all_df)
 
     sort!(df_agg, order(:enhancement, by = (x ->
         findfirst(isequal(x), lowercase.(enhancements)))))
-    CSV.write(joinpath(stats_dir, "agg" * ".csv"), df_agg)
+    CSV.write(joinpath(stats_dir, "agg.csv"), df_agg)
 
     # combine feasible and infeasible statuses
     transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] =>
@@ -231,7 +235,7 @@ function make_agg_tables(all_df)
         :iters_geomean_all, :time_geomean_thisconv, :time_geomean_everyconv,
         :time_geomean_all]
     sep = " & "
-    tex = open(joinpath(tex_dir, "agg" * ".tex"), "w")
+    tex = open(joinpath(tex_dir, "agg.tex"), "w")
 
     for i in 1:length(enhancements)
         row_str = enhancements[i]
