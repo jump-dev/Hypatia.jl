@@ -1,3 +1,8 @@
+#=
+run natvsext benchmarks
+see natvsext/README.md
+=#
+
 using Hypatia
 using MosekTools
 include(joinpath(@__DIR__, "../spawn.jl"))

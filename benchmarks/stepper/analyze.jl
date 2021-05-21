@@ -1,3 +1,8 @@
+#=
+analyze stepper benchmark results
+see stepper/README.md
+=#
+
 using CSV
 using DataFrames
 using Printf
@@ -5,7 +10,13 @@ import BenchmarkProfiles
 
 keep_set = "various"
 
-enhancements = ["basic", "TOA", "curve", "comb", "back"]
+enhancements = [
+    "basic",
+    "TOA",
+    "curve",
+    "comb",
+    "back",
+    ]
 
 compare_pairs = [
     ["basic", "toa"],
@@ -29,17 +40,17 @@ csv_dir = mkpath(joinpath(output_dir, "csvs"))
 # get extra info about runs; uses hardcoded enhancement names
 function extra_stats(all_df)
     all_df = transform(all_df, [:n, :p, :q] => ((x, y, z) -> x .+ y .+ z) => :npq)
-    basic_solver = filter(t -> t.enhancement == "basic", all_df)
+    basic_df = filter(t -> (t.enhancement == "basic"), all_df)
 
     # get stats from basic
-    CSV.write(joinpath(csv_dir, "basic.csv"), select(basic_solver,
+    CSV.write(joinpath(csv_dir, "basic.csv"), select(basic_df,
         :num_cones => ByRow(log10) => :log_numcones,
         :npq => ByRow(log10) => :log_npq,
         ),)
 
     # basic and converged
-    basic_solver_conv = filter(t -> t.conv, basic_solver)
-    CSV.write(joinpath(csv_dir, "basicconv.csv"), select(basic_solver_conv,
+    basic_df_conv = filter(t -> t.conv, basic_df)
+    CSV.write(joinpath(csv_dir, "basicconv.csv"), select(basic_df_conv,
         :iters,
         :solve_time,
         :solve_time => ByRow(log10) => :log_solve_time,
@@ -47,7 +58,7 @@ function extra_stats(all_df)
         ),)
 
     # back and converged
-    back_solver = filter(t -> t.enhancement == "back", all_df)
+    back_solver = filter(t -> (t.enhancement == "back"), all_df)
     back_solver_conv = filter(t -> t.conv, back_solver)
     CSV.write(joinpath(csv_dir, "backconv.csv"), select(back_solver_conv,
         :solve_time,
@@ -56,20 +67,20 @@ function extra_stats(all_df)
         ),)
 
     # basic and back where both converged
-    two_solver = filter(t -> t.enhancement in ("basic", "back"), all_df)
+    two_solver = filter(t -> (t.enhancement in ("basic", "back")), all_df)
     two_solver = combine(groupby(two_solver, :inst_key), names(all_df),
         :conv => all => :two_conv)
     two_solver_conv = filter(t -> t.two_conv, two_solver)
     two_solver_conv = combine(groupby(two_solver_conv, :inst_key),
         [:enhancement, :solve_time], :solve_time =>
         (x -> (x[1] - x[2]) / x[1]) => :improvement)
-    filter!(t -> t.enhancement == "basic", two_solver_conv)
+    filter!(t -> (t.enhancement == "basic"), two_solver_conv)
 
     CSV.write(joinpath(csv_dir, "basicbackconv.csv"),
         select(two_solver_conv, :solve_time, :improvement))
 
     # only used to get list of cones manually
-    ex_df = combine(groupby(basic_solver, :example),
+    ex_df = combine(groupby(basic_df, :example),
         :cone_types => (x -> union(eval.(Meta.parse.(x)))) => :cones,
         :cone_types => length => :num_instances,
         )
@@ -77,26 +88,16 @@ function extra_stats(all_df)
     CSV.write(joinpath(stats_dir, "examplestats.csv"), ex_df)
 
     # count instances with non-default solver options
-    examples_dir = "../../examples"
-    include(joinpath(examples_dir, "common.jl"))
-    count_nondefault = 0
-    for (m, l) in (("JuMP", 3), ("native", 2))
-        include(joinpath(examples_dir, "common_" * m * ".jl"))
-        m_df = filter(t -> (t.model_type == m), all_df)
-        for ex_name in unique(m_df[!, :example])
-            include(joinpath(examples_dir, ex_name, m * ".jl"))
-            (_, ex_insts) = include(joinpath(examples_dir, ex_name,
-                m * "_test.jl"))
-            for inst in ex_insts[keep_set]
-                if length(inst) >= l
-                    @assert length(inst) == l
-                    @assert inst[l] isa NamedTuple
-                    count_nondefault += 1
-                end
-            end
-        end
-    end
+    nondef = filter!(!ismissing, basic_df[!, :nondefaults])
+    count_nondefault = length(nondef)
     @info("$count_nondefault instances have non-default solver options")
+    if !iszero(count_nondefault)
+        @info("unique non-default solver options are:")
+        for nd in unique(nondef)
+            println(nd)
+        end
+        println()
+    end
 
     return
 end
@@ -370,7 +371,6 @@ function post_process()
         make_perf_profiles(all_df, comp, metric)
     end
     extra_stats(all_df)
-    println()
 
     return
 end

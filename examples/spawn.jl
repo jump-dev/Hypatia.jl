@@ -12,7 +12,12 @@ Base.eval(Distributed, :(function redirect_worker_output(ident, stream)
     end
 end))
 
-function spawn_step(fun::Function, fun_name::Symbol, time_limit::Real, worker::Int)
+function spawn_step(
+    fun::Function,
+    fun_name::Symbol,
+    time_limit::Real,
+    worker::Int,
+    )
     @assert nprocs() == 2
     status = :Success
     time_start = time()
@@ -76,7 +81,8 @@ function spawn_instance(
     solver::Tuple,
     solve::Bool;
     )
-    worker = addprocs(1, enable_threaded_blas = true, exeflags = `--threads $num_threads`)[1]
+    worker = addprocs(1, enable_threaded_blas = true,
+        exeflags = `--threads $num_threads`)[1]
     @assert nprocs() == 2
     println("loading files")
     @fetchfrom worker begin
@@ -92,7 +98,8 @@ function spawn_instance(
     original_stdout = stdout
     (out_rd, out_wr) = redirect_stdout() # don't print output
     @fetchfrom worker begin
-        run_instance(ex_type, compile_inst, extender, NamedTuple(), solver[2], default_options = solver[3], test = false)
+        run_instance(ex_type, compile_inst, extender, NamedTuple(), solver[2],
+            default_options = solver[3], test = false)
         flush(stdout); flush(stderr)
         return
     end
@@ -109,7 +116,8 @@ function spawn_instance(
         GC.gc()
         return model_stats
     end
-    setup_time = @elapsed (script_status, model_stats) = spawn_step(setup_fun, :SetupModel, setup_time_limit, worker)
+    setup_time = @elapsed (script_status, model_stats) =
+        spawn_step(setup_fun, :SetupModel, setup_time_limit, worker)
     setup_killed = (script_status != :Success)
     if setup_killed
         println("setup model failed: $script_status")
@@ -123,7 +131,8 @@ function spawn_instance(
             solve_stats = solve_check(model, test = false)
             return solve_stats
         end
-        check_time = @elapsed (script_status, solve_stats) = spawn_step(check_fun, :SolveCheck, check_time_limit, worker)
+        check_time = @elapsed (script_status, solve_stats) =
+            spawn_step(check_fun, :SolveCheck, check_time_limit, worker)
         check_killed = (script_status != :Success)
         check_killed && println("solve and check failed: $script_status")
     else
@@ -150,6 +159,7 @@ function spawn_instance(
     @assert nprocs() == 1
 
     script_status = string(script_status)
-    run_perf = (; model_stats..., solve_stats..., setup_time, check_time, script_status)
+    run_perf = (; model_stats..., solve_stats..., setup_time,
+        check_time, script_status)
     return (setup_killed, solver_hit_limit, run_perf)
 end

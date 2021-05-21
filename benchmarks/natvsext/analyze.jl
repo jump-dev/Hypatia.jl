@@ -1,3 +1,8 @@
+#=
+analyze natvsext benchmark results
+see natvsext/README.md
+=#
+
 using Printf
 using CSV
 using DataFrames

@@ -10,7 +10,6 @@ TODO
 - implement PSD formulation for complex case
 =#
 
-import Combinatorics
 include(joinpath(@__DIR__, "data_real.jl"))
 include(joinpath(@__DIR__, "data_complex.jl"))
 

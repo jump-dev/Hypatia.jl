@@ -2,12 +2,10 @@
 run examples tests from the examples folder
 =#
 
-examples_dir = joinpath(@__DIR__, "../examples")
-include(joinpath(@__DIR__, "../benchmarks/setup.jl"))
-
-# path to write results DataFrame to CSV, if any
-# results_path = joinpath(homedir(), "bench", "bench.csv")
-results_path = nothing
+using Test
+import DataFrames
+include(joinpath(@__DIR__, "../examples/Examples.jl"))
+using Main.Examples
 
 # script verbosity
 script_verbose = false
@@ -23,7 +21,7 @@ default_options = (
     )
 
 # instance sets and real types to run and corresponding time limits (seconds)
-instance_sets = [
+inst_sets = [
     ("minimal", Float64, 60),
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
@@ -31,98 +29,32 @@ instance_sets = [
     # ("various", Float64, 120),
     ]
 
-# types of models to run and corresponding options and example names
-model_types = [
-    "native",
-    "JuMP",
-    ]
-
-# list of names of native examples to run
-native_example_names = [
-    "densityest",
-    "doptimaldesign",
-    "linearopt",
-    "matrixcompletion",
-    "matrixregression",
-    "maxvolume",
-    "polyenvelope",
-    "polymin",
-    "portfolio",
-    "sparsepca",
-    ]
-
-# list of names of JuMP examples to run
-JuMP_example_names = [
-    "CBLIB",
-    "centralpolymat",
-    "classicalquantum",
-    "conditionnum",
-    "contraction",
-    "convexityparameter",
-    "covarianceest",
-    "densityest",
-    "doptimaldesign",
-    "entanglementassisted",
-    "experimentdesign",
-    "lotkavolterra",
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "nearestcorrelation",
-    "nearestpolymat",
-    "nearestpsd",
-    "nonparametricdistr",
-    "normconepoly",
-    "polyenvelope",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    "regionofattr",
-    "relentrentanglement",
-    "robustgeomprog",
-    "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
-    "sparselmi",
-    "stabilitynumber",
-    ]
-
-perf = setup_benchmark_dataframe()
-isnothing(results_path) || CSV.write(results_path, perf)
-
 @testset "examples tests" begin
-@testset "$mod_type" for mod_type in model_types
-@testset "$ex_name" for ex_name in eval(Symbol(mod_type, "_example_names"))
+test_insts = Examples.get_test_instances()
+perf = Examples.setup_benchmark_dataframe()
 
-include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
-(ex_type, ex_insts) = include(joinpath(
-    examples_dir, ex_name, mod_type * "_test.jl"))
-
-for (inst_set, real_T, time_limit) in instance_sets
+@testset "$mod, $ex" for (mod, mod_insts) in test_insts,
+    (ex, (ex_type, ex_insts)) in mod_insts
+@testset "$inst_set, $T, $time_limit" for (inst_set, T, time_limit) in inst_sets
     haskey(ex_insts, inst_set) || continue
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue
 
-    info_perf = (; inst_set, real_T, :example => ex_name,
-        :model_type => mod_type, :solver_options => ())
+    info_perf = (; inst_set, :real_T => T, :example => ex, :model_type => mod)
     new_default_options = (; default_options..., time_limit = time_limit)
-    ex_type_T = ex_type{real_T}
+    ex_type_T = ex_type{T}
 
-    println("starting $ex_type_T $inst_set tests\n")
-    @testset "$ex_type_T $inst_set" begin
-        run_instance_set(inst_subset, ex_type_T, info_perf,
-            new_default_options, script_verbose, perf, results_path)
+    str = "$mod $ex $T $inst_set"
+    println("\nstarting $str tests")
+    @testset "$str" begin
+        Examples.run_instance_set(inst_subset, ex_type_T, info_perf,
+            new_default_options, script_verbose, perf)
     end
-    println()
-end
-
 end
 end
 
-# println("\n")
-# DataFrames.show(perf, allrows = true, allcols = true)
-# println("\n")
+println("\n")
+DataFrames.show(perf, allrows = true, allcols = true)
+println("\n")
 end
 ;

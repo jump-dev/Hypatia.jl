@@ -20,6 +20,7 @@ function setup_benchmark_dataframe()
         real_T = Type{<:Real}[],
         solver = String[],
         solver_options = Tuple[],
+        nondefaults = Tuple[],
         script_status = String[],
         n = Int[],
         p = Int[],
@@ -53,11 +54,37 @@ function setup_benchmark_dataframe()
         total_time = Float64[],
         )
     DataFrames.allowmissing!(perf, 11:DataFrames.ncol(perf))
+    DataFrames.allowmissing!(perf, :extender)
+    DataFrames.allowmissing!(perf, :solver_options)
+    DataFrames.allowmissing!(perf, :nondefaults)
     return perf
 end
 
-get_extender(inst::Tuple, ::Type{<:ExampleInstanceJuMP}) = (length(inst) > 1 ? string(inst[2]) : "")
-get_extender(inst::Tuple, ::Type{<:ExampleInstance}) = ""
+function get_extender(inst::Tuple, ::Type{<:ExampleInstanceJuMP})
+    if length(inst) > 1
+        ext = inst[2]
+        !isnothing(ext) && return string(ext)
+    end
+    return missing
+end
+
+get_extender(inst::Tuple, ::Type{<:ExampleInstance}) = missing
+
+function get_nondefaults(inst::Tuple, ::Type{<:ExampleInstanceJuMP})
+    if length(inst) > 2
+        @assert length(inst) == 3
+        return inst[3]
+    end
+    return missing
+end
+
+function get_nondefaults(inst::Tuple, ::Type{<:ExampleInstance})
+    if length(inst) > 1
+        @assert length(inst) == 2
+        return inst[2]
+    end
+    return missing
+end
 
 function write_perf(
     perf::DataFrames.DataFrame,
@@ -66,7 +93,8 @@ function write_perf(
     )
     push!(perf, new_perf, cols = :subset)
     if !isnothing(results_path)
-        CSV.write(results_path, perf[end:end, :], transform = (col, val) -> something(val, missing), append = true)
+        CSV.write(results_path, perf[end:end, :], transform =
+            (col, val) -> something(val, missing), append = true)
     end
     return
 end
@@ -78,11 +106,19 @@ function run_instance_set(
     new_default_options::NamedTuple,
     script_verbose::Bool,
     perf::DataFrames.DataFrame,
-    results_path::Union{String, Nothing},
+    results_path::Union{String, Nothing} = nothing,
     )
     for (inst_num, inst) in enumerate(inst_subset)
         extender_name = get_extender(inst, ex_type_T)
-        test_info = "inst $inst_num: $(inst[1]) $extender_name"
+        nondefaults = get_nondefaults(inst, ex_type_T)
+        test_info = "inst $inst_num: $(inst[1])"
+        if !ismissing(extender_name)
+            test_info *= " $extender_name"
+        end
+        if !ismissing(nondefaults)
+            test_info *= " $nondefaults"
+        end
+
         @testset "$test_info" begin
             println(test_info, " ...")
 
@@ -92,7 +128,7 @@ function run_instance_set(
             new_perf = (;
                 info_perf..., run_perf..., total_time, inst_num,
                 :solver => "Hypatia", :inst_data => inst[1],
-                :extender => extender_name,
+                :extender => extender_name, :nondefaults => nondefaults,
                 )
             write_perf(perf, results_path, new_perf)
 
