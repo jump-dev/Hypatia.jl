@@ -27,9 +27,11 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
     hess_fact_cache
 
-    wprod::T
-    z::T
-    tempw::Vector{T}
+    ϕ::T
+    ζ::T
+    ζi::T
+    tempw1::Vector{T}
+    tempw2::Vector{T}
 
     function HypoPowerMean{T}(
         alpha::Vector{T};
@@ -50,7 +52,8 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
 end
 
 function setup_extra_data!(cone::HypoPowerMean{T}) where {T <: Real}
-    cone.tempw = zeros(T, cone.dim - 1)
+    cone.tempw1 = zeros(T, cone.dim - 1)
+    cone.tempw2 = zeros(T, cone.dim - 1)
     return cone
 end
 
@@ -77,10 +80,10 @@ function update_feas(cone::HypoPowerMean{T}) where T
     alpha = cone.alpha
 
     if all(>(eps(T)), w)
-        @inbounds cone.wprod = exp(sum(alpha[i] * log(w[i])
+        @inbounds cone.ϕ = exp(sum(alpha[i] * log(w[i])
             for i in eachindex(alpha)))
-        cone.z = cone.wprod - u
-        cone.is_feas = (cone.z > eps(T))
+        cone.ζ = cone.ϕ - u
+        cone.is_feas = (cone.ζ > eps(T))
     else
         cone.is_feas = false
     end
@@ -107,9 +110,10 @@ function update_grad(cone::HypoPowerMean)
     u = cone.point[1]
     @views w = cone.point[2:end]
 
-    cone.grad[1] = inv(cone.z)
-    wwprodu = -cone.wprod / cone.z
-    @. @views cone.grad[2:end] = (wwprodu * cone.alpha - 1) / w
+    ζi = cone.ζi = inv(cone.ζ)
+    cone.grad[1] = ζi
+    wϕu = -cone.ϕ * ζi
+    @. @views cone.grad[2:end] = (wϕu * cone.alpha - 1) / w
 
     cone.grad_updated = true
     return cone.grad
@@ -122,23 +126,24 @@ function update_hess(cone::HypoPowerMean)
     u = cone.point[1]
     @views w = cone.point[2:end]
     alpha = cone.alpha
-    z = cone.z
+    ζ = cone.ζ
+    ζi = cone.ζi
     aw = alpha ./ w # TODO
-    wwprodu = cone.wprod / z
-    wwprodum1 = wwprodu - 1
+    wϕu = cone.ϕ / ζ
+    wϕum1 = wϕu - 1
 
-    H[1, 1] = abs2(cone.grad[1])
+    H[1, 1] = abs2(ζi)
     @inbounds for j in eachindex(w)
         j1 = j + 1
         wj = w[j]
         aj = alpha[j]
-        awwwprodu = wwprodu * aw[j]
-        H[1, j1] = -awwwprodu / z
-        awwwprodum1 = awwwprodu * wwprodum1
+        awwϕu = wϕu * aw[j]
+        H[1, j1] = -awwϕu / ζ
+        awwϕum1 = awwϕu * wϕum1
         @inbounds for i in 1:(j - 1)
-            H[i + 1, j1] = awwwprodum1 * aw[i]
+            H[i + 1, j1] = awwϕum1 * aw[i]
         end
-        H[j1, j1] = (awwwprodu * (1 + aj * wwprodum1) + inv(wj)) / wj
+        H[j1, j1] = (awwϕu * (1 + aj * wϕum1) + inv(wj)) / wj
     end
 
     cone.hess_updated = true
@@ -154,19 +159,20 @@ function hess_prod!(
     u = cone.point[1]
     @views w = cone.point[2:end]
     alpha = cone.alpha
-    z = cone.z
-    wwprodu = cone.wprod / z
-    wwprodum1 = wwprodu - 1
+    ζ = cone.ζ
+    ζi = cone.ζi
+    wϕu = cone.ϕ / ζ
+    wϕum1 = wϕu - 1
     aw = alpha ./ w # TODO
-    awwwprodu = wwprodu * aw # TODO
+    awwϕu = wϕu * aw # TODO
 
     @inbounds @views for j in 1:size(arr, 2)
-        arr_u = arr[1, j]
-        arr_w = arr[2:end, j]
-        auz = arr_u / z
-        prod[1, j] = (auz - dot(awwwprodu, arr_w)) / z
-        dot1 = -auz + wwprodum1 * dot(arr_w, aw)
-        @. prod[2:end, j] = dot1 * awwwprodu + (awwwprodu * arr_w + arr_w / w) / w
+        p = arr[1, j]
+        r = arr[2:end, j]
+        pζ = p * ζi
+        prod[1, j] = (pζ - dot(awwϕu, r)) * ζi
+        dot1 = -pζ + wϕum1 * dot(r, aw)
+        @. prod[2:end, j] = dot1 * awwϕu + (awwϕu * r + r / w) / w
     end
 
     return prod
@@ -176,36 +182,34 @@ function dder3(cone::HypoPowerMean, dir::AbstractVector)
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
-    u_dir = dir[1]
-    @views w_dir = dir[2:end]
     dder3 = cone.dder3
-    @views w_dder3 = dder3[2:end]
-    z = cone.z
     alpha = cone.alpha
-    wdw = cone.tempw
+    p = dir[1]
+    @views r = dir[2:end]
+    ϕ = cone.ϕ
+    ζ = cone.ζ
+    ζi = cone.ζi
 
-    piz = cone.wprod / z
-    @. wdw = w_dir / w
-    udz = u_dir / z
-    const6 = -2 * udz * piz
-    awdw = dot(alpha, wdw)
-    const1 = awdw * piz * (2 * piz - 1)
-    awdw2 = sum(alpha[i] * abs2(wdw[i]) for i in eachindex(alpha))
-    dder3[1] = (abs2(udz) + const6 * awdw + (const1 * awdw + piz * awdw2) / 2) / -z
-    const2 = piz * (1 - piz)
-    const3 = (const6 * u_dir / z + const2 * awdw2 - u / z * const1 * awdw) / -2 -
-        udz * const1
-    const4 = const2 * awdw + udz * piz
-    const5 = const2 + piz * u / z
+    rwi = cone.tempw1
+    @. rwi = r / w
+    c0 = dot(rwi, alpha)
 
-    @. w_dder3 = piz + const5 * alpha
-    w_dder3 .*= alpha
-    w_dder3 .+= 1
-    w_dder3 .*= wdw
-    @. w_dder3 -= const4 * alpha
-    w_dder3 .*= wdw
-    @. w_dder3 += const3 * alpha
-    w_dder3 ./= w
+    ξb = cone.tempw2
+    # ∇2h[r] = ϕ * (c0 - rwi .* alpha) / w
+    @. ξb = ζi * ϕ * (c0 - rwi) * alpha / w
+    ζiχ = ζi * (p - ϕ * c0)
+    ξbξ = dot(ξb, r) / 2
+    c1 = -ζi * (ζiχ^2 - ξbξ)
+
+    c2 = -ζi / 2
+    rwi2 = sum(abs2(rwij) * aj for (rwij, aj) in zip(rwi, alpha))
+    w_aux = ξb
+    w_aux .*= ζiχ
+    # add c2 * ∇3h[r, r]
+    @. w_aux += c2 * ϕ * ((c0 -  rwi)^2 - rwi2 + rwi^2) * alpha / w
+
+    dder3[1] = c1
+    @. dder3[2:end] = (abs2(rwi) - c1 * ϕ * alpha) / w - w_aux
 
     return dder3
 end
