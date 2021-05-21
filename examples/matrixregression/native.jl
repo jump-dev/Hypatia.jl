@@ -28,6 +28,7 @@ struct MatrixRegressionNative{T <: Real} <: ExampleInstanceNative{T}
     lam_glr::Real # penalty on penalty on row group l1 norm
     lam_glc::Real # penalty on penalty on column group l1 norm
 end
+
 function MatrixRegressionNative{T}(
     is_complex::Bool,
     n::Int,

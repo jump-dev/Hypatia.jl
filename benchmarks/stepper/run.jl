@@ -30,6 +30,7 @@ stepper_options = [
 # instance sets and real types to run and corresponding time limits (seconds)
 instance_sets = [
     # "minimal",
+    # "fast",
     "compile",
     "various",
     ]

@@ -23,6 +23,7 @@ struct ShapeConRegrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_convexity::Bool # if true add convexity constraints, else don't
     is_fit_exact::Bool
 end
+
 function ShapeConRegrJuMP{Float64}(
     data_name::Symbol,
     args...)
@@ -31,6 +32,7 @@ function ShapeConRegrJuMP{Float64}(
     # TODO assert X data is on the domain [-1, 1]^n
     return ShapeConRegrJuMP{Float64}(X, y, args...)
 end
+
 function ShapeConRegrJuMP{Float64}(
     n::Int,
     num_points::Int,

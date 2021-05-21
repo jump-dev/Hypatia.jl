@@ -1,17 +1,110 @@
 using CSV
 using DataFrames
 using Printf
-using BenchmarkProfiles
+import BenchmarkProfiles
+
+keep_set = "various"
 
 enhancements = ["basic", "TOA", "curve", "comb", "back"]
-process_entry(x::Float64) = @sprintf("%.2f", x)
-process_entry(x::Int) = string(x)
 
+compare_pairs = [
+    ["basic", "toa"],
+    ["toa", "curve"],
+    ["curve", "comb"],
+    ["comb", "back"],
+    ]
+
+# geomean shifts
+time_shift = 1e-3
+total_shift = 1e-4
+piter_shift = 1e-5
+
+# file locations
 bench_file = joinpath(@__DIR__, "raw", "bench.csv")
 output_dir = mkpath(joinpath(@__DIR__, "analysis"))
 tex_dir = mkpath(joinpath(output_dir, "tex"))
 stats_dir = mkpath(joinpath(output_dir, "stats"))
 csv_dir = mkpath(joinpath(output_dir, "csvs"))
+
+# get extra info about runs; uses hardcoded enhancement names
+function extra_stats(all_df)
+    all_df = transform(all_df, [:n, :p, :q] => ((x, y, z) -> x .+ y .+ z) => :npq)
+    basic_solver = filter(t -> t.enhancement == "basic", all_df)
+
+    # get stats from basic
+    CSV.write(joinpath(csv_dir, "basic.csv"), select(basic_solver,
+        :num_cones => ByRow(log10) => :log_numcones,
+        :npq => ByRow(log10) => :log_npq,
+        ),)
+
+    # basic and converged
+    basic_solver_conv = filter(t -> t.conv, basic_solver)
+    CSV.write(joinpath(csv_dir, "basicconv.csv"), select(basic_solver_conv,
+        :iters,
+        :solve_time,
+        :solve_time => ByRow(log10) => :log_solve_time,
+        :npq,
+        ),)
+
+    # back and converged
+    back_solver = filter(t -> t.enhancement == "back", all_df)
+    back_solver_conv = filter(t -> t.conv, back_solver)
+    CSV.write(joinpath(csv_dir, "backconv.csv"), select(back_solver_conv,
+        :solve_time,
+        :npq,
+        [:time_uprhs, :solve_time] => ((x, y) -> x ./ y) => :prop_rhs,
+        ),)
+
+    # basic and back where both converged
+    two_solver = filter(t -> t.enhancement in ("basic", "back"), all_df)
+    two_solver = combine(groupby(two_solver, :inst_key), names(all_df),
+        :conv => all => :two_conv)
+    two_solver_conv = filter(t -> t.two_conv, two_solver)
+    two_solver_conv = combine(groupby(two_solver_conv, :inst_key),
+        [:enhancement, :solve_time], :solve_time =>
+        (x -> (x[1] - x[2]) / x[1]) => :improvement)
+    filter!(t -> t.enhancement == "basic", two_solver_conv)
+
+    CSV.write(joinpath(csv_dir, "basicbackconv.csv"),
+        select(two_solver_conv, :solve_time, :improvement))
+
+    # only used to get list of cones manually
+    ex_df = combine(groupby(basic_solver, :example),
+        :cone_types => (x -> union(eval.(Meta.parse.(x)))) => :cones,
+        :cone_types => length => :num_instances,
+        )
+
+    CSV.write(joinpath(stats_dir, "examplestats.csv"), ex_df)
+
+    # count instances with non-default solver options
+    examples_dir = "../../examples"
+    include(joinpath(examples_dir, "common.jl"))
+    count_nondefault = 0
+    for (m, l) in (("JuMP", 3), ("native", 2))
+        include(joinpath(examples_dir, "common_" * m * ".jl"))
+        m_df = filter(t -> (t.model_type == m), all_df)
+        for ex_name in unique(m_df[!, :example])
+            include(joinpath(examples_dir, ex_name, m * ".jl"))
+            (_, ex_insts) = include(joinpath(examples_dir, ex_name,
+                m * "_test.jl"))
+            for inst in ex_insts[keep_set]
+                if length(inst) >= l
+                    @assert length(inst) == l
+                    @assert inst[l] isa NamedTuple
+                    count_nondefault += 1
+                end
+            end
+        end
+    end
+    @info("$count_nondefault instances have non-default solver options")
+
+    return
+end
+
+# generic functions without hardcoded enhancement names
+
+process_entry(x::Float64) = @sprintf("%.2f", x)
+process_entry(x::Int) = string(x)
 
 function shifted_geomean(
     metric::AbstractVector{<:Real},
@@ -33,21 +126,47 @@ function shifted_geomean(
     return exp(sum(log, x .+ shift) / length(x)) - shift
 end
 
+# get enhancement name from solver options
+function get_enhancement(x)
+    sol_opt = eval(Meta.parse(x))
+    @assert length(sol_opt) == 1
+    return sol_opt[1]
+end
+
 function preprocess_df()
     all_df = CSV.read(bench_file, DataFrame)
+
+    # only keep wanted instance set
+    filter!(t -> (t.inst_set == keep_set), all_df)
+
+    # get enhancement name from solver options
+    transform!(all_df, :solver_options => ByRow(get_enhancement) => :enhancement)
+
+    # check if any instances could be duplicates:
+    possible_dupes = nonunique(all_df, [:enhancement, :example, :inst_data,
+        :n, :p, :q, :nu, :cone_types, :num_cones, :max_q])
+    if any(possible_dupes)
+        df_dupes = unique!(all_df[possible_dupes, [:example, :model_type,
+            :inst_set, :inst_num, :inst_data, :extender]])
+        println()
+        @warn("possible instance/option duplicates detected; inspect instance set " *
+            "for duplicates of each of the below (unique) rows:")
+        println("\n", df_dupes, "\n")
+    end
+
+    # get converged instances, identify by instance key
+    ok_status = ["Optimal", "PrimalInfeasible", "DualInfeasible"]
     transform!(all_df,
-        :status => ByRow(x -> !ismissing(x) && x in
-            ["Optimal", "PrimalInfeasible", "DualInfeasible"]) => :conv,
-        # each instance is identified by instance data + extender combination
-        [:example, :inst_data, :extender] => 
+        :status => ByRow(x -> (!ismissing(x) && x in ok_status)) => :conv,
+        # identify instances by example + inst_data + extender
+        [:example, :inst_data, :extender] =>
         ((x, y, z) -> x .* y .* z) => :inst_key,
-        :solver_options => ByRow(x -> eval(Meta.parse(x))[1]) => :solver_options,
         )
+
     # assumes that nothing returned incorrect status, which is checked manually
     all_df = combine(groupby(all_df, :inst_key), names(all_df),
         :conv => all => :every_conv)
-    # remove precompile instances
-    filter!(t -> t.inst_set == "various", all_df)
+
     return all_df
 end
 
@@ -55,9 +174,8 @@ function make_agg_tables(all_df)
     conv = all_df[!, :conv]
     max_time = maximum(all_df[!, :solve_time][conv])
     max_iter = maximum(all_df[!, :iters][conv])
-    time_shift = 1e-3
 
-    df_agg = combine(groupby(all_df, :solver_options),
+    df_agg = combine(groupby(all_df, :enhancement),
         [:solve_time, :conv] => ((x, y) ->
             shifted_geomean(x, y, shift = time_shift)) => :time_geomean_thisconv,
         [:iters, :conv] => ((x, y) ->
@@ -82,7 +200,7 @@ function make_agg_tables(all_df)
         :status => length => :total,
         )
 
-    sort!(df_agg, order(:solver_options, by = (x ->
+    sort!(df_agg, order(:enhancement, by = (x ->
         findfirst(isequal(x), lowercase.(enhancements)))))
     CSV.write(joinpath(stats_dir, "agg" * ".csv"), df_agg)
 
@@ -112,8 +230,6 @@ function make_agg_tables(all_df)
 end
 
 function make_subtime_tables(all_df)
-    total_shift = 1e-4
-    piter_shift = 1e-5
     divfunc(x, y) = (x ./ y)
     preproc_cols = [:time_rescale, :time_initx, :time_inity, :time_unproc]
     transform!(all_df,
@@ -144,7 +260,7 @@ function make_subtime_tables(all_df)
     max_search_iter = maximum(skipnan, all_df[!, :time_search_piter][conv])
 
     function get_subtime_df(set, convcol, use_cap)
-        subtime_df = combine(groupby(all_df, :solver_options),
+        subtime_df = combine(groupby(all_df, :enhancement),
             [:time_linalg, convcol] => ((x, y) ->
                 shifted_geomean(x, y, shift = total_shift, cap = max_linalg,
                 use_cap = use_cap)) => Symbol(:linalg, set),
@@ -178,7 +294,7 @@ function make_subtime_tables(all_df)
                 Symbol(:search_piter, set),
             )
 
-        sort!(subtime_df, order(:solver_options,
+        sort!(subtime_df, order(:enhancement,
             by = (x -> findfirst(isequal(x), lowercase.(enhancements)))))
         CSV.write(joinpath(stats_dir, "subtime" * string(set) * ".csv"),
             subtime_df)
@@ -217,14 +333,16 @@ function make_subtime_tables(all_df)
 end
 
 function make_perf_profiles(all_df, comp, metric)
-    pp = filter(t -> t.solver_options in comp, all_df)
+    pp = filter(t -> t.enhancement in comp, all_df)
+
     # BenchmarkProfiles.jl expects NaNs for failures
     select!(pp,
         :inst_key,
-        :solver_options,
+        :enhancement,
         [metric, :conv] => ByRow((x, y) -> (y ? x : NaN)) => metric,
         )
-    wide_df = unstack(pp, :solver_options, metric)
+    wide_df = unstack(pp, :enhancement, metric, allowduplicates = true)
+
     (x_plot, y_plot, max_ratio) = BenchmarkProfiles.performance_profile_data(
         Matrix{Float64}(wide_df[!, string.(comp)]), logscale = true)
 
@@ -235,92 +353,27 @@ function make_perf_profiles(all_df, comp, metric)
         CSV.write(joinpath(csv_dir, comp[s] * "_vs_" * comp[2 - s + 1] * "_" *
             string(metric) * ".csv"), DataFrame(x = x, y = y))
     end
-    return
-end
-
-function instance_stats(all_df)
-    all_df = transform(all_df, [:n, :p, :q] => ((x, y, z) -> x .+ y .+ z) => :npq)
-    basic_solver = filter(t -> t.solver_options == "basic", all_df)
-
-    # get stats from basic
-    CSV.write(joinpath(csv_dir, "basic.csv"), select(basic_solver,
-        :num_cones => ByRow(log10) => :log_numcones,
-        :npq => ByRow(log10) => :log_npq,
-        ),)
-
-    # basic and converged
-    basic_solver_conv = filter(t -> t.conv, basic_solver)
-    CSV.write(joinpath(csv_dir, "basicconv.csv"), select(basic_solver_conv,
-        :iters,
-        :solve_time,
-        :solve_time => ByRow(log10) => :log_solve_time,
-        :npq,
-        ),)
-
-    # back and converged
-    back_solver = filter(t -> t.solver_options == "back", all_df)
-    back_solver_conv = filter(t -> t.conv, back_solver)
-    CSV.write(joinpath(csv_dir, "backconv.csv"), select(back_solver_conv,
-        :solve_time,
-        :npq,
-        [:time_uprhs, :solve_time] => ((x, y) -> x ./ y) => :prop_rhs,
-        ),)
-
-    # basic and back where both converged
-    two_solver = filter(t -> t.solver_options in ("basic", "back"), all_df)
-    two_solver = combine(groupby(two_solver, :inst_key), names(all_df),
-        :conv => all => :two_conv)
-    two_solver_conv = filter(t -> t.two_conv, two_solver)
-    two_solver_conv = combine(groupby(two_solver_conv, :inst_key),
-        [:solver_options, :solve_time], :solve_time =>
-        (x -> (x[1] - x[2]) / x[1]) => :improvement)
-    filter!(t -> t.solver_options == "basic", two_solver_conv)
-    CSV.write(joinpath(csv_dir, "basicbackconv.csv"),
-        select(two_solver_conv, :solve_time, :improvement))
-
-    # only used to get list of cones manually
-    ex_df = combine(groupby(basic_solver, :example),
-        :cone_types => (x -> union(eval.(Meta.parse.(x)))) => :cones,
-        :cone_types => length => :num_instances,
-        )
-    CSV.write(joinpath(stats_dir, "examplestats.csv"), ex_df)
-
-    # count instances with loosened tols
-    examples_dir = "../../examples"
-    include(joinpath(examples_dir, "common.jl"))
-    n = 1
-    for (m, l) in (("JuMP", 3), ("native", 2))
-        include(joinpath(examples_dir, "common_" * m * ".jl"))
-        m_df = filter(t -> (t.model_type == m), all_df)
-        for ex_name in unique(m_df[!, :example])
-            include(joinpath(examples_dir, ex_name, m * ".jl"))
-            (_, ex_insts) = include(joinpath(examples_dir, ex_name,
-                m * "_test.jl"))
-            for inst in ex_insts["various"]
-                (length(inst) == l) && (n += 1)
-            end
-        end
-    end
-    @show n
 
     return
 end
 
 function post_process()
     all_df = preprocess_df()
+    if isempty(all_df)
+        error("input CSV has no $keep_set set instances with a full list of runs")
+    end
+
     make_agg_tables(all_df)
     make_subtime_tables(all_df)
-    comp_list = [
-        ["basic", "toa"],
-        ["toa", "curve"],
-        ["curve", "comb"],
-        ["comb", "back"],
-        ]
-    for comp in comp_list, metric in [:solve_time, :iters]
+
+    for comp in compare_pairs, metric in [:solve_time, :iters]
         make_perf_profiles(all_df, comp, metric)
     end
-    instance_stats(all_df)
+    extra_stats(all_df)
+    println()
+
     return
 end
+
 post_process()
 ;

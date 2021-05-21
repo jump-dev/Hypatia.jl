@@ -1,23 +1,23 @@
 
 insts = Dict()
 insts["minimal"] = [
-    ((2, Cones.InvSSF()),),
-    ((3, Cones.NegEntropySSF()),),
+    ((2, :InvSSF),),
+    ((3, :NegEntropySSF),),
     ]
 insts["fast"] = [
-    ((10, Cones.InvSSF()),),
-    ((15, Cones.NegLogSSF()),),
-    ((20, Cones.NegEntropySSF()),),
-    ((25, Cones.Power12SSF(1.5)),),
+    ((10, :InvSSF),),
+    ((15, :NegLogSSF),),
+    ((20, :NegEntropySSF),),
+    ((25, :Power12SSF),),
     ]
 insts["various"] = [
-    ((20, Cones.InvSSF()),),
-    ((20, Cones.NegLogSSF()),),
-    ((20, Cones.NegEntropySSF()),),
-    ((20, Cones.Power12SSF(1.5)),),
-    ((50, Cones.InvSSF()),),
-    ((50, Cones.NegLogSSF()),),
-    ((50, Cones.NegEntropySSF()),),
-    ((50, Cones.Power12SSF(1.5)),),
+    ((20, :InvSSF),),
+    ((20, :NegLogSSF),),
+    ((20, :NegEntropySSF),),
+    ((20, :Power12SSF),),
+    ((50, :InvSSF),),
+    ((50, :NegLogSSF),),
+    ((50, :NegEntropySSF),),
+    ((50, :Power12SSF),),
     ]
 return (CovarianceEstJuMP, insts)

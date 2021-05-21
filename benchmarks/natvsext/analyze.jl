@@ -58,7 +58,7 @@ print_table_solvers =
     true # add solver results to tex tables
     # false # just put formulation sizes in tex tables
 
-@info("running examples: $(keys(examples_params))")
+@info("analyzing examples: $(keys(examples_params))")
 
 function post_process()
     all_df = CSV.read(bench_file, DataFrame)
@@ -259,6 +259,5 @@ function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
     return
 end
 
-# run
 post_process()
 ;

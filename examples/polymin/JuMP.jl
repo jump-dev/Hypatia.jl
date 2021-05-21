@@ -11,12 +11,14 @@ struct PolyMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_primal::Bool # solve primal, else solve dual
     use_wsos::Bool # use wsosinterpnonnegative cone, else PSD formulation
 end
+
 function PolyMinJuMP{Float64}(
     poly_name::Symbol,
     halfdeg::Int,
     args...)
     return PolyMinJuMP{Float64}(get_interp_data(Float64, poly_name, halfdeg)..., args...)
 end
+
 function PolyMinJuMP{Float64}(
     n::Int,
     halfdeg::Int,
