@@ -14,12 +14,14 @@ struct SemidefinitePolyJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_wsosmatrix::Bool # use wsosinterppossemideftri cone, else PSD formulation
     use_dual::Bool # use dual formulation, else primal formulation
 end
+
 function SemidefinitePolyJuMP{Float64}(
     x::Vector{DP.PolyVar{true}},
     poly::DP.Polynomial,
     args...)
     return SemidefinitePolyJuMP{Float64}(x, DP.differentiate(poly, x, 2), args...)
 end
+
 function SemidefinitePolyJuMP{Float64}(
     matpoly::Symbol,
     args...)

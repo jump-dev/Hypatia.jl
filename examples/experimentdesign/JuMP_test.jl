@@ -1,27 +1,27 @@
 
 insts = Dict()
 insts["minimal"] = [
-    ((2, Cones.InvSSF()),),
-    ((3, Cones.NegEntropySSF()),),
+    ((2, :InvSSF),),
+    ((3, :NegEntropySSF),),
     ]
 insts["fast"] = [
-    ((10, Cones.InvSSF()),),
-    ((15, Cones.NegLogSSF()),),
-    ((20, Cones.NegEntropySSF()),),
-    ((25, Cones.Power12SSF(1.5)),),
+    ((10, :InvSSF),),
+    ((15, :NegLogSSF),),
+    ((20, :NegEntropySSF),),
+    ((25, :Power12SSF),),
     ]
 insts["various"] = [
-    ((100, Cones.InvSSF()),),
-    ((100, Cones.NegLogSSF()),),
-    ((100, Cones.NegEntropySSF()),),
-    ((100, Cones.Power12SSF(1.5)),),
-    ((200, Cones.InvSSF()),),
-    ((200, Cones.NegLogSSF()),),
-    ((200, Cones.NegEntropySSF()),),
-    ((200, Cones.Power12SSF(1.5)),),
-    ((300, Cones.InvSSF()),),
-    ((300, Cones.NegLogSSF()),),
-    ((300, Cones.NegEntropySSF()),),
-    ((300, Cones.Power12SSF(1.5)),),
+    ((100, :InvSSF),),
+    ((100, :NegLogSSF),),
+    ((100, :NegEntropySSF),),
+    ((100, :Power12SSF),),
+    ((200, :InvSSF),),
+    ((200, :NegLogSSF),),
+    ((200, :NegEntropySSF),),
+    ((200, :Power12SSF),),
+    ((300, :InvSSF),),
+    ((300, :NegLogSSF),),
+    ((300, :NegEntropySSF),),
+    ((300, :Power12SSF),),
     ]
 return (ExperimentDesignJuMP, insts)

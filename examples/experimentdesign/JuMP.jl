@@ -19,6 +19,17 @@ struct ExperimentDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     ssf::Cones.SepSpectralFun
 end
 
+function ExperimentDesignJuMP{T}(p::Int, ssf_name::Symbol) where {T <: Real}
+    ssf_dict = Dict(
+        :InvSSF => Cones.InvSSF(),
+        :NegLogSSF => Cones.NegLogSSF(),
+        :NegEntropySSF => Cones.NegEntropySSF(),
+        :Power12SSF => Cones.Power12SSF(1.5),
+        )
+    ssf = ssf_dict[ssf_name]
+    return ExperimentDesignJuMP{T}(p, ssf)
+end
+
 function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     p = inst.p
     @assert p >= 2

@@ -2,8 +2,6 @@
 common code for native examples
 =#
 
-include(joinpath(@__DIR__, "common.jl"))
-
 abstract type ExampleInstanceNative{T <: Real} <: ExampleInstance{T} end
 
 # fallback: just check optimal status

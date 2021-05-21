@@ -10,7 +10,6 @@ TODO
 - implement PSD formulation for complex case
 =#
 
-import Combinatorics
 include(joinpath(@__DIR__, "data_real.jl"))
 include(joinpath(@__DIR__, "data_complex.jl"))
 
@@ -22,6 +21,7 @@ struct PolyMinNative{T <: Real} <: ExampleInstanceNative{T}
     use_primal::Bool # solve primal, else solve dual
     use_wsos::Bool # use wsosinterpnonnegative cone, else PSD formulation
 end
+
 function PolyMinNative{T}(
     is_complex::Bool,
     poly_name::Symbol,
@@ -31,6 +31,7 @@ function PolyMinNative{T}(
     interp = get_interp_data(R, poly_name, halfdeg)
     return PolyMinNative{T}(is_complex, interp..., args...)
 end
+
 function PolyMinNative{T}(
     is_complex::Bool,
     n::Int,

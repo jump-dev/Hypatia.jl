@@ -1,3 +1,8 @@
+#=
+analyze natvsext benchmark results
+see natvsext/README.md
+=#
+
 using Printf
 using CSV
 using DataFrames
@@ -6,7 +11,7 @@ bench_file = joinpath(@__DIR__, "raw", "bench.csv")
 output_dir = mkpath(joinpath(@__DIR__, "analysis"))
 tex_dir = mkpath(joinpath(output_dir, "tex"))
 stats_dir = mkpath(joinpath(output_dir, "stats"))
-csv_dir = mkpath(joinpath(csv, "csvs"))
+csv_dir = mkpath(joinpath(output_dir, "csvs"))
 
 # uncomment examples to process
 examples_params = Dict(
@@ -19,13 +24,15 @@ examples_params = Dict(
         [:logdet, :k], [5, 1],
         # [:EP,], [:n_nat, :n_EP, :q_nat, :q_EP]
         # [:SEP,], [:n_SEP, :q_nat, :q_SEP]
-        [:EP, :SEP], [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
+        [:EP, :SEP], [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP,
+        :n_SEP, :q_SEP]
         ),
     "matrixcompletion" => (
         [:m, :k], [1, 2],
         # [:EP,], [:n_EP, :p_nat, :q_EP]
         # [:SEP,], [:n_SEP, :p_nat, :q_SEP]
-        [:EP, :SEP], [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
+        [:EP, :SEP], [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP,
+        :nu_SEP, :n_SEP, :q_SEP]
         ),
     "matrixregression" => (
         [:m, :k], [2, 1],
@@ -58,31 +65,33 @@ print_table_solvers =
     true # add solver results to tex tables
     # false # just put formulation sizes in tex tables
 
-@info("running examples: $(keys(examples_params))")
+@info("analyzing examples: $(keys(examples_params))")
 
 function post_process()
     all_df = CSV.read(bench_file, DataFrame)
     replace!(all_df.extender, extender_map...)
+
     for (ex_name, ex_params) in examples_params
         println()
-        ex_df = filter(t -> t.example == ex_name &&
-            t.extender in vcat("", string.(ex_params[3])), all_df)
+        ex_df = filter(t -> (t.example == ex_name) && (ismissing(t.extender) ||
+            t.extender in string.(ex_params[3])), all_df)
         if isempty(ex_df)
             @info("no data for $ex_name with params: $ex_params")
             continue
         end
+
         @info("starting $ex_name with params: $ex_params")
         (ex_df_wide, inst_solvers) = make_wide_csv(ex_df, ex_name, ex_params)
         make_table_tex(ex_name, ex_params, ex_df_wide, inst_solvers)
         make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
         @info("finished $ex_name")
     end
+
     println()
     @info("finished all")
 end
 
 extender_map = Dict(
-    "nothing" => "",
     "ExpPSD" => "EP",
     "SOCExpPSD" => "SEP",
     )
@@ -114,17 +123,20 @@ function make_wide_csv(ex_df, ex_name, ex_params)
     inst_keys = ex_params[1]
 
     # add columns
-    inst_ext_name(inst_set, extender) = (isempty(extender) ? inst_set : extender)
+    inst_ext_name(inst_set, extender) = (ismissing(extender) ? inst_set : extender)
     transform!(ex_df, [:inst_set, :extender] => ((x, y) ->
         inst_ext_name.(x, y)) => :inst_ext)
+
     inst_solver_name(inst_ext, solver) = (inst_ext * "_" * solver)
     transform!(ex_df,
-        [:inst_ext, :solver] => ((x, y) -> inst_solver_name.(x, y)) => :inst_solver,
+        [:inst_ext, :solver] => ((x, y) -> inst_solver_name.(x, y)) =>
+        :inst_solver,
         [:x_viol, :y_viol, :z_viol, :rel_obj_diff] => ByRow((res...) ->
             residual_tol_satisfied(coalesce.(res, NaN))) => :converged,
         [:status, :script_status] => ByRow((x, y) ->
             (y == "Success" ? status_map[x] : status_map[y])) => :status,
         )
+
     for (name, pos) in zip(inst_keys, ex_params[2])
         transform!(ex_df, :inst_data => ByRow(x ->
             eval(Meta.parse(x))[pos]) => name)
@@ -161,14 +173,18 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         for v in [:status, :converged, :iters, :solve_time]
         ]
     ex_df_wide = outerjoin(unstacked_dims..., unstacked_res..., on = inst_keys)
+
     CSV.write(ex_wide_file(ex_name), ex_df_wide)
 
     return (ex_df_wide, inst_solvers)
 end
 
 string_ast = "\$\\ast\$"
+
 process_entry(::Missing) = string_ast
+
 process_entry(::Missing, ::Missing) = "sk" # no data so instance was skipped
+
 function process_entry(x::Float64)
     isnan(x) && return string_ast
     @assert x > 0
@@ -178,8 +194,10 @@ function process_entry(x::Float64)
         return @sprintf("%.0f.", x)
     end
 end
+
 process_entry(st::String, converged::Bool) =
     (converged ? "\\underline{$(st)}" : st)
+
 process_entry(x) = string(x)
 
 function process_inst_solver(row, inst_solver)
@@ -204,6 +222,7 @@ function make_table_tex(ex_name, ex_params, ex_df_wide, inst_solvers)
     end
     header_str = replace(header_str[1:(end - 2)], "_" => " ") * "\\\\"
     println(ex_tex, header_str)
+
     for row in eachrow(ex_df_wide)
         row_str = process_entry(row[1])
         for i in 2:length(inst_keys)
@@ -220,6 +239,7 @@ function make_table_tex(ex_name, ex_params, ex_df_wide, inst_solvers)
         row_str *= " \\\\"
         println(ex_tex, row_str)
     end
+
     close(ex_tex)
 
     return
@@ -259,6 +279,5 @@ function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
     return
 end
 
-# run
 post_process()
 ;

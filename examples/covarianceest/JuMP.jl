@@ -15,6 +15,17 @@ struct CovarianceEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     ssf::Cones.SepSpectralFun
 end
 
+function CovarianceEstJuMP{T}(d::Int, ssf_name::Symbol) where {T <: Real}
+    ssf_dict = Dict(
+        :InvSSF => Cones.InvSSF(),
+        :NegLogSSF => Cones.NegLogSSF(),
+        :NegEntropySSF => Cones.NegEntropySSF(),
+        :Power12SSF => Cones.Power12SSF(1.5),
+        )
+    ssf = ssf_dict[ssf_name]
+    return CovarianceEstJuMP{T}(d, ssf)
+end
+
 function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     d = inst.d
     @assert d >= 1

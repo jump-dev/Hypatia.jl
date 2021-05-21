@@ -5,7 +5,10 @@ common code for examples
 using Test
 import Random
 using LinearAlgebra
-import LinearAlgebra.BlasReal
+using Printf
+import DataFrames
+import CSV
+
 import Hypatia
 import Hypatia.PolyUtils
 import Hypatia.Cones

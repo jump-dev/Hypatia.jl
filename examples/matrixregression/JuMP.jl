@@ -18,6 +18,7 @@ struct MatrixRegressionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     lam_glr::Real # penalty on penalty on row group l1 norm
     lam_glc::Real # penalty on penalty on column group l1 norm
 end
+
 function MatrixRegressionJuMP{Float64}(
     n::Int,
     m::Int,
@@ -37,6 +38,7 @@ function MatrixRegressionJuMP{Float64}(
     Y = X * A + Y_noise * randn(n, m)
     return MatrixRegressionJuMP{Float64}(Y, X, args...)
 end
+
 function MatrixRegressionJuMP{Float64}(n::Int, m::Int)
     @assert n >= m >= 1
     X = randn(n, m)

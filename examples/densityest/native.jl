@@ -17,6 +17,7 @@ struct DensityEstNative{T <: Real} <: ExampleInstanceNative{T}
     hypogeomean_obj::Bool # use geomean objective, else sum of logs objective
     use_hypogeomean::Bool # use hypogeomean cone, else 3-dim entropy formulation
 end
+
 function DensityEstNative{T}(
     dataset_name::Symbol,
     deg::Int,
@@ -29,6 +30,7 @@ function DensityEstNative{T}(
     return DensityEstNative{T}(dataset_name, X, deg, use_wsos,
         hypogeomean_obj, use_hypogeomean)
 end
+
 function DensityEstNative{T}(num_obs::Int, n::Int, args...) where {T <: Real}
     X = randn(T, num_obs, n)
     return DensityEstNative{T}(:Random, X, args...)

@@ -1,8 +1,20 @@
-include(joinpath(@__DIR__, "../setup.jl"))
+#=
+run stepper benchmarks
+see stepper/README.md
+=#
 
-# path to write results DataFrame to CSV, if any
+using Test
+using Printf
+import DataFrames
+import CSV
+import Hypatia
+import Hypatia.Solvers
+
+include(joinpath(@__DIR__, "../../examples/Examples.jl"))
+using Main.Examples
+
+# path to write results DataFrame to CSV
 results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
-# results_path = nothing
 
 # script verbosity
 script_verbose = false
@@ -28,84 +40,23 @@ stepper_options = [
     ]
 
 # instance sets and real types to run and corresponding time limits (seconds)
-instance_sets = [
+inst_sets = [
     # "minimal",
+    # "fast",
     "compile",
     "various",
     ]
 
-# types of models to run and corresponding options and example names
-model_types = [
-    "native",
-    "JuMP",
-    ]
-
-# list of names of native examples to run
-native_example_names = [
-    "densityest",
-    "doptimaldesign",
-    "linearopt",
-    "matrixcompletion",
-    "matrixregression",
-    "maxvolume",
-    "polyenvelope",
-    "polymin",
-    "portfolio",
-    "sparsepca",
-    ]
-
-# list of names of JuMP examples to run
-JuMP_example_names = [
-    "CBLIB",
-    "centralpolymat",
-    "classicalquantum",
-    "conditionnum",
-    "contraction",
-    "convexityparameter",
-    "covarianceest",
-    "densityest",
-    "doptimaldesign",
-    "entanglementassisted",
-    "experimentdesign",
-    "lotkavolterra",
-    "lyapunovstability",
-    "matrixcompletion",
-    "matrixquadratic",
-    "matrixregression",
-    "maxvolume",
-    "nearestcorrelation",
-    "nearestpsd",
-    "normconepoly",
-    "polyenvelope",
-    "polymin",
-    "polynorm",
-    "portfolio",
-    "relentrentanglement",
-    "nearestpolymat",
-    "nonparametricdistr",
-    "regionofattr",
-    "robustgeomprog",
-    "semidefinitepoly",
-    "shapeconregr",
-    "signomialmin",
-    "sparselmi",
-    "stabilitynumber",
-    ]
-
-perf = setup_benchmark_dataframe()
-isnothing(results_path) || CSV.write(results_path, perf)
 time_all = time()
 
 @testset "examples tests" begin
-@testset "$mod_type" for mod_type in model_types
-@testset "$ex_name" for ex_name in eval(Symbol(mod_type, "_example_names"))
+test_insts = Examples.get_test_instances()
+perf = Examples.setup_benchmark_dataframe()
+CSV.write(results_path, perf)
 
-include(joinpath(examples_dir, ex_name, mod_type * ".jl"))
-(ex_type, ex_insts) = include(joinpath(
-    examples_dir, ex_name, mod_type * "_test.jl"))
-ex_type_T = ex_type{Float64}
-
-for inst_set in instance_sets, (step_name, stepper) in stepper_options
+@testset "$mod, $ex" for (mod, mod_insts) in test_insts,
+    (ex, (ex_type, ex_insts)) in mod_insts
+@testset "$inst_set" for inst_set in inst_sets
     if inst_set == "compile"
         haskey(ex_insts, "various") || continue
         ex_insts["compile"] = ex_insts["various"]
@@ -114,16 +65,18 @@ for inst_set in instance_sets, (step_name, stepper) in stepper_options
     inst_subset = ex_insts[inst_set]
     isempty(inst_subset) && continue
 
-    info_perf = (; inst_set, :example => ex_name, :model_type => mod_type,
-        :real_T => Float64, :solver_options => (step_name,))
-    new_default_options = (; default_options..., stepper = stepper)
+    for (step_name, stepper) in stepper_options
+        info_perf = (; inst_set, :example => ex, :model_type => mod,
+            :real_T => Float64, :solver_options => (step_name,))
+        new_default_options = (; default_options..., stepper = stepper)
 
-    println("\nstarting $ex_type $inst_set tests")
-    @testset "$ex_type $inst_set" begin
-        run_instance_set(inst_subset, ex_type_T, info_perf, new_default_options,
-            script_verbose, perf, results_path)
+        str = "$mod $ex $inst_set $step_name"
+        println("\nstarting $str")
+        @testset "$str" begin
+            Examples.run_instance_set(inst_subset, ex_type{Float64}, info_perf,
+                new_default_options, script_verbose, perf, results_path)
+        end
     end
-end
 
 end
 end
@@ -131,6 +84,7 @@ end
 println("\n")
 DataFrames.show(perf, allrows = true, allcols = true)
 println("\n")
+flush(stdout); flush(stderr)
 end
 
 @printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)
