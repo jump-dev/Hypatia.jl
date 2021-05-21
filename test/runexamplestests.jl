@@ -53,8 +53,8 @@ perf = Examples.setup_benchmark_dataframe()
 end
 end
 
-println("\n")
-DataFrames.show(perf, allrows = true, allcols = true)
-println("\n")
+# println("\n")
+# DataFrames.show(perf, allrows = true, allcols = true)
+# println("\n")
 end
 ;
