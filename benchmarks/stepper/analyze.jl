@@ -104,7 +104,25 @@ end
 
 # generic functions without hardcoded enhancement names
 
+function post_process()
+    all_df = preprocess_df()
+    if isempty(all_df)
+        error("input CSV has no $keep_set set instances with a full list of runs")
+    end
+
+    make_agg_tables(all_df)
+    make_subtime_tables(all_df)
+
+    for comp in compare_pairs, metric in [:solve_time, :iters]
+        make_perf_profiles(all_df, comp, metric)
+    end
+    extra_stats(all_df)
+
+    return
+end
+
 process_entry(x::Float64) = @sprintf("%.2f", x)
+
 process_entry(x::Int) = string(x)
 
 function shifted_geomean(
@@ -354,23 +372,6 @@ function make_perf_profiles(all_df, comp, metric)
         CSV.write(joinpath(csv_dir, comp[s] * "_vs_" * comp[2 - s + 1] * "_" *
             string(metric) * ".csv"), DataFrame(x = x, y = y))
     end
-
-    return
-end
-
-function post_process()
-    all_df = preprocess_df()
-    if isempty(all_df)
-        error("input CSV has no $keep_set set instances with a full list of runs")
-    end
-
-    make_agg_tables(all_df)
-    make_subtime_tables(all_df)
-
-    for comp in compare_pairs, metric in [:solve_time, :iters]
-        make_perf_profiles(all_df, comp, metric)
-    end
-    extra_stats(all_df)
 
     return
 end

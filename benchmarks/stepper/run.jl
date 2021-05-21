@@ -9,6 +9,7 @@ import DataFrames
 import CSV
 import Hypatia
 import Hypatia.Solvers
+
 include(joinpath(@__DIR__, "../../examples/Examples.jl"))
 using Main.Examples
 
@@ -70,7 +71,7 @@ CSV.write(results_path, perf)
         new_default_options = (; default_options..., stepper = stepper)
 
         str = "$mod $ex $inst_set $step_name"
-        println("\nstarting $str tests")
+        println("\nstarting $str")
         @testset "$str" begin
             Examples.run_instance_set(inst_subset, ex_type{Float64}, info_perf,
                 new_default_options, script_verbose, perf, results_path)
@@ -83,6 +84,7 @@ end
 println("\n")
 DataFrames.show(perf, allrows = true, allcols = true)
 println("\n")
+flush(stdout); flush(stderr)
 end
 
 @printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)

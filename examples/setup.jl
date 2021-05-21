@@ -2,13 +2,6 @@
 utilities for benchmark scripts
 =#
 
-using Printf
-import DataFrames
-import CSV
-examples_dir = joinpath(@__DIR__, "../examples")
-include(joinpath(examples_dir, "common_JuMP.jl"))
-include(joinpath(examples_dir, "common_native.jl"))
-
 function setup_benchmark_dataframe()
     perf = DataFrames.DataFrame(
         example = String[],
@@ -54,9 +47,7 @@ function setup_benchmark_dataframe()
         total_time = Float64[],
         )
     DataFrames.allowmissing!(perf, 11:DataFrames.ncol(perf))
-    DataFrames.allowmissing!(perf, :extender)
-    DataFrames.allowmissing!(perf, :solver_options)
-    DataFrames.allowmissing!(perf, :nondefaults)
+    DataFrames.allowmissing!(perf, [:extender, :solver_options, :nondefaults])
     return perf
 end
 
@@ -125,11 +116,9 @@ function run_instance_set(
             total_time = @elapsed run_perf = run_instance(ex_type_T, inst...,
                 default_options = new_default_options, verbose = script_verbose)
 
-            new_perf = (;
-                info_perf..., run_perf..., total_time, inst_num,
+            new_perf = (; info_perf..., run_perf..., total_time, inst_num,
                 :solver => "Hypatia", :inst_data => inst[1],
-                :extender => extender_name, :nondefaults => nondefaults,
-                )
+                :extender => extender_name, :nondefaults => nondefaults)
             write_perf(perf, results_path, new_perf)
 
             @printf("%8.2e seconds\n", total_time)

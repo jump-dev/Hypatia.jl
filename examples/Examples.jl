@@ -1,5 +1,5 @@
 """
-Hypatia examples.
+Hypatia examples and script utilities.
 """
 module Examples
 
@@ -8,7 +8,6 @@ include("common_native.jl")
 include("common_JuMP.jl")
 
 include("setup.jl")
-include("spawn.jl")
 
 const model_types = [
     "native",
@@ -73,6 +72,9 @@ load_example(mod::String, ex::String) =
 get_test_instances(mod::String, ex::String) =
     include(joinpath(@__DIR__, ex, mod * "_test.jl"))
 
+get_benchmark_instances(mod::String, ex::String) =
+    include(joinpath(@__DIR__, ex, mod * "_benchmark.jl"))
+
 model_type_examples(mod::String) = eval(Symbol(mod, "_examples"))
 
 # load all examples
@@ -84,7 +86,7 @@ end
 function get_test_instances()
     test_insts = Dict{String, Dict}()
     for mod in model_types
-        mod_insts = test_insts[mod] = 
+        mod_insts = test_insts[mod] =
             Dict{String, Tuple{Type{<:ExampleInstance}, Dict}}()
         for ex in model_type_examples(mod)
             mod_insts[ex] = get_test_instances(mod, ex)
@@ -92,5 +94,6 @@ function get_test_instances()
     end
     return test_insts
 end
+
 
 end

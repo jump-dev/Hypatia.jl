@@ -2,9 +2,6 @@
 utilities for spawning benchmark runs
 =#
 
-using Distributed
-include(joinpath(@__DIR__, "setup.jl"))
-
 # reduce printing for worker
 Base.eval(Distributed, :(function redirect_worker_output(ident, stream)
     @async while !eof(stream)
@@ -74,12 +71,13 @@ end
 
 function spawn_instance(
     ex_name::String,
-    ex_type::Type{<:ExampleInstanceJuMP},
+    ex_type::Type{<:Examples.ExampleInstanceJuMP},
     compile_inst::Tuple,
     inst_data::Tuple,
     extender::Union{Symbol, Nothing},
     solver::Tuple,
-    solve::Bool;
+    solve::Bool,
+    num_threads::Int,
     )
     worker = addprocs(1, enable_threaded_blas = true,
         exeflags = `--threads $num_threads`)[1]
@@ -89,8 +87,8 @@ function spawn_instance(
         @eval import LinearAlgebra
         LinearAlgebra.BLAS.set_num_threads(num_threads)
         @eval using MosekTools
-        include(joinpath(examples_dir, "common_JuMP.jl"))
-        include(joinpath(examples_dir, ex_name, "JuMP.jl"))
+        include(joinpath(@__DIR__, "../../examples/Examples.jl"))
+        @eval using Main.Examples
         flush(stdout); flush(stderr)
         return
     end
@@ -98,7 +96,7 @@ function spawn_instance(
     original_stdout = stdout
     (out_rd, out_wr) = redirect_stdout() # don't print output
     @fetchfrom worker begin
-        run_instance(ex_type, compile_inst, extender, NamedTuple(), solver[2],
+        Examples.run_instance(ex_type, compile_inst, extender, NamedTuple(), solver[2],
             default_options = solver[3], test = false)
         flush(stdout); flush(stderr)
         return
@@ -112,7 +110,7 @@ function spawn_instance(
 
     setup_model_args = (ex_type, inst_data, extender, solver[3], solver[2])
     setup_fun() = @eval begin
-        (model, model_stats) = setup_model($setup_model_args...)
+        (model, model_stats) = Examples.setup_model($setup_model_args...)
         GC.gc()
         return model_stats
     end
@@ -128,7 +126,7 @@ function spawn_instance(
         println("\nsolve and check")
         print_memory()
         check_fun() = @eval begin
-            solve_stats = solve_check(model, test = false)
+            solve_stats = Examples.solve_check(model, test = false)
             return solve_stats
         end
         check_time = @elapsed (script_status, solve_stats) =

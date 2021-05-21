@@ -3,13 +3,21 @@ run natvsext benchmarks
 see natvsext/README.md
 =#
 
-using Hypatia
+using Test
+using Printf
+import DataFrames
+import CSV
+import Hypatia
 using MosekTools
-include(joinpath(@__DIR__, "../spawn.jl"))
 
-# path to write results DataFrame to CSV, if any
+include(joinpath(@__DIR__, "../../examples/Examples.jl"))
+using Main.Examples
+
+using Distributed
+include(joinpath(@__DIR__, "spawn.jl"))
+
+# path to write results DataFrame to CSV
 results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
-# results_path = nothing
 
 setup_model_anyway = true # keep setting up larger models even if last solve was killed
 # setup_model_anyway = false
@@ -35,6 +43,7 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     init_use_indirect = true, # skips dual equalities preprocessing
     use_dense_model = true,
     ))
+
 mosek_solver = ("Mosek", Mosek.Optimizer, (
     QUIET = !verbose,
     MSK_IPAR_NUM_THREADS = num_threads,
@@ -48,14 +57,14 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
     ))
 
 # instance sets and solvers to run
-instance_sets = [
+inst_sets = [
     ("nat", hyp_solver),
     ("ext", hyp_solver),
     ("ext", mosek_solver),
     ]
 
 # models to run
-JuMP_example_names = [
+JuMP_examples = [
     # Hypatia paper examples:
     # "densityest",
     # "doptimaldesign",
@@ -74,74 +83,70 @@ interrupt()
 @assert nprocs() == 1
 println()
 
-for ex_name in JuMP_example_names
-    include(joinpath(examples_dir, ex_name, "JuMP.jl"))
-end
-
 print_memory() = println("free memory (GB): ", Float64(Sys.free_memory()) / 2^30)
 print_memory()
 
-perf = setup_benchmark_dataframe()
-isnothing(results_path) || CSV.write(results_path, perf)
+extender_name(ext::Nothing) = missing
+extender_name(ext::Symbol) = string(ext)
+
+println("\nstarting benchmark runs")
 time_all = time()
 
-println("\nstarting benchmark runs\n")
-for ex_name in JuMP_example_names
-    (ex_type, ex_insts) = include(joinpath(
-        examples_dir, ex_name, "JuMP_benchmark.jl"))
-    ex_type_T = ex_type{Float64}
+@testset "examples tests" begin
+perf = Examples.setup_benchmark_dataframe()
+CSV.write(results_path, perf)
 
-    for (inst_set, solver) in instance_sets
-        haskey(ex_insts, inst_set) || continue
-        (extender, inst_subsets) = ex_insts[inst_set]
-        isempty(inst_subsets) && continue
+@testset "$ex" for ex in JuMP_examples
+(ex_type, ex_insts) = Examples.get_benchmark_instances("JuMP", ex)
+@testset "$inst_set, $(solver[1])" for (inst_set, solver) in inst_sets
+    haskey(ex_insts, inst_set) || continue
+    (extender, inst_subsets) = ex_insts[inst_set]
+    isempty(inst_subsets) && continue
 
-        info_perf = (; inst_set, :extender => string(extender),
-            :example => ex_name, :model_type => "JuMP", :real_T => Float64,
-            :solver_options => (), :solver => solver[1])
+    info_perf = (; inst_set, :example => ex, :model_type => "JuMP",
+        :real_T => Float64, :solver => solver[1],
+        :extender => extender_name(extender))
+    str = "$ex $inst_set $(solver[1])"
+    println("\nstarting $str")
 
-        println("\nstarting instances for $ex_type $inst_set\n")
-        for inst_subset in inst_subsets
-            solve = true
-            # first instance is only used for compilation
-            compile_inst = inst_subset[1]
+    for inst_subset in inst_subsets
+        solve = true
+        # first instance is only used for compilation
+        compile_inst = inst_subset[1]
+        for (inst_num, inst_data) in enumerate(inst_subset[2:end])
+            println("\nstarting $str $inst_num $inst_data")
+            flush(stdout); flush(stderr)
 
-            for (inst_num, inst_data) in enumerate(inst_subset[2:end])
-                println("\nstarting $ex_type $inst_set $(solver[1]) " *
-                    "$inst_num: $inst_data ...\n")
-                flush(stdout); flush(stderr)
+            total_time = @elapsed (setup_killed, check_killed, run_perf) =
+                spawn_instance(ex, ex_type{Float64}, compile_inst,
+                inst_data, extender, solver, solve, num_threads)
 
-                total_time = @elapsed (setup_killed, check_killed, run_perf) =
-                    spawn_instance(ex_name, ex_type_T, compile_inst,
-                    inst_data, extender, solver, solve)
+            new_perf = (; info_perf..., run_perf..., total_time,
+                inst_num, inst_data)
+            Examples.write_perf(perf, results_path, new_perf)
+            @printf("%8.2e seconds\n", total_time)
+            flush(stdout); flush(stderr)
 
-                new_perf = (; info_perf..., run_perf..., total_time,
-                    inst_num, inst_data)
-                write_perf(perf, results_path, new_perf)
-
-                @printf("%8.2e seconds\n", total_time)
-                flush(stdout); flush(stderr)
-
-                setup_killed && break
-                if check_killed
-                    if setup_model_anyway
-                        solve = false
-                    else
-                        break
-                    end
+            setup_killed && break
+            if check_killed
+                if setup_model_anyway
+                    solve = false
+                else
+                    break
                 end
             end
         end
     end
 end
+end
 
-interrupt()
-
-# flush(stdout); flush(stderr)
-# println("\n")
-# DataFrames.show(perf, allrows = true, allcols = true)
+flush(stdout); flush(stderr)
+println("\n")
+DataFrames.show(perf, allrows = true, allcols = true)
 println("\n")
 flush(stdout); flush(stderr)
+end
 
+interrupt()
 @printf("\nbenchmarks total time: %8.2e seconds\n\n", time() - time_all)
 ;
