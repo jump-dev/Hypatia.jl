@@ -96,7 +96,6 @@ function extra_stats(all_df)
         for nd in unique(nondef)
             println(nd)
         end
-        println()
     end
 
     return
@@ -175,11 +174,12 @@ function preprocess_df()
 
     # get converged instances, identify by instance key
     ok_status = ["Optimal", "PrimalInfeasible", "DualInfeasible"]
+    str_missing(s) = (ismissing(s) ? "" : string(s))
     transform!(all_df,
         :status => ByRow(x -> (!ismissing(x) && x in ok_status)) => :conv,
-        # identify instances by example + inst_data + extender
-        [:example, :inst_data, :extender] =>
-        ((x, y, z) -> x .* y .* z) => :inst_key,
+        # identify instances by example + model_type + inst_data + extender
+        [:example, :model_type, :inst_data, :extender] =>
+        ((s1, s2, s3, s4) -> s1 .* s2 .* s3 .* str_missing.(s4)) => :inst_key,
         )
 
     # assumes that nothing returned incorrect status, which is checked manually
@@ -360,7 +360,7 @@ function make_perf_profiles(all_df, comp, metric)
         :enhancement,
         [metric, :conv] => ByRow((x, y) -> (y ? x : NaN)) => metric,
         )
-    wide_df = unstack(pp, :enhancement, metric, allowduplicates = true)
+    wide_df = unstack(pp, :enhancement, metric)
 
     (x_plot, y_plot, max_ratio) = BenchmarkProfiles.performance_profile_data(
         Matrix{Float64}(wide_df[!, string.(comp)]), logscale = true)
