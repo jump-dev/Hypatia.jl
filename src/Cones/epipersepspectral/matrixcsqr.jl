@@ -452,12 +452,14 @@ function update_dder3_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     @inbounds for k in 1:d
         ∇3h_k = ∇3h[k]
         idx_ij = 1
+        kd = d * (k - 1)
         for j in 1:k
             ∇3h_j = ∇3h[j]
             Δh_jk = Δh[j, k]
             ijk = d * (idx_jk - 1 + j)
             jik = d * idx_jk + j
             kij = d * (idx_ij - 1) + k
+            jd = d * (j - 1)
 
             @inbounds for i in 1:j
                 denom_ij = viw_λ_Δ[idx_ij]
@@ -466,10 +468,10 @@ function update_dder3_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
                     if iszero(denom_ik)
                         t = (∇3h[i] + ∇3h_j + ∇3h_k) * i6
                     else
-                        t = (Δh[i, j] - Δh_jk) / denom_ik
+                        t = (Δh[jd + i] - Δh_jk) / denom_ik
                     end
                 else
-                    t = (Δh[i, k] - Δh_jk) / denom_ij
+                    t = (Δh[kd + i] - Δh_jk) / denom_ij
                 end
 
                 Δ2h[ijk + i] = Δ2h[jik] = Δ2h[kij] = t
