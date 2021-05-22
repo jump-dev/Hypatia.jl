@@ -26,7 +26,7 @@ mutable struct MatrixCSqrCache{T <: Real, R <: RealOrComplex{T}} <: CSqrCache{T}
     ∇h::Vector{T}
     ∇2h::Vector{T}
     ∇3h::Vector{T}
-    viw_λ_ij::Vector{T}
+    viw_λ_Δ::Vector{T}
     Δh::Matrix{T}
     Δ2h::Matrix{T}
     θ::Matrix{T}
@@ -57,7 +57,7 @@ function setup_csqr_cache(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R
     cache.∇h = zeros(T, d)
     cache.∇2h = zeros(T, d)
     cache.∇3h = zeros(T, d)
-    cache.viw_λ_ij = zeros(T, svec_length(d))
+    cache.viw_λ_Δ = zeros(T, svec_length(d))
     cache.Δh = zeros(T, d, d)
     cache.Δ2h = zeros(T, d, svec_length(d))
     cache.θ = zeros(T, d, d)
@@ -169,12 +169,12 @@ function update_hess_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     w_λi = cache.w_λi
     ∇h = cache.∇h
     ∇2h = cache.∇2h
-    viw_λ_ij = cache.viw_λ_ij
+    viw_λ_Δ = cache.viw_λ_Δ
     Δh = cache.Δh
 
     h_der2(∇2h, viw_λ, cone.h)
 
-    # setup viw_λ_ij
+    # setup viw_λ_Δ
     rteps = sqrt(eps(T))
     idx = 1
     @inbounds for j in 1:cone.d
@@ -182,13 +182,13 @@ function update_hess_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
         for i in 1:(j - 1)
             t = viw_λ[i] - λ_j
             if abs(t) < rteps
-                viw_λ_ij[idx] = 0
+                viw_λ_Δ[idx] = 0
             else
-                viw_λ_ij[idx] = t
+                viw_λ_Δ[idx] = t
             end
             idx += 1
         end
-        viw_λ_ij[idx] = 0
+        viw_λ_Δ[idx] = 0
         idx += 1
     end
 
@@ -198,7 +198,7 @@ function update_hess_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
         ∇h_j = ∇h[j]
         Δh[j, j] = ∇2h_j = ∇2h[j]
         for i in 1:(j - 1)
-            denom = viw_λ_ij[idx]
+            denom = viw_λ_Δ[idx]
             if iszero(denom)
                 Δh[i, j] = (∇2h[i] + ∇2h_j) / 2
             else
@@ -436,10 +436,11 @@ end
 function update_dder3_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     @assert !cone.dder3_aux_updated
     cone.hess_aux_updated || update_hess_aux(cone)
+    d = cone.d
     cache = cone.cache
     viw_λ = cache.viw_λ
     ∇3h = cache.∇3h
-    viw_λ_ij = cache.viw_λ_ij
+    viw_λ_Δ = cache.viw_λ_Δ
     Δh = cache.Δh
     Δ2h = cache.Δ2h
 
@@ -447,18 +448,21 @@ function update_dder3_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
 
     # setup Δ2h
     i6 = inv(T(6))
-    idx_jk = 1
-    @inbounds for k in 1:cone.d
+    idx_jk = 0
+    @inbounds for k in 1:d
         ∇3h_k = ∇3h[k]
         idx_ij = 1
         for j in 1:k
             ∇3h_j = ∇3h[j]
             Δh_jk = Δh[j, k]
+            ijk = d * (idx_jk - 1 + j)
+            jik = d * idx_jk + j
+            kij = d * (idx_ij - 1) + k
+
             @inbounds for i in 1:j
-                idx_ik = svec_idx(k, i)
-                denom_ij = viw_λ_ij[idx_ij]
+                denom_ij = viw_λ_Δ[idx_ij]
                 if iszero(denom_ij)
-                    denom_ik = viw_λ_ij[idx_ik]
+                    denom_ik = viw_λ_Δ[idx_jk + i]
                     if iszero(denom_ik)
                         t = (∇3h[i] + ∇3h_j + ∇3h_k) * i6
                     else
@@ -468,11 +472,14 @@ function update_dder3_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
                     t = (Δh[i, k] - Δh_jk) / denom_ij
                 end
 
-                Δ2h[i, idx_jk] = Δ2h[j, idx_ik] = Δ2h[k, idx_ij] = t
+                Δ2h[ijk + i] = Δ2h[jik] = Δ2h[kij] = t
+
                 idx_ij += 1
+                jik += d
+                kij += d
             end
-            idx_jk += 1
         end
+        idx_jk += k
     end
 
     cone.dder3_aux_updated = true
