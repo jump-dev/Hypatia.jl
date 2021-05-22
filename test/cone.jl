@@ -55,8 +55,8 @@ function test_oracles(
     init_only && return
 
     # perturb and scale the initial point
-    perturb_scale(point, noise, scale)
-    perturb_scale(dual_point, noise, inv(scale))
+    perturb_scale!(point, noise, scale)
+    perturb_scale!(dual_point, noise, inv(scale))
 
     Cones.reset_data(cone)
     Cones.load_point(cone, point)
@@ -100,7 +100,7 @@ function test_oracles(
     if Cones.use_dder3(cone)
         @test -Cones.dder3(cone, point) ≈ grad atol=tol rtol=tol
 
-        dir = perturb_scale(zeros(T, dim), noise, one(T))
+        dir = perturb_scale!(zeros(T, dim), noise, one(T))
         dder3 = Cones.dder3(cone, dir)
         @test dot(dder3, point) ≈ dot(dir, hess * dir) atol=tol rtol=tol
     end
@@ -122,7 +122,7 @@ function test_barrier(
 
     point = zeros(T, dim)
     Cones.set_initial_point!(point, cone)
-    perturb_scale(point, noise, scale)
+    perturb_scale!(point, noise, scale)
 
     Cones.reset_data(cone)
     Cones.load_point(cone, point)
@@ -152,7 +152,7 @@ end
 # show time and memory allocation for oracles
 function show_time_alloc(
     cone::Cones.Cone{T};
-    noise::T = T(1e-1),
+    noise::T = T(1e-4),
     scale::T = T(1e-1),
     ) where {T <: Real}
     Random.seed!(1)
@@ -165,10 +165,12 @@ function show_time_alloc(
 
     point = zeros(T, dim)
     Cones.set_initial_point!(point, cone)
+    perturb_scale!(point, noise, scale)
     Cones.load_point(cone, point)
     @assert Cones.is_feas(cone)
 
     dual_point = -Cones.grad(cone)
+    perturb_scale!(dual_point, noise, inv(scale))
     Cones.load_dual_point(cone, dual_point)
     @assert Cones.is_dual_feas(cone)
 
@@ -221,7 +223,7 @@ function show_time_alloc(
     return
 end
 
-function perturb_scale(
+function perturb_scale!(
     point::Vector{T},
     noise::T,
     scale::T,
