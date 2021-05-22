@@ -30,6 +30,7 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     ϕ::T
     ζ::T
     ζi::T
+    ϕζidi::T
     tempw1::Vector{T}
     tempw2::Vector{T}
 
@@ -100,8 +101,8 @@ function update_grad(cone::HypoGeoMean)
 
     ζi = cone.ζi = inv(cone.ζ)
     cone.grad[1] = ζi
-    gconst = -cone.di * cone.ϕ * ζi - 1
-    @. @views cone.grad[2:end] = gconst / w
+    ϕζidi = cone.ϕζidi = cone.ϕ * ζi * cone.di
+    @. @views cone.grad[2:end] = -(ϕζidi + 1) / w
 
     cone.grad_updated = true
     return cone.grad
@@ -113,19 +114,18 @@ function update_hess(cone::HypoGeoMean)
     H = cone.hess.data
     u = cone.point[1]
     @views w = cone.point[2:end]
-    ζ = cone.ζ
     ζi = cone.ζi
     di = cone.di
-    ϕz = di * cone.ϕ / ζ
-    ϕzm1 = ϕz - di
-    constww = ϕz * (1 + ϕzm1) + 1
+    ϕζidi = cone.ϕζidi
+    ϕzm1 = ϕζidi - di
+    constww = ϕζidi * (1 + ϕzm1) + 1
 
     H[1, 1] = abs2(ζi)
     @inbounds for j in eachindex(w)
         j1 = j + 1
         wj = w[j]
-        ϕzwj = ϕz / wj
-        H[1, j1] = -ϕzwj / ζ
+        ϕzwj = ϕζidi / wj
+        H[1, j1] = -ϕzwj * ζi
         ϕzwj2 = ϕzwj * ϕzm1
         @inbounds for i in 1:(j - 1)
             H[i + 1, j1] = ϕzwj2 / w[i]
@@ -145,22 +145,20 @@ function hess_prod!(
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
-    ζ = cone.ζ
-    ζi = cone.ζi
     di = cone.di
-    ϕz = di * cone.ϕ / ζ
-    ϕzm1 = ϕz - di
-    constww = ϕz + 1
+    ζi = cone.ζi
+    ϕ = cone.ϕ
+    rwi = cone.tempw1
 
     @inbounds @views for j in 1:size(arr, 2)
         p = arr[1, j]
-        pζ = p / ζ
-        prod_w = prod[2:end, j]
-        @. prod_w = arr[2:end, j] / w
-        c0 = sum(prod_w)
-        prod[1, j] = (pζ - ϕz * c0) * ζi
-        dot1 = ϕz * (-pζ + ϕzm1 * c0)
-        @. prod_w = (dot1 + constww * prod_w) / w
+        r = arr[2:end, j]
+        @. rwi = r / w
+        c0 = sum(rwi) * di
+        c1 = -ζi * (p - ϕ * c0) * ζi
+        prod[1, j] = -c1
+        # ∇2h[r] = ϕ * (c0 - rwi) / w * di
+        @. prod[2:end, j] = ϕ * (c1 - ζi * (c0 - rwi)) * di / w + r / w / w
     end
 
     return prod
@@ -230,29 +228,28 @@ function dder3(cone::HypoGeoMean, dir::AbstractVector)
     p = dir[1]
     @views r = dir[2:end]
     ϕ = cone.ϕ
-    ζ = cone.ζ
     ζi = cone.ζi
+    ϕζidi = cone.ϕζidi
 
     rwi = cone.tempw1
     @. rwi = r / w
     c0 = sum(rwi) * di
+    rwi_sqr = sum(abs2, rwi) * di
 
-    ξb = cone.tempw2
-    # ∇2h[r] = ϕ * (c0 - rwi) / w * di
-    @. ξb = ζi * ϕ * (c0 - rwi) / w * di
     ζiχ = ζi * (p - ϕ * c0)
-    ξbξ = dot(ξb, r) / 2
+    ξbξ = ζi * ϕ * (c0^2 - rwi_sqr) / 2
     c1 = -ζi * (ζiχ^2 - ξbξ)
 
     c2 = -ζi / 2
-    rwi2 = sum(abs2, rwi) * di
-    w_aux = ξb
+    w_aux = cone.tempw2
+    # ∇2h[r] = ϕ * (c0 - rwi) / w * di
+    @. w_aux = ϕζidi * (c0 - rwi) / w
     w_aux .*= ζiχ
     # add c2 * ∇3h[r, r]
-    @. w_aux += c2 * ϕ * ((c0 -  rwi)^2 - rwi2 + rwi^2) * di / w
+    @. w_aux -= c2 * ϕ * ((c0 - rwi)^2 - rwi_sqr + rwi^2) * di / w
 
     dder3[1] = c1
-    @. dder3[2:end] = (abs2(rwi) - c1 * ϕ * di) / w - w_aux
+    @. dder3[2:end] = (abs2(rwi) - c1 * ϕ * di) / w + w_aux
 
     return dder3
 end

@@ -159,20 +159,19 @@ function hess_prod!(
     u = cone.point[1]
     @views w = cone.point[2:end]
     alpha = cone.alpha
-    ζ = cone.ζ
     ζi = cone.ζi
-    wϕu = cone.ϕ / ζ
-    wϕum1 = wϕu - 1
-    aw = alpha ./ w # TODO
-    awwϕu = wϕu * aw # TODO
+    ϕ = cone.ϕ
+    rwi = cone.tempw1
 
     @inbounds @views for j in 1:size(arr, 2)
         p = arr[1, j]
         r = arr[2:end, j]
-        pζ = p * ζi
-        prod[1, j] = (pζ - dot(awwϕu, r)) * ζi
-        dot1 = -pζ + wϕum1 * dot(r, aw)
-        @. prod[2:end, j] = dot1 * awwϕu + (awwϕu * r + r / w) / w
+        @. rwi = r / w
+        c0 = dot(rwi, alpha)
+        c1 = -ζi * (p - ϕ * c0) * ζi
+        prod[1, j] = -c1
+        # ∇2h[r] = ϕ * (c0 - rwi) / w * alpha
+        @. prod[2:end, j] = ϕ * (c1 - ζi * (c0 - rwi)) * alpha / w + r / w / w
     end
 
     return prod
@@ -187,29 +186,27 @@ function dder3(cone::HypoPowerMean, dir::AbstractVector)
     p = dir[1]
     @views r = dir[2:end]
     ϕ = cone.ϕ
-    ζ = cone.ζ
     ζi = cone.ζi
 
     rwi = cone.tempw1
     @. rwi = r / w
     c0 = dot(rwi, alpha)
+    rwi_sqr = sum(abs2(rwij) * aj for (rwij, aj) in zip(rwi, alpha))
 
-    ξb = cone.tempw2
-    # ∇2h[r] = ϕ * (c0 - rwi .* alpha) / w
-    @. ξb = ζi * ϕ * (c0 - rwi) * alpha / w
     ζiχ = ζi * (p - ϕ * c0)
-    ξbξ = dot(ξb, r) / 2
+    ξbξ = ζi * ϕ * (c0^2 - rwi_sqr) / 2
     c1 = -ζi * (ζiχ^2 - ξbξ)
 
     c2 = -ζi / 2
-    rwi2 = sum(abs2(rwij) * aj for (rwij, aj) in zip(rwi, alpha))
-    w_aux = ξb
+    w_aux = cone.tempw2
+    # ∇2h[r] = ϕ * (c0 - rwi) / w * alpha
+    @. w_aux = ζi * ϕ * (c0 - rwi) / w * alpha
     w_aux .*= ζiχ
     # add c2 * ∇3h[r, r]
-    @. w_aux += c2 * ϕ * ((c0 -  rwi)^2 - rwi2 + rwi^2) * alpha / w
+    @. w_aux -= c2 * ϕ * ((c0 - rwi)^2 - rwi_sqr + rwi^2) * alpha / w
 
     dder3[1] = c1
-    @. dder3[2:end] = (abs2(rwi) - c1 * ϕ * alpha) / w - w_aux
+    @. dder3[2:end] = (abs2(rwi) - c1 * ϕ * alpha) / w + w_aux
 
     return dder3
 end
