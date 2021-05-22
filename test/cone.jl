@@ -211,7 +211,7 @@ function show_time_alloc(
     end
 
     if Cones.use_dder3(cone)
-        println("thdd")
+        println("dder3")
         @time Cones.dder3(cone, point1)
     end
 
