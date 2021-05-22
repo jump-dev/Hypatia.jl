@@ -34,6 +34,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     mat3::Matrix{R}
     mat4::Matrix{R}
     fact_W
+    di::T
     ϕ::T
     ζ::T
     ζi::T
@@ -82,6 +83,7 @@ function setup_extra_data!(
     cone.W = zeros(R, d, d)
     cone.Wi_vec = zeros(T, dim - 1)
     cone.tempw = zeros(T, dim - 1)
+    cone.di = inv(T(d))
     return cone
 end
 
@@ -140,6 +142,7 @@ function update_grad(
     u = cone.point[1]
     g = cone.grad
     ζi = cone.ζi = inv(cone.ζ)
+    di = cone.di
 
     g[1] = ζi
     # TODO in-place
@@ -147,9 +150,9 @@ function update_grad(
     # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0)) # TODO inplace for bigfloat
     cone.Wi = inv(cone.fact_W)
     smat_to_svec!(cone.Wi_vec, cone.Wi, cone.rt2)
-    ϕζidi = cone.ϕζidi = cone.ϕ * ζi / cone.d
+    ϕζidi = cone.ϕζidi = cone.ϕ * ζi * di
     @. @views g[2:end] = -(ϕζidi + 1) * cone.Wi_vec
-    cone.dot_const = ϕζidi * (ϕζidi - inv(T(cone.d)))
+    cone.dot_const = ϕζidi * (ϕζidi - di)
 
     cone.grad_updated = true
     return cone.grad
@@ -194,7 +197,7 @@ function hess_prod!(
     @assert cone.grad_updated
     ϕ = cone.ϕ
     ζi = cone.ζi
-    di = inv(cone.d)
+    di = cone.di
     Wi = Hermitian(cone.Wi, :U)
     w_aux = cone.mat3
 
@@ -288,7 +291,7 @@ function dder3(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where T
     @views r = dir[2:end]
     ϕ = cone.ϕ
     ζi = cone.ζi
-    di = inv(cone.d)
+    di = cone.di
     w_aux = cone.mat4
 
     Wi = Hermitian(cone.Wi, :U)
