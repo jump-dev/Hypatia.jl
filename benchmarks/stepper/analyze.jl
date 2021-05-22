@@ -195,9 +195,11 @@ end
 
 function make_agg_tables(all_df)
     conv = all_df[!, :conv]
+    # values to replace unconverged instances for the "all" group
     max_time = maximum(all_df[!, :solve_time][conv])
     max_iter = maximum(all_df[!, :iters][conv])
 
+    # collect aggregated summary statistics
     df_agg = combine(groupby(all_df, :enhancement),
         [:solve_time, :conv] => ((x, y) ->
             shifted_geomean(x, y, shift = time_shift)) => :time_geomean_thisconv,
@@ -226,6 +228,8 @@ function make_agg_tables(all_df)
     sort!(df_agg, order(:enhancement, by = (x ->
         findfirst(isequal(x), lowercase.(enhancements)))))
     CSV.write(joinpath(stats_dir, "agg.csv"), df_agg)
+
+    # prepare latex table
 
     # combine feasible and infeasible statuses
     transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] =>
@@ -275,7 +279,7 @@ function make_subtime_tables(all_df)
     max_getdir = maximum(all_df[!, :time_getdir][conv])
     max_search = maximum(all_df[!, :time_search][conv])
 
-    # get maximum values to use as caps for the "all" subset
+    # get values to use as caps for the "all" subset (ignore NaNs from 0 iterations)
     skipnan(x) = (isnan(x) ? 0 : x)
     max_upsys_iter = maximum(skipnan, all_df[!, :time_upsys_piter][conv])
     max_uprhs_iter = maximum(skipnan, all_df[!, :time_uprhs_piter][conv])
@@ -324,6 +328,8 @@ function make_subtime_tables(all_df)
 
         return subtime_df
     end
+
+    # prepare latex table
 
     sep = " & "
     for s in sets
