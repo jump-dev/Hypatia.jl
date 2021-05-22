@@ -26,6 +26,7 @@ mutable struct MatrixCSqrCache{T <: Real, R <: RealOrComplex{T}} <: CSqrCache{T}
     ∇h::Vector{T}
     ∇2h::Vector{T}
     ∇3h::Vector{T}
+    viw_λ_ij::Vector{T}
     Δh::Matrix{T}
     Δ2h::Matrix{T}
     θ::Matrix{T}
@@ -56,6 +57,7 @@ function setup_csqr_cache(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R
     cache.∇h = zeros(T, d)
     cache.∇2h = zeros(T, d)
     cache.∇3h = zeros(T, d)
+    cache.viw_λ_ij = zeros(T, svec_length(d))
     cache.Δh = zeros(T, d, d)
     cache.Δ2h = zeros(T, d, svec_length(d))
     cache.θ = zeros(T, d, d)
@@ -167,24 +169,44 @@ function update_hess_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     w_λi = cache.w_λi
     ∇h = cache.∇h
     ∇2h = cache.∇2h
+    viw_λ_ij = cache.viw_λ_ij
     Δh = cache.Δh
 
     h_der2(∇2h, viw_λ, cone.h)
 
+    # setup viw_λ_ij
     rteps = sqrt(eps(T))
+    idx = 1
     @inbounds for j in 1:cone.d
-        viw_λ_j = viw_λ[j]
-        ∇h_j = ∇h[j]
-        ∇2h_j = ∇2h[j]
+        λ_j = viw_λ[j]
         for i in 1:(j - 1)
-            denom = viw_λ[i] - viw_λ_j
-            if abs(denom) < rteps
+            t = viw_λ[i] - λ_j
+            if abs(t) < rteps
+                viw_λ_ij[idx] = 0
+            else
+                viw_λ_ij[idx] = t
+            end
+            idx += 1
+        end
+        viw_λ_ij[idx] = 0
+        idx += 1
+    end
+
+    # setup Δh
+    idx = 1
+    @inbounds for j in 1:cone.d
+        ∇h_j = ∇h[j]
+        Δh[j, j] = ∇2h_j = ∇2h[j]
+        for i in 1:(j - 1)
+            denom = viw_λ_ij[idx]
+            if iszero(denom)
                 Δh[i, j] = (∇2h[i] + ∇2h_j) / 2
             else
                 Δh[i, j] = (∇h[i] - ∇h_j) / denom
             end
+            idx += 1
         end
-        Δh[j, j] = ∇2h_j
+        idx += 1
     end
 
     ζivi = cache.ζi / cone.point[2]
@@ -414,37 +436,47 @@ end
 function update_dder3_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     @assert !cone.dder3_aux_updated
     cone.hess_aux_updated || update_hess_aux(cone)
-    d = cone.d
     cache = cone.cache
     viw_λ = cache.viw_λ
     ∇3h = cache.∇3h
+    viw_λ_ij = cache.viw_λ_ij
     Δh = cache.Δh
     Δ2h = cache.Δ2h
 
     h_der3(∇3h, viw_λ, cone.h)
 
-    rteps = sqrt(eps(T))
-    @inbounds for k in 1:d, j in 1:k, i in 1:j
-        (viw_λ_i, viw_λ_j, viw_λ_k) = (viw_λ[i], viw_λ[j], viw_λ[k])
-        (∇3h_i, ∇3h_j, ∇3h_k) = (∇3h[i], ∇3h[j], ∇3h[k])
-        denom_ij = viw_λ_i - viw_λ_j
-        denom_ik = viw_λ_i - viw_λ_k
+    # setup Δ2h
+    i6 = inv(T(6))
+    idx_jk = 1
+    @inbounds for k in 1:cone.d
+        ∇3h_k = ∇3h[k]
+        idx_ij = 1
+        for j in 1:k
+            ∇3h_j = ∇3h[j]
+            Δh_jk = Δh[j, k]
+            @inbounds for i in 1:j
+                idx_ik = svec_idx(k, i)
+                denom_ij = viw_λ_ij[idx_ij]
+                if iszero(denom_ij)
+                    denom_ik = viw_λ_ij[idx_ik]
+                    if iszero(denom_ik)
+                        t = (∇3h[i] + ∇3h_j + ∇3h_k) * i6
+                    else
+                        t = (Δh[i, j] - Δh_jk) / denom_ik
+                    end
+                else
+                    t = (Δh[i, k] - Δh_jk) / denom_ij
+                end
 
-        if abs(denom_ij) < rteps
-            if abs(denom_ik) < rteps
-                t = (∇3h_i + ∇3h_j + ∇3h_k) / 6
-            else
-                t = (Δh[i, j] - Δh[j, k]) / denom_ik
+                Δ2h[i, idx_jk] = Δ2h[j, idx_ik] = Δ2h[k, idx_ij] = t
+                idx_ij += 1
             end
-        else
-            t = (Δh[i, k] - Δh[j, k]) / denom_ij
+            idx_jk += 1
         end
-
-        Δ2h[i, svec_idx(k, j)] = Δ2h[j, svec_idx(k, i)] =
-            Δ2h[k, svec_idx(j, i)] = t
     end
 
     cone.dder3_aux_updated = true
+    return
 end
 
 function dder3(
@@ -491,10 +523,16 @@ function dder3(
 
     w_aux = ξb
     w_aux .*= ζiχ + viq
+    ξ_X_views = [view(ξ_X, :, j) for j in 1:d]
     col = 1
-    @inbounds for j in 1:d, i in 1:j
-        w_aux[i, j] -= ζi * sum(ξ_X[k, i]' * ξ_X[k, j] * Δ2h[k, col] for k in 1:d)
-        col += 1
+    @inbounds for j in 1:d
+        ξ_Xj = ξ_X_views[j]
+        for i in 1:j
+            ξ_Xi = ξ_X_views[i]
+            @views Δ2h_ij = Δ2h[:, col]
+            w_aux[i, j] -= ζi * dot(ξ_Xi, Diagonal(Δ2h_ij), ξ_Xj)
+            col += 1
+        end
     end
     @inbounds c2 = sum(viw_λ[i] * real(w_aux[i, i]) for i in 1:d)
 

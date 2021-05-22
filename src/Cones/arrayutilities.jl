@@ -87,7 +87,7 @@ The side dimension of a real symmetric matrix with vectorized triangle length
 `len::Int`.
 """
 function svec_side(len::Int)
-    side = round(Int, sqrt(0.25 + 2 * len) - 0.5)
+    side = div(isqrt(1 + 8 * len), 2)
     @assert side * (side + 1) == 2 * len
     return side
 end
@@ -106,14 +106,18 @@ function svec_side(::Type{<:Complex}, len::Int)
     return side
 end
 
-
 """
 $(SIGNATURES)
 
 The index in the vectorized triangle of a symmetric matrix for element
 (`row::Int`, `col::Int`).
 """
-svec_idx(row::Int, col::Int) = (svec_length(row - 1) + col)
+function svec_idx(row::Int, col::Int)
+    if row < col
+        (row, col) = (col, row)
+    end
+    return div((row - 1) * row, 2) + col
+end
 
 """
 $(SIGNATURES)
