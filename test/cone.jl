@@ -70,31 +70,31 @@ function test_oracles(
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
 
     hess = Matrix(Cones.hess(cone))
-    inv_hess = Matrix(Cones.inv_hess(cone))
-    @test hess * inv_hess ≈ I atol=tol rtol=tol
+    # inv_hess = Matrix(Cones.inv_hess(cone))
+    # @test hess * inv_hess ≈ I atol=tol rtol=tol
 
     @test hess * point ≈ -grad atol=tol rtol=tol
     @test Cones.hess_prod!(prod_vec, point, cone) ≈ -grad atol=tol rtol=tol
-    @test Cones.inv_hess_prod!(prod_vec, grad, cone) ≈ -point atol=tol rtol=tol
+    # @test Cones.inv_hess_prod!(prod_vec, grad, cone) ≈ -point atol=tol rtol=tol
+    #
+    # prod_mat = zeros(T, dim, dim)
+    # @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    # @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
 
-    prod_mat = zeros(T, dim, dim)
-    @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
-    @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
-
-    if hasproperty(cone, :use_hess_prod_slow)
-        Cones.update_use_hess_prod_slow(cone)
-        @test cone.use_hess_prod_slow_updated
-        @test !cone.use_hess_prod_slow
-        cone.use_hess_prod_slow = true
-        @test Cones.hess_prod_slow!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
-    end
-
-    if Cones.use_sqrt_hess_oracles(cone)
-        prod_mat2 = Matrix(Cones.sqrt_hess_prod!(prod_mat, inv_hess, cone)')
-        @test Cones.sqrt_hess_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
-        Cones.inv_sqrt_hess_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
-        @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
-    end
+    # if hasproperty(cone, :use_hess_prod_slow)
+    #     Cones.update_use_hess_prod_slow(cone)
+    #     @test cone.use_hess_prod_slow_updated
+    #     @test !cone.use_hess_prod_slow
+    #     cone.use_hess_prod_slow = true
+    #     @test Cones.hess_prod_slow!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    # end
+    #
+    # if Cones.use_sqrt_hess_oracles(cone)
+    #     prod_mat2 = Matrix(Cones.sqrt_hess_prod!(prod_mat, inv_hess, cone)')
+    #     @test Cones.sqrt_hess_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+    #     Cones.inv_sqrt_hess_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+    #     @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+    # end
 
     # test third order deriv oracle
     if Cones.use_dder3(cone)
@@ -144,6 +144,9 @@ function test_barrier(
         fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s ->
             ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), point)
         @test -2 * Cones.dder3(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
+
+        diff = -2 * Cones.dder3(cone, dir) - fd_third_dir
+        @show diff
     end
 
     return
@@ -180,45 +183,45 @@ function show_time_alloc(
     println("is_feas")
     @time Cones.is_feas(cone)
 
-    Cones.load_dual_point(cone, dual_point)
-    println("is_dual_feas")
-    @time Cones.is_dual_feas(cone)
+    # Cones.load_dual_point(cone, dual_point)
+    # println("is_dual_feas")
+    # @time Cones.is_dual_feas(cone)
 
     println("grad")
     @time Cones.grad(cone)
     println("hess")
     @time Cones.hess(cone)
-    println("inv_hess")
-    @time Cones.inv_hess(cone)
+    # println("inv_hess")
+    # @time Cones.inv_hess(cone)
 
     point1 = randn(T, dim)
-    point2 = zero(point1)
-    println("hess_prod")
-    @time Cones.hess_prod!(point2, point1, cone)
-    println("inv_hess_prod")
-    @time Cones.inv_hess_prod!(point2, point1, cone)
+    # point2 = zero(point1)
+    # println("hess_prod")
+    # @time Cones.hess_prod!(point2, point1, cone)
+    # println("inv_hess_prod")
+    # @time Cones.inv_hess_prod!(point2, point1, cone)
 
-    if hasproperty(cone, :use_hess_prod_slow)
-        cone.use_hess_prod_slow_updated = true
-        cone.use_hess_prod_slow = true
-        println("hess_prod_slow")
-        @time Cones.hess_prod_slow!(point2, point1, cone)
-    end
-
-    if Cones.use_sqrt_hess_oracles(cone)
-        println("sqrt_hess_prod")
-        @time Cones.sqrt_hess_prod!(point2, point1, cone)
-        println("inv_sqrt_hess_prod")
-        @time Cones.inv_sqrt_hess_prod!(point2, point1, cone)
-    end
+    # if hasproperty(cone, :use_hess_prod_slow)
+    #     cone.use_hess_prod_slow_updated = true
+    #     cone.use_hess_prod_slow = true
+    #     println("hess_prod_slow")
+    #     @time Cones.hess_prod_slow!(point2, point1, cone)
+    # end
+    #
+    # if Cones.use_sqrt_hess_oracles(cone)
+    #     println("sqrt_hess_prod")
+    #     @time Cones.sqrt_hess_prod!(point2, point1, cone)
+    #     println("inv_sqrt_hess_prod")
+    #     @time Cones.inv_sqrt_hess_prod!(point2, point1, cone)
+    # end
 
     if Cones.use_dder3(cone)
         println("dder3")
         @time Cones.dder3(cone, point1)
     end
 
-    println("in_neighborhood")
-    @time Cones.in_neighborhood(cone, one(T), one(T))
+    # println("in_neighborhood")
+    # @time Cones.in_neighborhood(cone, one(T), one(T))
 
     return
 end
@@ -729,7 +732,7 @@ function test_oracles(C::Type{<:Cones.EpiTrRelEntropyTri})
 end
 
 function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T}}) where T
-    dW = 2
+    dW = 3
     dw = Cones.svec_length(dW)
     function barrier(s)
         (u, v, w) = (s[1], s[1 .+ (1:dw)], s[(2 + dw):end])
@@ -737,10 +740,11 @@ function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T}}) where T
         W = new_herm(w, dW, T)
         return -log(u - dot(W, log(W) - log(V))) - logdet_pd(V) - logdet_pd(W)
     end
-    test_barrier(C(1 + 2 * dw), barrier, tol = 1e8 * eps(T))
+    # test_barrier(C(1 + 2 * dw), barrier, tol = 1e8 * eps(T))
+    test_barrier(C(1 + 2 * dw), barrier)
 end
 
-show_time_alloc(C::Type{<:Cones.EpiTrRelEntropyTri}) = show_time_alloc(C(13))
+show_time_alloc(C::Type{<:Cones.EpiTrRelEntropyTri}) = show_time_alloc(C(1 + 2 * Cones.svec_length(100)))
 
 
 # WSOSInterpNonnegative
