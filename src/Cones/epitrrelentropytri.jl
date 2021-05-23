@@ -523,14 +523,14 @@ println("tr2")
     @inbounds for j in 1:d, i in 1:j
         col_idx = 1
         ijeq = (i == j)
-        di = block_idxs(d, i)
-        dj = block_idxs(d, j)
+        di = d * (i - 1)
+        dj = d * (j - 1)
         for l in 1:d, k in 1:l
             rho = (k == l ? (ijeq ? T(0.5) : rt2i) : (ijeq ? rt2i : one(T)))
-            dlk = block_idxs(d, l)[k]
-            dkl = block_idxs(d, k)[l]
-            dji = dj[i]
-            dij = di[j]
+            dlk = d * (l - 1) + k
+            dkl = d * (k - 1) + l
+            dji = dj + i
+            dij = di + j
             mat[row_idx, col_idx] = rho * (
                 temp[dji, dlk] + temp[dij, dlk] + temp[dji, dkl] + temp[dij, dkl])
             col_idx += 1
