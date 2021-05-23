@@ -99,9 +99,9 @@ end
 function update_grad(cone::LinMatrixIneq{T}) where {T <: Real}
     @assert cone.is_feas
 
-    sumAinvAs = cone.sumAinvAs = [Hermitian(cone.fact.L \ (cone.fact.L \ A_i)')
-        for A_i in cone.As]
-    @inbounds for (i, mat_i) in enumerate(sumAinvAs)
+    L = cone.fact.L
+    cone.sumAinvAs = [Hermitian(L \ (L \ A_i)', :U) for A_i in cone.As]
+    @inbounds for (i, mat_i) in enumerate(cone.sumAinvAs)
         cone.grad[i] = -tr(mat_i)
     end
 

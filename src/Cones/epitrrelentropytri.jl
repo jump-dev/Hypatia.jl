@@ -49,6 +49,7 @@ mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
     Δ2_V::Matrix{T}
     Δ2_W::Matrix{T}
     Δ3_V::Array{T, 3}
+    Δ3_W::Array{T, 3}
     V_fact::Eigen{T}
     W_fact::Eigen{T}
     V_λ_log::Vector{T}
@@ -99,6 +100,7 @@ function setup_extra_data!(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     cone.Δ2_V = zeros(T, d, d)
     cone.Δ2_W = zeros(T, d, d)
     cone.Δ3_V = zeros(T, d, d, d)
+    cone.Δ3_W = zeros(T, d, d, d)
     cone.V_λ_log = zeros(T, d)
     cone.W_λ_log = zeros(T, d)
     cone.V_log = zeros(T, d, d)
@@ -192,10 +194,9 @@ function update_grad(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     spectral_outer!(W_sim, V_vecs', Symmetric(cone.W, :U), mat)
     @. mat = W_sim * Δ2_V
     spectral_outer!(mat2, V_vecs, Symmetric(mat, :U), mat3)
-    mat2 .*= zi
     @views smat_to_svec!(cone.dzdV, mat2, rt2)
 
-    axpby!(-1, Vi, -1, mat2)
+    axpby!(-1, Vi, -zi, mat2)
     @views smat_to_svec!(g[cone.V_idxs], mat2, rt2)
 
     cone.grad_updated = true
@@ -214,15 +215,16 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     Δ2_V = Symmetric(cone.Δ2_V, :U)
     Δ2_W = Symmetric(cone.Δ2_W, :U)
     Δ3_V = cone.Δ3_V
-    dzdV = cone.dzdV
     dzdW = cone.dzdW
     dz_sqr_dV_sqr = cone.dz_sqr_dV_sqr
     dz_sqr_dW_sqr = cone.dz_sqr_dW_sqr
     dz_sqr_dW_dV = cone.dz_sqr_dW_dV
     H = cone.hess.data
 
+    dzdVzi = zi * cone.dzdV
+
     H[1, 1] = abs2(zi)
-    @. H[1, V_idxs] = zi * dzdV
+    @time @. H[1, V_idxs] = zi * dzdVzi
     @. H[1, W_idxs] = zi * dzdW
 
     Δ2!(Δ2_W.data, W_λ, cone.W_λ_log)
@@ -234,7 +236,7 @@ println("trvv")
     @. dz_sqr_dV_sqr *= -1
     @views Hvv = H[V_idxs, V_idxs]
     symm_kron!(Hvv, cone.Vi, rt2)
-    mul!(Hvv, dzdV, dzdV', true, true)
+    mul!(Hvv, dzdVzi, dzdVzi', true, true)
     @. Hvv += zi * dz_sqr_dV_sqr
 
     grad_logm!(dz_sqr_dW_sqr, W_vecs, cone.matsdim1, cone.matsdim2,
@@ -248,7 +250,7 @@ println("trvv")
         cone.tempsdim, Δ2_V, rt2)
     @views Hvw = H[V_idxs, W_idxs]
     @. Hvw = -zi * dz_sqr_dW_dV
-    mul!(Hvw, dzdV, dzdW', true, true)
+    mul!(Hvw, dzdVzi, dzdW', true, true)
 
     cone.hess_updated = true
     return cone.hess
@@ -259,76 +261,93 @@ function dder3(
     dir::AbstractVector{T},
     ) where {T <: Real}
     @assert cone.hess_updated
-    d = cone.d
-    dder3 = cone.dder3
+    rt2 = cone.rt2
     V_idxs = cone.V_idxs
     W_idxs = cone.W_idxs
-    z = cone.z
+    zi = inv(cone.z)
     (V_λ, V_vecs) = cone.V_fact
     (W_λ, W_vecs) = cone.W_fact
     Vi = Symmetric(cone.Vi, :U)
     Wi = Symmetric(cone.Wi, :U)
-    dzdV = cone.dzdV * z
-    dzdW = cone.dzdW * z
     Δ2_V = Symmetric(cone.Δ2_V, :U)
     Δ2_W = Symmetric(cone.Δ2_W, :U)
     Δ3_V = cone.Δ3_V
+    Δ3_W = cone.Δ3_W
     W_sim = cone.W_sim
-    dz_sqr_dV_sqr = cone.dz_sqr_dV_sqr
-    dlogW_dW = cone.dz_sqr_dW_sqr
-    dlogV_dV = cone.dz_sqr_dW_dV
-
+    dzdV = cone.dzdV
+    dzdW = cone.dzdW
     mat = cone.mat
     mat2 = cone.mat2
     mat3 = cone.mat3
+    dder3 = cone.dder3
+
+
+    # TODO do in a update_dder3_aux function
+    Δ3!(Δ3_W, Δ2_W, W_λ)
 
     u_dir = dir[1]
     @views v_dir = dir[V_idxs]
     @views w_dir = dir[W_idxs]
 
+    # TODO prealloc
+    V_dir = Symmetric(zero(mat), :U)
+    W_dir = Symmetric(zero(mat), :U)
+    V_dir_sim = zero(mat)
+    W_dir_sim = zero(mat)
+    VW_dir_sim = zero(mat)
+    W_part_1 = zero(mat)
+    V_part_1 = zero(mat)
+    d3WlogVdV = zero(mat)
 
-println("start")
+
+    svec_to_smat!(V_dir.data, v_dir, rt2)
+    svec_to_smat!(W_dir.data, w_dir, rt2)
+    spectral_outer!(V_dir_sim, V_vecs', V_dir, mat)
+    spectral_outer!(W_dir_sim, W_vecs', W_dir, mat)
+    spectral_outer!(VW_dir_sim, V_vecs', W_dir, mat)
+
+
+    d = cone.d
+
+    # TODO improve
+println("diff_dots")
 @time begin
-    @views V_dir = Symmetric(svec_to_smat!(
-        zeros(T, d, d), dir[V_idxs], cone.rt2), :U)
-    @views W_dir = Symmetric(svec_to_smat!(
-        zeros(T, d, d), dir[W_idxs], cone.rt2), :U)
-    V_dir_sim = V_vecs' * V_dir * V_vecs
-    W_dir_sim = W_vecs' * W_dir * W_vecs
-
-    Δ3_W = zeros(T, d, d, d)
-    Δ3!(Δ3_W, Δ2_W, W_λ)
-
-    VW_dir_sim = V_vecs' * W_dir * V_vecs
     diff_dot_V_VV = [V_dir_sim[:, q]' * Diagonal(Δ3_V[:, p, q]) *
         V_dir_sim[:, p] for p in 1:d, q in 1:d]
-    d2logV_dV2_VV = V_vecs * diff_dot_V_VV * V_vecs'
     diff_dot_V_VW = [V_dir_sim[:, q]' * Diagonal(Δ3_V[:, p, q]) *
         VW_dir_sim[:, p] for p in 1:d, q in 1:d]
     diff_dot_W_WW = [W_dir_sim[:, q]' * Diagonal(Δ3_W[:, p, q]) *
         W_dir_sim[:, p] for p in 1:d, q in 1:d]
+end
 
-    dlogV_dV_dw = Symmetric(svec_to_smat!(
-        zeros(T, d, d), dlogV_dV * w_dir, cone.rt2), :U)
-    dlogV_dV_dv = Symmetric(svec_to_smat!(
-        zeros(T, d, d), dlogV_dV * v_dir, cone.rt2), :U)
-    dlogW_dW_dw = Symmetric(svec_to_smat!(
-        zeros(T, d, d), dlogW_dW * w_dir, cone.rt2), :U)
-    dz_sqr_dV_sqr_dv = Symmetric(svec_to_smat!(
-        zeros(T, d, d), dz_sqr_dV_sqr * v_dir, cone.rt2), :U)
-    const0 = (u_dir + dot(dzdV, v_dir) + dot(dzdW, w_dir)) / z
-    const1 = abs2(const0) + (dot(v_dir, dz_sqr_dV_sqr, v_dir) / 2 +
-        dot(w_dir, dlogW_dW, w_dir) / 2 - dot(v_dir, dlogV_dV, w_dir)) / z
+
+    Vvd = cone.dz_sqr_dV_sqr * v_dir
+    Wwd = cone.dz_sqr_dW_sqr * w_dir
+    WVvd = cone.dz_sqr_dW_dV * v_dir
+    WVwd = cone.dz_sqr_dW_dV * w_dir
+
+    const0 = zi * (u_dir + dot(v_dir, dzdV)) + dot(w_dir, dzdW)
+    const1 = abs2(const0) + zi * (-dot(v_dir, WVwd) +
+        (dot(v_dir, Vvd) + dot(w_dir, Wwd)) / 2)
+
+
+    V_part_1a = const0 * (Vvd - WVwd)
+    svec_to_smat!(V_part_1, V_part_1a, rt2)
+
+    W_part_1a = Wwd - WVvd
+    svec_to_smat!(W_part_1, W_part_1a, rt2)
+    spectral_outer!(mat2, V_vecs, Symmetric(diff_dot_V_VV, :U), mat)
+    axpby!(true, mat2, const0, W_part_1)
+
 
     # u
-    dder3[1] = const1
-end
+    ziconst1 = dder3[1] = zi * const1
+
+    # v
 
 println("v1")
 @time begin
-    # v
-    Δ4_ij = zeros(T, d, d)
-    d3WlogVdV = zeros(T, d, d)
+    Δ4_ij = mat
     Vds = V_dir_sim
     Ws = W_sim
     @inbounds for j in 1:d, i in 1:j
@@ -345,32 +364,27 @@ println("v1")
     copytri!(d3WlogVdV, 'U')
 end
 
-println("end")
-@time begin
-    V_part_1 = (dz_sqr_dV_sqr_dv - dlogV_dV_dw) * const0
-    sqrt_λ = sqrt.(V_λ)
-    rdiv!(V_dir_sim, Diagonal(sqrt_λ))
+    rdiv!(V_dir_sim, Diagonal(sqrt.(V_λ)))
     ldiv!(Diagonal(V_λ), V_dir_sim)
-    V_part_2a = V_dir_sim * V_dir_sim'
-    V_part_2 = V_vecs * (diff_dot_V_VW + diff_dot_V_VW' +
-        d3WlogVdV + V_part_2a * z) * V_vecs'
-    V_dder3 = V_part_1 + V_part_2
-    @views smat_to_svec!(dder3[V_idxs], V_dder3, cone.rt2)
-    @. @views dder3[V_idxs] += dzdV * const1
+    V_part_2 = d3WlogVdV
+    @. V_part_2 += diff_dot_V_VW + diff_dot_V_VW'
+    mul!(V_part_2, V_dir_sim, V_dir_sim', true, zi)
+    mul!(mat, Symmetric(V_part_2, :U), V_vecs')
+    mul!(V_part_1, V_vecs, mat, true, zi)
+    @views dder3_V = dder3[V_idxs]
+    smat_to_svec!(dder3_V, V_part_1, rt2)
+    @. dder3_V += ziconst1 * dzdV
 
     # w
-    W_part_1 = const0 * (dlogW_dW_dw - dlogV_dV_dv) + d2logV_dV2_VV
-    sqrt_λ = sqrt.(W_λ)
-    rdiv!(W_dir_sim, Diagonal(sqrt_λ))
+    rdiv!(W_dir_sim, Diagonal(sqrt.(W_λ)))
     ldiv!(Diagonal(W_λ), W_dir_sim)
-    W_part_2a = W_dir_sim * W_dir_sim'
-    W_part_2 = W_vecs * (W_part_2a * z - diff_dot_W_WW) * W_vecs'
-    W_dder3 = W_part_1 + W_part_2
-    @views smat_to_svec!(dder3[W_idxs], W_dder3, cone.rt2)
-    @. @views dder3[W_idxs] += dzdW * const1
-
-    dder3 .*= inv(z)
-end
+    W_part_2 = diff_dot_W_WW
+    mul!(W_part_2, W_dir_sim, W_dir_sim', true, -zi)
+    mul!(mat, Symmetric(W_part_2, :U), W_vecs')
+    mul!(W_part_1, W_vecs, mat, true, zi)
+    @views dder3_W = dder3[W_idxs]
+    smat_to_svec!(dder3_W, W_part_1, rt2)
+    @. dder3_W += const1 * dzdW
 
     return dder3
 end
