@@ -38,6 +38,7 @@ const JuMP_examples = [
     "convexityparameter",
     "covarianceest",
     "densityest",
+    "discretemaxlikelihood",
     "doptimaldesign",
     "entanglementassisted",
     "experimentdesign",
