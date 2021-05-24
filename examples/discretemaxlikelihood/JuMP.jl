@@ -15,7 +15,7 @@ function build(inst::DiscreteMaxLikelihood{T}) where {T <: Float64}
 
     model = JuMP.Model()
     JuMP.@variables(model, begin
-        p[1:d] >= 0
+        p[1:d]
         prodp
     end)
     JuMP.@constraints(model, begin
