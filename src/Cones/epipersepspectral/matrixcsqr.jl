@@ -211,6 +211,7 @@ function update_hess_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
 
     ζivi = cache.ζi / cone.point[2]
     @. cache.θ = ζivi * Δh + w_λi * w_λi'
+    copytri!(cache.θ, 'U')
 
     cone.hess_aux_updated = true
 end
@@ -262,7 +263,7 @@ function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
 
     # Hww
     @views Hww = H[3:end, 3:end]
-    eig_kron!(Hww, cache.θ, cone)
+    eig_dot_kron!(Hww, cache.θ, viw_X, w1, w2, cache.w3, cache.w4, rt2)
     mul!(Hww, Hwu, Hwu', true, true)
 
     cone.hess_updated = true
@@ -382,7 +383,7 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     # Hiww
     @views Hiww = Hi[3:end, 3:end]
     @. wT = inv(cache.θ)
-    eig_kron!(Hiww, wT, cone)
+    eig_dot_kron!(Hiww, wT, viw_X, w1, w2, cache.w3, cache.w4, rt2)
     mul!(Hiww, γ_vec, γ_vec', c4, true)
 
     cone.inv_hess_updated = true
@@ -559,55 +560,4 @@ function dder3(
     @views smat_to_svec!(dder3[3:end], w_aux, cache.rt2)
 
     return dder3
-end
-
-function eig_kron!(
-    Hww::AbstractMatrix{T},
-    dot_mat::Matrix{T},
-    cone::EpiPerSepSpectral{<:MatrixCSqr{T}},
-    ) where T
-    rt2 = sqrt(T(2))
-    rt2i = inv(rt2)
-    d = cone.d
-    cache = cone.cache
-    w1 = cache.w1
-    w2 = cache.w2
-    w3 = cache.w3
-    V = cache.w4
-    copyto!(V, cache.viw_X') # allows column slices
-
-    col_idx = 1
-    @inbounds for j in 1:d
-        @views V_j = V[:, j]
-        for i in 1:(j - 1)
-            @views V_i = V[:, i]
-            mul!(w2, V_j, V_i', rt2i, zero(T))
-
-            @. w3 = w2 + w2'
-            w3 .*= dot_mat
-            mul!(w1, Hermitian(w3, :U), V)
-            mul!(w3, V', w1)
-            @views smat_to_svec!(Hww[:, col_idx], w3, rt2)
-            col_idx += 1
-
-            if cache.is_complex
-                w2 *= im
-                @. w3 = w2 + w2'
-                w3 .*= dot_mat
-                mul!(w1, Hermitian(w3, :U), V)
-                mul!(w3, V', w1)
-                @views smat_to_svec!(Hww[:, col_idx], w3, rt2)
-                col_idx += 1
-            end
-        end
-
-        mul!(w3, V_j, V_j')
-        w3 .*= dot_mat
-        mul!(w1, Hermitian(w3, :U), V)
-        mul!(w3, V', w1)
-        @views smat_to_svec!(Hww[:, col_idx], w3, rt2)
-        col_idx += 1
-    end
-
-    return Hww
 end

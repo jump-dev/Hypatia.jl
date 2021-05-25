@@ -86,9 +86,9 @@ end
 # helpers for spectral outer products
 
 function spectral_outer!(
-    mat::Matrix{T},
+    mat::AbstractMatrix{T},
     vecs::Union{Matrix{T}, Adjoint{T, Matrix{T}}},
-    diag::Vector{T},
+    diag::AbstractVector{T},
     temp::Matrix{T},
     ) where {T <: Real}
     mul!(temp, vecs, Diagonal(diag))
@@ -97,7 +97,7 @@ function spectral_outer!(
 end
 
 function spectral_outer!(
-    mat::Matrix{T},
+    mat::AbstractMatrix{T},
     vecs::Union{Matrix{T}, Adjoint{T, Matrix{T}}},
     symm::Symmetric{T},
     temp::Matrix{T},

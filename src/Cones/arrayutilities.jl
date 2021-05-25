@@ -381,3 +381,44 @@ function spectral_kron_element!(
     end
     return skr
 end
+
+# compute a real symmetric Kronecker-like outer product of a real or complex
+# matrix of eigenvectors and a real symmetric matrix
+function eig_dot_kron!(
+    skr::AbstractMatrix{T},
+    inner::Matrix{T},
+    vecs::Matrix{R},
+    temp1::Matrix{R},
+    temp2::Matrix{R},
+    temp3::Matrix{R},
+    V::Matrix{R},
+    rt2::T,
+    ) where {T <: Real, R <: RealOrComplex{T}}
+    @assert issymmetric(inner) # must be symmetric (wrapper is less efficient)
+    rt2i = inv(rt2)
+    d = size(inner, 1)
+    copyto!(V, vecs') # allows fast column slices
+    V_views = [view(V, :, i) for i in 1:size(inner, 1)]
+    scals = (R <: Complex{T} ? (rt2i, rt2i * im) : (rt2i,)) # real and imag parts
+
+    col_idx = 1
+    @inbounds for (j, V_j) in enumerate(V_views)
+        for i in 1:(j - 1), scal in scals
+            mul!(temp3, V_j, V_views[i]', scal, false)
+            @. temp2 = inner * (temp3 + temp3')
+            mul!(temp1, Hermitian(temp2, :U), V)
+            mul!(temp2, V', temp1)
+            @views smat_to_svec!(skr[:, col_idx], temp2, rt2)
+            col_idx += 1
+        end
+
+        mul!(temp2, V_j, V_j')
+        temp2 .*= inner
+        mul!(temp1, Hermitian(temp2, :U), V)
+        mul!(temp2, V', temp1)
+        @views smat_to_svec!(skr[:, col_idx], temp2, rt2)
+        col_idx += 1
+    end
+
+    return skr
+end

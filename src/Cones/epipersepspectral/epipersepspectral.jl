@@ -40,7 +40,6 @@ mutable struct EpiPerSepSpectral{Q <: ConeOfSquares, T <: Real} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
-    dder3_updated::Bool
     hess_aux_updated::Bool
     inv_hess_aux_updated::Bool
     dder3_aux_updated::Bool
@@ -69,8 +68,7 @@ end
 
 reset_data(cone::EpiPerSepSpectral) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated =
-    cone.inv_hess_aux_updated = cone.dder3_updated =
-    cone.dder3_aux_updated = false)
+    cone.inv_hess_aux_updated = cone.dder3_aux_updated = false)
 
 use_sqrt_hess_oracles(cone::EpiPerSepSpectral) = false
 

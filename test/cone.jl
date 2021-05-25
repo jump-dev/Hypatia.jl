@@ -727,13 +727,14 @@ show_time_alloc(C::Type{<:Cones.EpiRelEntropy}) = show_time_alloc(C(9))
 
 # EpiTrRelEntropyTri
 function test_oracles(C::Type{<:Cones.EpiTrRelEntropyTri})
-    for dW in [1, 2, 4]
+    for dW in [1, 2, 3]#, 4]
+        println("\n\n$dW")
         test_oracles(C(1 + 2 * Cones.svec_length(dW)), init_tol = 1e-4)
     end
-    for dW in [6, 10]
-        test_oracles(C(1 + 2 * Cones.svec_length(dW)), init_tol = 1e-1,
-            init_only = true)
-    end
+    # for dW in [6, 10]
+    #     test_oracles(C(1 + 2 * Cones.svec_length(dW)), init_tol = 1e-1,
+    #         init_only = true)
+    # end
 end
 
 function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T}}) where T
@@ -745,7 +746,6 @@ function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T}}) where T
         W = new_herm(w, dW, T)
         return -log(u - dot(W, log(W) - log(V))) - logdet_pd(V) - logdet_pd(W)
     end
-    # test_barrier(C(1 + 2 * dw), barrier, tol = 1e8 * eps(T))
     test_barrier(C(1 + 2 * dw), barrier, TFD = BigFloat)
 end
 
