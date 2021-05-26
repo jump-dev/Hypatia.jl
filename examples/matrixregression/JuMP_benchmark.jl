@@ -5,7 +5,7 @@ matrixregression_insts = [
         (30, vcat(50:50:150, 250:250:1500)))
     ]
 
-insts = Dict()
+insts = OrderedDict()
 insts["nat"] = (nothing, matrixregression_insts)
 insts["ext"] = (:SOCExpPSD, matrixregression_insts)
 return (MatrixRegressionJuMP, insts)

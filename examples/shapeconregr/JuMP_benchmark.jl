@@ -58,7 +58,7 @@ shapeconregr_insts(use_nat::Bool) = [
     for nds in shapeconregr_n_ds
     ]
 
-insts = Dict()
+insts = OrderedDict()
 insts["nat"] = (nothing, shapeconregr_insts(true))
 insts["ext"] = (:SOCExpPSD, shapeconregr_insts(false))
 return (ShapeConRegrJuMP, insts)

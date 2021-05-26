@@ -1,6 +1,6 @@
 
 relaxed_infeas_tols = (tol_infeas = 1e-9,)
-insts = Dict()
+insts = OrderedDict()
 insts["minimal"] = [
     ((0.7, 4, 1e-3, true, true),),
     ((0.7, 4, 1e-3, false, true), :SOCExpPSD),

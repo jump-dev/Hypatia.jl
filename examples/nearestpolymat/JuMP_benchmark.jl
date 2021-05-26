@@ -38,7 +38,7 @@ nearestpolymat_n_d_ms = [
     ],
     ]
 
-insts = Dict()
+insts = OrderedDict()
 insts["nat"] = (nothing, [[(n, d, m, false, true, false)
     for (n, d, m) in ndms] for ndms in nearestpolymat_n_d_ms])
 insts["ext"] = (nothing, [[(n, d, m, true, false, false)

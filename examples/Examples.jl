@@ -3,6 +3,8 @@ Hypatia examples and script utilities.
 """
 module Examples
 
+import DataStructures: OrderedDict
+
 include("common.jl")
 include("common_native.jl")
 include("common_JuMP.jl")
@@ -83,12 +85,12 @@ for mod in model_types, ex in model_type_examples(mod)
     load_example(mod, ex)
 end
 
-# build dictionary of all test instances
+# build ordered dictionary of all test instances
 function get_test_instances()
-    test_insts = Dict{String, Dict}()
+    test_insts = OrderedDict{String, Dict}()
     for mod in model_types
         mod_insts = test_insts[mod] =
-            Dict{String, Tuple{Type{<:ExampleInstance}, Dict}}()
+            OrderedDict{String, Tuple{Type{<:ExampleInstance}, Dict}}()
         for ex in model_type_examples(mod)
             mod_insts[ex] = get_test_instances(mod, ex)
         end

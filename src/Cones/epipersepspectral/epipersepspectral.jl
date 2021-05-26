@@ -28,7 +28,6 @@ mutable struct EpiPerSepSpectral{Q <: ConeOfSquares, T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     d::Int
     dim::Int
-    nu::Int
 
     point::Vector{T}
     dual_point::Vector{T}
@@ -61,7 +60,6 @@ mutable struct EpiPerSepSpectral{Q <: ConeOfSquares, T <: Real} <: Cone{T}
         cone.use_dual_barrier = use_dual
         cone.d = d
         cone.dim = 2 + vector_dim(Q, d)
-        cone.nu = 2 + d
         return cone
     end
 end
@@ -77,6 +75,8 @@ function setup_extra_data!(cone::EpiPerSepSpectral)
     setup_csqr_cache(cone)
     return cone
 end
+
+get_nu(cone::EpiPerSepSpectral) = 2 + cone.d
 
 include("vectorcsqr.jl")
 include("matrixcsqr.jl")
