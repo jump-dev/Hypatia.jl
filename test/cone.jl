@@ -115,6 +115,7 @@ function test_barrier(
     noise::T = T(1e-1),
     scale::T = T(1e-1),
     tol::Real = 1e4 * eps(T),
+    TFD::Type{<:Real} = T,
     ) where {T <: Real}
     Random.seed!(1)
     dim = Cones.dimension(cone)
@@ -128,21 +129,25 @@ function test_barrier(
     Cones.load_point(cone, point)
     @test Cones.is_feas(cone)
 
-    fd_grad = ForwardDiff.gradient(barrier, point)
+    TFD_point = TFD.(point)
+
+    fd_grad = ForwardDiff.gradient(barrier, TFD_point)
     @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
 
     dir = 10 * randn(T, dim)
-    barrier_dir(s, t) = barrier(s + t * dir)
+    TFD_dir = TFD.(dir)
 
-    fd_hess_dir = ForwardDiff.gradient(s ->
-        ForwardDiff.derivative(t -> barrier_dir(s, t), 0), point)
+    barrier_dir(s, t) = barrier(s + t * TFD_dir)
+
+    fd_hess_dir = ForwardDiff.gradient(s -> ForwardDiff.derivative(t ->
+        barrier_dir(s, t), 0), TFD_point)
     @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
     prod_vec = zero(dir)
     @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
 
     if Cones.use_dder3(cone)
         fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s ->
-            ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), point)
+            ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), TFD_point)
         @test -2 * Cones.dder3(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
     end
 
@@ -729,7 +734,7 @@ function test_oracles(C::Type{<:Cones.EpiTrRelEntropyTri})
 end
 
 function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T}}) where T
-    dW = 2
+    dW = 3
     dw = Cones.svec_length(dW)
     function barrier(s)
         (u, v, w) = (s[1], s[1 .+ (1:dw)], s[(2 + dw):end])
@@ -737,7 +742,7 @@ function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T}}) where T
         W = new_herm(w, dW, T)
         return -log(u - dot(W, log(W) - log(V))) - logdet_pd(V) - logdet_pd(W)
     end
-    test_barrier(C(1 + 2 * dw), barrier, tol = 1e8 * eps(T))
+    test_barrier(C(1 + 2 * dw), barrier, TFD = BigFloat)
 end
 
 show_time_alloc(C::Type{<:Cones.EpiTrRelEntropyTri}) = show_time_alloc(C(13))

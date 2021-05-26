@@ -13,6 +13,7 @@ using SparseArrays
 import Hypatia.RealOrComplex
 import Hypatia.chol_inv!
 import Hypatia.update_eigen!
+import Hypatia.spectral_outer!
 import Hypatia.DenseSymCache
 import Hypatia.DensePosDefCache
 import Hypatia.load_matrix

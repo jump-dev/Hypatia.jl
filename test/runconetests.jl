@@ -36,7 +36,7 @@ function cone_types(T::Type{<:Real})
         Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, T},
         Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, T},
         Cones.EpiRelEntropy{T},
-        Cones.EpiTrRelEntropyTri{T}, # TODO tighten tol on test_barrier
+        Cones.EpiTrRelEntropyTri{T},
         Cones.WSOSInterpNonnegative{T, T},
         Cones.WSOSInterpNonnegative{T, Complex{T}},
         Cones.WSOSInterpPosSemidefTri{T},

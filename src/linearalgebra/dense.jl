@@ -71,6 +71,7 @@ outer_prod!(
     ) where {R <: RealOrComplex} =
     mul!(B, A', A, alpha, beta)
 
+
 # ensure diagonal terms in symm/herm are not too small
 function increase_diag!(A::Matrix{<:RealOrComplex{T}}) where {T <: Real}
     diag_pert = 1 + T(1e-5)
@@ -80,6 +81,32 @@ function increase_diag!(A::Matrix{<:RealOrComplex{T}}) where {T <: Real}
     end
     return A
 end
+
+
+# helpers for spectral outer products
+
+function spectral_outer!(
+    mat::AbstractMatrix{T},
+    vecs::Union{Matrix{T}, Adjoint{T, Matrix{T}}},
+    diag::AbstractVector{T},
+    temp::Matrix{T},
+    ) where {T <: Real}
+    mul!(temp, vecs, Diagonal(diag))
+    mul!(mat, temp, vecs')
+    return mat
+end
+
+function spectral_outer!(
+    mat::AbstractMatrix{T},
+    vecs::Union{Matrix{T}, Adjoint{T, Matrix{T}}},
+    symm::Symmetric{T},
+    temp::Matrix{T},
+    ) where {T <: Real}
+    mul!(temp, vecs, symm)
+    mul!(mat, temp, vecs')
+    return mat
+end
+
 
 #=
 nonsymmetric: LU
