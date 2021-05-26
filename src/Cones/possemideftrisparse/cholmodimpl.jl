@@ -48,19 +48,18 @@ end
 
 function setup_extra_data!(
     cone::PosSemidefTriSparse{PSDSparseCholmod, T, R},
-    ) where {R <: RealOrComplex{T}} where {T <: BlasReal}
+    ) where {T <: BlasReal, R <: RealOrComplex{T}}
     cone.cache = cache = PSDSparseCholmodCache{T, R}()
 
     # setup symbolic factorization
     side = cone.side
     dim_R = length(cone.row_idxs)
-    cm = CHOLMOD.common
 
     fake_point = [R(l) for l in 1:dim_R]
     sparse_point = cache.sparse_point = CHOLMOD.Sparse(Hermitian(
         sparse(cone.row_idxs, cone.col_idxs, fake_point, side, side), :L))
     sparse_point_map = cache.sparse_point_map = zeros(Int, dim_R)
-    sx_ptr = unsafe_load(pointer(sparse_point)).x
+    sx_ptr = Ptr{R}(unsafe_load(sparse_point.ptr).x)
     for l in 1:dim_R
         sparse_point_map[Int(unsafe_load(sx_ptr, l))] = l
     end
@@ -184,14 +183,16 @@ function setup_extra_data!(
     return
 end
 
-function update_feas(cone::PosSemidefTriSparse{PSDSparseCholmod})
+function update_feas(
+    cone::PosSemidefTriSparse{PSDSparseCholmod, T, R},
+    ) where {T <: BlasReal, R <: RealOrComplex{T}}
     @assert !cone.feas_updated
     point = cone.point
     cache = cone.cache
     sparse_point = cache.sparse_point
 
     # svec scale point and copy directly to CHOLDMOD Sparse data structure
-    sx_ptr = unsafe_load(pointer(sparse_point)).x
+    sx_ptr = Ptr{R}(unsafe_load(sparse_point.ptr).x)
     if cone.is_complex
         idx = 1
         @inbounds for (p_idx, s_idx) in enumerate(cache.sparse_point_map)
@@ -224,14 +225,16 @@ function update_feas(cone::PosSemidefTriSparse{PSDSparseCholmod})
     return cone.is_feas
 end
 
-function update_grad(cone::PosSemidefTriSparse{PSDSparseCholmod})
+function update_grad(
+    cone::PosSemidefTriSparse{PSDSparseCholmod, T, R},
+    ) where {T <: BlasReal, R <: RealOrComplex{T}}
     @assert cone.is_feas
     cache = cone.cache
     num_cols = cache.num_cols
     num_rows = cache.num_rows
 
     # update L blocks from CHOLMOD numerical factorization
-    lx_ptr = unsafe_load(pointer(cache.symb_mat)).x
+    lx_ptr = Ptr{R}(unsafe_load(pointer(cache.symb_mat)).x)
     @inbounds for k in 1:length(num_cols)
         L_block = cache.L_blocks[k]
         for (l, lx_idx) in enumerate(cache.L_idxs[k])
