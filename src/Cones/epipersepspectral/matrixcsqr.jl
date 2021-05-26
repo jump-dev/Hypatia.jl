@@ -357,6 +357,7 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     Hi = cone.inv_hess.data
     cache = cone.cache
+    rt2 = cache.rt2
     viw_X = cache.viw_X
     c4 = cache.c4
     wT = cache.wT
@@ -373,11 +374,11 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     @views γ_vec = Hi[3:end, 2]
     mul!(w2, Diagonal(cache.γ), viw_X')
     mul!(w1, viw_X, w2)
-    smat_to_svec!(γ_vec, w1, cache.rt2)
+    smat_to_svec!(γ_vec, w1, rt2)
     @. Hi[2, 3:end] = c4 * γ_vec
     mul!(w2, Diagonal(cache.α), viw_X')
     mul!(w1, viw_X, w2)
-    smat_to_svec!(HiuW, w1, cache.rt2)
+    smat_to_svec!(HiuW, w1, rt2)
     @. HiuW += Hiuv * γ_vec
 
     # Hiww
