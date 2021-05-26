@@ -143,8 +143,8 @@ function update_feas(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     for (X, idxs) in zip((cone.V, cone.W), (cone.V_idxs, cone.W_idxs))
         @views svec_to_smat!(X, point[idxs], cone.rt2)
     end
-    VH = Symmetric(cone.V, :U)
-    WH = Symmetric(cone.W, :U)
+    VH = Hermitian(cone.V, :U)
+    WH = Hermitian(cone.W, :U)
     if isposdef(VH) && isposdef(WH)
         # TODO use LAPACK syev! instead of syevr! for efficiency
         V_fact = cone.V_fact = eigen(VH)
@@ -157,7 +157,7 @@ function update_feas(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
                 spectral_outer!(X_log, vecs, λ_log, cone.mat)
             end
             @. cone.WV_log = cone.W_log - cone.V_log
-            cone.z = point[1] - dot(WH, Symmetric(cone.WV_log, :U))
+            cone.z = point[1] - dot(WH, Hermitian(cone.WV_log, :U))
             cone.is_feas = (cone.z > 0)
         end
     end
@@ -286,23 +286,35 @@ function dder3(
     zi = inv(cone.z)
     (V_λ, V_vecs) = cone.V_fact
     (W_λ, W_vecs) = cone.W_fact
-    Vi = Symmetric(cone.Vi, :U)
-    Wi = Symmetric(cone.Wi, :U)
-    W_sim = cone.W_sim
-    Δ2_W = cone.Δ2_W
     Δ3_V = cone.Δ3_V
     Δ3_W = cone.Δ3_W
     dzdV = cone.dzdV
     dzdW = cone.dzdW
     mat = cone.mat
     mat2 = cone.mat2
-    mat3 = cone.mat3
     dder3 = cone.dder3
 
     u_dir = dir[1]
     @views v_dir = dir[V_idxs]
     @views w_dir = dir[W_idxs]
 
+    # TODO in-place
+    Vvd = Symmetric(cone.d2zdV2, :U) * v_dir
+    Wwd = Symmetric(cone.d2zdW2, :U) * w_dir
+    d2zdVW = Symmetric(cone.d2zdVW, :U)
+    VWwd = d2zdVW * w_dir
+
+    const0 = zi * (u_dir + dot(v_dir, dzdV)) + dot(w_dir, dzdW)
+    const1 = abs2(const0) + zi * (-dot(v_dir, VWwd) +
+        (dot(v_dir, Vvd) + dot(w_dir, Wwd)) / 2)
+
+    V_part_1a = const0 * (Vvd - VWwd)
+    W_part_1a = Wwd - d2zdVW * v_dir
+
+    # u
+    ziconst1 = dder3[1] = zi * const1
+
+    # v, w
     # TODO prealloc
     V_dir = Symmetric(zero(mat), :U)
     W_dir = Symmetric(zero(mat), :U)
@@ -322,10 +334,10 @@ function dder3(
     spectral_outer!(W_dir_sim, W_vecs', W_dir, mat)
     spectral_outer!(VW_dir_sim, V_vecs', W_dir, mat)
 
-    @inbounds for j in 1:cone.d
-        @views Vds_j = V_dir_sim[:, j]
-        @views Wds_j = W_dir_sim[:, j]
-        @views for i in 1:j
+    @inbounds @views for j in 1:cone.d
+        Vds_j = V_dir_sim[:, j]
+        Wds_j = W_dir_sim[:, j]
+        for i in 1:j
             Vds_i = V_dir_sim[:, i]
             Wds_i = W_dir_sim[:, i]
             DΔ3_V_ij = Diagonal(Δ3_V[:, i, j])
@@ -333,31 +345,16 @@ function dder3(
             diff_dot_V_VV[i, j] = dot(Vds_j, DΔ3_V_ij, Vds_i)
             diff_dot_W_WW[i, j] = dot(Wds_j, DΔ3_W_ij, Wds_i)
         end
-        @views for i in 1:cone.d
+        for i in 1:cone.d
             VWds_i = VW_dir_sim[:, i]
             DΔ3_V_ij = Diagonal(Δ3_V[:, i, j])
             diff_dot_V_VW[i, j] = dot(Vds_j, DΔ3_V_ij, VWds_i)
         end
     end
 
-    Vvd = Symmetric(cone.d2zdV2, :U) * v_dir
-    Wwd = Symmetric(cone.d2zdW2, :U) * w_dir
-    d2zdVW = Symmetric(cone.d2zdVW, :U)
-    VWwd = d2zdVW * w_dir
-
-    const0 = zi * (u_dir + dot(v_dir, dzdV)) + dot(w_dir, dzdW)
-    const1 = abs2(const0) + zi * (-dot(v_dir, VWwd) +
-        (dot(v_dir, Vvd) + dot(w_dir, Wwd)) / 2)
-
-    # u
-    ziconst1 = dder3[1] = zi * const1
-
     # v
-    d3WlogVdV!(d3WlogVdV, Δ3_V, V_λ, V_dir_sim, W_sim, mat)
-
-    V_part_1a = const0 * (Vvd - VWwd)
+    d3WlogVdV!(d3WlogVdV, Δ3_V, V_λ, V_dir_sim, cone.W_sim, mat)
     svec_to_smat!(V_part_1, V_part_1a, rt2)
-
     rdiv!(V_dir_sim, Diagonal(sqrt.(V_λ)))
     ldiv!(Diagonal(V_λ), V_dir_sim)
     V_part_2 = d3WlogVdV
@@ -370,11 +367,9 @@ function dder3(
     @. dder3_V += ziconst1 * dzdV
 
     # w
-    W_part_1a = Wwd - d2zdVW * v_dir
     svec_to_smat!(W_part_1, W_part_1a, rt2)
     spectral_outer!(mat2, V_vecs, Symmetric(diff_dot_V_VV, :U), mat)
     axpby!(true, mat2, const0, W_part_1)
-
     rdiv!(W_dir_sim, Diagonal(sqrt.(W_λ)))
     ldiv!(Diagonal(W_λ), W_dir_sim)
     W_part_2 = diff_dot_W_WW
@@ -453,8 +448,8 @@ function d2zdV2!(
     vecs::Matrix{T},
     inner::Matrix{T},
     Δ3::Array{T, 3},
-    ten3d::Array{T, 3},
-    matd2::Matrix{T},
+    ten3d::Array{T, 3}, # temp
+    matd2::Matrix{T}, # temp
     mat::Matrix{T}, # temp
     mat2::Matrix{T}, # temp
     rt2::T,
