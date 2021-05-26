@@ -67,7 +67,7 @@ perf = DataFrames.DataFrame(
 @testset "default options tests" begin
     println("starting default options tests")
     inst_defaults = vcat(
-        inst_preproc,
+        # inst_preproc,
         inst_infeas,
         inst_cones_many,
         )
@@ -76,56 +76,56 @@ perf = DataFrames.DataFrame(
     end
 end
 
-@testset "no preprocess tests" begin
-    println("\nstarting no preprocess tests")
-    for inst_name in inst_cones_few, T in diff_reals
-        options = (; default_options..., preprocess = false, reduce = false,
-            syssolver = Solvers.SymIndefDenseSystemSolver{T}())
-        test_instance_solver(inst_name, T, options)
-    end
-end
+# @testset "no preprocess tests" begin
+#     println("\nstarting no preprocess tests")
+#     for inst_name in inst_cones_few, T in diff_reals
+#         options = (; default_options..., preprocess = false, reduce = false,
+#             syssolver = Solvers.SymIndefDenseSystemSolver{T}())
+#         test_instance_solver(inst_name, T, options)
+#     end
+# end
 
-@testset "indirect solvers tests" begin
-    println("\nstarting indirect solvers tests")
-    for inst_name in inst_indirect, T in diff_reals
-        options = (; default_options..., init_use_indirect = true,
-            preprocess = false, reduce = false,
-            syssolver = Solvers.SymIndefIndirectSystemSolver{T}(),
-            tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4,
-            tol_infeas = 1e-6)
-        test_instance_solver(inst_name, T, options)
-    end
-end
+# @testset "indirect solvers tests" begin
+#     println("\nstarting indirect solvers tests")
+#     for inst_name in inst_indirect, T in diff_reals
+#         options = (; default_options..., init_use_indirect = true,
+#             preprocess = false, reduce = false,
+#             syssolver = Solvers.SymIndefIndirectSystemSolver{T}(),
+#             tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4,
+#             tol_infeas = 1e-6)
+#         test_instance_solver(inst_name, T, options)
+#     end
+# end
 
-@testset "system solvers tests" begin
-    println("\nstarting system solvers tests")
-    syssolvers = [
-        (Solvers.NaiveDenseSystemSolver, diff_reals),
-        (Solvers.NaiveSparseSystemSolver, [Float64,]),
-        (Solvers.NaiveElimDenseSystemSolver, diff_reals),
-        (Solvers.NaiveElimSparseSystemSolver, [Float64,]),
-        (Solvers.SymIndefDenseSystemSolver, all_reals),
-        (Solvers.SymIndefSparseSystemSolver, [Float64,]),
-        (Solvers.QRCholDenseSystemSolver, all_reals),
-        ]
-    for inst_name in inst_minimal, (syssolver, real_types) in syssolvers,
-        T in real_types
-        options = (; default_options..., syssolver = syssolver{T}(),
-            reduce = false)
-        test_instance_solver(inst_name, T, options, string_nameof(syssolver))
-    end
-end
+# @testset "system solvers tests" begin
+#     println("\nstarting system solvers tests")
+#     syssolvers = [
+#         (Solvers.NaiveDenseSystemSolver, diff_reals),
+#         (Solvers.NaiveSparseSystemSolver, [Float64,]),
+#         (Solvers.NaiveElimDenseSystemSolver, diff_reals),
+#         (Solvers.NaiveElimSparseSystemSolver, [Float64,]),
+#         (Solvers.SymIndefDenseSystemSolver, all_reals),
+#         (Solvers.SymIndefSparseSystemSolver, [Float64,]),
+#         (Solvers.QRCholDenseSystemSolver, all_reals),
+#         ]
+#     for inst_name in inst_minimal, (syssolver, real_types) in syssolvers,
+#         T in real_types
+#         options = (; default_options..., syssolver = syssolver{T}(),
+#             reduce = false)
+#         test_instance_solver(inst_name, T, options, string_nameof(syssolver))
+#     end
+# end
 
-@testset "PredOrCentStepper tests" begin
-    println("\nstarting PredOrCentStepper tests (with printing)")
-    use_adj_curv = [(false, false), (true, false), (true, true)]
-    for inst_name in inst_minimal, (adj, curv) in use_adj_curv, T in diff_reals
-        options = (; default_options..., verbose = true, stepper =
-            Solvers.PredOrCentStepper{T}(
-            use_adjustment = adj, use_curve_search = curv))
-        test_instance_solver(inst_name, T, options, "adj=$adj curv=$curv")
-    end
-end
+# @testset "PredOrCentStepper tests" begin
+#     println("\nstarting PredOrCentStepper tests (with printing)")
+#     use_adj_curv = [(false, false), (true, false), (true, true)]
+#     for inst_name in inst_minimal, (adj, curv) in use_adj_curv, T in diff_reals
+#         options = (; default_options..., verbose = true, stepper =
+#             Solvers.PredOrCentStepper{T}(
+#             use_adjustment = adj, use_curve_search = curv))
+#         test_instance_solver(inst_name, T, options, "adj=$adj curv=$curv")
+#     end
+# end
 
 @testset "CombinedStepper tests" begin
     println("\nstarting CombinedStepper tests (with printing)")
