@@ -1,5 +1,5 @@
 
-insts = Dict()
+insts = OrderedDict()
 insts["minimal"] = [
     ((2, 3, true, true, true, true),),
     ((2, 3, false, true, true, true),),

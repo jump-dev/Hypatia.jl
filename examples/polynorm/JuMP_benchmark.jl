@@ -78,7 +78,7 @@ polynorm_insts(
     for ndms in (use_l1 ? polynorm_l1_n_d_ms : polynorm_l2_n_d_ms)
     ]
 
-insts = Dict()
+insts = OrderedDict()
 insts["nat"] = (nothing, vcat(
     polynorm_insts(false, true, false, [1, 2]),
     polynorm_insts(true, true, false, [1,]),

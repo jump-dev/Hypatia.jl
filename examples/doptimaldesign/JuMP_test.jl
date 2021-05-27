@@ -1,6 +1,6 @@
 
 relaxed_tols = (default_tol_relax = 100,)
-insts = Dict()
+insts = OrderedDict()
 insts["minimal"] = [
     ((2, 3, 4, 2, true, false, false), nothing, relaxed_tols),
     ((2, 3, 4, 2, true, false, false), :SOCExpPSD),

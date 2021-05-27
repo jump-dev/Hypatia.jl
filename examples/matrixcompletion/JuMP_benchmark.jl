@@ -4,7 +4,7 @@ matrixcompletion_insts = [
     for (k, max_d) in ((10, 45), (20, 35))
     ]
 
-insts = Dict()
+insts = OrderedDict()
 insts["nat"] = (nothing, matrixcompletion_insts)
 insts["ext"] = (:SOCExpPSD, matrixcompletion_insts)
 return (MatrixCompletionJuMP, insts)

@@ -1,5 +1,5 @@
 
-insts = Dict()
+insts = OrderedDict()
 insts["minimal"] = [
     ((4, true),),
     ((4, false), :SOCExpPSD),

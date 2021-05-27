@@ -1,5 +1,5 @@
 
-insts = Dict()
+insts = OrderedDict()
 insts["minimal"] = [
     ((:poly1, :dom1, true, -4),),
     ((:poly1, :dom1, false, -4), :SOCExpPSD),

@@ -5,7 +5,7 @@ nearestpsd_insts(use_nat::Bool) = [
     for use_completable in (false, true)
     ]
 
-insts = Dict()
+insts = OrderedDict()
 insts["nat"] = (nothing, nearestpsd_insts(true))
 insts["ext"] = (:SOCExpPSD, nearestpsd_insts(false))
 return (NearestPSDJuMP, insts)

@@ -63,7 +63,7 @@ polymin_insts(use_nat::Bool) = [
     for nds in polymin_n_ds
     ]
 
-insts = Dict()
+insts = OrderedDict()
 insts["nat"] = (nothing, polymin_insts(true))
 insts["ext"] = (:SOCExpPSD, polymin_insts(false))
 return (PolyMinJuMP, insts)

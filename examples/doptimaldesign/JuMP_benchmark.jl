@@ -5,7 +5,7 @@ doptimaldesign_insts = [
     for use_logdet in (false, true)
     ]
 
-insts = Dict()
+insts = OrderedDict()
 insts["nat"] = (nothing, doptimaldesign_insts)
 insts["ext"] = (:SOCExpPSD, doptimaldesign_insts)
 return (DOptimalDesignJuMP, insts)

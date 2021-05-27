@@ -1,6 +1,6 @@
 
 relaxed_tols = (default_tol_relax = 100,)
-insts = Dict()
+insts = OrderedDict()
 insts["minimal"] = [
     ((1, 1, 1, 2, true, true, false), nothing, relaxed_tols),
     ((1, 1, 1, 2, true, false, true),),

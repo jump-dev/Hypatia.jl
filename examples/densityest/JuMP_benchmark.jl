@@ -48,7 +48,7 @@ densityest_insts(use_nat::Bool) = [
     for nds in densityest_n_ds
     ]
 
-insts = Dict()
+insts = OrderedDict()
 insts["nat"] = (nothing, densityest_insts(true))
 insts["ext"] = (:SOCExpPSD, densityest_insts(false))
 return (DensityEstJuMP, insts)

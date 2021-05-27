@@ -21,7 +21,7 @@ else
 end
 
 relaxed_tols = (default_tol_relax = 1000,)
-insts = Dict()
+insts = OrderedDict()
 insts["minimal"] = [(("expdesign_D_8_4",), nothing, relaxed_tols)]
 insts["fast"] = [((inst,), nothing, relaxed_tols) for inst in cblib_diverse]
 insts["various"] = insts["fast"]
