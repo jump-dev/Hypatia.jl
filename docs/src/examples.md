@@ -10,10 +10,10 @@ New examples are welcomed and should be implemented similarly to the existing ex
 - [Central polynomial matrix.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/centralpolymat) Compute a maximum-determinant gram matrix of a polynomial.
 - [Classical-quantum capacity.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/classicalquantum) Compute the capacity of a classical-to-quantum channel.
 - [Condition number.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/conditionnum) Minimize the condition number of a matrix pencil subject to a linear matrix inequality.
-- [Contraction analysis.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/contraction) Solve a problem to find a contraction metric that guarantees global stability of a dynamical system.
+- [Contraction analysis.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/contraction) Find a contraction metric that guarantees global stability of a dynamical system.
 - [Convexity parameter.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/convexityparameter) Find the strong convexity parameter of a polynomial function over a domain.
 - [Covariance estimation.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/covarianceest) Estimate a covariance matrix that satisfies some given prior information and minimizes a given convex spectral function.
-- [Density estimation.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/densityest) Find a valid polynomial density function maximizing the log likelihood of a set of observations.
+- [Density estimation.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/densityest) Find a valid polynomial density function maximizing the likelihood of a set of observations.
 - [Discrete maximum likelihood.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/discretemaxlikelihood) Maximize likelihood of observations at discrete points, subject to probability vector not being too far from a uniform prior.
 - [D-optimal design.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/doptimaldesign) Solve a D-optimal experiment design problem, i.e. maximize the determinant of the information matrix subject to side constraints.
 - [Entanglement-assisted capacity.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/entanglementassisted) Compute the entanglement-assisted classical capacity of a quantum channel.
@@ -32,7 +32,7 @@ New examples are welcomed and should be implemented similarly to the existing ex
 - [Norm cone polynomial.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/normconepoly) Given a vector of polynomials, check a sufficient condition for pointwise membership in the epigraph of the ``\ell_1`` or ``\ell_2`` norm.
 - [Polynomial envelope.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/polyenvelope) Find a polynomial that closely approximates, over the unit box, the lower envelope of a given list of polynomials.
 - [Polynomial minimization.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/polymin) Compute a lower bound for a given polynomial over a given semialgebraic set.
-- [Polynomial norm.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/polynorm) Find a polynomial that, over the unit box, has minimal integral and belongs pointwise to the epigraph of the ``\ell_1`` or ``\ell_2`` norm of a list of given polynomials.
+- [Polynomial norm.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/polynorm) Find a polynomial that, over the unit box, has minimal integral and belongs pointwise to the epigraph of the ``\ell_1`` or ``\ell_2`` norm of other given polynomials.
 - [Portfolio.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/portfolio) Maximize the expected returns of a stock portfolio and satisfy various risk constraints.
 - [Region of attraction.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/regionofattr) Find the region of attraction of a polynomial control system.
 - [Relative entropy of entanglement.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/relentrentanglement) Compute a lower bound on relative entropy of entanglement with a positive partial transpose relaxation.
