@@ -79,7 +79,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
 
     # get unadjusted direction
     solver.time_uprhs += @elapsed rhs_fun_noadj(solver, rhs)
-    solver.time_getdir += @elapsed get_directions(stepper, solver, is_pred)
+    solver.time_getdir += @elapsed get_directions(stepper, solver)
     copyto!(dir_noadj.vec, dir.vec) # TODO maybe instead of copying, pass in the dir point we want into the directions function
     try_noadj = true
 
@@ -88,7 +88,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         rhs_fun_adj = (is_pred ? update_rhs_predadj : update_rhs_centadj)
         dir_adj = stepper.dir_adj
         solver.time_uprhs += @elapsed rhs_fun_adj(solver, rhs, dir)
-        solver.time_getdir += @elapsed get_directions(stepper, solver, is_pred)
+        solver.time_getdir += @elapsed get_directions(stepper, solver)
         copyto!(dir_adj.vec, dir.vec)
 
         if stepper.use_curve_search
