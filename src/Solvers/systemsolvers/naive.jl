@@ -119,7 +119,6 @@ function update_lhs(syssolver::NaiveSparseSystemSolver, solver::Solver)
         end
     end
     tau = solver.point.tau[]
-    #: mismatch when using NT for kaptau
     syssolver.lhs.nzval[syssolver.mtt_idx] = solver.mu / tau / tau
 
     solver.time_upfact += @elapsed update_fact(syssolver.fact_cache,
@@ -133,7 +132,6 @@ function solve_system(
     solver::Solver{T},
     sol::Point{T},
     rhs::Point{T},
-    ::T,
     ) where {T <: Real}
     inv_prod(syssolver.fact_cache, sol.vec, syssolver.lhs, rhs.vec)
     return sol
@@ -197,7 +195,6 @@ function update_lhs(syssolver::NaiveDenseSystemSolver, solver::Solver)
         copyto!(lhs_H_k, Cones.hess(cone_k))
     end
     tau = solver.point.tau[]
-    #: mismatch when using NT for kaptau
     syssolver.lhs[end, syssolver.tau_row] = solver.mu / tau / tau
 
     solver.time_upfact += @elapsed update_fact(syssolver.fact_cache,
@@ -211,7 +208,6 @@ function solve_system(
     solver::Solver,
     sol::Point{T},
     rhs::Point{T},
-    ::T,
     ) where {T <: Real}
     copyto!(sol.vec, rhs.vec)
     inv_prod(syssolver.fact_cache, sol.vec)

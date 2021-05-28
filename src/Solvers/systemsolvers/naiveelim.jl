@@ -39,7 +39,6 @@ function solve_subsystem4(
     solver::Solver{T},
     sol::Point{T},
     rhs::Point{T},
-    tau_scal::T,
     ) where {T <: Real}
     rhs_sub = syssolver.rhs_sub
     dim4 = length(rhs_sub.vec)
@@ -213,7 +212,6 @@ function update_lhs(syssolver::NaiveElimSparseSystemSolver, solver::Solver)
         end
     end
     tau = solver.point.tau[]
-    #: mismatch when using NT for kaptau
     syssolver.lhs_sub.nzval[end] = solver.mu / tau / tau
 
     solver.time_upfact += @elapsed update_fact(syssolver.fact_cache,
@@ -294,7 +292,6 @@ function update_lhs(
         end
     end
     tau = solver.point.tau[]
-    #: mismatch when using NT for kaptau
     lhs_sub[end, end] = solver.mu / tau / tau
 
     solver.time_upfact += @elapsed update_fact(syssolver.fact_cache,

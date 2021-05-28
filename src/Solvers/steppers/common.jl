@@ -51,11 +51,9 @@ function update_rhs_predadj(
         end
     end
 
-    # TODO NT way:
-    rhs.kap[] = dir.tau[] * dir.kap[] / solver.point.tau[]
-    # TODO SY way:
-    # tau_dir_tau = dir.tau / solver.point.tau
-    # rhs[end] = tau_dir_tau * solver.mu / solver.point.tau * (1 + tau_dir_tau)
+    taubar = solver.point.tau[]
+    tau_dir_tau = dir.tau[] / taubar
+    rhs.kap[] = tau_dir_tau * solver.mu / taubar * (1 + tau_dir_tau)
 
     return rhs
 end
@@ -112,11 +110,9 @@ function update_rhs_centadj(
         end
     end
 
-    # TODO NT way:
-    # rhs.kap = dir.tau * dir.kap / solver.point.tau
-    # TODO SY way:
-    tau_dir_tau = dir.tau[] / solver.point.tau[]
-    rhs.kap[] = tau_dir_tau * solver.mu / solver.point.tau[] * tau_dir_tau
+    taubar = solver.point.tau[]
+    tau_dir_tau = dir.tau[] / taubar
+    rhs.kap[] = tau_dir_tau * solver.mu / taubar * tau_dir_tau
 
     return rhs
 end
