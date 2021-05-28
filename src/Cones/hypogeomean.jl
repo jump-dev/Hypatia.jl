@@ -29,7 +29,6 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     ζi::T
     ϕζidi::T
     tempw1::Vector{T}
-    tempw2::Vector{T}
 
     function HypoGeoMean{T}(
         dim::Int;
@@ -52,13 +51,15 @@ function setup_extra_data!(cone::HypoGeoMean{T}) where {T <: Real}
     d = cone.dim - 1
     cone.di = inv(T(d))
     cone.tempw1 = zeros(T, d)
-    cone.tempw2 = zeros(T, d)
     return cone
 end
 
 get_nu(cone::HypoGeoMean) = cone.dim
 
-function set_initial_point!(arr::AbstractVector{T}, cone::HypoGeoMean{T}) where {T <: Real}
+function set_initial_point!(
+    arr::AbstractVector{T},
+    cone::HypoGeoMean{T},
+    ) where {T <: Real}
     d = cone.dim - 1
     c = sqrt(T(5 * d ^ 2 + 2 * d + 1))
     arr[1] = -sqrt((-c + 3 * d + 1) / T(2 * cone.dim))
@@ -96,14 +97,14 @@ end
 
 function update_grad(cone::HypoGeoMean)
     @assert cone.is_feas
-    u = cone.point[1]
     @views w = cone.point[2:end]
     g = cone.grad
 
     ζi = cone.ζi = inv(cone.ζ)
     g[1] = ζi
     cone.ϕζidi = cone.ϕ * ζi * cone.di
-    @. g[2:end] = -(cone.ϕζidi + 1) / w
+    ϕζidi1 = -cone.ϕζidi - 1
+    @. g[2:end] = ϕζidi1 / w
 
     cone.grad_updated = true
     return cone.grad
@@ -112,11 +113,10 @@ end
 function update_hess(cone::HypoGeoMean)
     @assert cone.grad_updated
     isdefined(cone, :hess) || alloc_hess!(cone)
-    u = cone.point[1]
     @views w = cone.point[2:end]
+    H = cone.hess.data
     ζi = cone.ζi
     ϕζidi = cone.ϕζidi
-    H = cone.hess.data
     ϕzm1 = ϕζidi - cone.di
     constww = ϕζidi * (1 + ϕzm1) + 1
 
@@ -145,7 +145,6 @@ function hess_prod!(
     cone::HypoGeoMean{T},
     ) where {T <: Real}
     @assert cone.grad_updated
-    u = cone.point[1]
     @views w = cone.point[2:end]
     di = cone.di
     ζi = cone.ζi
@@ -173,9 +172,9 @@ function update_inv_hess(cone::HypoGeoMean{T}) where {T <: Real}
     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     u = cone.point[1]
     @views w = cone.point[2:end]
+    Hi = cone.inv_hess.data
     ϕ = cone.ϕ
     di = cone.di
-    Hi = cone.inv_hess.data
     ϕdi = ϕ * di
     c1 = cone.dim * ϕdi - u
     c2 = cone.ζ / c1
@@ -230,8 +229,8 @@ end
 
 function dder3(cone::HypoGeoMean{T}, dir::AbstractVector{T}) where {T <: Real}
     @assert cone.grad_updated
-    u = cone.point[1]
     @views w = cone.point[2:end]
+    dder3 = cone.dder3
     p = dir[1]
     @views r = dir[2:end]
     di = cone.di
@@ -239,22 +238,21 @@ function dder3(cone::HypoGeoMean{T}, dir::AbstractVector{T}) where {T <: Real}
     ζi = cone.ζi
     ϕζidi = cone.ϕζidi
     rwi = cone.tempw1
-    temp = cone.tempw2
-    dder3 = cone.dder3
-    c5 = ϕζidi / 2
-    c3 = c5 + 1
 
     @. rwi = r / w
+    c5 = ϕζidi / 2
     c0 = sum(rwi) * di
-    rwi_sqr = sum(abs2, rwi) * di
+    c6 = sum(abs2, rwi) * di
     ζiχ = ζi * (p - ϕ * c0)
-    c1 = ζiχ^2 + ζi * ϕ * (rwi_sqr - c0^2) / 2
-    c2 = ϕζidi * (c1 - rwi_sqr / 2)
+    c1 = ζiχ^2 + ζi * ϕ * (c6 - abs2(c0)) / 2
+    c2 = ϕζidi * (c1 - c6 / 2)
     c4 = ϕζidi * ζiχ
-    @. temp = c0 - rwi
+    c7 = c2 + c0 * (c4 + c5 * c0)
+    c8 = -c4 - 2 * c5 * c0
+    c9 = 2 * c5 + 1
 
     dder3[1] = -ζi * c1
-    @. dder3[2:end] = (c2 + temp * (c4 + c5 * temp) + c3 * rwi^2) / w
+    @. dder3[2:end] = (c7 + rwi * (c8 + c9 * rwi)) / w
 
     return dder3
 end
