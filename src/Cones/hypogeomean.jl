@@ -168,6 +168,7 @@ function hess_prod!(
 end
 
 function update_inv_hess(cone::HypoGeoMean{T}) where {T <: Real}
+    @assert cone.grad_updated
     @assert !cone.inv_hess_updated
     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     u = cone.point[1]
@@ -203,14 +204,15 @@ function inv_hess_prod!(
     arr::AbstractVecOrMat{T},
     cone::HypoGeoMean{T},
     ) where {T <: Real}
+    @assert cone.grad_updated
     @views w = cone.point[2:end]
     ϕ = cone.ϕ
     di = cone.di
     ϕdi = ϕ * di
-    rw = cone.tempw1
     c2 = inv(cone.ϕζidi + 1)
     c3 = c2 * cone.ζi * di
     c4 = abs2(cone.ζ) + ϕdi * ϕ
+    rw = cone.tempw1
 
     @inbounds for j in 1:size(prod, 2)
         p = arr[1, j]
@@ -238,16 +240,13 @@ function dder3(cone::HypoGeoMean{T}, dir::AbstractVector{T}) where {T <: Real}
     rwi = cone.tempw1
 
     @. rwi = r / w
-    c5 = ϕζidi / 2
     c0 = sum(rwi) * di
     c6 = sum(abs2, rwi) * di
     ζiχ = ζi * (p - ϕ * c0)
     c1 = ζiχ^2 + ζi * ϕ * (c6 - abs2(c0)) / 2
-    c2 = ϕζidi * (c1 - c6 / 2)
-    c4 = ϕζidi * ζiχ
-    c7 = c2 + c0 * (c4 + c5 * c0)
-    c8 = -c4 - 2 * c5 * c0
-    c9 = 2 * c5 + 1
+    c7 = ϕζidi * (c1 - c6 / 2 + c0 * (ζiχ + c0 / 2))
+    c8 = -ϕζidi * (ζiχ + c0)
+    c9 = ϕζidi + 1
 
     dder3[1] = -ζi * c1
     @. dder3[2:end] = (c7 + rwi * (c8 + c9 * rwi)) / w

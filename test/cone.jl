@@ -615,7 +615,7 @@ function test_barrier(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R}
 end
 
 show_time_alloc(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R} =
-    show_time_alloc(C(1 + Cones.svec_length(R, 3)))
+    show_time_alloc(C(1 + Cones.svec_length(R, 100)))
 
 
 # HypoPerLog

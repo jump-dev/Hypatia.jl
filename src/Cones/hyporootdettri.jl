@@ -211,6 +211,7 @@ function hess_prod!(
 end
 
 function update_inv_hess(cone::HypoRootdetTri)
+    @assert cone.grad_updated
     @assert !cone.inv_hess_updated
     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     @views w = cone.point[2:end]
@@ -244,32 +245,34 @@ function inv_hess_prod!(
     arr::AbstractVecOrMat{T},
     cone::HypoRootdetTri{T},
     ) where {T <: Real}
+    @assert cone.grad_updated
     @views w = cone.point[2:end]
     svec_to_smat!(cone.W, w, cone.rt2)
     W = Hermitian(cone.W, :U)
-    ζ = cone.ζ
-    d = cone.d
     ϕ = cone.ϕ
-    c0 = d * ζ + ϕ
-    c1 = ϕ / d
-    c2 = c1 / c0
-    c3 = d * ζ / c0
-    c4 = abs2(ζ) + c1 * ϕ
+    di = cone.di
+    ϕdi = ϕ * di
+    c2 = inv(cone.ϕζidi + 1)
+    c3 = c2 * cone.ζi * di
+    c4 = abs2(cone.ζ) + ϕdi * ϕ
+    w_aux = cone.mat2
+    w_aux2 = cone.mat3
 
-    @inbounds for i in 1:size(arr, 2)
-        p = arr[1, i]
-        @views r = arr[2:end, i]
-        @views prod_w = prod[2:end, i]
-        svec_to_smat!(cone.mat2, r, cone.rt2)
-        copytri!(cone.mat2, 'U', true)
-        mul!(cone.mat3, cone.mat2, W)
-        mul!(cone.mat2, W, cone.mat3)
-        smat_to_svec!(prod_w, cone.mat2, cone.rt2)
-        @. prod_w *= c3
-        dot_i = dot(w, r)
-        c_i = c2 * dot_i + c1 * p
-        @. prod_w += c_i * w
-        prod[1, i] = c1 * dot_i + c4 * p
+    @inbounds for j in 1:size(arr, 2)
+        p = arr[1, j]
+        @views r = arr[2:end, j]
+        @views prod_w = prod[2:end, j]
+        svec_to_smat!(w_aux, r, cone.rt2)
+        copytri!(w_aux, 'U', true)
+
+        c5 = dot(w, r)
+        c6 = ϕdi * (c3 * c5 + p)
+        prod[1, j] = ϕdi * c5 + c4 * p
+
+        mul!(w_aux2, w_aux, W)
+        mul!(w_aux, W, w_aux2)
+        smat_to_svec!(prod_w, w_aux, cone.rt2)
+        axpby!(c6, w, c2, prod_w)
     end
 
     return prod
@@ -284,32 +287,119 @@ function dder3(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where {T <: Real
     ϕ = cone.ϕ
     ζi = cone.ζi
     di = cone.di
-    w_aux = cone.mat4
+    ϕζidi = cone.ϕζidi
+    FU = cone.fact_W.U
+    rwi = cone.mat2
+    w_aux = cone.mat3
+    w_aux2 = cone.mat4
 
-    Wi = Hermitian(cone.Wi, :U)
-    r_X = copytri!(svec_to_smat!(cone.mat2, r, cone.rt2), 'U', true)
-    c0 = dot(Wi, Hermitian(r_X, :U)) * di
-
-    rwi = rdiv!(r_X, cone.fact_W)
-    rwi_sqr = real(dot(rwi, rwi')) * di
-    L_rwi = ldiv!(cone.fact_W.U', rwi)
-    wirwirwi = mul!(cone.mat3, L_rwi', L_rwi)
-    wirwi = ldiv!(cone.fact_W.U, L_rwi)
-
+    svec_to_smat!(rwi, r, cone.rt2)
+    copytri!(rwi, 'U', true)
+    rdiv!(rwi, FU)
+    ldiv!(FU', rwi)
+    c0 = tr(Hermitian(rwi, :U)) * di
+    c6 = sum(abs2, rwi) * di
     ζiχ = ζi * (p - ϕ * c0)
-    ξbξ = ζi * ϕ * (c0^2 - rwi_sqr) / 2
-    c1 = -ζi * (ζiχ^2 - ξbξ)
+    c1 = ζiχ^2 + ζi * ϕ * (c6 - abs2(c0)) / 2
+    c7 = ϕζidi * (c1 - c6 / 2 + c0 * (ζiχ + c0 / 2))
+    c8 = -ϕζidi * (ζiχ + c0)
+    c9 = ϕζidi + 1
 
-    c2 = -ζi / 2
-    # ∇2h[r] = ϕ * (c0 - rwi) / w * di
-    @. w_aux = ζi * ϕ * (c0 * Wi - wirwi) * di
-    w_aux .*= ζiχ
-    # add c2 * ∇3h[r, r]
-    @. w_aux -= c2 * ϕ * ((c0^2 - rwi_sqr) * Wi + 2 * (wirwirwi - c0 * wirwi)) * di
+    dder3[1] = -ζi * c1
 
-    dder3[1] = c1
-    w_aux += wirwirwi - c1 * ϕ * di * Wi
+    copyto!(w_aux2, I)
+    axpby!(c9, rwi, c8, w_aux2)
+    mul!(w_aux, Hermitian(rwi, :U), w_aux2)
+    @inbounds for i in diagind(w_aux)
+        w_aux[i] += c7
+    end
+    rdiv!(w_aux, FU')
+    ldiv!(FU, w_aux)
     @views smat_to_svec!(dder3[2:end], w_aux, cone.rt2)
 
     return dder3
 end
+
+# function dder3(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where {T <: Real}
+#     @assert cone.grad_updated
+#     @views w = cone.point[2:end]
+#     dder3 = cone.dder3
+#     p = dir[1]
+#     @views r = dir[2:end]
+#     ϕ = cone.ϕ
+#     ζi = cone.ζi
+#     di = cone.di
+#     ϕζidi = cone.ϕζidi
+#     FU = cone.fact_W.U
+#     w_aux = cone.mat4
+#     rwi = cone.mat2
+#     Wi = Hermitian(cone.Wi, :U)
+#
+#     svec_to_smat!(rwi, r, cone.rt2)
+#     copytri!(rwi, 'U', true)
+#     c0 = dot(Wi, Hermitian(rwi, :U)) * di
+#
+#     rdiv!(rwi, cone.fact_W)
+#     # @assert real(dot(rwi, rwi')) ≈ sum(abs2, rwi)
+#     c6 = real(dot(rwi, rwi')) * di
+#     L_rwi = ldiv!(cone.fact_W.U', rwi)
+#     wirwirwi = mul!(cone.mat3, L_rwi', L_rwi)
+#     wirwi = ldiv!(cone.fact_W.U, L_rwi)
+#
+#     c5 = ϕζidi / 2
+#     ζiχ = ζi * (p - ϕ * c0)
+#     c1 = ζiχ^2 + ζi * ϕ * (c6 - abs2(c0)) / 2
+#     c2 = ϕζidi * (c1 - c6 / 2)
+#     c4 = ϕζidi * ζiχ
+#     c7 = c2 + c0 * (c4 + c5 * c0)
+#     c8 = -c4 - 2 * c5 * c0
+#     c9 = 2 * c5 + 1
+#
+#     dder3[1] = -ζi * c1
+#
+#     @. w_aux = c7 * Wi + c8 * wirwi + c9 * wirwirwi
+#
+#     @views smat_to_svec!(dder3[2:end], w_aux, cone.rt2)
+#
+#     return dder3
+# end
+
+# function dder3(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where {T <: Real}
+#     @assert cone.grad_updated
+#     @views w = cone.point[2:end]
+#     dder3 = cone.dder3
+#     p = dir[1]
+#     @views r = dir[2:end]
+#     ϕ = cone.ϕ
+#     ζi = cone.ζi
+#     di = cone.di
+#     w_aux = cone.mat4
+#     FU = cone.fact_W.U
+#
+#     Wi = Hermitian(cone.Wi, :U)
+#     r_X = copytri!(svec_to_smat!(cone.mat2, r, cone.rt2), 'U', true)
+#     c0 = dot(Wi, Hermitian(r_X, :U)) * di
+#
+#     rwi = rdiv!(r_X, cone.fact_W)
+#     c6 = real(dot(rwi, rwi')) * di
+#     L_rwi = ldiv!(cone.fact_W.U', rwi)
+#     wirwirwi = mul!(cone.mat3, L_rwi', L_rwi)
+#     wirwi = ldiv!(cone.fact_W.U, L_rwi)
+#
+#     ζiχ = ζi * (p - ϕ * c0)
+#     ξbξ = ζi * ϕ * (c0^2 - c6) / 2
+#     c1 = -ζi * (ζiχ^2 - ξbξ)
+#
+#     c2 = -ζi / 2
+#     # ∇2h[r] = ϕ * (c0 - rwi) / w * di
+#     @. w_aux = ζi * ϕ * (c0 * Wi - wirwi) * di
+#     w_aux .*= ζiχ
+#     # add c2 * ∇3h[r, r]
+#     @. w_aux -= c2 * ϕ * ((c0^2 - c6) * Wi + 2 * (wirwirwi - c0 * wirwi)) * di
+#
+#     dder3[1] = c1
+#     w_aux += wirwirwi - c1 * ϕ * di * Wi
+#     @views smat_to_svec!(dder3[2:end], w_aux, cone.rt2)
+#
+#     return dder3
+# end
