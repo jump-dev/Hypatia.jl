@@ -23,36 +23,25 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
-    inv_hess_aux_updated::Bool
-    hess_fact_updated::Bool
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact_cache
 
-    mat::Matrix{R}
-    mat2::Matrix{R}
-    mat3::Matrix{R}
-    mat4::Matrix{R}
-    mat5::Matrix{R}
-    fact_W
-    α::T
     ϕ::T
-    σ::T
     ζ::T
     ζi::T
-    W::Matrix{R}
+    mat::Matrix{R}
+    fact_W::Cholesky{R}
     Wi::Matrix{R}
     Wi_vec::Vector{T}
     tempw::Vector{T}
-    c0::T
-    c4::T
-    Hiuu::T
+    mat2::Matrix{R}
+    mat3::Matrix{R}
+    mat4::Matrix{R}
 
     function HypoPerLogdetTri{T, R}(
         dim::Int;
         use_dual::Bool = false,
-        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real, R <: RealOrComplex{T}}
         @assert dim >= 3
         cone = new{T, R}()
@@ -61,41 +50,31 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone.rt2 = sqrt(T(2))
         cone.is_complex = (R <: Complex)
         cone.d = svec_side(R, dim - 2)
-        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
 
 reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_aux_updated =
-    cone.hess_fact_updated = false)
+    cone.hess_updated = cone.inv_hess_updated = false)
+
+use_sqrt_hess_oracles(cone::HypoPerLogdetTri) = false
 
 function setup_extra_data!(
     cone::HypoPerLogdetTri{T, R},
     ) where {T <: Real, R <: RealOrComplex{T}}
     dim = cone.dim
-
-
-    # don't alloc here
-
-    cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    cone.inv_hess = Symmetric(zeros(T, dim, dim), :U)
-    load_matrix(cone.hess_fact_cache, cone.hess)
-
-
     d = cone.d
     cone.mat = zeros(R, d, d)
+    cone.Wi = zeros(R, d, d)
+    cone.Wi_vec = zeros(T, dim - 2)
+    cone.tempw = zeros(T, dim - 2)
     cone.mat2 = zeros(R, d, d)
     cone.mat3 = zeros(R, d, d)
     cone.mat4 = zeros(R, d, d)
-    cone.mat5 = zeros(R, d, d)
-    cone.W = zeros(R, d, d)
-    cone.Wi_vec = zeros(T, dim - 2)
-    cone.tempw = zeros(T, dim - 2)
     return cone
 end
 
-get_nu(cone::HypoPerLogdetTri) = cone.d + 2
+get_nu(cone::HypoPerLogdetTri) = 2 + cone.d
 
 function set_initial_point!(
     arr::AbstractVector{T},
@@ -113,7 +92,7 @@ function set_initial_point!(
     return arr
 end
 
-function update_feas(cone::HypoPerLogdetTri{T}) where T
+function update_feas(cone::HypoPerLogdetTri{T}) where {T <: Real}
     @assert !cone.feas_updated
     v = cone.point[2]
 
@@ -136,37 +115,35 @@ function update_feas(cone::HypoPerLogdetTri{T}) where T
     return cone.is_feas
 end
 
-function is_dual_feas(cone::HypoPerLogdetTri{T}) where T
+function is_dual_feas(cone::HypoPerLogdetTri{T}) where {T <: Real}
     u = cone.dual_point[1]
+
     if u < -eps(T)
         v = cone.dual_point[2]
         @views svec_to_smat!(cone.mat2, cone.dual_point[3:end], cone.rt2)
         fact = cholesky!(Hermitian(cone.mat2, :U), check = false)
-        return isposdef(fact) &&
-            (v - u * (logdet(fact) + cone.d * (1 - log(-u))) > eps(T))
+        if isposdef(fact)
+            return (v - u * (logdet(fact) + cone.d * (1 - log(-u))) > eps(T))
+        end
     end
+
     return false
 end
 
 function update_grad(cone::HypoPerLogdetTri)
     @assert cone.is_feas
-    u = cone.point[1]
     v = cone.point[2]
     g = cone.grad
     ζ = cone.ζ
     ζi = cone.ζi = inv(ζ)
-    cone.σ = cone.ϕ - cone.d
 
     g[1] = ζi
-    g[2] = -inv(v) - cone.σ / ζ
-    # TODO in-place
-    # copyto!(cone.Wi, cone.fact_W.factors)
-    # LinearAlgebra.inv!(Cholesky(cone.Wi, 'U', 0))
-    cone.Wi = inv(cone.fact_W)
+    g[2] = -inv(v) - (cone.ϕ - cone.d) / ζ
+    chol_inv!(cone.Wi, cone.fact_W)
     smat_to_svec!(cone.Wi_vec, cone.Wi, cone.rt2)
     # ∇ϕ = cone.Wi_vec * v
-    zvzi = -(ζ + v) / ζ
-    @inbounds @. @views g[3:end] = zvzi * cone.Wi_vec
+    ζvζi = -1 - v / ζ
+    @. g[3:end] = ζvζi * cone.Wi_vec
 
     cone.grad_updated = true
     return cone.grad
@@ -174,46 +151,38 @@ end
 
 function update_hess(cone::HypoPerLogdetTri)
     @assert cone.grad_updated
+    isdefined(cone, :hess) || alloc_hess!(cone)
     v = cone.point[2]
     H = cone.hess.data
+    d = cone.d
     ζ = cone.ζ
     ζi = cone.ζi
-    σ = cone.σ
+    σ = cone.ϕ - d
     Wi_vec = cone.Wi_vec
-    zvzi = (ζ + v) / ζ
-    vzi = zvzi - 1
-    Wivzi = cone.tempw
-    ζi2 = abs2(ζi)
-    ζivi = ζi / v
-    @. Wivzi = vzi * Wi_vec
-    d = cone.d
+    Wivζi = cone.tempw
+    ζiσ = σ / ζ
+    vζi = v / ζ
+    ζvζi = 1 + vζi
+    @. Wivζi = vζi * Wi_vec
 
-    # Huu
-    H[1, 1] = ζi2
+    # u, v
+    H[1, 1] = abs2(ζi)
+    H[1, 2] = -ζi * ζiσ
+    H[2, 2] = v^-2 + abs2(ζiσ) + d / (v * ζ)
 
-    # Huv
-    H[1, 2] = -ζi2 * σ
+    # u, v, w
+    c1 = -vζi / ζ
+    @. H[1, 3:end] = c1 * Wi_vec
+    c2 = (σ * vζi - 1) / ζ
+    @. H[2, 3:end] = c2 * Wi_vec
 
-    # Hvv
-    H[2, 2] = v^-2 + abs2(ζi * σ) + ζivi * d
-
-    @inbounds begin
-        # Huw
-        H13const = -v * ζi2
-        @. @views H[1, 3:end] = H13const * Wi_vec
-
-        # Hvw
-        H23const = (σ * v / ζ - 1) / ζ
-        @. @views H[2, 3:end] = H23const * Wi_vec
-    end
-
-    # Hww
-    @inbounds @views symm_kron!(H[3:end, 3:end], cone.Wi, cone.rt2)
+    # w, w
+    @views symm_kron!(H[3:end, 3:end], cone.Wi, cone.rt2)
     @inbounds for j in eachindex(Wi_vec)
         j2 = 2 + j
-        Wivzij = Wivzi[j]
+        Wivζij = Wivζi[j]
         for i in 1:j
-            H[2 + i, j2] = zvzi * H[2 + i, j2] + Wivzi[i] * Wivzij
+            H[2 + i, j2] = ζvζi * H[2 + i, j2] + Wivζi[i] * Wivζij
         end
     end
 
@@ -228,90 +197,72 @@ function hess_prod!(
     )
     @assert cone.grad_updated
     v = cone.point[2]
+    d = cone.d
     ζ = cone.ζ
-    ζi = cone.ζi
-    σ = cone.σ
-    Wi = Hermitian(cone.Wi, :U)
     w_aux = cone.mat3
+    FU = cone.fact_W.U
+    σ = cone.ϕ - d
+    vζi1 = v / ζ + 1
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
         q = arr[2, j]
-        @views r_X = svec_to_smat!(cone.mat2, arr[3:end, j], cone.rt2)
+        @views svec_to_smat!(w_aux, arr[3:end, j], cone.rt2)
+        copytri!(w_aux, 'U', true)
+        rdiv!(w_aux, FU)
+        ldiv!(FU', w_aux)
 
-        c0 = dot(Wi, Hermitian(r_X, :U))
-        # ∇ϕr = c0 * v
-        c1 = ζi * (c0 * v - p + σ * q) * ζi
-        c2 = (q * cone.d / v - c0) / ζ
-
-        copytri!(r_X, 'U', true)
-        ldiv!(cone.fact_W, r_X)
-        rdiv!(r_X, cone.fact_W)
-
-        # negative tau
-        @. w_aux = (v * r_X - q * Wi) / ζ
-        @. w_aux += c1 * v * Wi + r_X
-
+        qζi = q / ζ
+        c0 = tr(Hermitian(w_aux, :U)) / ζ
+        # ∇ϕ[r] = v * c0
+        c1 = (v * c0 - p / ζ + σ * qζi) / ζ
+        c3 = c1 * v - qζi
         prod[1, j] = -c1
-        prod[2, j] = c1 * σ + c2 + q / v / v
+        prod[2, j] = c1 * σ - c0 + (qζi * d + q / v) / v
+
+        lmul!(vζi1, w_aux)
+        for i in diagind(w_aux)
+            w_aux[i] += c3
+        end
+        rdiv!(w_aux, FU')
+        ldiv!(FU, w_aux)
+
         @views smat_to_svec!(prod[3:end, j], w_aux, cone.rt2)
     end
 
     return prod
 end
 
-function update_inv_hess_aux(cone::HypoPerLogdetTri)
-    @assert cone.feas_updated
-    @assert !cone.inv_hess_aux_updated
-    u = cone.point[1]
+function update_inv_hess(cone::HypoPerLogdetTri)
+    @assert cone.grad_updated
+    @assert !cone.inv_hess_updated
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     v = cone.point[2]
     @views w = cone.point[3:end]
-    svec_to_smat!(cone.W, w, cone.rt2)
+    svec_to_smat!(cone.mat2, w, cone.rt2)
+    W = Hermitian(cone.mat2, :U)
     Hi = cone.inv_hess.data
     d = cone.d
     ζ = cone.ζ
+    ϕ = cone.ϕ
     ζv = ζ + v
-    ζuζ = 2 * ζ + u
-    den = ζv + d * v
+    ζζvi = ζ / ζv
+    c3 = v / (ζv + d * v)
+    c0 = ϕ - d * ζζvi
+    c2 = v * c3
+    c4 = c2 * ζv
+    c1 = v * ζζvi + c0 * c2
 
-    c0 = cone.ϕ - d * ζ / (ζ + v)
-    Hiuu = abs2(ζ + u) + ζ * (den - v) - d * abs2(ζuζ) * v / den
-    c4 = v^2 / den * ζv
-    cone.c0 = c0
-    cone.c4 = c4
-    cone.Hiuu = Hiuu
-    # α is a scaling of w
-    cone.α = v * ζ / ζv
-
-    cone.inv_hess_aux_updated = true
-    return
-end
-
-function update_inv_hess(cone::HypoPerLogdetTri)
-    cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-    v = cone.point[2]
-    @views w = cone.point[3:end]
-    W = Hermitian(cone.W, :U)
-    Hi = cone.inv_hess.data
-    ζ = cone.ζ
-    ζv = ζ + v
-    ζζv = ζ / ζv
-
-    γ_vec = cone.tempw
-    @. γ_vec = w / ζv
-
-    c0 = cone.c0
-    c4 = cone.c4
-    Hi[1, 1] = cone.Hiuu
+    Hi[1, 1] = abs2(v * ϕ) + ζ * (ζ + d * v) - d * abs2(ζ + v * ϕ) * c3
     Hi[1, 2] = c0 * c4
     Hi[2, 2] = c4
-    @inbounds @views begin
-        @. Hi[1, 3:end] = (cone.α + c0 * c4 / ζv) * w
-        @. Hi[2, 3:end] = c4 * w / ζv
-        symm_kron!(Hi[3:end, 3:end], W, cone.rt2)
-        @. Hi[3:end, 3:end] *= ζζv
-        mul!(Hi[3:end, 3:end], γ_vec, γ_vec', c4, true)
-    end
+
+    @. Hi[1, 3:end] = c1 * w
+    @. Hi[2, 3:end] = c2 * w
+
+    @views Hiww = Hi[3:end, 3:end]
+    symm_kron!(Hiww, W, cone.rt2)
+    mul!(Hiww, w, w', c2 / ζv, ζζvi)
 
     cone.inv_hess_updated = true
     return cone.inv_hess
@@ -322,33 +273,43 @@ function inv_hess_prod!(
     arr::AbstractVecOrMat,
     cone::HypoPerLogdetTri,
     )
-    cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
+    @assert cone.grad_updated
     v = cone.point[2]
-    W = Hermitian(cone.W, :U)
+    @views w = cone.point[3:end]
+    svec_to_smat!(cone.mat4, w, cone.rt2)
+    W = Hermitian(cone.mat4, :U)
+    d = cone.d
     ζ = cone.ζ
+    ϕ = cone.ϕ
     ζv = ζ + v
-    ζi = cone.ζi
-    c0 = cone.c0
-    c4 = cone.c4
-    α = cone.α
-    w_aux = cone.mat3
-    w_prod = cone.mat4
+    ζζvi = ζ / ζv
+    c3 = v / (ζv + d * v)
+    c0 = ϕ - d * ζζvi
+    c4 = v * c3 * ζv
+    c6 = abs2(v * ϕ) + ζ * (ζ + d * v) - d * abs2(ζ + v * ϕ) * c3
+    c7 = c4 * c0
+    c8 = c7 + v * ζ
+    w_aux = cone.mat2
+    w_aux2 = cone.mat3
+
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
         q = arr[2, j]
         @views r = arr[3:end, j]
-        @views r_X = svec_to_smat!(cone.mat4, arr[3:end, j], cone.rt2)
-        copytri!(r_X, 'U', true)
+        svec_to_smat!(w_aux, r, cone.rt2)
+        copytri!(w_aux, 'U', true)
+
+        c1 = dot(w, r) / ζv
+        c5 = c0 * p + q + c1
+        c2 = v * (ζζvi * p + c3 * c5)
+        prod[1, j] = c6 * p + c7 * q + c8 * c1
+        prod[2, j] = c4 * c5
+
+        mul!(w_aux2, w_aux, W)
+        mul!(w_aux, W, w_aux2)
         @views prod_w = prod[3:end, j]
-        rw_const = dot(Hermitian(r_X, :U), W)
-        qγr = q + rw_const / ζv
-        cv = c4 * (c0 * p + qγr)
-        prod[1, j] = cone.Hiuu * p + c4 * c0 * qγr + rw_const * α
-        prod[2, j] = cv
-        mul!(w_aux, W, r_X)
-        mul!(w_prod, w_aux, W, ζ / ζv, false)
-        @. w_prod += (p * α + cv / ζv) * W
-        @views smat_to_svec!(prod[3:end, j], w_prod, cone.rt2)
+        smat_to_svec!(prod_w, w_aux, cone.rt2)
+        axpby!(c2, w, ζζvi, prod_w)
     end
 
     return prod
@@ -356,47 +317,48 @@ end
 
 function dder3(cone::HypoPerLogdetTri, dir::AbstractVector)
     @assert cone.grad_updated
+    v = cone.point[2]
+    dder3 = cone.dder3
     p = dir[1]
     q = dir[2]
     @views r = dir[3:end]
-    dder3 = cone.dder3
-    v = cone.point[2]
-    ζ = cone.ζ
-    ζi = cone.ζi
-    σ = cone.σ
     d = cone.d
-    Wi = Hermitian(cone.Wi)
-    @views w = cone.point[3:end]
-    W = Hermitian(svec_to_smat!(cone.W, w, cone.rt2), :U)
+    ζ = cone.ζ
+    FU = cone.fact_W.U
+    rwi = cone.mat2
+    w_aux = cone.mat3
+    w_aux2 = cone.mat4
+    σ = cone.ϕ - d
     viq = q / v
     viq2 = abs2(viq)
-    w_aux = cone.mat5
+    vζi = v / ζ
+    vζi1 = vζi + 1
 
-    r_X = copytri!(svec_to_smat!(cone.mat3, r, cone.rt2), 'U', true)
-    c0 = dot(Wi, Hermitian(r_X, :U))
-    # ∇ϕr = c0 * v
-    χ = c0 * v - p + σ * q
-
-    rwi = rdiv!(r_X, cone.fact_W)
-    rwi_sqr = real(dot(rwi, rwi'))
-    L_rwi = ldiv!(cone.fact_W.U', rwi)
-    wirwirwi = mul!(cone.mat4, L_rwi', L_rwi)
-    wirwi = ldiv!(cone.fact_W.U, L_rwi)
-
-    # tau of the same form as prod
-    @. w_aux = (q * Wi - v * wirwi) / ζ
-    # tau of TOO
-    ζiχ = ζi * χ
-    @. w_aux *= -ζiχ - viq
-    @. w_aux += v * (viq2 * Wi - 2 * viq * wirwi + wirwirwi) / ζ
-
-    ∇2ϕξξ = -viq2 * d + 2 * viq * c0 - rwi_sqr
-    c1 = ζi * (abs2(ζiχ) - v * ∇2ϕξξ * ζi / 2)
-    c2 = (viq * d - c0) / ζ
+    svec_to_smat!(rwi, r, cone.rt2)
+    copytri!(rwi, 'U', true)
+    rdiv!(rwi, FU)
+    ldiv!(FU', rwi)
+    c0 = tr(Hermitian(rwi, :U))
+    c7 = sum(abs2, rwi)
+    ζiχ = (-p + σ * q + c0 * v) / ζ
+    c4 = (viq * (-viq * d + 2 * c0) - c7) / ζ / 2
+    c1 = (abs2(ζiχ) - v * c4) / ζ
+    c3 = -(ζiχ + viq) / ζ
+    c5 = c3 * q + vζi * viq2
+    c6 = -2 * vζi * viq - c3 * v
+    c8 = c5 + c1 * v
 
     dder3[1] = -c1
-    dder3[2] = c1 * σ + (viq2 - dot(Hermitian(w_aux, :U), W)) / v - ∇2ϕξξ / ζ / 2
-    @. w_aux += c1 * v * Wi + wirwirwi
+    dder3[2] = c1 * σ + (viq2 - (d * c5 + c6 * c0 + vζi * c7)) / v - c4
+
+    copyto!(w_aux2, I)
+    axpby!(vζi1, rwi, c6, w_aux2)
+    mul!(w_aux, Hermitian(rwi, :U), w_aux2)
+    @inbounds for i in diagind(w_aux)
+        w_aux[i] += c8
+    end
+    rdiv!(w_aux, FU')
+    ldiv!(FU, w_aux)
     @views smat_to_svec!(dder3[3:end], w_aux, cone.rt2)
 
     return dder3

@@ -19,7 +19,6 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
-    hess_fact_updated::Bool
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
@@ -41,7 +40,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
 end
 
 reset_data(cone::HypoPerLog) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
+    cone.hess_updated = cone.inv_hess_updated = false)
 
 use_sqrt_hess_oracles(cone::HypoPerLog) = false
 
@@ -179,6 +178,8 @@ function hess_prod!(
 end
 
 function update_inv_hess(cone::HypoPerLog)
+    @assert cone.grad_updated
+    @assert !cone.inv_hess_updated
     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     v = cone.point[2]
     @views w = cone.point[3:end]
@@ -201,12 +202,11 @@ function update_inv_hess(cone::HypoPerLog)
     @. Hi[1, 3:end] = c1 * w
     @. Hi[2, 3:end] = c2 * w
 
-    @views mul!(Hi[3:end, 3:end], w, w', c2 / ζv, true)
-
     @inbounds for j in eachindex(w)
         j2 = 2 + j
-        Hi[j2, j2] += ζζvi * abs2(w[j])
+        Hi[j2, j2] += abs2(w[j])
     end
+    @views mul!(Hi[3:end, 3:end], w, w', c2 / ζv, ζζvi)
 
     cone.inv_hess_updated = true
     return cone.inv_hess
@@ -217,6 +217,7 @@ function inv_hess_prod!(
     arr::AbstractVecOrMat,
     cone::HypoPerLog,
     )
+    @assert cone.grad_updated
     v = cone.point[2]
     @views w = cone.point[3:end]
     d = length(w)
@@ -242,7 +243,7 @@ function inv_hess_prod!(
         c2 = v * (ζζvi * p + c3 * c5)
         prod[1, j] = c6 * p + c7 * q + c8 * c1
         prod[2, j] = c4 * c5
-        @. @views prod[3:end, j] = (c2 + ζζvi * rw) * w
+        @. prod[3:end, j] = (c2 + ζζvi * rw) * w
     end
 
     return prod

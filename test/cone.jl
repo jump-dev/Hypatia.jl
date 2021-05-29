@@ -636,7 +636,7 @@ function test_barrier(C::Type{<:Cones.HypoPerLog})
     test_barrier(C(4), barrier)
 end
 
-show_time_alloc(C::Type{<:Cones.HypoPerLog}) = show_time_alloc(C(1000))
+show_time_alloc(C::Type{<:Cones.HypoPerLog}) = show_time_alloc(C(10))
 
 
 # HypoPerLogdetTri

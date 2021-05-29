@@ -23,7 +23,6 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
-    hess_fact_updated::Bool
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
@@ -33,7 +32,6 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     ζ::T
     ζi::T
     ϕζidi::T
-    W::Matrix{R}
     mat::Matrix{R}
     fact_W::Cholesky{R}
     Wi::Matrix{R}
@@ -58,6 +56,9 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
+reset_data(cone::HypoRootdetTri) = (cone.feas_updated = cone.grad_updated =
+    cone.hess_updated = cone.inv_hess_updated = false)
+
 use_sqrt_hess_oracles(cone::HypoRootdetTri) = false
 
 function setup_extra_data!(
@@ -66,9 +67,8 @@ function setup_extra_data!(
     dim = cone.dim
     d = cone.d
     cone.di = inv(T(d))
-    cone.W = zeros(R, d, d)
-    cone.Wi = zeros(R, d, d)
     cone.mat = zeros(R, d, d)
+    cone.Wi = zeros(R, d, d)
     cone.Wi_vec = zeros(T, dim - 1)
     cone.tempw = zeros(T, dim - 1)
     cone.mat2 = zeros(R, d, d)
@@ -77,7 +77,7 @@ function setup_extra_data!(
     return cone
 end
 
-get_nu(cone::HypoRootdetTri) = (cone.d + 1)
+get_nu(cone::HypoRootdetTri) = 1 + cone.d
 
 function set_initial_point!(
     arr::AbstractVector{T},
@@ -120,8 +120,9 @@ function is_dual_feas(cone::HypoRootdetTri{T}) where {T <: Real}
     if u < -eps(T)
         @views svec_to_smat!(cone.mat2, cone.dual_point[2:end], cone.rt2)
         fact = cholesky!(Hermitian(cone.mat2, :U), check = false)
-        return isposdef(fact) && (logdet(fact) -
-            cone.d * log(-u / cone.d) > eps(T))
+        if isposdef(fact)
+            return (logdet(fact) - cone.d * log(-u / cone.d) > eps(T))
+        end
     end
 
     return false
@@ -130,9 +131,9 @@ end
 function update_grad(cone::HypoRootdetTri)
     @assert cone.is_feas
     g = cone.grad
-    di = cone.di
-    ζi = cone.ζi = inv(cone.ζ)
-    ϕζidi = cone.ϕζidi = cone.ϕ * ζi * di
+    ζ = cone.ζ
+    ζi = cone.ζi = inv(ζ)
+    ϕζidi = cone.ϕζidi = cone.ϕ * cone.di / ζ
 
     g[1] = ζi
     chol_inv!(cone.Wi, cone.fact_W)
@@ -149,16 +150,16 @@ function update_hess(cone::HypoRootdetTri)
     isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
     Wi_vec = cone.Wi_vec
-    ζi = cone.ζi
     ϕζidi = cone.ϕζidi
-    c1 = -ϕζidi * ζi
+    c1 = -ϕζidi / cone.ζ
     ϕζidi1 = ϕζidi + 1
     c2 = ϕζidi * (ϕζidi - cone.di)
 
-    H[1, 1] = abs2(ζi)
+    H[1, 1] = abs2(cone.ζi)
     @. H[1, 2:end] = c1 * Wi_vec
 
     @views symm_kron!(H[2:end, 2:end], cone.Wi, cone.rt2)
+
     @inbounds for j in eachindex(Wi_vec)
         j1 = 1 + j
         Wi_vecj = c2 * Wi_vec[j]
@@ -186,8 +187,7 @@ function hess_prod!(
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
-        @views r = arr[2:end, j]
-        svec_to_smat!(w_aux, r, cone.rt2)
+        @views svec_to_smat!(w_aux, arr[2:end, j], cone.rt2)
         copytri!(w_aux, 'U', true)
         rdiv!(w_aux, FU)
         ldiv!(FU', w_aux)
@@ -215,8 +215,8 @@ function update_inv_hess(cone::HypoRootdetTri)
     @assert !cone.inv_hess_updated
     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     @views w = cone.point[2:end]
-    svec_to_smat!(cone.W, w, cone.rt2)
-    W = Hermitian(cone.W, :U)
+    svec_to_smat!(cone.mat2, w, cone.rt2)
+    W = Hermitian(cone.mat2, :U)
     Hi = cone.inv_hess.data
     ϕ = cone.ϕ
     di = cone.di
@@ -227,7 +227,8 @@ function update_inv_hess(cone::HypoRootdetTri)
     Hi[1, 1] = abs2(cone.ζ) + ϕdi * ϕ
     @. Hi[1, 2:end] = ϕdi * w
 
-    @inbounds @views symm_kron!(Hi[2:end, 2:end], W, cone.rt2)
+    @views symm_kron!(Hi[2:end, 2:end], W, cone.rt2)
+
     @inbounds for j in eachindex(w)
         j1 = 1 + j
         scwj = c3 * w[j]
@@ -247,8 +248,8 @@ function inv_hess_prod!(
     ) where {T <: Real}
     @assert cone.grad_updated
     @views w = cone.point[2:end]
-    svec_to_smat!(cone.W, w, cone.rt2)
-    W = Hermitian(cone.W, :U)
+    svec_to_smat!(cone.mat4, w, cone.rt2)
+    W = Hermitian(cone.mat4, :U)
     ϕ = cone.ϕ
     di = cone.di
     ϕdi = ϕ * di
@@ -261,7 +262,6 @@ function inv_hess_prod!(
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
         @views r = arr[2:end, j]
-        @views prod_w = prod[2:end, j]
         svec_to_smat!(w_aux, r, cone.rt2)
         copytri!(w_aux, 'U', true)
 
@@ -271,6 +271,7 @@ function inv_hess_prod!(
 
         mul!(w_aux2, w_aux, W)
         mul!(w_aux, W, w_aux2)
+        @views prod_w = prod[2:end, j]
         smat_to_svec!(prod_w, w_aux, cone.rt2)
         axpby!(c6, w, c2, prod_w)
     end
