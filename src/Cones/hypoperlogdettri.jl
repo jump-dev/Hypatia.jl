@@ -53,7 +53,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         dim::Int;
         use_dual::Bool = false,
         hess_fact_cache = hessian_cache(T),
-        ) where {R <: RealOrComplex{T}} where {T <: Real}
+        ) where {T <: Real, R <: RealOrComplex{T}}
         @assert dim >= 3
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
@@ -72,7 +72,7 @@ reset_data(cone::HypoPerLogdetTri) = (cone.feas_updated = cone.grad_updated =
 
 function setup_extra_data!(
     cone::HypoPerLogdetTri{T, R},
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
+    ) where {T <: Real, R <: RealOrComplex{T}}
     dim = cone.dim
 
 
@@ -100,7 +100,7 @@ get_nu(cone::HypoPerLogdetTri) = cone.d + 2
 function set_initial_point!(
     arr::AbstractVector{T},
     cone::HypoPerLogdetTri{T, R},
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
+    ) where {T <: Real, R <: RealOrComplex{T}}
     arr .= 0
     # central point data are the same as for hypoperlog
     (arr[1], arr[2], w) = get_central_ray_hypoperlog(cone.d)

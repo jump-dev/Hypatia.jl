@@ -35,7 +35,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
 
     function PosSemidefTri{T, R}(
         dim::Int,
-        ) where {R <: RealOrComplex{T}} where {T <: Real}
+        ) where {T <: Real, R <: RealOrComplex{T}}
         @assert dim >= 1
         cone = new{T, R}()
         cone.dim = dim
@@ -55,7 +55,7 @@ use_sqrt_hess_oracles(cone::PosSemidefTri) = true
 
 function setup_extra_data!(
     cone::PosSemidefTri{T, R},
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
+    ) where {T <: Real, R <: RealOrComplex{T}}
     cone.mat = zeros(R, cone.side, cone.side)
     cone.mat2 = zero(cone.mat)
     cone.mat3 = zero(cone.mat)

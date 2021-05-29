@@ -54,7 +54,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         d2::Int;
         use_dual::Bool = false,
         hess_fact_cache = hessian_cache(T),
-        ) where {R <: RealOrComplex{T}} where {T <: Real}
+        ) where {T <: Real, R <: RealOrComplex{T}}
         @assert 1 <= d1 <= d2
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
@@ -74,7 +74,7 @@ reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated =
 # TODO only allocate the fields we use
 function setup_extra_data!(
     cone::EpiNormSpectral{T, R},
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
+    ) where {T <: Real, R <: RealOrComplex{T}}
     dim = cone.dim
     (d1, d2) = (cone.d1, cone.d2)
     cone.W = zeros(R, d1, d2)
@@ -99,7 +99,7 @@ get_nu(cone::EpiNormSpectral) = cone.d1 + 1
 function set_initial_point!(
     arr::AbstractVector,
     cone::EpiNormSpectral{T, R},
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
+    ) where {T <: Real, R <: RealOrComplex{T}}
     arr .= 0
     arr[1] = sqrt(T(get_nu(cone)))
     return arr

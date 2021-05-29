@@ -57,7 +57,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         d2::Int;
         use_dual::Bool = false,
         hess_fact_cache = hessian_cache(T),
-        ) where {R <: RealOrComplex{T}} where {T <: Real}
+        ) where {T <: Real, R <: RealOrComplex{T}}
         @assert 1 <= d1 <= d2
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
@@ -80,7 +80,7 @@ reset_data(cone::MatrixEpiPerSquare) = (cone.feas_updated = cone.grad_updated =
 
 function setup_extra_data!(
     cone::MatrixEpiPerSquare{T, R},
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
+    ) where {T <: Real, R <: RealOrComplex{T}}
     (d1, d2) = (cone.d1, cone.d2)
     cone.U = Hermitian(zeros(R, d1, d1), :U)
     cone.W = zeros(R, d1, d2)
@@ -104,7 +104,7 @@ get_nu(cone::MatrixEpiPerSquare) = cone.d1 + 1
 function set_initial_point!(
     arr::AbstractVector,
     cone::MatrixEpiPerSquare{T, R},
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
+    ) where {T <: Real, R <: RealOrComplex{T}}
     incr = (cone.is_complex ? 2 : 1)
     arr .= 0
     k = 1
