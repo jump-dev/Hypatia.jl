@@ -32,7 +32,7 @@ const native_examples = [
 
 # list of names of JuMP examples to run
 const JuMP_examples = [
-    "CBLIB",
+    # "CBLIB",
     "centralpolymat",
     "classicalquantum",
     "conditionnum",
@@ -87,11 +87,10 @@ end
 
 # build ordered dictionary of all test instances
 function get_test_instances()
-    test_insts = OrderedDict{String, Dict}()
+    test_insts = OrderedDict{String, OrderedDict}()
     for mod in model_types
-        test_insts[mod] =
+        mod_insts = test_insts[mod] =
             OrderedDict{String, Tuple{Type{<:ExampleInstance}, Dict}}()
-        mod_insts = test_insts[mod]
         for ex in model_type_examples(mod)
             mod_insts[ex] = get_test_instances(mod, ex)
         end
