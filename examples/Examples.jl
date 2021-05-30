@@ -89,8 +89,9 @@ end
 function get_test_instances()
     test_insts = OrderedDict{String, Dict}()
     for mod in model_types
-        mod_insts = test_insts[mod] =
+        test_insts[mod] =
             OrderedDict{String, Tuple{Type{<:ExampleInstance}, Dict}}()
+        mod_insts = test_insts[mod]
         for ex in model_type_examples(mod)
             mod_insts[ex] = get_test_instances(mod, ex)
         end
