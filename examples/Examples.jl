@@ -87,7 +87,7 @@ end
 
 # build ordered dictionary of all test instances
 function get_test_instances()
-    test_insts = OrderedDict{String, Dict}()
+    test_insts = OrderedDict{String, OrderedDict}()
     for mod in model_types
         mod_insts = test_insts[mod] =
             OrderedDict{String, Tuple{Type{<:ExampleInstance}, Dict}}()
