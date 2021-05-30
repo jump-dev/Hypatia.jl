@@ -164,6 +164,7 @@ function hess_prod!(
         p = arr[1, j]
         @views r = arr[2:end, j]
         @. rwi = r / w
+
         c0 = dot(rwi, α)
         c1 = ζiϕ * c0 - p / ζ
         prod[1, j] = c1 / -ζ

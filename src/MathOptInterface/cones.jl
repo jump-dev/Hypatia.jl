@@ -357,19 +357,19 @@ See [`Cones.GeneralizedPower`](@ref).
 $(TYPEDFIELDS)
 """
 struct GeneralizedPowerCone{T <: Real} <: MOI.AbstractVectorSet
-    alpha::Vector{T}
+    α::Vector{T}
     n::Int
     use_dual::Bool
 end
 export GeneralizedPowerCone
 
-GeneralizedPowerCone{T}(alpha::Vector{T}, n::Int) where {T <: Real} =
-    GeneralizedPowerCone{T}(alpha, n, false)
+GeneralizedPowerCone{T}(α::Vector{T}, n::Int) where {T <: Real} =
+    GeneralizedPowerCone{T}(α, n, false)
 
-MOI.dimension(cone::GeneralizedPowerCone) = length(cone.alpha) + cone.n
+MOI.dimension(cone::GeneralizedPowerCone) = length(cone.α) + cone.n
 
 cone_from_moi(::Type{T}, cone::GeneralizedPowerCone{T}) where {T <: Real} =
-    Cones.GeneralizedPower{T}(cone.alpha, cone.n, use_dual = cone.use_dual)
+    Cones.GeneralizedPower{T}(cone.α, cone.n, use_dual = cone.use_dual)
 
 """
 $(TYPEDEF)
@@ -379,18 +379,18 @@ See [`Cones.HypoPowerMean`](@ref).
 $(TYPEDFIELDS)
 """
 struct HypoPowerMeanCone{T <: Real} <: MOI.AbstractVectorSet
-    alpha::Vector{T}
+    α::Vector{T}
     use_dual::Bool
 end
 export HypoPowerMeanCone
 
-HypoPowerMeanCone{T}(alpha::Vector{T}) where {T <: Real} =
-    HypoPowerMeanCone{T}(alpha, false)
+HypoPowerMeanCone{T}(α::Vector{T}) where {T <: Real} =
+    HypoPowerMeanCone{T}(α, false)
 
-MOI.dimension(cone::HypoPowerMeanCone) = 1 + length(cone.alpha)
+MOI.dimension(cone::HypoPowerMeanCone) = 1 + length(cone.α)
 
 cone_from_moi(::Type{T}, cone::HypoPowerMeanCone{T}) where {T <: Real} =
-    Cones.HypoPowerMean{T}(cone.alpha, use_dual = cone.use_dual)
+    Cones.HypoPowerMean{T}(cone.α, use_dual = cone.use_dual)
 
 """
 $(TYPEDEF)

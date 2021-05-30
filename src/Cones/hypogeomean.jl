@@ -218,6 +218,7 @@ function inv_hess_prod!(
         p = arr[1, j]
         @views r = arr[2:end, j]
         @. rw = r * w
+
         c5 = sum(rw)
         prod[1, j] = ϕdi * c5 + c4 * p
         c6 = ϕdi * (c3 * c5 + p)
