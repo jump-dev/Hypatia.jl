@@ -1,15 +1,15 @@
 """
 $(TYPEDEF)
 
-Hypograph of weighted power mean cone parametrized by powers `alpha` in the unit
+Hypograph of weighted power mean cone parametrized by powers `α` in the unit
 simplex.
 
-    $(FUNCTIONNAME){T}(alpha::Vector{T}, use_dual::Bool = false)
+    $(FUNCTIONNAME){T}(α::Vector{T}, use_dual::Bool = false)
 """
 mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
-    alpha::Vector{T}
+    α::Vector{T}
 
     point::Vector{T}
     dual_point::Vector{T}
@@ -29,23 +29,21 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
 
     ϕ::T
     ζ::T
-    ζi::T
     tempw1::Vector{T}
-    tempw2::Vector{T}
 
     function HypoPowerMean{T}(
-        alpha::Vector{T};
+        α::Vector{T};
         use_dual::Bool = false,
         hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
-        dim = length(alpha) + 1
+        dim = length(α) + 1
         @assert dim >= 2
-        @assert all(ai > 0 for ai in alpha)
-        @assert sum(alpha) ≈ 1
+        @assert all(ai > 0 for ai in α)
+        @assert sum(α) ≈ 1
         cone = new{T}()
         cone.use_dual_barrier = use_dual
         cone.dim = dim
-        cone.alpha = alpha
+        cone.α = α
         cone.hess_fact_cache = hess_fact_cache
         return cone
     end
@@ -53,35 +51,34 @@ end
 
 function setup_extra_data!(cone::HypoPowerMean{T}) where {T <: Real}
     cone.tempw1 = zeros(T, cone.dim - 1)
-    cone.tempw2 = zeros(T, cone.dim - 1)
     return cone
 end
 
 get_nu(cone::HypoPowerMean) = cone.dim
 
-function set_initial_point!(arr::AbstractVector{T}, cone::HypoPowerMean{T}) where T
+function set_initial_point!(
+    arr::AbstractVector{T},
+    cone::HypoPowerMean{T},
+    ) where {T <: Real}
     # get closed form central ray if all powers are equal, else use fitting
-    if all(isequal(inv(T(cone.dim - 1))), cone.alpha)
-        n = cone.dim - 1
-        c = sqrt(T(5 * n ^ 2 + 2 * n + 1))
-        arr[1] = -sqrt((-c + 3 * n + 1) / T(2 * n + 2))
-        @views arr[2:end] .= (c - n + 1) / sqrt(T(n + 1) * (-2 * c + 6 * n + 2))
+    d = cone.dim - 1
+    if all(isequal(inv(T(d))), cone.α)
+        (u, w) = get_central_ray_hypogeomean(T, d)
     else
-        (arr[1], w) = get_central_ray_hypopowermean(cone.alpha)
-        @views arr[2:end] = w
+        (u, w) = get_central_ray_hypopowermean(cone.α)
     end
+    arr[1] = u
+    arr[2:end] .= w
     return arr
 end
 
-function update_feas(cone::HypoPowerMean{T}) where T
+function update_feas(cone::HypoPowerMean{T}) where {T <: Real}
     @assert !cone.feas_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
-    alpha = cone.alpha
 
     if all(>(eps(T)), w)
-        @inbounds cone.ϕ = exp(sum(alpha[i] * log(w[i])
-            for i in eachindex(alpha)))
+        cone.ϕ = exp(sum(α_i * log(w_i) for (α_i, w_i) in zip(cone.α, w)))
         cone.ζ = cone.ϕ - u
         cone.is_feas = (cone.ζ > eps(T))
     else
@@ -92,14 +89,14 @@ function update_feas(cone::HypoPowerMean{T}) where T
     return cone.is_feas
 end
 
-function is_dual_feas(cone::HypoPowerMean{T}) where T
+function is_dual_feas(cone::HypoPowerMean{T}) where {T <: Real}
     u = cone.dual_point[1]
     @views w = cone.dual_point[2:end]
-    alpha = cone.alpha
+    α = cone.α
 
-    @inbounds if u < -eps(T) && all(>(eps(T)), w)
-        return (exp(sum(alpha[i] * log(w[i] / alpha[i])
-            for i in eachindex(alpha))) + u > eps(T))
+    if u < -eps(T) && all(>(eps(T)), w)
+        sumlog = sum(α_i * log(w_i / α_i) for (α_i, w_i) in zip(α, w))
+        return (exp(sumlog) + u > eps(T))
     end
 
     return false
@@ -107,13 +104,13 @@ end
 
 function update_grad(cone::HypoPowerMean)
     @assert cone.is_feas
-    u = cone.point[1]
     @views w = cone.point[2:end]
+    g = cone.grad
+    ζ = cone.ζ
 
-    ζi = cone.ζi = inv(cone.ζ)
-    cone.grad[1] = ζi
-    wϕu = -cone.ϕ * ζi
-    @. @views cone.grad[2:end] = (wϕu * cone.alpha - 1) / w
+    g[1] = inv(ζ)
+    ζiϕ = -cone.ϕ / ζ
+    @. g[2:end] = (ζiϕ * cone.α - 1) / w
 
     cone.grad_updated = true
     return cone.grad
@@ -122,28 +119,29 @@ end
 function update_hess(cone::HypoPowerMean)
     @assert cone.grad_updated
     isdefined(cone, :hess) || alloc_hess!(cone)
-    H = cone.hess.data
-    u = cone.point[1]
     @views w = cone.point[2:end]
-    alpha = cone.alpha
+    α = cone.α
+    H = cone.hess.data
     ζ = cone.ζ
-    ζi = cone.ζi
-    aw = alpha ./ w # TODO
-    wϕu = cone.ϕ / ζ
-    wϕum1 = wϕu - 1
+    αwi = cone.tempw1
+    ζiϕ = cone.ϕ / ζ
+    ζiϕ1 = ζiϕ - 1
+    @. αwi = α ./ w
 
-    H[1, 1] = abs2(ζi)
+    H[1, 1] = ζ^-2
+
     @inbounds for j in eachindex(w)
         j1 = j + 1
-        wj = w[j]
-        aj = alpha[j]
-        awwϕu = wϕu * aw[j]
-        H[1, j1] = -awwϕu / ζ
-        awwϕum1 = awwϕu * wϕum1
-        @inbounds for i in 1:(j - 1)
-            H[i + 1, j1] = awwϕum1 * aw[i]
+        w_j = w[j]
+        α_j = α[j]
+        c3 = ζiϕ * αwi[j]
+        H[1, j1] = -c3 / ζ
+
+        c2 = c3 * ζiϕ1
+        for i in 1:(j - 1)
+            H[i + 1, j1] = c2 * αwi[i]
         end
-        H[j1, j1] = (awwϕu * (1 + aj * wϕum1) + inv(wj)) / wj
+        H[j1, j1] = (c3 * (1 + α_j * ζiϕ1) + inv(w_j)) / w_j
     end
 
     cone.hess_updated = true
@@ -151,87 +149,79 @@ function update_hess(cone::HypoPowerMean)
 end
 
 function hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::HypoPowerMean,
-    )
+    prod::AbstractVecOrMat{T},
+    arr::AbstractVecOrMat{T},
+    cone::HypoPowerMean{T},
+    ) where {T <: Real}
     @assert cone.grad_updated
-    u = cone.point[1]
     @views w = cone.point[2:end]
-    alpha = cone.alpha
-    ζi = cone.ζi
-    ϕ = cone.ϕ
+    α = cone.α
+    ζ = cone.ζ
     rwi = cone.tempw1
+    ζiϕ = cone.ϕ / ζ
 
-    @inbounds @views for j in 1:size(arr, 2)
+    @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
-        r = arr[2:end, j]
+        @views r = arr[2:end, j]
         @. rwi = r / w
-        c0 = dot(rwi, alpha)
-        c1 = -ζi * (p - ϕ * c0) * ζi
-        prod[1, j] = -c1
-        # ∇2h[r] = ϕ * (c0 - rwi) / w * alpha
-        @. prod[2:end, j] = ϕ * (c1 - ζi * (c0 - rwi)) * alpha / w + r / w / w
+
+        c0 = dot(rwi, α)
+        c1 = ζiϕ * c0 - p / ζ
+        prod[1, j] = c1 / -ζ
+        c2 = c1 - c0
+        @. prod[2:end, j] = (α * ζiϕ * (c2 + rwi) + rwi) / w
     end
 
     return prod
 end
 
-function dder3(cone::HypoPowerMean, dir::AbstractVector)
+function dder3(cone::HypoPowerMean{T}, dir::AbstractVector{T}) where {T <: Real}
     @assert cone.grad_updated
-    u = cone.point[1]
     @views w = cone.point[2:end]
     dder3 = cone.dder3
-    alpha = cone.alpha
     p = dir[1]
     @views r = dir[2:end]
+    α = cone.α
     ϕ = cone.ϕ
-    ζi = cone.ζi
-
+    ζ = cone.ζ
     rwi = cone.tempw1
+    ζiϕ = ϕ / ζ
+
     @. rwi = r / w
-    c0 = dot(rwi, alpha)
-    rwi_sqr = sum(abs2(rwij) * aj for (rwij, aj) in zip(rwi, alpha))
+    c0 = dot(rwi, α)
+    c6 = sum(abs2(rwij) * α_i for (rwij, α_i) in zip(rwi, α))
+    ζiχ = (p - ϕ * c0) / ζ
+    c1 = ζiχ^2 + ζiϕ * (c6 - abs2(c0)) / 2
+    c7 = ζiϕ * (c1 - c6 / 2 + c0 * (ζiχ + c0 / 2))
+    c8 = -ζiϕ * (ζiχ + c0)
 
-    ζiχ = ζi * (p - ϕ * c0)
-    ξbξ = ζi * ϕ * (c0^2 - rwi_sqr) / 2
-    c1 = -ζi * (ζiχ^2 - ξbξ)
-
-    c2 = -ζi / 2
-    w_aux = cone.tempw2
-    # ∇2h[r] = ϕ * (c0 - rwi) / w * alpha
-    @. w_aux = ζi * ϕ * (c0 - rwi) / w * alpha
-    w_aux .*= ζiχ
-    # add c2 * ∇3h[r, r]
-    @. w_aux -= c2 * ϕ * ((c0 - rwi)^2 - rwi_sqr + rwi^2) * alpha / w
-
-    dder3[1] = c1
-    @. dder3[2:end] = (abs2(rwi) - c1 * ϕ * alpha) / w + w_aux
+    dder3[1] = -c1 / ζ
+    @. dder3[2:end] = (α * (c7 + rwi * (c8 + ζiϕ * rwi)) + abs2(rwi)) / w
 
     return dder3
 end
 
 # see analysis in
 # https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
-function get_central_ray_hypopowermean(alpha::Vector{<:Real})
-    w_dim = length(alpha)
-    # predict each w_i given alpha_i and n
-    w = zeros(w_dim)
-    if w_dim == 1
+function get_central_ray_hypopowermean(α::Vector{T}) where {T <: Real}
+    d = length(α)
+    # predict w given α and d
+    w = zeros(T, d)
+    if d == 1
         w .= 1.306563
-    elseif w_dim == 2
-        @. w = 1.0049885 + 0.2986276 * alpha
-    elseif w_dim <= 5
-        @. w = 1.0040142949 - 0.0004885108 * w_dim + 0.3016645951 * alpha
-    elseif w_dim <= 20
-        @. w = 1.001168 - 4.547017e-05 * w_dim + 3.032880e-01 * alpha
-    elseif w_dim <= 100
-        @. w = 1.000069 - 5.469926e-07 * w_dim + 3.074084e-01 * alpha
+    elseif d == 2
+        @. w = 1.0049885 + 0.2986276 * α
+    elseif d <= 5
+        @. w = 1.0040142949 - 0.0004885108 * d + 0.3016645951 * α
+    elseif d <= 20
+        @. w = 1.001168 - 4.547017e-05 * d + 3.032880e-01 * α
+    elseif d <= 100
+        @. w = 1.000069 - 5.469926e-07 * d + 3.074084e-01 * α
     else
-        @. w = 1 + 3.086535e-01 * alpha
+        @. w = 1 + 3.086535e-01 * α
     end
     # get u in closed form from w
-    p = exp(sum(alpha[i] * log(w[i]) for i in eachindex(alpha)))
-    u = sum(p .- alpha .* p ./ (abs2.(w) .- 1)) / w_dim
-    return [u, w]
+    p = exp(sum(α_i * log(w_i) for (α_i, w_i) in zip(α, w)))
+    u = p - p / d * sum(α_i / (abs2(w_i) - 1) for (α_i, w_i) in zip(α, w))
+    return (u, w)
 end

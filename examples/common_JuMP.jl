@@ -240,7 +240,7 @@ cone_from_hyp(cone::Cones.HypoGeoMean) =
     MOI.GeometricMeanCone(Cones.dimension(cone))
 
 cone_from_hyp(cone::Cones.GeneralizedPower) =
-    (@assert Cones.dimension(cone) == 3; MOI.PowerCone{Float64}(cone.alpha[1]))
+    (@assert Cones.dimension(cone) == 3; MOI.PowerCone{Float64}(cone.α[1]))
 
 cone_from_hyp(cone::Cones.EpiNormSpectral{T, T}) where {T <: Real} =
     (Cones.use_dual_barrier(cone) ? MOI.NormNuclearCone :

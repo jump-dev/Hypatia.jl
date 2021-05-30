@@ -1358,7 +1358,7 @@ function generalizedpower4(T; options...)
         @test norm(r.x) ≈ 0 atol=tol rtol=tol
     end
 end
-# TODO test with non-equal alphas
+# TODO test with non-equal αs
 function hypopowermean1(T; options...)
     tol = test_tol(T)
     c = T[-1, 0, 0]

@@ -50,7 +50,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
         Ps::Vector{Matrix{R}};
         use_dual::Bool = false,
         hess_fact_cache = hessian_cache(T),
-        ) where {R <: RealOrComplex{T}} where {T <: Real}
+        ) where {T <: Real, R <: RealOrComplex{T}}
         for Pk in Ps
             @assert size(Pk, 1) == U
         end
@@ -70,7 +70,7 @@ reset_data(cone::WSOSInterpNonnegative) = (cone.feas_updated = cone.grad_updated
 
 function setup_extra_data!(
     cone::WSOSInterpNonnegative{T, R},
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
+    ) where {T <: Real, R <: RealOrComplex{T}}
     dim = cone.dim
     Ls = [size(Pk, 2) for Pk in cone.Ps]
     cone.tempLL = [zeros(R, L, L) for L in Ls]

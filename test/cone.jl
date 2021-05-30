@@ -285,9 +285,9 @@ end
 
 function rand_powers(T, d)
     Random.seed!(1)
-    alpha = rand(T, d) .+ 1
-    alpha ./= sum(alpha)
-    return alpha
+    α = rand(T, d) .+ 1
+    α ./= sum(α)
+    return α
 end
 
 # real Ps for WSOS cones, use unit box domain
@@ -541,13 +541,13 @@ end
 
 function test_barrier(C::Type{Cones.GeneralizedPower{T}}) where T
     (du, dw) = (2, 2)
-    alpha = rand_powers(T, du)
+    α = rand_powers(T, du)
     function barrier(s)
         (u, w) = (s[1:du], s[(du + 1):end])
-        return -log(exp(2 * sum(alpha[i] * log(u[i]) for i in eachindex(u))) -
-            sum(abs2, w)) - sum((1 - alpha[i]) * log(u[i]) for i in eachindex(u))
+        return -log(exp(2 * sum(α[i] * log(u[i]) for i in eachindex(u))) -
+            sum(abs2, w)) - sum((1 - α[i]) * log(u[i]) for i in eachindex(u))
     end
-    test_barrier(C(alpha, dw), barrier)
+    test_barrier(C(α, dw), barrier)
 end
 
 show_time_alloc(C::Type{Cones.GeneralizedPower{T}}) where T =
@@ -565,13 +565,13 @@ function test_oracles(C::Type{Cones.HypoPowerMean{T}}) where T
 end
 
 function test_barrier(C::Type{Cones.HypoPowerMean{T}}) where T
-    alpha = rand_powers(T, 3)
+    α = rand_powers(T, 3)
     function barrier(s)
         (u, w) = (s[1], s[2:end])
-        return -log(exp(sum(alpha[i] * log(w[i]) for i in eachindex(w))) - u) -
+        return -log(exp(sum(α[i] * log(w[i]) for i in eachindex(w))) - u) -
             sum(log, w)
     end
-    test_barrier(C(alpha), barrier)
+    test_barrier(C(α), barrier)
 end
 
 show_time_alloc(C::Type{Cones.HypoPowerMean{T}}) where T =
@@ -636,7 +636,7 @@ function test_barrier(C::Type{<:Cones.HypoPerLog})
     test_barrier(C(4), barrier)
 end
 
-show_time_alloc(C::Type{<:Cones.HypoPerLog}) = show_time_alloc(C(9))
+show_time_alloc(C::Type{<:Cones.HypoPerLog}) = show_time_alloc(C(10))
 
 
 # HypoPerLogdetTri

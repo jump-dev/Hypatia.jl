@@ -45,7 +45,7 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     function EpiNormInf{T, R}(
         dim::Int;
         use_dual::Bool = false,
-        ) where {R <: RealOrComplex{T}} where {T <: Real}
+        ) where {T <: Real, R <: RealOrComplex{T}}
         @assert dim >= 2
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
@@ -64,7 +64,7 @@ use_sqrt_hess_oracles(cone::EpiNormInf) = false
 
 function setup_extra_data!(
     cone::EpiNormInf{T, R},
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
+    ) where {T <: Real, R <: RealOrComplex{T}}
     n = cone.n
     cone.w = zeros(R, n)
     cone.wden = zeros(R, n)
@@ -123,7 +123,7 @@ end
 
 function update_grad(
     cone::EpiNormInf{T, R},
-    ) where {R <: RealOrComplex{T}} where {T <: Real}
+    ) where {T <: Real, R <: RealOrComplex{T}}
     @assert cone.is_feas
     u = cone.point[1]
     w = cone.w
