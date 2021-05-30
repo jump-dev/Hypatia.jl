@@ -32,7 +32,7 @@ const native_examples = [
 
 # list of names of JuMP examples to run
 const JuMP_examples = [
-    # "CBLIB",
+    "CBLIB",
     "centralpolymat",
     "classicalquantum",
     "conditionnum",
