@@ -30,7 +30,6 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     di::T
     ϕ::T
     ζ::T
-    ζi::T
     ϕζidi::T
     mat::Matrix{R}
     fact_W::Cholesky{R}
@@ -132,13 +131,12 @@ function update_grad(cone::HypoRootdetTri)
     @assert cone.is_feas
     g = cone.grad
     ζ = cone.ζ
-    ζi = cone.ζi = inv(ζ)
-    ϕζidi = cone.ϕζidi = cone.ϕ * cone.di / ζ
+    cone.ϕζidi = cone.ϕ / ζ * cone.di
+    ϕζidi1 = -cone.ϕζidi - 1
 
-    g[1] = ζi
+    g[1] = inv(ζ)
     chol_inv!(cone.Wi, cone.fact_W)
     smat_to_svec!(cone.Wi_vec, cone.Wi, cone.rt2)
-    ϕζidi1 = -ϕζidi - 1
     @. g[2:end] = ϕζidi1 * cone.Wi_vec
 
     cone.grad_updated = true
@@ -150,12 +148,13 @@ function update_hess(cone::HypoRootdetTri)
     isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
     Wi_vec = cone.Wi_vec
+    ζ = cone.ζ
     ϕζidi = cone.ϕζidi
-    c1 = -ϕζidi / cone.ζ
+    c1 = -ϕζidi / ζ
     ϕζidi1 = ϕζidi + 1
     c2 = ϕζidi * (ϕζidi - cone.di)
 
-    H[1, 1] = abs2(cone.ζi)
+    H[1, 1] = ζ^-2
     @. H[1, 2:end] = c1 * Wi_vec
 
     @views symm_kron!(H[2:end, 2:end], cone.Wi, cone.rt2)
@@ -178,12 +177,12 @@ function hess_prod!(
     cone::HypoRootdetTri{T},
     ) where {T <: Real}
     @assert cone.grad_updated
-    ζi = cone.ζi
     di = cone.di
-    w_aux = cone.mat2
+    ζ = cone.ζ
     ϕζidi = cone.ϕζidi
-    ϕζidi1 = ϕζidi + 1
+    w_aux = cone.mat2
     FU = cone.fact_W.U
+    ϕζidi1 = ϕζidi + 1
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
@@ -193,7 +192,7 @@ function hess_prod!(
         ldiv!(FU', w_aux)
 
         c0 = ϕζidi * tr(Hermitian(w_aux, :U))
-        c1 = c0 - ζi * p
+        c1 = c0 - p / ζ
         c2 = ϕζidi * c1 - di * c0
 
         lmul!(ϕζidi1, w_aux)
@@ -203,7 +202,7 @@ function hess_prod!(
         rdiv!(w_aux, FU')
         ldiv!(FU, w_aux)
 
-        prod[1, j] = -ζi * c1
+        prod[1, j] = c1 / -ζ
         @views smat_to_svec!(prod[2:end, j], w_aux, cone.rt2)
     end
 
@@ -218,13 +217,14 @@ function update_inv_hess(cone::HypoRootdetTri)
     svec_to_smat!(cone.mat2, w, cone.rt2)
     W = Hermitian(cone.mat2, :U)
     Hi = cone.inv_hess.data
+    ζ = cone.ζ
     ϕ = cone.ϕ
     di = cone.di
     ϕdi = ϕ * di
     c2 = inv(cone.ϕζidi + 1)
-    c3 = ϕdi * c2 * cone.ζi * di
+    c3 = ϕdi * c2 / ζ * di
 
-    Hi[1, 1] = abs2(cone.ζ) + ϕdi * ϕ
+    Hi[1, 1] = abs2(ζ) + ϕdi * ϕ
     @. Hi[1, 2:end] = ϕdi * w
 
     @views symm_kron!(Hi[2:end, 2:end], W, cone.rt2)
@@ -250,12 +250,13 @@ function inv_hess_prod!(
     @views w = cone.point[2:end]
     svec_to_smat!(cone.mat4, w, cone.rt2)
     W = Hermitian(cone.mat4, :U)
+    ζ = cone.ζ
     ϕ = cone.ϕ
     di = cone.di
     ϕdi = ϕ * di
     c2 = inv(cone.ϕζidi + 1)
-    c3 = c2 * cone.ζi * di
-    c4 = abs2(cone.ζ) + ϕdi * ϕ
+    c3 = c2 / ζ * di
+    c4 = abs2(ζ) + ϕdi * ϕ
     w_aux = cone.mat2
     w_aux2 = cone.mat3
 
@@ -284,8 +285,8 @@ function dder3(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where {T <: Real
     dder3 = cone.dder3
     p = dir[1]
     @views r = dir[2:end]
+    ζ = cone.ζ
     ϕ = cone.ϕ
-    ζi = cone.ζi
     di = cone.di
     ϕζidi = cone.ϕζidi
     FU = cone.fact_W.U
@@ -299,13 +300,13 @@ function dder3(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where {T <: Real
     ldiv!(FU', rwi)
     c0 = tr(Hermitian(rwi, :U)) * di
     c6 = sum(abs2, rwi) * di
-    ζiχ = ζi * (p - ϕ * c0)
-    c1 = ζiχ^2 + ζi * ϕ * (c6 - abs2(c0)) / 2
+    ζiχ = (p - ϕ * c0) / ζ
+    c1 = ζiχ^2 + ϕ / ζ * (c6 - abs2(c0)) / 2
     c7 = ϕζidi * (c1 - c6 / 2 + c0 * (ζiχ + c0 / 2))
     c8 = -ϕζidi * (ζiχ + c0)
     c9 = ϕζidi + 1
 
-    dder3[1] = -ζi * c1
+    dder3[1] = c1 / -ζ
 
     copyto!(w_aux2, I)
     axpby!(c9, rwi, c8, w_aux2)
