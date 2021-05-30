@@ -12,7 +12,7 @@ makedocs(
         "Modeling" => "modeling.md",
         "Solving" => "solving.md",
         "Examples" => "examples.md",
-        "Scripts" => "scripts.md",
+        "Benchmarks" => "benchmarks.md",
         "API reference" => [
             "api/hypatia.md",
             "api/cones.md",

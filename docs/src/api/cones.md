@@ -70,7 +70,7 @@ WSOSInterpEpiNormEucl
 WSOSInterpEpiNormOne
 ```
 
-### PosSemidefTriSparse helpers
+### Helpers for PosSemidefTriSparse
 
 ```@docs
 PSDSparseImpl
