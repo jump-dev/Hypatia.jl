@@ -5,9 +5,13 @@ predict or center stepper
 mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     use_adjustment::Bool
     use_curve_search::Bool
+    max_cent_steps::Int
+    pred_prox_bound::T
+    use_pred_sum_prox::Bool
+    searcher_options
+
     prev_alpha::T
     cent_count::Int
-
     rhs::Point{T}
     dir::Point{T}
     temp::Point{T}
@@ -15,13 +19,17 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     dir_adj::Point{T}
     dir_temp::Vector{T}
 
-    step_searcher::StepSearcher{T}
+    searcher::StepSearcher{T}
     unadj_only::Bool
     unadj_alpha::T
 
     function PredOrCentStepper{T}(;
         use_adjustment::Bool = true,
         use_curve_search::Bool = true,
+        max_cent_steps::Int = 4,
+        pred_prox_bound::T = T(0.05),
+        use_pred_sum_prox::Bool = false,
+        searcher_options...
         ) where {T <: Real}
         stepper = new{T}()
         if use_curve_search
@@ -30,6 +38,9 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
         end
         stepper.use_adjustment = use_adjustment
         stepper.use_curve_search = use_curve_search
+        stepper.pred_prox_bound = pred_prox_bound
+        stepper.use_pred_sum_prox = use_pred_sum_prox
+        stepper.searcher_options = searcher_options
         return stepper
     end
 end
@@ -43,17 +54,16 @@ function load(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
 
     stepper.prev_alpha = one(T)
     stepper.cent_count = 0
-
     stepper.rhs = Point(model)
     stepper.dir = Point(model)
     stepper.temp = Point(model)
-    stepper.dir_noadj = Point(model, ztsk_only = true) # TODO probably don't need this AND dir
+    stepper.dir_noadj = Point(model, ztsk_only = true)
     if stepper.use_adjustment
         stepper.dir_adj = Point(model, ztsk_only = true)
     end
     stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
 
-    stepper.step_searcher = StepSearcher{T}(model)
+    stepper.searcher = StepSearcher{T}(model; stepper.searcher_options...)
     stepper.unadj_only = false
     stepper.unadj_alpha = 0
 
@@ -72,15 +82,23 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     solver.time_upsys += @elapsed update_lhs(solver.syssolver, solver)
 
     # decide whether to predict or center
-    is_pred = ((stepper.cent_count > 3) ||
-        all(Cones.in_neighborhood.(cones, sqrt(solver.mu), T(0.05)))) # TODO tune, make option
+    if stepper.cent_count >= stepper.max_cent_steps
+        is_pred = true
+    else
+        rtmu = sqrt(solver.mu)
+        use_sum = stepper.use_pred_sum_prox
+        proxs = (Cones.get_proximity(cone_k, rtmu, use_sum) for cone_k in cones)
+        prox = (use_sum ? sum(proxs) : maximum(proxs))
+        is_pred = (!isnan(prox) && prox < stepper.pred_prox_bound)
+    end
+
     stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
     rhs_fun_noadj = (is_pred ? update_rhs_pred : update_rhs_cent)
 
     # get unadjusted direction
     solver.time_uprhs += @elapsed rhs_fun_noadj(solver, rhs)
     solver.time_getdir += @elapsed get_directions(stepper, solver)
-    copyto!(dir_noadj.vec, dir.vec) # TODO maybe instead of copying, pass in the dir point we want into the directions function
+    copyto!(dir_noadj.vec, dir.vec)
     try_noadj = true
 
     if stepper.use_adjustment
@@ -113,7 +131,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             solver.time_search += @elapsed alpha = search_alpha(point, model,
                 stepper)
             stepper.unadj_alpha = alpha
-            unadj_sched = stepper.step_searcher.prev_sched
+            unadj_sched = stepper.searcher.prev_sched
 
             if !iszero(alpha)
                 stepper.unadj_only = false
@@ -127,7 +145,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
                     solver.time_search += @elapsed alpha = search_alpha(point,
                         model, stepper, sched = unadj_sched)
                     # check alpha didn't decrease more
-                    @assert stepper.step_searcher.prev_sched == unadj_sched
+                    @assert stepper.searcher.prev_sched == unadj_sched
                 end
 
                 update_stepper_points(alpha, point, stepper, false)

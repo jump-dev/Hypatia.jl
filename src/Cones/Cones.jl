@@ -285,40 +285,43 @@ hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 inv_hess_nz_idxs_col(cone::Cone, j::Int) = 1:dimension(cone)
 inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
-function in_neighborhood(
+# check numerics of some oracles used in proximity check TODO tune
+function check_numerics(
     cone::Cone{T},
-    rtmu::T,
-    max_nbhd::T;
+    gtol::T = sqrt(sqrt(eps(T))),
+    Htol::T = 10sqrt(gtol),
     ) where {T <: Real}
-    is_feas(cone) || return false
     g = grad(cone)
-    vec1 = cone.vec1
-
-    # check numerics of barrier oracles
-    # TODO tune
-    tol = sqrt(eps(T))
-    gtol = sqrt(tol)
-    Htol = 10sqrt(gtol)
-    dim = dimension(cone)
+    dim = length(g)
     nu = get_nu(cone)
+
     # grad check
     (abs(1 + dot(g, cone.point) / nu) > gtol * dim) && return false
+
     # inv hess check
-    inv_hess_prod!(vec1, g, cone)
-    (abs(1 - dot(vec1, g) / nu) > Htol * dim) && return false
+    Hig = inv_hess_prod!(cone.vec1, g, cone)
+    (abs(1 - dot(Hig, g) / nu) > Htol * dim) && return false
 
-    # check neighborhood condition
-    @. vec1 = cone.dual_point + rtmu * g
-    # nbhd = norm(vec1, Inf) / norm(g, Inf) # heuristic neighborhood
+    return true
+end
+
+# compute central path proximity for a cone; if using max proximity, proximity
+# is computed differently if cone is not primitive, eg nonnegative cone
+function get_proximity(
+    cone::Cone{T},
+    rtmu::T,
+    ::Bool, # use sum proximity
+    negtol::T = sqrt(eps(T)),
+    ) where {T <: Real}
+    g = grad(cone)
+    vec1 = cone.vec1
     vec2 = cone.vec2
-    inv_hess_prod!(vec2, vec1, cone)
-    nbhd_sqr = dot(vec2, vec1)
-    if nbhd_sqr < -tol * dim
-        return false
-    end
-    nbhd = sqrt(abs(nbhd_sqr))
 
-    return (nbhd < rtmu * max_nbhd)
+    @. vec1 = cone.dual_point + rtmu * g
+    inv_hess_prod!(vec2, vec1, cone)
+    prox_sqr = dot(vec2, vec1)
+    (prox_sqr < -negtol * length(g)) && return T(NaN) # should be positive
+    return sqrt(abs(prox_sqr)) / rtmu
 end
 
 include("nonnegative.jl")

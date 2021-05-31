@@ -43,7 +43,8 @@ function test_oracles(
     Cones.load_dual_point(cone, dual_point)
     @test Cones.is_dual_feas(cone)
     @test cone.dual_point == dual_point
-    @test Cones.in_neighborhood(cone, one(T), one(T))
+    @test Cones.get_proximity(cone, one(T), false) <= 1 # max proximity
+    @test Cones.get_proximity(cone, one(T), true) <= dim # sum proximity
 
     prod_vec = zero(point)
     @test Cones.hess_prod!(prod_vec, point, cone) ≈ dual_point atol=tol rtol=tol
@@ -222,8 +223,8 @@ function show_time_alloc(
         @time Cones.dder3(cone, point1)
     end
 
-    println("in_neighborhood")
-    @time Cones.in_neighborhood(cone, one(T), one(T))
+    println("get_proximity")
+    @time Cones.get_proximity(cone, one(T), false)
 
     return
 end

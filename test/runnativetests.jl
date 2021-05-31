@@ -28,6 +28,7 @@ diff_reals = [
     ]
 
 string_nameof(T) = string(nameof(T))
+
 type_name(::T) where T = string_nameof(T)
 
 function test_instance_solver(
@@ -120,19 +121,19 @@ end
     println("\nstarting PredOrCentStepper tests (with printing)")
     use_adj_curv = [(false, false), (true, false), (true, true)]
     for inst_name in inst_minimal, (adj, curv) in use_adj_curv, T in diff_reals
-        options = (; default_options..., verbose = true, stepper =
-            Solvers.PredOrCentStepper{T}(
-            use_adjustment = adj, use_curve_search = curv))
+        stepper = Solvers.PredOrCentStepper{T}(
+            use_adjustment = adj, use_curve_search = curv)
+        options = (; default_options..., verbose = true, stepper = stepper)
         test_instance_solver(inst_name, T, options, "adj=$adj curv=$curv")
     end
 end
 
 @testset "CombinedStepper tests" begin
     println("\nstarting CombinedStepper tests (with printing)")
-    use_shift = [0, 2]
-    for inst_name in inst_minimal, shift in use_shift, T in diff_reals
+    shifts = [0, 2]
+    for inst_name in inst_minimal, shift in shifts, T in diff_reals
         options = (; default_options..., verbose = true,
-            stepper = Solvers.CombinedStepper{T}(shift))
+            stepper = Solvers.CombinedStepper{T}(shift_sched = shift))
         test_instance_solver(inst_name, T, options, "shift=$shift")
     end
 end
