@@ -120,8 +120,8 @@ function check_cone_points(
         Cones.reset_data(cone_k)
 
         in_prox_k = false
-        if Cones.is_feas(cone_k) && Cones.check_numerics(cone_k) &&
-            Cones.is_dual_feas(cone_k)
+        if Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) &&
+            Cones.check_numerics(cone_k)
             prox_k = Cones.get_proximity(cone_k, rtmu, use_sum_prox)
             if !isnan(prox_k) && (prox_k < prox_bound)
                 sum_prox += prox_k
