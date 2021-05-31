@@ -6,7 +6,7 @@ mutable struct StepSearcher{T <: Real}
     min_prox::T
     prox_bound::T
     use_sum_prox::Bool
-    alpha_sched::AbstractVector{T}
+    alpha_sched::Vector{T}
 
     skzk::Vector{T}
     nup1::T
@@ -19,7 +19,7 @@ mutable struct StepSearcher{T <: Real}
         min_prox::T = T(0.01),
         prox_bound::T = T(0.99),
         use_sum_prox::Bool = false,
-        alpha_sched::AbstractVector{T} = default_alpha_sched(T),
+        alpha_sched::Vector{T} = default_alpha_sched(T),
         ) where {T <: Real}
         cones = model.cones
         searcher = new{T}()
