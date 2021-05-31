@@ -24,7 +24,7 @@ all_reals = [
     ]
 diff_reals = [
     Float64,
-    BigFloat,
+    # BigFloat,
     ]
 
 string_nameof(T) = string(nameof(T))
