@@ -38,7 +38,7 @@ sypy_options = (;
     max_cent_steps = 8, pred_prox_bound = 0.0332, use_pred_sum_prox = true,
     # searcher options
     min_prox = 0.0, prox_bound = 0.2844, use_sum_prox = true,
-    alpha_sched = [0.9999 * 0.7^i for i in 0:8])
+    alpha_sched = [0.9999 * 0.7^i for i in 0:22])
 
 stepper_options = [
     "sypy" => porc(; sypy_options...),
