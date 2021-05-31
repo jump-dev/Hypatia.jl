@@ -7,14 +7,14 @@ using Printf
 using Hypatia
 
 test_files = [
-    # "polyutils",
-    # "cone",
+    "polyutils",
+    "cone",
     "native",
-    # "moi",
-    # "examples",
-    # # require optional dependencies:
-    # # "pardiso",
-    # # "hsl",
+    "moi",
+    "examples",
+    # require optional dependencies:
+    # "pardiso",
+    # "hsl",
     ]
 
 println()
