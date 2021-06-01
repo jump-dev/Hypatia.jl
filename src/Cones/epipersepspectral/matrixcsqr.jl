@@ -115,7 +115,7 @@ function update_feas(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
 end
 
 # TODO check whether it is faster to do chol before eigdecomp
-# TODO check if this is faster or slower than only using nbhd check
+# TODO check if this is faster or slower than only using prox check
 function is_dual_feas(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R}
     u = cone.dual_point[1]
     (u < eps(T)) && return false
