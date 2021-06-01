@@ -72,10 +72,10 @@ outer_prod!(
     mul!(B, A', A, alpha, beta)
 
 
-# ensure diagonal terms in symm/herm are not too small
-function increase_diag!(A::Matrix{<:RealOrComplex{T}}) where {T <: Real}
+# ensure diagonal terms in square matrix are not too small
+function increase_diag!(A::Matrix{T}) where {T <: Real}
     diag_pert = 1 + T(1e-5)
-    diag_min = 10eps(T)
+    diag_min = 10 * eps(T)
     @inbounds for j in 1:size(A, 1)
         A[j, j] = diag_pert * max(A[j, j], diag_min)
     end
@@ -109,117 +109,89 @@ end
 
 
 #=
-nonsymmetric: LU
+nonsymmetric square: LU
 =#
 
-abstract type DenseNonSymCache{T <: Real} end
-
-mutable struct LAPACKNonSymCache{T <: BlasReal} <: DenseNonSymCache{T}
-    copy_A
-    AF
-    ipiv
-    info
-    LAPACKNonSymCache{T}() where {T <: BlasReal} = new{T}()
-end
-
-function load_matrix(
-    cache::LAPACKNonSymCache{T},
-    A::Matrix{T};
-    copy_A::Bool = true,
-    ) where {T <: BlasReal}
-    LinearAlgebra.require_one_based_indexing(A)
-    LinearAlgebra.chkstride1(A)
-    n = LinearAlgebra.checksquare(A)
-    cache.copy_A = copy_A
-    cache.AF = (copy_A ? zero(A) : A) # copy over A to new matrix or use A directly
-    cache.ipiv = Vector{BlasInt}(undef, n)
-    cache.info = Ref{BlasInt}()
-    return cache
-end
-
-# wrap LAPACK functions
-for (getrf, elty) in [(:dgetrf_, :Float64), (:sgetrf_, :Float32)]
-    @eval begin
-        function update_fact(cache::LAPACKNonSymCache{$elty}, A::AbstractMatrix{$elty})
-            n = LinearAlgebra.checksquare(A)
-            cache.copy_A && copyto!(cache.AF, A)
-
-            # call dgetrf( m, n, a, lda, ipiv, info )
-            ccall((@blasfunc($getrf), liblapack), Cvoid,
-                (Ref{BlasInt}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},
-                Ptr{BlasInt}, Ptr{BlasInt}),
-                n, n, cache.AF, max(stride(cache.AF, 2), 1),
-                cache.ipiv, cache.info)
-
-            if cache.info[] < 0
-                throw(ArgumentError("invalid argument #$(-cache.info[]) to LAPACK"))
-            elseif 0 < cache.info[] <= n
-                # @warn("factorization failed: #$(cache.info[])")
-                return false
-            elseif cache.info[] > n
-                @warn("condition number is small: $(cache.rcond[])")
-            end
-
-            return true
-        end
-    end
-end
-
-for (getrs, elty) in [(:dgetrs_, :Float64), (:sgetrs_, :Float32)]
-    @eval begin
-        function inv_prod(cache::LAPACKNonSymCache{$elty}, X::AbstractVecOrMat{$elty})
-            LinearAlgebra.require_one_based_indexing(X)
-            LinearAlgebra.chkstride1(X)
-
-            # call dgetrs( trans, n, nrhs, a, lda, ipiv, b, ldb, info )
-            ccall((@blasfunc($getrs), liblapack), Cvoid,
-                (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$elty},
-                Ref{BlasInt}, Ptr{BlasInt}, Ptr{$elty}, Ref{BlasInt},
-                Ptr{BlasInt}),
-                'N', size(cache.AF, 1), size(X, 2), cache.AF,
-                max(stride(cache.AF, 2), 1), cache.ipiv, X, max(stride(X, 2), 1),
-                cache.info)
-
-            return X
-        end
-    end
-end
-
-mutable struct LUNonSymCache{T <: Real} <: DenseNonSymCache{T}
-    copy_A
-    AF
-    fact
-    LUNonSymCache{T}() where {T <: Real} = new{T}()
-end
-
-function load_matrix(
-    cache::LUNonSymCache{T},
-    A::AbstractMatrix{T};
-    copy_A::Bool = true,
+function nonsymm_fact_copy!(
+    mat2::Matrix{T},
+    mat::Matrix{T},
     ) where {T <: Real}
-    n = LinearAlgebra.checksquare(A)
-    cache.copy_A = copy_A
-    cache.AF = (copy_A ? zero(A) : A) # copy over A to new matrix or use A directly
-    return cache
+    copyto!(mat2, mat)
+
+    fact = lu!(mat2, Val(true), check = false)
+
+    if !issuccess(fact)
+        copyto!(mat2, mat)
+        increase_diag!(mat2)
+
+        fact = lu!(mat2, Val(true), check = false)
+    end
+
+    return fact
 end
-
-function update_fact(cache::LUNonSymCache{T}, A::AbstractMatrix{T}) where {T <: Real}
-    cache.copy_A && copyto!(cache.AF, A)
-    cache.fact = lu!(cache.AF, check = false)
-    return issuccess(cache.fact)
-end
-
-inv_prod(cache::LUNonSymCache{T}, prod::AbstractVecOrMat{T}) where {T <: Real} =
-    ldiv!(cache.fact, prod)
-
-# default to LAPACKNonSymCache for BlasReals, otherwise generic LUNonSymCache
-DenseNonSymCache{T}() where {T <: BlasReal} = LAPACKNonSymCache{T}()
-DenseNonSymCache{T}() where {T <: Real} = LUNonSymCache{T}()
 
 #=
-symmetric indefinite: BunchKaufman (and LU fallback)
-TODO add a generic BunchKaufman implementation to Julia and use that instead of LU for generic case
-TODO try Aasen's version (http://www.netlib.org/lapack/lawnspdf/lawn294.pdf) and others
+symmetric indefinite: BunchKaufman (rook pivoting) and LU for generic fallback
+NOTE if better fallback becomes available (eg dense LDL), use that
+=#
+
+symm_fact!(A::Symmetric{T, Matrix{T}}) where {T <: BlasReal} =
+    bunchkaufman!(A, true, check = false)
+
+symm_fact!(A::Symmetric{T, Matrix{T}}) where {T <: Real} =
+    lu!(A, Val(true), check = false)
+
+function symm_fact_copy!(
+    mat2::Symmetric{T, Matrix{T}},
+    mat::Symmetric{T, Matrix{T}},
+    ) where {T <: Real}
+    copyto!(mat2, mat)
+
+    fact = symm_fact!(mat2)
+
+    if !issuccess(fact)
+        copyto!(mat2, mat)
+        increase_diag!(mat2.data)
+
+        fact = symm_fact!(mat2)
+    end
+
+    return fact
+end
+
+#=
+symmetric positive definite: unpivoted Cholesky
+NOTE pivoted seems slower than BunchKaufman
+=#
+
+posdef_fact!(A::Symmetric{T, Matrix{T}}) where {T <: Real} =
+    cholesky!(A, Val(false), check = false)
+
+function posdef_fact_copy!(
+    mat2::Symmetric{T, Matrix{T}},
+    mat::Symmetric{T, Matrix{T}},
+    ) where {T <: Real}
+    copyto!(mat2, mat)
+
+    fact = posdef_fact!(mat2)
+
+    if !issuccess(fact)
+        copyto!(mat2, mat)
+        increase_diag!(mat2.data)
+
+        fact = posdef_fact!(mat2)
+    end
+
+    if !issuccess(fact)
+        # try using symmetric factorization instead
+        fact = symm_fact_copy!(mat2, mat)
+    end
+
+    return fact
+end
+
+#=
+symmetric indefinite: BunchKaufman and LU fallback
 =#
 
 abstract type DenseSymCache{T <: Real} end

@@ -42,7 +42,7 @@ function solve_subsystem4(
     ) where {T <: Real}
     rhs_sub = syssolver.rhs_sub
     dim4 = length(rhs_sub.vec)
-    @inbounds @views rhs_sub.vec .= rhs.vec[1:dim4]
+    rhs_sub.vec .= rhs.vec[1:dim4]
 
     @inbounds for (k, cone_k) in enumerate(solver.model.cones)
         rhs_z_k = rhs.z_views[k]
@@ -66,7 +66,7 @@ function solve_subsystem4(
 
     sol_sub = syssolver.sol_sub
     solve_inner_system(syssolver, sol_sub, rhs_sub)
-    @inbounds @views sol.vec[1:dim4] .= sol_sub.vec
+    sol.vec[1:dim4] .= sol_sub.vec
 
     return sol
 end
@@ -155,8 +155,8 @@ function load(
             len_kj = length(nz_rows_kj)
             IJV_idxs = offset:(offset + len_kj - 1)
             offset += len_kj
-            @. @views H_Is[IJV_idxs] = nz_rows_kj
-            @. @views H_Js[IJV_idxs] = z_start_k + j
+            @. H_Is[IJV_idxs] = nz_rows_kj
+            @. H_Js[IJV_idxs] = z_start_k + j
         end
     end
     append!(Is, H_Is)
@@ -220,6 +220,15 @@ function update_lhs(syssolver::NaiveElimSparseSystemSolver, solver::Solver)
     return syssolver
 end
 
+function solve_inner_system(
+    syssolver::NaiveElimSparseSystemSolver,
+    sol::Point,
+    rhs::Point,
+    )
+    inv_prod(syssolver.fact_cache, sol.vec, syssolver.lhs_sub, rhs.vec)
+    return sol
+end
+
 #=
 direct dense
 =#
@@ -227,16 +236,15 @@ direct dense
 mutable struct NaiveElimDenseSystemSolver{T <: Real} <: NaiveElimSystemSolver{T}
     use_inv_hess::Bool
     lhs_sub::Matrix{T}
-    fact_cache::DenseNonSymCache{T}
+    lhs_sub_fact::Matrix{T}
+    fact::LU{T, Matrix{T}}
     rhs_sub::Point{T}
     sol_sub::Point{T}
     function NaiveElimDenseSystemSolver{T}(;
         use_inv_hess::Bool = true,
-        fact_cache::DenseNonSymCache{T} = DenseNonSymCache{T}(),
         ) where {T <: Real}
         syssolver = new{T}()
         syssolver.use_inv_hess = use_inv_hess
-        syssolver.fact_cache = fact_cache
         return syssolver
     end
 end
@@ -257,8 +265,7 @@ function load(
         -model.c', -model.b', -model.h', 1)
     @assert lhs_sub isa Matrix{T}
     syssolver.lhs_sub = lhs_sub
-
-    load_matrix(syssolver.fact_cache, syssolver.lhs_sub)
+    syssolver.lhs_sub_fact = zero(lhs_sub)
 
     setup_point_sub(syssolver, model)
 
@@ -286,7 +293,7 @@ function update_lhs(
             # -mu*H_k*G_k*x + z_k + mu*H_k*h_k*tau = mu*H_k*zrhs_k + srhs_k
             @views Cones.hess_prod!(lhs_sub[z_rows_k, 1:n],
                 model.G[idxs_k, :], cone_k)
-            @. @views lhs_sub[z_rows_k, 1:n] *= -1
+            @. lhs_sub[z_rows_k, 1:n] *= -1
             @views Cones.hess_prod!(lhs_sub[z_rows_k, end],
                 model.h[idxs_k], cone_k)
         end
@@ -294,8 +301,21 @@ function update_lhs(
     tau = solver.point.tau[]
     lhs_sub[end, end] = solver.mu / tau / tau
 
-    solver.time_upfact += @elapsed update_fact(syssolver.fact_cache,
-        syssolver.lhs_sub)
+    solver.time_upfact += @elapsed syssolver.fact =
+        nonsymm_fact_copy!(syssolver.lhs_sub_fact, syssolver.lhs_sub)
+
+    if !issuccess(syssolver.fact)
+        println("nonsymmetric linear system factorization failed")
+    end
 
     return syssolver
+end
+
+function solve_inner_system(
+    syssolver::NaiveElimDenseSystemSolver,
+    sol::Point,
+    rhs::Point,
+    )
+    ldiv!(sol.vec, syssolver.fact, rhs.vec)
+    return sol
 end
