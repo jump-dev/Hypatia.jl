@@ -75,7 +75,6 @@ function check_cone_points(
     ) where {T <: Real}
     searcher = stepper.searcher
     cand = stepper.temp
-    cone_order = searcher.cone_order
     skzk = searcher.skzk
     cones = model.cones
     prox_bound = searcher.prox_bound
@@ -85,7 +84,7 @@ function check_cone_points(
     taukap_cand = cand.tau[] * cand.kap[]
     (min(cand.tau[], cand.kap[], taukap_cand) < eps(T)) && return false
 
-    for k in cone_order
+    for k in eachindex(cones)
         skzk[k] = dot(cand.primal_views[k], cand.dual_views[k])
         (skzk[k] < eps(T)) && return false
     end
@@ -97,7 +96,7 @@ function check_cone_points(
         return false
     end
     prox_bound_sqr = abs2(prox_bound)
-    for k in cone_order
+    for k in eachindex(cones)
         nu_k = Cones.get_nu(cones[k])
         skzkmu = skzk[k] / mu_cand
         if (skzkmu < min_prox * nu_k) || (abs2(skzkmu - nu_k) > prox_bound_sqr * nu_k)
@@ -107,6 +106,7 @@ function check_cone_points(
 
     # order the cones by how long it takes to check proximity condition and
     # iterate in that order, to improve efficiency
+    cone_order = searcher.cone_order
     sortperm!(cone_order, searcher.cone_times, initialized = true) # stochastic
 
     sum_prox = taukap_prox
