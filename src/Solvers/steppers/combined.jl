@@ -3,9 +3,10 @@ combined predict and center stepper
 =#
 
 mutable struct CombinedStepper{T <: Real} <: Stepper{T}
-    prev_alpha::T
-    shift_alpha_sched::Int
+    shift_sched::Int
+    searcher_options
 
+    prev_alpha::T
     rhs::Point{T}
     dir::Point{T}
     temp::Point{T}
@@ -15,15 +16,17 @@ mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     dir_predadj::Point{T}
     dir_temp::Vector{T}
 
-    step_searcher::StepSearcher{T}
+    searcher::StepSearcher{T}
     cent_only::Bool
     unadj_only::Bool
 
-    function CombinedStepper{T}(
-        shift_alpha_sched::Int = 0, # TODO tune, maybe use heuristic based on how fast alpha search is compared to a full IPM iteration
+    function CombinedStepper{T}(;
+        shift_sched::Int = 0,
+        searcher_options...
         ) where {T <: Real}
         stepper = new{T}()
-        stepper.shift_alpha_sched = shift_alpha_sched
+        stepper.shift_sched = shift_sched
+        stepper.searcher_options = searcher_options
         return stepper
     end
 end
@@ -32,7 +35,6 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
 
     stepper.prev_alpha = one(T)
-
     stepper.rhs = Point(model)
     stepper.dir = Point(model)
     stepper.temp = Point(model)
@@ -42,7 +44,7 @@ function load(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
     stepper.dir_predadj = Point(model, ztsk_only = true)
     stepper.dir_temp = zeros(T, length(stepper.rhs.vec))
 
-    stepper.step_searcher = StepSearcher{T}(model)
+    stepper.searcher = StepSearcher{T}(model; stepper.searcher_options...)
     stepper.unadj_only = stepper.cent_only = false
 
     return stepper
@@ -168,9 +170,9 @@ function update_stepper_points(
     return
 end
 
-function start_sched(stepper::CombinedStepper, step_searcher::StepSearcher)
-    (stepper.shift_alpha_sched <= 0) && return 1
-    return max(1, step_searcher.prev_sched - stepper.shift_alpha_sched)
+function start_sched(stepper::CombinedStepper, searcher::StepSearcher)
+    (stepper.shift_sched <= 0) && return 1
+    return max(1, searcher.prev_sched - stepper.shift_sched)
 end
 
 print_header_more(stepper::CombinedStepper, solver::Solver) =
