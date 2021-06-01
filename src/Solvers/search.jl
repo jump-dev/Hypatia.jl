@@ -63,7 +63,6 @@ function check_cone_points(
     step_searcher::StepSearcher{T},
     model::Models.Model{T},
     ) where {T <: Real}
-    cone_order = step_searcher.cone_order
     skzk = step_searcher.skzk
     cones = model.cones
     max_nbhd = step_searcher.max_nbhd
@@ -72,7 +71,7 @@ function check_cone_points(
     taukap_cand = cand.tau[] * cand.kap[]
     (min(cand.tau[], cand.kap[], taukap_cand) < eps(T)) && return false
 
-    for k in cone_order
+    for k in eachindex(cones)
         skzk[k] = dot(cand.primal_views[k], cand.dual_views[k])
         (skzk[k] < eps(T)) && return false
     end
@@ -83,7 +82,7 @@ function check_cone_points(
         return false
     end
     max_nbhd_sqr = abs2(max_nbhd)
-    for k in cone_order
+    for k in eachindex(cones)
         nu_k = Cones.get_nu(cones[k])
         skzkmu = skzk[k] / mu_cand
         if (skzkmu < min_nbhd * nu_k) || (abs2(skzkmu - nu_k) > max_nbhd_sqr * nu_k)
@@ -93,6 +92,7 @@ function check_cone_points(
 
     # order the cones by how long it takes to check neighborhood condition and
     # iterate in that order, to improve efficiency
+    cone_order = step_searcher.cone_order
     sortperm!(cone_order, step_searcher.cone_times, initialized = true) # stochastic
 
     rtmu = sqrt(mu_cand)

@@ -27,7 +27,7 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     ϕ::T
     ζ::T
     ϕζidi::T
-    tempw1::Vector{T}
+    tempw::Vector{T}
 
     function HypoGeoMean{T}(
         dim::Int;
@@ -49,7 +49,7 @@ use_sqrt_hess_oracles(cone::HypoGeoMean) = false
 function setup_extra_data!(cone::HypoGeoMean{T}) where {T <: Real}
     d = cone.dim - 1
     cone.di = inv(T(d))
-    cone.tempw1 = zeros(T, d)
+    cone.tempw = zeros(T, d)
     return cone
 end
 
@@ -147,7 +147,7 @@ function hess_prod!(
     di = cone.di
     ζ = cone.ζ
     ϕζidi = cone.ϕζidi
-    rwi = cone.tempw1
+    rwi = cone.tempw
     ϕζidi1 = ϕζidi + 1
 
     @inbounds for j in 1:size(arr, 2)
@@ -208,7 +208,7 @@ function inv_hess_prod!(
     ζ = cone.ζ
     ϕ = cone.ϕ
     di = cone.di
-    rw = cone.tempw1
+    rw = cone.tempw
     ϕdi = ϕ * di
     c2 = inv(cone.ϕζidi + 1)
     c3 = c2 / ζ * di
@@ -238,7 +238,7 @@ function dder3(cone::HypoGeoMean{T}, dir::AbstractVector{T}) where {T <: Real}
     di = cone.di
     ϕ = cone.ϕ
     ϕζidi = cone.ϕζidi
-    rwi = cone.tempw1
+    rwi = cone.tempw
 
     @. rwi = r / w
     c0 = sum(rwi) * di
