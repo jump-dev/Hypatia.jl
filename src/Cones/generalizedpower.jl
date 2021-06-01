@@ -198,6 +198,7 @@ function hess_prod!(
 end
 
 function dder3(cone::GeneralizedPower, dir::AbstractVector)
+    @assert cone.grad_updated
     u_idxs = cone.u_idxs
     w_idxs = cone.w_idxs
     @views u = cone.point[u_idxs]
