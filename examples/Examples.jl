@@ -8,7 +8,7 @@ import DataStructures: OrderedDict
 include("common.jl")
 include("common_native.jl")
 include("common_JuMP.jl")
-
+include("extendedforms_JuMP.jl")
 include("setup.jl")
 
 const model_types = [

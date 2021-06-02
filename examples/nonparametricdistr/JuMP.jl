@@ -16,6 +16,7 @@ where f and gⱼ are different convex spectral functions
 
 struct NonparametricDistrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     d::Int
+    use_standard_cones::Bool
 end
 
 function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
@@ -35,19 +36,6 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     JuMP.@variable(model, p[1:d])
     JuMP.@constraint(model, sum(p) == d)
 
-    # convex objective
-    f_cone = Hypatia.EpiPerSepSpectralCone{T}(fg_funs[1], Cones.VectorCSqr{T}, d)
-    JuMP.@variable(model, epi)
-    JuMP.@objective(model, Min, epi)
-    JuMP.@constraint(model, vcat(epi, 1, p) in f_cone)
-
-    # convex prior constraints
-    for g in fg_funs[2:end]
-        g_cone = Hypatia.EpiPerSepSpectralCone{T}(g, Cones.VectorCSqr{T}, d)
-        k = Cones.h_val(p0, g)
-        JuMP.@constraint(model, vcat(k, 1, p) in g_cone)
-    end
-
     # linear prior constraints
     B = randn(T, round(Int, sqrt(d - 1)), d)
     b = B * p0
@@ -55,6 +43,18 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     C = randn(T, round(Int, log(d - 1)), d)
     c = C * p0
     JuMP.@constraint(model, C * p .<= c)
+
+    # convex objective
+    JuMP.@variable(model, epi)
+    JuMP.@objective(model, Min, epi)
+
+    # convex constraints
+    add_sepspectral(fg_funs[1], Cones.VectorCSqr{T}, d, vcat(epi, 1, p), model, 
+        inst.use_standard_cones)
+    for h in fg_funs[2:end]
+        add_sepspectral(h, Cones.VectorCSqr{T}, d,
+            vcat(Cones.h_val(p0, h), 1, p), model, inst.use_standard_cones)
+    end
 
     return model
 end

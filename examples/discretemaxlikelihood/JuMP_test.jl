@@ -1,7 +1,8 @@
 
 insts = OrderedDict()
 insts["minimal"] = [
-    ((2,),),
+    ((2, false),),
+    ((2, true),),
     ]
 insts["fast"] = [
     ((10,),),
