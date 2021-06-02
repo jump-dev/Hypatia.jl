@@ -23,11 +23,11 @@ end
 # construct a standard cone EF for a separable spectral vector cone constraint
 function extend_sepspectral(
     h::Cones.SepSpectralFun,
-    ::Type{<:Cones.VectorCSqr},
+    ::Type{Cones.VectorCSqr{T}},
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
-    )
+    ) where {T <: Real}
     @assert d >= 1
     @assert d == length(aff) - 2
 
@@ -43,6 +43,44 @@ function extend_sepspectral(
         aff_i = vcat(x[i], aff[2], aff[2 + i])
         extend_atom_jump(h, aff_i, model)
     end
+
+    return
+end
+
+# construct a standard cone EF for a separable spectral matrix cone constraint
+# TODO support complex MatrixCSqr
+function extend_sepspectral(
+    h::Cones.SepSpectralFun,
+    ::Type{Cones.MatrixCSqr{T, T}},
+    d::Int,
+    aff::Vector{JuMP.AffExpr},
+    model::JuMP.Model,
+    ) where {T <: Real}
+    @assert d >= 1
+    @assert Cones.svec_length(d) == length(aff) - 2
+
+    # symmetric matrix (use upper triangle) of aff[2:end]
+    W = zeros(JuMP.AffExpr, d, d)
+    Cones.svec_to_smat!(W, aff[3:end], sqrt(2))
+
+    # eigenvalue ordering
+    λ = JuMP.@variable(model, [1:d])
+    JuMP.@constraint(model, [i in 1:(d - 1)], λ[i] >= λ[i + 1])
+    JuMP.@constraint(model, tr(W) == sum(λ))
+
+    # PSD constraints
+    for i in 1:d
+        Z_i = JuMP.@variable(model, [1:d, 1:d], PSD)
+        s_i = JuMP.@variable(model)
+        JuMP.@constraint(model, sum(λ[1:i]) - i * s_i - tr(Z_i) >= 0)
+        mat_i = Symmetric(Z_i - W + s_i * Matrix(I, d, d), :U)
+        JuMP.@SDconstraint(model, mat_i >= 0)
+    end
+
+    # vector separable spectral constraint
+    vec_aff = vcat(aff[1], aff[2], λ)
+    extend_sepspectral(h, Cones.VectorCSqr{T}, d, vec_aff, model)
+
     return
 end
 

@@ -29,13 +29,13 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     JuMP.@variable(model, qe_epi)
     JuMP.@objective(model, Max, -qe_epi + dot(prob, Hs))
 
-    entr_sum_vec = zeros(JuMP.AffExpr, Cones.svec_length(n))
+    entr_sum_vec = zeros(JuMP.AffExpr, Cones.svec_length(R, n))
     ρ_vec = zeros(T, length(entr_sum_vec))
     for (ρ, p) in zip(ρs, prob)
         Cones.smat_to_svec!(ρ_vec, ρ, rt2)
         entr_sum_vec += p * ρ_vec
     end
-    add_sepspectral(Cones.NegEntropySSF(), Cones.MatrixCSqr{T, R}, 
+    add_sepspectral(Cones.NegEntropySSF(), Cones.MatrixCSqr{T, R}, n,
         vcat(qe_epi, 1, entr_sum_vec), model, inst.use_standard_cones)
 
     return model
