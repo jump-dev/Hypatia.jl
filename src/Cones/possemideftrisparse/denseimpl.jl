@@ -42,9 +42,11 @@ end
 function update_grad(cone::PosSemidefTriSparse{PSDSparseDense})
     @assert !cone.grad_updated && cone.is_feas
     cache = cone.cache
+    inv_mat = cache.inv_mat
 
-    chol_inv!(cache.inv_mat, cache.fact_mat)
-    smat_to_svec_sparse!(cone.grad, cache.inv_mat, cone)
+    inv_fact!(inv_mat, cache.fact_mat)
+    copytri!(inv_mat, 'L', true)
+    smat_to_svec_sparse!(cone.grad, inv_mat, cone)
     cone.grad .*= -1
 
     cone.grad_updated = true

@@ -29,7 +29,8 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact_cache
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
 
     mat::Vector{Matrix{T}}
     matfact::Vector
@@ -61,7 +62,6 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
         U::Int,
         Ps::Vector{Matrix{T}};
         use_dual::Bool = false,
-        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         for Pj in Ps
             @assert size(Pj, 1) == U
@@ -72,7 +72,6 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
         cone.R = R
         cone.U = U
         cone.Ps = Ps
-        cone.hess_fact_cache = hess_fact_cache
         cone.nu = 2 * sum(size(Pk, 2) for Pk in Ps)
         return cone
     end

@@ -139,7 +139,7 @@ function update_grad(cone::HypoPerLogdetTri)
 
     g[1] = ζi
     g[2] = -inv(v) - (cone.ϕ - cone.d) / ζ
-    chol_inv!(cone.Wi, cone.fact_W)
+    inv_fact!(cone.Wi, cone.fact_W)
     smat_to_svec!(cone.Wi_vec, cone.Wi, cone.rt2)
     # ∇ϕ = cone.Wi_vec * v
     ζvζi = -1 - v / ζ
@@ -177,7 +177,9 @@ function update_hess(cone::HypoPerLogdetTri)
     @. H[2, 3:end] = c2 * Wi_vec
 
     # w, w
+    copytri!(cone.Wi, 'U', true)
     @views symm_kron!(H[3:end, 3:end], cone.Wi, cone.rt2)
+
     @inbounds for j in eachindex(Wi_vec)
         j2 = 2 + j
         Wivζij = Wivζi[j]

@@ -31,7 +31,8 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact_cache
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
 
     mats::Vector{Vector{Matrix{T}}}
     matfact::Vector{Vector}
@@ -64,7 +65,7 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     hess_diag_blocks::Vector{Matrix{T}}
     hess_diag_facts::Vector
     hess_diags::Vector{Matrix{T}}
-    hess_schur_fact
+    hess_schur_fact::Factorization{T}
     point_views::Vector
     Ps_times::Vector{Float64}
     Ps_order::Vector{Int}
@@ -74,7 +75,6 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
         U::Int,
         Ps::Vector{Matrix{T}};
         use_dual::Bool = false,
-        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert R >= 2
         for Pk in Ps
@@ -86,7 +86,6 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
         cone.R = R
         cone.U = U
         cone.Ps = Ps
-        cone.hess_fact_cache = hess_fact_cache
         cone.nu = R * sum(size(Pk, 2) for Pk in Ps)
         return cone
     end
@@ -271,12 +270,14 @@ function update_hess_prod(cone::WSOSInterpEpiNormOne)
     U = cone.U
     R = cone.R
     R2 = R - 2
+    diag_blocks = cone.hess_diag_blocks
+    edge_blocks = cone.hess_edge_blocks
 
     @inbounds for r in 1:(R - 1)
-        cone.hess_diag_blocks[r] .= 0
-        cone.hess_edge_blocks[r] .= 0
+        diag_blocks[r] .= 0
+        edge_blocks[r] .= 0
     end
-    cone.hess_diag_blocks[R] .= 0
+    diag_blocks[R] .= 0
 
     @inbounds for k in eachindex(cone.Ps)
         Λ11LiP = cone.Λ11LiP[k]
@@ -296,13 +297,13 @@ function update_hess_prod(cone::WSOSInterpEpiNormOne)
                 ij1 = PΛiPs1[r][i, j]
                 ij2 = PΛiPs2[r][i, j]
                 uu = 2 * (abs2(ij1) + abs2(ij2))
-                cone.hess_diag_blocks[1][i, j] += uu
-                cone.hess_diag_blocks[r + 1][i, j] += uu
-                cone.hess_edge_blocks[r][i, j] += 4 * (ij1 * ij2)
+                diag_blocks[1][i, j] += uu
+                diag_blocks[r + 1][i, j] += uu
+                edge_blocks[r][i, j] += 4 * (ij1 * ij2)
             end
         end
         for j in 1:U, i in 1:j
-            cone.hess_diag_blocks[1][i, j] -= abs2(PΛ11iP[i, j]) * R2
+            diag_blocks[1][i, j] -= abs2(PΛ11iP[i, j]) * R2
         end
     end
 
@@ -321,16 +322,16 @@ function hess_prod!(
     U = cone.U
     R = cone.R
     prod .= 0
+    diag_blocks = cone.hess_diag_blocks
 
-    @views mul!(prod[1:U, :], Symmetric(cone.hess_diag_blocks[1], :U), arr[1:U, :])
+    @views mul!(prod[1:U, :], Symmetric(diag_blocks[1], :U), arr[1:U, :])
     @inbounds @views for r in 1:(R - 1)
         idxs = block_idxs(U, r + 1)
         edge_r = Symmetric(cone.hess_edge_blocks[r], :U)
         arr_r = arr[idxs, :]
         mul!(prod[1:U, :], edge_r, arr_r, true, true)
         mul!(prod[idxs, :], edge_r, arr[1:U, :])
-        mul!(prod[idxs, :], Symmetric(cone.hess_diag_blocks[r + 1], :U), arr_r,
-            true, true)
+        mul!(prod[idxs, :], Symmetric(diag_blocks[r + 1], :U), arr_r, true, true)
     end
 
     return prod
@@ -343,59 +344,27 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where T
     U = cone.U
     R = cone.R
     schur = cone.tempUU2
-    hess_diag_facts = cone.hess_diag_facts
+    diag_facts = cone.hess_diag_facts
+    diag_blocks = cone.hess_diag_blocks
     Diz = cone.tempURU2
     schur_backup = cone.tempUU
 
-    copyto!(schur, Symmetric(cone.hess_diag_blocks[1], :U))
+    copyto!(schur, diag_blocks[1])
 
     @inbounds for r in 2:R
         r1 = r - 1
-        diag_r = cone.hess_diags[r1]
-
-        copyto!(diag_r, cone.hess_diag_blocks[r])
-        S = Symmetric(diag_r, :U)
-        r_fact = hess_diag_facts[r1] = cholesky!(S, check = false)
-        if !isposdef(r_fact)
-            # attempt recovery NOTE can do what hessian factorization fallback does
-            copyto!(diag_r, cone.hess_diag_blocks[r])
-            increase_diag!(diag_r)
-            r_fact = hess_diag_facts[r1] = cholesky!(S, check = false)
-            if !isposdef(r_fact)
-                copyto!(diag_r, cone.hess_diag_blocks[r])
-                if T <: BlasReal # TODO refac
-                    hess_diag_facts[r1] = bunchkaufman!(S, true)
-                else
-                    hess_diag_facts[r1] = lu!(S)
-                end
-            end
-        end
+        diag_facts[r1] = posdef_fact_copy!(Symmetric(cone.hess_diags[r1], :U),
+            Symmetric(diag_blocks[r], :U), false)
 
         z = cone.hess_edge_blocks[r1]
         LinearAlgebra.copytri!(z, 'U')
-        idxs2 = block_idxs(U, r1)
-        @views Dizi = Diz[idxs2, :]
-        ldiv!(Dizi, hess_diag_facts[r1], z)
+        @views Dizi = Diz[block_idxs(U, r1), :]
+        ldiv!(Dizi, diag_facts[r1], z)
         mul!(schur, z', Dizi, -1, true)
     end
 
-    copyto!(schur_backup, schur)
-    S = Symmetric(schur_backup, :U)
-    s_fact = cone.hess_schur_fact = cholesky!(S, check = false)
-    if !isposdef(s_fact)
-        # attempt recovery NOTE: can do what hessian factorization fallback
-        copyto!(schur_backup, schur)
-        increase_diag!(schur_backup)
-        s_fact = cone.hess_schur_fact = cholesky!(S, check = false)
-        if !isposdef(s_fact)
-            copyto!(schur_backup, schur)
-            if T <: BlasReal # TODO refac
-                cone.hess_schur_fact = bunchkaufman!(S, true)
-            else
-                cone.hess_schur_fact = lu!(S)
-            end
-        end
-    end
+    cone.hess_schur_fact = posdef_fact_copy!(Symmetric(schur_backup, :U),
+        Symmetric(schur, :U), false)
 
     cone.inv_hess_prod_updated = true
     return
@@ -457,7 +426,7 @@ function dder3(cone::WSOSInterpEpiNormOne, dir::AbstractVector)
             dder3[u] += sum(abs2, LUk[:, u])
         end
     end
-    @. @views dder3[1:U] *= 2 - R
+    @. dder3[1:U] *= 2 - R
 
     @inbounds for k in eachindex(cone.Ps)
         L = size(cone.Ps[k], 2)

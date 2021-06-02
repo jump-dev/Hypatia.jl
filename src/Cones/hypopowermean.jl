@@ -25,7 +25,8 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact_cache
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
 
     ϕ::T
     ζ::T
@@ -34,7 +35,6 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     function HypoPowerMean{T}(
         α::Vector{T};
         use_dual::Bool = false,
-        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         dim = length(α) + 1
         @assert dim >= 2
@@ -44,7 +44,6 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
         cone.use_dual_barrier = use_dual
         cone.dim = dim
         cone.α = α
-        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end

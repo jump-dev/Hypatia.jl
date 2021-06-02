@@ -26,7 +26,8 @@ mutable struct GeneralizedPower{T <: Real} <: Cone{T}
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact_cache
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
 
     u_idxs::UnitRange{Int}
     w_idxs::UnitRange{Int}
@@ -41,7 +42,6 @@ mutable struct GeneralizedPower{T <: Real} <: Cone{T}
         α::Vector{T},
         n::Int;
         use_dual::Bool = false,
-        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert n >= 1
         dim = length(α) + n
@@ -53,7 +53,6 @@ mutable struct GeneralizedPower{T <: Real} <: Cone{T}
         cone.use_dual_barrier = use_dual
         cone.dim = dim
         cone.α = α
-        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
