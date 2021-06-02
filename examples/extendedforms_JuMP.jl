@@ -69,7 +69,7 @@ function extend_sepspectral(
     JuMP.@constraint(model, tr(W) == sum(λ))
 
     # PSD constraints
-    for i in 1:d
+    for i in 1:(d - 1)
         Z_i = JuMP.@variable(model, [1:d, 1:d], PSD)
         s_i = JuMP.@variable(model)
         JuMP.@constraint(model, sum(λ[1:i]) - i * s_i - tr(Z_i) >= 0)
