@@ -135,7 +135,7 @@ function update_grad(cone::HypoRootdetTri)
     ϕζidi1 = -cone.ϕζidi - 1
 
     g[1] = inv(ζ)
-    chol_inv!(cone.Wi, cone.fact_W)
+    inv_fact!(cone.Wi, cone.fact_W)
     smat_to_svec!(cone.Wi_vec, cone.Wi, cone.rt2)
     @. g[2:end] = ϕζidi1 * cone.Wi_vec
 
@@ -157,6 +157,7 @@ function update_hess(cone::HypoRootdetTri)
     H[1, 1] = ζ^-2
     @. H[1, 2:end] = c1 * Wi_vec
 
+    copytri!(cone.Wi, 'U', true)
     @views symm_kron!(H[2:end, 2:end], cone.Wi, cone.rt2)
 
     @inbounds for j in eachindex(Wi_vec)

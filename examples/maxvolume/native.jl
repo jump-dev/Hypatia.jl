@@ -55,7 +55,7 @@ function build(inst::MaxVolumeNative{T}) where {T <: Real}
                 T(i + 1) / T(i + 2)], 1))
             offset += 3
         end
-        # last row also special becuase hypograph variable is involved
+        # last row also special because hypograph variable is involved
         G_geo_orig[offset, n] = -1
         G_geo_newvars[offset + 1, n - 2] = -1
         G = [

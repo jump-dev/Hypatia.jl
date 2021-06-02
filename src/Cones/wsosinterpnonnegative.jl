@@ -32,7 +32,8 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact_cache
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
     use_hess_prod_slow::Bool
     use_hess_prod_slow_updated::Bool
 
@@ -49,7 +50,6 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
         U::Int,
         Ps::Vector{Matrix{R}};
         use_dual::Bool = false,
-        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real, R <: RealOrComplex{T}}
         for Pk in Ps
             @assert size(Pk, 1) == U
@@ -58,7 +58,6 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
         cone.use_dual_barrier = !use_dual # using dual barrier
         cone.dim = U
         cone.Ps = Ps
-        cone.hess_fact_cache = hess_fact_cache
         cone.nu = sum(size(Pk, 2) for Pk in Ps)
         return cone
     end

@@ -29,7 +29,8 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact_cache
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
 
     W::Matrix{R}
     Z::Matrix{R}
@@ -53,7 +54,6 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         d1::Int,
         d2::Int;
         use_dual::Bool = false,
-        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real, R <: RealOrComplex{T}}
         @assert 1 <= d1 <= d2
         cone = new{T, R}()
@@ -62,7 +62,6 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone.dim = 1 + vec_length(R, d1 * d2)
         cone.d1 = d1
         cone.d2 = d2
-        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
@@ -135,10 +134,13 @@ end
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
     u = cone.point[1]
+    Zi = cone.Zi
 
     ldiv!(cone.tau, cone.fact_Z, cone.W)
-    chol_inv!(cone.Zi, cone.fact_Z)
-    cone.grad[1] = -u * tr(Hermitian(cone.Zi, :U))
+    inv_fact!(Zi, cone.fact_Z)
+    copytri!(Zi, 'U', true)
+
+    cone.grad[1] = -u * tr(Hermitian(Zi, :U))
     @views vec_copyto!(cone.grad[2:end], cone.tau)
     cone.grad .*= 2
     cone.grad[1] += (cone.d1 - 1) / u

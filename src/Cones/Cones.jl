@@ -11,19 +11,11 @@ import LinearAlgebra.BlasReal
 import PolynomialRoots
 using SparseArrays
 import Hypatia.RealOrComplex
-import Hypatia.chol_inv!
+import Hypatia.outer_prod!
 import Hypatia.update_eigen!
 import Hypatia.spectral_outer!
-import Hypatia.DenseSymCache
-import Hypatia.DensePosDefCache
-import Hypatia.load_matrix
-import Hypatia.update_fact
-import Hypatia.inv_prod
-import Hypatia.sqrt_prod
-import Hypatia.inv_sqrt_prod
-import Hypatia.invert
-import Hypatia.increase_diag!
-import Hypatia.outer_prod!
+import Hypatia.posdef_fact_copy!
+import Hypatia.inv_fact!
 
 include("arrayutilities.jl")
 
@@ -120,8 +112,7 @@ currently-loaded primal point with a vector or array, in-place.
 """
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     update_hess_fact(cone)
-    copyto!(prod, arr)
-    inv_prod(cone.hess_fact_cache, prod)
+    ldiv!(prod, cone.hess_fact, arr)
     return prod
 end
 
@@ -181,9 +172,6 @@ load_dual_point(
 function alloc_hess!(cone::Cone{T}) where {T <: Real}
     dim = dimension(cone)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    if hasfield(typeof(cone), :hess_fact_cache)
-        load_matrix(cone.hess_fact_cache, cone.hess)
-    end
     return
 end
 
@@ -193,9 +181,6 @@ function alloc_inv_hess!(cone::Cone{T}) where {T <: Real}
     return
 end
 
-# hessian_cache(T::Type{<:BlasReal}) = DenseSymCache{T}() # BunchKaufman for BlasReal
-hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}()
-
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
@@ -203,28 +188,28 @@ function use_sqrt_hess_oracles(cone::Cone)
     if !cone.hess_fact_updated
         update_hess_fact(cone) || return false
     end
-    return (cone.hess_fact_cache isa DensePosDefCache)
+    return (cone.hess_fact isa Cholesky)
 end
 
+# only use if use_sqrt_hess_oracles is true
 function sqrt_hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::Cone,
     )
-    update_hess_fact(cone)
-    copyto!(prod, arr)
-    sqrt_prod(cone.hess_fact_cache, prod)
+    @assert cone.hess_fact_updated
+    mul!(prod, cone.hess_fact.U, arr)
     return prod
 end
 
+# only use if use_sqrt_hess_oracles is true
 function inv_sqrt_hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::Cone,
     )
-    update_hess_fact(cone)
-    copyto!(prod, arr)
-    inv_sqrt_prod(cone.hess_fact_cache, prod)
+    @assert cone.hess_fact_updated
+    ldiv!(prod, cone.hess_fact.U', arr)
     return prod
 end
 
@@ -250,26 +235,21 @@ hess_prod_slow!(
 function update_hess_fact(cone::Cone{T}) where {T <: Real}
     cone.hess_fact_updated && return true
     cone.hess_updated || update_hess(cone)
-
-    if !update_fact(cone.hess_fact_cache, cone.hess)
-        if T <: BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
-            # @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
-            cone.hess_fact_cache = DenseSymCache{T}()
-            load_matrix(cone.hess_fact_cache, cone.hess)
-            update_fact(cone.hess_fact_cache, cone.hess) || return false
-        else
-            return false
-        end
+    if !isdefined(cone, :hess_fact_mat)
+        cone.hess_fact_mat = zero(cone.hess)
     end
 
+    # do not modify the hessian during recovery
+    cone.hess_fact = posdef_fact_copy!(cone.hess_fact_mat, cone.hess, false)
+
     cone.hess_fact_updated = true
-    return true
+    return issuccess(cone.hess_fact)
 end
 
 function update_inv_hess(cone::Cone)
     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     update_hess_fact(cone)
-    invert(cone.hess_fact_cache, cone.inv_hess)
+    inv_fact!(cone.inv_hess.data, cone.hess_fact)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end

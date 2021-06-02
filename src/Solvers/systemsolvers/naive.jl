@@ -63,8 +63,8 @@ function load(
             len_kj = length(nz_rows_kj)
             IJV_idxs = offset:(offset + len_kj - 1)
             offset += len_kj
-            @. @views H_Is[IJV_idxs] = nz_rows_kj
-            @. @views H_Js[IJV_idxs] = H_start_k + j
+            @. H_Is[IJV_idxs] = nz_rows_kj
+            @. H_Js[IJV_idxs] = H_start_k + j
         end
     end
     append!(Is, H_Is)
@@ -144,12 +144,11 @@ direct dense
 mutable struct NaiveDenseSystemSolver{T <: Real} <: NaiveSystemSolver{T}
     tau_row::Int
     lhs::Matrix{T}
-    fact_cache::DenseNonSymCache{T}
+    lhs_fact::Matrix{T}
+    fact::LU{T, Matrix{T}}
     lhs_H_k::Vector
-    function NaiveDenseSystemSolver{T}(; fact_cache::DenseNonSymCache{T} =
-        DenseNonSymCache{T}()) where {T <: Real}
+    function NaiveDenseSystemSolver{T}() where {T <: Real}
         syssolver = new{T}()
-        syssolver.fact_cache = fact_cache
         return syssolver
     end
 end
@@ -176,6 +175,7 @@ function load(
         dz(1, n + p + q), 1, dz(1, q), 1)
     @assert lhs isa Matrix{T}
     syssolver.lhs = lhs
+    syssolver.lhs_fact = zero(lhs)
 
     function view_H_k(cone_k, idxs_k)
         rows = syssolver.tau_row .+ idxs_k
@@ -184,8 +184,6 @@ function load(
     end
     syssolver.lhs_H_k = [view_H_k(cone_k, idxs_k) for
         (cone_k, idxs_k) in zip(cones, cone_idxs)]
-
-    load_matrix(syssolver.fact_cache, syssolver.lhs)
 
     return syssolver
 end
@@ -197,8 +195,12 @@ function update_lhs(syssolver::NaiveDenseSystemSolver, solver::Solver)
     tau = solver.point.tau[]
     syssolver.lhs[end, syssolver.tau_row] = solver.mu / tau / tau
 
-    solver.time_upfact += @elapsed update_fact(syssolver.fact_cache,
-        syssolver.lhs)
+    solver.time_upfact += @elapsed syssolver.fact =
+        nonsymm_fact_copy!(syssolver.lhs_fact, syssolver.lhs)
+
+    if !issuccess(syssolver.fact)
+        println("nonsymmetric linear system factorization failed")
+    end
 
     return syssolver
 end
@@ -209,7 +211,6 @@ function solve_system(
     sol::Point{T},
     rhs::Point{T},
     ) where {T <: Real}
-    copyto!(sol.vec, rhs.vec)
-    inv_prod(syssolver.fact_cache, sol.vec)
+    ldiv!(sol.vec, syssolver.fact, rhs.vec)
     return sol
 end

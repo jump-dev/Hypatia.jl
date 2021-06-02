@@ -7,9 +7,9 @@ insts["minimal"] = [
     ((false, 3, 1, false, false),),
     ((true, :abs1d, 1, true, true),),
     ((true, :absball2d, 1, false, true),),
-    ((false, :motzkin, 3, false, true),),
+    ((false, :motzkin, 3, true, true),),
     ((false, :motzkin_ball, 3, false, false),),
-    ((false, :motzkin_ellipsoid, 3, true, true),),
+    ((false, :motzkin_ellipsoid, 3, false, true),),
     ]
 insts["fast"] = [
     ((false, 1, 30, true, true),),
