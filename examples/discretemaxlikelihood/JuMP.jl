@@ -6,6 +6,7 @@ prior
 
 struct DiscreteMaxLikelihood{T <: Real} <: ExampleInstanceJuMP{T}
     d::Int
+    use_standard_cones::Bool
 end
 
 function build(inst::DiscreteMaxLikelihood{T}) where {T <: Float64}
@@ -14,17 +15,17 @@ function build(inst::DiscreteMaxLikelihood{T}) where {T <: Float64}
     freq = rand(1:(2 * d), d)
 
     model = JuMP.Model()
-    JuMP.@variables(model, begin
-        p[1:d]
-        prodp
-    end)
+    JuMP.@variable(model, p[1:d])
+    JuMP.@variable(model, hypo)
+    JuMP.@objective(model, Max, hypo)
+
     JuMP.@constraints(model, begin
-        vcat(prodp, p) in Hypatia.HypoPowerMeanCone{T}(freq / sum(freq))
-        vcat(inv(d), inv(d), p) in Hypatia.EpiPerSepSpectralCone{T}(
-            Cones.NegEntropySSF(), Cones.VectorCSqr{T}, d)
+        vcat(hypo, p) in Hypatia.HypoPowerMeanCone{T}(freq / sum(freq))
         sum(p) == 1
     end)
-    JuMP.@objective(model, Max, prodp)
+
+    add_sepspectral(Cones.NegEntropySSF(), Cones.VectorCSqr{T}, d,
+        vcat(inv(d), inv(d), p), model, inst.use_standard_cones)
 
     return model
 end

@@ -12,18 +12,8 @@ where f is a convex spectral function
 
 struct CovarianceEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     d::Int
-    ssf::Cones.SepSpectralFun
-end
-
-function CovarianceEstJuMP{T}(d::Int, ssf_name::Symbol) where {T <: Real}
-    ssf_dict = Dict(
-        :InvSSF => Cones.InvSSF(),
-        :NegLogSSF => Cones.NegLogSSF(),
-        :NegEntropySSF => Cones.NegEntropySSF(),
-        :Power12SSF => Cones.Power12SSF(1.5),
-        )
-    ssf = ssf_dict[ssf_name]
-    return CovarianceEstJuMP{T}(d, ssf)
+    ssf::Symbol
+    use_standard_cones::Bool
 end
 
 function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
@@ -43,10 +33,17 @@ function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     Cones.smat_to_svec!(p_vec, one(T) * p, sqrt(T(2)))
 
     # convex objective
-    f_cone = Hypatia.EpiPerSepSpectralCone{T}(inst.ssf, Cones.MatrixCSqr{T, T}, d)
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Min, epi)
-    JuMP.@constraint(model, vcat(epi, 1, p_vec) in f_cone)
+
+    ssf_dict = Dict(
+        :InvSSF => Cones.InvSSF(),
+        :NegLogSSF => Cones.NegLogSSF(),
+        :NegEntropySSF => Cones.NegEntropySSF(),
+        :Power12SSF => Cones.Power12SSF(1.5),
+        )
+    add_sepspectral(ssf_dict[inst.ssf], Cones.MatrixCSqr{T, T}, d,
+        vcat(epi, 1, p_vec), model, inst.use_standard_cones)
 
     # linear prior constraints
     lin_dim = round(Int, sqrt(d - 1))

@@ -1,8 +1,11 @@
 
+relaxed_tols = (default_tol_relax = 100,)
 insts = OrderedDict()
 insts["minimal"] = [
-    ((2,),),
-    ((4,),),
+    ((2, false),),
+    ((2, true),),
+    ((4, false),),
+    ((4, true), nothing, relaxed_tols),
     ]
 insts["fast"] = [
     ((25,),),

@@ -112,6 +112,7 @@ currently-loaded primal point with a vector or array, in-place.
 """
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     update_hess_fact(cone)
+    # TODO try equilibration, iterative refinement etc like posvx/sysvx
     ldiv!(prod, cone.hess_fact, arr)
     return prod
 end
@@ -209,6 +210,7 @@ function inv_sqrt_hess_prod!(
     cone::Cone,
     )
     @assert cone.hess_fact_updated
+    # TODO try equilibration, iterative refinement etc like posvx/sysvx
     ldiv!(prod, cone.hess_fact.U', arr)
     return prod
 end
