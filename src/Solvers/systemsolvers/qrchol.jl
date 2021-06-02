@@ -37,10 +37,10 @@ function setup_rhs3(
 end
 
 function solve_subsystem3(
-    syssolver::QRCholSystemSolver,
-    solver::Solver,
-    sol::Point,
-    rhs::Point,
+    syssolver::QRCholSystemSolver{T},
+    solver::Solver{T},
+    sol::Point{T},
+    rhs::Point{T},
     ) where {T <: Real}
     model = solver.model
     copyto!(sol.vec, rhs.vec)
@@ -64,9 +64,8 @@ function solve_subsystem3(
     end
 
     if !isempty(syssolver.Q2div)
-        @views x_sub2 = copyto!(sol.vec[(model.p + 1):model.n], syssolver.Q2div)
-        # inv_prod(syssolver.fact_cache, x_sub2)
-        ldiv!(syssolver.fact, x_sub2)
+        @views x_sub2 = sol.vec[(model.p + 1):model.n]
+        ldiv!(x_sub2, syssolver.fact, syssolver.Q2div)
     end
 
     lmul!(solver.Ap_Q, x)
@@ -257,6 +256,7 @@ function update_lhs(
         end
     end
 
+    # TODO try equilibration, iterative refinement etc like posvx/sysvx
     solver.time_upfact += @elapsed syssolver.fact =
         posdef_fact_copy!(syssolver.lhs_sub_fact, syssolver.lhs_sub)
 
