@@ -1,11 +1,14 @@
 
 insts = OrderedDict()
 insts["minimal"] = [
-    ((4, :NegEntropySSF, false, false),),
-    ((4, :NegEntropySSF, true, false),),
     ((4, :InvSSF, false, false),),
     ((4, :InvSSF, true, false),),
     ((4, :InvSSF, true, true),),
+    ((4, :NegLogSSF, false, false),),
+    ((4, :NegLogSSF, true, false),),
+    ((4, :NegLogSSF, true, true),),
+    ((4, :NegEntropySSF, false, false),),
+    ((4, :NegEntropySSF, true, false),),
     ]
 insts["fast"] = [
     ((10, :InvSSF),),

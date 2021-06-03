@@ -1,5 +1,5 @@
 #=
-JuMP helpers for constructing extended formulations for separable spectral cones
+JuMP helpers for constructing extended formulations for spectral/eigenvalue cones
 =#
 
 # add a separable spectral cone constraint, possibly extended
@@ -67,14 +67,13 @@ function extend_sepspectral(
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     ) where {T <: Real}
-    W = get_aff_W(aff[3:end], d)
+    W = get_smat(aff[3:end], d)
 
     # eigenvalue ordering
     λ = JuMP.@variable(model, [1:d])
     JuMP.@constraint(model, [i in 1:(d - 1)], λ[i] >= λ[i + 1])
     JuMP.@constraint(model, tr(W) == sum(λ))
 
-    # PSD constraints
     for i in 1:(d - 1)
         Z_i = JuMP.@variable(model, [1:d, 1:d], PSD)
         s_i = JuMP.@variable(model)
@@ -91,7 +90,7 @@ function extend_sepspectral(
 end
 
 # check dimension and get symmetric matrix W (upper triangle) of vectorized w
-function get_aff_W(w::Vector{JuMP.AffExpr}, d::Int)
+function get_smat(w::Vector{JuMP.AffExpr}, d::Int)
     @assert Cones.svec_length(d) == length(w)
     W = zeros(JuMP.AffExpr, d, d)
     Cones.svec_to_smat!(W, w, sqrt(2))
@@ -178,7 +177,7 @@ function extend_sepspectral_direct(
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     ) where {T <: Real}
-    W = get_aff_W(aff[3:end], d)
+    W = get_smat(aff[3:end], d)
 
     Z = JuMP.@variable(model, [1:d, 1:d], Symmetric)
     JuMP.@constraint(model, aff[1] >= tr(Z))
@@ -187,6 +186,39 @@ function extend_sepspectral_direct(
     vI = aff[2] * Matrix(I, d, d)
     mat = Symmetric(hvcat((2, 2), Z, vI, vI, W), :U)
     JuMP.@SDconstraint(model, mat >= 0)
+
+    return
+end
+
+#=
+NegLogSSF matrix cone direct EF:
+(u, v > 0, W ≻ 0) : u > v logdet(W / v)
+↔ ∃ upper triangular U : [W U'; U Diag(δ)] ≻ 0, δ = diag(U),
+(u, v, δ) ∈ NegLogVector
+=#
+function extend_sepspectral_direct(
+    h::Cones.NegLogSSF,
+    ::Type{Cones.MatrixCSqr{T, T}},
+    d::Int,
+    aff::Vector{JuMP.AffExpr},
+    model::JuMP.Model,
+    ) where {T <: Real}
+    w = aff[3:end]
+    W = get_smat(w, d)
+    svec_dim = length(w)
+
+    # δ like eigenvalues constraints
+    u = JuMP.@variable(model, [1:svec_dim])
+    U = get_smat(1.0 * u, d)
+    @assert istriu(U)
+    δ = diag(U)
+
+    mat = Symmetric(hvcat((2, 2), W, U', U, Diagonal(δ)), :U)
+    JuMP.@SDconstraint(model, mat >= 0)
+
+    # vector NegLogSSF constraint
+    vec_aff = vcat(aff[1], aff[2], δ)
+    extend_sepspectral(h, Cones.VectorCSqr{T}, d, vec_aff, model)
 
     return
 end
