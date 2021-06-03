@@ -16,7 +16,8 @@ where f and gⱼ are different convex spectral functions
 
 struct NonparametricDistrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     d::Int
-    use_standard_cones::Bool
+    num_spec::Int # number of spectral cones
+    use_EFs::Bool # use standard cone extended formulations for spectral cones
 end
 
 function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
@@ -25,12 +26,16 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     p0 = rand(T, d)
     p0 .*= d / sum(p0)
 
-    fg_funs = Random.shuffle!([
-        Cones.InvSSF(),
-        Cones.NegLogSSF(),
-        Cones.NegEntropySSF(),
-        Cones.Power12SSF(1.5),
-        ])
+    # pick random spectral cones (or EFs)
+    if inst.use_EFs
+        exts = [VecNegGeomEFExp(), VecNegGeomEFPow(), VecInvEF(), VecNegLogEF(),
+            VecNegEntropyEF(), VecPower12EF(1.5)]
+    else
+        exts = [VecNegGeom(), VecInv(), VecNegLog(), VecNegEntropy(),
+            VecPower12(1.5)]
+    end
+    @assert 1 <= inst.num_spec <= length(exts)
+    exts = Random.shuffle!(exts)[1:inst.num_spec]
 
     model = JuMP.Model()
     JuMP.@variable(model, p[1:d])
@@ -47,13 +52,12 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     # convex objective
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Min, epi)
+    add_homog_spectral(exts[1], d, vcat(1.0 * epi, p), model)
 
     # convex constraints
-    add_sepspectral(fg_funs[1], Cones.VectorCSqr{T}, d, vcat(epi, 1, p), model, 
-        inst.use_standard_cones)
-    for h in fg_funs[2:end]
-        add_sepspectral(h, Cones.VectorCSqr{T}, d,
-            vcat(Cones.h_val(p0, h), 1, p), model, inst.use_standard_cones)
+    for ext in exts[2:end]
+        aff = vcat(get_val(p0, ext), p)
+        add_homog_spectral(ext, d, aff, model)
     end
 
     return model

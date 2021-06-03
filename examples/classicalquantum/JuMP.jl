@@ -7,11 +7,12 @@ and listing 1 in "Efficient optimization of the quantum relative entropy" by H. 
 struct ClassicalQuantum{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int
     complex::Bool
-    use_standard_cones::Bool
+    use_EF::Bool
 end
 
 function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     n = inst.n
+    @assert !(inst.complex && inst.use_EF)
     rt2 = sqrt(T(2))
     R = (inst.complex ? Complex{T} : T)
     function hermtr1()
@@ -35,8 +36,14 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
         Cones.smat_to_svec!(ρ_vec, ρ, rt2)
         entr_sum_vec += p * ρ_vec
     end
-    add_sepspectral(Cones.NegEntropySSF(), Cones.MatrixCSqr{T, R}, n,
-        vcat(qe_epi, 1, entr_sum_vec), model, inst.use_standard_cones)
+
+    aff = vcat(qe_epi, 1, entr_sum_vec)
+    if inst.use_EF
+        add_spectral(MatNegEntropyEigOrd(), n, aff, model)
+    else
+        JuMP.@constraint(model, aff in Hypatia.EpiPerSepSpectralCone{Float64}(
+            Cones.NegEntropySSF(), Cones.MatrixCSqr{T, R}, n))
+    end
 
     return model
 end

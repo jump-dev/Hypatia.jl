@@ -1,14 +1,16 @@
 
 insts = OrderedDict()
 insts["minimal"] = [
-    ((3, :InvSSF, false, false),),
-    ((3, :InvSSF, true, false),),
-    ((3, :InvSSF, true, true),),
-    ((3, :NegLogSSF, false, false),),
-    ((3, :NegLogSSF, true, false),),
-    ((3, :NegLogSSF, true, true),),
-    ((3, :Power12SSF, false, false),),
-    ((3, :Power12SSF, true, false),),
+    # tr neglog
+    ((3, MatNegLog()),),
+    ((3, MatNegLogEigOrd()),),
+    ((3, MatNegLogDirect()),),
+    # tr negentropy
+    ((3, MatNegEntropy()),),
+    ((3, MatNegEntropyEigOrd()),),
+    # tr power12
+    ((3, MatPower12(1.5)),),
+    ((3, MatPower12EigOrd(1.5)),),
     ]
 insts["fast"] = [
     ((10, :InvSSF),),
