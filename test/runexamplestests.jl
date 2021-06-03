@@ -29,9 +29,10 @@ inst_sets = [
     # ("various", Float64, 120),
     ]
 
+perf = Examples.setup_benchmark_dataframe()
+
 @testset "examples tests" begin
 test_insts = Examples.get_test_instances()
-perf = Examples.setup_benchmark_dataframe()
 
 @testset "$mod, $ex" for (mod, mod_insts) in test_insts,
     (ex, (ex_type, ex_insts)) in mod_insts

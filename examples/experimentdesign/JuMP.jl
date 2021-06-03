@@ -16,8 +16,7 @@ experiment (let q ≈ p/2), and f is a convex spectral function
 
 struct ExperimentDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     p::Int
-    ssf::Symbol
-    use_standard_cones::Bool
+    ext::MatSpecExt # formulation specifier
 end
 
 function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
@@ -33,22 +32,15 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     JuMP.@constraint(model, sum(x) == p)
     JuMP.@constraint(model, A * x .== b)
 
-    JuMP.@variable(model, epi)
-    JuMP.@objective(model, Min, epi)
-
     vec_dim = Cones.svec_length(q)
     Q = V * diagm(x) * V' # information matrix
     Q_vec = zeros(JuMP.AffExpr, vec_dim)
     Cones.smat_to_svec!(Q_vec, Q, sqrt(T(2)))
 
-    ssf_dict = Dict(
-        :InvSSF => Cones.InvSSF(),
-        :NegLogSSF => Cones.NegLogSSF(),
-        :NegEntropySSF => Cones.NegEntropySSF(),
-        :Power12SSF => Cones.Power12SSF(1.5),
-        )
-    add_sepspectral(ssf_dict[inst.ssf], Cones.MatrixCSqr{T, T}, q,
-        vcat(epi, 1, Q_vec), model, inst.use_standard_cones)
+    # convex objective
+    JuMP.@variable(model, epi)
+    JuMP.@objective(model, Min, epi)
+    add_homog_spectral(inst.ext, q, vcat(1.0 * epi, Q_vec), model)
 
     return model
 end

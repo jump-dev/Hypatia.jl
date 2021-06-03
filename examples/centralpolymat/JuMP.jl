@@ -7,7 +7,7 @@ import DynamicPolynomials
 struct CentralPolyMatJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     n::Int # number of polyvars
     halfdeg::Int # half degree of random polynomials
-    logdet_obj::Bool # use logdet, else rootdet
+    ext::MatSpecExt # formulation specifier
 end
 
 function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64}
@@ -20,22 +20,17 @@ function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64}
     poly_rand = poly_half' * poly_half
 
     model = JuMP.Model()
-    JuMP.@variable(model, hypo)
-    JuMP.@objective(model, Max, hypo)
+    JuMP.@variable(model, Q_vec[1:Cones.svec_length(L)])
 
-    # objective hypograph
-    JuMP.@variable(model, Q[1:L, 1:L], Symmetric)
-    v1 = [Q[i, j] for i in 1:L for j in 1:i] # vectorized Q
-    if inst.logdet_obj
-        JuMP.@constraint(model, vcat(hypo, 1, v1) in MOI.LogDetConeTriangle(L))
-    else
-        JuMP.@constraint(model, vcat(hypo, v1) in MOI.RootDetConeTriangle(L))
-    end
+    # convex objective
+    JuMP.@variable(model, epi)
+    JuMP.@objective(model, Min, epi)
+    add_homog_spectral(inst.ext, L, vcat(1.0 * epi, Q_vec), model)
 
     # coefficients equal
-    poly_Q = basis' * Q * basis
-    JuMP.@constraint(model,
-        DynamicPolynomials.coefficients(poly_Q - poly_rand) .== 0)
+    Q = Symmetric(get_smat_U(L, 1.0 * Q_vec), :U)
+    poly_eq = basis' * Q * basis - poly_rand
+    JuMP.@constraint(model, DynamicPolynomials.coefficients(poly_eq) .== 0)
 
     return model
 end

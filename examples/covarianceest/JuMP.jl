@@ -12,8 +12,7 @@ where f is a convex spectral function
 
 struct CovarianceEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     d::Int
-    ssf::Symbol
-    use_standard_cones::Bool
+    ext::MatSpecExt # formulation specifier
 end
 
 function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
@@ -35,15 +34,7 @@ function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     # convex objective
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Min, epi)
-
-    ssf_dict = Dict(
-        :InvSSF => Cones.InvSSF(),
-        :NegLogSSF => Cones.NegLogSSF(),
-        :NegEntropySSF => Cones.NegEntropySSF(),
-        :Power12SSF => Cones.Power12SSF(1.5),
-        )
-    add_sepspectral(ssf_dict[inst.ssf], Cones.MatrixCSqr{T, T}, d,
-        vcat(epi, 1, p_vec), model, inst.use_standard_cones)
+    add_homog_spectral(inst.ext, d, vcat(1.0 * epi, p_vec), model)
 
     # linear prior constraints
     lin_dim = round(Int, sqrt(d - 1))
