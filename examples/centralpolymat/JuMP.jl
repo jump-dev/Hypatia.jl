@@ -20,8 +20,7 @@ function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64}
     poly_rand = poly_half' * poly_half
 
     model = JuMP.Model()
-    svec_dim = Cones.svec_length(L)
-    JuMP.@variable(model, Q_vec[1:svec_dim])
+    JuMP.@variable(model, Q_vec[1:Cones.svec_length(L)])
 
     # convex objective
     JuMP.@variable(model, epi)
