@@ -1,5 +1,5 @@
 #=
-helpers for constructing extended formulations in JuMP
+JuMP helpers for constructing extended formulations for separable spectral cones
 =#
 
 # add a separable spectral cone constraint, possibly extended
@@ -9,16 +9,28 @@ function add_sepspectral(
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
-    use_standard_cones::Bool,
+    use_standard_cones::Bool = false, # extend with standard cones
+    use_eigorder_ef::Bool = false, # use eigval EF, else smaller EF if available
     ) where {T <: Real}
+    @assert d >= 1
+
     if use_standard_cones
-        extend_sepspectral(h, csqr, d, aff, model)
+        if use_eigorder_ef
+            extend_sepspectral(h, csqr, d, aff, model)
+        else
+            extend_sepspectral_direct(h, csqr, d, aff, model)
+        end
     else
         JuMP.@constraint(model, aff in
             Hypatia.EpiPerSepSpectralCone{T}(h, csqr, d))
     end
+
     return
 end
+
+# fallback
+extend_sepspectral_direct(h, csqr, d, aff, model) =
+    extend_sepspectral(h, csqr, d, aff, model)
 
 # construct a standard cone EF for a separable spectral vector cone constraint
 function extend_sepspectral(
@@ -28,7 +40,6 @@ function extend_sepspectral(
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     ) where {T <: Real}
-    @assert d >= 1
     @assert d == length(aff) - 2
 
     # perspective nonnegative NOTE could be redundant
@@ -56,12 +67,7 @@ function extend_sepspectral(
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     ) where {T <: Real}
-    @assert d >= 1
-    @assert Cones.svec_length(d) == length(aff) - 2
-
-    # symmetric matrix (use upper triangle) of aff[2:end]
-    W = zeros(JuMP.AffExpr, d, d)
-    Cones.svec_to_smat!(W, aff[3:end], sqrt(2))
+    W = get_aff_W(aff[3:end], d)
 
     # eigenvalue ordering
     λ = JuMP.@variable(model, [1:d])
@@ -82,6 +88,14 @@ function extend_sepspectral(
     extend_sepspectral(h, Cones.VectorCSqr{T}, d, vec_aff, model)
 
     return
+end
+
+# check dimension and get symmetric matrix W (upper triangle) of vectorized w
+function get_aff_W(w::Vector{JuMP.AffExpr}, d::Int)
+    @assert Cones.svec_length(d) == length(w)
+    W = zeros(JuMP.AffExpr, d, d)
+    Cones.svec_to_smat!(W, w, sqrt(2))
+    return W
 end
 
 #=
@@ -149,5 +163,30 @@ function extend_atom_jump(
     @assert length(aff) == 3
     JuMP.@constraint(model, aff[3] >= 0)
     JuMP.@constraint(model, aff in MOI.PowerCone(inv(h.p)))
+    return
+end
+
+#=
+InvSSF matrix cone direct EF (use Schur complement):
+(u, v > 0, W ≻ 0) : u > v tr(inv(W / v))
+↔ ∃ Z : [Z vI; vI W] ≻ 0, u > tr(Z), v > 0
+=#
+function extend_sepspectral_direct(
+    ::Cones.InvSSF,
+    ::Type{Cones.MatrixCSqr{T, T}},
+    d::Int,
+    aff::Vector{JuMP.AffExpr},
+    model::JuMP.Model,
+    ) where {T <: Real}
+    W = get_aff_W(aff[3:end], d)
+
+    Z = JuMP.@variable(model, [1:d, 1:d], Symmetric)
+    JuMP.@constraint(model, aff[1] >= tr(Z))
+    JuMP.@constraint(model, aff[2] >= 0)
+
+    vI = aff[2] * Matrix(I, d, d)
+    mat = Symmetric(hvcat((2, 2), Z, vI, vI, W), :U)
+    JuMP.@SDconstraint(model, mat >= 0)
+
     return
 end

@@ -18,6 +18,7 @@ struct ExperimentDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     p::Int
     ssf::Symbol
     use_standard_cones::Bool
+    use_eigorder_ef::Bool
 end
 
 function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
@@ -48,7 +49,7 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
         :Power12SSF => Cones.Power12SSF(1.5),
         )
     add_sepspectral(ssf_dict[inst.ssf], Cones.MatrixCSqr{T, T}, q,
-        vcat(epi, 1, Q_vec), model, inst.use_standard_cones)
+        vcat(epi, 1, Q_vec), model, inst.use_standard_cones, inst.use_eigorder_ef)
 
     return model
 end
