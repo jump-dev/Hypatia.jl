@@ -1,14 +1,14 @@
 
 insts = OrderedDict()
 insts["minimal"] = [
-    ((2, 3, true, true, true, true),),
-    ((2, 3, false, true, true, true),),
-    ((2, 3, true, false, true, true),),
-    ((2, 3, false, false, true, true),),
-    ((2, 3, true, true, false, true),),
-    ((2, 3, false, false, false, true),),
-    ((2, 3, true, true, false, false),),
-    ((2, 3, false, false, false, false),),
+    ((3, 4, true, true, true, true),),
+    ((3, 4, false, true, true, true),),
+    ((3, 4, true, false, true, true),),
+    ((3, 4, false, false, true, true),),
+    ((3, 4, true, true, false, true),),
+    ((3, 4, false, false, false, true),),
+    ((3, 4, true, true, false, false),),
+    ((3, 4, false, false, false, false),),
     ]
 insts["fast"] = [
     ((12, 24, true, true, true, true),),
