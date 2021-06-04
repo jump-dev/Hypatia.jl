@@ -13,6 +13,7 @@ function build(inst::DiscreteMaxLikelihood{T}) where {T <: Float64}
     d = inst.d
     @assert d >= 2
     freq = rand(1:(2 * d), d)
+    freq /= sum(freq)
 
     model = JuMP.Model()
     JuMP.@variable(model, p[1:d])
@@ -20,12 +21,31 @@ function build(inst::DiscreteMaxLikelihood{T}) where {T <: Float64}
     JuMP.@objective(model, Max, hypo)
     JuMP.@constraint(model, sum(p) == 1)
 
-    # TODO extend
-    JuMP.@constraint(model, vcat(hypo, p) in
-        Hypatia.HypoPowerMeanCone{T}(freq / sum(freq)))
+    JuMP.@constraint(model, vcat(hypo, p) in Hypatia.HypoPowerMeanCone{T}(freq))
 
-    ext = (inst.use_EF ? VecNegEntropyEF : VecNegEntropy)
-    add_spectral(ext(), d, vcat(inv(d), inv(d), p), model)
+    form = (inst.use_EF ? VecNegEntropyEF : VecNegEntropy)
+    add_spectral(form(), d, vcat(inv(d), inv(d), p), model)
+
+    # save for use in tests
+    model.ext[:freq] = freq
+    model.ext[:p_var] = p
 
     return model
+end
+
+function test_extra(inst::DiscreteMaxLikelihood{T}, model::JuMP.Model) where T
+    stat = JuMP.termination_status(model)
+    @test stat == MOI.OPTIMAL
+    (stat == MOI.OPTIMAL) || return
+
+    # check objective and constraints
+    tol = eps(T)^0.2
+    freq = model.ext[:freq]
+    p_opt = JuMP.value.(model.ext[:p_var])
+    @test sum(p_opt) ≈ 1 atol=tol rtol=tol
+    obj_result = exp(sum(f_i * log(p_i) for (f_i, p_i) in zip(freq, p_opt)))
+    @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
+    di = inv(length(freq))
+    @test di >= sum(p_i * log(p_i / di) for p_i in p_opt) - tol
+    return
 end

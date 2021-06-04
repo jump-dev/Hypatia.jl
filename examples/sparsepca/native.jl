@@ -87,6 +87,6 @@ function test_extra(
     if solve_stats.status == Solvers.Optimal && iszero(inst.noise_ratio)
         # check objective value is correct
         tol = eps(T)^0.25
-        @test solve_stats.primal_obj ≈ -1 atol = tol rtol = tol
+        @test solve_stats.primal_obj ≈ -1 atol=tol rtol=tol
     end
 end

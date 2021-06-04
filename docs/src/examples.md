@@ -7,7 +7,7 @@ Most example models use JuMP, and some use Hypatia's native interface.
 New examples are welcomed and should be implemented similarly to the existing examples and linked from this page.
 
 - [CBLIB.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/CBLIB) Run a given CBLIB instance from the [Conic Benchmark Library](http://cblib.zib.de/).
-- [Central polynomial matrix.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/centralpolymat) Compute a maximum-determinant gram matrix of a polynomial.
+- [Central polynomial matrix.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/centralpolymat) Minimize a spectral function of a gram matrix of a polynomial.
 - [Classical-quantum capacity.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/classicalquantum) Compute the capacity of a classical-to-quantum channel.
 - [Condition number.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/conditionnum) Minimize the condition number of a matrix pencil subject to a linear matrix inequality.
 - [Contraction analysis.](https://github.com/chriscoey/Hypatia.jl/tree/master/examples/contraction) Find a contraction metric that guarantees global stability of a dynamical system.

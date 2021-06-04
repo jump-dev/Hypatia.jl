@@ -9,6 +9,15 @@ insts["minimal"] = [
     ((1, 2, MatInv()),),
     ((1, 2, MatInvEigOrd()),),
     ((1, 2, MatInvDirect()),),
+    # tr neg2sqrt
+    ((1, 2, MatNeg2Sqrt()),),
+    ((1, 2, MatNeg2SqrtEigOrd()),),
+    # tr negexp1 (domain not positive)
+    ((1, 2, MatNegExp1()),),
+    ((1, 2, MatNegExp1EigOrd()),),
+    # tr power12conj (domain not positive)
+    ((1, 2, MatPower12Conj(1.5)),),
+    ((1, 2, MatPower12ConjEigOrd(1.5)),),
     ]
 insts["fast"] = [
     ((1, 10, MatNegGeomEFExp()),),
