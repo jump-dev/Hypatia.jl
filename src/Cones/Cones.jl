@@ -344,5 +344,6 @@ include("wsosinterpnonnegative.jl")
 include("wsosinterppossemideftri.jl")
 include("wsosinterpepinormone.jl")
 include("wsosinterpepinormeucl.jl")
+include("mynewcone.jl")
 
 end

@@ -756,6 +756,22 @@ function test_oracles(C::Type{Cones.WSOSInterpNonnegative{T, R}}) where {T, R}
     end
 end
 
+function test_oracles(C::Type{Cones.MyNewCone{T}}) where {T}
+    for (num_vars, halfdeg) in [(1, 1), (1, 3), (2, 1), (2, 2), (3, 1)]
+        (d, Ps) = rand_interp(num_vars, halfdeg, Float64)
+        L = size(Ps[1], 2)
+        sd = div(L * (L + 1), 2)
+        A = zeros(T, sd, d)
+        P = Ps[1]
+        for i in 1:d
+            ei = zeros(T, d)
+            ei[i] = 1
+            @views Cones.smat_to_svec!(A[:, i], P' * Diagonal(ei) * P, sqrt(T(2)))
+        end
+        test_oracles(C(A), init_tol = Inf)
+    end
+end
+
 function test_barrier(C::Type{Cones.WSOSInterpNonnegative{T, R}}) where {T, R}
     (d, Ps) = rand_interp(2, 1, R)
     barrier(s) = -sum(logdet_pd(Hermitian(P' * Diagonal(s) * P)) for P in Ps)
