@@ -200,11 +200,12 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64}
 end
 
 function test_extra(inst::ShapeConRegrJuMP{T}, model::JuMP.Model) where T
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-    if JuMP.termination_status(model) == MOI.OPTIMAL && inst.is_fit_exact
+    stat = JuMP.termination_status(model)
+    @test stat == MOI.OPTIMAL
+    if (stat == MOI.OPTIMAL) && inst.is_fit_exact
         # check objective value is correct
         tol = eps(T)^0.25
-        @test JuMP.objective_value(model) ≈ 0 atol = tol rtol = tol
+        @test JuMP.objective_value(model) ≈ 0 atol=tol rtol=tol
     end
 end
 

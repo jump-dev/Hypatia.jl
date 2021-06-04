@@ -29,7 +29,8 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact_cache
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
     use_hess_prod_slow::Bool
     use_hess_prod_slow_updated::Bool
 
@@ -52,7 +53,6 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         U::Int,
         Ps::Vector{Matrix{T}};
         use_dual::Bool = false,
-        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         for Pk in Ps
             @assert size(Pk, 1) == U
@@ -63,7 +63,6 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         cone.R = R
         cone.U = U
         cone.Ps = Ps
-        cone.hess_fact_cache = hess_fact_cache
         cone.nu = R * sum(size(Pk, 2) for Pk in Ps)
         return cone
     end

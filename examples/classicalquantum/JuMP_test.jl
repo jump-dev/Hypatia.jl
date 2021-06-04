@@ -1,19 +1,27 @@
 
 insts = OrderedDict()
 insts["minimal"] = [
-    ((2, false),),
-    ((2, true),),
+    ((3, false, false),),
+    ((3, false, true),),
+    ((3, true, false),),
     ]
 insts["fast"] = [
-    ((10, false),),
-    ((10, true),),
+    ((20, false, false),),
+    ((20, true, false),),
+    ((8, false, true),),
+    ((50, false, false),),
+    ((50, true, false),),
+    ((12, false, true),),
     ]
 insts["various"] = [
-    ((25, false),),
-    ((25, true),),
-    ((50, false),),
-    ((50, true),),
-    ((100, false),),
-    ((100, true),),
+    ((100, false, false),),
+    ((100, true, false),),
+    ((12, false, true),),
+    ((200, false, false),),
+    ((200, true, false),),
+    ((15, false, true), nothing, (default_tol_relax = 100,)),
+    ((300, false, false),),
+    ((300, true, false),),
+    ((17, false, true), nothing, (default_tol_relax = 1000,)),
     ]
 return (ClassicalQuantum, insts)

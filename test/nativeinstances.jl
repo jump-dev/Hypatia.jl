@@ -2607,13 +2607,13 @@ end
 function indirect1(T; options...)
     tol = 1e-3
     Random.seed!(1)
-    (n, p, q) = (4, 3, 4)
+    (n, p) = (4, 2)
     c = rand(T(0):T(9), n)
     A = rand(T(-9):T(9), p, n)
     b = vec(sum(A, dims = 2))
-    G = LinearMap(SparseMatrixCSC(-one(T) * I, q, n), isposdef = false)
-    h = zeros(T, q)
-    cones = Cone{T}[Cones.Nonnegative{T}(q)]
+    G = LinearMap(SparseMatrixCSC(-one(T) * I, n, n), isposdef = false)
+    h = zeros(T, n)
+    cones = Cone{T}[Cones.Nonnegative{T}(n)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol;
         obj_offset = one(T), options...)

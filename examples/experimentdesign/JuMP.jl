@@ -16,23 +16,14 @@ experiment (let q ≈ p/2), and f is a convex spectral function
 
 struct ExperimentDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     p::Int
-    ssf::Cones.SepSpectralFun
-end
-
-function ExperimentDesignJuMP{T}(p::Int, ssf_name::Symbol) where {T <: Real}
-    ssf_dict = Dict(
-        :InvSSF => Cones.InvSSF(),
-        :NegLogSSF => Cones.NegLogSSF(),
-        :NegEntropySSF => Cones.NegEntropySSF(),
-        :Power12SSF => Cones.Power12SSF(1.5),
-        )
-    ssf = ssf_dict[ssf_name]
-    return ExperimentDesignJuMP{T}(p, ssf)
+    ext::MatSpecExt # formulation specifier
 end
 
 function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     p = inst.p
     @assert p >= 2
+    @assert is_domain_pos(inst.ext)
+
     q = div(p, 2)
     V = randn(T, q, p)
     A = randn(T, round(Int, sqrt(p - 1)), p)
@@ -43,15 +34,31 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     JuMP.@constraint(model, sum(x) == p)
     JuMP.@constraint(model, A * x .== b)
 
-    JuMP.@variable(model, epi)
-    JuMP.@objective(model, Min, epi)
-
     vec_dim = Cones.svec_length(q)
     Q = V * diagm(x) * V' # information matrix
     Q_vec = zeros(JuMP.AffExpr, vec_dim)
     Cones.smat_to_svec!(Q_vec, Q, sqrt(T(2)))
-    f_cone = Hypatia.EpiPerSepSpectralCone{T}(inst.ssf, Cones.MatrixCSqr{T, T}, q)
-    JuMP.@constraint(model, vcat(epi, 1, Q_vec) in f_cone)
+
+    # convex objective
+    JuMP.@variable(model, epi)
+    JuMP.@objective(model, Min, epi)
+    add_homog_spectral(inst.ext, q, vcat(1.0 * epi, Q_vec), model)
+
+    # save for use in tests
+    model.ext[:Q_var] = Q
 
     return model
+end
+
+function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where T
+    stat = JuMP.termination_status(model)
+    @test stat == MOI.OPTIMAL
+    (stat == MOI.OPTIMAL) || return
+
+    # check objective
+    tol = eps(T)^0.2
+    Q_opt = JuMP.value.(model.ext[:Q_var])
+    obj_result = get_val(Symmetric(Q_opt, :U), inst.ext)
+    @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
+    return
 end

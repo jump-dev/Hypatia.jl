@@ -26,7 +26,8 @@ mutable struct DoublyNonnegativeTri{T <: Real} <: Cone{T}
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact_cache
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
 
     mat::Matrix{T}
     mat2::Matrix{T} # TODO rename to imply mutates fact_mat
@@ -40,7 +41,6 @@ mutable struct DoublyNonnegativeTri{T <: Real} <: Cone{T}
     function DoublyNonnegativeTri{T}(
         dim::Int;
         use_dual::Bool = false,
-        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim >= 1
         cone = new{T}()
@@ -48,9 +48,8 @@ mutable struct DoublyNonnegativeTri{T <: Real} <: Cone{T}
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
         cone.side = side = svec_side(dim)
-        cone.offdiag_idxs = vcat(
-            [svec_length(i - 1) .+ (1:(i - 1)) for i in 2:side]...)
-        cone.hess_fact_cache = hess_fact_cache
+        cone.offdiag_idxs =
+            vcat([svec_length(i - 1) .+ (1:(i - 1)) for i in 2:side]...)
         return cone
     end
 end
@@ -144,11 +143,11 @@ end
 function update_grad(cone::DoublyNonnegativeTri)
     @assert cone.is_feas
 
-    chol_inv!(cone.inv_mat, cone.fact_mat)
+    inv_fact!(cone.inv_mat, cone.fact_mat)
     smat_to_svec!(cone.grad, cone.inv_mat, cone.rt2)
     cone.grad .*= -1
     @. @views cone.inv_vec = inv(cone.point[cone.offdiag_idxs])
-    @. @views cone.grad[cone.offdiag_idxs] -= cone.inv_vec
+    @. cone.grad[cone.offdiag_idxs] -= cone.inv_vec
 
     cone.grad_updated = true
     return cone.grad
@@ -159,6 +158,7 @@ function update_hess(cone::DoublyNonnegativeTri)
     isdefined(cone, :hess) || alloc_hess!(cone)
     H = cone.hess.data
 
+    copytri!(cone.inv_mat, 'U')
     symm_kron!(H, cone.inv_mat, cone.rt2)
     for (inv_od, idx) in zip(cone.inv_vec, cone.offdiag_idxs)
         H[idx, idx] += abs2(inv_od)

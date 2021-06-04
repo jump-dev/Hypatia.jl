@@ -12,23 +12,14 @@ where f is a convex spectral function
 
 struct CovarianceEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     d::Int
-    ssf::Cones.SepSpectralFun
-end
-
-function CovarianceEstJuMP{T}(d::Int, ssf_name::Symbol) where {T <: Real}
-    ssf_dict = Dict(
-        :InvSSF => Cones.InvSSF(),
-        :NegLogSSF => Cones.NegLogSSF(),
-        :NegEntropySSF => Cones.NegEntropySSF(),
-        :Power12SSF => Cones.Power12SSF(1.5),
-        )
-    ssf = ssf_dict[ssf_name]
-    return CovarianceEstJuMP{T}(d, ssf)
+    ext::MatSpecExt # formulation specifier
 end
 
 function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     d = inst.d
     @assert d >= 1
+    @assert is_domain_pos(inst.ext)
+
     p0 = randn(T, d, d)
     p0 = p0 * p0' + I / 2
     p0 ./= tr(p0)
@@ -43,10 +34,9 @@ function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     Cones.smat_to_svec!(p_vec, one(T) * p, sqrt(T(2)))
 
     # convex objective
-    f_cone = Hypatia.EpiPerSepSpectralCone{T}(inst.ssf, Cones.MatrixCSqr{T, T}, d)
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Min, epi)
-    JuMP.@constraint(model, vcat(epi, 1, p_vec) in f_cone)
+    add_homog_spectral(inst.ext, d, vcat(1.0 * epi, p_vec), model)
 
     # linear prior constraints
     lin_dim = round(Int, sqrt(d - 1))
@@ -57,5 +47,21 @@ function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     c = C * p0_vec
     JuMP.@constraint(model, C * p_vec .<= c)
 
+    # save for use in tests
+    model.ext[:p_var] = p
+
     return model
+end
+
+function test_extra(inst::CovarianceEstJuMP{T}, model::JuMP.Model) where T
+    stat = JuMP.termination_status(model)
+    @test stat == MOI.OPTIMAL
+    (stat == MOI.OPTIMAL) || return
+
+    # check objective
+    tol = eps(T)^0.2
+    p_opt = JuMP.value.(model.ext[:p_var])
+    obj_result = get_val(Symmetric(p_opt, :U), inst.ext)
+    @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
+    return
 end

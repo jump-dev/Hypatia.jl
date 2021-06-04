@@ -44,7 +44,7 @@ function build(inst::EntanglementAssisted{T}) where {T <: Float64}
     Q2_vec = Cones.smat_to_svec!(zeros(JuMP.AffExpr, sa), Q2, rt2)
     Q3_vec = Cones.smat_to_svec!(zeros(JuMP.AffExpr, sb), Q3, rt2)
     RE_cone = Hypatia.EpiTrRelEntropyTriCone{T}(1 + 2 * sa)
-    E_cone = Hypatia.EpiPerSepSpectralCone{T}(Hypatia.Cones.NegEntropySSF(),
+    E_cone = Hypatia.EpiPerSepSpectralCone{T}(Cones.NegEntropySSF(),
         Cones.MatrixCSqr{T, T}, nb)
 
     JuMP.@constraints(model, begin

@@ -97,7 +97,7 @@ end
 function update_grad(cone::PosSemidefTri)
     @assert cone.is_feas
 
-    chol_inv!(cone.inv_mat, cone.fact_mat)
+    inv_fact!(cone.inv_mat, cone.fact_mat)
     smat_to_svec!(cone.grad, cone.inv_mat, cone.rt2)
     cone.grad .*= -1
     copytri!(cone.mat, 'U', true)
@@ -109,6 +109,7 @@ end
 function update_hess(cone::PosSemidefTri)
     @assert cone.grad_updated
     isdefined(cone, :hess) || alloc_hess!(cone)
+    copytri!(cone.inv_mat, 'U', true)
     symm_kron!(cone.hess.data, cone.inv_mat, cone.rt2)
     cone.hess_updated = true
     return cone.hess

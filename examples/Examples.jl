@@ -8,7 +8,7 @@ import DataStructures: OrderedDict
 include("common.jl")
 include("common_native.jl")
 include("common_JuMP.jl")
-
+include("spectral_EFs_JuMP.jl")
 include("setup.jl")
 
 const model_types = [
@@ -89,14 +89,12 @@ end
 function get_test_instances()
     test_insts = OrderedDict{String, OrderedDict}()
     for mod in model_types
-        mod_insts = test_insts[mod] =
-            OrderedDict{String, Tuple{Type{<:ExampleInstance}, Dict}}()
+        mod_insts = test_insts[mod] = OrderedDict()
         for ex in model_type_examples(mod)
             mod_insts[ex] = get_test_instances(mod, ex)
         end
     end
     return test_insts
 end
-
 
 end

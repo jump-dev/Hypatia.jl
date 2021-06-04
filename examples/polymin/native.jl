@@ -139,6 +139,6 @@ function test_extra(inst::PolyMinNative{T}, solve_stats::NamedTuple, ::NamedTupl
         # check objective value is correct
         tol = eps(T)^0.1
         true_min = (inst.use_primal ? -1 : 1) * inst.true_min
-        @test solve_stats.primal_obj ≈ true_min atol = tol rtol = tol
+        @test solve_stats.primal_obj ≈ true_min atol=tol rtol=tol
     end
 end

@@ -42,7 +42,8 @@ mutable struct PosSemidefTriSparse{I <: PSDSparseImpl, T <: Real,
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact_cache
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
     use_hess_prod_slow::Bool
     use_hess_prod_slow_updated::Bool
 
@@ -53,7 +54,6 @@ mutable struct PosSemidefTriSparse{I <: PSDSparseImpl, T <: Real,
         row_idxs::Vector{Int},
         col_idxs::Vector{Int};
         use_dual::Bool = false,
-        hess_fact_cache = hessian_cache(T),
         ) where {I <: PSDSparseImpl, T <: Real, R <: RealOrComplex{T}}
         # check validity of inputs
         num_nz = length(row_idxs)
@@ -82,7 +82,6 @@ mutable struct PosSemidefTriSparse{I <: PSDSparseImpl, T <: Real,
         cone.row_idxs = row_idxs
         cone.col_idxs = col_idxs
         cone.rt2 = sqrt(T(2))
-        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end

@@ -27,7 +27,8 @@ mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact_cache
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
 
     rt2::T
     vw_dim::Int
@@ -65,7 +66,6 @@ mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
     function EpiTrRelEntropyTri{T}(
         dim::Int;
         use_dual::Bool = false,
-        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         @assert dim > 2
         @assert isodd(dim)
@@ -74,7 +74,6 @@ mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
         cone.dim = dim
         cone.vw_dim = div(dim - 1, 2)
         cone.d = svec_side(cone.vw_dim)
-        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end

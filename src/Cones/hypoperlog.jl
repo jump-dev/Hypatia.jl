@@ -25,7 +25,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
 
     ϕ::T
     ζ::T
-    tempw1::Vector{T}
+    tempw::Vector{T}
 
     function HypoPerLog{T}(
         dim::Int;
@@ -46,7 +46,7 @@ use_sqrt_hess_oracles(cone::HypoPerLog) = false
 
 function setup_extra_data!(cone::HypoPerLog{T}) where {T <: Real}
     d = cone.dim - 2
-    cone.tempw1 = zeros(T, d)
+    cone.tempw = zeros(T, d)
     return cone
 end
 
@@ -115,7 +115,7 @@ function update_hess(cone::HypoPerLog)
     H = cone.hess.data
     g = cone.grad
     ζ = cone.ζ
-    wivζi = cone.tempw1
+    wivζi = cone.tempw
     d = length(w)
     σζi = (cone.ϕ - d) / ζ
     vζi = v / ζ
@@ -156,7 +156,7 @@ function hess_prod!(
     ζ = cone.ζ
     d = length(w)
     σ = cone.ϕ - d
-    rwi = cone.tempw1
+    rwi = cone.tempw
     vζi1 = v / ζ + 1
 
     @inbounds for j in 1:size(arr, 2)
@@ -231,7 +231,7 @@ function inv_hess_prod!(
     c6 = abs2(v * ϕ) + ζ * (ζ + d * v) - d * abs2(ζ + v * ϕ) * c3
     c7 = c4 * c0
     c8 = c7 + v * ζ
-    rw = cone.tempw1
+    rw = cone.tempw
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
@@ -261,7 +261,7 @@ function dder3(cone::HypoPerLog{T}, dir::AbstractVector{T}) where {T <: Real}
     σ = cone.ϕ - d
     viq = q / v
     viq2 = abs2(viq)
-    rwi = cone.tempw1
+    rwi = cone.tempw
     vζi = v / ζ
     vζi1 = vζi + 1
 

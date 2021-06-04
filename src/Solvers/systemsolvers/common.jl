@@ -125,25 +125,6 @@ include("naiveelim.jl")
 include("symindef.jl")
 include("qrchol.jl")
 
-function solve_inner_system(
-    syssolver::Union{NaiveElimSparseSystemSolver, SymIndefSparseSystemSolver},
-    sol::Point,
-    rhs::Point,
-    )
-    inv_prod(syssolver.fact_cache, sol.vec, syssolver.lhs_sub, rhs.vec)
-    return sol
-end
-
-function solve_inner_system(
-    syssolver::Union{NaiveElimDenseSystemSolver, SymIndefDenseSystemSolver},
-    sol::Point,
-    rhs::Point,
-    )
-    copyto!(sol.vec, rhs.vec)
-    inv_prod(syssolver.fact_cache, sol.vec)
-    return sol
-end
-
 # reduce to 4x4 subsystem
 function solve_system(
     syssolver::Union{NaiveElimSystemSolver{T}, SymIndefSystemSolver{T},
@@ -194,7 +175,7 @@ function solve_subsystem4(
     sol_tau = tau_num / tau_denom
 
     dim3 = length(sol_sub.vec)
-    @. @views sol.vec[1:dim3] = sol_sub.vec + sol_tau * sol_const.vec
+    @. sol.vec[1:dim3] = sol_sub.vec + sol_tau * sol_const.vec
     sol.tau[] = sol_tau
 
     return sol

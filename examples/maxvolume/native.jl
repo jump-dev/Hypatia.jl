@@ -30,7 +30,7 @@ function build(inst::MaxVolumeNative{T}) where {T <: Real}
         h = zeros(T, n + 1)
         cones = Cones.Cone{T}[Cones.HypoGeoMean{T}(1 + n)]
     elseif inst.use_power
-        @assert n > 2
+        @assert n > 3 # power cone formulation minimum
         cones = Cones.Cone{T}[]
         # n - 1 3-dim power cones needed, number of new variables is n - 2
         len_power = 3 * (n - 1)
@@ -55,7 +55,7 @@ function build(inst::MaxVolumeNative{T}) where {T <: Real}
                 T(i + 1) / T(i + 2)], 1))
             offset += 3
         end
-        # last row also special becuase hypograph variable is involved
+        # last row also special because hypograph variable is involved
         G_geo_orig[offset, n] = -1
         G_geo_newvars[offset + 1, n - 2] = -1
         G = [

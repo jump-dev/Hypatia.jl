@@ -115,8 +115,8 @@ function load(
             len_kj = length(nz_rows_kj)
             IJV_idxs = offset:(offset + len_kj - 1)
             offset += len_kj
-            @. @views H_Is[IJV_idxs] = nz_rows_kj
-            @. @views H_Js[IJV_idxs] = z_start_k + j
+            @. H_Is[IJV_idxs] = nz_rows_kj
+            @. H_Js[IJV_idxs] = z_start_k + j
         end
     end
     append!(Is, H_Is)
@@ -189,11 +189,11 @@ end
 function solve_subsystem3(
     syssolver::SymIndefSparseSystemSolver,
     ::Solver,
-    sol_sub::Point,
-    rhs_sub::Point,
+    sol::Point,
+    rhs::Point,
     )
-    inv_prod(syssolver.fact_cache, sol_sub.vec, syssolver.lhs_sub, rhs_sub.vec)
-    return sol_sub
+    inv_prod(syssolver.fact_cache, sol.vec, syssolver.lhs_sub, rhs.vec)
+    return sol
 end
 
 #=
@@ -202,16 +202,15 @@ direct dense
 
 mutable struct SymIndefDenseSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
     lhs_sub::Symmetric{T, Matrix{T}}
-    fact_cache::DenseSymCache{T}
+    lhs_sub_fact::Symmetric{T, Matrix{T}}
+    fact::Factorization{T}
     rhs_sub::Point{T}
     sol_sub::Point{T}
     sol_const::Point{T}
     rhs_const::Point{T}
     function SymIndefDenseSystemSolver{T}(;
-        fact_cache::DenseSymCache{T} = DenseSymCache{T}(),
         ) where {T <: Real}
         syssolver = new{T}()
-        syssolver.fact_cache = fact_cache
         return syssolver
     end
 end
@@ -230,8 +229,7 @@ function load(
     @views copyto!(lhs_sub[n + p .+ (1:q), 1:n], model.G)
     @assert lhs_sub isa Matrix{T}
     syssolver.lhs_sub = Symmetric(lhs_sub, :L)
-
-    load_matrix(syssolver.fact_cache, syssolver.lhs_sub)
+    syssolver.lhs_sub_fact = zero(syssolver.lhs_sub)
 
     setup_point_sub(syssolver, model)
 
@@ -247,11 +245,16 @@ function update_lhs(syssolver::SymIndefDenseSystemSolver, solver::Solver)
         z_rows_k = z_start .+ idxs_k
         H_k = (Cones.use_dual_barrier(cone_k) ? Cones.hess :
             Cones.inv_hess)(cone_k)
-        @. @views lhs_sub[z_rows_k, z_rows_k] = -H_k
+        @. lhs_sub[z_rows_k, z_rows_k] = -H_k
     end
 
-    solver.time_upfact += @elapsed update_fact(syssolver.fact_cache,
-        syssolver.lhs_sub)
+    solver.time_upfact += @elapsed syssolver.fact =
+        symm_fact_copy!(syssolver.lhs_sub_fact, syssolver.lhs_sub)
+
+    if !issuccess(syssolver.fact)
+        println("symmetric linear system factorization failed")
+    end
+
     solve_subsystem3(syssolver, solver, syssolver.sol_const, syssolver.rhs_const)
 
     return syssolver
@@ -260,12 +263,11 @@ end
 function solve_subsystem3(
     syssolver::SymIndefDenseSystemSolver,
     ::Solver,
-    sol_sub::Point,
-    rhs_sub::Point,
+    sol::Point,
+    rhs::Point,
     )
-    copyto!(sol_sub.vec, rhs_sub.vec)
-    inv_prod(syssolver.fact_cache, sol_sub.vec)
-    return sol_sub
+    ldiv!(sol.vec, syssolver.fact, rhs.vec)
+    return sol
 end
 
 #=
@@ -274,7 +276,7 @@ TODO
 - precondition
 - optimize operations
 - tune tolerances etc
-- try to make initial point in sol_sub a good guess (currently zeros)
+- try to make initial point in sol a good guess (currently zeros)
 =#
 
 mutable struct SymIndefIndirectSystemSolver{T <: Real} <: SymIndefSystemSolver{T}
@@ -330,12 +332,12 @@ end
 function solve_subsystem3(
     syssolver::SymIndefIndirectSystemSolver,
     ::Solver,
-    sol_sub::Point,
-    rhs_sub::Point,
+    sol::Point,
+    rhs::Point,
     )
-    sol_sub.vec .= 0 # initially_zero = true
+    sol.vec .= 0 # initially_zero = true
     # TODO tune options, initial guess?
-    IterativeSolvers.minres!(sol_sub.vec, syssolver.lhs, rhs_sub.vec,
-        initially_zero = true)#, maxiter = 2 * size(sol_sub.vec, 1))
-    return sol_sub
+    IterativeSolvers.minres!(sol.vec, syssolver.lhs, rhs.vec,
+        initially_zero = true) #, maxiter = 2 * size(sol.vec, 1))
+    return sol
 end

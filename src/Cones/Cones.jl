@@ -11,19 +11,11 @@ import LinearAlgebra.BlasReal
 import PolynomialRoots
 using SparseArrays
 import Hypatia.RealOrComplex
-import Hypatia.chol_inv!
+import Hypatia.outer_prod!
 import Hypatia.update_eigen!
 import Hypatia.spectral_outer!
-import Hypatia.DenseSymCache
-import Hypatia.DensePosDefCache
-import Hypatia.load_matrix
-import Hypatia.update_fact
-import Hypatia.inv_prod
-import Hypatia.sqrt_prod
-import Hypatia.inv_sqrt_prod
-import Hypatia.invert
-import Hypatia.increase_diag!
-import Hypatia.outer_prod!
+import Hypatia.posdef_fact_copy!
+import Hypatia.inv_fact!
 
 include("arrayutilities.jl")
 
@@ -120,8 +112,8 @@ currently-loaded primal point with a vector or array, in-place.
 """
 function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Cone)
     update_hess_fact(cone)
-    copyto!(prod, arr)
-    inv_prod(cone.hess_fact_cache, prod)
+    # TODO try equilibration, iterative refinement etc like posvx/sysvx
+    ldiv!(prod, cone.hess_fact, arr)
     return prod
 end
 
@@ -181,9 +173,6 @@ load_dual_point(
 function alloc_hess!(cone::Cone{T}) where {T <: Real}
     dim = dimension(cone)
     cone.hess = Symmetric(zeros(T, dim, dim), :U)
-    if hasfield(typeof(cone), :hess_fact_cache)
-        load_matrix(cone.hess_fact_cache, cone.hess)
-    end
     return
 end
 
@@ -193,9 +182,6 @@ function alloc_inv_hess!(cone::Cone{T}) where {T <: Real}
     return
 end
 
-# hessian_cache(T::Type{<:BlasReal}) = DenseSymCache{T}() # BunchKaufman for BlasReal
-hessian_cache(T::Type{<:Real}) = DensePosDefCache{T}()
-
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
@@ -203,28 +189,29 @@ function use_sqrt_hess_oracles(cone::Cone)
     if !cone.hess_fact_updated
         update_hess_fact(cone) || return false
     end
-    return (cone.hess_fact_cache isa DensePosDefCache)
+    return (cone.hess_fact isa Cholesky)
 end
 
+# only use if use_sqrt_hess_oracles is true
 function sqrt_hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::Cone,
     )
-    update_hess_fact(cone)
-    copyto!(prod, arr)
-    sqrt_prod(cone.hess_fact_cache, prod)
+    @assert cone.hess_fact_updated
+    mul!(prod, cone.hess_fact.U, arr)
     return prod
 end
 
+# only use if use_sqrt_hess_oracles is true
 function inv_sqrt_hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::Cone,
     )
-    update_hess_fact(cone)
-    copyto!(prod, arr)
-    inv_sqrt_prod(cone.hess_fact_cache, prod)
+    @assert cone.hess_fact_updated
+    # TODO try equilibration, iterative refinement etc like posvx/sysvx
+    ldiv!(prod, cone.hess_fact.U', arr)
     return prod
 end
 
@@ -250,26 +237,21 @@ hess_prod_slow!(
 function update_hess_fact(cone::Cone{T}) where {T <: Real}
     cone.hess_fact_updated && return true
     cone.hess_updated || update_hess(cone)
-
-    if !update_fact(cone.hess_fact_cache, cone.hess)
-        if T <: BlasReal && cone.hess_fact_cache isa DensePosDefCache{T}
-            # @warn("switching Hessian cache from Cholesky to Bunch Kaufman")
-            cone.hess_fact_cache = DenseSymCache{T}()
-            load_matrix(cone.hess_fact_cache, cone.hess)
-            update_fact(cone.hess_fact_cache, cone.hess) || return false
-        else
-            return false
-        end
+    if !isdefined(cone, :hess_fact_mat)
+        cone.hess_fact_mat = zero(cone.hess)
     end
 
+    # do not modify the hessian during recovery
+    cone.hess_fact = posdef_fact_copy!(cone.hess_fact_mat, cone.hess, false)
+
     cone.hess_fact_updated = true
-    return true
+    return issuccess(cone.hess_fact)
 end
 
 function update_inv_hess(cone::Cone)
     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     update_hess_fact(cone)
-    invert(cone.hess_fact_cache, cone.inv_hess)
+    inv_fact!(cone.inv_hess.data, cone.hess_fact)
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
@@ -285,40 +267,43 @@ hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 inv_hess_nz_idxs_col(cone::Cone, j::Int) = 1:dimension(cone)
 inv_hess_nz_idxs_col_tril(cone::Cone, j::Int) = j:dimension(cone)
 
-function in_neighborhood(
+# check numerics of some oracles used in proximity check TODO tune
+function check_numerics(
     cone::Cone{T},
-    rtmu::T,
-    max_nbhd::T;
+    gtol::T = sqrt(sqrt(eps(T))),
+    Htol::T = 10sqrt(gtol),
     ) where {T <: Real}
-    is_feas(cone) || return false
     g = grad(cone)
-    vec1 = cone.vec1
-
-    # check numerics of barrier oracles
-    # TODO tune
-    tol = sqrt(eps(T))
-    gtol = sqrt(tol)
-    Htol = 10sqrt(gtol)
-    dim = dimension(cone)
+    dim = length(g)
     nu = get_nu(cone)
+
     # grad check
     (abs(1 + dot(g, cone.point) / nu) > gtol * dim) && return false
+
     # inv hess check
-    inv_hess_prod!(vec1, g, cone)
-    (abs(1 - dot(vec1, g) / nu) > Htol * dim) && return false
+    Hig = inv_hess_prod!(cone.vec1, g, cone)
+    (abs(1 - dot(Hig, g) / nu) > Htol * dim) && return false
 
-    # check neighborhood condition
-    @. vec1 = cone.dual_point + rtmu * g
-    # nbhd = norm(vec1, Inf) / norm(g, Inf) # heuristic neighborhood
+    return true
+end
+
+# compute central path proximity for a cone; if using max proximity, proximity
+# is computed differently if cone is not primitive, eg nonnegative cone
+function get_proximity(
+    cone::Cone{T},
+    rtmu::T,
+    ::Bool, # use sum proximity
+    negtol::T = sqrt(eps(T)),
+    ) where {T <: Real}
+    g = grad(cone)
+    vec1 = cone.vec1
     vec2 = cone.vec2
-    inv_hess_prod!(vec2, vec1, cone)
-    nbhd_sqr = dot(vec2, vec1)
-    if nbhd_sqr < -tol * dim
-        return false
-    end
-    nbhd = sqrt(abs(nbhd_sqr))
 
-    return (nbhd < rtmu * max_nbhd)
+    @. vec1 = cone.dual_point + rtmu * g
+    inv_hess_prod!(vec2, vec1, cone)
+    prox_sqr = dot(vec2, vec1)
+    (prox_sqr < -negtol * length(g)) && return T(NaN) # should be positive
+    return sqrt(abs(prox_sqr)) / rtmu
 end
 
 include("nonnegative.jl")

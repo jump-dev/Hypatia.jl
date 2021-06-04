@@ -196,6 +196,8 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
         else
             # number of 3-dimensional power cones needed is num_unknown - 1,
             # number of new variables is num_unknown - 2
+            @assert num_unknown > 3 # power cone formulation minimum
+
             # first num_unknown columns overlap with G_norm, column for the
             # epigraph variable of the spectral cone added later
             len_power = 3 * (num_unknown - 1)

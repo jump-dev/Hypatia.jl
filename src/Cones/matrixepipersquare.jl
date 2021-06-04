@@ -30,7 +30,8 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact_cache
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
 
     U_idxs::UnitRange{Int}
     v_idx::Int
@@ -56,7 +57,6 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         d1::Int,
         d2::Int;
         use_dual::Bool = false,
-        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real, R <: RealOrComplex{T}}
         @assert 1 <= d1 <= d2
         cone = new{T, R}()
@@ -67,7 +67,6 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone.d1 = d1
         cone.d2 = d2
         cone.rt2 = sqrt(T(2))
-        cone.hess_fact_cache = hess_fact_cache
         cone.U_idxs = 1:(cone.v_idx - 1)
         cone.W_idxs = (cone.v_idx + 1):cone.dim
         return cone
@@ -158,7 +157,7 @@ function update_grad(cone::MatrixEpiPerSquare)
     v = cone.point[cone.v_idx]
 
     Zi = cone.Zi
-    chol_inv!(Zi.data, cone.fact_Z)
+    inv_fact!(Zi.data, cone.fact_Z)
     @views smat_to_svec!(cone.grad[cone.U_idxs], Zi, cone.rt2)
     @views cone.grad[cone.U_idxs] .*= -2 * v
     cone.grad[cone.v_idx] = -2 * dot(Zi, U) + (cone.d1 - 1) / v

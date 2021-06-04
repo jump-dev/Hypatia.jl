@@ -29,8 +29,8 @@ function build(inst::NormConePoly{T}) where {T <: Float64}
 end
 
 function test_extra(inst::NormConePoly{T}, model::JuMP.Model) where T
-    @test JuMP.termination_status(model) ==
-        (inst.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
+    stat = JuMP.termination_status(model)
+    @test stat == (inst.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
 
 normconepoly_data = Dict(

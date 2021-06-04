@@ -28,6 +28,7 @@ diff_reals = [
     ]
 
 string_nameof(T) = string(nameof(T))
+
 type_name(::T) where T = string_nameof(T)
 
 function test_instance_solver(
@@ -118,21 +119,37 @@ end
 
 @testset "PredOrCentStepper tests" begin
     println("\nstarting PredOrCentStepper tests (with printing)")
+    verbose = true
+    # Skajaa-Ye/Papp-Yildiz options
+    for inst_name in inst_minimal
+        T = Float64
+        stepper = Solvers.PredOrCentStepper{T}(;
+            # stepper options
+            use_adjustment = false, use_curve_search = false,
+            max_cent_steps = 8, pred_prox_bound = 0.0332, use_pred_sum_prox = true,
+            # searcher options
+            min_prox = 0.0, prox_bound = 0.2844, use_sum_prox = true,
+            alpha_sched = [0.9999 * 0.7^i for i in 0:22])
+        options = (; default_options..., verbose = verbose, stepper = stepper)
+        test_instance_solver(inst_name, T, options, "SYPY-options")
+    end
+    # adjustment and curve search options
     use_adj_curv = [(false, false), (true, false), (true, true)]
     for inst_name in inst_minimal, (adj, curv) in use_adj_curv, T in diff_reals
-        options = (; default_options..., verbose = true, stepper =
-            Solvers.PredOrCentStepper{T}(
-            use_adjustment = adj, use_curve_search = curv))
+        stepper = Solvers.PredOrCentStepper{T}(;
+            use_adjustment = adj, use_curve_search = curv)
+        options = (; default_options..., verbose = verbose, stepper = stepper)
         test_instance_solver(inst_name, T, options, "adj=$adj curv=$curv")
     end
 end
 
 @testset "CombinedStepper tests" begin
     println("\nstarting CombinedStepper tests (with printing)")
-    use_shift = [0, 2]
-    for inst_name in inst_minimal, shift in use_shift, T in diff_reals
-        options = (; default_options..., verbose = true,
-            stepper = Solvers.CombinedStepper{T}(shift))
+    verbose = true
+    shifts = [0, 2]
+    for inst_name in inst_minimal, shift in shifts, T in diff_reals
+        options = (; default_options..., verbose = verbose,
+            stepper = Solvers.CombinedStepper{T}(shift_sched = shift))
         test_instance_solver(inst_name, T, options, "shift=$shift")
     end
 end

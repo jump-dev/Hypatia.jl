@@ -25,16 +25,16 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
-    hess_fact_cache
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
 
     ϕ::T
     ζ::T
-    tempw1::Vector{T}
+    tempw::Vector{T}
 
     function HypoPowerMean{T}(
         α::Vector{T};
         use_dual::Bool = false,
-        hess_fact_cache = hessian_cache(T),
         ) where {T <: Real}
         dim = length(α) + 1
         @assert dim >= 2
@@ -44,13 +44,12 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
         cone.use_dual_barrier = use_dual
         cone.dim = dim
         cone.α = α
-        cone.hess_fact_cache = hess_fact_cache
         return cone
     end
 end
 
 function setup_extra_data!(cone::HypoPowerMean{T}) where {T <: Real}
-    cone.tempw1 = zeros(T, cone.dim - 1)
+    cone.tempw = zeros(T, cone.dim - 1)
     return cone
 end
 
@@ -123,7 +122,7 @@ function update_hess(cone::HypoPowerMean)
     α = cone.α
     H = cone.hess.data
     ζ = cone.ζ
-    αwi = cone.tempw1
+    αwi = cone.tempw
     ζiϕ = cone.ϕ / ζ
     ζiϕ1 = ζiϕ - 1
     @. αwi = α ./ w
@@ -157,7 +156,7 @@ function hess_prod!(
     @views w = cone.point[2:end]
     α = cone.α
     ζ = cone.ζ
-    rwi = cone.tempw1
+    rwi = cone.tempw
     ζiϕ = cone.ϕ / ζ
 
     @inbounds for j in 1:size(arr, 2)
@@ -184,7 +183,7 @@ function dder3(cone::HypoPowerMean{T}, dir::AbstractVector{T}) where {T <: Real}
     α = cone.α
     ϕ = cone.ϕ
     ζ = cone.ζ
-    rwi = cone.tempw1
+    rwi = cone.tempw
     ζiϕ = ϕ / ζ
 
     @. rwi = r / w

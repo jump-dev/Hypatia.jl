@@ -68,7 +68,9 @@ function build(inst::ContractionJuMP{T}) where {T <: Float64}
 end
 
 function test_extra(inst::ContractionJuMP{T}, model::JuMP.Model) where T
-    @test JuMP.termination_status(model) == (inst.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
+    stat = JuMP.termination_status(model)
+    @test stat == (inst.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
+    return
 end
 
 # TODO below functions used for recovering lagrange polys are not numerically

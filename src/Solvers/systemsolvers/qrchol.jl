@@ -37,16 +37,16 @@ function setup_rhs3(
 end
 
 function solve_subsystem3(
-    syssolver::QRCholSystemSolver,
-    solver::Solver,
-    sol_sub::Point,
-    rhs_sub::Point,
+    syssolver::QRCholSystemSolver{T},
+    solver::Solver{T},
+    sol::Point{T},
+    rhs::Point{T},
     ) where {T <: Real}
     model = solver.model
-    copyto!(sol_sub.vec, rhs_sub.vec)
-    x = sol_sub.x
-    y = sol_sub.y
-    z = sol_sub.z
+    copyto!(sol.vec, rhs.vec)
+    x = sol.x
+    y = sol.y
+    z = sol.z
 
     copyto!(syssolver.QpbxGHbz, x)
     mul!(syssolver.QpbxGHbz, model.G', z, true, true)
@@ -54,7 +54,7 @@ function solve_subsystem3(
 
     if !iszero(model.p)
         ldiv!(solver.Ap_R', y)
-        sol_sub.vec[1:model.p] = y
+        @views copyto!(sol.vec[1:model.p], y)
 
         if !isempty(syssolver.Q2div)
             mul!(syssolver.GQ1x, syssolver.GQ1, y)
@@ -64,9 +64,8 @@ function solve_subsystem3(
     end
 
     if !isempty(syssolver.Q2div)
-        @views x_sub2 = copyto!(sol_sub.vec[(model.p + 1):model.n],
-            syssolver.Q2div)
-        inv_prod(syssolver.fact_cache, x_sub2)
+        @views x_sub2 = sol.vec[(model.p + 1):model.n]
+        ldiv!(x_sub2, syssolver.fact, syssolver.Q2div)
     end
 
     lmul!(solver.Ap_Q, x)
@@ -74,7 +73,7 @@ function solve_subsystem3(
     mul!(syssolver.Gx, model.G, x)
     block_hess_prod!.(syssolver.HGx_k, syssolver.Gx_k, model.cones)
 
-    @. z = syssolver.HGx - z
+    axpby!(true, syssolver.HGx, -1, z)
 
     if !iszero(model.p)
         copyto!(y, syssolver.Q1pbxGHbz)
@@ -82,7 +81,7 @@ function solve_subsystem3(
         ldiv!(solver.Ap_R, y)
     end
 
-    return sol_sub
+    return sol
 end
 
 function block_hess_prod!(
@@ -103,15 +102,20 @@ direct dense
 =#
 
 mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
-    lhs1::Symmetric{T, Matrix{T}}
+    lhs_sub::Symmetric{T, Matrix{T}}
+    lhs_sub_fact::Symmetric{T, Matrix{T}}
+    fact::Factorization{T}
+
     inv_hess_cones::Vector{Int}
     inv_sqrt_hess_cones::Vector{Int}
     hess_cones::Vector{Int}
     sqrt_hess_cones::Vector{Int}
+
     rhs_sub::Point{T}
     sol_sub::Point{T}
     sol_const::Point{T}
     rhs_const::Point{T}
+
     GQ1
     GQ2
     QpbxGHbz
@@ -128,13 +132,9 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     GQ2_k
     HGx_k
     Gx_k
-    fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}}
-    function QRCholDenseSystemSolver{T}(;
-        fact_cache::Union{DensePosDefCache{T}, DenseSymCache{T}} =
-            DensePosDefCache{T}(), # or DenseSymCache{T}()
-        ) where {T <: Real}
+
+    function QRCholDenseSystemSolver{T}() where {T <: Real}
         syssolver = new{T}()
-        syssolver.fact_cache = fact_cache
         return syssolver
     end
 end
@@ -148,7 +148,8 @@ function load(
     nmp = n - p
     cone_idxs = model.cone_idxs
 
-    syssolver.lhs1 = Symmetric(zeros(T, nmp, nmp), :U)
+    syssolver.lhs_sub = Symmetric(zeros(T, nmp, nmp), :U)
+    syssolver.lhs_sub_fact = zero(syssolver.lhs_sub)
 
     num_cones = length(cone_idxs)
     syssolver.inv_hess_cones = sizehint!(Int[], num_cones)
@@ -180,8 +181,6 @@ function load(
         syssolver.GQ1x_k = [view(syssolver.GQ1x, idxs, :) for idxs in cone_idxs]
     end
 
-    load_matrix(syssolver.fact_cache, syssolver.lhs1)
-
     setup_point_sub(syssolver, model)
 
     return syssolver
@@ -192,7 +191,7 @@ function update_lhs(
     solver::Solver{T},
     ) where {T <: Real}
     model = solver.model
-    lhs = syssolver.lhs1.data
+    lhs = syssolver.lhs_sub.data
 
     if !isempty(syssolver.Q2div)
         inv_hess_cones = empty!(syssolver.inv_hess_cones)
@@ -257,35 +256,18 @@ function update_lhs(
         end
     end
 
-    start_time = time()
-    # TODO refactor below
-    if !isempty(syssolver.lhs1) &&
-        !update_fact(syssolver.fact_cache, syssolver.lhs1)
-        # @warn("QRChol factorization failed")
-        if T <: LinearAlgebra.BlasReal &&
-            syssolver.fact_cache isa DensePosDefCache{T}
-            # @warn("switching QRChol solver from Cholesky to Bunch Kaufman")
-            syssolver.fact_cache = DenseSymCache{T}()
-            load_matrix(syssolver.fact_cache, syssolver.lhs1)
-        else
-            # attempt recovery
-            increase_diag!(syssolver.lhs1.data)
-        end
-        if !update_fact(syssolver.fact_cache, syssolver.lhs1)
-            # attempt recovery # TODO make more efficient
-            syssolver.lhs1 += sqrt(eps(T)) * I
-            if !update_fact(syssolver.fact_cache, syssolver.lhs1)
-                @warn("QRChol Bunch-Kaufman factorization failed after recovery")
-                @assert !any(isnan, syssolver.lhs1)
-            end
-        end
+    # TODO try equilibration, iterative refinement etc like posvx/sysvx
+    solver.time_upfact += @elapsed syssolver.fact =
+        posdef_fact_copy!(syssolver.lhs_sub_fact, syssolver.lhs_sub)
+
+    if !issuccess(syssolver.fact)
+        println("positive definite linear system factorization failed")
     end
-    solver.time_upfact += time() - start_time
 
     # update solution for fixed c,b,h part
     rhs_const = syssolver.rhs_const
-    for (k, cone_k) in enumerate(model.cones)
-        @inbounds @views h_k = model.h[model.cone_idxs[k]]
+    @inbounds for (k, cone_k) in enumerate(model.cones)
+        @views h_k = model.h[model.cone_idxs[k]]
         block_hess_prod!(rhs_const.z_views[k], h_k, cone_k)
     end
     solve_subsystem3(syssolver, solver, syssolver.sol_const, rhs_const)
