@@ -25,9 +25,9 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
 
     function PredOrCentStepper{T}(;
         use_adjustment::Bool = true,
-        use_curve_search::Bool = true,
+        use_curve_search::Bool = use_adjustment,
         max_cent_steps::Int = 4,
-        pred_prox_bound::T = T(0.05),
+        pred_prox_bound::T = T(0.0332), # from Alfonso solver
         use_pred_sum_prox::Bool = false,
         searcher_options...
         ) where {T <: Real}
