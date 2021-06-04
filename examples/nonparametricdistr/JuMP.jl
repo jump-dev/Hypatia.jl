@@ -55,10 +55,39 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     add_homog_spectral(exts[1], d, vcat(1.0 * epi, p), model)
 
     # convex constraints
+    val_p0s = T[]
     for ext in exts[2:end]
-        aff = vcat(get_val(p0, ext), p)
-        add_homog_spectral(ext, d, aff, model)
+        val_p0 = get_val(p0, ext)
+        push!(val_p0s, val_p0)
+        add_homog_spectral(ext, d, vcat(val_p0, p), model)
     end
 
+    # save for use in tests
+    model.ext[:exts] = exts
+    model.ext[:val_p0s] = val_p0s
+    model.ext[:p_var] = p
+
     return model
+end
+
+function test_extra(inst::NonparametricDistrJuMP{T}, model::JuMP.Model) where T
+    stat = JuMP.termination_status(model)
+    @test stat == MOI.OPTIMAL
+    (stat == MOI.OPTIMAL) || return
+
+    # check objective and constraints
+    tol = eps(T)^0.20
+    exts = model.ext[:exts]
+    val_p0s = model.ext[:val_p0s]
+    p_opt = JuMP.value.(model.ext[:p_var])
+    d = length(p_opt)
+    @test sum(p_opt) ≈ d atol=tol rtol=tol
+    # objective
+    obj_result = get_val(p_opt, exts[1])
+    @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
+    # convex constraints
+    for (i, ext) in enumerate(exts[2:end])
+        @test val_p0s[i] >= get_val(p_opt, ext) - tol
+    end
+    return
 end

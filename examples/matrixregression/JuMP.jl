@@ -113,24 +113,26 @@ function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64}
 end
 
 function test_extra(inst::MatrixRegressionJuMP{T}, model::JuMP.Model) where T
-    @test JuMP.termination_status(model) == MOI.OPTIMAL
-    if JuMP.termination_status(model) == MOI.OPTIMAL
-        # check objective value is correct
-        (Y, X) = (inst.Y, inst.X)
-        A_opt = JuMP.value.(model.ext[:A_var])
-        loss_mat = Y - X * A_opt
-        if inst.nuc_obj
-            loss = sum(svdvals(loss_mat))
-        else
-            loss = sum(abs2, loss_mat) / (2 * size(Y, 1))
-        end
-        obj_result = loss +
-            inst.lam_fro * norm(vec(A_opt), 2) +
-            inst.lam_nuc * sum(svdvals(A_opt)) +
-            inst.lam_las * norm(vec(A_opt), 1) +
-            inst.lam_glr * sum(norm, eachrow(A_opt)) +
-            inst.lam_glc * sum(norm, eachcol(A_opt))
-        tol = eps(T)^0.20
-        @test JuMP.objective_value(model) ≈ obj_result atol = tol rtol = tol
+    stat = JuMP.termination_status(model)
+    @test stat == MOI.OPTIMAL
+    (stat == MOI.OPTIMAL) || return
+
+    # check objective value is correct
+    tol = eps(T)^0.20
+    (Y, X) = (inst.Y, inst.X)
+    A_opt = JuMP.value.(model.ext[:A_var])
+    loss_mat = Y - X * A_opt
+    if inst.nuc_obj
+        loss = sum(svdvals(loss_mat))
+    else
+        loss = sum(abs2, loss_mat) / (2 * size(Y, 1))
     end
+    obj_result = loss +
+        inst.lam_fro * norm(vec(A_opt), 2) +
+        inst.lam_nuc * sum(svdvals(A_opt)) +
+        inst.lam_las * norm(vec(A_opt), 1) +
+        inst.lam_glr * sum(norm, eachrow(A_opt)) +
+        inst.lam_glc * sum(norm, eachcol(A_opt))
+    @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
+    return
 end

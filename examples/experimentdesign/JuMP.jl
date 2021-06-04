@@ -42,5 +42,21 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     JuMP.@objective(model, Min, epi)
     add_homog_spectral(inst.ext, q, vcat(1.0 * epi, Q_vec), model)
 
+    # save for use in tests
+    model.ext[:Q_var] = Q
+
     return model
+end
+
+function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where T
+    stat = JuMP.termination_status(model)
+    @test stat == MOI.OPTIMAL
+    (stat == MOI.OPTIMAL) || return
+
+    # check objective
+    tol = eps(T)^0.20
+    Q_opt = JuMP.value.(model.ext[:Q_var])
+    obj_result = get_val(Symmetric(Q_opt, :U), inst.ext)
+    @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
+    return
 end

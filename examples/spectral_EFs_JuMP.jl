@@ -13,8 +13,6 @@ struct VecNegGeomEFPow <: VecSpecExt end
 
 const VecNegGeomAll = Union{VecNegGeom, VecNegGeomEFExp, VecNegGeomEFPow}
 
-get_val(x::Vector{<:Real}, ::VecNegGeomAll) = exp(sum(log, x) / length(x))
-
 struct VecInv <: VecSpecExt end
 struct VecInvEF <: VecSpecExt end
 struct VecNegLog <: VecSpecExt end
@@ -27,18 +25,13 @@ struct VecPower12EF <: VecSpecExt p::Real end
 const VecSepSpec = Union{VecInv, VecNegLog, VecNegEntropy, VecPower12}
 const VecSepSpecEF = Union{VecInvEF, VecNegLogEF, VecNegEntropyEF, VecPower12EF}
 
-get_val(x::Vector{<:Real}, ext::VecSpecExt) = Cones.h_val(x, get_ssf(ext))
-
 abstract type MatSpecExt <: SpectralExtender end
 
 struct MatNegGeom <: MatSpecExt end
 struct MatNegGeomEFExp <: MatSpecExt end
 struct MatNegGeomEFPow <: MatSpecExt end
 
-const MatNegGeomEF = Union{MatNegGeomEFExp, MatNegGeomEFPow}
-
-get_vec_ef(::MatNegGeomEFExp) = VecNegGeomEFExp()
-get_vec_ef(::MatNegGeomEFPow) = VecNegGeomEFPow()
+const MatNegGeomAll = Union{MatNegGeom, MatNegGeomEFExp, MatNegGeomEFPow}
 
 struct MatInv <: MatSpecExt end
 struct MatInvEigOrd <: MatSpecExt end
@@ -58,17 +51,26 @@ const MatSepSpecEigOrd = Union{MatInvEigOrd, MatNegLogEigOrd,
 const SepSpecAll = Union{VecSepSpec, VecSepSpecEF, MatSepSpec, MatSepSpecEigOrd,
     MatInvDirect, MatNegLogDirect}
 
+get_vec_ef(::MatNegGeomEFExp) = VecNegGeomEFExp()
+get_vec_ef(::MatNegGeomEFPow) = VecNegGeomEFPow()
 get_vec_ef(::MatInvEigOrd) = VecInvEF()
 get_vec_ef(::MatNegLogEigOrd) = VecNegLogEF()
 get_vec_ef(::MatNegEntropyEigOrd) = VecNegEntropyEF()
 get_vec_ef(ext::MatPower12EigOrd) = VecPower12EF(ext.p)
 
-get_ssf(::Union{VecInv, VecInvEF, MatInv}) = Cones.InvSSF()
-get_ssf(::Union{VecNegLog, VecNegLogEF, MatNegLog}) = Cones.NegLogSSF()
-get_ssf(::Union{VecNegEntropy, VecNegEntropyEF, MatNegEntropy}) =
-    Cones.NegEntropySSF()
-get_ssf(ext::Union{VecPower12, VecPower12EF, MatPower12}) =
+get_ssf(::Union{VecInv, VecInvEF, MatInv, MatInvEigOrd, MatInvDirect}) =
+    Cones.InvSSF()
+get_ssf(::Union{VecNegLog, VecNegLogEF, MatNegLog, MatNegLogEigOrd,
+    MatNegLogDirect}) = Cones.NegLogSSF()
+get_ssf(::Union{VecNegEntropy, VecNegEntropyEF, MatNegEntropy,
+    MatNegEntropyEigOrd}) = Cones.NegEntropySSF()
+get_ssf(ext::Union{VecPower12, VecPower12EF, MatPower12, MatPower12EigOrd}) =
     Cones.Power12SSF(ext.p)
+
+get_val(x::Vector, ::VecNegGeomAll) = -exp(sum(log, x) / length(x))
+get_val(x::Vector, ext::VecSpecExt) = Cones.h_val(x, get_ssf(ext))
+get_val(X::Symmetric, ::MatNegGeomAll) = -exp(logdet(X) / size(X, 1))
+get_val(X::Symmetric, ext::MatSpecExt) = Cones.h_val(eigvals(X), get_ssf(ext))
 
 #=
 homogenizes separable spectral vector/matrix constraints
@@ -225,7 +227,7 @@ MatNegGeomEF
 (u, δ) ∈ NegGeomean
 =#
 function add_homog_spectral(
-    ext::MatNegGeomEF,
+    ext::Union{MatNegGeomEFExp, MatNegGeomEFPow},
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,

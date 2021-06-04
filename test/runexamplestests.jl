@@ -8,12 +8,12 @@ include(joinpath(@__DIR__, "../examples/Examples.jl"))
 using Main.Examples
 
 # script verbosity
-script_verbose = false
+script_verbose = true
 
 # default options to solvers
 default_options = (
-    verbose = false,
-    # verbose = true,
+    # verbose = false,
+    verbose = true,
     default_tol_relax = 10,
     # stepper = Solvers.CombinedStepper{Float64}(),
     # stepper = Solvers.PredOrCentStepper{Float64}(),
