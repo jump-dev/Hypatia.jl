@@ -22,6 +22,8 @@ end
 function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     p = inst.p
     @assert p >= 2
+    @assert is_domain_pos(inst.ext)
+
     q = div(p, 2)
     V = randn(T, q, p)
     A = randn(T, round(Int, sqrt(p - 1)), p)
@@ -54,7 +56,7 @@ function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where T
     (stat == MOI.OPTIMAL) || return
 
     # check objective
-    tol = eps(T)^0.20
+    tol = eps(T)^0.2
     Q_opt = JuMP.value.(model.ext[:Q_var])
     obj_result = get_val(Symmetric(Q_opt, :U), inst.ext)
     @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol

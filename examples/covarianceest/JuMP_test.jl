@@ -11,6 +11,9 @@ insts["minimal"] = [
     # tr power12
     ((3, MatPower12(1.5)),),
     ((3, MatPower12EigOrd(1.5)),),
+    # tr neg2sqrt
+    ((3, MatNeg2Sqrt()),),
+    ((3, MatNeg2SqrtEigOrd()),),
     ]
 insts["fast"] = [
     ((40, MatNegGeom()),),

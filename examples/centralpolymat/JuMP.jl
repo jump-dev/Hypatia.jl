@@ -1,5 +1,5 @@
 #=
-compute a maximum-determinant gram matrix of a polynomial
+minimize a spectral function of a gram matrix of a polynomial
 =#
 
 import DynamicPolynomials
@@ -44,7 +44,7 @@ function test_extra(inst::CentralPolyMatJuMP{T}, model::JuMP.Model) where T
     (stat == MOI.OPTIMAL) || return
 
     # check objective
-    tol = eps(T)^0.20
+    tol = eps(T)^0.2
     Q_opt = JuMP.value.(model.ext[:Q_var])
     obj_result = get_val(Symmetric(Q_opt, :U), inst.ext)
     @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol

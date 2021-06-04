@@ -18,6 +18,8 @@ end
 function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     d = inst.d
     @assert d >= 1
+    @assert is_domain_pos(inst.ext)
+
     p0 = randn(T, d, d)
     p0 = p0 * p0' + I / 2
     p0 ./= tr(p0)
@@ -57,7 +59,7 @@ function test_extra(inst::CovarianceEstJuMP{T}, model::JuMP.Model) where T
     (stat == MOI.OPTIMAL) || return
 
     # check objective
-    tol = eps(T)^0.20
+    tol = eps(T)^0.2
     p_opt = JuMP.value.(model.ext[:p_var])
     obj_result = get_val(Symmetric(p_opt, :U), inst.ext)
     @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol

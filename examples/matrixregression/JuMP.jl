@@ -118,7 +118,7 @@ function test_extra(inst::MatrixRegressionJuMP{T}, model::JuMP.Model) where T
     (stat == MOI.OPTIMAL) || return
 
     # check objective value is correct
-    tol = eps(T)^0.20
+    tol = eps(T)^0.2
     (Y, X) = (inst.Y, inst.X)
     A_opt = JuMP.value.(model.ext[:A_var])
     loss_mat = Y - X * A_opt

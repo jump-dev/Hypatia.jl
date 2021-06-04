@@ -39,7 +39,7 @@ function test_extra(inst::DiscreteMaxLikelihood{T}, model::JuMP.Model) where T
     (stat == MOI.OPTIMAL) || return
 
     # check objective and constraints
-    tol = eps(T)^0.20
+    tol = eps(T)^0.2
     freq = model.ext[:freq]
     p_opt = JuMP.value.(model.ext[:p_var])
     @test sum(p_opt) ≈ 1 atol=tol rtol=tol
