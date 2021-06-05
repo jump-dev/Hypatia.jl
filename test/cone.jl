@@ -757,7 +757,7 @@ function test_oracles(C::Type{Cones.WSOSInterpNonnegative{T, R}}) where {T, R}
     end
 end
 
-function test_oracles(C::Type{Cones.MyNewCone{T}}) where {T}
+function test_oracles(C::Type{Cones.MySpectrahedron{T}}) where {T}
     for (num_vars, halfdeg) in [(1, 1), (1, 3), (2, 1), (2, 2), (3, 1)]
         (d, Ps) = rand_interp(num_vars, halfdeg, Float64)
         L = size(Ps[1], 2)
