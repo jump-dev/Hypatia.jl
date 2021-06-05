@@ -61,7 +61,9 @@ function test_extra(inst::CovarianceEstJuMP{T}, model::JuMP.Model) where T
     # check objective
     tol = eps(T)^0.2
     p_opt = JuMP.value.(model.ext[:p_var])
-    obj_result = get_val(Symmetric(p_opt, :U), inst.ext)
+    λ = eigvals(Symmetric(p_opt, :U))
+    @test minimum(λ) >= -tol
+    obj_result = get_val(pos_only(λ), inst.ext)
     @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
     return
 end

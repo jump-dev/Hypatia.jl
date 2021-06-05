@@ -85,10 +85,10 @@ function test_extra(inst::NonparametricDistrJuMP{T}, model::JuMP.Model) where T
     p_opt = JuMP.value.(model.ext[:p_var])
     d = length(p_opt)
     @test sum(p_opt) ≈ 1 atol=tol rtol=tol
-    # objective
+    @test minimum(p_opt) >= -tol
+    p_opt = pos_only(p_opt)
     obj_result = get_val(p_opt, exts[1])
     @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
-    # convex constraints
     for (i, ext) in enumerate(exts[2:end])
         (val_p0, D) = con_aff[i]
         @test val_p0 >= get_val(D * p_opt, ext) - tol

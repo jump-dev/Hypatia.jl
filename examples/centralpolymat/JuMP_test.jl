@@ -2,13 +2,13 @@
 insts = OrderedDict()
 insts["minimal"] = [
     # rootdet
-    ((1, 2, MatNegGeom()),),
-    ((1, 2, MatNegGeomEFExp()),),
-    ((1, 2, MatNegGeomEFPow()),),
+    ((2, 2, MatNegGeom()),),
+    ((2, 2, MatNegGeomEFExp()),),
+    ((2, 2, MatNegGeomEFPow()),),
     # tr inv
-    ((1, 2, MatInv()),),
-    ((1, 2, MatInvEigOrd()),),
-    ((1, 2, MatInvDirect()),),
+    ((2, 2, MatInv()),),
+    ((2, 2, MatInvEigOrd()),),
+    ((2, 2, MatInvDirect()),),
     # tr neg2sqrt
     ((1, 2, MatNeg2Sqrt()),),
     ((1, 2, MatNeg2SqrtEigOrd()),),
@@ -29,6 +29,10 @@ insts["fast"] = [
     ((2, 6, MatNegEntropy()),),
     ((2, 7, MatNegLog()),),
     ((3, 2, MatNegEntropyEigOrd()),),
+    ((3, 2, MatNegExp1()),),
+    ((3, 2, MatNegExp1EigOrd()),),
+    ((3, 2, MatPower12Conj(1.5)),),
+    ((3, 2, MatPower12ConjEigOrd(1.5)),),
     ((3, 2, MatPower12EigOrd(1.5)),),
     ((3, 4, MatPower12(1.5)),),
     ((3, 4, MatNegGeom()),),
@@ -54,6 +58,10 @@ insts["various"] = [
     ((3, 6, MatNegEntropy()),),
     ((3, 7, MatNegLog()),),
     ((3, 5, MatPower12(1.5)),),
+    ((3, 5, MatNegExp1()),),
+    ((3, 4, MatPower12Conj(1.5)),),
+    ((5, 2, MatNegExp1EigOrd()),),
+    ((5, 2, MatPower12ConjEigOrd(1.5)),),
     ((5, 3, MatInvDirect()),),
     ((5, 3, MatNegLogDirect()),),
     ((8, 3, MatNegGeom()),),

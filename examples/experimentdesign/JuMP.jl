@@ -58,7 +58,9 @@ function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where T
     # check objective
     tol = eps(T)^0.2
     Q_opt = JuMP.value.(model.ext[:Q_var])
-    obj_result = get_val(Symmetric(Q_opt, :U), inst.ext)
+    λ = eigvals(Symmetric(Q_opt, :U))
+    @test minimum(λ) >= -tol
+    obj_result = get_val(pos_only(λ), inst.ext)
     @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
     return
 end
