@@ -2,19 +2,6 @@
 common code for examples
 =#
 
-using Test
-import Random
-using LinearAlgebra
-using Printf
-import DataFrames
-import CSV
-
-import Hypatia
-import Hypatia.PolyUtils
-import Hypatia.Cones
-import Hypatia.Models
-import Hypatia.Solvers
-
 abstract type ExampleInstance{T <: Real} end
 
 # this is a workaround for randn's lack of support for BigFloat

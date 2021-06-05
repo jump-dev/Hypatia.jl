@@ -51,7 +51,7 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
     halfdeg = div(inst.deg + 1, 2)
     (U, _, Ps, V, w) = PolyUtils.interpolate(domain, halfdeg,
         calc_V = true, get_quadr = true)
-    F = qr!(Array(V'), Val(true))
+    F = qr!(Array(V'), ColumnNorm())
     V_X = PolyUtils.make_chebyshev_vandermonde(X, 2halfdeg)
     X_pts_polys = (F \ V_X')'
 

@@ -66,7 +66,7 @@ function build(inst::MatrixRegressionJuMP{T}) where {T <: Float64}
     else
         if data_n > data_p
             # dimension reduction via QR
-            F = qr(X, Val(true))
+            F = qr(X, ColumnNorm())
             loss_mat = (F.Q' * Y)[1:data_p, :] - F.R[1:data_p, 1:data_p] *
                 F.P' * A
         end

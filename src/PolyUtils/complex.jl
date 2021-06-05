@@ -47,7 +47,7 @@ function interpolate(
     # select subset of points to maximize abs(det(V)) in heuristic QR-based
     # procedure (analogous to real case)
     V = [b(z) for z in samples, b in V_basis]
-    VF = qr(Matrix(transpose(V)), Val(true))
+    VF = qr(Matrix(transpose(V)), ColumnNorm())
     keep = VF.p[1:U]
     points = samples[keep]
     V = V[keep, :]

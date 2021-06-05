@@ -4,6 +4,11 @@ preprocessing and initial point finding functions for interior point algorithms
 
 MatrixyAG = Union{AbstractMatrix, UniformScaling}
 
+# delete later, affects qr. see https://github.com/JuliaLang/julia/pull/40623
+if VERSION < v"1.7.0-DEV.1188"
+    const ColumnNorm = Val{true}
+end
+
 # rescale the rows and columns of the conic data to get an equivalent conic problem
 function rescale_data(solver::Solver{T}) where {T <: Real}
     solver.rescale || return false
@@ -109,12 +114,12 @@ function find_initial_x(
             @warn("using dense factorization of [A; G] in preprocessing and " *
                 "initial point finding because sparse factorization for number " *
                 "type $T is not supported by SuiteSparse packages")
-            AG_fact = qr!(Matrix(AG), Val(true))
+            AG_fact = qr!(Matrix(AG), ColumnNorm())
         else
             AG_fact = qr(AG, tol = solver.init_tol_qr)
         end
     else
-        AG_fact = qr!(AG, Val(true))
+        AG_fact = qr!(AG, ColumnNorm())
     end
     AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
 
@@ -214,12 +219,12 @@ function find_initial_y(
             @warn("using dense factorization of A' in preprocessing and initial " *
                 "point finding because sparse factorization for number type $T " *
                 "is not supported by SuiteSparse packages")
-            Ap_fact = qr!(Matrix(A'), Val(true))
+            Ap_fact = qr!(Matrix(A'), ColumnNorm())
         else
             Ap_fact = qr(sparse(A'), tol = solver.init_tol_qr)
         end
     else
-        Ap_fact = qr!(Matrix(A'), Val(true))
+        Ap_fact = qr!(Matrix(A'), ColumnNorm())
     end
     Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
 

@@ -350,7 +350,7 @@ function choose_interp_pts(
         return (V, 1:U, T[])
     end
 
-    F = qr!(Array(V'), Val(true))
+    F = qr!(Array(V'), ColumnNorm())
     keep_pts = F.p[1:U]
     V = V[keep_pts, :]
 

@@ -64,7 +64,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64}
     free_dom = PolyUtils.FreeDomain{T}(n)
     (U, points, Ps, V) = PolyUtils.interpolate(free_dom,
         halfdeg, calc_V = true)
-    F = qr!(Array(V'), Val(true)) # TODO reuse QR parts
+    F = qr!(Array(V'), ColumnNorm()) # TODO reuse QR parts
     V_X = PolyUtils.make_chebyshev_vandermonde(X, 2halfdeg)
     X_points_polys = F \ V_X'
 
