@@ -6,5 +6,6 @@ matrixcompletion_insts = [
 
 insts = OrderedDict()
 insts["nat"] = (nothing, matrixcompletion_insts)
-insts["ext"] = (:SOCExpPSD, matrixcompletion_insts)
+insts["extEP"] = (:ExpPSD, matrixcompletion_insts)
+insts["extSEP"] = (:SOCExpPSD, matrixcompletion_insts)
 return (MatrixCompletionJuMP, insts)

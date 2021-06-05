@@ -38,10 +38,6 @@ examples_params = Dict(
         [:m, :k], [2, 1],
         [:SEP,], [:n_SEP, :q_nat]
         ),
-    "nearestpsd" => (
-        [:compl, :k], [2, 1],
-        [:SEP,], [:n_nat, :q_SEP]
-        ),
     "polymin" => (
         [:m, :k], [1, 2],
         [:SEP,], [:nu_nat, :n_nat, :q_SEP]
