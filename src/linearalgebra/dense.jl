@@ -145,12 +145,12 @@ function nonsymm_fact_copy!(
     mat::Matrix{T},
     ) where {T <: Real}
     copyto!(mat2, mat)
-    fact = lu!(mat2, Val(true), check = false)
+    fact = lu!(mat2, check = false)
 
     if !issuccess(fact)
         copyto!(mat2, mat)
         increase_diag!(mat2)
-        fact = lu!(mat2, Val(true), check = false)
+        fact = lu!(mat2, check = false)
     end
 
     return fact
@@ -165,7 +165,7 @@ symm_fact!(A::Symmetric{T, Matrix{T}}) where {T <: BlasReal} =
     bunchkaufman!(A, true, check = false)
 
 symm_fact!(A::Symmetric{T, Matrix{T}}) where {T <: Real} =
-    lu!(A, Val(true), check = false)
+    lu!(A, check = false)
 
 function symm_fact_copy!(
     mat2::Symmetric{T, Matrix{T}},
@@ -189,7 +189,7 @@ NOTE pivoted seems slower than BunchKaufman
 =#
 
 posdef_fact!(A::Symmetric{T, Matrix{T}}) where {T <: Real} =
-    cholesky!(A, Val(false), check = false)
+    cholesky!(A, check = false)
 
 function posdef_fact_copy!(
     mat2::Symmetric{T, Matrix{T}},

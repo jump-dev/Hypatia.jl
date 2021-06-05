@@ -3,7 +3,24 @@ Hypatia examples and script utilities.
 """
 module Examples
 
+using LinearAlgebra
+# delete later, affects qr. see https://github.com/JuliaLang/julia/pull/40623
+if VERSION < v"1.7.0-DEV.1188"
+    const ColumnNorm = Val{true}
+end
+
+using Test
+import Random
+using Printf
+import DataFrames
+import CSV
 import DataStructures: OrderedDict
+
+import Hypatia
+import Hypatia.PolyUtils
+import Hypatia.Cones
+import Hypatia.Models
+import Hypatia.Solvers
 
 include("common.jl")
 include("common_native.jl")
