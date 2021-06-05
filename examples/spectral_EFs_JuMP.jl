@@ -116,17 +116,19 @@ get_ssf(ext::Union{VecPower12, VecPower12EF, VecPower12Conj, VecPower12ConjEF,
     MatPower12, MatPower12EigOrd, MatPower12Conj, MatPower12ConjEigOrd}) =
     Cones.Power12SSF(ext.p)
 
-get_val(x::Vector, ::VecNegGeomAll) = -exp(sum(log, x) / length(x))
-get_val(X::Symmetric, ::MatNegGeomAll) = -exp(logdet(X) / size(X, 1))
-get_val(x::Vector, ext::VecSepSpecPrimAll) = Cones.h_val(x, get_ssf(ext))
-get_val(x::Vector, ext::VecSepSpecDualAll) = Cones.h_conj(x, get_ssf(ext))
-get_val(X::Symmetric, ext::MatSepSpecPrimAll) =
-    Cones.h_val(eigvals(X), get_ssf(ext))
-get_val(X::Symmetric, ext::MatSepSpecDualAll) =
-    Cones.h_conj(eigvals(X), get_ssf(ext))
-
 is_domain_pos(::SpectralExtender) = true
-is_domain_pos(ext::Union{VecSepSpecDualAll, MatSepSpecDualAll}) = Cones.h_conj_dom_pos(get_ssf(ext))
+is_domain_pos(ext::Union{VecSepSpecDualAll, MatSepSpecDualAll}) =
+    Cones.h_conj_dom_pos(get_ssf(ext))
+
+get_val(x::Vector, ::Union{VecNegGeomAll, MatNegGeomAll}) =
+    -exp(sum(log, x) / length(x))
+get_val(x::Vector, ext::Union{VecSepSpecPrimAll, MatSepSpecPrimAll}) =
+    Cones.h_val(x, get_ssf(ext))
+get_val(x::Vector, ext::Union{VecSepSpecDualAll, MatSepSpecDualAll}) =
+    Cones.h_conj(x, get_ssf(ext))
+
+pos_only(x::Vector{T}, minval::T = eps(T)) where {T <: Real} =
+    [(x_i < minval ? minval : x_i) for x_i in x]
 
 #=
 homogenizes separable spectral vector/matrix constraints

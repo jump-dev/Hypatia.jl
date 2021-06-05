@@ -2607,7 +2607,7 @@ end
 function indirect1(T; options...)
     tol = 1e-3
     Random.seed!(1)
-    (n, p) = (4, 2)
+    (n, p) = (3, 2)
     c = rand(T(0):T(9), n)
     A = rand(T(-9):T(9), p, n)
     b = vec(sum(A, dims = 2))
