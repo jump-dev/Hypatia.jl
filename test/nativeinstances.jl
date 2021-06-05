@@ -2611,7 +2611,7 @@ function indirect1(T; options...)
     c = rand(T(0):T(9), n)
     A = rand(T(-9):T(9), p, n)
     b = vec(sum(A, dims = 2))
-    G = LinearMap(SparseMatrixCSC(-one(T) * I, n, n))
+    G = LinearMap(SparseMatrixCSC(-one(T) * I, n, n), isposdef = false)
     h = zeros(T, n)
     cones = Cone{T}[Cones.Nonnegative{T}(n)]
 
