@@ -7,5 +7,6 @@ doptimaldesign_insts = [
 
 insts = OrderedDict()
 insts["nat"] = (nothing, doptimaldesign_insts)
-insts["ext"] = (:SOCExpPSD, doptimaldesign_insts)
+insts["extEP"] = (:ExpPSD, doptimaldesign_insts)
+insts["extSEP"] = (:SOCExpPSD, doptimaldesign_insts)
 return (DOptimalDesignJuMP, insts)
