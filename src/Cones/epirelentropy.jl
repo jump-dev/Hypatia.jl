@@ -23,9 +23,12 @@ mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
     hess_updated::Bool
     inv_hess_updated::Bool
     inv_hess_aux_updated::Bool
+    hess_fact_updated::Bool
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, SparseMatrixCSC{T, Int}}
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
 
     lwv::Vector{T}
     tau::Vector{T}
@@ -57,9 +60,8 @@ mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
 end
 
 reset_data(cone::EpiRelEntropy) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_aux_updated = false)
-
-use_sqrt_hess_oracles(cone::EpiRelEntropy) = false
+    cone.hess_updated = cone.inv_hess_updated = cone.inv_hess_aux_updated =
+    cone.hess_fact_updated = false)
 
 function setup_extra_data!(cone::EpiRelEntropy{T}) where {T <: Real}
     w_dim = cone.w_dim
