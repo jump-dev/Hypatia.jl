@@ -34,7 +34,7 @@ insts["various"] = [
     ((100, MatNegGeom()),),
     ((50, MatNegGeomEFExp()),),
     ((30, MatNegGeomEFPow()),),
-    ((200, MatInv()),),
+    ((100, MatInv()),),
     ((12, MatInvEigOrd()),),
     ((150, MatInvDirect()),),
     ((100, MatNegLog()),),
