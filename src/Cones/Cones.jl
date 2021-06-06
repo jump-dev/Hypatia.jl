@@ -185,8 +185,10 @@ end
 reset_data(cone::Cone) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
-function use_sqrt_hess_oracles(cone::Cone)
+# decide whether to use sqrt oracles
+function use_sqrt_hess_oracles(arr_dim::Int, cone::Cone)
     if !cone.hess_fact_updated
+        (arr_dim < dimension(cone)) && return false # array is small
         update_hess_fact(cone) || return false
     end
     return (cone.hess_fact isa Cholesky)

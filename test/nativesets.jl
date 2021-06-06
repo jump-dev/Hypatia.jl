@@ -89,7 +89,6 @@ inst_cones_many = [
     "epinorminf5",
     "epinorminf6",
     "epinorminf7",
-    "epinorminf8",
     "epinormeucl1",
     "epinormeucl2",
     "epinormeucl3",

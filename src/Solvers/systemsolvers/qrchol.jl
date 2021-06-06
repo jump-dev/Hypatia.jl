@@ -106,32 +106,28 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     lhs_sub_fact::Symmetric{T, Matrix{T}}
     fact::Factorization{T}
 
-    inv_hess_cones::Vector{Int}
-    inv_sqrt_hess_cones::Vector{Int}
-    hess_cones::Vector{Int}
-    sqrt_hess_cones::Vector{Int}
-
     rhs_sub::Point{T}
     sol_sub::Point{T}
     sol_const::Point{T}
     rhs_const::Point{T}
 
-    GQ1
-    GQ2
-    QpbxGHbz
-    Q1pbxGHbz
-    Q2div
-    GQ1x
-    HGQ1x
-    HGQ2
-    Gx
-    HGx
-    HGQ1x_k
-    GQ1x_k
-    HGQ2_k
-    GQ2_k
-    HGx_k
-    Gx_k
+    use_sqrt_hess_cones::Vector{Bool}
+    GQ1::AbstractMatrix{T}
+    GQ2::AbstractMatrix{T}
+    QpbxGHbz::Vector{T}
+    Q1pbxGHbz::SubArray
+    Q2div::SubArray
+    GQ1x::Vector{T}
+    HGQ1x::Vector{T}
+    HGQ2::Matrix{T}
+    Gx::Vector{T}
+    HGx::Vector{T}
+    HGQ1x_k::Vector
+    GQ1x_k::Vector
+    HGQ2_k::Vector
+    GQ2_k::Vector
+    HGx_k::Vector
+    Gx_k::Vector
 
     function QRCholDenseSystemSolver{T}() where {T <: Real}
         syssolver = new{T}()
@@ -151,11 +147,7 @@ function load(
     syssolver.lhs_sub = Symmetric(zeros(T, nmp, nmp), :U)
     syssolver.lhs_sub_fact = zero(syssolver.lhs_sub)
 
-    num_cones = length(cone_idxs)
-    syssolver.inv_hess_cones = sizehint!(Int[], num_cones)
-    syssolver.inv_sqrt_hess_cones = sizehint!(Int[], num_cones)
-    syssolver.hess_cones = sizehint!(Int[], num_cones)
-    syssolver.sqrt_hess_cones = sizehint!(Int[], num_cones)
+    syssolver.use_sqrt_hess_cones = falses(length(cone_idxs))
 
     # very inefficient method used for sparse G * QRSparseQ
     # see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
@@ -191,78 +183,9 @@ function update_lhs(
     solver::Solver{T},
     ) where {T <: Real}
     model = solver.model
-    lhs = syssolver.lhs_sub.data
 
-    if !isempty(syssolver.Q2div)
-        inv_hess_cones = empty!(syssolver.inv_hess_cones)
-        inv_sqrt_hess_cones = empty!(syssolver.inv_sqrt_hess_cones)
-        hess_cones = empty!(syssolver.hess_cones)
-        sqrt_hess_cones = empty!(syssolver.sqrt_hess_cones)
-
-        # update hessian factorizations and partition of cones
-        for (k, cone_k) in enumerate(model.cones)
-            if Cones.use_sqrt_hess_oracles(cone_k)
-                cones_list = Cones.use_dual_barrier(cone_k) ?
-                    inv_sqrt_hess_cones : sqrt_hess_cones
-            else
-                cones_list = Cones.use_dual_barrier(cone_k) ?
-                    inv_hess_cones : hess_cones
-            end
-            push!(cones_list, k)
-        end
-
-        # do inv_hess and inv_sqrt_hess cones
-        if isempty(inv_sqrt_hess_cones)
-            lhs .= 0
-        else
-            idx = 1
-            for k in inv_sqrt_hess_cones
-                arr_k = syssolver.GQ2_k[k]
-                q_k = size(arr_k, 1)
-                @views prod_k = syssolver.HGQ2[idx:(idx + q_k - 1), :]
-                Cones.inv_sqrt_hess_prod!(prod_k, arr_k, model.cones[k])
-                idx += q_k
-            end
-            @views HGQ2_sub = syssolver.HGQ2[1:(idx - 1), :]
-            outer_prod!(HGQ2_sub, lhs, true, false)
-        end
-
-        for k in inv_hess_cones
-            arr_k = syssolver.GQ2_k[k]
-            prod_k = syssolver.HGQ2_k[k]
-            Cones.inv_hess_prod!(prod_k, arr_k, model.cones[k])
-            mul!(lhs, arr_k', prod_k, true, true)
-        end
-
-        # do hess and sqrt_hess cones
-        if !isempty(sqrt_hess_cones)
-            idx = 1
-            for k in sqrt_hess_cones
-                arr_k = syssolver.GQ2_k[k]
-                q_k = size(arr_k, 1)
-                @views prod_k = syssolver.HGQ2[idx:(idx + q_k - 1), :]
-                Cones.sqrt_hess_prod!(prod_k, arr_k, model.cones[k])
-                idx += q_k
-            end
-            @views HGQ2_sub = syssolver.HGQ2[1:(idx - 1), :]
-            outer_prod!(HGQ2_sub, lhs, true, true)
-        end
-
-        for k in hess_cones
-            arr_k = syssolver.GQ2_k[k]
-            prod_k = syssolver.HGQ2_k[k]
-            Cones.hess_prod!(prod_k, arr_k, model.cones[k])
-            mul!(lhs, arr_k', prod_k, true, true)
-        end
-    end
-
-    # TODO try equilibration, iterative refinement etc like posvx/sysvx
-    solver.time_upfact += @elapsed syssolver.fact =
-        posdef_fact_copy!(syssolver.lhs_sub_fact, syssolver.lhs_sub)
-
-    if !issuccess(syssolver.fact)
-        println("positive definite linear system factorization failed")
-    end
+    # update LHS and factorization
+    isempty(syssolver.Q2div) || update_lhs_fact(syssolver, solver)
 
     # update solution for fixed c,b,h part
     rhs_const = syssolver.rhs_const
@@ -273,4 +196,62 @@ function update_lhs(
     solve_subsystem3(syssolver, solver, syssolver.sol_const, rhs_const)
 
     return syssolver
+end
+
+function update_lhs_fact(
+    syssolver::QRCholDenseSystemSolver{T},
+    solver::Solver{T},
+    ) where {T <: Real}
+    model = solver.model
+    lhs = syssolver.lhs_sub.data
+    cones = model.cones
+    use_sqrt_hess_cones = syssolver.use_sqrt_hess_cones
+    HGQ2 = syssolver.HGQ2
+    GQ2_k = syssolver.GQ2_k
+    HGQ2_k = syssolver.HGQ2_k
+
+    nmp = size(lhs, 1)
+    @inbounds for k in eachindex(cones)
+        use_sqrt_hess_cones[k] = Cones.use_sqrt_hess_oracles(nmp, cones[k])
+    end
+
+    # sqrt cones
+    if any(use_sqrt_hess_cones)
+        idx = 1
+        @inbounds for k in eachindex(cones)
+            use_sqrt_hess_cones[k] || continue
+            cone_k = cones[k]
+            arr_k = GQ2_k[k]
+            q_k = size(arr_k, 1)
+            @views prod_k = HGQ2[idx:(idx + q_k - 1), :]
+            if Cones.use_dual_barrier(cone_k)
+                Cones.inv_sqrt_hess_prod!(prod_k, arr_k, cone_k)
+            else
+                Cones.sqrt_hess_prod!(prod_k, arr_k, cone_k)
+            end
+            idx += q_k
+        end
+        @views outer_prod!(HGQ2[1:(idx - 1), :], lhs, true, false)
+    else
+        fill!(lhs, 0)
+    end
+
+    # not sqrt cones
+    @inbounds for k in eachindex(cones)
+        use_sqrt_hess_cones[k] && continue
+        arr_k = GQ2_k[k]
+        prod_k = HGQ2_k[k]
+        block_hess_prod!(prod_k, arr_k, cones[k])
+        mul!(lhs, arr_k', prod_k, true, true)
+    end
+
+    # TODO try equilibration, iterative refinement etc like posvx/sysvx
+    solver.time_upfact += @elapsed syssolver.fact =
+        posdef_fact_copy!(syssolver.lhs_sub_fact, syssolver.lhs_sub)
+
+    if !issuccess(syssolver.fact)
+        println("positive definite linear system factorization failed")
+    end
+
+    return
 end

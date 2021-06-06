@@ -60,7 +60,7 @@ reset_data(cone::EpiNormInf) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated =
     cone.inv_hess_aux_updated = false)
 
-use_sqrt_hess_oracles(cone::EpiNormInf) = false
+use_sqrt_hess_oracles(::Int, cone::EpiNormInf) = false
 
 function setup_extra_data!(
     cone::EpiNormInf{T, R},
