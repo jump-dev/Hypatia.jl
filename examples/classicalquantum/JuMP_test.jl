@@ -21,7 +21,7 @@ insts["various"] = [
     ((200, true, false),),
     ((15, false, true), nothing, (default_tol_relax = 100,)),
     ((300, false, false),),
-    ((300, true, false),),
+    ((250, true, false),),
     ((17, false, true), nothing, (default_tol_relax = 1000,)),
     ]
 return (ClassicalQuantum, insts)

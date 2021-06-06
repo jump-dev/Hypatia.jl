@@ -31,10 +31,10 @@ insts["fast"] = [
     ((10, MatPower12EigOrd(1.5)),),
     ]
 insts["various"] = [
-    ((200, MatNegGeom()),),
+    ((100, MatNegGeom()),),
     ((50, MatNegGeomEFExp()),),
     ((30, MatNegGeomEFPow()),),
-    ((350, MatInv()),),
+    ((200, MatInv()),),
     ((12, MatInvEigOrd()),),
     ((150, MatInvDirect()),),
     ((100, MatNegLog()),),
