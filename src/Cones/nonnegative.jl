@@ -35,7 +35,7 @@ use_dual_barrier(::Nonnegative) = false
 reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = false)
 
-use_sqrt_hess_oracles(cone::Nonnegative) = true
+use_sqrt_hess_oracles(::Int, cone::Nonnegative) = true
 
 get_nu(cone::Nonnegative) = cone.dim
 

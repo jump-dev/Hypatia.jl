@@ -37,7 +37,7 @@ use_dual_barrier(::EpiNormEucl) = false
 reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = false)
 
-use_sqrt_hess_oracles(cone::EpiNormEucl) = true
+use_sqrt_hess_oracles(::Int, cone::EpiNormEucl) = true
 
 get_nu(cone::EpiNormEucl) = 2
 

@@ -51,7 +51,7 @@ use_dual_barrier(::PosSemidefTri) = false
 reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = false)
 
-use_sqrt_hess_oracles(cone::PosSemidefTri) = true
+use_sqrt_hess_oracles(::Int, cone::PosSemidefTri) = true
 
 function setup_extra_data!(
     cone::PosSemidefTri{T, R},

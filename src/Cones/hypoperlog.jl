@@ -19,9 +19,12 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
     grad_updated::Bool
     hess_updated::Bool
     inv_hess_updated::Bool
+    hess_fact_updated::Bool
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
+    hess_fact_mat::Symmetric{T, Matrix{T}}
+    hess_fact::Factorization{T}
 
     ϕ::T
     ζ::T
@@ -40,9 +43,7 @@ mutable struct HypoPerLog{T <: Real} <: Cone{T}
 end
 
 reset_data(cone::HypoPerLog) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = false)
-
-use_sqrt_hess_oracles(cone::HypoPerLog) = false
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
 
 function setup_extra_data!(cone::HypoPerLog{T}) where {T <: Real}
     d = cone.dim - 2

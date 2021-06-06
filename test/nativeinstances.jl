@@ -864,21 +864,6 @@ end
 
 function epinorminf5(T; options...)
     tol = test_tol(T)
-    Random.seed!(1)
-    c = T[1, 0, 0, 0, 0, 0]
-    A = rand(T(-9):T(9), 6, 6)
-    b = vec(sum(A, dims = 2))
-    G = rand(T, 6, 6)
-    h = vec(sum(G, dims = 2))
-    cones = Cone{T}[Cones.EpiNormInf{T, T}(6, use_dual = true)]
-
-    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
-    @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 1 atol=tol rtol=tol
-end
-
-function epinorminf6(T; options...)
-    tol = test_tol(T)
     c = T[0, -1, -1, -1, -1]
     A = T[1 0 0 0 0; 0 1 0 0 0; 0 0 0 1 0; 0 0 0 0 1]
     b = T[2, 0, 1, 0]
@@ -892,7 +877,7 @@ function epinorminf6(T; options...)
     @test r.x ≈ [2, 0, 2, 1, 0] atol=tol rtol=tol
 end
 
-function epinorminf7(T; options...)
+function epinorminf6(T; options...)
     tol = test_tol(T)
     c = T[1, 0, 0, 0, 0, 0, 0]
     A = zeros(T, 0, 7)
@@ -910,7 +895,7 @@ function epinorminf7(T; options...)
     end
 end
 
-function epinorminf8(T; options...)
+function epinorminf7(T; options...)
     tol = eps(T) ^ 0.2
     c = T[1, -1, 1, 1]
     A = T[1 0 0 0 ; 0 1 0 0; 0 0 1 0]

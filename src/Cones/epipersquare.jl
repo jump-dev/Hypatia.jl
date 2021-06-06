@@ -45,7 +45,7 @@ reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated =
     cone.hess_updated = cone.inv_hess_updated = cone.sqrt_hess_prod_updated =
     cone.inv_sqrt_hess_prod_updated = false)
 
-use_sqrt_hess_oracles(cone::EpiPerSquare) = true
+use_sqrt_hess_oracles(::Int, cone::EpiPerSquare) = true
 
 get_nu(cone::EpiPerSquare) = 2
 
