@@ -19,8 +19,8 @@ include(joinpath(@__DIR__, "spawn.jl"))
 # path to write results DataFrame to CSV
 results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
 
-setup_model_anyway = true # keep setting up larger models even if last solve was killed
-# setup_model_anyway = false
+# setup_model_anyway = true # keep setting up larger models even if last solve was killed
+setup_model_anyway = false
 
 verbose = true # make solvers print output
 # verbose = false
