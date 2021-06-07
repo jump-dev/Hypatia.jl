@@ -2,14 +2,12 @@
 densityest_n_ds = [
     [
     (1, 3), # compile run
-    (1, 50),
-    (1, 100),
+    (1, 125),
     (1, 250),
     (1, 500),
     (1, 1000),
-    (1, 1500),
     (1, 2000),
-    (1, 2500),
+    (1, 3000),
     ],
     [
     (2, 2), # compile run
@@ -36,11 +34,6 @@ densityest_n_ds = [
     (3, 2), # compile run
     (8, 2),
     (8, 3),
-    ],
-    [
-    (3, 2), # compile run
-    (16, 1),
-    (16, 2),
     ],
     ]
 densityest_insts(use_nat::Bool) = [
