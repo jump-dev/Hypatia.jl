@@ -20,8 +20,7 @@ insts["various"] = [
     ((4, 2, 10, false, true, false),),
     ((4, 2, 10, true, false, false),),
     ((4, 4, 5, false, true, false),),
-    ((4, 4, 5, true, false, false),),
-    ((4, 3, 6, false, true, false),),
     ((4, 3, 6, true, false, false),),
+    ((4, 3, 6, false, true, false),),
     ]
 return (NearestPolyMatJuMP, insts)
