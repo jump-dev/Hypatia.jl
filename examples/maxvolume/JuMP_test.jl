@@ -27,6 +27,5 @@ insts["various"] = [
     ((2000, true, false),),
     ((2000, false, true),),
     ((2000, true, false), :SOCExpPSD),
-    ((2000, false, true), :SOCExpPSD),
     ]
 return (MaxVolumeJuMP, insts)

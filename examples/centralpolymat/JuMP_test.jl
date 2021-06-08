@@ -56,7 +56,7 @@ insts["various"] = [
     ((3, 6, MatInvDirect()),),
     ((3, 5, MatNegLogDirect()),),
     ((3, 6, MatNegEntropy()),),
-    ((3, 7, MatNegLog()),),
+    ((3, 6, MatNegLog()),),
     ((3, 5, MatPower12(1.5)),),
     ((3, 5, MatNegExp1()),),
     ((3, 4, MatPower12Conj(1.5)),),
@@ -64,7 +64,7 @@ insts["various"] = [
     ((5, 2, MatPower12ConjEigOrd(1.5)),),
     ((5, 3, MatInvDirect()),),
     ((5, 3, MatNegLogDirect()),),
-    ((8, 3, MatNegGeom()),),
-    ((8, 3, MatInv()),),
+    ((6, 3, MatNegGeom()),),
+    ((6, 3, MatInv()),),
     ]
 return (CentralPolyMatJuMP, insts)

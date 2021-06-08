@@ -33,8 +33,8 @@ insts["various"] = [
     ((:CS16ex13,),),
     ((:MCW19ex1_mod,),),
     ((:MCW19ex8,),),
-    ((3, 2),),
-    ((3, 2), :SOCExpPSD),
+    ((6, 3),),
+    ((6, 3), :SOCExpPSD),
     ((20, 3), nothing, relaxed_tols),
     ((20, 3), :SOCExpPSD, relaxed_tols),
     ]

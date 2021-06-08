@@ -31,17 +31,17 @@ insts["fast"] = [
     ((10, MatPower12EigOrd(1.5)),),
     ]
 insts["various"] = [
-    ((200, MatNegGeom()),),
+    ((100, MatNegGeom()),),
     ((50, MatNegGeomEFExp()),),
     ((30, MatNegGeomEFPow()),),
-    ((350, MatInv()),),
+    ((100, MatInv()),),
     ((12, MatInvEigOrd()),),
-    ((150, MatInvDirect()),),
+    ((50, MatInvDirect()),),
     ((100, MatNegLog()),),
     ((18, MatNegLogEigOrd()), nothing, (default_tol_relax = 1000,)),
     ((80, MatNegLogDirect()),),
-    ((300, MatNegEntropy()),),
-    ((14, MatNegEntropyEigOrd())),
+    ((75, MatNegEntropy()),),
+    ((14, MatNegEntropyEigOrd()),),
     ((30, MatPower12(1.5)),),
     ((6, MatPower12EigOrd(1.5)),),
     ]

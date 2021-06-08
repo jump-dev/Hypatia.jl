@@ -51,7 +51,7 @@ insts["fast"] = [
     ]
 insts["various"] = [
     ((4, 5, true, true),),
-    ((4, 5, true, false),),
+    ((3, 5, true, false),),
     ((4, 5, false, true),),
     ((4, 5, false, false),),
     ((:butcher, 2, true, true),),
