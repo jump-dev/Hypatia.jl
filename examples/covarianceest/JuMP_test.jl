@@ -40,7 +40,7 @@ insts["various"] = [
     ((100, MatNegLog()),),
     ((18, MatNegLogEigOrd()), nothing, (default_tol_relax = 1000,)),
     ((80, MatNegLogDirect()),),
-    ((150, MatNegEntropy()),),
+    ((75, MatNegEntropy()),),
     ((14, MatNegEntropyEigOrd()),),
     ((30, MatPower12(1.5)),),
     ((6, MatPower12EigOrd(1.5)),),
