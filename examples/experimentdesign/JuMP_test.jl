@@ -51,6 +51,6 @@ insts["various"] = [
     ((300, MatNegEntropy()),),
     ((20, MatNegEntropyEigOrd()),),
     ((30, MatPower12(1.5)),),
-    ((18, MatPower12EigOrd(1.5)),),
+    ((18, MatPower12EigOrd(1.5)), nothing, (default_tol_relax = 100,)),
     ]
 return (ExperimentDesignJuMP, insts)

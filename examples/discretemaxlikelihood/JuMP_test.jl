@@ -18,7 +18,7 @@ insts["various"] = [
     ((4000, false),),
     ((1000, true),),
     ((8000, false),),
-    ((3000, true),),
+    ((2000, true),),
     ((10000, false),),
     ]
 return (DiscreteMaxLikelihood, insts)
