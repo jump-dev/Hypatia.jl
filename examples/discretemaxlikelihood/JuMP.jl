@@ -47,7 +47,5 @@ function test_extra(inst::DiscreteMaxLikelihood{T}, model::JuMP.Model) where T
     p_opt = pos_only(p_opt)
     obj_result = exp(sum(f_i * log(p_i) for (f_i, p_i) in zip(freq, p_opt)))
     @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
-    entr_result = get_val(p_opt * length(p_opt), VecNegEntropy())
-    @test 1 >= entr_result - tol
     return
 end
