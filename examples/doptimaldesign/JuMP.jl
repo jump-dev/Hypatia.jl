@@ -30,20 +30,21 @@ function build(inst::DOptimalDesignJuMP{T}) where {T <: Float64}
 
     model = JuMP.Model()
     JuMP.@variable(model, np[1:p])
-    JuMP.@constraint(model, vcat(n_max / 2, np .- n_max / 2) in
-        MOI.NormInfinityCone(p + 1))
-    Q = V * diagm(np) * V' # information matrix
     JuMP.@constraint(model, sum(np) == n)
-    v1 = [Q[i, j] for i in 1:q for j in 1:i] # vectorized Q
-
-    # hypograph of logdet/rootdet/geomean
+    mid = n_max / 2
+    JuMP.@constraint(model, vcat(mid, np .- mid) in MOI.NormInfinityCone(p + 1))
     JuMP.@variable(model, hypo)
     JuMP.@objective(model, Max, hypo)
 
-    if inst.logdet_obj
-        JuMP.@constraint(model, vcat(hypo, 1, v1) in MOI.LogDetConeTriangle(q))
-    elseif inst.rootdet_obj
-        JuMP.@constraint(model, vcat(hypo, v1) in MOI.RootDetConeTriangle(q))
+    if inst.logdet_obj || inst.rootdet_obj
+        # information matrix lower triangle
+        v1 = [JuMP.@expression(model,
+            sum(V[i, k] * np[k] * V[j, k] for k in 1:p)) for i in 1:q for j in 1:i]
+        if inst.logdet_obj
+            JuMP.@constraint(model, vcat(hypo, 1, v1) in MOI.LogDetConeTriangle(q))
+        else
+            JuMP.@constraint(model, vcat(hypo, v1) in MOI.RootDetConeTriangle(q))
+        end
     else
         # hypogeomean + epinormeucl formulation
         JuMP.@variable(model, L[i in 1:q, j in 1:i])
@@ -52,7 +53,7 @@ function build(inst::DOptimalDesignJuMP{T}) where {T <: Float64}
         JuMP.@constraints(model, begin
             [i in 1:q, j in 1:i], VW[i, j] == L[i, j]
             [i in 1:q, j in (i + 1):q], VW[i, j] == 0
-            vcat(hypo, [L[i, i] for i in 1:q]) in MOI.GeometricMeanCone(q + 1)
+            vcat(hypo, [L[i, i] for i in 1:q]) in MOI.GeometricMeanCone(1 + q)
             [i in 1:p], vcat(sqrt(q) * np[i], W[i, :]) in JuMP.SecondOrderCone()
         end)
     end
