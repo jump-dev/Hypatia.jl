@@ -32,7 +32,7 @@ total_shift = 1e-4
 piter_shift = 1e-5
 
 # file locations
-bench_file = joinpath(@__DIR__, "raw", "bench8.csv") # TODO undo
+bench_file = joinpath(@__DIR__, "raw", "bench.csv")
 output_dir = mkpath(joinpath(@__DIR__, "analysis"))
 tex_dir = mkpath(joinpath(output_dir, "tex"))
 stats_dir = mkpath(joinpath(output_dir, "stats"))
@@ -157,8 +157,6 @@ function preprocess_df()
 
     # get enhancement name from solver options
     transform!(all_df, :solver_options => ByRow(get_enhancement) => :enhancement)
-    # TODO remove
-    filter!(t -> (t.enhancement != "back"), all_df)
 
     # check if any instances could be duplicates:
     possible_dupes = nonunique(all_df, [:enhancement, :example, :inst_data,
