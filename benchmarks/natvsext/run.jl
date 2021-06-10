@@ -19,15 +19,15 @@ include(joinpath(@__DIR__, "spawn.jl"))
 # path to write results DataFrame to CSV
 results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
 
-# setup_model_anyway = true # keep setting up larger models even if last solve was killed
-setup_model_anyway = false
+setup_model_anyway = true # keep setting up larger models even if last solve was killed
+# setup_model_anyway = false
 
 verbose = true # make solvers print output
 # verbose = false
 num_threads = 16 # number of threads for BLAS and Julia processes running instances
 free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
 optimizer_time_limit = 1800
-setup_time_limit = 2 * optimizer_time_limit
+setup_time_limit = 1.2 * optimizer_time_limit
 check_time_limit = 1.2 * optimizer_time_limit
 tol_loose = 1e-7
 tol_tight = 1e-3 * tol_loose
