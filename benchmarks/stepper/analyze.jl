@@ -12,17 +12,18 @@ keep_set = "various"
 
 enhancements = [
     "basic",
+    "prox",
     "TOA",
     "curve",
     "comb",
-    "back",
     ]
 
 compare_pairs = [
-    ["basic", "toa"],
+    ["basic", "prox"],
+    ["prox", "toa"],
     ["toa", "curve"],
     ["curve", "comb"],
-    ["comb", "back"],
+    ["basic", "comb"],
     ]
 
 # geomean shifts
@@ -31,7 +32,7 @@ total_shift = 1e-4
 piter_shift = 1e-5
 
 # file locations
-bench_file = joinpath(@__DIR__, "raw", "bench.csv")
+bench_file = joinpath(@__DIR__, "raw", "bench8.csv") # TODO undo
 output_dir = mkpath(joinpath(@__DIR__, "analysis"))
 tex_dir = mkpath(joinpath(output_dir, "tex"))
 stats_dir = mkpath(joinpath(output_dir, "stats"))
@@ -42,32 +43,25 @@ function extra_stats(all_df)
     all_df = transform(all_df, [:n, :p, :q] => ((x, y, z) -> x .+ y .+ z) => :npq)
     basic_df = filter(t -> (t.enhancement == "basic"), all_df)
 
-    # get stats from basic
+    # get stats from basic (for all instances)
     CSV.write(joinpath(csv_dir, "basic.csv"), select(basic_df,
         :num_cones => ByRow(log10) => :log_numcones,
         :npq => ByRow(log10) => :log_npq,
         ),)
 
-    # basic and converged
-    basic_df_conv = filter(t -> t.conv, basic_df)
-    CSV.write(joinpath(csv_dir, "basicconv.csv"), select(basic_df_conv,
+    # comb and converged
+    comb_solver = filter(t -> (t.enhancement == "comb"), all_df)
+    comb_solver_conv = filter(t -> t.conv, comb_solver)
+    CSV.write(joinpath(csv_dir, "combconv.csv"), select(comb_solver_conv,
         :iters,
         :solve_time,
         :solve_time => ByRow(log10) => :log_solve_time,
         :npq,
-        ),)
-
-    # back and converged
-    back_solver = filter(t -> (t.enhancement == "back"), all_df)
-    back_solver_conv = filter(t -> t.conv, back_solver)
-    CSV.write(joinpath(csv_dir, "backconv.csv"), select(back_solver_conv,
-        :solve_time,
-        :npq,
         [:time_uprhs, :solve_time] => ((x, y) -> x ./ y) => :prop_rhs,
         ),)
 
-    # basic and back where both converged
-    two_solver = filter(t -> (t.enhancement in ("basic", "back")), all_df)
+    # basic and comb where both converged
+    two_solver = filter(t -> (t.enhancement in ("basic", "comb")), all_df)
     two_solver = combine(groupby(two_solver, :inst_key), names(all_df),
         :conv => all => :two_conv)
     two_solver_conv = filter(t -> t.two_conv, two_solver)
@@ -76,7 +70,7 @@ function extra_stats(all_df)
         (x -> (x[1] - x[2]) / x[1]) => :improvement)
     filter!(t -> (t.enhancement == "basic"), two_solver_conv)
 
-    CSV.write(joinpath(csv_dir, "basicbackconv.csv"),
+    CSV.write(joinpath(csv_dir, "basiccombconv.csv"),
         select(two_solver_conv, :solve_time, :improvement))
 
     # update examplestats.csv with unique cones and instance count for each example
@@ -163,6 +157,8 @@ function preprocess_df()
 
     # get enhancement name from solver options
     transform!(all_df, :solver_options => ByRow(get_enhancement) => :enhancement)
+    # TODO remove
+    filter!(t -> (t.enhancement != "back"), all_df)
 
     # check if any instances could be duplicates:
     possible_dupes = nonunique(all_df, [:enhancement, :example, :inst_data,
