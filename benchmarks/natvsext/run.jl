@@ -19,7 +19,9 @@ include(joinpath(@__DIR__, "spawn.jl"))
 # path to write results DataFrame to CSV
 results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
 
-setup_model_anyway = true # keep setting up larger models even if last solve was killed
+# option to keep setting up larger models, only if solver is Hypatia,
+# even if last solve was killed
+setup_model_anyway = true
 # setup_model_anyway = false
 
 verbose = true # make solvers print output
@@ -132,7 +134,7 @@ CSV.write(results_path, perf)
 
             setup_killed && break
             if check_killed
-                if setup_model_anyway
+                if setup_model_anyway && (solver[1] == "Hypatia")
                     solve = false
                 else
                     break
