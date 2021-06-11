@@ -25,7 +25,7 @@ default_options = (
     # verbose = true,
     default_tol_relax = 10,
     iter_limit = 10000,
-    time_limit = 3600,
+    time_limit = 10000,
     )
 
 # stepper option sets to run
@@ -38,7 +38,6 @@ stepper_options = [
     "toa" => porc(use_adjustment = true, use_curve_search = false),
     "curve" => porc(use_adjustment = true, use_curve_search = true),
     "comb" => comb(shift_sched = 0),
-    "back" => comb(shift_sched = 2),
     ]
 
 # instance sets and real types to run and corresponding time limits (seconds)
