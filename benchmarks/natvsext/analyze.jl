@@ -101,10 +101,10 @@ status_map = Dict(
     "TimeLimit" => "tl",
     "SolveCheckKilledTime" => "tl",
     "SolveCheckKilledMemory" => "rl",
+    "SolveCheckCaughtError" => "rl", # rare, seems to be memory error
     "SlowProgress" => "sp",
     "NumericalFailure" => "er",
     "SkippedSolveCheck" => "sk",
-    "SolveCheckCaughtError" => "other",
     )
 
 residual_tol_satisfied(a, tol = 1e-5) =
