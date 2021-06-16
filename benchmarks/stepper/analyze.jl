@@ -96,6 +96,11 @@ function extra_stats(all_df)
         end
     end
 
+    # count number of instances in "every"
+    count_every = nrow(unique(select(filter(t -> t.every_conv, all_df),
+        :inst_key)))
+    @info("$count_every instances are in the every set")
+
     return
 end
 
@@ -184,6 +189,11 @@ function preprocess_df()
     all_df = combine(groupby(all_df, :inst_key), names(all_df),
         :conv => all => :every_conv)
 
+    # assert all instances are solved by at least one stepper (removes noise)
+    none_df = combine(groupby(all_df, :inst_key), :inst_key,
+        :conv => (x -> !any(x)) => :none_conv)
+    @assert isempty(filter(t -> t.none_conv, none_df))
+
     return all_df
 end
 
@@ -252,22 +262,23 @@ end
 
 function make_subtime_tables(all_df)
     divfunc(x, y) = (x ./ y)
-    preproc_cols = [:time_rescale, :time_initx, :time_inity, :time_unproc]
+    init_cols = [:time_rescale, :time_initx, :time_inity, :time_unproc,
+        :time_loadsys]
     transform!(all_df,
         [:time_upsys, :iters] => divfunc => :time_upsys_piter,
         [:time_uprhs, :iters] => divfunc => :time_uprhs_piter,
         [:time_getdir, :iters] => divfunc => :time_getdir_piter,
         [:time_search, :iters] => divfunc => :time_search_piter,
-        preproc_cols => ((x...) -> sum(x)) => :time_linalg,
+        init_cols => ((x...) -> sum(x)) => :time_init,
         )
 
-    metrics = [:linalg, :uplhs, :uprhs, :getdir, :search, :uplhs_piter,
-        :uprhs_piter, :getdir_piter, :search_piter]
+    metrics = [:init, :lhs, :rhs, :direc, :search, :lhs_piter,
+        :rhs_piter, :direc_piter, :search_piter]
     sets = [:_thisconv, :_everyconv, :_all]
 
     # get values to replace unconverged instances for the "all" group
     conv = all_df[!, :conv]
-    max_linalg = maximum(all_df[!, :time_linalg][conv])
+    max_init = maximum(all_df[!, :time_init][conv])
     max_upsys = maximum(all_df[!, :time_upsys][conv])
     max_uprhs = maximum(all_df[!, :time_uprhs][conv])
     max_getdir = maximum(all_df[!, :time_getdir][conv])
@@ -282,33 +293,33 @@ function make_subtime_tables(all_df)
 
     function get_subtime_df(set, convcol, use_cap)
         subtime_df = combine(groupby(all_df, :enhancement),
-            [:time_linalg, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = total_shift, cap = max_linalg,
-                use_cap = use_cap)) => Symbol(:linalg, set),
+            [:time_init, convcol] => ((x, y) ->
+                shifted_geomean(x, y, shift = total_shift, cap = max_init,
+                use_cap = use_cap)) => Symbol(:init, set),
             [:time_upsys, convcol] => ((x, y) ->
                 shifted_geomean(x, y, shift = total_shift, cap = max_upsys,
-                use_cap = use_cap)) => Symbol(:uplhs, set),
+                use_cap = use_cap)) => Symbol(:lhs, set),
             [:time_uprhs, convcol] => ((x, y) ->
                 shifted_geomean(x, y, shift = total_shift, cap = max_uprhs,
-                use_cap = use_cap)) => Symbol(:uprhs, set),
+                use_cap = use_cap)) => Symbol(:rhs, set),
             [:time_getdir, convcol] => ((x, y) ->
                 shifted_geomean(x, y, shift = total_shift, cap = max_getdir,
-                use_cap = use_cap)) => Symbol(:getdir, set),
+                use_cap = use_cap)) => Symbol(:direc, set),
             [:time_search, convcol] => ((x, y) ->
                 shifted_geomean(x, y, shift = total_shift, cap = max_search,
                 use_cap = use_cap)) => Symbol(:search, set),
             [:time_upsys_piter, convcol] => ((x, y) ->
                 shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true,
                 cap = max_upsys_iter, use_cap = use_cap)) =>
-                Symbol(:uplhs_piter, set),
+                Symbol(:lhs_piter, set),
             [:time_uprhs_piter, convcol] => ((x, y) ->
                 shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true,
                 cap = max_uprhs_iter, use_cap = use_cap)) =>
-                Symbol(:uprhs_piter, set),
+                Symbol(:rhs_piter, set),
             [:time_getdir_piter, convcol] => ((x, y) ->
                 shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true,
                 cap = max_getdir_iter, use_cap = use_cap)) =>
-                Symbol(:getdir_piter, set),
+                Symbol(:direc_piter, set),
             [:time_search_piter, convcol] => ((x, y) ->
                 shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true,
                 cap = max_search_iter, use_cap = use_cap)) =>

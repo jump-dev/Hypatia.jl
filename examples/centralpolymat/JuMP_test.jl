@@ -1,4 +1,5 @@
 
+relaxed_tols = (default_tol_relax = 100,)
 insts = OrderedDict()
 insts["minimal"] = [
     # rootdet
@@ -44,7 +45,7 @@ insts["fast"] = [
 insts["various"] = [
     ((2, 5, MatInvEigOrd()),),
     ((2, 5, MatNegLogEigOrd()),),
-    ((2, 4, MatPower12EigOrd(1.5)),),
+    ((2, 4, MatPower12EigOrd(1.5)), nothing, relaxed_tols),
     ((2, 4, MatNegEntropyEigOrd()),),
     ((2, 10, MatNegGeomEFExp()),),
     ((2, 8, MatNegGeomEFPow()),),
@@ -60,7 +61,7 @@ insts["various"] = [
     ((3, 5, MatPower12(1.5)),),
     ((3, 5, MatNegExp1()),),
     ((3, 4, MatPower12Conj(1.5)),),
-    ((5, 2, MatNegExp1EigOrd()),),
+    ((5, 2, MatNegExp1EigOrd()), nothing, relaxed_tols),
     ((5, 2, MatPower12ConjEigOrd(1.5)),),
     ((5, 3, MatInvDirect()),),
     ((5, 3, MatNegLogDirect()),),

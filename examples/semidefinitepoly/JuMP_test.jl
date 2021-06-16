@@ -1,4 +1,5 @@
 
+relaxed_tols = (default_tol_relax = 1000,)
 insts = OrderedDict()
 insts["minimal"] = [
     ((:matpoly2, true, true),),
@@ -12,7 +13,7 @@ insts["fast"] = [
     ((:matpoly1, false, false), :SOCExpPSD),
     ((:matpoly2, true, true),),
     ((:matpoly2, true, false),),
-    ((:matpoly2, false, false), :SOCExpPSD),
+    ((:matpoly2, false, false), :SOCExpPSD, relaxed_tols),
     ((:matpoly3, true, true),),
     ((:matpoly3, true, false),),
     ((:matpoly3, false, false), :SOCExpPSD),
@@ -22,7 +23,7 @@ insts["fast"] = [
     ((:matpoly6, true, true),),
     ((:matpoly6, true, false),),
     ((:matpoly6, false, false), :SOCExpPSD),
-    ((:matpoly7, true, true),),
+    ((:matpoly7, true, true), nothing, relaxed_tols),
     ((:matpoly7, true, false),),
     ((:matpoly7, false, false), :SOCExpPSD),
     ]

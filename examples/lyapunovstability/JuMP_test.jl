@@ -25,11 +25,9 @@ insts["various"] = [
     ((6, 6, false, true),),
     ((6, 6, false, false),),
     ((12, 12, true, true), nothing, relaxed_tols),
-    ((12, 12, true, false), nothing, relaxed_tols),
     ((12, 12, false, true),),
     ((12, 12, false, false),),
     ((24, 24, true, true), nothing, relaxed_tols),
-    ((24, 24, true, false), nothing, relaxed_tols),
     ((24, 24, false, true), nothing, relaxed_tols),
     ((24, 24, false, false), nothing, relaxed_tols),
     ]
