@@ -1,4 +1,5 @@
 
+relaxed_tols = (default_tol_relax = 1000,)
 insts = OrderedDict()
 insts["minimal"] = [
     ((:naics5811, 3, true, false, true, true, false),),
@@ -47,7 +48,7 @@ insts["various"] = [
     ((8, 100, :func4, 5, 3, true, false, true, true, false),),
     ((8, 100, :func4, 5, 3, false, true, true, true, false),),
     ((8, 100, :func4, 5, 3, false, false, true, true, false),),
-    ((5, 500, :func4, 5, 6, true, true, true, true, false),),
+    ((5, 500, :func4, 5, 6, true, true, true, true, false), nothing, relaxed_tols),
     ((5, 500, :func4, 5, 6, true, false, true, true, false),),
     ((:naics5811, 3, true, true, true, true, false),),
     ((:naics5811, 3, true, false, true, true, false),),

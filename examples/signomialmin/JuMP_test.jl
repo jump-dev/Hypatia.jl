@@ -28,7 +28,7 @@ insts["various"] = [
     ((:motzkin3,),),
     ((:CS16ex8_13,),),
     ((:CS16ex8_14,),),
-    ((:CS16ex18,),),
+    ((:CS16ex18,), nothing, relaxed_tols),
     ((:CS16ex12,),),
     ((:CS16ex13,),),
     ((:MCW19ex1_mod,),),

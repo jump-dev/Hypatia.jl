@@ -1,5 +1,4 @@
 
-relaxed_tols = (default_tol_relax = 1000,)
 insts = OrderedDict()
 insts["minimal"] = [
     ((5, 2, 2, true, true, true),),
@@ -44,8 +43,6 @@ insts["various"] = [
     ((50, 32, 2, true, false, false),),
     ((50, 32, 2, true, false, false), :ExpPSD),
     ((50, 32, 2, true, false, false), :SOCExpPSD),
-    ((50, 32, 2, false, false, false), nothing, relaxed_tols),
-    ((50, 32, 2, false, false, true), nothing, relaxed_tols),
     ((:iris, 6, true, true, true),),
     ((:cancer, 4, true, true, true),),
     ]
