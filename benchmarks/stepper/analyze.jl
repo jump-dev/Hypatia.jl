@@ -205,14 +205,14 @@ function make_agg_tables(all_df)
 
     # collect aggregated summary statistics
     df_agg = combine(groupby(all_df, :enhancement),
-        [:solve_time, :conv] => ((x, y) ->
-            shifted_geomean(x, y, shift = time_shift)) => :time_geomean_thisconv,
-        [:iters, :conv] => ((x, y) ->
-            shifted_geomean(x, y, shift = 1)) => :iters_geomean_thisconv,
         [:solve_time, :every_conv] => ((x, y) ->
             shifted_geomean(x, y, shift = time_shift)) => :time_geomean_everyconv,
         [:iters, :every_conv] => ((x, y) ->
             shifted_geomean(x, y, shift = 1)) => :iters_geomean_everyconv,
+        [:solve_time, :conv] => ((x, y) ->
+            shifted_geomean(x, y, shift = time_shift)) => :time_geomean_thisconv,
+        [:iters, :conv] => ((x, y) ->
+            shifted_geomean(x, y, shift = 1)) => :iters_geomean_thisconv,
         [:solve_time, :conv] => ((x, y) ->
             shifted_geomean(x, y, cap = max_time, use_cap = true,
             shift = time_shift)) => :time_geomean_all,
@@ -239,8 +239,8 @@ function make_agg_tables(all_df)
     transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] =>
         ByRow((x...) -> sum(x)) => :converged)
 
-    cols = [:converged, :iters_geomean_thisconv, :iters_geomean_everyconv,
-        :iters_geomean_all, :time_geomean_thisconv, :time_geomean_everyconv,
+    cols = [:converged, :iters_geomean_everyconv, :iters_geomean_thisconv,
+        :iters_geomean_all, :time_geomean_everyconv, :time_geomean_thisconv,
         :time_geomean_all]
     sep = " & "
     tex = open(joinpath(tex_dir, "agg.tex"), "w")
