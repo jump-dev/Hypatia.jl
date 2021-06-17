@@ -86,7 +86,7 @@ function get_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
     basis = get_chebyshev_polys(x, deg)
     @assert length(basis) == U
     vand_inv = inv([basis[j](x => view(pts, i, :)) for i in 1:U, j in 1:U])
-    lagrange_polys = [DP.polynomial(view(vand_inv, :, i), basis) for i in 1:U]
+    lagrange_polys = [dot(view(vand_inv, :, i), basis) for i in 1:U]
     return lagrange_polys
 end
 
