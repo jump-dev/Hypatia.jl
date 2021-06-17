@@ -127,23 +127,23 @@ process_entry(x::Float64) = @sprintf("%.2f", x)
 
 process_entry(x::Int) = string(x)
 
+get_cap(x::AbstractVector, y::AbstractVector) = 2 * maximum(x[y])
+
 function shifted_geomean(
     metric::AbstractVector{<:Real},
     conv::AbstractVector{Bool};
     shift::Real = 0,
-    cap::Real = Inf,
-    skipnotfinite::Bool = false,
+    cap::AbstractVector = fill(Inf, length(conv)),
     use_cap::Bool = false,
     )
     if use_cap
+        @assert length(cap) == length(metric)
         x = copy(metric)
-        x[.!conv] .= cap
+        x[.!conv] .= cap[.!conv]
     else
         x = metric[conv]
     end
-    if skipnotfinite
-        x = x[isfinite.(x)]
-    end
+    @assert all(isfinite, x)
     return exp(sum(log, x .+ shift) / length(x)) - shift
 end
 
@@ -194,30 +194,40 @@ function preprocess_df()
         :conv => (x -> !any(x)) => :none_conv)
     @assert isempty(filter(t -> t.none_conv, none_df))
 
+    # assert all instances took at least one iteration
+    @assert minimum(all_df[!, :iters]) >= 1
+
     return all_df
 end
 
 function make_agg_tables(all_df)
-    conv = all_df[!, :conv]
-    # values to replace unconverged instances for the "all" group
-    max_time = maximum(all_df[!, :solve_time][conv])
-    max_iter = maximum(all_df[!, :iters][conv])
+    # calculate caps for replacing time/iters of unconverged instances
+    # use double the largest value for the same instance across all steppers
+    # assumes instances are in the same order for all steppers
+    max_df = combine(groupby(all_df, :inst_key),
+        [:solve_time, :conv] => get_cap => :max_time,
+        [:iters, :conv] => get_cap => :max_iters,
+        )
+    cap(x::Symbol) = max_df[!, x]
 
     # collect aggregated summary statistics
     df_agg = combine(groupby(all_df, :enhancement),
+        # geometric mean over instances where every stepper converged
         [:solve_time, :every_conv] => ((x, y) ->
             shifted_geomean(x, y, shift = time_shift)) => :time_geomean_everyconv,
         [:iters, :every_conv] => ((x, y) ->
             shifted_geomean(x, y, shift = 1)) => :iters_geomean_everyconv,
+        # geometric mean over instances where this stepper converged
         [:solve_time, :conv] => ((x, y) ->
             shifted_geomean(x, y, shift = time_shift)) => :time_geomean_thisconv,
         [:iters, :conv] => ((x, y) ->
             shifted_geomean(x, y, shift = 1)) => :iters_geomean_thisconv,
+        # geometric mean over all instances, use caps on unconverged isntances
         [:solve_time, :conv] => ((x, y) ->
-            shifted_geomean(x, y, cap = max_time, use_cap = true,
+            shifted_geomean(x, y, cap = cap(:max_time), use_cap = true,
             shift = time_shift)) => :time_geomean_all,
         [:iters, :conv] => ((x, y) ->
-            shifted_geomean(x, y, shift = 1, cap = max_iter,
+            shifted_geomean(x, y, shift = 1, cap = cap(:max_iters),
             use_cap = true)) => :iters_geomean_all,
         :status => (x -> count(isequal("Optimal"), x)) => :optimal,
         :status => (x -> count(isequal("PrimalInfeasible"), x)) => :priminfeas,
@@ -276,53 +286,54 @@ function make_subtime_tables(all_df)
         :rhs_piter, :direc_piter, :search_piter]
     sets = [:_thisconv, :_everyconv, :_all]
 
-    # get values to replace unconverged instances for the "all" group
-    conv = all_df[!, :conv]
-    max_init = maximum(all_df[!, :time_init][conv])
-    max_upsys = maximum(all_df[!, :time_upsys][conv])
-    max_uprhs = maximum(all_df[!, :time_uprhs][conv])
-    max_getdir = maximum(all_df[!, :time_getdir][conv])
-    max_search = maximum(all_df[!, :time_search][conv])
-
-    # get values to use as caps for the "all" subset (ignore NaNs from 0 iterations)
-    skipnan(x) = (isnan(x) ? 0 : x)
-    max_upsys_iter = maximum(skipnan, all_df[!, :time_upsys_piter][conv])
-    max_uprhs_iter = maximum(skipnan, all_df[!, :time_uprhs_piter][conv])
-    max_getdir_iter = maximum(skipnan, all_df[!, :time_getdir_piter][conv])
-    max_search_iter = maximum(skipnan, all_df[!, :time_search_piter][conv])
+    # calculate caps for replacing time/iters of unconverged instances
+    # use double the largest value for the same instance across all steppers
+    # assumes instances are in the same order for all steppers
+    max_df = combine(groupby(all_df, :inst_key),
+        [:time_init, :conv] => get_cap => :max_init,
+        [:time_upsys, :conv] => get_cap => :max_upsys,
+        [:time_uprhs, :conv] => get_cap => :max_uprhs,
+        [:time_getdir, :conv] => get_cap => :max_getdir,
+        [:time_search, :conv] => get_cap => :max_search,
+        [:time_upsys_piter, :conv] => get_cap => :max_upsys_iter,
+        [:time_uprhs_piter, :conv] => get_cap => :max_uprhs_iter,
+        [:time_getdir_piter, :conv] => get_cap => :max_getdir_iter,
+        [:time_search_piter, :conv] => get_cap => :max_search_iter,
+        )
+    cap(x::Symbol) = max_df[!, x]
 
     function get_subtime_df(set, convcol, use_cap)
         subtime_df = combine(groupby(all_df, :enhancement),
             [:time_init, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = total_shift, cap = max_init,
+                shifted_geomean(x, y, shift = total_shift, cap = cap(:max_init),
                 use_cap = use_cap)) => Symbol(:init, set),
             [:time_upsys, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = total_shift, cap = max_upsys,
+                shifted_geomean(x, y, shift = total_shift, cap = cap(:max_upsys),
                 use_cap = use_cap)) => Symbol(:lhs, set),
             [:time_uprhs, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = total_shift, cap = max_uprhs,
+                shifted_geomean(x, y, shift = total_shift, cap = cap(:max_uprhs),
                 use_cap = use_cap)) => Symbol(:rhs, set),
             [:time_getdir, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = total_shift, cap = max_getdir,
+                shifted_geomean(x, y, shift = total_shift, cap = cap(:max_getdir),
                 use_cap = use_cap)) => Symbol(:direc, set),
             [:time_search, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = total_shift, cap = max_search,
+                shifted_geomean(x, y, shift = total_shift, cap = cap(:max_search),
                 use_cap = use_cap)) => Symbol(:search, set),
             [:time_upsys_piter, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true,
-                cap = max_upsys_iter, use_cap = use_cap)) =>
+                shifted_geomean(x, y, shift = piter_shift,
+                cap = cap(:max_upsys_iter), use_cap = use_cap)) =>
                 Symbol(:lhs_piter, set),
             [:time_uprhs_piter, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true,
-                cap = max_uprhs_iter, use_cap = use_cap)) =>
+                shifted_geomean(x, y, shift = piter_shift,
+                cap = cap(:max_uprhs_iter), use_cap = use_cap)) =>
                 Symbol(:rhs_piter, set),
             [:time_getdir_piter, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true,
-                cap = max_getdir_iter, use_cap = use_cap)) =>
+                shifted_geomean(x, y, shift = piter_shift,
+                cap = cap(:max_getdir_iter), use_cap = use_cap)) =>
                 Symbol(:direc_piter, set),
             [:time_search_piter, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = piter_shift, skipnotfinite = true,
-                cap = max_search_iter, use_cap = use_cap)) =>
+                shifted_geomean(x, y, shift = piter_shift,
+                cap = cap(:max_search_iter), use_cap = use_cap)) =>
                 Symbol(:search_piter, set),
             )
 
