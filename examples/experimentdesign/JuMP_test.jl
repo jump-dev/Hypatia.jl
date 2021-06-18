@@ -66,7 +66,7 @@ insts["natvext"] = [
     ((500, MatInv()),), # 192.15 seconds
     ((750, MatInv()),), # 793.386 seconds
     # ((1000, MatInv()),), # nearly converged in 2000s
-    # ((500, MatInvDirect()),), # something v slow in setup (JuMP model OK)
+    # ((500, MatInvDirect()),), # slow qr in find_initial_x at /home/ptah/.julia/dev/Hypatia/src/Solvers/process.jl:122
     ((300, MatInvDirect()),),
     ((40, MatInvEigOrd()),),
     # tr neglog
