@@ -30,11 +30,13 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Max, -epi + dot(prob, Hs))
 
-    entr = zeros(JuMP.AffExpr, Cones.svec_length(R, n))
+    entr = JuMP.AffExpr.(zeros(Cones.svec_length(R, n)))
     ρ_vec = zeros(T, length(entr))
     for (ρ, p) in zip(ρs, prob)
         Cones.smat_to_svec!(ρ_vec, ρ, rt2)
-        entr += p * ρ_vec
+        for (i, ρv) in enumerate(ρ_vec)
+            JuMP.add_to_expression!(entr[i], p, ρv)
+        end
     end
 
     aff = vcat(epi, 1, entr)
@@ -48,9 +50,6 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     # save for use in tests
     model.ext[:epi] = epi
     model.ext[:entr] = entr
-
-    pritnln("model built")
-    flush(stdout)
 
     return model
 end
