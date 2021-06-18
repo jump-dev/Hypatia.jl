@@ -73,8 +73,8 @@ insts["natvext"] = [
     # ((8, 3, MatInv()),), # good, 1066.2s
     # ((6, 6, MatInv()),), # memory error in densify
     # ((4, 12, MatInv()),),  # memory error in densify
-    ((6, 4, MatInv()),)
-    ((4, 6, MatInv()),)
+    ((6, 4, MatInv()),),
+    ((4, 6, MatInv()),),
     ((8, 4, MatInvDirect()),),
     ((6, 6, MatInvDirect()),),
     ((2, 6, MatInvEigOrd()),),
