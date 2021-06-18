@@ -70,22 +70,26 @@ insts["various"] = [
     ]
 insts["natvext"] = [
     # tr inv
-    ((8, 3, MatInv()),),
-    ((6, 6, MatInv()),),
-    ((4, 12, MatInv()),),
+    ((8, 3, MatInv()),), # good, 1066.2s
+    # ((6, 6, MatInv()),), # memory error in densify
+    # ((4, 12, MatInv()),),  # memory error in densify
+    ((6, 4, MatInv()),)
+    ((4, 6, MatInv()),)
     ((8, 4, MatInvDirect()),),
     ((6, 6, MatInvDirect()),),
+    ((2, 6, MatInvEigOrd()),),
+    ((4, 4, MatInvEigOrd()),),
     # neg entr
     ((8, 3, MatNegEntropy()),),
-    ((6, 6, MatNegEntropy()),),
-    ((4, 12, MatNegEntropy()),),
+    ((6, 4, MatNegEntropy()),),
+    ((4, 6, MatNegEntropy()),),
     ((2, 6, MatNegEntropyEigOrd()),),
     ((4, 4, MatNegEntropyEigOrd()),),
     # power
-    ((8, 3, MatPower12Conj(1.5)),),
-    ((6, 6, MatPower12Conj(1.5)),),
-    ((4, 12, MatPower12Conj(1.5)),),
-    ((2, 6, MatPower12ConjEigOrd(1.5)),),
-    ((4, 4, MatPower12ConjEigOrd(1.5)),),
+    ((8, 3, MatPower12(1.5)),),
+    ((6, 4, MatPower12(1.5)),),
+    ((4, 6, MatPower12(1.5)),),
+    ((2, 6, MatPower12EigOrd(1.5)),),
+    ((4, 4, MatPower12EigOrd(1.5)),),
     ]
 return (CentralPolyMatJuMP, insts)
