@@ -27,7 +27,6 @@ insts["various"] = [
 insts["natvext"] = [
     ((400, false, false),),
     ((600, false, false),),
-    ((250, false, true),),
     ((20, false, true), nothing, (default_tol_relax = 1000,)),
     ((50, false, true), nothing, (default_tol_relax = 1000,)),
     ]
