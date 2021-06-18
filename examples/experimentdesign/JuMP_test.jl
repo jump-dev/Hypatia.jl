@@ -69,29 +69,36 @@ insts["natvext"] = [
     # ((500, MatInvDirect()),), # slow qr in find_initial_x at /home/ptah/.julia/dev/Hypatia/src/Solvers/process.jl:122
     # ((300, MatInvDirect()),), # good, 1143.046 seconds
     # ((40, MatInvEigOrd()),), # 70.522 seconds
-    ((50, MatInvEigOrd()),),
+    # ((50, MatInvEigOrd()),), # 56 iterations and 434.485 seconds
     #
     # tr neglog
     #
     # ((500, MatNegLog()),), # 259.763 seconds
-    ((750, MatNegLog()),),
+    # ((750, MatNegLog()),), # 49 iterations and 1335.334 seconds
+    ((800, MatNegLog()),),
     # ((1000, MatNegLog()),), # far from converging in 2000s
     # ((300, MatNegLogDirect()),), # good, 1272.722 seconds
-    ((350, MatNegLogDirect()),),
+    ((325, MatNegLogDirect()),),
+    # ((350, MatNegLogDirect()),), # far from converging after 2036.531 seconds
     # ((40, MatNegLogEigOrd()),), # 53.995 seconds
-    ((50, MatNegLogEigOrd()),),
+    # ((50, MatNegLogEigOrd()),), # 43 iterations and 345.392 seconds
+    ((55, MatNegLogEigOrd()),),
     #
     # tr negentropy
     #
-    ((500, MatNegEntropy()),),
-    ((750, MatNegEntropy()),),
-    ((40, MatNegEntropyEigOrd()), nothing, (default_tol_relax = 100,)), # relaxed tols needed
-    ((50, MatNegEntropyEigOrd()), nothing, (default_tol_relax = 100,)),
+    # ((500, MatNegEntropy()),), # 133 iterations and 750.526 seconds
+    ((600, MatNegEntropy()),),
+    # ((750, MatNegEntropy()),), # far from converging and time limit
+    # ((40, MatNegEntropyEigOrd()), nothing, (default_tol_relax = 100,)), # relaxed tols needed, 25 iterations and 44.133 seconds
+    # ((50, MatNegEntropyEigOrd()), nothing, (default_tol_relax = 100,)), # 36 iterations and 300.562 seconds
+    ((55, MatNegEntropyEigOrd()), nothing, (default_tol_relax = 100,)),
     #
     # power
     #
-    ((500, MatPower12(1.5)),),
-    ((750, MatPower12(1.5)),),
-    ((50, MatNegEntropyEigOrd()),),
+    # ((500, MatPower12(1.5)),), # 135 iterations and 751.368 seconds
+    ((600, MatPower12(1.5)),),
+    # ((750, MatPower12(1.5)),), # far from converging after time limit
+    ((50, MatPower12(1.5)),),
+    ((55, MatPower12(1.5)),),
     ]
 return (ExperimentDesignJuMP, insts)
