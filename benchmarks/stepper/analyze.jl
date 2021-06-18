@@ -65,13 +65,15 @@ function extra_stats(all_df)
     two_solver = combine(groupby(two_solver, :inst_key), names(all_df),
         :conv => all => :two_conv)
     two_solver_conv = filter(t -> t.two_conv, two_solver)
+    rel_impr = (x -> (x[1] - x[2]) / x[1])
     two_solver_conv = combine(groupby(two_solver_conv, :inst_key),
-        [:enhancement, :solve_time], :solve_time =>
-        (x -> (x[1] - x[2]) / x[1]) => :improvement)
-    filter!(t -> (t.enhancement == "basic"), two_solver_conv)
+        [:enhancement, :solve_time], :solve_time => rel_impr => :time_impr,
+        [:enhancement, :iters], :iters => rel_impr => :iters_impr,
+        )
+    filter!(t -> (t.enhancement == "comb"), two_solver_conv)
 
     CSV.write(joinpath(csv_dir, "basiccombconv.csv"),
-        select(two_solver_conv, :solve_time, :improvement))
+        select(two_solver_conv, :solve_time, :time_impr, :iters, :iters_impr))
 
     # update examplestats.csv with unique cones and instance count for each example
     exstats = open(joinpath(stats_dir, "examplestats.csv"), "w")
