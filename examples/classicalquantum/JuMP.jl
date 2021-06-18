@@ -49,6 +49,9 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     model.ext[:epi] = epi
     model.ext[:entr] = entr
 
+    pritnln("model built")
+    flush(stdout)
+
     return model
 end
 
