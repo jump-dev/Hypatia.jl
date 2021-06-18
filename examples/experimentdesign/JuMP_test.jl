@@ -67,20 +67,31 @@ insts["natvext"] = [
     # ((750, MatInv()),), # 793.386 seconds
     # ((1000, MatInv()),), # nearly converged in 2000s
     # ((500, MatInvDirect()),), # slow qr in find_initial_x at /home/ptah/.julia/dev/Hypatia/src/Solvers/process.jl:122
-    ((300, MatInvDirect()),),
-    ((40, MatInvEigOrd()),),
+    # ((300, MatInvDirect()),), # good, 1143.046 seconds
+    # ((40, MatInvEigOrd()),), # 70.522 seconds
+    ((50, MatInvEigOrd()),),
+    #
     # tr neglog
-    ((500, MatNegLog()),),
-    ((1000, MatNegLog()),),
-    ((300, MatNegLogDirect()),),
-    ((40, MatNegLogEigOrd()),),
+    #
+    # ((500, MatNegLog()),), # 259.763 seconds
+    ((750, MatNegLog()),),
+    # ((1000, MatNegLog()),), # far from converging in 2000s
+    # ((300, MatNegLogDirect()),), # good, 1272.722 seconds
+    ((350, MatNegLogDirect()),),
+    # ((40, MatNegLogEigOrd()),), # 53.995 seconds
+    ((50, MatNegLogEigOrd()),),
+    #
     # tr negentropy
-    ((500, MatNegLog()),),
-    ((1000, MatNegEntropy()),),
-    ((40, MatNegEntropyEigOrd()),),
+    #
+    ((500, MatNegEntropy()),),
+    ((750, MatNegEntropy()),),
+    ((40, MatNegEntropyEigOrd()), nothing, (default_tol_relax = 100,)), # relaxed tols needed
+    ((50, MatNegEntropyEigOrd()), nothing, (default_tol_relax = 100,)),
+    #
     # power
+    #
     ((500, MatPower12(1.5)),),
-    ((1000, MatPower12(1.5)),),
-    ((40, MatNegEntropyEigOrd()),),
+    ((750, MatPower12(1.5)),),
+    ((50, MatNegEntropyEigOrd()),),
     ]
 return (ExperimentDesignJuMP, insts)
