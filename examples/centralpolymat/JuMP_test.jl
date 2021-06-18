@@ -70,19 +70,19 @@ insts["various"] = [
     ]
 insts["natvext"] = [
     # tr inv
-    ((8, 4, MatInv()),),
+    ((8, 3, MatInv()),),
     ((6, 6, MatInv()),),
     ((4, 12, MatInv()),),
     ((8, 4, MatInvDirect()),),
     ((6, 6, MatInvDirect()),),
     # neg entr
-    ((8, 4, MatNegEntropy()),),
+    ((8, 3, MatNegEntropy()),),
     ((6, 6, MatNegEntropy()),),
     ((4, 12, MatNegEntropy()),),
     ((2, 6, MatNegEntropyEigOrd()),),
     ((4, 4, MatNegEntropyEigOrd()),),
     # power
-    ((8, 4, MatPower12Conj(1.5)),),
+    ((8, 3, MatPower12Conj(1.5)),),
     ((6, 6, MatPower12Conj(1.5)),),
     ((4, 12, MatPower12Conj(1.5)),),
     ((2, 6, MatPower12ConjEigOrd(1.5)),),
