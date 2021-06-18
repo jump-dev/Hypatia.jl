@@ -63,8 +63,8 @@ insts["natvext"] = [
     # ((200, MatNegGeomEFPow()),),
     # ((400, MatNegGeomEFPow()),),
     # tr inv
-    ((500, MatInv()),), # 192.15 seconds
-    ((750, MatInv()),), # 793.386 seconds
+    # ((500, MatInv()),), # 192.15 seconds
+    # ((750, MatInv()),), # 793.386 seconds
     # ((1000, MatInv()),), # nearly converged in 2000s
     # ((500, MatInvDirect()),), # slow qr in find_initial_x at /home/ptah/.julia/dev/Hypatia/src/Solvers/process.jl:122
     ((300, MatInvDirect()),),
