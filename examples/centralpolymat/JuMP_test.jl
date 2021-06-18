@@ -70,7 +70,7 @@ insts["various"] = [
     ]
 insts["natvext"] = [
     # tr inv
-    ((8, 3, MatInv()),), # good, 1066.2s
+    # ((8, 3, MatInv()),), # good, 1066.2s
     # ((6, 6, MatInv()),), # memory error in densify
     # ((4, 12, MatInv()),),  # memory error in densify
     ((6, 4, MatInv()),)
