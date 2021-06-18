@@ -53,4 +53,34 @@ insts["various"] = [
     ((30, MatPower12(1.5)),),
     ((18, MatPower12EigOrd(1.5)), nothing, (default_tol_relax = 100,)),
     ]
+insts["natvext"] = [
+    # rootdet
+    ((2000, MatNegGeom()),),
+    ((4000, MatNegGeom()),),
+    ((150, MatNegGeomEFExp()),),
+    ((300, MatNegGeomEFExp()),),
+    ((450, MatNegGeomEFExp()),),
+    ((100, MatNegGeomEFPow()),),
+    ((200, MatNegGeomEFPow()),),
+    ((400, MatNegGeomEFPow()),),
+    # tr inv
+    ((1000, MatInv()),),
+    ((2000, MatInv()),),
+    ((500, MatInvDirect()),),
+    ((1000, MatInvDirect()),),
+    ((200, MatInvEigOrd()),),
+    ((1000, MatInvEigOrd()),),
+    # tr neglog
+    ((1000, MatNegLog()),),
+    ((2000, MatNegLog()),),
+    ((500, MatNegLogDirect()),),
+    ((1000, MatNegLogDirect()),),
+    ((100, MatNegLogEigOrd()),),
+    ((500, MatNegLogEigOrd()),),
+    # tr negentropy
+    ((1000, MatNegEntropy()),),
+    ((2000, MatNegEntropy()),),
+    ((200, MatNegEntropyEigOrd()),),
+    ((500, MatNegEntropyEigOrd()),),
+    ]
 return (ExperimentDesignJuMP, insts)
