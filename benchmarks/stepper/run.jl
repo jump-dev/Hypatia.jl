@@ -25,7 +25,7 @@ default_options = (
     verbose = true,
     default_tol_relax = 10,
     iter_limit = 10000,
-    time_limit = 10000,
+    time_limit = 2000,
     )
 
 # stepper option sets to run
@@ -42,7 +42,7 @@ stepper_options = [
 
 # instance sets and real types to run and corresponding time limits (seconds)
 inst_sets = [
-    "minimal",
+    # "minimal",
     # "fast",
     # "compile",
     # "various",

@@ -47,6 +47,9 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     # save for use in tests
     model.ext[:Q_var] = Q
 
+    println("model constructed")
+    flush(stdout)
+
     return model
 end
 

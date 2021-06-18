@@ -55,14 +55,13 @@ insts["various"] = [
     ]
 insts["natvext"] = [
     # rootdet
-    ((2000, MatNegGeom()),),
-    ((4000, MatNegGeom()),),
-    ((150, MatNegGeomEFExp()),),
-    ((300, MatNegGeomEFExp()),),
-    ((450, MatNegGeomEFExp()),),
-    ((100, MatNegGeomEFPow()),),
-    ((200, MatNegGeomEFPow()),),
-    ((400, MatNegGeomEFPow()),),
+    # ((1000, MatNegGeom()),),
+    # ((150, MatNegGeomEFExp()),),
+    # ((300, MatNegGeomEFExp()),),
+    # ((450, MatNegGeomEFExp()),),
+    # ((100, MatNegGeomEFPow()),),
+    # ((200, MatNegGeomEFPow()),),
+    # ((400, MatNegGeomEFPow()),),
     # tr inv
     ((1000, MatInv()),),
     ((2000, MatInv()),),
