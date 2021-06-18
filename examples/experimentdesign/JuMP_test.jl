@@ -63,23 +63,21 @@ insts["natvext"] = [
     # ((200, MatNegGeomEFPow()),),
     # ((400, MatNegGeomEFPow()),),
     # tr inv
-    ((1000, MatInv()),),
-    ((2000, MatInv()),),
+    ((500, MatInv()),),
+    ((750, MatInv()),),
+    # ((1000, MatInv()),), # nearly converged in 2000s
     ((500, MatInvDirect()),),
-    ((1000, MatInvDirect()),),
     ((200, MatInvEigOrd()),),
-    ((1000, MatInvEigOrd()),),
     # tr neglog
+    ((500, MatInv()),),
     ((1000, MatNegLog()),),
-    ((2000, MatNegLog()),),
     ((500, MatNegLogDirect()),),
-    ((1000, MatNegLogDirect()),),
     ((100, MatNegLogEigOrd()),),
-    ((500, MatNegLogEigOrd()),),
+    ((200, MatNegLogEigOrd()),),
     # tr negentropy
+    ((500, MatInv()),),
     ((1000, MatNegEntropy()),),
-    ((2000, MatNegEntropy()),),
     ((200, MatNegEntropyEigOrd()),),
-    ((500, MatNegEntropyEigOrd()),),
+    ((200, MatNegEntropyEigOrd()),),
     ]
 return (ExperimentDesignJuMP, insts)
