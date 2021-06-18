@@ -24,4 +24,11 @@ insts["various"] = [
     ((250, true, false),),
     ((17, false, true), nothing, (default_tol_relax = 1000,)),
     ]
+insts["natvext"] = [
+    ((600, false, false),),
+    ((900, false, false),),
+    ((250, false, true),),
+    ((20, false, true), nothing, (default_tol_relax = 1000,)),
+    ((50, false, true), nothing, (default_tol_relax = 1000,)),
+    ]
 return (ClassicalQuantum, insts)

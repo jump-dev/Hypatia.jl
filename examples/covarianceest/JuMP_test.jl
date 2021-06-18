@@ -45,4 +45,12 @@ insts["various"] = [
     ((30, MatPower12(1.5)),),
     ((6, MatPower12EigOrd(1.5)),),
     ]
+insts["natvext"] = [
+    # tr neglog
+
+    # tr negentropy
+
+    # tr power12
+
+    ]
 return (CovarianceEstJuMP, insts)
