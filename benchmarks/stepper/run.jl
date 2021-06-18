@@ -21,8 +21,8 @@ script_verbose = false
 
 # default options to solvers
 default_options = (
-    verbose = false,
-    # verbose = true,
+    # verbose = false,
+    verbose = true,
     default_tol_relax = 10,
     iter_limit = 10000,
     time_limit = 10000,
@@ -32,20 +32,21 @@ default_options = (
 porc = Solvers.PredOrCentStepper{Float64}
 comb = Solvers.CombinedStepper{Float64}
 stepper_options = [
-    "basic" => porc(use_adjustment = false, use_curve_search = false,
-        use_pred_sum_prox = true, use_sum_prox = true, prox_bound = 0.2844),
-    "prox" => porc(use_adjustment = false, use_curve_search = false),
-    "toa" => porc(use_adjustment = true, use_curve_search = false),
-    "curve" => porc(use_adjustment = true, use_curve_search = true),
+    # "basic" => porc(use_adjustment = false, use_curve_search = false,
+    #     use_pred_sum_prox = true, use_sum_prox = true, prox_bound = 0.2844),
+    # "prox" => porc(use_adjustment = false, use_curve_search = false),
+    # "toa" => porc(use_adjustment = true, use_curve_search = false),
+    # "curve" => porc(use_adjustment = true, use_curve_search = true),
     "comb" => comb(shift_sched = 0),
     ]
 
 # instance sets and real types to run and corresponding time limits (seconds)
 inst_sets = [
-    # "minimal",
+    "minimal",
     # "fast",
-    "compile",
-    "various",
+    # "compile",
+    # "various",
+    "natvext",
     ]
 
 time_all = time()
