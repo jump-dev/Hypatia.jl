@@ -73,23 +73,25 @@ insts["natvext"] = [
     # ((8, 3, MatInv()),), # good, 1066.2s
     # ((6, 6, MatInv()),), # memory error in densify
     # ((4, 12, MatInv()),),  # memory error in densify
-    ((6, 4, MatInv()),),
-    ((4, 6, MatInv()),),
-    ((8, 4, MatInvDirect()),),
-    ((6, 6, MatInvDirect()),),
-    ((2, 6, MatInvEigOrd()),),
-    ((4, 4, MatInvEigOrd()),),
+    # ((6, 4, MatInv()),), # v far from converging after 2000s
+    # ((4, 6, MatInv()),), # v far from converging after 2000s
+    # ((8, 4, MatInvDirect()),), # memory error in densify
+    # ((6, 6, MatInvDirect()),), # memory error in densify
+    # ((2, 6, MatInvEigOrd()),), # good, 982.957
+    # ((4, 4, MatInvEigOrd()),), # memory error in densify
     # neg entr
-    ((8, 3, MatNegEntropy()),),
-    ((6, 4, MatNegEntropy()),),
-    ((4, 6, MatNegEntropy()),),
+    # ((8, 3, MatNegEntropy()),), # good, 1591.051
+    ((4, 4, MatNegEntropy()),),
     ((2, 6, MatNegEntropyEigOrd()),),
-    ((4, 4, MatNegEntropyEigOrd()),),
+    ((4, 3, MatNegEntropyEigOrd()),),
     # power
     ((8, 3, MatPower12(1.5)),),
-    ((6, 4, MatPower12(1.5)),),
-    ((4, 6, MatPower12(1.5)),),
+    ((4, 4, MatPower12(1.5)),),
     ((2, 6, MatPower12EigOrd(1.5)),),
-    ((4, 4, MatPower12EigOrd(1.5)),),
+    # neg log
+    ((8, 3, MatNegLog()),),
+    ((4, 4, MatNegLog()),),
+    ((8, 2, MatNegLogDirect()),),
+    ((2, 6, MatNegLogEigOrd()),),
     ]
 return (CentralPolyMatJuMP, insts)
