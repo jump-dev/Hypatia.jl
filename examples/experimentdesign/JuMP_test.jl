@@ -101,7 +101,8 @@ insts["natvext"] = [
     # ((500, MatPower12(1.5)),), # 135 iterations and 751.368 seconds
     # ((600, MatPower12(1.5)),), # 150 iterations and 1822.182 seconds
     # ((750, MatPower12(1.5)),), # far from converging after time limit
-    ((50, MatPower12EigOrd(1.5)), nothing, (default_tol_relax = 1000,)),
-    ((55, MatPower12EigOrd(1.5)), nothing, (default_tol_relax = 1000,)),
+    # ((50, MatPower12EigOrd(1.5)), nothing, (default_tol_relax = 1000,)), # 40 iterations and 339.778 seconds
+    # ((55, MatPower12EigOrd(1.5)), nothing, (default_tol_relax = 1000,)), # 43 iterations and 633.049 seconds
+    # so can go up to around 600 for nat, around 60 for ord
     ]
 return (ExperimentDesignJuMP, insts)

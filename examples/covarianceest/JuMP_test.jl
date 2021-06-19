@@ -47,19 +47,15 @@ insts["various"] = [
     ]
 insts["natvext"] = [
     # tr neglog
-    ((600, MatNegLog()),),
-    ((800, MatNegLog()),),
-    ((200, MatNegLogDirect()),),
-    ((325, MatNegLogDirect()),),
-    ((40, MatNegLogEigOrd()), nothing, (default_tol_relax = 1000,)),
-    ((60, MatNegLogEigOrd()), nothing, (default_tol_relax = 1000,)),
+    # ((600, MatNegLog()),), # out of memory in densify
+    ((200, MatNegLog()),),
+    ((100, MatNegLogDirect()),),
+    ((20, MatNegLogEigOrd()), nothing, (default_tol_relax = 1000,)),
     # tr negentropy
-    ((650, MatNegEntropy()),),
-    ((40, MatNegEntropyEigOrd()),),
-    ((50, MatNegEntropyEigOrd()),),
+    ((200, MatNegEntropy()),),
+    ((20, MatNegEntropyEigOrd()),),
     # tr power12
-    ((650, MatPower12(1.5)),),
-    ((40, MatPower12EigOrd(1.5)),),
-    ((50, MatPower12EigOrd(1.5)),),
+    ((200, MatPower12(1.5)),),
+    ((20, MatPower12EigOrd(1.5)),),
     ]
 return (CovarianceEstJuMP, insts)
