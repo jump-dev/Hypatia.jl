@@ -100,7 +100,7 @@ insts["natvext"] = [
     # ((500, MatPower12(1.5)),), # 135 iterations and 751.368 seconds
     # ((600, MatPower12(1.5)),), # 150 iterations and 1822.182 seconds
     # ((750, MatPower12(1.5)),), # far from converging after time limit
-    ((50, MatNegLogEigOrd(1.5)),),
-    ((55, MatNegLogEigOrd(1.5)),),
+    ((50, MatPower12(1.5)),),
+    ((55, MatPower12(1.5)),),
     ]
 return (ExperimentDesignJuMP, insts)
