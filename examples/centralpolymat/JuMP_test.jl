@@ -103,7 +103,7 @@ insts["natvext"] = [
     # ((2, 11, MatPower12(1.5)), nothing, relaxed_tols), # 34 iterations and 51.489 seconds
     # ((2, 13, MatPower12(1.5)), nothing, relaxed_tols), # 220.495 seconds
     # ((2, 15, MatPower12(1.5)), nothing, relaxed_tols), # 41 iterations and 928.411 seconds
-    ((2, 18, MatPower12(1.5)),
+    ((2, 18, MatPower12(1.5)),),
     # ((8, 2, MatPower12(1.5)), nothing, relaxed_tols), # 18 iterations and 1.353 seconds
     # ((7, 3, MatPower12(1.5)), nothing, relaxed_tols), # 29 iterations and 289.864 seconds
     # ((8, 3, MatPower12(1.5)), nothing, relaxed_tols), # relaxed tols needed, hit 2028.072 seconds and was struggling but ok viols like 1e-5, 1e-6
