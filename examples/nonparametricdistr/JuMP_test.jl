@@ -31,6 +31,6 @@ insts["natvext"] = [
     # ((7000, 1, true),), # 27 iterations and 832.922 seconds
     # ((8000, 1, true),), # 27 iterations and 1218.224 seconds
     # ((15000, 1, false),), # 27 iterations and 857.543 seconds
-    ((17000, 1, false),),
+    # ((17000, 1, false),), # 25 iterations and 1169.233 seconds
     ]
 return (NonparametricDistrJuMP, insts)
