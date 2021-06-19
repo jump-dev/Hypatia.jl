@@ -83,7 +83,8 @@ insts["natvext"] = [
     # ((40, MatNegLogEigOrd()),), # 53.995 seconds
     # ((50, MatNegLogEigOrd()),), # 43 iterations and 345.392 seconds
     # ((55, MatNegLogEigOrd()),), # 40 iterations and 599.326 seconds
-    ((60, MatNegLogEigOrd()),),
+    # ((60, MatNegLogEigOrd()),), # 45 iterations and 1489.163 seconds
+    # so can go up to 800 for nat, 325 for direct, just over 60 for ord
     #
     # tr negentropy
     #
