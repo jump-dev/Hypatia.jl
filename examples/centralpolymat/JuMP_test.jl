@@ -84,7 +84,7 @@ insts["natvext"] = [
     # ((2, 11, MatNegEntropy()),), # 26 iterations and 60.033 seconds
     # ((2, 13, MatNegEntropy()),), # 26 iterations and 189.161 seconds
     # ((2, 15, MatNegEntropy()),), # 29 iterations and 703.259 seconds
-    ((2, 20, MatNegEntropy()),),
+    # ((2, 20, MatNegEntropy()),), # much too big
     # ((8, 3, MatNegEntropy()),), # good, 1591.051
     # ((4, 4, MatNegEntropy()),), # 27 iterations and 41.804 seconds
     # ((4, 5, MatNegEntropy()),), # 28 iterations and 465.674 seconds
@@ -96,14 +96,14 @@ insts["natvext"] = [
     # ((1, 20, MatNegEntropyEigOrd()),), # 29 iterations and 95.061 seconds
     # ((1, 30, MatNegEntropyEigOrd()),), # numerical failure after 2321.074 seconds, not too close to converging
     # for ord can go as big as (2, 6), (3, 3), symmetric wrt n, d so (4, 2) then stop. proabably (1, 25) ok
-    # for nat (3, 8), (4, 5)
+    # for nat (3, 8), (4, 5), around (2, 16) (more than 15, less than 20)
     #
     # power
     # ((2, 9, MatPower12(1.5)), nothing, relaxed_tols), # 23 iterations and 6.617 seconds
     # ((2, 11, MatPower12(1.5)), nothing, relaxed_tols), # 34 iterations and 51.489 seconds
     # ((2, 13, MatPower12(1.5)), nothing, relaxed_tols), # 220.495 seconds
     # ((2, 15, MatPower12(1.5)), nothing, relaxed_tols), # 41 iterations and 928.411 seconds
-    ((2, 18, MatPower12(1.5)),),
+    # ((2, 18, MatPower12(1.5)),), # far from converging after
     # ((8, 2, MatPower12(1.5)), nothing, relaxed_tols), # 18 iterations and 1.353 seconds
     # ((7, 3, MatPower12(1.5)), nothing, relaxed_tols), # 29 iterations and 289.864 seconds
     # ((8, 3, MatPower12(1.5)), nothing, relaxed_tols), # relaxed tols needed, hit 2028.072 seconds and was struggling but ok viols like 1e-5, 1e-6
@@ -112,6 +112,7 @@ insts["natvext"] = [
     # ((2, 6, MatPower12EigOrd(1.5)), nothing, relaxed_tols), # relaxed tols needed, 32 iterations and 866.97 seconds
     # ((3, 3, MatPower12EigOrd(1.5)), nothing, relaxed_tols), # relaxed tols needed, 19 iterations and 49.388 seconds
     # MatPower12EigOrd can go as big as (2, 6), (3, 3)
+    # for nat (3, 7), (4, 5), (2, 16)
     #
     # neg log
     # ((2, 10, MatNegLog()),), # 59 iterations and 38.681 seconds
