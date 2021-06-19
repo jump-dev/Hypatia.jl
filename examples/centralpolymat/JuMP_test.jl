@@ -81,7 +81,8 @@ insts["natvext"] = [
     # ((4, 4, MatInvEigOrd()),), # memory error in densify
     # neg entr
     # ((2, 10, MatNegEntropy()),), # 25 iterations and 37.121 seconds
-    ((2, 11, MatNegEntropy()),),
+    # ((2, 11, MatNegEntropy()),), # 26 iterations and 60.033 seconds
+    ((2, 13, MatNegEntropy()),),
     # ((8, 3, MatNegEntropy()),), # good, 1591.051
     # ((4, 4, MatNegEntropy()),), # 27 iterations and 41.804 seconds
     # ((4, 5, MatNegEntropy()),), # 28 iterations and 465.674 seconds
@@ -90,25 +91,27 @@ insts["natvext"] = [
     # ((4, 3, MatNegEntropyEigOrd()),), too big, tl in 0 iters
     # ((3, 3, MatNegEntropyEigOrd()), nothing, relaxed_tols), # relaxed tols needed, 18 iterations and 49.083 seconds
     # ((1, 10, MatNegEntropyEigOrd()),), # 18 iterations and 0.976 second
-    ((1, 20, MatNegEntropyEigOrd()),),
+    # ((1, 20, MatNegEntropyEigOrd()),), # 29 iterations and 95.061 seconds
+    ((1, 30, MatNegEntropyEigOrd()),),
     # for ord can go as big as (2, 6), (3, 3), symmetric wrt n, d so (4, 2) then stop
     # for nat (3, 8), (4, 5)
     #
     # power
     # ((2, 9, MatPower12(1.5)), nothing, relaxed_tols), # 23 iterations and 6.617 seconds
-    ((2, 11, MatPower12(1.5)), nothing, relaxed_tols),
+    # ((2, 11, MatPower12(1.5)), nothing, relaxed_tols), # 34 iterations and 51.489 seconds
+    ((2, 13, MatPower12(1.5)), nothing, relaxed_tols),
     # ((8, 2, MatPower12(1.5)), nothing, relaxed_tols), # 18 iterations and 1.353 seconds
     # ((7, 3, MatPower12(1.5)), nothing, relaxed_tols), # 29 iterations and 289.864 seconds
     # ((8, 3, MatPower12(1.5)), nothing, relaxed_tols), # relaxed tols needed, hit 2028.072 seconds and was struggling but ok viols like 1e-5, 1e-6
     # ((4, 4, MatPower12(1.5)),), # 31 iterations and 24.411 seconds
     # ((4, 5, MatPower12(1.5)),), # 40 iterations and 617.041 seconds
     # ((2, 6, MatPower12EigOrd(1.5)), nothing, relaxed_tols), # relaxed tols needed, 32 iterations and 866.97 seconds
-    ((3, 3, MatPower12EigOrd(1.5)), nothing, relaxed_tols), # relaxed tols needed,
-    # MatPower12EigOrd can go as big as (2, 6)
+    # ((3, 3, MatPower12EigOrd(1.5)), nothing, relaxed_tols), # relaxed tols needed, 19 iterations and 49.388 seconds
+    # MatPower12EigOrd can go as big as (2, 6), (3, 3)
     #
     # neg log
     # ((2, 10, MatNegLog()),), # 59 iterations and 38.681 seconds
-    ((2, 11, MatNegLog()),),
+    # ((2, 11, MatNegLog()),), # 70 iterations and 103.35 seconds
     # ((8, 3, MatNegLog()),), # 18 iterations and 1002.817 seconds
     # ((4, 4, MatNegLog()),), # 23 iterations and 18.455 seconds
     # ((4, 5, MatNegLog()),), # 32 iterations and 502.311 seconds
