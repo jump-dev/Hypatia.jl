@@ -29,7 +29,7 @@ insts["various"] = [
 insts["natvext"] = [
     # ((5000, 1, true),), # 28 iterations and 341.91 seconds
     # ((7000, 1, true),), # 27 iterations and 832.922 seconds
-    ((8000, 1, true),),
+    # ((8000, 1, true),), # 27 iterations and 1218.224 seconds
     # ((15000, 1, false),), # 27 iterations and 857.543 seconds
     ((17000, 1, false),),
     ]
