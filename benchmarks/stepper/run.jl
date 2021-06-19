@@ -25,7 +25,7 @@ default_options = (
     verbose = true,
     default_tol_relax = 10,
     iter_limit = 10000,
-    time_limit = 2000,
+    time_limit = 2500,
     )
 
 # stepper option sets to run

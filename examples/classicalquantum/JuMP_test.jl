@@ -29,7 +29,7 @@ insts["natvext"] = [
     # ((500, false, false),), # close to converging after 2040.447 seconds
     # ((20, false, true), nothing, (default_tol_relax = 1000,)), # 53.465 seconds
     # ((50, false, true), nothing, (default_tol_relax = 1000,)), # killed before solving but didn't investigate
-    ((25, false, true), nothing, (default_tol_relax = 1000,)),
-    ((30, false, true), nothing, (default_tol_relax = 1000,)),
+    # ((25, false, true), nothing, (default_tol_relax = 1000,)), # 312.469 seconds
+    # ((30, false, true), nothing, (default_tol_relax = 1000,)), # 1477.232 seconds
     ]
 return (ClassicalQuantum, insts)

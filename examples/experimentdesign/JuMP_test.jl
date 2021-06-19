@@ -75,30 +75,32 @@ insts["natvext"] = [
     #
     # ((500, MatNegLog()),), # 259.763 seconds
     # ((750, MatNegLog()),), # 49 iterations and 1335.334 seconds
-    ((800, MatNegLog()),),
+    # ((800, MatNegLog()),), # 48 iterations and 1808.715 seconds
     # ((1000, MatNegLog()),), # far from converging in 2000s
     # ((300, MatNegLogDirect()),), # good, 1272.722 seconds
-    ((325, MatNegLogDirect()),),
+    # ((325, MatNegLogDirect()),), # 25 iterations and 1992.384 seconds
     # ((350, MatNegLogDirect()),), # far from converging after 2036.531 seconds
     # ((40, MatNegLogEigOrd()),), # 53.995 seconds
     # ((50, MatNegLogEigOrd()),), # 43 iterations and 345.392 seconds
-    ((55, MatNegLogEigOrd()),),
+    # ((55, MatNegLogEigOrd()),), # 40 iterations and 599.326 seconds
+    ((60, MatNegLogEigOrd()),),
     #
     # tr negentropy
     #
     # ((500, MatNegEntropy()),), # 133 iterations and 750.526 seconds
-    ((600, MatNegEntropy()),),
+    # ((600, MatNegEntropy()),), # 138 iterations and 1676.687 seconds
+    ((620, MatNegEntropy()),),
     # ((750, MatNegEntropy()),), # far from converging and time limit
     # ((40, MatNegEntropyEigOrd()), nothing, (default_tol_relax = 100,)), # relaxed tols needed, 25 iterations and 44.133 seconds
     # ((50, MatNegEntropyEigOrd()), nothing, (default_tol_relax = 100,)), # 36 iterations and 300.562 seconds
-    ((55, MatNegEntropyEigOrd()), nothing, (default_tol_relax = 100,)),
+    # ((55, MatNegEntropyEigOrd()), nothing, (default_tol_relax = 100,)), # slow progress, 1000 wouldn't be enough
     #
     # power
     #
     # ((500, MatPower12(1.5)),), # 135 iterations and 751.368 seconds
-    ((600, MatPower12(1.5)),),
+    # ((600, MatPower12(1.5)),), # 150 iterations and 1822.182 seconds
     # ((750, MatPower12(1.5)),), # far from converging after time limit
-    ((50, MatPower12(1.5)),),
-    ((55, MatPower12(1.5)),),
+    ((50, MatNegLogEigOrd(1.5)),),
+    ((55, MatNegLogEigOrd(1.5)),),
     ]
 return (ExperimentDesignJuMP, insts)
