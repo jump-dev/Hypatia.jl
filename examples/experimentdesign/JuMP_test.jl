@@ -90,7 +90,7 @@ insts["natvext"] = [
     #
     # ((500, MatNegEntropy()),), # 133 iterations and 750.526 seconds
     # ((600, MatNegEntropy()),), # 138 iterations and 1676.687 seconds
-    ((620, MatNegEntropy()),),
+    # ((620, MatNegEntropy()),), # 142 iterations and 1835.331 seconds
     # ((750, MatNegEntropy()),), # far from converging and time limit
     # ((40, MatNegEntropyEigOrd()), nothing, (default_tol_relax = 100,)), # relaxed tols needed, 25 iterations and 44.133 seconds
     # ((50, MatNegEntropyEigOrd()), nothing, (default_tol_relax = 100,)), # 36 iterations and 300.562 seconds
@@ -101,7 +101,7 @@ insts["natvext"] = [
     # ((500, MatPower12(1.5)),), # 135 iterations and 751.368 seconds
     # ((600, MatPower12(1.5)),), # 150 iterations and 1822.182 seconds
     # ((750, MatPower12(1.5)),), # far from converging after time limit
-    ((50, MatPower12(1.5)),),
-    ((55, MatPower12(1.5)),),
+    ((50, MatPower12EigOrd(1.5)),),
+    ((55, MatPower12EigOrd(1.5)),),
     ]
 return (ExperimentDesignJuMP, insts)
