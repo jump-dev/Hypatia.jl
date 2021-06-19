@@ -34,6 +34,7 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     ρ_vec = zeros(T, length(entr))
     for (ρ, p) in zip(ρs, prob)
         Cones.smat_to_svec!(ρ_vec, ρ, rt2)
+        # JuMP.add_to_expression!.(entr[i], p, ρv)
         for (i, ρv) in enumerate(ρ_vec)
             JuMP.add_to_expression!(entr[i], p, ρv)
         end

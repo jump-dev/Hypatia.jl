@@ -80,23 +80,35 @@ insts["natvext"] = [
     # ((2, 6, MatInvEigOrd()),), # good, 982.957
     # ((4, 4, MatInvEigOrd()),), # memory error in densify
     # neg entr
+    ((2, 10, MatNegEntropy()),),
     # ((8, 3, MatNegEntropy()),), # good, 1591.051
     # ((4, 4, MatNegEntropy()),), # 27 iterations and 41.804 seconds
-    ((4, 5, MatNegEntropy()),),
-    ((2, 6, MatNegEntropyEigOrd()), nothing, relaxed_tols), # relaxed tols needed
-    ((2, 7, MatNegEntropyEigOrd()), nothing, relaxed_tols),
+    # ((4, 5, MatNegEntropy()),), # 28 iterations and 465.674 seconds
+    # ((2, 6, MatNegEntropyEigOrd()), nothing, relaxed_tols), # relaxed tols needed, 22 iterations and 711.949 seconds
+    # ((2, 7, MatNegEntropyEigOrd()), nothing, relaxed_tols), # too big, tl in 0 iters
     # ((4, 3, MatNegEntropyEigOrd()),), too big, tl in 0 iters
-    ((3, 3, MatNegEntropyEigOrd()),),
+    ((3, 3, MatNegEntropyEigOrd()), nothing, relaxed_tols), # relaxed tols needed
+    ((1, 10, MatNegEntropyEigOrd()),),
+    # for ord can go as big as (2, 6), (3, 3), symmetric wrt n, d so (4, 2) then stop
+    # for nat (3, 8), (4, 5)
+    #
     # power
-    ((8, 3, MatPower12(1.5)), nothing, relaxed_tols), # relaxed tols needed
+    ((2, 9, MatPower12(1.5)), nothing, relaxed_tols),
+    ((8, 2, MatPower12(1.5)), nothing, relaxed_tols),
+    ((7, 3, MatPower12(1.5)), nothing, relaxed_tols),
+    # ((8, 3, MatPower12(1.5)), nothing, relaxed_tols), # relaxed tols needed, hit 2028.072 seconds and was struggling but ok viols like 1e-5, 1e-6
     # ((4, 4, MatPower12(1.5)),), # 31 iterations and 24.411 seconds
-    ((4, 5, MatPower12(1.5)),),
-    ((2, 6, MatPower12EigOrd(1.5)), nothing, relaxed_tols), # relaxed tols needed
+    # ((4, 5, MatPower12(1.5)),), # 40 iterations and 617.041 seconds
+    # ((2, 6, MatPower12EigOrd(1.5)), nothing, relaxed_tols), # relaxed tols needed, 32 iterations and 866.97 seconds
+    ((3, 3, MatPower12EigOrd(1.5)),),
+    # MatPower12EigOrd can go as big as (2, 6)
+    #
     # neg log
+    ((2, 10, MatNegLog()),),
     # ((8, 3, MatNegLog()),), 18 iterations and 1002.817 seconds
     # ((4, 4, MatNegLog()),), # 23 iterations and 18.455 seconds
-    ((4, 5, MatNegLog()),),
-    ((8, 2, MatNegLogDirect()), nothing, relaxed_tols), # relaxed tols needed
+    # ((4, 5, MatNegLog()),), # 32 iterations and 502.311 seconds
+    # ((8, 2, MatNegLogDirect()), nothing, relaxed_tols), # relaxed tols needed, 14 iterations and 3.254 seconds
     # ((2, 6, MatNegLogEigOrd()),), # 50 iterations and 1138.664 seconds
     ]
 return (CentralPolyMatJuMP, insts)
