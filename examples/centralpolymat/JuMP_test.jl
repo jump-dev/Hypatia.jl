@@ -117,7 +117,7 @@ insts["natvext"] = [
     # neg log
     # ((2, 10, MatNegLog()),), # 59 iterations and 38.681 seconds
     # ((2, 11, MatNegLog()),), # 70 iterations and 103.35 seconds
-    ((2, 15, MatNegLog()),),
+    # ((2, 15, MatNegLog()),), # 109 iterations and 2357.671
     # ((2, 16, MatNegLog()),), # TimeLimit after 62 iterations and 2518.514 seconds, numerics going ok needed more time
     # ((8, 3, MatNegLog()),), # 18 iterations and 1002.817 seconds
     # ((4, 4, MatNegLog()),), # 23 iterations and 18.455 seconds

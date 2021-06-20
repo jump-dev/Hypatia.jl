@@ -47,20 +47,25 @@ insts["various"] = [
     ]
 insts["natvext"] = [
     # tr neglog
-    ((140, MatNegLog()),),
+    # ((140, MatNegLog()),), # 43 iterations and 1196.353 seconds
     # ((150, MatNegLog()),), # 48 iterations and 2017.965 seconds
     # ((200, MatNegLog()),), # far from converging after 2628.812 seconds
     # ((600, MatNegLog()),), # out of memory in densify
     # ((100, MatNegLogDirect()),), # 17 iterations and 373.72 seconds
     # ((120, MatNegLogDirect()),), # 18 iterations and 1055.078 seconds
-    ((125, MatNegLogDirect()),),
+    # ((125, MatNegLogDirect()),), # 17 iterations and 1301.223 seconds
     # ((20, MatNegLogEigOrd()), nothing, (default_tol_relax = 1000,)), # 36 iterations and 63.414 seconds
-    ((35, MatNegLogEigOrd()),),
+    ((25, MatNegLogEigOrd()),),
+    ((30, MatNegLogEigOrd()),),
+    # ((35, MatNegLogEigOrd()),), # far from converging after 2531.325 seconds
     # tr negentropy
-    ((150, MatNegEntropy()),),
-    ((35, MatNegEntropyEigOrd()),),
+    # ((150, MatNegEntropy()),), # 33 iterations and 1323.408 seconds
+    # ((35, MatNegEntropyEigOrd()),), # far from converging after 2532.218 second
+    ((25, MatNegEntropyEigOrd()),),
     # tr power12
-    ((150, MatPower12(1.5)),),
-    ((35, MatPower12EigOrd(1.5)),),
+    # ((150, MatPower12(1.5)),), # 33 iterations and 1311.723 seconds
+    ((155, MatPower12(1.5)),),
+    # ((35, MatPower12EigOrd(1.5)),), # tl
+    ((25, MatPower12EigOrd(1.5)),),
     ]
 return (CovarianceEstJuMP, insts)
