@@ -104,5 +104,52 @@ insts["natvext"] = [
     # ((50, MatPower12EigOrd(1.5)), nothing, (default_tol_relax = 1000,)), # 40 iterations and 339.778 seconds
     # ((55, MatPower12EigOrd(1.5)), nothing, (default_tol_relax = 1000,)), # 43 iterations and 633.049 seconds
     # so can go up to around 600 for nat, around 60 for ord
+    #
+    # tr neglog
+    #
+    ((20, MatNegLogEigOrd()),),
+    ((40, MatNegLogEigOrd()),),
+    ((60, MatNegLogEigOrd()),),
+    ((80, MatNegLogEigOrd()),),
+    #
+    ((20, MatNegLogDirect()),),
+    ((40, MatNegLogDirect()),),
+    ((60, MatNegLogDirect()),),
+    ((80, MatNegLogDirect()),),
+    ((100, MatNegLogDirect()),),
+    ((200, MatNegLogDirect()),),
+    ((300, MatNegLogDirect()),),
+    ((400, MatNegLogDirect()),),
+    #
+    ((20, MatNegLog()),),
+    ((40, MatNegLog()),),
+    ((60, MatNegLog()),),
+    ((80, MatNegLog()),),
+    ((100, MatNegLog()),),
+    ((200, MatNegLog()),),
+    ((300, MatNegLog()),),
+    ((400, MatNegLog()),),
+    ((500, MatNegLog()),),
+    ((600, MatNegLog()),),
+    ((700, MatNegLog()),),
+    ((800, MatNegLog()),),
+    #
+    # power
+    #
+    ((20, MatPower12EigOrd(1.5)),),
+    ((40, MatPower12EigOrd(1.5)),),
+    ((60, MatPower12EigOrd(1.5)),),
+    ((80, MatPower12EigOrd(1.5)),),
+    #
+    ((20, MatPower12(1.5)),),
+    ((40, MatPower12(1.5)),),
+    ((60, MatPower12(1.5)),),
+    ((80, MatPower12(1.5)),),
+    ((100, MatPower12(1.5)),),
+    ((200, MatPower12(1.5)),),
+    ((300, MatPower12(1.5)),),
+    ((400, MatPower12(1.5)),),
+    ((500, MatPower12(1.5)),),
+    ((600, MatPower12(1.5)),),
     ]
 return (ExperimentDesignJuMP, insts)

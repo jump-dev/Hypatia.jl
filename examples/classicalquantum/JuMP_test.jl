@@ -31,5 +31,22 @@ insts["natvext"] = [
     # ((50, false, true), nothing, (default_tol_relax = 1000,)), # killed before solving but didn't investigate
     # ((25, false, true), nothing, (default_tol_relax = 1000,)), # 312.469 seconds
     # ((30, false, true), nothing, (default_tol_relax = 1000,)), # 1477.232 seconds
+    ((10, false, true),),
+    ((20, false, true),),
+    ((30, false, true),),
+    ((40, false, true),),
+    ((50, false, true),),
+    #
+    ((10, false, false),),
+    ((20, false, false),),
+    ((30, false, false),),
+    ((40, false, false),),
+    ((50, false, false),),
+    #
+    ((100, false, false),),
+    ((200, false, false),),
+    ((300, false, false),),
+    ((400, false, false),),
+    ((500, false, false),),
     ]
 return (ClassicalQuantum, insts)
