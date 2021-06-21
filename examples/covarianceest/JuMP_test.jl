@@ -71,8 +71,8 @@ insts["natvext"] = [
     ((10, MatNegLogEigOrd()),),
     ((20, MatNegLogEigOrd()),),
     ((30, MatNegLogEigOrd()),),
-    ((40, MatNegLogEigOrd()),),
-    ((50, MatNegLogEigOrd()),),
+    # ((40, MatNegLogEigOrd()),),
+    # ((50, MatNegLogEigOrd()),),
     #
     ((10, MatNegLogDirect()),),
     ((20, MatNegLogDirect()),),
@@ -82,7 +82,7 @@ insts["natvext"] = [
     ((75, MatNegLogDirect()),),
     ((100, MatNegLogDirect()),),
     ((125, MatNegLogDirect()),),
-    ((150, MatNegLogDirect()),),
+    # ((150, MatNegLogDirect()),),
     #
     ((10, MatNegLog()),),
     ((20, MatNegLog()),),
