@@ -16,8 +16,7 @@ where f and gⱼ are different convex spectral functions
 
 struct NonparametricDistrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     d::Int
-    num_spec::Int # number of spectral cones
-    use_EFs::Bool # use standard cone extended formulations for spectral cones
+    exts::VecSpecExt # formulation specifier
 end
 
 function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
@@ -26,18 +25,10 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     p0 = rand(T, d)
     p0 ./= sum(p0)
 
-    # pick random spectral cones (or EFs)
-    if inst.use_EFs
-        exts = [VecNegGeomEFExp(), VecNegGeomEFPow(), VecInvEF(), VecNegLogEF(),
-            VecNegEntropyEF(), VecPower12EF(1.5), VecNeg2SqrtEF()]
-    else
-        exts = [VecNegGeom(), VecInv(), VecNegLog(), VecNegEntropy(),
-            VecPower12(1.5), VecNeg2Sqrt()]
-    end
-    @assert all(is_domain_pos, exts) # all domains must be positive
-    @assert 1 <= inst.num_spec <= length(exts)
+    @assert is_domain_pos(inst.ext) # domain must be positive
+    @assert 1 <= inst.num_spec
     Random.seed!(inst.num_spec)
-    exts = Random.shuffle!(exts)[1:inst.num_spec]
+    exts = fill(inst.ext, inst.num_spec)
 
     model = JuMP.Model()
     JuMP.@variable(model, p[1:d])

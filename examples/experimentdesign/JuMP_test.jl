@@ -138,8 +138,8 @@ insts["natvext"] = [
     #
     ((20, MatPower12EigOrd(1.5)),),
     ((40, MatPower12EigOrd(1.5)),),
-    ((60, MatPower12EigOrd(1.5)),),
-    ((80, MatPower12EigOrd(1.5)),),
+    # ((60, MatPower12EigOrd(1.5)),), # death
+    # ((80, MatPower12EigOrd(1.5)),),
     #
     ((20, MatPower12(1.5)),),
     ((40, MatPower12(1.5)),),
