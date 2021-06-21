@@ -16,19 +16,17 @@ where f and gⱼ are different convex spectral functions
 
 struct NonparametricDistrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     d::Int
-    exts::VecSpecExt # formulation specifier
+    exts::Vector{VecSpecExt} # formulation specifier
 end
 
 function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     d = inst.d
+    exts = inst.exts
     @assert d >= 2
     p0 = rand(T, d)
     p0 ./= sum(p0)
 
-    @assert is_domain_pos(inst.ext) # domain must be positive
-    @assert 1 <= inst.num_spec
-    Random.seed!(inst.num_spec)
-    exts = fill(inst.ext, inst.num_spec)
+    @assert all(is_domain_pos, exts) # domain must be positive
 
     model = JuMP.Model()
     JuMP.@variable(model, p[1:d])
