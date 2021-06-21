@@ -34,8 +34,8 @@ insts["natvext"] = [
     ((10, false, true),),
     ((20, false, true),),
     ((30, false, true),),
-    ((40, false, true),),
-    ((50, false, true),),
+    # ((40, false, true),), # time limit
+    # ((50, false, true),), # very dead
     #
     ((10, false, false),),
     ((20, false, false),),
