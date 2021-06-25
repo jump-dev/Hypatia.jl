@@ -137,10 +137,9 @@ inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 function get_proximity(
     cone::Nonnegative{T},
     irtmu::T,
-    use_sum_prox::Bool, # use sum proximity
-    negtol::T = sqrt(eps(T)),
+    use_max_prox::Bool,
     ) where {T <: Real}
-    aggfun = (use_sum_prox ? sum : maximum)
+    aggfun = (use_max_prox ? maximum : sum)
     return aggfun(abs2(si * zi * irtmu - 1) for (si, zi) in
         zip(cone.point, cone.dual_point))
 end

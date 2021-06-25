@@ -294,7 +294,7 @@ end
 function get_proximity(
     cone::Cone{T},
     irtmu::T,
-    ::Bool, # use sum proximity
+    ::Bool,
     negtol::T = sqrt(eps(T)),
     ) where {T <: Real}
     g = grad(cone)
@@ -306,7 +306,7 @@ function get_proximity(
     prox_sqr = dot(vec2, vec1)
     (prox_sqr < -negtol * length(g)) && return T(Inf) # should be positive
 
-    return prox_sqr
+    return abs(prox_sqr)
 end
 
 include("nonnegative.jl")
