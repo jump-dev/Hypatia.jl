@@ -134,17 +134,12 @@ inv_hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 
 # nonnegative is not primitive, so sum and max proximity measures differ
-function get_proximity(
+function get_proxsqr(
     cone::Nonnegative{T},
-    rtmu::T,
-    use_sum_prox::Bool, # use sum proximity
-    negtol::T = sqrt(eps(T)),
+    irtmu::T,
+    use_max_prox::Bool,
     ) where {T <: Real}
-    proxs = (abs(si * zi / rtmu - 1) for (si, zi) in
+    aggfun = (use_max_prox ? maximum : sum)
+    return aggfun(abs2(si * zi * irtmu - 1) for (si, zi) in
         zip(cone.point, cone.dual_point))
-    if use_sum_prox
-        return sum(proxs)
-    else
-        return maximum(proxs)
-    end
 end

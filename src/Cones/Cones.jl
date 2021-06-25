@@ -289,23 +289,24 @@ function check_numerics(
     return true
 end
 
-# compute central path proximity for a cone; if using max proximity, proximity
-# is computed differently if cone is not primitive, eg nonnegative cone
-function get_proximity(
+# compute squared proximity value for a cone
+# NOTE if cone is not primitive (eg nonnegative), sum and max proximities differ
+function get_proxsqr(
     cone::Cone{T},
-    rtmu::T,
-    ::Bool, # use sum proximity
+    irtmu::T,
+    ::Bool,
     negtol::T = sqrt(eps(T)),
     ) where {T <: Real}
     g = grad(cone)
     vec1 = cone.vec1
     vec2 = cone.vec2
 
-    @. vec1 = cone.dual_point + rtmu * g
+    @. vec1 = irtmu * cone.dual_point + g
     inv_hess_prod!(vec2, vec1, cone)
     prox_sqr = dot(vec2, vec1)
-    (prox_sqr < -negtol * length(g)) && return T(NaN) # should be positive
-    return sqrt(abs(prox_sqr)) / rtmu
+    (prox_sqr < -negtol * length(g)) && return T(Inf) # should be positive
+
+    return abs(prox_sqr)
 end
 
 include("nonnegative.jl")
