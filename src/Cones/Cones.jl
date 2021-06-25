@@ -289,9 +289,9 @@ function check_numerics(
     return true
 end
 
-# compute central path proximity for a cone; if using max proximity, proximity
-# is computed differently if cone is not primitive, eg nonnegative cone
-function get_proximity(
+# compute squared proximity value for a cone
+# NOTE if cone is not primitive (eg nonnegative), sum and max proximities differ
+function get_proxsqr(
     cone::Cone{T},
     irtmu::T,
     ::Bool,

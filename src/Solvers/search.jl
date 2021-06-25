@@ -125,7 +125,7 @@ function check_cone_points(
         in_prox_k = false
         if Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) &&
             Cones.check_numerics(cone_k)
-            proxsqr_k = Cones.get_proximity(cone_k, irtmu, use_max_prox)
+            proxsqr_k = Cones.get_proxsqr(cone_k, irtmu, use_max_prox)
             agg_proxsqr = aggfun(agg_proxsqr, proxsqr_k)
             in_prox_k = (agg_proxsqr < proxsqr_bound)
         end
