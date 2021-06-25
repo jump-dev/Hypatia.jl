@@ -33,7 +33,7 @@ mutable struct StepSearcher{T <: Real}
         searcher.cone_times = zeros(length(cones))
         searcher.cone_order = collect(1:length(cones))
         searcher.prev_sched = 0
-        searcher.prox = T(NaN)
+        searcher.prox = zero(T)
         return searcher
     end
 end

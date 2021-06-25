@@ -3,7 +3,7 @@ relaxed_tols = (default_tol_relax = 100,)
 insts = OrderedDict()
 insts["minimal"] = [
     ((2, 3, 4, 2, true, false, false), nothing, relaxed_tols),
-    ((2, 3, 4, 2, true, false, false), :SOCExpPSD),
+    ((2, 3, 4, 2, true, false, false), :SOCExpPSD, relaxed_tols),
     ((2, 3, 4, 2, false, true, false),),
     ((2, 3, 4, 2, false, true, false), :ExpPSD),
     ((2, 3, 4, 2, false, false, true),),
