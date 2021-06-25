@@ -293,7 +293,7 @@ end
 # is computed differently if cone is not primitive, eg nonnegative cone
 function get_proximity(
     cone::Cone{T},
-    rtmu::T,
+    irtmu::T,
     ::Bool, # use sum proximity
     negtol::T = sqrt(eps(T)),
     ) where {T <: Real}
@@ -301,11 +301,12 @@ function get_proximity(
     vec1 = cone.vec1
     vec2 = cone.vec2
 
-    @. vec1 = cone.dual_point + rtmu * g
+    @. vec1 = irtmu * cone.dual_point + g
     inv_hess_prod!(vec2, vec1, cone)
     prox_sqr = dot(vec2, vec1)
-    (prox_sqr < -negtol * length(g)) && return T(NaN) # should be positive
-    return sqrt(abs(prox_sqr)) / rtmu
+    (prox_sqr < -negtol * length(g)) && return T(Inf) # should be positive
+
+    return prox_sqr
 end
 
 include("nonnegative.jl")
