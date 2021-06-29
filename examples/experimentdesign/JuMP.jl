@@ -42,7 +42,8 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     # convex objective
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Min, epi)
-    add_homog_spectral(inst.ext, q, vcat(1.0 * epi, Q_vec), model)
+    # add_homog_spectral(inst.ext, q, vcat(1.0 * epi, Q_vec), model)
+    JuMP.@constraint(model, vcat(-1.0 * epi, 1, Q_vec) in MOI.LogDetConeTriangle(q))
 
     # save for use in tests
     model.ext[:Q_var] = Q
