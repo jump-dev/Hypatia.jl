@@ -43,7 +43,8 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     # convex objective
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Min, epi)
-    add_homog_spectral(exts[1], d, vcat(1.0 * epi, p), model)
+    # add_homog_spectral(exts[1], d, vcat(1.0 * epi, p), model)
+    JuMP.@objective(model, vcat(1.0 * epi, 1.0, p) in Hypatia.HypoPerLogCone{T}(2 + d))
 
     # convex constraints
     con_aff = Vector{Tuple{T, Matrix{T}}}()
