@@ -37,7 +37,8 @@ function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Min, epi)
     # add_homog_spectral(inst.ext, d, vcat(1.0 * epi, p_vec), model)
-    JuMP.@constraint(model, vcat(-1.0 * epi, 1, p_vec) in MOI.LogDetConeTriangle(d))
+    # JuMP.@constraint(model, vcat(-1.0 * epi, 1, p_vec) in MOI.LogDetConeTriangle(d))
+    JuMP.@constraint(model, vcat(-1.0 * epi, 1, p_vec) in Hypatia.HypoPerLogdetTriCone{Float64, Float64}(length(p_vec) + 2))
 
     # linear prior constraints
     lin_dim = round(Int, sqrt(d - 1))

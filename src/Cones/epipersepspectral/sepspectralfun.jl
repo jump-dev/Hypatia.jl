@@ -41,11 +41,13 @@ h_conj_dom_pos(::NegLogSSF) = true
 h_conj(xs::Vector, ::NegLogSSF) = -length(xs) - sum(log, xs)
 
 h_der1(ds::Vector, xs::Vector, ::NegLogSSF) = (@. ds = -inv(xs))
-h_der2(ds::Vector, xs::Vector, ::NegLogSSF) = (@. ds = xs^-2)
-h_der3(ds::Vector, xs::Vector, ::NegLogSSF) = (@. ds = -2 * xs^-3)
+h_der2(ds::Vector, xs::Vector, ::NegLogSSF) = (@. ds = inv(xs) / xs)
+h_der3(ds::Vector, xs::Vector, ::NegLogSSF) = (@. ds = -2 * inv(xs) / xs / xs)
 
 function get_initial_point(d::Int, ::NegLogSSF)
     # TODO initial central point
+    # (u, v, w) = get_central_ray_hypoperlog(d)
+    # return (-u, v, w)
     return (1, 1, 1)
 end
 
