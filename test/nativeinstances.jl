@@ -7,7 +7,7 @@ import Random
 using LinearAlgebra
 import LinearAlgebra.BlasReal
 using SparseArrays
-using LinearMaps
+import LinearMaps.LinearMap
 import GenericLinearAlgebra.svdvals
 import GenericLinearAlgebra.eigvals
 import GenericLinearAlgebra.eigen
