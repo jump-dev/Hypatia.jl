@@ -7,7 +7,7 @@ import Random
 using LinearAlgebra
 import LinearAlgebra.BlasReal
 using SparseArrays
-using LinearMaps
+import LinearMaps
 import GenericLinearAlgebra.svdvals
 import GenericLinearAlgebra.eigvals
 import GenericLinearAlgebra.eigen
@@ -2596,7 +2596,7 @@ function indirect1(T; options...)
     c = rand(T(0):T(9), n)
     A = rand(T(-9):T(9), p, n)
     b = vec(sum(A, dims = 2))
-    G = LinearMap(SparseMatrixCSC(-one(T) * I, n, n), isposdef = false)
+    G = LinearMaps.LinearMap(SparseMatrixCSC(-one(T) * I, n, n), isposdef = false)
     h = zeros(T, n)
     cones = Cone{T}[Cones.Nonnegative{T}(n)]
 
@@ -2608,9 +2608,9 @@ end
 function indirect2(T; options...)
     tol = 1e-3
     c = T[0, 0, -1, -1]
-    A = LinearMap(T[1 0 0 0; 0 1 0 0])
+    A = LinearMaps.LinearMap(T[1 0 0 0; 0 1 0 0])
     b = T[0.5, 1]
-    G = LinearMap(-I, 4)
+    G = LinearMaps.LinearMap(-I, 4)
     h = zeros(T, 4)
     cones = Cone{T}[Cones.EpiPerSquare{T}(4)]
 
@@ -2626,7 +2626,7 @@ function indirect3(T; options...)
     c = T[1, 0, 0, 0, 0, 0]
     A_mat = rand(T(-9):T(9), 6, 6)
     b = vec(sum(A_mat, dims = 2))
-    A = LinearMap(A_mat)
+    A = LinearMaps.LinearMap(A_mat)
     G = rand(T, 6, 6)
     h = vec(sum(G, dims = 2))
     cones = Cone{T}[Cones.EpiNormInf{T, T}(6, use_dual = true)]
@@ -2639,7 +2639,7 @@ end
 function indirect4(T; options...)
     tol = 1e-3
     c = zeros(T, 3)
-    A = LinearMap(-I, 3)
+    A = LinearMaps.LinearMap(-I, 3)
     b = [one(T), one(T), T(3)]
     G = -one(T) * I
     h = zeros(T, 3)
@@ -2652,9 +2652,9 @@ end
 function indirect5(T; options...)
     tol = 1e-3
     c = zeros(T, 3)
-    A = LinearMap(-I, 3)
+    A = LinearMaps.LinearMap(-I, 3)
     b = [one(T), one(T), T(3)]
-    G = LinearMap(-I, 3)
+    G = LinearMaps.LinearMap(-I, 3)
     h = zeros(T, 3)
     cones = Cone{T}[Cones.HypoPerLog{T}(3)]
 
