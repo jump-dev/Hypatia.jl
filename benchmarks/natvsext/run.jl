@@ -62,26 +62,37 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
 inst_sets = [
     ("nat", hyp_solver),
     ("ext", hyp_solver),
-    ("extEP", hyp_solver), # ExpPSD extender
-    ("extSEP", hyp_solver), # SOCExpPSD extender
+    ("extdirect", hyp_solver),
+    ("extord", hyp_solver),
+    ("logdet", hyp_solver),
+    # ("extEP", hyp_solver), # ExpPSD extender
+    # ("extSEP", hyp_solver), # SOCExpPSD extender
     ("ext", mosek_solver),
-    ("extEP", mosek_solver), # ExpPSD extender
-    ("extSEP", mosek_solver), # SOCExpPSD extender
+    ("extdirect", mosek_solver),
+    ("extord", mosek_solver),
+    # ("extEP", mosek_solver), # ExpPSD extender
+    # ("extSEP", mosek_solver), # SOCExpPSD extender
     ]
 
 # models to run
 JuMP_examples = [
     # Hypatia paper examples:
-    "densityest",
-    "doptimaldesign",
-    "matrixcompletion",
-    "matrixregression",
-    "polymin",
-    "portfolio",
-    "shapeconregr",
+    # "densityest",
+    # "doptimaldesign",
+    # "matrixcompletion",
+    # "matrixregression",
+    # "polymin",
+    # "portfolio",
+    # "shapeconregr",
     # SOS paper examples:
     # "nearestpolymat",
     # "polynorm",
+    # spectral paper examples:
+    "centralpolymat",
+    "classicalquantum",
+    "covarianceest",
+    "expdesign",
+    "nonparametricdistr",
     ]
 
 interrupt()
