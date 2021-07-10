@@ -14,5 +14,5 @@ insts["nat"] = (nothing, vcat(experimentdesign_insts(MatNegLog()),
 insts["extdirect"] = (nothing, experimentdesign_insts(MatNegLogDirect()))
 insts["extord"] = (nothing, vcat(experimentdesign_insts(MatNegLogEigOrd()),
     experimentdesign_insts(MatPower12EigOrd(1.5))))
-insts["logdet"] = (nothing, [[(p, nothing) for p log_ps]])
+insts["logdet"] = (nothing, [[(p, nothing) for p in log_ps]])
 return (ExperimentDesignJuMP, insts)
