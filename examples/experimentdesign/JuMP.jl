@@ -16,7 +16,7 @@ experiment (let q ≈ p/2), and f is a convex spectral function
 
 struct ExperimentDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     p::Int
-    ext::MatSpecExt # formulation specifier, if nothing then use logdet cone
+    ext::Union{MatSpecExt, Nothing} # formulation specifier, if nothing then use logdet cone
 end
 
 function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
