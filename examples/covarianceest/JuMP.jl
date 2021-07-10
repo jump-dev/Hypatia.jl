@@ -12,7 +12,7 @@ where f is a convex spectral function
 
 struct CovarianceEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     d::Int
-    ext::MatSpecExt # formulation specifier
+    ext::Union{MatSpecExt, Nothing} # formulation specifier, if nothing then use logdet cone
 end
 
 function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
@@ -36,9 +36,11 @@ function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     # convex objective
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Min, epi)
-    # add_homog_spectral(inst.ext, d, vcat(1.0 * epi, p_vec), model)
-    # JuMP.@constraint(model, vcat(-1.0 * epi, 1, p_vec) in MOI.LogDetConeTriangle(d))
-    JuMP.@constraint(model, vcat(-1.0 * epi, 1, p_vec) in Hypatia.HypoPerLogdetTriCone{Float64, Float64}(length(p_vec) + 2))
+    if isnothing(inst.ext)
+        JuMP.@constraint(model, vcat(-1.0 * epi, 1.0, p_vec) in Hypatia.HypoPerLogdetTriCone{Float64, Float64}(length(p_vec) + 2))
+    else
+        add_homog_spectral(inst.ext, d, vcat(1.0 * epi, p_vec), model)
+    end
 
     # linear prior constraints
     lin_dim = round(Int, sqrt(d - 1))
@@ -65,7 +67,11 @@ function test_extra(inst::CovarianceEstJuMP{T}, model::JuMP.Model) where T
     p_opt = JuMP.value.(model.ext[:p_var])
     λ = eigvals(Symmetric(p_opt, :U))
     @test minimum(λ) >= -tol
-    obj_result = get_val(pos_only(λ), inst.ext)
+    if isnothing(inst.ext)
+        obj_result = -sum(log, pos_only(λ))
+    else
+        obj_result = get_val(pos_only(λ), inst.ext)
+    end
     @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
     return
 end
