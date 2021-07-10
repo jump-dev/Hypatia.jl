@@ -21,8 +21,8 @@ results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
 
 # option to keep setting up larger models, only if solver is Hypatia,
 # even if last solve was killed
-setup_model_anyway = true
-# setup_model_anyway = false
+# setup_model_anyway = true
+setup_model_anyway = false
 
 verbose = true # make solvers print output
 # verbose = false
