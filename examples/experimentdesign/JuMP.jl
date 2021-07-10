@@ -22,7 +22,6 @@ end
 function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     p = inst.p
     @assert p >= 2
-    @assert is_domain_pos(inst.ext)
 
     q = div(p, 2)
     V = randn(T, q, p)
@@ -45,6 +44,7 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     if isnothing(inst.ext)
         JuMP.@constraint(model, vcat(-1.0 * epi, 1.0, Q_vec) in Hypatia.HypoPerLogdetTriCone{Float64, Float64}(length(Q_vec) + 2))
     else
+        @assert is_domain_pos(inst.ext)
         add_homog_spectral(inst.ext, q, vcat(1.0 * epi, Q_vec), model)
     end
 

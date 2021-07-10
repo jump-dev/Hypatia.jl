@@ -18,7 +18,6 @@ end
 function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     d = inst.d
     @assert d >= 1
-    @assert is_domain_pos(inst.ext)
 
     p0 = randn(T, d, d)
     p0 = p0 * p0' + I / 2
@@ -39,6 +38,7 @@ function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     if isnothing(inst.ext)
         JuMP.@constraint(model, vcat(-1.0 * epi, 1.0, p_vec) in Hypatia.HypoPerLogdetTriCone{Float64, Float64}(length(p_vec) + 2))
     else
+        @assert is_domain_pos(inst.ext)
         add_homog_spectral(inst.ext, d, vcat(1.0 * epi, p_vec), model)
     end
 
