@@ -7,7 +7,6 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     use_curve_search::Bool
     max_cent_steps::Int
     pred_prox_bound::T
-    use_pred_sum_prox::Bool
     searcher_options
 
     prev_alpha::T
@@ -28,7 +27,6 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
         use_curve_search::Bool = use_adjustment,
         max_cent_steps::Int = 4,
         pred_prox_bound::T = T(0.0332), # from Alfonso solver
-        use_pred_sum_prox::Bool = false,
         searcher_options...
         ) where {T <: Real}
         stepper = new{T}()
@@ -40,7 +38,6 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
         stepper.use_curve_search = use_curve_search
         stepper.max_cent_steps = max_cent_steps
         stepper.pred_prox_bound = pred_prox_bound
-        stepper.use_pred_sum_prox = use_pred_sum_prox
         stepper.searcher_options = searcher_options
         return stepper
     end
@@ -83,7 +80,8 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     solver.time_upsys += @elapsed update_lhs(solver.syssolver, solver)
 
     # decide whether to predict or center
-    is_pred = choose_pred_cent(stepper, solver)
+    is_pred = (stepper.cent_count >= stepper.max_cent_steps) ||
+        (stepper.searcher.prox < stepper.pred_prox_bound)
     stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
     rhs_fun_noadj = (is_pred ? update_rhs_pred : update_rhs_cent)
 
@@ -165,20 +163,6 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     stepper.prev_alpha = alpha
 
     return true
-end
-
-# decide whether to predict or center
-function choose_pred_cent(stepper::PredOrCentStepper, solver::Solver)
-    if stepper.cent_count >= stepper.max_cent_steps
-        return true
-    else
-        rtmu = sqrt(solver.mu)
-        use_sum = stepper.use_pred_sum_prox
-        proxs = (Cones.get_proximity(cone_k, rtmu, use_sum) for
-            cone_k in solver.model.cones)
-        prox = (use_sum ? sum(proxs) : maximum(proxs))
-        return (!isnan(prox) && prox < stepper.pred_prox_bound)
-    end
 end
 
 expect_improvement(stepper::PredOrCentStepper) = iszero(stepper.cent_count)

@@ -5,33 +5,35 @@ step distance search helpers for s,z
 mutable struct StepSearcher{T <: Real}
     min_prox::T
     prox_bound::T
-    use_sum_prox::Bool
+    use_max_prox::Bool
     alpha_sched::Vector{T}
 
-    skzk::Vector{T}
+    szk::Vector{T}
     nup1::T
     cone_times::Vector{Float64}
     cone_order::Vector{Int}
     prev_sched::Int
+    prox::T
 
     function StepSearcher{T}(
         model::Models.Model{T};
         min_prox::T = T(0.01),
         prox_bound::T = T(0.99),
-        use_sum_prox::Bool = false,
+        use_max_prox::Bool = true,
         alpha_sched::Vector{T} = default_alpha_sched(T),
         ) where {T <: Real}
         cones = model.cones
         searcher = new{T}()
         searcher.min_prox = min_prox
         searcher.prox_bound = prox_bound
-        searcher.use_sum_prox = use_sum_prox
+        searcher.use_max_prox = use_max_prox
         searcher.alpha_sched = alpha_sched
-        searcher.skzk = zeros(T, length(cones))
+        searcher.szk = zeros(T, length(cones))
         searcher.nup1 = T(model.nu + 1)
         searcher.cone_times = zeros(length(cones))
         searcher.cone_order = collect(1:length(cones))
         searcher.prev_sched = 0
+        searcher.prox = zero(T)
         return searcher
     end
 end
@@ -75,31 +77,31 @@ function check_cone_points(
     ) where {T <: Real}
     searcher = stepper.searcher
     cand = stepper.temp
-    skzk = searcher.skzk
+    szk = searcher.szk
     cones = model.cones
-    prox_bound = searcher.prox_bound
     min_prox = searcher.min_prox
-    use_sum_prox = searcher.use_sum_prox
+    use_max_prox = searcher.use_max_prox
+    proxsqr_bound = abs2(searcher.prox_bound)
 
-    taukap_cand = cand.tau[] * cand.kap[]
-    (min(cand.tau[], cand.kap[], taukap_cand) < eps(T)) && return false
+    taukap = cand.tau[] * cand.kap[]
+    (min(cand.tau[], cand.kap[], taukap) < eps(T)) && return false
 
     for k in eachindex(cones)
-        skzk[k] = dot(cand.primal_views[k], cand.dual_views[k])
-        (skzk[k] < eps(T)) && return false
+        szk[k] = dot(cand.primal_views[k], cand.dual_views[k])
+        (szk[k] < eps(T)) && return false
     end
-    mu_cand = (sum(skzk) + taukap_cand) / searcher.nup1
+    mu = (sum(szk) + taukap) / searcher.nup1
+    (mu < eps(T)) && return false
 
-    taukap_rel = taukap_cand / mu_cand
-    taukap_prox = abs(taukap_rel - 1)
-    if (mu_cand < eps(T)) || (taukap_rel < min_prox) || (taukap_prox > prox_bound)
-        return false
-    end
-    prox_bound_sqr = abs2(prox_bound)
+    taukap_rel = taukap / mu
+    (taukap_rel < min_prox) && return false
+    taukap_proxsqr = abs2(taukap_rel - 1)
+    (taukap_proxsqr > proxsqr_bound) && return false
+
     for k in eachindex(cones)
         nu_k = Cones.get_nu(cones[k])
-        skzkmu = skzk[k] / mu_cand
-        if (skzkmu < min_prox * nu_k) || (abs2(skzkmu - nu_k) > prox_bound_sqr * nu_k)
+        sz_rel_k = szk[k] / (mu * nu_k)
+        if (sz_rel_k < min_prox) || (nu_k * abs2(sz_rel_k - 1) > proxsqr_bound)
             return false
         end
     end
@@ -109,9 +111,10 @@ function check_cone_points(
     cone_order = searcher.cone_order
     sortperm!(cone_order, searcher.cone_times, initialized = true) # stochastic
 
-    sum_prox = taukap_prox
-    rtmu = sqrt(mu_cand)
-    irtmu = inv(rtmu)
+    irtmu = inv(sqrt(mu))
+    agg_proxsqr = taukap_proxsqr
+    aggfun = (use_max_prox ? max : +)
+
     for k in cone_order
         cone_k = cones[k]
         start_time = time()
@@ -122,17 +125,14 @@ function check_cone_points(
         in_prox_k = false
         if Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) &&
             Cones.check_numerics(cone_k)
-            prox_k = Cones.get_proximity(cone_k, rtmu, use_sum_prox)
-            if !isnan(prox_k) && (prox_k < prox_bound)
-                sum_prox += prox_k
-                if !use_sum_prox || (sum_prox < prox_bound)
-                    in_prox_k = true
-                end
-            end
+            proxsqr_k = Cones.get_proxsqr(cone_k, irtmu, use_max_prox)
+            agg_proxsqr = aggfun(agg_proxsqr, proxsqr_k)
+            in_prox_k = (agg_proxsqr < proxsqr_bound)
         end
         searcher.cone_times[k] = time() - start_time
         in_prox_k || return false
     end
 
+    searcher.prox = sqrt(agg_proxsqr)
     return true
 end

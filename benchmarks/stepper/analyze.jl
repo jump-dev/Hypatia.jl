@@ -41,37 +41,39 @@ csv_dir = mkpath(joinpath(output_dir, "csvs"))
 # get extra info about runs; uses hardcoded enhancement names
 function extra_stats(all_df)
     all_df = transform(all_df, [:n, :p, :q] => ((x, y, z) -> x .+ y .+ z) => :npq)
-    basic_df = filter(t -> (t.enhancement == "basic"), all_df)
 
-    # get stats from basic (for all instances)
-    CSV.write(joinpath(csv_dir, "basic.csv"), select(basic_df,
-        :num_cones => ByRow(log10) => :log_numcones,
-        :npq => ByRow(log10) => :log_npq,
-        ),)
+    # basic or comb converged
+    for enh in ("basic", "comb")
+        enh_conv = filter(t -> ((t.enhancement == enh) && t.conv), all_df)
+        enh_data = select(enh_conv,
+            :npq, :iters, :solve_time,
+            :iters => ByRow(log10) => :log_iters,
+            :solve_time => ByRow(log10) => :log_solve_time,
+            [:time_uprhs, :solve_time] => ((x, y) -> x ./ y) => :prop_rhs,
+            )
+        CSV.write(joinpath(csv_dir, enh * "conv.csv"), enh_data)
+    end
 
-    # comb and converged
-    comb_solver = filter(t -> (t.enhancement == "comb"), all_df)
-    comb_solver_conv = filter(t -> t.conv, comb_solver)
-    CSV.write(joinpath(csv_dir, "combconv.csv"), select(comb_solver_conv,
-        :iters,
-        :solve_time,
-        :solve_time => ByRow(log10) => :log_solve_time,
-        :npq,
-        [:time_uprhs, :solve_time] => ((x, y) -> x ./ y) => :prop_rhs,
-        ),)
-
-    # basic and comb where both converged
+    # basic/comb both converged
     two_solver = filter(t -> (t.enhancement in ("basic", "comb")), all_df)
     two_solver = combine(groupby(two_solver, :inst_key), names(all_df),
         :conv => all => :two_conv)
     two_solver_conv = filter(t -> t.two_conv, two_solver)
+    rel_impr = (x -> (x[1] - x[2]) / x[1])
     two_solver_conv = combine(groupby(two_solver_conv, :inst_key),
-        [:enhancement, :solve_time], :solve_time =>
-        (x -> (x[1] - x[2]) / x[1]) => :improvement)
-    filter!(t -> (t.enhancement == "basic"), two_solver_conv)
-
+        [:enhancement, :solve_time], :solve_time => rel_impr => :time_impr,
+        [:enhancement, :iters], :iters => rel_impr => :iters_impr,
+        )
+    filter!(t -> (t.enhancement == "comb"), two_solver_conv)
     CSV.write(joinpath(csv_dir, "basiccombconv.csv"),
-        select(two_solver_conv, :solve_time, :improvement))
+        select(two_solver_conv, :solve_time, :time_impr, :iters, :iters_impr))
+
+    # logged stats for instances
+    basic_df = filter(t -> (t.enhancement == "basic"), all_df)
+    CSV.write(joinpath(csv_dir, "inst_stats.csv"), select(basic_df,
+        :num_cones => ByRow(log10) => :log_numcones,
+        :npq => ByRow(log10) => :log_npq,
+        ),)
 
     # update examplestats.csv with unique cones and instance count for each example
     exstats = open(joinpath(stats_dir, "examplestats.csv"), "w")

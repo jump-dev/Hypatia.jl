@@ -592,7 +592,7 @@ function print_header(stepper::Stepper, solver::Solver)
     else
         @printf("%9s %9s %9s ", "x_feas", "y_feas", "z_feas")
     end
-    @printf("|%9s %9s %9s |%9s ", "tau", "kap", "mu", "dir_res")
+    @printf("|%9s %9s %9s |%8s %8s ", "tau", "kap", "mu", "dir_res", "prox")
 
     print_header_more(stepper, solver)
     println()
@@ -612,7 +612,7 @@ function print_iteration(stepper::Stepper, solver::Solver)
         solver.mu)
 
     if !iszero(solver.num_iters)
-        @printf("%9.2e ", solver.worst_dir_res)
+        @printf("%8.1e %8.1e ", solver.worst_dir_res, stepper.searcher.prox)
         print_iteration_more(stepper, solver)
     end
     println()
