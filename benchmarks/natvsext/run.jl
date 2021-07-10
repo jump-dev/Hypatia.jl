@@ -91,7 +91,7 @@ JuMP_examples = [
     "centralpolymat",
     "classicalquantum",
     "covarianceest",
-    "expdesign",
+    "experimentdesign",
     "nonparametricdistr",
     ]
 
