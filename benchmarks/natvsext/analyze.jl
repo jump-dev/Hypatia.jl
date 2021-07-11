@@ -68,18 +68,18 @@ examples_params = Dict(
         [:m], [1],
         [:nat, :ext], Symbol[]
         ),
-    # "covarianceest" => (
-    #     [:d, :func], [1, 2],
-    #     [:nat, :logdet, :extdirect, :extord], Symbol[]
-    #     ),
+    "covarianceest" => (
+        [:d], [1],
+        [:nat, :logdet, :extdirect, :extord], Symbol[]
+        ),
     "experimentdesign" => (
         [:p, :func], [1, 2],
         [:nat, :logdet, :extdirect, :extord], Symbol[]
         ),
-    # "nonparametricdistr" => (
-    #     [:d], [1],
-    #     [:nat, :ext], Symbol[]
-    #     ),
+    "nonparametricdistr" => (
+        [:d], [1],
+        [:nat, :ext], Symbol[]
+        ),
     )
 
 spectral_funcs = ["Log", "Entropy", "Exp1", "Power12", "Power12Conj"]
