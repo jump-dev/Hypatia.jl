@@ -16,7 +16,8 @@ experiment (let q ≈ p/2), and f is a convex spectral function
 
 struct ExperimentDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     p::Int
-    ext::MatSpecExt # formulation specifier
+    # formulation specifier, if nothing then use logdet cone
+    ext::Union{MatSpecExt, Nothing}
 end
 
 function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
@@ -42,7 +43,13 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     # convex objective
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Min, epi)
-    add_homog_spectral(inst.ext, q, vcat(1.0 * epi, Q_vec), model)
+    if isnothing(inst.ext)
+        JuMP.@constraint(model, vcat(-1.0 * epi, 1.0, Q_vec) in
+            Hypatia.HypoPerLogdetTriCone{Float64, Float64}(length(Q_vec) + 2))
+    else
+        @assert is_domain_pos(inst.ext)
+        add_homog_spectral(inst.ext, q, vcat(1.0 * epi, Q_vec), model)
+    end
 
     # save for use in tests
     model.ext[:Q_var] = Q
@@ -60,7 +67,11 @@ function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where T
     Q_opt = JuMP.value.(model.ext[:Q_var])
     λ = eigvals(Symmetric(Q_opt, :U))
     @test minimum(λ) >= -tol
-    obj_result = get_val(pos_only(λ), inst.ext)
+    if isnothing(inst.ext)
+        obj_result = -sum(log, pos_only(λ))
+    else
+        obj_result = get_val(pos_only(λ), inst.ext)
+    end
     @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
     return
 end

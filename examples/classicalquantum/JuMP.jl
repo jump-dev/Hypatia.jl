@@ -5,44 +5,44 @@ and listing 1 in "Efficient optimization of the quantum relative entropy" by H. 
 =#
 
 struct ClassicalQuantum{T <: Real} <: ExampleInstanceJuMP{T}
-    n::Int
+    m::Int
     complex::Bool
     use_EF::Bool
 end
 
 function build(inst::ClassicalQuantum{T}) where {T <: Float64}
-    n = inst.n
+    m = inst.m
     @assert !(inst.complex && inst.use_EF)
     rt2 = sqrt(T(2))
     R = (inst.complex ? Complex{T} : T)
     function hermtr1()
-        ρ = randn(R, n, n)
+        ρ = randn(R, m, m)
         ρ = ρ * ρ'
         ρ ./= tr(ρ)
         return Hermitian(ρ)
     end
-    ρs = [hermtr1() for _ in 1:n]
+    ρs = [hermtr1() for _ in 1:m]
     Hs = [dot(ρ, log(ρ)) for ρ in ρs]
 
     model = JuMP.Model()
-    JuMP.@variable(model, prob[1:n] >= 0)
+    JuMP.@variable(model, prob[1:m] >= 0)
     JuMP.@constraint(model, sum(prob) == 1)
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Max, -epi + dot(prob, Hs))
 
-    entr = zeros(JuMP.AffExpr, Cones.svec_length(R, n))
+    entr = JuMP.AffExpr.(zeros(Cones.svec_length(R, m)))
     ρ_vec = zeros(T, length(entr))
     for (ρ, p) in zip(ρs, prob)
         Cones.smat_to_svec!(ρ_vec, ρ, rt2)
-        entr += p * ρ_vec
+        JuMP.add_to_expression!.(entr, p, ρ_vec)
     end
 
     aff = vcat(epi, 1, entr)
     if inst.use_EF
-        add_spectral(MatNegEntropyEigOrd(), n, aff, model)
+        add_spectral(MatNegEntropyEigOrd(), m, aff, model)
     else
         JuMP.@constraint(model, aff in Hypatia.EpiPerSepSpectralCone{Float64}(
-            Cones.NegEntropySSF(), Cones.MatrixCSqr{T, R}, n))
+            Cones.NegEntropySSF(), Cones.MatrixCSqr{T, R}, m))
     end
 
     # save for use in tests
@@ -61,7 +61,7 @@ function test_extra(inst::ClassicalQuantum{T}, model::JuMP.Model) where T
     tol = eps(T)^0.2
     epi_opt = JuMP.value(model.ext[:epi])
     entr_opt = JuMP.value.(model.ext[:entr])
-    Entr_opt = zeros(inst.complex ? Complex{T} : T, inst.n, inst.n)
+    Entr_opt = zeros(inst.complex ? Complex{T} : T, inst.m, inst.m)
     Cones.svec_to_smat!(Entr_opt, entr_opt, sqrt(T(2)))
     λ = eigvals(Hermitian(Entr_opt, :U))
     @test minimum(λ) >= -tol

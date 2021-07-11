@@ -59,7 +59,37 @@ examples_params = Dict(
     #     [:L1, :n, :d, :m], [5, 1, 3, 4],
     #     [:SEP,], Symbol[]
     #     ),
+    # spectral paper examples:
+    "centralpolymat" => (
+        [:m, :d, :func], [1, 2, 3],
+        [:nat, :ext], Symbol[]
+        ),
+    "classicalquantum" => (
+        [:m], [1],
+        [:nat, :ext], Symbol[]
+        ),
+    "covarianceest" => (
+        [:d], [1],
+        [:nat, :logdet, :extdirect, :extord], Symbol[]
+        ),
+    "experimentdesign" => (
+        [:p, :func], [1, 2],
+        [:nat, :logdet, :extdirect, :extord], Symbol[]
+        ),
+    "nonparametricdistr" => (
+        [:d], [1],
+        [:nat, :ext], Symbol[]
+        ),
     )
+
+function spectral_func(ext::AbstractString)
+    (ext == "nothing") && (return "Log")
+    spectral_funcs = ["Log", "Entropy", "Exp1", "Power12", "Power12Conj"]
+    for f in spectral_funcs
+        occursin(f, ext) && return f
+    end
+    error("Unknown formulation $(ext).")
+end
 
 @info("analyzing examples: $(keys(examples_params))")
 
@@ -118,6 +148,7 @@ ex_wide_file(ex_name::String) = joinpath(stats_dir, ex_name * "_wide.csv")
 function make_wide_csv(ex_df, ex_name, ex_params)
     @info("making wide csv for $ex_name")
     inst_keys = ex_params[1]
+    str(x) = split(x[2:(end - 1)], ", ")
 
     # add columns
     inst_ext_name(inst_set, ext) = (ismissing(ext) ? inst_set : ext)
@@ -134,8 +165,13 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         (y == "Success" ? status_map[x] : status_map[y])) => :status)
 
     for (name, pos) in zip(inst_keys, ex_params[2])
-        transform!(ex_df, :inst_data => ByRow(x ->
-            eval(Meta.parse(x))[pos]) => name)
+        if name == :func
+            transform!(ex_df, :inst_data =>ByRow(x ->
+                spectral_func(str(x)[pos])) => name)
+        else
+            transform!(ex_df, :inst_data => ByRow(x ->
+                eval(Meta.parse(str(x)[pos]))) => name)
+        end
     end
 
     # get solver combinations and reorder
@@ -260,7 +296,6 @@ function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
     @info("making plot csv for $ex_name")
     inst_keys = ex_params[1]
     num_params = length(inst_keys)
-    @assert 1 <= num_params <= 2 # handle case of more parameters if/when needed
 
     for inst_solver in inst_solvers
         transform_plot_cols(ex_df_wide, inst_solver)
