@@ -22,6 +22,7 @@ end
 function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     d = inst.d
     @assert d >= 2
+    exts = inst.exts
     p0 = rand(T, d)
     p0 ./= sum(p0)
 
