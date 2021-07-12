@@ -1,14 +1,14 @@
 
 nonparametricdistr_insts(exts::Vector{VecSpecExt}) = [
     [(d, exts)
-    for d in vcat(10, 1000:1000:8000)] # includes compile run
+    for d in vcat(10, 1000:1000:12000)] # includes compile run
     ]
 
 insts = OrderedDict()
 insts["nat"] = (nothing, nonparametricdistr_insts(
-    VecSpecExt[VecNegEntropy(), VecNegLog(), VecPower12(1.5)]
+    VecSpecExt[VecPower12(1.5), VecNegEntropy()]
     ))
 insts["ext"] = (nothing, nonparametricdistr_insts(
-    VecSpecExt[VecNegEntropyEF(), VecNegLogEF(), VecPower12EF(1.5)]
+    VecSpecExt[VecPower12EF(1.5), VecNegEntropyEF()]
     ))
 return (NonparametricDistrJuMP, insts)
