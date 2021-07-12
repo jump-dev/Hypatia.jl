@@ -60,23 +60,29 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
 
 # instance sets and solvers to run
 inst_sets = [
-    ("nat", hyp_solver),
-    ("ext", hyp_solver),
-    ("extdirect", hyp_solver),
-    ("extord", hyp_solver),
-    ("logdet", hyp_solver),
+    #= natural formulations paper =#
+    # ("nat", hyp_solver),
+    # ("ext", hyp_solver),
+    # ("ext", mosek_solver),
     # ("extEP", hyp_solver), # ExpPSD extender
     # ("extSEP", hyp_solver), # SOCExpPSD extender
-    ("ext", mosek_solver),
-    ("extdirect", mosek_solver),
-    ("extord", mosek_solver),
     # ("extEP", mosek_solver), # ExpPSD extender
     # ("extSEP", mosek_solver), # SOCExpPSD extender
+    #= spectral function cones paper =#
+    ("nat", hyp_solver),
+    ("ext", hyp_solver),
+    ("ext", mosek_solver),
+    ("logdet", hyp_solver),
+    ("sepspec", hyp_solver),
+    ("direct", hyp_solver),
+    ("direct", mosek_solver),
+    ("eigord", hyp_solver),
+    ("eigord", mosek_solver),
     ]
 
 # models to run
 JuMP_examples = [
-    # Hypatia paper examples:
+    #= natural formulations paper =#
     # "densityest",
     # "doptimaldesign",
     # "matrixcompletion",
@@ -84,10 +90,10 @@ JuMP_examples = [
     # "polymin",
     # "portfolio",
     # "shapeconregr",
-    # SOS paper examples:
+    #= WSOS cones paper =#
     # "nearestpolymat",
     # "polynorm",
-    # spectral paper examples:
+    #= spectral function cones paper =#
     "centralpolymat",
     "classicalquantum",
     "covarianceest",

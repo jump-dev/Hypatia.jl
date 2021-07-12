@@ -1,6 +1,10 @@
 
-classicalquantum_ms = vcat(3, 10:10:50, 100:100:500) # includes compile run
+classicalquantum_insts(use_EF::Bool) = [
+    [(d, false, use_EF)
+    for d in vcat(3, 10:10:50, 100:100:500)] # includes compile run
+    ]
+
 insts = OrderedDict()
-insts["nat"] = (nothing, [[(m, false, false) for m in classicalquantum_ms]])
-insts["ext"] = (nothing, [[(m, false, true) for m in classicalquantum_ms]])
+insts["nat"] = (nothing, classicalquantum_insts(false))
+insts["ext"] = (nothing, classicalquantum_insts(true))
 return (ClassicalQuantum, insts)

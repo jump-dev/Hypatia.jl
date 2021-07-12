@@ -5,32 +5,33 @@ and listing 1 in "Efficient optimization of the quantum relative entropy" by H. 
 =#
 
 struct ClassicalQuantum{T <: Real} <: ExampleInstanceJuMP{T}
-    m::Int
+    d::Int
     complex::Bool
     use_EF::Bool
 end
 
 function build(inst::ClassicalQuantum{T}) where {T <: Float64}
-    m = inst.m
+    d = inst.d
     @assert !(inst.complex && inst.use_EF)
     rt2 = sqrt(T(2))
     R = (inst.complex ? Complex{T} : T)
+
     function hermtr1()
-        ρ = randn(R, m, m)
+        ρ = randn(R, d, d)
         ρ = ρ * ρ'
         ρ ./= tr(ρ)
         return Hermitian(ρ)
     end
-    ρs = [hermtr1() for _ in 1:m]
+    ρs = [hermtr1() for _ in 1:d]
     Hs = [dot(ρ, log(ρ)) for ρ in ρs]
 
     model = JuMP.Model()
-    JuMP.@variable(model, prob[1:m] >= 0)
+    JuMP.@variable(model, prob[1:d] >= 0)
     JuMP.@constraint(model, sum(prob) == 1)
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Max, -epi + dot(prob, Hs))
 
-    entr = JuMP.AffExpr.(zeros(Cones.svec_length(R, m)))
+    entr = JuMP.AffExpr.(zeros(Cones.svec_length(R, d)))
     ρ_vec = zeros(T, length(entr))
     for (ρ, p) in zip(ρs, prob)
         Cones.smat_to_svec!(ρ_vec, ρ, rt2)
@@ -39,10 +40,10 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
 
     aff = vcat(epi, 1, entr)
     if inst.use_EF
-        add_spectral(MatNegEntropyEigOrd(), m, aff, model)
+        add_spectral(MatNegEntropyEigOrd(), d, aff, model)
     else
         JuMP.@constraint(model, aff in Hypatia.EpiPerSepSpectralCone{Float64}(
-            Cones.NegEntropySSF(), Cones.MatrixCSqr{T, R}, m))
+            Cones.NegEntropySSF(), Cones.MatrixCSqr{T, R}, d))
     end
 
     # save for use in tests
@@ -60,9 +61,8 @@ function test_extra(inst::ClassicalQuantum{T}, model::JuMP.Model) where T
     # check constraint
     tol = eps(T)^0.2
     epi_opt = JuMP.value(model.ext[:epi])
-    entr_opt = JuMP.value.(model.ext[:entr])
-    Entr_opt = zeros(inst.complex ? Complex{T} : T, inst.m, inst.m)
-    Cones.svec_to_smat!(Entr_opt, entr_opt, sqrt(T(2)))
+    Entr_opt = zeros(inst.complex ? Complex{T} : T, inst.d, inst.d)
+    Cones.svec_to_smat!(Entr_opt, JuMP.value.(model.ext[:entr]), sqrt(T(2)))
     λ = eigvals(Hermitian(Entr_opt, :U))
     @test minimum(λ) >= -tol
     qe_result = get_val(pos_only(λ), MatNegEntropy())

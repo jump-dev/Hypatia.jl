@@ -3,14 +3,15 @@ relaxed_tols = (default_tol_relax = 1000,)
 insts = OrderedDict()
 insts["minimal"] = [
     ((2, [VecNegLog(), VecNegGeom(), VecNeg2SqrtEF()]),),
-    ((2, [VecNegLogEF(), VecInv(), VecNegEntropyEF()]),),
-    ((2, [VecNegEntropy(), VecNeg2Sqrt()]),),
-    ((2, [VecNegLogEF(), VecNegGeomEFExp()]),),
-    ((3, [VecPower12(1.5), VecNegGeomEFPow()]),),
-    ((2, [VecPower12EF(1.5), VecInvEF()]),),
+    ((3, [VecNegLogEF(), VecInv(), VecNegEntropyEF()]),),
+    ((2, [VecLogCone()]),),
+    ((3, [VecNegGeomEFExp()]),),
+    ((2, [VecPower12(1.5), VecLogCone()]),),
+    ((3, [VecPower12EF(1.5), VecInvEF()]),),
     ]
 insts["fast"] = [
     ((1000, [VecNegLog()]),),
+    ((500, [VecLogCone()]),),
     ((200, [VecNegLogEF()]), nothing, relaxed_tols),
     ((1000, [VecNegEntropy()]),),
     ((200, [VecNegLogEF()]), nothing, relaxed_tols),
@@ -18,6 +19,7 @@ insts["fast"] = [
     ]
 insts["various"] = [
     ((1000, [VecNegLog()]),),
+    ((3000, [VecLogCone()]),),
     ((7000, [VecNegEntropy()]),),
     ((500, [VecNegLogEF()]), nothing, relaxed_tols),
     ((1000, [VecNegLogEF()]), nothing, relaxed_tols),

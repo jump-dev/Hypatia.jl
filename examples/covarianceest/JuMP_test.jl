@@ -2,6 +2,7 @@
 insts = OrderedDict()
 insts["minimal"] = [
     # tr neglog
+    ((3, MatLogdetCone()),),
     ((3, MatNegLog()),),
     ((3, MatNegLogEigOrd()),),
     ((3, MatNegLogDirect()),),
@@ -22,6 +23,7 @@ insts["fast"] = [
     ((40, MatInv()),),
     ((8, MatInvEigOrd()),),
     ((20, MatInvDirect()),),
+    ((50, MatLogdetCone()),),
     ((30, MatNegLog()),),
     ((12, MatNegLogEigOrd()),),
     ((15, MatNegLogDirect()),),
@@ -37,6 +39,7 @@ insts["various"] = [
     ((100, MatInv()),),
     ((12, MatInvEigOrd()),),
     ((50, MatInvDirect()),),
+    ((150, MatLogdetCone()),),
     ((100, MatNegLog()),),
     ((18, MatNegLogEigOrd()), nothing, (default_tol_relax = 1000,)),
     ((80, MatNegLogDirect()),),

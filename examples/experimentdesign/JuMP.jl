@@ -7,35 +7,34 @@ adapted from Boyd and Vandenberghe, "Convex Optimization", section 7.5
 
 minimize    f(V × Diagonal(x) × V')
 subject to  x ≥ 0
-            Σ x = k
+            e'x = k
             A x = b
-where variable x ∈ ℝᵖ is the frequency of each experiment, k is the number of
-experiments to run (let k = p), the columns of V ∈ ℝ^(q × p) correspond to each
-experiment (let q ≈ p/2), and f is a convex spectral function
+where k = 2d, variable x ∈ ℝᵏ is the frequency of each experiment, k is the
+number of experiments to run, the columns of V ∈ ℝ^(d × k) correspond to each
+experiment, f is a convex spectral function, and A x = b are side constraints
 =#
 
 struct ExperimentDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
-    p::Int
-    # formulation specifier, if nothing then use logdet cone
-    ext::Union{MatSpecExt, Nothing}
+    d::Int
+    ext::MatSpecExt # formulation specifier
 end
 
 function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
-    p = inst.p
-    @assert p >= 2
+    d = inst.d
+    @assert d >= 1
     @assert is_domain_pos(inst.ext)
 
-    q = div(p, 2)
-    V = randn(T, q, p)
-    A = randn(T, round(Int, sqrt(p - 1)), p)
+    k = 2 * d
+    V = randn(T, d, k)
+    A = randn(T, round(Int, sqrt(k - 1)), k)
     b = sum(A, dims = 2)
 
     model = JuMP.Model()
-    JuMP.@variable(model, x[1:p] >= 0)
-    JuMP.@constraint(model, sum(x) == p)
+    JuMP.@variable(model, x[1:k] >= 0)
+    JuMP.@constraint(model, sum(x) == k)
     JuMP.@constraint(model, A * x .== b)
 
-    vec_dim = Cones.svec_length(q)
+    vec_dim = Cones.svec_length(d)
     Q = V * diagm(x) * V' # information matrix
     Q_vec = zeros(JuMP.AffExpr, vec_dim)
     Cones.smat_to_svec!(Q_vec, Q, sqrt(T(2)))
@@ -43,13 +42,7 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     # convex objective
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Min, epi)
-    if isnothing(inst.ext)
-        JuMP.@constraint(model, vcat(-1.0 * epi, 1.0, Q_vec) in
-            Hypatia.HypoPerLogdetTriCone{Float64, Float64}(length(Q_vec) + 2))
-    else
-        @assert is_domain_pos(inst.ext)
-        add_homog_spectral(inst.ext, q, vcat(1.0 * epi, Q_vec), model)
-    end
+    add_homog_spectral(inst.ext, d, vcat(1.0 * epi, Q_vec), model)
 
     # save for use in tests
     model.ext[:Q_var] = Q
@@ -67,11 +60,7 @@ function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where T
     Q_opt = JuMP.value.(model.ext[:Q_var])
     λ = eigvals(Symmetric(Q_opt, :U))
     @test minimum(λ) >= -tol
-    if isnothing(inst.ext)
-        obj_result = -sum(log, pos_only(λ))
-    else
-        obj_result = get_val(pos_only(λ), inst.ext)
-    end
+    obj_result = get_val(pos_only(λ), inst.ext)
     @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
     return
 end

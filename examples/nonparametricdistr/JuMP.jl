@@ -9,8 +9,7 @@ p ∈ ℝᵈ is the probability variable
 minimize    f(p)            (note: enforces p ≥ 0)
 subject to  Σᵢ pᵢ = 1       (probability distribution)
             gⱼ(D p) ≤ kⱼ ∀j (prior info as convex constraints)
-            B p = b         (prior info as equalities)
-            C p ≤ c         (prior info as inequalities)
+            A p = b         (prior info as equalities)
 where f and gⱼ are different convex spectral functions
 =#
 
@@ -23,23 +22,18 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     d = inst.d
     @assert d >= 2
     exts = inst.exts
+    @assert all(is_domain_pos, exts) # domain must be positive
     p0 = rand(T, d)
     p0 ./= sum(p0)
-
-    # pick random spectral cones (or EFs)
-    @assert all(is_domain_pos, exts) # domain must be positive
 
     model = JuMP.Model()
     JuMP.@variable(model, p[1:d])
     JuMP.@constraint(model, sum(p) == 1)
 
     # linear prior constraints
-    B = randn(T, round(Int, sqrt(d - 2)), d)
-    b = B * p0
-    JuMP.@constraint(model, B * p .== b)
-    C = randn(T, round(Int, log(d - 1)), d)
-    c = C * p0
-    JuMP.@constraint(model, C * p .<= c)
+    A = randn(T, round(Int, sqrt(d - 2)), d)
+    b = A * p0
+    JuMP.@constraint(model, A * p .== b)
 
     # convex objective
     JuMP.@variable(model, epi)
