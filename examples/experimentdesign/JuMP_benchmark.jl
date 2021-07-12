@@ -5,10 +5,14 @@ experimentdesign_insts(ext::MatSpecExt) = [
     ]
 
 insts = OrderedDict()
-insts["nat"] = (nothing, experimentdesign_insts.(
-    [MatNegLog(), MatNegEntropy(), MatPower12(1.5)]
+insts["nat"] = (nothing, vcat(
+    experimentdesign_insts(MatNegLog()),
+    experimentdesign_insts(MatNegEntropy()),
+    experimentdesign_insts(MatPower12(1.5)),
     ))
-insts["ext"] = (nothing, experimentdesign_insts.(
-    [MatNegLogEigOrd(), MatNegEntropyEigOrd(), MatPower12EigOrd(1.5)]
+insts["ext"] = (nothing, vcat(
+    experimentdesign_insts(MatNegLogEigOrd()),
+    experimentdesign_insts(MatNegEntropyEigOrd()),
+    experimentdesign_insts(MatPower12EigOrd(1.5)),
     ))
 return (ExperimentDesignJuMP, insts)

@@ -36,10 +36,12 @@ centralpolymat_insts(ext::MatSpecExt) = [
     ]
 
 insts = OrderedDict()
-insts["nat"] = (nothing, centralpolymat_insts.(
-    [MatNegExp1(), MatPower12Conj(1.5)]
+insts["nat"] = (nothing, vcat(
+    centralpolymat_insts(MatNegExp1()),
+    centralpolymat_insts(MatPower12Conj(1.5)),
     ))
-insts["ext"] = (nothing, centralpolymat_insts.(
-    [MatNegExp1EigOrd(), MatPower12ConjEigOrd(1.5)]
+insts["ext"] = (nothing, vcat(
+    centralpolymat_insts(MatNegExp1EigOrd()),
+    centralpolymat_insts(MatPower12ConjEigOrd(1.5)),
     ))
 return (CentralPolyMatJuMP, insts)
