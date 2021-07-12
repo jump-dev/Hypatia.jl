@@ -1,6 +1,6 @@
 
-nonparametricdistr_insts(exts::Vector{<:VecSpecExt}) = [
-    [(d, ext)
+nonparametricdistr_insts(exts::Vector{VecSpecExt}) = [
+    [(d, exts)
     for d in vcat(10, 1000:1000:8000)] # includes compile run
     ]
 

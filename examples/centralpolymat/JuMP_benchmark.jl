@@ -1,12 +1,12 @@
 
-centralpolymat_m_halfdegs = [
+centralpolymat_m_ks = [
     [
     (1, 4), # compile run
-    (1, 50),
-    (1, 100),
-    (1, 150),
+    (1, 40),
+    (1, 80),
+    (1, 120),
+    (1, 160),
     (1, 200),
-    (1, 250),
     ],
     [
     (2, 2), # compile run
@@ -31,8 +31,8 @@ centralpolymat_m_halfdegs = [
     ],
     ]
 centralpolymat_insts(ext::MatSpecExt) = [
-    [(m, halfdeg, ext) for (m, halfdeg) in mhalfdegs]
-    for mhalfdegs in centralpolymat_m_halfdegs
+    [(m, k, ext) for (m, k) in mks]
+    for mks in centralpolymat_m_ks
     ]
 
 insts = OrderedDict()

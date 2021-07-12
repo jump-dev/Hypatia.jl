@@ -20,40 +20,40 @@ print_table_solvers =
 # uncomment examples to process
 examples_params = Dict(
     # Hypatia paper examples:
-    "densityest" => (
-        [:m, :twok], [2, 3],
-        [:SEP,], [:nu_nat, :n_nat, :n_SEP]
-        ),
-    "doptimaldesign" => (
-        [:logdet, :k], [5, 1],
-        # [:EP,], [:n_EP, :q_nat, :q_EP]
-        [:EP, :SEP],
-        Symbol[]
-        # [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
-        ),
-    "matrixcompletion" => (
-        [:m, :k], [1, 2],
-        [:EP, :SEP],
-        Symbol[]
-        # [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP,
-        # :n_SEP, :q_SEP]
-        ),
-    "matrixregression" => (
-        [:m, :k], [2, 1],
-        [:SEP,], [:n_SEP, :q_nat]
-        ),
-    "polymin" => (
-        [:m, :k], [1, 2],
-        [:SEP,], [:nu_nat, :n_nat, :q_SEP]
-        ),
-    "portfolio" => (
-        [:k], [1],
-        [:SEP,], Symbol[]
-        ),
-    "shapeconregr" => (
-        [:m, :twok], [1, 5],
-        [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
-        ),
+    # "densityest" => (
+    #     [:m, :twok], [2, 3],
+    #     [:SEP,], [:nu_nat, :n_nat, :n_SEP]
+    #     ),
+    # "doptimaldesign" => (
+    #     [:logdet, :k], [5, 1],
+    #     # [:EP,], [:n_EP, :q_nat, :q_EP]
+    #     [:EP, :SEP],
+    #     Symbol[]
+    #     # [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
+    #     ),
+    # "matrixcompletion" => (
+    #     [:m, :k], [1, 2],
+    #     [:EP, :SEP],
+    #     Symbol[]
+    #     # [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP,
+    #     # :n_SEP, :q_SEP]
+    #     ),
+    # "matrixregression" => (
+    #     [:m, :k], [2, 1],
+    #     [:SEP,], [:n_SEP, :q_nat]
+    #     ),
+    # "polymin" => (
+    #     [:m, :k], [1, 2],
+    #     [:SEP,], [:nu_nat, :n_nat, :q_SEP]
+    #     ),
+    # "portfolio" => (
+    #     [:k], [1],
+    #     [:SEP,], Symbol[]
+    #     ),
+    # "shapeconregr" => (
+    #     [:m, :twok], [1, 5],
+    #     [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
+    #     ),
     # SOS paper example:
     # "polynorm" => (
     #     [:L1, :n, :d, :m], [5, 1, 3, 4],
@@ -61,20 +61,20 @@ examples_params = Dict(
     #     ),
     # spectral paper examples:
     "centralpolymat" => (
-        [:m, :d, :func], [1, 2, 3],
+        [:func, :m, :k], [3, 1, 2],
         [:nat, :ext], Symbol[]
         ),
     "classicalquantum" => (
-        [:m], [1],
+        [:d], [1],
         [:nat, :ext], Symbol[]
         ),
     "covarianceest" => (
         [:d], [1],
-        [:nat, :logdet, :extdirect, :extord], Symbol[]
+        [:logdet, :sepspec, :direct, :eigord], Symbol[]
         ),
     "experimentdesign" => (
-        [:p, :func], [1, 2],
-        [:nat, :logdet, :extdirect, :extord], Symbol[]
+        [:func, :d], [2, 1],
+        [:nat, :ext], Symbol[]
         ),
     "nonparametricdistr" => (
         [:d], [1],
