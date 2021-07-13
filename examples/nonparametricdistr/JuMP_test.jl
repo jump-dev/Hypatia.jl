@@ -2,10 +2,9 @@
 relaxed_tols = (default_tol_relax = 1000,)
 insts = OrderedDict()
 insts["minimal"] = [
-    ((2, [VecNegLog(), VecNegGeom(), VecNeg2SqrtEF()]),),
-    ((3, [VecNegLogEF(), VecInv(), VecNegEntropyEF()]),),
+    ((3, [VecNegLog(), VecNegGeom(), VecNeg2SqrtEF()]),),
     ((2, [VecLogCone()]),),
-    ((3, [VecNegGeomEFExp()]),),
+    ((2, [VecNegGeomEFExp()]),),
     ((2, [VecPower12(1.5), VecLogCone()]),),
     ((3, [VecPower12EF(1.5), VecInvEF()]),),
     ]

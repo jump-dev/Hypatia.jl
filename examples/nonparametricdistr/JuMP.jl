@@ -1,13 +1,13 @@
 #=
 given a random X variable taking values in the finite set {α₁,...,αₙ}, compute
 the distribution minimizing a given convex spectral function over all distributions
-satisfying some prior information (expressed using convex constraints)
+satisfying some prior information (expressed using equality constraints)
 
 adapted from Boyd and Vandenberghe, "Convex Optimization", section 7.2
 
 p ∈ ℝᵈ is the probability variable
 minimize    f(p)            (note: enforces p ≥ 0)
-subject to  Σᵢ pᵢ = 1       (probability distribution)
+subject to  Σᵢ pᵢ = d       (probability distribution, scaled by d)
             gⱼ(D p) ≤ kⱼ ∀j (prior info as convex constraints)
             A p = b         (prior info as equalities)
 where f and gⱼ are different convex spectral functions
@@ -22,16 +22,17 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     d = inst.d
     @assert d >= 2
     exts = inst.exts
+    @assert length(exts) >= 1 # first is for objective
     @assert all(is_domain_pos, exts) # domain must be positive
     p0 = rand(T, d)
-    p0 ./= sum(p0)
+    p0 .*= d / sum(p0)
 
     model = JuMP.Model()
     JuMP.@variable(model, p[1:d])
-    JuMP.@constraint(model, sum(p) == 1)
+    JuMP.@constraint(model, sum(p) == d)
 
     # linear prior constraints
-    A = randn(T, round(Int, sqrt(d - 2)), d)
+    A = randn(T, round(Int, d / 3), d)
     b = A * p0
     JuMP.@constraint(model, A * p .== b)
 
@@ -50,7 +51,6 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     end
 
     # save for use in tests
-    model.ext[:exts] = exts
     model.ext[:con_aff] = con_aff
     model.ext[:p_var] = p
 
@@ -64,11 +64,11 @@ function test_extra(inst::NonparametricDistrJuMP{T}, model::JuMP.Model) where T
 
     # check objective and constraints
     tol = eps(T)^0.2
-    exts = model.ext[:exts]
+    exts = inst.exts
     con_aff = model.ext[:con_aff]
     p_opt = JuMP.value.(model.ext[:p_var])
     d = length(p_opt)
-    @test sum(p_opt) ≈ 1 atol=tol rtol=tol
+    @test sum(p_opt) ≈ d atol=tol rtol=tol
     @test minimum(p_opt) >= -tol
     p_opt = pos_only(p_opt)
     obj_result = get_val(p_opt, exts[1])

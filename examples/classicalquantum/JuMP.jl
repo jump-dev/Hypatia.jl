@@ -17,25 +17,25 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     R = (inst.complex ? Complex{T} : T)
 
     function hermtr1()
-        ρ = randn(R, d, d)
-        ρ = ρ * ρ'
-        ρ ./= tr(ρ)
-        return Hermitian(ρ)
+        P = randn(R, d, d)
+        P = P * P'
+        P ./= tr(P)
+        return Hermitian(P)
     end
-    ρs = [hermtr1() for _ in 1:d]
-    Hs = [dot(ρ, log(ρ)) for ρ in ρs]
+    Ps = [hermtr1() for _ in 1:d]
+    Hs = [dot(P, log(P)) for P in Ps]
 
     model = JuMP.Model()
-    JuMP.@variable(model, prob[1:d] >= 0)
-    JuMP.@constraint(model, sum(prob) == 1)
+    JuMP.@variable(model, ρ[1:d] >= 0)
+    JuMP.@constraint(model, sum(ρ) == 1)
     JuMP.@variable(model, epi)
-    JuMP.@objective(model, Max, -epi + dot(prob, Hs))
+    JuMP.@objective(model, Max, -epi + dot(ρ, Hs))
 
     entr = JuMP.AffExpr.(zeros(Cones.svec_length(R, d)))
-    ρ_vec = zeros(T, length(entr))
-    for (ρ, p) in zip(ρs, prob)
-        Cones.smat_to_svec!(ρ_vec, ρ, rt2)
-        JuMP.add_to_expression!.(entr, p, ρ_vec)
+    P_vec = zeros(T, length(entr))
+    for (Pi, ρi) in zip(Ps, ρ)
+        Cones.smat_to_svec!(P_vec, Pi, rt2)
+        JuMP.add_to_expression!.(entr, ρi, P_vec)
     end
 
     aff = vcat(epi, 1, entr)
