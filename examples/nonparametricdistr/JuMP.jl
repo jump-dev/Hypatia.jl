@@ -67,8 +67,7 @@ function test_extra(inst::NonparametricDistrJuMP{T}, model::JuMP.Model) where T
     exts = inst.exts
     con_aff = model.ext[:con_aff]
     p_opt = JuMP.value.(model.ext[:p_var])
-    d = length(p_opt)
-    @test sum(p_opt) ≈ d atol=tol rtol=tol
+    @test sum(p_opt) ≈ inst.d atol=tol rtol=tol
     @test minimum(p_opt) >= -tol
     p_opt = pos_only(p_opt)
     obj_result = get_val(p_opt, exts[1])

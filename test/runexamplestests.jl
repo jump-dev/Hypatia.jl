@@ -6,6 +6,8 @@ using Test
 import DataFrames
 include(joinpath(@__DIR__, "../examples/Examples.jl"))
 using Main.Examples
+import Hypatia
+import Hypatia.Solvers
 
 # script verbosity
 script_verbose = false
