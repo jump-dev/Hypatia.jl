@@ -18,6 +18,7 @@ const VecNegGeomAll = Union{VecNegGeom, VecNegGeomEFExp, VecNegGeomEFPow}
 # vector separable spectral primal formulations
 struct VecInv <: VecSpecExt end
 struct VecInvEF <: VecSpecExt end
+struct VecLogCone <: VecSpecExt end
 struct VecNegLog <: VecSpecExt end
 struct VecNegLogEF <: VecSpecExt end
 struct VecNegEntropy <: VecSpecExt end
@@ -25,7 +26,8 @@ struct VecNegEntropyEF <: VecSpecExt end
 struct VecPower12 <: VecSpecExt p::Real end
 struct VecPower12EF <: VecSpecExt p::Real end
 
-const VecSepSpecPrim = Union{VecInv, VecNegLog, VecNegEntropy, VecPower12}
+const VecSepSpecPrim = Union{VecInv, VecLogCone, VecNegLog, VecNegEntropy,
+    VecPower12}
 const VecSepSpecPrimEF = Union{VecInvEF, VecNegLogEF, VecNegEntropyEF,
     VecPower12EF}
 const VecSepSpecPrimAll = Union{VecSepSpecPrim, VecSepSpecPrimEF}
@@ -59,6 +61,7 @@ const MatNegGeomAll = Union{MatNegGeom, MatNegGeomEFExp, MatNegGeomEFPow}
 struct MatInv <: MatSpecExt end
 struct MatInvEigOrd <: MatSpecExt end
 struct MatInvDirect <: MatSpecExt end
+struct MatLogdetCone <: MatSpecExt end
 struct MatNegLog <: MatSpecExt end
 struct MatNegLogEigOrd <: MatSpecExt end
 struct MatNegLogDirect <: MatSpecExt end
@@ -67,7 +70,8 @@ struct MatNegEntropyEigOrd <: MatSpecExt end
 struct MatPower12 <: MatSpecExt p::Real end
 struct MatPower12EigOrd <: MatSpecExt p::Real end
 
-const MatSepSpecPrim = Union{MatInv, MatNegLog, MatNegEntropy, MatPower12}
+const MatSepSpecPrim = Union{MatInv, MatLogdetCone, MatNegLog, MatNegEntropy,
+    MatPower12}
 const MatSepSpecPrimEF = Union{MatInvEigOrd, MatInvDirect, MatNegLogEigOrd,
     MatNegLogDirect, MatNegEntropyEigOrd, MatPower12EigOrd}
 const MatSepSpecPrimAll = Union{MatSepSpecPrim, MatSepSpecPrimEF}
@@ -106,8 +110,8 @@ get_vec_ef(ext::MatPower12ConjEigOrd) = VecPower12ConjEF(ext.p)
 get_ssf(::Union{VecInv, VecInvEF, VecNeg2Sqrt, VecNeg2SqrtEF, MatInv,
     MatInvEigOrd, MatInvDirect, MatNeg2Sqrt, MatNeg2SqrtEigOrd}) =
     Cones.InvSSF()
-get_ssf(::Union{VecNegLog, VecNegLogEF, MatNegLog, MatNegLogEigOrd,
-    MatNegLogDirect}) =
+get_ssf(::Union{VecLogCone, VecNegLog, VecNegLogEF, MatLogdetCone, MatNegLog,
+    MatNegLogEigOrd, MatNegLogDirect}) =
     Cones.NegLogSSF()
 get_ssf(::Union{VecNegEntropy, VecNegEntropyEF, VecNegExp1, VecNegExp1EF,
     MatNegEntropy, MatNegEntropyEigOrd, MatNegExp1, MatNegExp1EigOrd}) =
@@ -222,6 +226,22 @@ function add_homog_spectral(
 end
 
 #=
+VecLogCone
+=#
+function add_spectral(
+    ::VecLogCone,
+    d::Int,
+    aff::Vector{JuMP.AffExpr},
+    model::JuMP.Model,
+    )
+    @assert 2 + d == length(aff)
+    aff_new = vcat(-aff[1], aff[2], aff[3:end])
+    JuMP.@constraint(model, aff_new in
+        Hypatia.HypoPerLogCone{Float64}(length(aff)))
+    return
+end
+
+#=
 VecSepSpec
 =#
 function add_spectral(
@@ -296,6 +316,22 @@ function add_homog_spectral(
     )
     δ = extend_det(d, aff[2:end], model) # checks dimension
     add_homog_spectral(get_vec_ef(ext), d, vcat(aff[1], δ), model)
+    return
+end
+
+#=
+MatLogdetCone
+=#
+function add_spectral(
+    ::MatLogdetCone,
+    d::Int,
+    aff::Vector{JuMP.AffExpr},
+    model::JuMP.Model,
+    )
+    @assert 2 + Cones.svec_length(d) == length(aff)
+    aff_new = vcat(-aff[1], aff[2], aff[3:end])
+    JuMP.@constraint(model, aff_new in
+        Hypatia.HypoPerLogdetTriCone{Float64, Float64}(length(aff)))
     return
 end
 

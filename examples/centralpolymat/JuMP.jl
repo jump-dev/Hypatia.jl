@@ -5,17 +5,16 @@ minimize a spectral function of a gram matrix of a polynomial
 import DynamicPolynomials
 
 struct CentralPolyMatJuMP{T <: Real} <: ExampleInstanceJuMP{T}
-    n::Int # number of polyvars
+    m::Int # number of polyvars
     halfdeg::Int # half degree of random polynomials
     ext::MatSpecExt # formulation specifier
 end
 
 function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64}
-    (n, halfdeg) = (inst.n, inst.halfdeg)
-
-    DynamicPolynomials.@polyvar x[1:n]
-    basis = DynamicPolynomials.monomials(x, 0:halfdeg)
+    DynamicPolynomials.@polyvar x[1:inst.m]
+    basis = DynamicPolynomials.monomials(x, 0:inst.halfdeg)
     L = length(basis)
+
     Q0 = randn(L, L)
     if is_domain_pos(inst.ext)
         # make the polynomial nonnegative

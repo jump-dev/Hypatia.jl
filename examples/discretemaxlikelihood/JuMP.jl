@@ -23,8 +23,8 @@ function build(inst::DiscreteMaxLikelihood{T}) where {T <: Float64}
 
     JuMP.@constraint(model, vcat(hypo, p) in Hypatia.HypoPowerMeanCone{T}(freq))
 
-    form = (inst.use_EF ? VecNegEntropyEF : VecNegEntropy)
-    add_spectral(form(), d, vcat(inv(d), inv(d), p), model)
+    ext = (inst.use_EF ? VecNegEntropyEF() : VecNegEntropy())
+    add_spectral(ext, d, vcat(inv(d), inv(d), p), model)
 
     # save for use in tests
     model.ext[:freq] = freq

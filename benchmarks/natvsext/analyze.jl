@@ -20,46 +20,75 @@ print_table_solvers =
 # uncomment examples to process
 examples_params = Dict(
     # Hypatia paper examples:
-    "densityest" => (
-        [:m, :twok], [2, 3],
-        [:SEP,], [:nu_nat, :n_nat, :n_SEP]
-        ),
-    "doptimaldesign" => (
-        [:logdet, :k], [5, 1],
-        # [:EP,], [:n_EP, :q_nat, :q_EP]
-        [:EP, :SEP],
-        Symbol[]
-        # [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
-        ),
-    "matrixcompletion" => (
-        [:m, :k], [1, 2],
-        [:EP, :SEP],
-        Symbol[]
-        # [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP,
-        # :n_SEP, :q_SEP]
-        ),
-    "matrixregression" => (
-        [:m, :k], [2, 1],
-        [:SEP,], [:n_SEP, :q_nat]
-        ),
-    "polymin" => (
-        [:m, :k], [1, 2],
-        [:SEP,], [:nu_nat, :n_nat, :q_SEP]
-        ),
-    "portfolio" => (
-        [:k], [1],
-        [:SEP,], Symbol[]
-        ),
-    "shapeconregr" => (
-        [:m, :twok], [1, 5],
-        [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
-        ),
+    # "densityest" => (
+    #     [:m, :twok], [2, 3],
+    #     [:SEP,], [:nu_nat, :n_nat, :n_SEP]
+    #     ),
+    # "doptimaldesign" => (
+    #     [:logdet, :k], [5, 1],
+    #     # [:EP,], [:n_EP, :q_nat, :q_EP]
+    #     [:EP, :SEP],
+    #     Symbol[]
+    #     # [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
+    #     ),
+    # "matrixcompletion" => (
+    #     [:m, :k], [1, 2],
+    #     [:EP, :SEP],
+    #     Symbol[]
+    #     # [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP,
+    #     # :n_SEP, :q_SEP]
+    #     ),
+    # "matrixregression" => (
+    #     [:m, :k], [2, 1],
+    #     [:SEP,], [:n_SEP, :q_nat]
+    #     ),
+    # "polymin" => (
+    #     [:m, :k], [1, 2],
+    #     [:SEP,], [:nu_nat, :n_nat, :q_SEP]
+    #     ),
+    # "portfolio" => (
+    #     [:k], [1],
+    #     [:SEP,], Symbol[]
+    #     ),
+    # "shapeconregr" => (
+    #     [:m, :twok], [1, 5],
+    #     [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
+    #     ),
     # SOS paper example:
     # "polynorm" => (
     #     [:L1, :n, :d, :m], [5, 1, 3, 4],
     #     [:SEP,], Symbol[]
     #     ),
+    # spectral paper examples:
+    "centralpolymat" => (
+        [:func, :m, :k], [3, 1, 2],
+        [:nat, :ext], Symbol[]
+        ),
+    "classicalquantum" => (
+        [:d], [1],
+        [:nat, :ext], Symbol[]
+        ),
+    "covarianceest" => (
+        [:d], [1],
+        [:logdet, :sepspec, :direct, :eigord], Symbol[]
+        ),
+    "experimentdesign" => (
+        [:func, :d], [2, 1],
+        [:nat, :ext], Symbol[]
+        ),
+    "nonparametricdistr" => (
+        [:func, :d], [2, 1],
+        [:nat, :ext], Symbol[]
+        ),
     )
+
+function spectral_func(ext::AbstractString)
+    spectral_funcs = ["Log", "Entropy", "Exp1", "Power12Conj", "Power12"]
+    for f in spectral_funcs
+        occursin(f, ext) && return f
+    end
+    error("Unknown formulation $(ext).")
+end
 
 @info("analyzing examples: $(keys(examples_params))")
 
@@ -118,6 +147,7 @@ ex_wide_file(ex_name::String) = joinpath(stats_dir, ex_name * "_wide.csv")
 function make_wide_csv(ex_df, ex_name, ex_params)
     @info("making wide csv for $ex_name")
     inst_keys = ex_params[1]
+    str(x) = split(x[2:(end - 1)], ", ")
 
     # add columns
     inst_ext_name(inst_set, ext) = (ismissing(ext) ? inst_set : ext)
@@ -134,8 +164,13 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         (y == "Success" ? status_map[x] : status_map[y])) => :status)
 
     for (name, pos) in zip(inst_keys, ex_params[2])
-        transform!(ex_df, :inst_data => ByRow(x ->
-            eval(Meta.parse(x))[pos]) => name)
+        if name == :func
+            transform!(ex_df, :inst_data =>ByRow(x ->
+                spectral_func(str(x)[pos])) => name)
+        else
+            transform!(ex_df, :inst_data => ByRow(x ->
+                eval(Meta.parse(str(x)[pos]))) => name)
+        end
     end
 
     # get solver combinations and reorder
@@ -260,7 +295,6 @@ function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
     @info("making plot csv for $ex_name")
     inst_keys = ex_params[1]
     num_params = length(inst_keys)
-    @assert 1 <= num_params <= 2 # handle case of more parameters if/when needed
 
     for inst_solver in inst_solvers
         transform_plot_cols(ex_df_wide, inst_solver)

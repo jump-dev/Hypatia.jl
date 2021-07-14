@@ -1,55 +1,40 @@
 #=
 given a random X variable taking values in the finite set {α₁,...,αₙ}, compute
 the distribution minimizing a given convex spectral function over all distributions
-satisfying some prior information (expressed using convex constraints)
+satisfying some prior information (expressed using equality constraints)
 
 adapted from Boyd and Vandenberghe, "Convex Optimization", section 7.2
 
 p ∈ ℝᵈ is the probability variable
 minimize    f(p)            (note: enforces p ≥ 0)
-subject to  Σᵢ pᵢ = 1       (probability distribution)
+subject to  Σᵢ pᵢ = d       (probability distribution, scaled by d)
             gⱼ(D p) ≤ kⱼ ∀j (prior info as convex constraints)
-            B p = b         (prior info as equalities)
-            C p ≤ c         (prior info as inequalities)
+            A p = b         (prior info as equalities)
 where f and gⱼ are different convex spectral functions
 =#
 
 struct NonparametricDistrJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     d::Int
-    num_spec::Int # number of spectral cones
-    use_EFs::Bool # use standard cone extended formulations for spectral cones
+    exts::Vector{VecSpecExt} # formulation specifier
 end
 
 function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     d = inst.d
     @assert d >= 2
+    exts = inst.exts
+    @assert length(exts) >= 1 # first is for objective
+    @assert all(is_domain_pos, exts) # domain must be positive
     p0 = rand(T, d)
-    p0 ./= sum(p0)
-
-    # pick random spectral cones (or EFs)
-    if inst.use_EFs
-        exts = [VecNegGeomEFExp(), VecNegGeomEFPow(), VecInvEF(), VecNegLogEF(),
-            VecNegEntropyEF(), VecPower12EF(1.5), VecNeg2SqrtEF()]
-    else
-        exts = [VecNegGeom(), VecInv(), VecNegLog(), VecNegEntropy(),
-            VecPower12(1.5), VecNeg2Sqrt()]
-    end
-    @assert all(is_domain_pos, exts) # all domains must be positive
-    @assert 1 <= inst.num_spec <= length(exts)
-    Random.seed!(inst.num_spec)
-    exts = Random.shuffle!(exts)[1:inst.num_spec]
+    p0 .*= d / sum(p0)
 
     model = JuMP.Model()
     JuMP.@variable(model, p[1:d])
-    JuMP.@constraint(model, sum(p) == 1)
+    JuMP.@constraint(model, sum(p) == d)
 
     # linear prior constraints
-    B = randn(T, round(Int, sqrt(d - 2)), d)
-    b = B * p0
-    JuMP.@constraint(model, B * p .== b)
-    C = randn(T, round(Int, log(d - 1)), d)
-    c = C * p0
-    JuMP.@constraint(model, C * p .<= c)
+    A = randn(T, round(Int, d / 3), d)
+    b = A * p0
+    JuMP.@constraint(model, A * p .== b)
 
     # convex objective
     JuMP.@variable(model, epi)
@@ -66,7 +51,6 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     end
 
     # save for use in tests
-    model.ext[:exts] = exts
     model.ext[:con_aff] = con_aff
     model.ext[:p_var] = p
 
@@ -80,11 +64,10 @@ function test_extra(inst::NonparametricDistrJuMP{T}, model::JuMP.Model) where T
 
     # check objective and constraints
     tol = eps(T)^0.2
-    exts = model.ext[:exts]
+    exts = inst.exts
     con_aff = model.ext[:con_aff]
     p_opt = JuMP.value.(model.ext[:p_var])
-    d = length(p_opt)
-    @test sum(p_opt) ≈ 1 atol=tol rtol=tol
+    @test sum(p_opt) ≈ inst.d atol=tol rtol=tol
     @test minimum(p_opt) >= -tol
     p_opt = pos_only(p_opt)
     obj_result = get_val(p_opt, exts[1])

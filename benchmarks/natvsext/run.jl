@@ -21,8 +21,8 @@ results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
 
 # option to keep setting up larger models, only if solver is Hypatia,
 # even if last solve was killed
-setup_model_anyway = true
-# setup_model_anyway = false
+# setup_model_anyway = true
+setup_model_anyway = false
 
 verbose = true # make solvers print output
 # verbose = false
@@ -60,28 +60,45 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
 
 # instance sets and solvers to run
 inst_sets = [
+    #= natural formulations paper =#
+    # ("nat", hyp_solver),
+    # ("ext", hyp_solver),
+    # ("ext", mosek_solver),
+    # ("extEP", hyp_solver), # ExpPSD extender
+    # ("extSEP", hyp_solver), # SOCExpPSD extender
+    # ("extEP", mosek_solver), # ExpPSD extender
+    # ("extSEP", mosek_solver), # SOCExpPSD extender
+    #= spectral function cones paper =#
     ("nat", hyp_solver),
     ("ext", hyp_solver),
-    ("extEP", hyp_solver), # ExpPSD extender
-    ("extSEP", hyp_solver), # SOCExpPSD extender
     ("ext", mosek_solver),
-    ("extEP", mosek_solver), # ExpPSD extender
-    ("extSEP", mosek_solver), # SOCExpPSD extender
+    ("logdet", hyp_solver),
+    ("sepspec", hyp_solver),
+    ("direct", hyp_solver),
+    ("direct", mosek_solver),
+    ("eigord", hyp_solver),
+    ("eigord", mosek_solver),
     ]
 
 # models to run
 JuMP_examples = [
-    # Hypatia paper examples:
-    "densityest",
-    "doptimaldesign",
-    "matrixcompletion",
-    "matrixregression",
-    "polymin",
-    "portfolio",
-    "shapeconregr",
-    # SOS paper examples:
+    #= natural formulations paper =#
+    # "densityest",
+    # "doptimaldesign",
+    # "matrixcompletion",
+    # "matrixregression",
+    # "polymin",
+    # "portfolio",
+    # "shapeconregr",
+    #= WSOS cones paper =#
     # "nearestpolymat",
     # "polynorm",
+    #= spectral function cones paper =#
+    "centralpolymat",
+    "classicalquantum",
+    "covarianceest",
+    "experimentdesign",
+    "nonparametricdistr",
     ]
 
 interrupt()
