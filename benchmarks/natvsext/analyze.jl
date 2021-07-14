@@ -83,8 +83,7 @@ examples_params = Dict(
     )
 
 function spectral_func(ext::AbstractString)
-    (ext == "nothing") && (return "Log")
-    spectral_funcs = ["Log", "Entropy", "Exp1", "Power12", "Power12Conj"]
+    spectral_funcs = ["Log", "Entropy", "Exp1", "Power12Conj", "Power12"]
     for f in spectral_funcs
         occursin(f, ext) && return f
     end
