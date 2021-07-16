@@ -6,7 +6,6 @@ centralpolymat_m_ks = [
     (1, 80),
     (1, 120),
     (1, 160),
-    (1, 200),
     ],
     [
     (2, 2), # compile run
@@ -22,7 +21,6 @@ centralpolymat_m_ks = [
     (4, 3),
     (4, 4),
     (4, 5),
-    (4, 6),
     ],
     [
     (3, 2), # compile run

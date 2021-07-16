@@ -21,15 +21,15 @@ function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     @assert is_domain_pos(inst.ext)
 
     P0 = randn(T, d, d)
-    P0 = P0 * P0' + I / 2
-    P0 ./= tr(P0)
+    P0 = Hermitian(P0 * P0' + 0.5 * I, :U)
+    P0 *= d / tr(P0)
     vec_dim = Cones.svec_length(d)
     P0_vec = zeros(T, vec_dim)
     Cones.smat_to_svec!(P0_vec, P0, sqrt(T(2)))
 
     model = JuMP.Model()
     JuMP.@variable(model, P[1:d, 1:d], Symmetric)
-    JuMP.@constraint(model, tr(P) == 1)
+    JuMP.@constraint(model, tr(P) == d)
     P_vec = zeros(JuMP.AffExpr, vec_dim)
     Cones.smat_to_svec!(P_vec, one(T) * P, sqrt(T(2)))
 

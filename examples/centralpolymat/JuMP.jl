@@ -20,8 +20,9 @@ function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64}
         # make the polynomial nonnegative
         Q0 = Q0' * Q0
     end
-    Q0 .*= inv(L)
-    poly = basis' * Symmetric(Q0, :U) * basis
+    Q0 = Symmetric(Q0, :U)
+    Q0 *= inv(eigmax(Q0))
+    poly = basis' * Q0 * basis
 
     model = JuMP.Model()
     JuMP.@variable(model, Q_vec[1:Cones.svec_length(L)])

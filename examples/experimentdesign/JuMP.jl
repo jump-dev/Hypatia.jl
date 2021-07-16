@@ -23,9 +23,10 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     d = inst.d
     @assert d >= 1
     @assert is_domain_pos(inst.ext)
-
     k = 2 * d
+
     V = randn(T, d, k)
+    V .*= d / sum(svdvals(V))
     A = randn(T, round(Int, sqrt(k - 1)), k)
     b = sum(A, dims = 2)
 
