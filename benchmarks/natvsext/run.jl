@@ -18,7 +18,7 @@ using Distributed
 include(joinpath(@__DIR__, "spawn.jl"))
 
 # path to write results DataFrame to CSV
-results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "ecos.csv")
+results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
 
 # option to keep setting up larger models, only if solver is Hypatia,
 # even if last solve was killed
@@ -27,6 +27,8 @@ setup_model_anyway = false
 
 verbose = true # make solvers print output
 # verbose = false
+
+iter_limit = 250
 num_threads = 16 # number of threads for BLAS and Julia processes running instances
 free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
 optimizer_time_limit = 1800
@@ -37,7 +39,7 @@ tol_tight = 1e-3 * tol_loose
 
 hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     verbose = verbose,
-    iter_limit = 250,
+    iter_limit = iter_limit,
     time_limit = optimizer_time_limit,
     tol_abs_opt = tol_tight,
     tol_rel_opt = tol_loose,
@@ -49,6 +51,7 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
 
 mosek_solver = ("Mosek", Mosek.Optimizer, (
     QUIET = !verbose,
+    MSK_IPAR_INTPNT_MAX_ITERATIONS = iter_limit,
     MSK_IPAR_NUM_THREADS = num_threads,
     MSK_IPAR_OPTIMIZER = Mosek.MSK_OPTIMIZER_CONIC,
     MSK_IPAR_INTPNT_BASIS = Mosek.MSK_BI_NEVER, # no basis identification for LP
@@ -59,11 +62,12 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
     MSK_DPAR_INTPNT_CO_TOL_INFEAS = tol_tight,
     ))
 
-ecos_solver = ("Ecos", ECOS.Optimizer, (
-    verbose = 3 * verbose,
-    reltol = tol_loose,
+ecos_solver = ("ECOS", ECOS.Optimizer, (
+    verbose = 2 * verbose,
+    maxit = iter_limit, # no time limit option available
     abstol = tol_tight,
-    feastol = tol_tight,
+    reltol = tol_loose,
+    feastol = tol_loose,
     ))
 
 # instance sets and solvers to run
@@ -80,7 +84,11 @@ inst_sets = [
     ("nat", hyp_solver),
     ("ext", hyp_solver),
     ("ext", mosek_solver),
-    ("ext", ecos_solver),
+    # for nonparametricdistr:
+    ("vecext", hyp_solver),
+    ("vecext", mosek_solver),
+    ("vecext", ecos_solver),
+    # for covarianceest
     ("logdet", hyp_solver),
     ("sepspec", hyp_solver),
     ("direct", hyp_solver),
@@ -101,10 +109,10 @@ JuMP_examples = [
     # "nearestpolymat",
     # "polynorm",
     #= spectral function cones paper =#
-    # "centralpolymat",
-    # "classicalquantum",
-    # "covarianceest",
-    # "experimentdesign",
+    "centralpolymat",
+    "classicalquantum",
+    "covarianceest",
+    "experimentdesign",
     "nonparametricdistr",
     ]
 

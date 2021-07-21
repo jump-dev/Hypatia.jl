@@ -9,7 +9,7 @@ insts["nat"] = (nothing, vcat(
     nonparametricdistr_insts(VecNegLog()),
     nonparametricdistr_insts(VecNegEntropy()),
     ))
-insts["ext"] = (nothing, vcat(
+insts["vecext"] = (nothing, vcat(
     nonparametricdistr_insts(VecNegLogEF()),
     nonparametricdistr_insts(VecNegEntropyEF()),
     ))
