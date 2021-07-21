@@ -1,6 +1,6 @@
 
 nonparametricdistr_insts(ext::VecSpecExt) = [
-    [(d, [ext])
+    [(d, ext)
     for d in vcat(10, 500, 1000, 2500, 5000:5000:25000)] # includes compile run
     ]
 
