@@ -106,10 +106,11 @@ h_val(xs::Vector{T}, h::NegPower01SSF) where {T <: Real} =
 
 h_conj_dom_pos(::NegPower01SSF) = true
 
+# -(p - 1) * sum((x / p)^q for x in xs)
 function h_conj(xs::Vector{T}, h::NegPower01SSF) where {T <: Real}
     p = T(h.p)
     q = p / (p - 1)
-    return -(p - 1) * sum((x / p)^q for x in xs)
+    return (1 - p) * p^-q * sum(x^q for x in xs)
 end
 
 function h_der1(ds::Vector{T}, xs::Vector{T}, h::NegPower01SSF) where {T <: Real}
@@ -154,10 +155,17 @@ h_val(xs::Vector{T}, h::Power12SSF) where {T <: Real} =
 
 h_conj_dom_pos(::Power12SSF) = false
 
+# (p - 1) * sum((x >= 0 ? zero(x) : (abs(x) / p)^q) for x in xs)
 function h_conj(xs::Vector{T}, h::Power12SSF) where {T <: Real}
     p = T(h.p)
     q = p / (p - 1)
-    return (p - 1) * sum((x >= 0 ? zero(x) : (abs(x) / p)^q) for x in xs)
+    val = zero(T)
+    for x in xs
+        if x < 0
+            val += abs(x)^q
+        end
+    end
+    return (p - 1) * p^-q * val
 end
 
 function h_der1(ds::Vector{T}, xs::Vector{T}, h::Power12SSF) where {T <: Real}
