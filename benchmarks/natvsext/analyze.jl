@@ -70,7 +70,7 @@ examples_params = Dict(
         ),
     "covarianceest" => (
         [:d], [1],
-        [:logdet, :sepspec, :direct, :eigord], Symbol[]
+        [:logdet, :sepspec, :direct], Symbol[]
         ),
     "experimentdesign" => (
         [:func, :d], [2, 1],

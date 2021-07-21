@@ -39,11 +39,10 @@ function build(inst::CovarianceEstJuMP{T}) where {T <: Float64}
     add_homog_spectral(inst.ext, d, vcat(1.0 * epi, P_vec), model)
 
     # linear prior constraints
-    lin_dim = round(Int, sqrt(d - 1))
-    B = randn(T, lin_dim, vec_dim)
+    B = randn(T, div(d, 3), vec_dim)
     b = B * P0_vec
     JuMP.@constraint(model, B * P_vec .== b)
-    C = randn(T, lin_dim, vec_dim)
+    C = randn(T, round(Int, log(d)), vec_dim)
     c = C * P0_vec
     JuMP.@constraint(model, C * P_vec .<= c)
 

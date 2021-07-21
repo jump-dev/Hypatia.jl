@@ -76,8 +76,6 @@ inst_sets = [
     ("sepspec", hyp_solver),
     ("direct", hyp_solver),
     ("direct", mosek_solver),
-    ("eigord", hyp_solver),
-    ("eigord", mosek_solver),
     ]
 
 # models to run
