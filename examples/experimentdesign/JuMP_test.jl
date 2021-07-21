@@ -25,7 +25,7 @@ insts["minimal"] = [
 insts["fast"] = [
     ((50, MatNegGeom()),),
     ((12, MatNegGeomEFExp()),),
-    ((12, MatNegGeomEFPow()),),
+    ((8, MatNegGeomEFPow()),),
     ((40, MatNegSqrt()),),
     ((5, MatNegSqrtEigOrd()),),
     ((6, MatNegSqrtConjEigOrd()),),
@@ -33,7 +33,7 @@ insts["fast"] = [
     ((100, MatLogdetCone()),),
     ((75, MatNegLog()),),
     ((7, MatNegLogEigOrd()),),
-    ((15, MatNegLogDirect()),),
+    ((20, MatNegLogDirect()),),
     ((60, MatNegEntropy()),),
     ((8, MatNegEntropyEigOrd()),),
     ((50, MatPower12(1.5)),),

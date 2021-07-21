@@ -28,12 +28,12 @@ insts["fast"] = [
     ((20, MatNegSqrtConjDirect()),),
     ((50, MatLogdetCone()),),
     ((30, MatNegLog()),),
-    ((12, MatNegLogEigOrd()),),
+    ((6, MatNegLogEigOrd()),),
     ((15, MatNegLogDirect()),),
     ((30, MatNegEntropy()),),
     ((8, MatNegEntropyEigOrd()),),
     ((30, MatPower12(1.5)),),
-    ((10, MatPower12EigOrd(1.5)),),
+    ((7, MatPower12EigOrd(1.5)),),
     ]
 insts["various"] = [
     ((100, MatNegGeom()),),

@@ -11,7 +11,7 @@ insts["minimal"] = [
     ((1, 2, MatNegEntropyConjEigOrd()),),
     # tr negsqrtconj
     ((1, 2, MatNegSqrtConj()),),
-    # ((1, 2, MatNegSqrtConjEigOrd()),),
+    ((1, 2, MatNegSqrtConjEigOrd()),),
     ((1, 2, MatNegSqrtConjDirect()),),
     # tr negpower01conj
     ((1, 2, MatNegPower01Conj(0.3)),),

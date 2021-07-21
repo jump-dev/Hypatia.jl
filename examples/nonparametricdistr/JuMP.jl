@@ -32,7 +32,7 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     JuMP.@constraint(model, sum(p) == d)
 
     # linear prior constraints
-    A = randn(T, round(Int, d / 3), d)
+    A = randn(T, round(Int, d / 2), d)
     b = A * p0
     JuMP.@constraint(model, A * p .== b)
 
