@@ -17,9 +17,9 @@ Install the selected version of Hypatia (e.g. v0.5.0) and script dependencies
 and run update:
 ```julia
 pkg> add Hypatia#v0.5.0
-pkg> add CSV DataFrames DataStructures DelimitedFiles Distributions
+pkg> add Combinatorics CSV DataFrames DataStructures DelimitedFiles Distributions
 pkg> add DynamicPolynomials ForwardDiff JuMP PolyJuMP Random SemialgebraicSets
-pkg> add SumOfSquares Test Printf MosekTools Distributed
+pkg> add SpecialFunctions SumOfSquares Test Printf MosekTools Distributed
 pkg> up
 ```
 
