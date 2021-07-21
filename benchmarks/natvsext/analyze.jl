@@ -7,6 +7,9 @@ using Printf
 using CSV
 using DataFrames
 
+include(joinpath(@__DIR__, "../../examples/Examples.jl"))
+using Main.Examples
+
 bench_file = joinpath(@__DIR__, "raw", "bench.csv")
 output_dir = mkpath(joinpath(@__DIR__, "analysis"))
 tex_dir = mkpath(joinpath(output_dir, "tex"))
@@ -136,6 +139,9 @@ relative_tol_satisfied(a::T, b::T, tol::T = 1e-4) where {T <: Real} =
 
 ex_wide_file(ex_name::String) = joinpath(stats_dir, ex_name * "_wide.csv")
 
+get_name(x::Any) = x
+get_name(x::Main.Examples.SpectralExtender) = nameof(typeof(x))
+
 function make_wide_csv(ex_df, ex_name, ex_params)
     @info("making wide csv for $ex_name")
     inst_keys = ex_params[1]
@@ -157,7 +163,7 @@ function make_wide_csv(ex_df, ex_name, ex_params)
 
     for (name, pos) in zip(inst_keys, ex_params[2])
         transform!(ex_df, :inst_data => ByRow(x ->
-            eval(Meta.parse(str(x)[pos]))) => name)
+            get_name(eval(Meta.parse(x))[pos])) => name)
     end
 
     # get solver combinations and reorder
