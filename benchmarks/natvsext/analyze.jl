@@ -82,14 +82,6 @@ examples_params = Dict(
         ),
     )
 
-function spectral_func(ext::AbstractString)
-    spectral_funcs = ["Log", "Entropy", "Exp1", "Power12Conj", "Power12"]
-    for f in spectral_funcs
-        occursin(f, ext) && return f
-    end
-    error("Unknown formulation $(ext).")
-end
-
 @info("analyzing examples: $(keys(examples_params))")
 
 function post_process()
@@ -164,13 +156,8 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         (y == "Success" ? status_map[x] : status_map[y])) => :status)
 
     for (name, pos) in zip(inst_keys, ex_params[2])
-        if name == :func
-            transform!(ex_df, :inst_data =>ByRow(x ->
-                spectral_func(str(x)[pos])) => name)
-        else
-            transform!(ex_df, :inst_data => ByRow(x ->
-                eval(Meta.parse(str(x)[pos]))) => name)
-        end
+        transform!(ex_df, :inst_data => ByRow(x ->
+            eval(Meta.parse(str(x)[pos]))) => name)
     end
 
     # get solver combinations and reorder
