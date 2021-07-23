@@ -8,7 +8,7 @@ using CSV
 using DataFrames
 
 include(joinpath(@__DIR__, "../../examples/Examples.jl"))
-using Main.Examples
+import Main.Examples
 
 bench_file = joinpath(@__DIR__, "raw", "bench.csv")
 output_dir = mkpath(joinpath(@__DIR__, "analysis"))
@@ -137,10 +137,8 @@ residual_tol_satisfied(a, tol = 1e-5) =
 relative_tol_satisfied(a::T, b::T, tol::T = 1e-4) where {T <: Real} =
     (abs(a - b) / (1 + max(abs(a), abs(b))) < tol)
 
-ex_wide_file(ex_name::String) = joinpath(stats_dir, ex_name * "_wide.csv")
-
-get_name(x::Any) = x
-get_name(x::Main.Examples.SpectralExtender) = nameof(typeof(x))
+get_name(x::Any) = string(x)
+get_name(x::Main.Examples.SpectralExtender) = Main.Examples.nat_name(x)
 
 function make_wide_csv(ex_df, ex_name, ex_params)
     @info("making wide csv for $ex_name")
@@ -208,7 +206,7 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         ]
     ex_df_wide = outerjoin(unstacked_dims..., unstacked_res..., on = inst_keys)
 
-    CSV.write(ex_wide_file(ex_name), ex_df_wide)
+    CSV.write(joinpath(stats_dir, ex_name * "_wide.csv"), ex_df_wide)
 
     return (ex_df_wide, inst_solvers)
 end
