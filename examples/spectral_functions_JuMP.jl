@@ -107,8 +107,10 @@ const MatSepSpecEigOrd = Union{MatNegLogEigOrd, MatNegEntropyEigOrd,
     MatNegEntropyConjEigOrd, MatNegSqrtConjEigOrd, MatNegPower01ConjEigOrd,
     MatPower12ConjEigOrd}
 
-const SepSpecAll = Union{VecSepSpecPrimAll, VecSepSpecDualAll,
-    MatSepSpecPrimAll, MatSepSpecDualAll}
+const NegGeomAll = Union{VecNegGeomAll, MatNegGeomAll}
+const SepSpecPrimAll = Union{VecSepSpecPrimAll, MatSepSpecPrimAll}
+const SepSpecDualAll = Union{VecSepSpecDualAll, MatSepSpecDualAll}
+const SepSpecAll = Union{SepSpecPrimAll, SepSpecDualAll}
 
 # helpers
 get_vec_ef(::MatNegGeomEFExp) = VecNegGeomEFExp()
@@ -142,16 +144,17 @@ get_ssf(ext::Union{VecPower12, VecPower12EF, VecPower12Conj, VecPower12ConjEF,
     MatPower12, MatPower12EigOrd, MatPower12Conj, MatPower12ConjEigOrd}) =
     Cones.Power12SSF(ext.p)
 
-is_domain_pos(::SpectralExtender) = true
-is_domain_pos(ext::Union{VecSepSpecDualAll, MatSepSpecDualAll}) =
-    Cones.h_conj_dom_pos(get_ssf(ext))
+nat_name(::VecNegGeomAll) = "NegGeom"
+get_name_ssf(ext::SepSpecAll) = string(nameof(typeof(get_ssf(ext))))
+nat_name(ext::SepSpecPrimAll) = get_name_ssf(ext)
+nat_name(ext::SepSpecDualAll) = get_name_ssf(ext) * "Conj"
 
-get_val(x::Vector, ::Union{VecNegGeomAll, MatNegGeomAll}) =
-    -exp(sum(log, x) / length(x))
-get_val(x::Vector, ext::Union{VecSepSpecPrimAll, MatSepSpecPrimAll}) =
-    Cones.h_val(x, get_ssf(ext))
-get_val(x::Vector, ext::Union{VecSepSpecDualAll, MatSepSpecDualAll}) =
-    Cones.h_conj(x, get_ssf(ext))
+is_domain_pos(::SpectralExtender) = true
+is_domain_pos(ext::SepSpecDualAll) = Cones.h_conj_dom_pos(get_ssf(ext))
+
+get_val(x::Vector, ::NegGeomAll) = -exp(sum(log, x) / length(x))
+get_val(x::Vector, ext::SepSpecPrimAll) = Cones.h_val(x, get_ssf(ext))
+get_val(x::Vector, ext::SepSpecDualAll) = Cones.h_conj(x, get_ssf(ext))
 
 pos_only(x::Vector{T}, minval::T = eps(T)) where {T <: Real} =
     [(x_i < minval ? minval : x_i) for x_i in x]
@@ -454,7 +457,7 @@ helpers
 =#
 
 # get epigraph and perspective variables, swapping if using dual cone
-swap_if_dual(x, y, ext::Union{VecSepSpecDualAll, MatSepSpecDualAll}) = (y, x)
+swap_if_dual(x, y, ext::SepSpecDualAll) = (y, x)
 swap_if_dual(x, y, ext::SepSpecAll) = (x, y)
 
 # check dimension and get symmetric matrix W (upper triangle) of vectorized w
