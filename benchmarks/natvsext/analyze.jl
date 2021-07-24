@@ -81,7 +81,7 @@ examples_params = Dict(
         ),
     "nonparametricdistr" => (
         [:func, :d], [2, 1],
-        [:nat, :ext], Symbol[]
+        [:nat, :vecext], Symbol[]
         ),
     )
 
