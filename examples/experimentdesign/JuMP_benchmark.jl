@@ -6,6 +6,7 @@ experimentdesign_insts(ext::MatSpecExt) = [
 
 insts = OrderedDict()
 insts["nat"] = (nothing, vcat(
+    experimentdesign_insts(MatNegGeom()),
     experimentdesign_insts(MatNegSqrt()),
     experimentdesign_insts(MatNegSqrtConj()),
     experimentdesign_insts(MatNegPower01(1/3)),
@@ -13,6 +14,7 @@ insts["nat"] = (nothing, vcat(
     experimentdesign_insts(MatPower12(1.5)),
     ))
 insts["ext"] = (nothing, vcat(
+    experimentdesign_insts(MatNegGeomEFExp()),
     experimentdesign_insts(MatNegSqrtEigOrd()),
     experimentdesign_insts(MatNegSqrtConjDirect()),
     experimentdesign_insts(MatNegPower01EigOrd(1/3)),

@@ -6,10 +6,12 @@ nonparametricdistr_insts(ext::VecSpecExt) = [
 
 insts = OrderedDict()
 insts["nat"] = (nothing, vcat(
+    nonparametricdistr_insts(VecNegGeom()),
     nonparametricdistr_insts(VecNegLog()),
     nonparametricdistr_insts(VecNegEntropy()),
     ))
 insts["vecext"] = (nothing, vcat(
+    nonparametricdistr_insts(VecNegGeomEFExp()),
     nonparametricdistr_insts(VecNegLogEF()),
     nonparametricdistr_insts(VecNegEntropyEF()),
     ))
