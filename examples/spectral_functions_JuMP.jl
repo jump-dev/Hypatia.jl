@@ -144,7 +144,7 @@ get_ssf(ext::Union{VecPower12, VecPower12EF, VecPower12Conj, VecPower12ConjEF,
     MatPower12, MatPower12EigOrd, MatPower12Conj, MatPower12ConjEigOrd}) =
     Cones.Power12SSF(ext.p)
 
-nat_name(::VecNegGeomAll) = "NegGeom"
+nat_name(::NegGeomAll) = "NegGeom"
 get_name_ssf(ext::SepSpecAll) = string(nameof(typeof(get_ssf(ext))))
 nat_name(ext::SepSpecPrimAll) = get_name_ssf(ext)
 nat_name(ext::SepSpecDualAll) = get_name_ssf(ext) * "Conj"
