@@ -147,6 +147,34 @@ function update_hess(cone::HypoPowerMean)
     return cone.hess
 end
 
+function update_inv_hess(cone::HypoPowerMean)
+    @assert cone.grad_updated
+    @assert !cone.inv_hess_updated
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
+    u = cone.point[1]
+    @views w = cone.point[2:end]
+    gu = cone.grad[1]
+    ϕ = cone.ϕ
+    tempw = cone.tempw
+    α = cone.α
+
+    @. tempw = 1 + α * ϕ * gu
+    s1 = sum(αi^2 / ti for (αi, ti) in zip(α, tempw))
+    s2 = 1 - ϕ * gu * s1
+    H = cone.inv_hess.data
+    H .= 0
+    H[1, 1] = (ϕ - u)^2 + s1 * ϕ^2 / s2
+    @inbounds for j in eachindex(w)
+        H[j + 1, j + 1] = w[j]^2 / tempw[j]
+    end
+    @. tempw = α * w / tempw
+    @views mul!(H[2:end, 2:end], tempw, tempw', ϕ * gu / s2, true)
+    H[1, 2:end] = ϕ / s2 * tempw
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
 function hess_prod!(
     prod::AbstractVecOrMat{T},
     arr::AbstractVecOrMat{T},
@@ -171,6 +199,36 @@ function hess_prod!(
         @. prod[2:end, j] = (α * ζiϕ * (c2 + rwi) + rwi) / w
     end
 
+    return prod
+end
+
+function inv_hess_prod!(
+    prod::AbstractVecOrMat{T},
+    arr::AbstractVecOrMat{T},
+    cone::HypoPowerMean{T},
+    ) where {T <: Real}
+    @assert cone.grad_updated
+    u = cone.point[1]
+    @views w = cone.point[2:end]
+    gu = cone.grad[1]
+    ϕ = cone.ϕ
+    tempw = cone.tempw
+    α = cone.α
+
+    @. tempw = 1 + α * ϕ * gu
+    s1 = sum(αi^2 / ti for (αi, ti) in zip(α, tempw))
+    s2 = 1 - ϕ * gu * s1
+    H11 = (ϕ - u)^2 + s1 * ϕ^2 / s2
+    @. @views prod[1, :] = H11 * arr[1, :]
+    @. @views prod[2:end, :] = w^2 * arr[2:end, :] / tempw
+    @. tempw = α * w / tempw
+    @inbounds for j in 1:size(arr, 2)
+        p = arr[1, j]
+        @views r = arr[2:end, j]
+        s3 = -dot(r, tempw)
+        prod[1, j] -= s3 / s2 * ϕ
+        @. prod[2:end, j] -= ϕ / s2 * (-p + gu * s3) * tempw
+    end
     return prod
 end
 
