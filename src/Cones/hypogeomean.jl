@@ -44,9 +44,6 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::HypoGeoMean) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
-
 function setup_extra_data!(cone::HypoGeoMean{T}) where {T <: Real}
     d = cone.dim - 1
     cone.di = inv(T(d))

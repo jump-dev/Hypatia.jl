@@ -215,7 +215,7 @@ function show_time_alloc(
         @time Cones.hess_prod_slow!(point2, point1, cone)
     end
 
-    if Cones.use_sqrt_hess_oracles(cone)
+    if Cones.use_sqrt_hess_oracles(dim + 1, cone)
         println("sqrt_hess_prod")
         @time Cones.sqrt_hess_prod!(point2, point1, cone)
         println("inv_sqrt_hess_prod")
