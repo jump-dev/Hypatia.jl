@@ -30,7 +30,8 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
 
     ϕ::T
     ζ::T
-    tempw::Vector{T}
+    tempw1::Vector{T}
+    tempw2::Vector{T}
 
     function HypoPowerMean{T}(
         α::Vector{T};
@@ -49,7 +50,8 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
 end
 
 function setup_extra_data!(cone::HypoPowerMean{T}) where {T <: Real}
-    cone.tempw = zeros(T, cone.dim - 1)
+    cone.tempw1 = zeros(T, cone.dim - 1)
+    cone.tempw2 = zero(cone.tempw1)
     return cone
 end
 
@@ -122,7 +124,7 @@ function update_hess(cone::HypoPowerMean)
     α = cone.α
     H = cone.hess.data
     ζ = cone.ζ
-    αwi = cone.tempw
+    αwi = cone.tempw1
     ζiϕ = cone.ϕ / ζ
     ζiϕ1 = ζiϕ - 1
     @. αwi = α ./ w
@@ -147,34 +149,6 @@ function update_hess(cone::HypoPowerMean)
     return cone.hess
 end
 
-function update_inv_hess(cone::HypoPowerMean)
-    @assert cone.grad_updated
-    @assert !cone.inv_hess_updated
-    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
-    u = cone.point[1]
-    @views w = cone.point[2:end]
-    gu = cone.grad[1]
-    ϕ = cone.ϕ
-    tempw = cone.tempw
-    α = cone.α
-
-    @. tempw = 1 + α * ϕ * gu
-    s1 = sum(αi^2 / ti for (αi, ti) in zip(α, tempw))
-    s2 = 1 - ϕ * gu * s1
-    H = cone.inv_hess.data
-    H .= 0
-    H[1, 1] = (ϕ - u)^2 + s1 * ϕ^2 / s2
-    @inbounds for j in eachindex(w)
-        H[j + 1, j + 1] = w[j]^2 / tempw[j]
-    end
-    @. tempw = α * w / tempw
-    @views mul!(H[2:end, 2:end], tempw, tempw', ϕ * gu / s2, true)
-    H[1, 2:end] = ϕ / s2 * tempw
-
-    cone.inv_hess_updated = true
-    return cone.inv_hess
-end
-
 function hess_prod!(
     prod::AbstractVecOrMat{T},
     arr::AbstractVecOrMat{T},
@@ -184,7 +158,7 @@ function hess_prod!(
     @views w = cone.point[2:end]
     α = cone.α
     ζ = cone.ζ
-    rwi = cone.tempw
+    rwi = cone.tempw1
     ζiϕ = cone.ϕ / ζ
 
     @inbounds for j in 1:size(arr, 2)
@@ -202,6 +176,38 @@ function hess_prod!(
     return prod
 end
 
+function update_inv_hess(cone::HypoPowerMean)
+    @assert cone.grad_updated
+    @assert !cone.inv_hess_updated
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
+    u = cone.point[1]
+    @views w = cone.point[2:end]
+    Hi = cone.inv_hess.data
+    ϕ = cone.ϕ
+    ζiϕ = ϕ / cone.ζ
+    tempw1 = cone.tempw1
+    tempw2 = cone.tempw2
+    α = cone.α
+
+    @. tempw1 = 1 + α * ζiϕ
+    s1 = sum(abs2(α_i) / t_i for (α_i, t_i) in zip(α, tempw1))
+    s2 = 1 - ζiϕ * s1
+    ϕs2i = ϕ / s2
+    Hi11 = (ϕ - u)^2 + s1 * ϕ * ϕs2i
+    @. tempw2 = w / tempw1
+    @. tempw1 = α * tempw2
+
+    @views mul!(Hi[2:end, 2:end], tempw1, tempw1', ζiϕ / s2, false)
+    @. Hi[1, 2:end] = ϕs2i * tempw1
+    Hi[1, 1] = (ϕ - u)^2 + s1 * ϕ * ϕs2i
+    @inbounds for j in eachindex(w)
+        Hi[j + 1, j + 1] += w[j] * tempw2[j]
+    end
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
 function inv_hess_prod!(
     prod::AbstractVecOrMat{T},
     arr::AbstractVecOrMat{T},
@@ -210,25 +216,30 @@ function inv_hess_prod!(
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
-    gu = cone.grad[1]
     ϕ = cone.ϕ
-    tempw = cone.tempw
+    ζiϕ = ϕ / cone.ζ
+    tempw1 = cone.tempw1
+    tempw2 = cone.tempw2
     α = cone.α
 
-    @. tempw = 1 + α * ϕ * gu
-    s1 = sum(αi^2 / ti for (αi, ti) in zip(α, tempw))
-    s2 = 1 - ϕ * gu * s1
-    H11 = (ϕ - u)^2 + s1 * ϕ^2 / s2
-    @. @views prod[1, :] = H11 * arr[1, :]
-    @. @views prod[2:end, :] = w^2 * arr[2:end, :] / tempw
-    @. tempw = α * w / tempw
+    @. tempw1 = 1 + α * ζiϕ
+    s1 = sum(abs2(α_i) / t_i for (α_i, t_i) in zip(α, tempw1))
+    s2 = 1 - ζiϕ * s1
+    ϕs2i = ϕ / s2
+    Hi11 = (ϕ - u)^2 + s1 * ϕ * ϕs2i
+    @. tempw2 = w / tempw1
+    @. tempw1 = α * tempw2
+    @. tempw2 *= w
+
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
         @views r = arr[2:end, j]
-        s3 = -dot(r, tempw)
-        prod[1, j] -= s3 / s2 * ϕ
-        @. prod[2:end, j] -= ϕ / s2 * (-p + gu * s3) * tempw
+        s3 = dot(r, tempw1)
+        prod[1, j] = Hi11 * p + ϕs2i * s3
+        cj = ϕs2i * (p + s3 / cone.ζ)
+        @. prod[2:end, j] = cj * tempw1 + r * tempw2
     end
+
     return prod
 end
 
@@ -241,12 +252,12 @@ function dder3(cone::HypoPowerMean{T}, dir::AbstractVector{T}) where {T <: Real}
     α = cone.α
     ϕ = cone.ϕ
     ζ = cone.ζ
-    rwi = cone.tempw
+    rwi = cone.tempw1
     ζiϕ = ϕ / ζ
 
     @. rwi = r / w
     c0 = dot(rwi, α)
-    c6 = sum(abs2(rwij) * α_i for (rwij, α_i) in zip(rwi, α))
+    c6 = sum(abs2(rwi_i) * α_i for (rwi_i, α_i) in zip(rwi, α))
     ζiχ = (p - ϕ * c0) / ζ
     c1 = ζiχ^2 + ζiϕ * (c6 - abs2(c0)) / 2
     c7 = ζiϕ * (c1 - c6 / 2 + c0 * (ζiχ + c0 / 2))
