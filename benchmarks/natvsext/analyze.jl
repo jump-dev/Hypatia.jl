@@ -205,7 +205,7 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         for v in [:status, :converged, :iters, :solve_time]
         ]
     ex_df_wide = outerjoin(unstacked_dims..., unstacked_res..., on = inst_keys)
-    sort!(ex_df_wide, inst_keys[1])
+    (:func in inst_keys) && sort!(ex_df_wide, :func)
 
     CSV.write(joinpath(stats_dir, ex_name * "_wide.csv"), ex_df_wide)
 
