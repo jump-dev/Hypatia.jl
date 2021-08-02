@@ -143,7 +143,7 @@ function solve_system(
     @. sol.s = model.h * tau - rhs.z
     mul!(sol.s, model.G, sol.x, -1, true)
 
-    # kap = -kapbar/taubar*tau + kaprhs
+    # kap = -mu/taubar^2*tau + kaprhs
     taubar = solver.point.tau[]
     sol.kap[] = -solver.mu / taubar / taubar * tau + rhs.kap[]
 
