@@ -196,6 +196,50 @@ function hess_prod!(
     return prod
 end
 
+function inv_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::GeneralizedPower,
+    )
+    @assert cone.grad_updated
+    u_idxs = cone.u_idxs
+    w_idxs = cone.w_idxs
+    α = cone.α
+    w = cone.point[w_idxs][1]
+    u = cone.point[u_idxs]
+    gw = cone.grad[w_idxs][1]
+    gu = cone.grad[u_idxs]
+    z = cone.z
+    zw = cone.zw
+
+    c3 = 1 .+ inv.(α) .+ gw * w
+    k1 = inv.(c3)
+    uk1 = u .* k1
+    c4 = α .* k1
+    k2 = sum(c4)
+    k5 = z + w^2
+    k3 = (-gw * w - 2) * zw / k5
+    k4 = 1 - z * 2 * (2 .+ k3) / zw * k2
+
+    @inbounds for j in 1:size(arr, 2)
+        @views begin
+            arr_u = arr[u_idxs, j]
+            arr_w = arr[w_idxs, j]
+            prod_u = prod[u_idxs, j]
+            prod_w = prod[w_idxs, j]
+        end
+        p = arr_u
+        r = arr_w[1]
+        my_y = k3 * w * r * k2 / k4 - dot(p, uk1) / k4
+        prod_w .= zw^2 * r / k5 / 2 - 2 * w * z * (k3 * w * r * k2 / k4 - dot(p, uk1) / k4) / k5
+        prod_u .= -(4 * α * z * my_y + 2 * α * (-gw * w - 2) * (z * my_y + w * prod_w[1]) -
+            p .* u * zw) / zw ./ -gu
+    end
+
+
+    return prod
+end
+
 function dder3(cone::GeneralizedPower, dir::AbstractVector)
     @assert cone.grad_updated
     u_idxs = cone.u_idxs
