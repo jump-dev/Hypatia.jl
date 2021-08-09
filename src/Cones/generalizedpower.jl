@@ -196,6 +196,57 @@ function hess_prod!(
     return prod
 end
 
+# function inv_hess_prod!(
+#     prod::AbstractVecOrMat,
+#     arr::AbstractVecOrMat,
+#     cone::GeneralizedPower,
+#     )
+#     @assert cone.grad_updated
+#     u_idxs = cone.u_idxs
+#     w_idxs = cone.w_idxs
+#     α = cone.α
+#     w = cone.point[w_idxs][1]
+#     u = cone.point[u_idxs]
+#     gw = cone.grad[w_idxs][1]
+#     gu = cone.grad[u_idxs]
+#     z = cone.z
+#     zw = cone.zw
+#
+#     c3 = 1 .+ inv.(α) .+ gw * w
+#     k1 = inv.(c3)
+#     uk1 = u .* k1
+#     c4 = α .* k1
+#     k2 = sum(c4)
+#     k5 = z + w^2
+#     k3 = (-gw * w - 2) * zw / k5
+#     k4 = 1 - z * 2 * (2 .+ k3) / zw * k2
+#
+#     @inbounds for j in 1:size(arr, 2)
+#         @views begin
+#             arr_u = arr[u_idxs, j]
+#             arr_w = arr[w_idxs, j]
+#             prod_u = prod[u_idxs, j]
+#             prod_w = prod[w_idxs, j]
+#         end
+#         p = arr_u
+#         r = arr_w[1]
+#         my_y = k3 * w * r * k2 / k4 - dot(p, uk1) / k4
+#         prod_w .= (zw^2 / 2 - 2 * w^2 * z * k3 * k2 / k4) / k5 * r +
+#             2 * w * z * dot(p, uk1) / k4 / k5
+#         # prod_u .= -(4 * α * z * my_y + 2 * α * (-gw * w - 2) * (z * my_y + w * prod_w[1]) -
+#         #     p .* u * zw) / zw ./ -gu
+#         prod_u .=
+#             -4 * α * z * (k3 * w * r * k2 / k4 - dot(p, uk1) / k4) / zw ./ -gu +
+#             -2 * α * (-gw * w - 2) * z * my_y / zw ./ -gu +
+#             -2 * α * (-gw * w - 2) * w * prod_w[1] / zw ./ -gu +
+#             p .* u * zw / zw ./ -gu
+#
+#     end
+#
+#
+#     return prod
+# end
+
 function inv_hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
@@ -205,20 +256,20 @@ function inv_hess_prod!(
     u_idxs = cone.u_idxs
     w_idxs = cone.w_idxs
     α = cone.α
-    w = cone.point[w_idxs][1]
+    w = cone.point[w_idxs]
     u = cone.point[u_idxs]
-    gw = cone.grad[w_idxs][1]
+    gw = cone.grad[w_idxs]
     gu = cone.grad[u_idxs]
     z = cone.z
     zw = cone.zw
 
-    c3 = 1 .+ inv.(α) .+ gw * w
+    c3 = 1 .+ inv.(α) .+ dot(gw, w)
     k1 = inv.(c3)
     uk1 = u .* k1
     c4 = α .* k1
     k2 = sum(c4)
-    k5 = z + w^2
-    k3 = (-gw * w - 2) * zw / k5
+    k5 = z + sum(abs2, w)
+    k3 = (-dot(gw, w) - 2) * zw / k5
     k4 = 1 - z * 2 * (2 .+ k3) / zw * k2
 
     @inbounds for j in 1:size(arr, 2)
@@ -229,11 +280,51 @@ function inv_hess_prod!(
             prod_w = prod[w_idxs, j]
         end
         p = arr_u
-        r = arr_w[1]
-        my_y = k3 * w * r * k2 / k4 - dot(p, uk1) / k4
-        prod_w .= zw^2 * r / k5 / 2 - 2 * w * z * (k3 * w * r * k2 / k4 - dot(p, uk1) / k4) / k5
-        prod_u .= -(4 * α * z * my_y + 2 * α * (-gw * w - 2) * (z * my_y + w * prod_w[1]) -
-            p .* u * zw) / zw ./ -gu
+        r = arr_w
+
+        # Q' * (H(QW) * Q(R))
+
+
+        k234 = k2 * k3 / k4
+        @assert k234 ≈ (-dot(gw, w) - 2) * zw^2 / k5 / (zw / k2 - z * 2 * (2 .+ k3))
+
+
+        # my_y = k3 * dot(w, r) * k2 / k4 - dot(p, uk1) / k4
+        my_y = k234 * dot(w, r) - dot(p, uk1) / k4
+        # prod_w .= zw^2 * r / k5 / 2 - 2 .* w * z .* (k3 .* w .* r * k2 / k4 .- dot(p, uk1) / k4) / k5
+        prod_w .= r .* (zw^2 / 2 .- 2 .* w.^2 * z .* k234) .+ 2 .* w * z .* dot(p, uk1) / k4
+        prod_w ./= k5
+        # prod_u .= -(4 * α * z * my_y + 2 * α * (-dot(gw, w) - 2) * (z * my_y + dot(w, prod_w)) -
+        #     p .* u * zw) / zw ./ -gu
+        # prod_u .= (dot(gw, w) * z * 2 * α * my_y -
+        #     2 * α * (-dot(gw, w) - 2) * dot(w, prod_w) +
+        #     p .* u * zw) / zw ./ -gu
+        prod_u .= (dot(gw, w) * z * 2 * α * my_y / zw +
+            2 * α * (dot(gw, w) + 2) * dot(w, prod_w) / zw +
+            # 2 * α * (dot(gw, w) + 2) * dot(w, zw^2 * r / k5 / 2 - 2 .* w * z .* (k3 .* w .* r * k2 / k4 .- dot(p, uk1) / k4) / k5) / zw +
+            p .* u) ./ -gu
+
+
+        # @assert all(1 .+ u .* gu .≈ α * (-dot(gw, w) - 1)) # can we differentiate both sides wrt t at t=0
+        # @show prod_u .* gu + u .* p ./ (α * (dot(-gw, prod_w) + dot(-r, w)))
+        # @assert all(prod_u .* gu + u .* p .≈ α * (dot(-gw, prod_w) + dot(-r, w)))
+
+        # c3 = 1 .+ inv.(α) .+ dot(gw, w)
+        1 .+ u .* gu ≈ α * (dot(-gw, w) - 1) # Erling fact
+        (1 .+ u .* gu) ./ α .≈ dot(-gw, w) - 1
+        (1 .+ u .* gu) ./ α .+ 1 .≈ dot(-gw, w)
+        c3 ≈ 1 .+ inv.(α) - ((1 .+ u .* gu) ./ α .+ 1)
+        c3 ≈ inv.(α) - (1 .+ u .* gu) ./ α
+        @assert c3 ≈ -u .* gu ./ α
+        @assert k1 ≈ α ./ (-u .* gu)
+        @assert uk1 ≈ -α ./ gu
+        @assert c4 ≈ α.^2 ./ (-u .* gu)
+        # k2 == sum(α^2 ./ (-u .* gu))
+        # k5 = z + sum(abs2, w)
+        # k3 = (-dot(gw, w) - 2) * zw / k5
+        # k4 = 1 - z * 2 * (2 .+ (-dot(gw, w) - 2) * zw / k5) / zw * sum(α^2 ./ (-u .* gu))
+        # k4 = 1 - z * 2 * (2 / zw .+ (-dot(gw, w) - 2) / k5) * sum(α^2 ./ (-u .* gu))
+
     end
 
 
