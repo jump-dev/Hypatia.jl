@@ -262,6 +262,7 @@ function inv_hess_prod!(
     gu = cone.grad[u_idxs]
     z = cone.z
     zw = cone.zw
+    w2 = cone.w2
 
     c3 = 1 .+ inv.(α) .+ dot(gw, w)
     k1 = inv.(c3)
@@ -271,6 +272,9 @@ function inv_hess_prod!(
     k5 = z + sum(abs2, w)
     k3 = (-dot(gw, w) - 2) * zw / k5
     k4 = 1 - z * 2 * (2 .+ k3) / zw * k2
+
+    k234 = k2 * k3 / k4
+    @assert k234 ≈ (-dot(gw, w) - 2) * zw^2 / k5 / (zw / k2 - z * 2 * (2 .+ k3))
 
     @inbounds for j in 1:size(arr, 2)
         @views begin
@@ -284,11 +288,6 @@ function inv_hess_prod!(
 
         # Q' * (H(QW) * Q(R))
 
-
-        k234 = k2 * k3 / k4
-        @assert k234 ≈ (-dot(gw, w) - 2) * zw^2 / k5 / (zw / k2 - z * 2 * (2 .+ k3))
-
-
         # my_y = k3 * dot(w, r) * k2 / k4 - dot(p, uk1) / k4
         my_y = k234 * dot(w, r) - dot(p, uk1) / k4
         # prod_w .= zw^2 * r / k5 / 2 - 2 .* w * z .* (k3 .* w .* r * k2 / k4 .- dot(p, uk1) / k4) / k5
@@ -299,10 +298,11 @@ function inv_hess_prod!(
         # prod_u .= (dot(gw, w) * z * 2 * α * my_y -
         #     2 * α * (-dot(gw, w) - 2) * dot(w, prod_w) +
         #     p .* u * zw) / zw ./ -gu
-        prod_u .= (dot(gw, w) * z * 2 * α * my_y / zw +
-            2 * α * (dot(gw, w) + 2) * dot(w, prod_w) / zw +
-            # 2 * α * (dot(gw, w) + 2) * dot(w, zw^2 * r / k5 / 2 - 2 .* w * z .* (k3 .* w .* r * k2 / k4 .- dot(p, uk1) / k4) / k5) / zw +
-            p .* u) ./ -gu
+        prod_u .= dot(gw, w) * z * 2 * α * my_y / zw +
+            # 2 * α * (dot(gw, w) + 2) * dot(w, prod_w) / zw +
+            2 * α * (dot(gw, w) + 2) * (dot(w, r) * zw^2 / 2 - dot(w.^3, r) * 2 * z * k234 + 2 * z .* dot(p, uk1) / k4 * w2) / k5 / zw +
+            p .* u
+        prod_u ./= -gu
 
 
         # @assert all(1 .+ u .* gu .≈ α * (-dot(gw, w) - 1)) # can we differentiate both sides wrt t at t=0
