@@ -269,7 +269,7 @@ function inv_hess_prod!(
     uk1 = u .* k1
     c4 = α .* k1
     k2 = sum(c4)
-    k5 = z + sum(abs2, w)
+    k5 = z + w2
     k3 = (-dot(gw, w) - 2) * zw / k5
     k4 = 1 - z * 2 * (2 .+ k3) / zw * k2
 
@@ -298,10 +298,24 @@ function inv_hess_prod!(
         # prod_u .= (dot(gw, w) * z * 2 * α * my_y -
         #     2 * α * (-dot(gw, w) - 2) * dot(w, prod_w) +
         #     p .* u * zw) / zw ./ -gu
-        prod_u .= dot(gw, w) * z * 2 * α * my_y / zw +
-            # 2 * α * (dot(gw, w) + 2) * dot(w, prod_w) / zw +
-            2 * α * (dot(gw, w) + 2) * (dot(w, r) * zw^2 / 2 - dot(w.^3, r) * 2 * z * k234 + 2 * z .* dot(p, uk1) / k4 * w2) / k5 / zw +
-            p .* u
+        # v = w * zw^2 / 2 - w.^3 * 2 * z * k234
+        # prod_u .= dot(gw, w) * z * 2 * α * my_y / zw +
+        #     # 2 * α * (dot(gw, w) + 2) * dot(w, prod_w) / zw +
+        #     2 * α * (dot(gw, w) + 2) * (dot(v, r) + 2 * z .* dot(p, uk1) / k4 * w2) / k5 / zw +
+        #     p .* u
+        #
+        v = (dot(gw, w) + 2) * (w * zw^2 / 2 - w.^3 * 2 * z * k234) / k5 / zw + dot(gw, w) * z * k234 * w / zw
+        t = (-dot(gw, w) + (dot(gw, w) + 2) * 2 * w2 / k5) * z / zw / k4 * uk1
+        big_c = dot(p, t) + dot(v, r)
+        prod_u .= 2 * α * big_c + p .* u
+        prod_u ./= -gu
+        # mixed terms should be the same, so
+        @assert (2 .* w[1] .* z .* uk1 / k4) / k5 ≈ (2 * α .* v[1]) ./ -gu
+        v2 = (w[1] .* z .* uk1 / k4) / k5 .* -gu ./ α
+        v2 = w[1] .* z / k4 / k5 # using defn of uk1 below
+        # big_c = dot(p, t) + v2 * r[1]
+        big_c = dot(p, t) + w[1] .* z / k4 / k5 * r[1]
+        prod_u .= 2 * α * big_c + p .* u
         prod_u ./= -gu
 
 
@@ -310,7 +324,7 @@ function inv_hess_prod!(
         # @assert all(prod_u .* gu + u .* p .≈ α * (dot(-gw, prod_w) + dot(-r, w)))
 
         # c3 = 1 .+ inv.(α) .+ dot(gw, w)
-        1 .+ u .* gu ≈ α * (dot(-gw, w) - 1) # Erling fact
+        1 .+ u .* gu ≈ α * (dot(-gw, w) - 1)
         (1 .+ u .* gu) ./ α .≈ dot(-gw, w) - 1
         (1 .+ u .* gu) ./ α .+ 1 .≈ dot(-gw, w)
         c3 ≈ 1 .+ inv.(α) - ((1 .+ u .* gu) ./ α .+ 1)
