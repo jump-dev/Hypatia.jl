@@ -109,7 +109,6 @@ function MOI.copy_to(
     opt::Optimizer{T},
     src::MOI.ModelLike;
     copy_names::Bool = false,
-    warn_attributes::Bool = true,
     ) where {T <: Real}
     @assert !copy_names
     idx_map = MOI.Utilities.IndexMap()
