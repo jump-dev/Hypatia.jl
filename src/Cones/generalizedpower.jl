@@ -158,6 +158,41 @@ function update_hess(cone::GeneralizedPower)
     return cone.hess
 end
 
+function update_inv_hess(cone::GeneralizedPower)
+    @assert cone.grad_updated
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
+    u_idxs = cone.u_idxs
+    w_idxs = cone.w_idxs
+    @views u = cone.point[u_idxs]
+    H = cone.inv_hess.data
+    α = cone.α
+    w = cone.point[w_idxs]
+    u = cone.point[u_idxs]
+    gu = cone.grad[u_idxs]
+    gw = cone.grad[w_idxs]
+    z = cone.z
+    zw = cone.zw
+    w2 = cone.w2
+
+    c3 = 1 .+ inv.(α) .+ dot(gw, w)
+    k1 = inv.(c3)
+    uk1 = u .* k1
+    c4 = α .* k1
+    k2 = sum(c4)
+    k5 = z + w2
+    k3 = (-gw[1] * w[1] - 2) * zw / k5
+    k4 = 1 - z * 2 * (2 + k3) / zw * k2
+    k234 = k2 * k3 / k4    
+
+    t = (-dot(gw, w) + (dot(gw, w) + 2) * 2 * w2 / k5) * z / zw / k4 * uk1
+    H[u_idxs, u_idxs] .= Diagonal(u ./ -gu) + 2 * (α ./ -gu) * t'
+    H[u_idxs, w_idxs] .= 2 .* w * z .* uk1 / k4 / k5
+    H[w_idxs, w_idxs] .= Diagonal(zw^2 / 2 .- 2 .* w.^2 * z .* k234) / k5
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
 function hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
