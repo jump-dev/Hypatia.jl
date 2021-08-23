@@ -182,10 +182,10 @@ function update_inv_hess(cone::GeneralizedPower{T}) where {T <: Real}
     k3 = gww2 * zw / (z + w2)
     k4 = 1 + z * 2 * k2 * (2 / (z + w2) + k3 / zw)
     k234 = k2 * k3 / k4
-    k5 = (-z^2 + w2 * z) / (z + w2) / k4
+    k5 = 2 * z / (z + w2) / k4
 
-    H[u_idxs, u_idxs] .= Diagonal(u ./ -gu) - uk1 * uk1' * 2 / zw * (z * gww / k4 - 2 * gww2 * k5 * w2 / zw)
-    H[u_idxs, w_idxs] .= 2 * uk1 / zw * k5 * w'
+    H[u_idxs, u_idxs] .= Diagonal(u ./ -gu) - uk1 * uk1' * 2 / zw * (z * gww / k4 + gww2 * k5 * w2)
+    H[u_idxs, w_idxs] .= -k5 * uk1 * w'
     H[w_idxs, w_idxs] .= zw / 2 * I - 2 * w * w' * (z * k234 + zw / 2) / (z + w2)
 
     cone.inv_hess_updated = true
@@ -258,6 +258,7 @@ function inv_hess_prod!(
     k3 = gww2 * zw / (z + w2)
     k4 = 1 + z * 2 * k2 * (2 / (z + w2) + k3 / zw)
     k234 = k2 * k3 / k4
+    k5 = z * -zw / (z + w2) / k4
 
     @inbounds for j in 1:size(arr, 2)
         @views begin
@@ -266,15 +267,14 @@ function inv_hess_prod!(
             prod_u = prod[u_idxs, j]
             prod_w = prod[w_idxs, j]
         end
+        dot_wr = dot(r, w)
+        dot_pu = dot(uk1, p)
 
-        k5 = (-z^2 + w2 * z) / (z + w2) / k4
-        k6 = zw * (z * k234 + zw / 2) / (z + w2)
+        prod_w .= zw * r / 2 - 2 * w / (z + w2) * ((z * k234 + zw / 2) * dot_wr + z / k4 * dot_pu)
 
-        prod_w .= zw * r / 2 - 2 * w / zw * (k6 * dot(r, w) - k5 * dot(uk1, p))
-
-        prod_u .=
-            -dot(uk1, p) * uk1 * 2 / zw * (z * gww / k4 - 2 * gww2 * k5 * w2 / zw) +
-            2 * uk1 / zw * k5 * dot(w, r) +
+        prod_u .= uk1 / zw * (
+            -dot_pu * 2 * z / k4 * (gww + 2 * gww2 / (z + w2) * w2) +
+            2 * k5 * dot_wr) +
             p .* u ./ -gu
     end
 
