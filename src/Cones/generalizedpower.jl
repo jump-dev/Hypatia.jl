@@ -158,40 +158,40 @@ function update_hess(cone::GeneralizedPower)
     return cone.hess
 end
 
-function update_inv_hess(cone::GeneralizedPower)
+function update_inv_hess(cone::GeneralizedPower{T}) where {T <: Real}
     @assert cone.grad_updated
     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     u_idxs = cone.u_idxs
     w_idxs = cone.w_idxs
-    @views u = cone.point[u_idxs]
     H = cone.inv_hess.data
     α = cone.α
-    w = cone.point[w_idxs]
-    u = cone.point[u_idxs]
-    gu = cone.grad[u_idxs]
-    gw = cone.grad[w_idxs]
+    @views begin
+        w = cone.point[w_idxs]
+        u = cone.point[u_idxs]
+        gw = cone.grad[w_idxs]
+        gu = cone.grad[u_idxs]
+    end
     z = cone.z
     zw = cone.zw
+
+    gww = dot(gw, w) # also product of norms
+    gww2 = -gww - 2
+    uk1 = α ./ gu
+    k2 = sum(α.^2 ./ (-u .* gu))
     w2 = cone.w2
+    k3 = gww2 * zw / (z + w2)
+    k4 = 1 + z * 2 * k2 * (2 / (z + w2) + k3 / zw)
+    k234 = k2 * k3 / k4
+    k5 = (-z^2 + w2 * z) / (z + w2) / k4
 
-    c3 = 1 .+ inv.(α) .+ dot(gw, w)
-    k1 = inv.(c3)
-    uk1 = u .* k1
-    c4 = α .* k1
-    k2 = sum(c4)
-    k5 = z + w2
-    k3 = (-gw[1] * w[1] - 2) * zw / k5
-    k4 = 1 - z * 2 * (2 + k3) / zw * k2
-    k234 = k2 * k3 / k4    
-
-    t = (-dot(gw, w) + (dot(gw, w) + 2) * 2 * w2 / k5) * z / zw / k4 * uk1
-    H[u_idxs, u_idxs] .= Diagonal(u ./ -gu) + 2 * (α ./ -gu) * t'
-    H[u_idxs, w_idxs] .= 2 .* w * z .* uk1 / k4 / k5
-    H[w_idxs, w_idxs] .= Diagonal(zw^2 / 2 .- 2 .* w.^2 * z .* k234) / k5
+    H[u_idxs, u_idxs] .= Diagonal(u ./ -gu) - uk1 * uk1' * 2 / zw * (z * gww / k4 - 2 * gww2 * k5 * w2 / zw)
+    H[u_idxs, w_idxs] .= 2 * uk1 / zw * k5 * w'
+    H[w_idxs, w_idxs] .= zw / 2 * I - 2 * w * w' * (z * k234 + zw / 2) / (z + w2)
 
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
+
 
 function hess_prod!(
     prod::AbstractVecOrMat,
@@ -231,56 +231,6 @@ function hess_prod!(
     return prod
 end
 
-# function inv_hess_prod!(
-#     prod::AbstractVecOrMat,
-#     arr::AbstractVecOrMat,
-#     cone::GeneralizedPower,
-#     )
-#     @assert cone.grad_updated
-#     u_idxs = cone.u_idxs
-#     w_idxs = cone.w_idxs
-#     α = cone.α
-#     w = cone.point[w_idxs][1]
-#     u = cone.point[u_idxs]
-#     gw = cone.grad[w_idxs][1]
-#     gu = cone.grad[u_idxs]
-#     z = cone.z
-#     zw = cone.zw
-#
-#     c3 = 1 .+ inv.(α) .+ gw * w
-#     k1 = inv.(c3)
-#     uk1 = u .* k1
-#     c4 = α .* k1
-#     k2 = sum(c4)
-#     k5 = z + w^2
-#     k3 = (-gw * w - 2) * zw / k5
-#     k4 = 1 - z * 2 * (2 .+ k3) / zw * k2
-#
-#     @inbounds for j in 1:size(arr, 2)
-#         @views begin
-#             arr_u = arr[u_idxs, j]
-#             arr_w = arr[w_idxs, j]
-#             prod_u = prod[u_idxs, j]
-#             prod_w = prod[w_idxs, j]
-#         end
-#         p = arr_u
-#         r = arr_w[1]
-#         my_y = k3 * w * r * k2 / k4 - dot(p, uk1) / k4
-#         prod_w .= (zw^2 / 2 - 2 * w^2 * z * k3 * k2 / k4) / k5 * r +
-#             2 * w * z * dot(p, uk1) / k4 / k5
-#         # prod_u .= -(4 * α * z * my_y + 2 * α * (-gw * w - 2) * (z * my_y + w * prod_w[1]) -
-#         #     p .* u * zw) / zw ./ -gu
-#         prod_u .=
-#             -4 * α * z * (k3 * w * r * k2 / k4 - dot(p, uk1) / k4) / zw ./ -gu +
-#             -2 * α * (-gw * w - 2) * z * my_y / zw ./ -gu +
-#             -2 * α * (-gw * w - 2) * w * prod_w[1] / zw ./ -gu +
-#             p .* u * zw / zw ./ -gu
-#
-#     end
-#
-#
-#     return prod
-# end
 
 function inv_hess_prod!(
     prod::AbstractVecOrMat,
@@ -291,91 +241,42 @@ function inv_hess_prod!(
     u_idxs = cone.u_idxs
     w_idxs = cone.w_idxs
     α = cone.α
-    w = cone.point[w_idxs]
-    u = cone.point[u_idxs]
-    gw = cone.grad[w_idxs]
-    gu = cone.grad[u_idxs]
+    @views begin
+        w = cone.point[w_idxs]
+        u = cone.point[u_idxs]
+        gw = cone.grad[w_idxs]
+        gu = cone.grad[u_idxs]
+    end
     z = cone.z
     zw = cone.zw
+
+    gww = dot(gw, w) # also product of norms
+    gww2 = -gww - 2
+    uk1 = α ./ gu
+    k2 = sum(α.^2 ./ (-u .* gu))
     w2 = cone.w2
-
-    c3 = 1 .+ inv.(α) .+ dot(gw, w)
-    k1 = inv.(c3)
-    uk1 = u .* k1
-    c4 = α .* k1
-    k2 = sum(c4)
-    k5 = z + w2
-    k3 = (-dot(gw, w) - 2) * zw / k5
-    k4 = 1 - z * 2 * (2 .+ k3) / zw * k2
-
+    k3 = gww2 * zw / (z + w2)
+    k4 = 1 + z * 2 * k2 * (2 / (z + w2) + k3 / zw)
     k234 = k2 * k3 / k4
-    @assert k234 ≈ (-dot(gw, w) - 2) * zw^2 / k5 / (zw / k2 - z * 2 * (2 .+ k3))
 
     @inbounds for j in 1:size(arr, 2)
         @views begin
-            arr_u = arr[u_idxs, j]
-            arr_w = arr[w_idxs, j]
+            p = arr[u_idxs, j]
+            r = arr[w_idxs, j]
             prod_u = prod[u_idxs, j]
             prod_w = prod[w_idxs, j]
         end
-        p = arr_u
-        r = arr_w
 
-        # Q' * (H(QW) * Q(R))
+        k5 = (-z^2 + w2 * z) / (z + w2) / k4
+        k6 = zw * (z * k234 + zw / 2) / (z + w2)
 
-        # my_y = k3 * dot(w, r) * k2 / k4 - dot(p, uk1) / k4
-        my_y = k234 * dot(w, r) - dot(p, uk1) / k4
-        # prod_w .= zw^2 * r / k5 / 2 - 2 .* w * z .* (k3 .* w .* r * k2 / k4 .- dot(p, uk1) / k4) / k5
-        prod_w .= r .* (zw^2 / 2 .- 2 .* w.^2 * z .* k234) .+ 2 .* w * z .* dot(p, uk1) / k4
-        prod_w ./= k5
-        # prod_u .= -(4 * α * z * my_y + 2 * α * (-dot(gw, w) - 2) * (z * my_y + dot(w, prod_w)) -
-        #     p .* u * zw) / zw ./ -gu
-        # prod_u .= (dot(gw, w) * z * 2 * α * my_y -
-        #     2 * α * (-dot(gw, w) - 2) * dot(w, prod_w) +
-        #     p .* u * zw) / zw ./ -gu
-        # v = w * zw^2 / 2 - w.^3 * 2 * z * k234
-        # prod_u .= dot(gw, w) * z * 2 * α * my_y / zw +
-        #     # 2 * α * (dot(gw, w) + 2) * dot(w, prod_w) / zw +
-        #     2 * α * (dot(gw, w) + 2) * (dot(v, r) + 2 * z .* dot(p, uk1) / k4 * w2) / k5 / zw +
-        #     p .* u
-        #
-        v = (dot(gw, w) + 2) * (w * zw^2 / 2 - w.^3 * 2 * z * k234) / k5 / zw + dot(gw, w) * z * k234 * w / zw
-        t = (-dot(gw, w) + (dot(gw, w) + 2) * 2 * w2 / k5) * z / zw / k4 * uk1
-        big_c = dot(p, t) + dot(v, r)
-        prod_u .= 2 * α * big_c + p .* u
-        prod_u ./= -gu
-        # mixed terms should be the same, so
-        @assert (2 .* w[1] .* z .* uk1 / k4) / k5 ≈ (2 * α .* v[1]) ./ -gu
-        v2 = (w[1] .* z .* uk1 / k4) / k5 .* -gu ./ α
-        v2 = w[1] .* z / k4 / k5 # using defn of uk1 below
-        # big_c = dot(p, t) + v2 * r[1]
-        big_c = dot(p, t) + w[1] .* z / k4 / k5 * r[1]
-        prod_u .= 2 * α * big_c + p .* u
-        prod_u ./= -gu
+        prod_w .= zw * r / 2 - 2 * w / zw * (k6 * dot(r, w) - k5 * dot(uk1, p))
 
-
-        # @assert all(1 .+ u .* gu .≈ α * (-dot(gw, w) - 1)) # can we differentiate both sides wrt t at t=0
-        # @show prod_u .* gu + u .* p ./ (α * (dot(-gw, prod_w) + dot(-r, w)))
-        # @assert all(prod_u .* gu + u .* p .≈ α * (dot(-gw, prod_w) + dot(-r, w)))
-
-        # c3 = 1 .+ inv.(α) .+ dot(gw, w)
-        1 .+ u .* gu ≈ α * (dot(-gw, w) - 1)
-        (1 .+ u .* gu) ./ α .≈ dot(-gw, w) - 1
-        (1 .+ u .* gu) ./ α .+ 1 .≈ dot(-gw, w)
-        c3 ≈ 1 .+ inv.(α) - ((1 .+ u .* gu) ./ α .+ 1)
-        c3 ≈ inv.(α) - (1 .+ u .* gu) ./ α
-        @assert c3 ≈ -u .* gu ./ α
-        @assert k1 ≈ α ./ (-u .* gu)
-        @assert uk1 ≈ -α ./ gu
-        @assert c4 ≈ α.^2 ./ (-u .* gu)
-        # k2 == sum(α^2 ./ (-u .* gu))
-        # k5 = z + sum(abs2, w)
-        # k3 = (-dot(gw, w) - 2) * zw / k5
-        # k4 = 1 - z * 2 * (2 .+ (-dot(gw, w) - 2) * zw / k5) / zw * sum(α^2 ./ (-u .* gu))
-        # k4 = 1 - z * 2 * (2 / zw .+ (-dot(gw, w) - 2) / k5) * sum(α^2 ./ (-u .* gu))
-
+        prod_u .=
+            -dot(uk1, p) * uk1 * 2 / zw * (z * gww / k4 - 2 * gww2 * k5 * w2 / zw) +
+            2 * uk1 / zw * k5 * dot(w, r) +
+            p .* u ./ -gu
     end
-
 
     return prod
 end
