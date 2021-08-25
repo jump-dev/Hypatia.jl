@@ -173,20 +173,18 @@ function update_inv_hess(cone::GeneralizedPower{T}) where {T <: Real}
     end
     z = cone.z
     zw = cone.zw
-
-    gww = dot(gw, w) # also product of norms
-    gww2 = -gww - 2
-    uk1 = α ./ gu
-    k2 = sum(α.^2 ./ (-u .* gu))
     w2 = cone.w2
-    k3 = gww2 * zw / (z + w2)
-    k4 = 1 + z * 2 * k2 * (2 / (z + w2) + k3 / zw)
-    k234 = k2 * k3 / k4
-    k5 = 2 * z / (z + w2) / k4
+    gww = dot(gw, w) # also product of norms
+    guiα = α ./ gu
+    k2 = -dot(α ./ u, α ./ gu)
+    # @assert -u .* gu ./ α ≈ 1 .+ inv.(α) .- -gww
+    # @assert k2 ≈ dot(α, inv.(1 .+ inv.(α) .- -gww))
+    # @assert k2 ≈ sum(α ./ (1 .+ inv.(α) .+ gww))
+    k1 = 1 / 2 + w2 / z / 2 - k2 * gww
 
-    H[u_idxs, u_idxs] .= Diagonal(u ./ -gu) - uk1 * uk1' * 2 / zw * (z * gww / k4 + gww2 * k5 * w2)
-    H[u_idxs, w_idxs] .= -k5 * uk1 * w'
-    H[w_idxs, w_idxs] .= zw / 2 * I - 2 * w * w' * (z * k234 + zw / 2) / (z + w2)
+    H[u_idxs, u_idxs] .= Diagonal(u ./ -gu) - guiα * guiα' * (gww - 4 * w2 / zw) / k1
+    H[u_idxs, w_idxs] .= -guiα * w' / k1
+    H[w_idxs, w_idxs] .= zw / 2 * I - w * w' * zw * (-k2 * (gww + 2) / k1 + 1) / (z + w2)
 
     cone.inv_hess_updated = true
     return cone.inv_hess
@@ -249,16 +247,11 @@ function inv_hess_prod!(
     end
     z = cone.z
     zw = cone.zw
-
-    gww = dot(gw, w) # also product of norms
-    gww2 = -gww - 2
-    uk1 = α ./ gu
-    k2 = sum(α.^2 ./ (-u .* gu))
     w2 = cone.w2
-    k3 = gww2 * zw / (z + w2)
-    k4 = 1 + z * 2 * k2 * (2 / (z + w2) + k3 / zw)
-    k234 = k2 * k3 / k4
-    k5 = z * -zw / (z + w2) / k4
+    gww = dot(gw, w) # also product of norms
+    guiα = α ./ gu
+    k2 = -dot(α ./ u, α ./ gu)
+    k1 = 1 / 2 + w2 / z / 2 - k2 * gww
 
     @inbounds for j in 1:size(arr, 2)
         @views begin
@@ -268,14 +261,9 @@ function inv_hess_prod!(
             prod_w = prod[w_idxs, j]
         end
         dot_wr = dot(r, w)
-        dot_pu = dot(uk1, p)
-
-        prod_w .= zw * r / 2 - 2 * w / (z + w2) * ((z * k234 + zw / 2) * dot_wr + z / k4 * dot_pu)
-
-        prod_u .= uk1 / zw * (
-            -dot_pu * 2 * z / k4 * (gww + 2 * gww2 / (z + w2) * w2) +
-            2 * k5 * dot_wr) +
-            p .* u ./ -gu
+        dot_pu = dot(guiα, p)
+        prod_w .= zw * r / 2 - w * (zw * (-k2 * gww - 2 * k2 + k1) / (z + w2) * dot_wr + dot_pu) / k1
+        prod_u .= p .* u ./ -gu - guiα * ((gww - 4 * w2 / zw) * dot_pu + dot_wr) / k1
     end
 
     return prod
