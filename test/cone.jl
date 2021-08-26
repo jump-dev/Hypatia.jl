@@ -540,7 +540,6 @@ show_time_alloc(C::Type{<:Cones.MatrixEpiPerSquare}) = show_time_alloc(C(2, 2))
 # GeneralizedPower
 function test_oracles(C::Type{Cones.GeneralizedPower{T}}) where T
     for (du, dw) in [(2, 1), (3, 2), (4, 1), (2, 4)]
-    # for (du, dw) in [(2, 1), (4, 1), (5, 1)]
         test_oracles(C(rand_powers(T, du), dw))
     end
 end
