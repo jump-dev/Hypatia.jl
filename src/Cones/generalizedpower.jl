@@ -158,6 +158,57 @@ function update_hess(cone::GeneralizedPower)
     return cone.hess
 end
 
+function update_inv_hess(cone::GeneralizedPower{T}) where {T <: Real}
+    @assert cone.grad_updated
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
+    u_idxs = cone.u_idxs
+    w_idxs = cone.w_idxs
+    H = cone.inv_hess.data
+    α = cone.α
+    @views begin
+        w = cone.point[w_idxs]
+        u = cone.point[u_idxs]
+        gw = cone.grad[w_idxs]
+        gu = cone.grad[u_idxs]
+    end
+    z = cone.z
+    zw = cone.zw
+    w2 = cone.w2
+    gww = dot(gw, w)
+    guiα = cone.tempu1
+    uiα = cone.tempu2
+    @. guiα = α / gu
+    @. uiα = α / u
+    k2 = -dot(uiα, guiα)
+    k1 = (1 + w2 / z) / 2 - k2 * gww
+    k3 = zw * (-k2 * (gww + 2) / k1 + 1) / (z + w2)
+    k4 = -gww / k1
+    zw2 = zw / 2
+
+    @inbounds for j in u_idxs
+        guiαj = -guiα[j] * k4
+        for i in 1:j
+            H[i, j] = guiα[i] * guiαj
+        end
+        H[j, j] -= u[j] / gu[j]
+    end
+
+    @inbounds for j in w_idxs
+        wj = cone.point[j]
+        for i in u_idxs
+            H[i, j] = -guiα[i] * wj / k1
+        end
+        for i in first(w_idxs):j
+            H[i, j] = -cone.point[i] * wj * k3
+        end
+        H[j, j] += zw2
+    end
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+
 function hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
@@ -191,6 +242,50 @@ function hess_prod!(
         @. prod_u += dot3 * α
         prod_u ./= u
         @. prod_w += dot2 * w
+    end
+
+    return prod
+end
+
+
+function inv_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::GeneralizedPower,
+    )
+    @assert cone.grad_updated
+    u_idxs = cone.u_idxs
+    w_idxs = cone.w_idxs
+    α = cone.α
+    @views begin
+        w = cone.point[w_idxs]
+        u = cone.point[u_idxs]
+        gw = cone.grad[w_idxs]
+        gu = cone.grad[u_idxs]
+    end
+    z = cone.z
+    zw = cone.zw
+    w2 = cone.w2
+    gww = dot(gw, w)
+    guiα = cone.tempu1
+    uiα = cone.tempu2
+    @. guiα = α / gu
+    @. uiα = α / u
+    k2 = -dot(uiα, guiα)
+    k1 = (1 + w2 / z) / 2 - k2 * gww
+    k3 = zw * (-k2 * (gww + 2) + k1) / (z + w2)
+
+    @inbounds for j in 1:size(arr, 2)
+        @views begin
+            p = arr[u_idxs, j]
+            r = arr[w_idxs, j]
+            prod_u = prod[u_idxs, j]
+            prod_w = prod[w_idxs, j]
+        end
+        dot_wr = dot(r, w)
+        dot_pu = dot(guiα, p)
+        @. prod_w = zw * r / 2 - w * (k3 * dot_wr + dot_pu) / k1
+        @. prod_u = p * u / -gu - guiα * (-gww * dot_pu + dot_wr) / k1
     end
 
     return prod
