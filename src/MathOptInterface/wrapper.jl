@@ -2,7 +2,7 @@
 MathOptInterface wrapper of Hypatia solver
 =#
 
-const SV = MOI.SingleVariable
+const VI = MOI.VariableIndex
 const SAF = MOI.ScalarAffineFunction
 const VV = MOI.VectorOfVariables
 const VAF = MOI.VectorAffineFunction
@@ -82,14 +82,14 @@ MOI.supports(
     ::Optimizer{T},
     ::Union{
         MOI.ObjectiveSense,
-        MOI.ObjectiveFunction{SV},
+        MOI.ObjectiveFunction{VI},
         MOI.ObjectiveFunction{SAF{T}},
         },
     ) where {T <: Real} = true
 
 MOI.supports_constraint(
     ::Optimizer{T},
-    ::Type{<:Union{SV, SAF{T}}},
+    ::Type{<:Union{VI, SAF{T}}},
     ::Type{<:Union{
         MOI.EqualTo{T},
         MOI.GreaterThan{T},
@@ -124,7 +124,7 @@ function MOI.copy_to(
 
     # objective function
     F = MOI.get(src, MOI.ObjectiveFunctionType())
-    if F == SV
+    if F == VI
         obj = SAF{T}(MOI.get(src, MOI.ObjectiveFunction{F}()))
     elseif F == SAF{T}
         obj = MOI.get(src, MOI.ObjectiveFunction{F}())
@@ -157,14 +157,14 @@ function MOI.copy_to(
     (Icpe, Vcpe) = (Int[], T[]) # constraint set constants for opt.constr_prim_eq
     constr_offset_eq = Vector{Int}()
 
-    for F in (SV, SAF{T}), ci in get_src_cons(F, MOI.EqualTo{T})
+    for F in (VI, SAF{T}), ci in get_src_cons(F, MOI.EqualTo{T})
         i += 1
         idx_map[ci] = MOI.ConstraintIndex{F, MOI.EqualTo{T}}(i)
         push!(constr_offset_eq, p)
         p += 1
         fi = get_con_fun(ci)
         si = get_con_set(ci)
-        if F == SV
+        if F == VI
             push!(IA, p)
             push!(JA, idx_map[fi.variable].value)
             push!(VA, -1)
@@ -223,14 +223,14 @@ function MOI.copy_to(
     nonneg_start = q
 
     # nonnegative-like constraints
-    for F in (SV, SAF{T}), ci in get_src_cons(F, MOI.GreaterThan{T})
+    for F in (VI, SAF{T}), ci in get_src_cons(F, MOI.GreaterThan{T})
         i += 1
         idx_map[ci] = MOI.ConstraintIndex{F, MOI.GreaterThan{T}}(i)
         push!(constr_offset_cone, q)
         q += 1
         fi = get_con_fun(ci)
         si = get_con_set(ci)
-        if F == SV
+        if F == VI
             push!(IG, q)
             push!(JG, idx_map[fi.variable].value)
             push!(VG, -1)
@@ -276,14 +276,14 @@ function MOI.copy_to(
     # nonpositive-like constraints
     nonpos_start = q
 
-    for F in (SV, SAF{T}), ci in get_src_cons(F, MOI.LessThan{T})
+    for F in (VI, SAF{T}), ci in get_src_cons(F, MOI.LessThan{T})
         i += 1
         idx_map[ci] = MOI.ConstraintIndex{F, MOI.LessThan{T}}(i)
         push!(constr_offset_cone, q)
         q += 1
         fi = get_con_fun(ci)
         si = get_con_set(ci)
-        if F == SV
+        if F == VI
             push!(IG, q)
             push!(JG, idx_map[fi.variable].value)
             push!(VG, 1)
@@ -334,7 +334,7 @@ function MOI.copy_to(
 
     # build up one L_infinity norm cone from two-sided interval constraints
     interval_start = q
-    SV_intvl = get_src_cons(SV, MOI.Interval{T})
+    SV_intvl = get_src_cons(VI, MOI.Interval{T})
     SAF_intvl = get_src_cons(SAF{T}, MOI.Interval{T})
     num_intervals = length(SV_intvl) + length(SAF_intvl)
     interval_scales = zeros(T, num_intervals)
@@ -348,7 +348,7 @@ function MOI.copy_to(
     end
 
     interval_count = 0
-    for (F, Cs) in ((SV, SV_intvl), (SAF{T}, SAF_intvl)), ci in Cs
+    for (F, Cs) in ((VI, SV_intvl), (SAF{T}, SAF_intvl)), ci in Cs
         i += 1
         idx_map[ci] = MOI.ConstraintIndex{F, MOI.Interval{T}}(i)
         push!(constr_offset_cone, q)
@@ -362,7 +362,7 @@ function MOI.copy_to(
         scal = 2 / (upper - lower)
 
         fi = get_con_fun(ci)
-        if F == SV
+        if F == VI
             push!(IG, q)
             push!(JG, idx_map[fi.variable].value)
             push!(VG, -scal)
@@ -506,7 +506,7 @@ function MOI.get(opt::Optimizer, ::MOI.TimeLimitSec)
     return
 end
 
-function MOI.get(opt::Optimizer, ::MOI.SolveTime)
+function MOI.get(opt::Optimizer, ::MOI.SolveTimeSec)
     if opt.solver.status in (:NotLoaded, :Loaded)
         error("solve has not been called")
     end
