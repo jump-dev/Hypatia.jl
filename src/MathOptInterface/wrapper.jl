@@ -133,7 +133,7 @@ function MOI.copy_to(
     end
     (Jc, Vc) = (Int[], T[])
     for t in obj.terms
-        push!(Jc, idx_map[t.variable_index].value)
+        push!(Jc, idx_map[t.variable].value)
         push!(Vc, t.coefficient)
     end
     obj_offset = obj.constant
@@ -166,13 +166,13 @@ function MOI.copy_to(
         si = get_con_set(ci)
         if F == VI
             push!(IA, p)
-            push!(JA, idx_map[fi.variable].value)
+            push!(JA, idx_map[fi].value)
             push!(VA, -1)
             push!(Vb, -si.value)
         else
             for vt in fi.terms
                 push!(IA, p)
-                push!(JA, idx_map[vt.variable_index].value)
+                push!(JA, idx_map[vt.variable].value)
                 push!(VA, -vt.coefficient)
             end
             push!(Vb, fi.constant - si.value)
@@ -195,7 +195,7 @@ function MOI.copy_to(
         else
             for vt in fi.terms
                 push!(IA, p + vt.output_index)
-                push!(JA, idx_map[vt.scalar_term.variable_index].value)
+                push!(JA, idx_map[vt.scalar_term.variable].value)
                 push!(VA, -vt.scalar_term.coefficient)
             end
             append!(Ib, (p + 1):(p + dim))
@@ -232,13 +232,13 @@ function MOI.copy_to(
         si = get_con_set(ci)
         if F == VI
             push!(IG, q)
-            push!(JG, idx_map[fi.variable].value)
+            push!(JG, idx_map[fi].value)
             push!(VG, -1)
             push!(Vh, -si.lower)
         else
             for vt in fi.terms
                 push!(IG, q)
-                push!(JG, idx_map[vt.variable_index].value)
+                push!(JG, idx_map[vt.variable].value)
                 push!(VG, -vt.coefficient)
             end
             push!(Vh, fi.constant - si.lower)
@@ -264,7 +264,7 @@ function MOI.copy_to(
             dim = MOI.output_dimension(fi)
             for vt in fi.terms
                 push!(IG, q + vt.output_index)
-                push!(JG, idx_map[vt.scalar_term.variable_index].value)
+                push!(JG, idx_map[vt.scalar_term.variable].value)
                 push!(VG, -vt.scalar_term.coefficient)
             end
             append!(Ih, (q + 1):(q + dim))
@@ -285,13 +285,13 @@ function MOI.copy_to(
         si = get_con_set(ci)
         if F == VI
             push!(IG, q)
-            push!(JG, idx_map[fi.variable].value)
+            push!(JG, idx_map[fi].value)
             push!(VG, 1)
             push!(Vh, si.upper)
         else
             for vt in fi.terms
                 push!(IG, q)
-                push!(JG, idx_map[vt.variable_index].value)
+                push!(JG, idx_map[vt.variable].value)
                 push!(VG, vt.coefficient)
             end
             push!(Vh, -fi.constant + si.upper)
@@ -317,7 +317,7 @@ function MOI.copy_to(
             dim = MOI.output_dimension(fi)
             for vt in fi.terms
                 push!(IG, q + vt.output_index)
-                push!(JG, idx_map[vt.scalar_term.variable_index].value)
+                push!(JG, idx_map[vt.scalar_term.variable].value)
                 push!(VG, vt.scalar_term.coefficient)
             end
             append!(Ih, (q + 1):(q + dim))
@@ -370,7 +370,7 @@ function MOI.copy_to(
         else
             for vt in fi.terms
                 push!(IG, q)
-                push!(JG, idx_map[vt.variable_index].value)
+                push!(JG, idx_map[vt.variable].value)
                 push!(VG, -vt.coefficient * scal)
             end
             push!(Vh, (fi.constant - mid) * scal)
@@ -413,7 +413,7 @@ function MOI.copy_to(
                 IGi = permute_affine(si, 1:dim)
                 VGi = rescale_affine(si, fill(-one(T), dim))
             else
-                JGi = (idx_map[vt.scalar_term.variable_index].value
+                JGi = (idx_map[vt.scalar_term.variable].value
                     for vt in fi.terms)
                 IGi = permute_affine(si, [vt.output_index for vt in fi.terms])
                 VGi = rescale_affine(si, [-vt.scalar_term.coefficient
