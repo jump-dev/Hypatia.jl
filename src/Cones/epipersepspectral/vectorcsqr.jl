@@ -225,7 +225,7 @@ function update_inv_hess_aux(cone::EpiPerSepSpectral{<:VectorCSqr})
 
     ζ2β = abs2(cache.ζ) + dot(∇h, α)
     c1 = σ + dot(∇h, γ)
-    c4 = inv(v^-2 + sum((viw[i] - γ[i]) * w1[i] for i in 1:cone.d))
+    @inbounds c4 = inv(v^-2 + sum((viw[i] - γ[i]) * w1[i] for i in 1:cone.d))
     c5 = ζ2β
 
     cache.c1 = c1
