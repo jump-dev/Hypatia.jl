@@ -28,9 +28,9 @@ mutable struct VectorCSqrCache{T <: Real} <: CSqrCache{T}
     m::Vector{T}
     α::Vector{T}
     γ::Vector{T}
-    c0::T
+    c1::T
     c4::T
-    c5::T
+    ζ2β::T
 
     VectorCSqrCache{T}() where {T <: Real} = new{T}()
 end
@@ -224,15 +224,12 @@ function update_inv_hess_aux(cone::EpiPerSepSpectral{<:VectorCSqr})
     @. γ = m * w1
 
     ζ2β = abs2(cache.ζ) + dot(∇h, α)
-    c0 = σ + dot(∇h, γ)
-    c1 = c0 / ζ2β
-    @inbounds sum1 = sum((viw[i] + c1 * α[i] - γ[i]) * w1[i] for i in 1:cone.d)
-    c3 = v^-2 + σ * c1 + sum1
-    c4 = inv(c3 - c0 * c1)
-    c5 = ζ2β * c3
-    cache.c0 = c0
+    c1 = σ + dot(∇h, γ)
+    @inbounds c4 = inv(v^-2 + sum((viw[i] - γ[i]) * w1[i] for i in 1:cone.d))
+
+    cache.c1 = c1
     cache.c4 = c4
-    cache.c5 = c5
+    cache.ζ2β = ζ2β
 
     cone.inv_hess_aux_updated = true
 end
@@ -245,13 +242,13 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr})
     m = cache.m
     α = cache.α
     γ = cache.γ
-    c0 = cache.c0
+    c1 = cache.c1
     c4 = cache.c4
-    c5 = cache.c5
+    ζ2β = cache.ζ2β
 
     # Hiuu, Hiuv, Hivv
-    Hi[1, 1] = c4 * c5
-    Hi[1, 2] = c4 * c0
+    Hi[1, 1] = ζ2β + c1 * c4 * c1
+    Hi[1, 2] = c4 * c1
     Hi[2, 2] = c4
 
     @inbounds for j in 1:cone.d
@@ -261,7 +258,7 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr})
         Hivj = Hi[2, j2] = c4 * γ[j]
 
         # Hiuw
-        Hi[1, j2] = α[j] + c0 * Hivj
+        Hi[1, j2] = α[j] + c1 * Hivj
 
         # Hiww
         for i in 1:j
@@ -284,9 +281,9 @@ function inv_hess_prod!(
     m = cache.m
     α = cache.α
     γ = cache.γ
-    c0 = cache.c0
+    c1 = cache.c1
     c4 = cache.c4
-    c5 = cache.c5
+    ζ2β = cache.ζ2β
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
@@ -294,10 +291,9 @@ function inv_hess_prod!(
         @views r = arr[3:end, j]
 
         qγr = q + dot(γ, r)
-        cu = c4 * (c5 * p + c0 * qγr)
-        cv = c4 * (c0 * p + qγr)
+        cv = c4 * (c1 * p + qγr)
 
-        prod[1, j] = cu + dot(α, r)
+        prod[1, j] = ζ2β * p + c1 * cv + dot(α, r)
         prod[2, j] = cv
         @. @views prod[3:end, j] = p * α + cv * γ + m * r
     end
