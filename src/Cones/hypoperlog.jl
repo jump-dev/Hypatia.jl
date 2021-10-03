@@ -223,25 +223,19 @@ function inv_hess_prod!(
     ϕ = cone.ϕ
     ζv = ζ + v
     ζζvi = ζ / ζv
-    c3 = v / (ζv + d * v)
-    c0 = ϕ - d * ζζvi
-    c4 = v * c3 * ζv
-    c6 = abs2(v * ϕ) + ζ * (ζ + d * v) - d * abs2(ζ + v * ϕ) * c3
-    c7 = c4 * c0
-    c8 = c7 + v * ζ
     rw = cone.tempw
+    v2dζv = v^2 / (ζ + (1 + d) * v)
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
         q = arr[2, j]
         @. @views rw = arr[3:end, j] * w
+        trrw = sum(rw)
 
-        c1 = sum(rw) / ζv
-        c5 = c0 * p + q + c1
-        c2 = v * (ζζvi * p + c3 * c5)
-        prod[1, j] = c6 * p + c7 * q + c8 * c1
-        prod[2, j] = c4 * c5
-        @. prod[3:end, j] = (c2 + ζζvi * rw) * w
+        cv = v2dζv * (ζv * (ϕ * p + q) - d * ζ * p + trrw)
+        prod[1, j] = ζζvi * (d * v^2 * p - d * cv + v * trrw) + ζ^2 * p + ϕ * cv
+        prod[2, j] = cv
+        @. prod[3:end, j] = ((rw + p * v) * ζ + cv) * w / ζv
     end
 
     return prod
