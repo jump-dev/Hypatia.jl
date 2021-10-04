@@ -80,15 +80,14 @@ function set_initial_point!(
     arr::AbstractVector{T},
     cone::HypoRootdetTri{T, R},
     ) where {T <: Real, R <: RealOrComplex{T}}
-    arr .= 0
     d = cone.d
-    c1 = sqrt(T(5d^2 + 2d + 1))
-    c2 = arr[1] = -sqrt((3d + 1 - c1) / T(2d + 2))
-    c3 = -c2 * (d + 1 + c1) / 2d
+    arr .= 0
+    # central point data are the same as for hypogeomean
+    (arr[1], w) = get_central_ray_hypogeomean(T, d)
     incr = (cone.is_complex ? 2 : 1)
     k = 2
     @inbounds for i in 1:d
-        arr[k] = c3
+        arr[k] = w
         k += incr * i + 1
     end
     return arr
@@ -303,10 +302,10 @@ function dder3(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where {T <: Real
     tr1 = tr(Hermitian(rwi, :U))
     χ = -p / ζ + η * tr1
     ητ = η * (χ - di * tr1)
-    ησh = η * (sum(abs2, rwi) - di * abs2(tr1)) / 2
-    c1 = χ * ητ + (η - di) * ησh
+    ηυh = η * (sum(abs2, rwi) - di * abs2(tr1)) / 2
+    c1 = χ * ητ + (η - di) * ηυh
 
-    dder3[1] = (abs2(χ) + ησh) / -ζ
+    dder3[1] = (abs2(χ) + ηυh) / -ζ
 
     copyto!(w_aux2, I)
     axpby!(1 + η, rwi, ητ, w_aux2)
