@@ -254,8 +254,8 @@ function dder3(cone::HypoGeoMean{T}, dir::AbstractVector{T}) where {T <: Real}
 end
 
 function get_central_ray_hypogeomean(::Type{T}, d::Int) where {T <: Real}
-    c = sqrt(T(5 * d ^ 2 + 2 * d + 1))
+    c = sqrt(T(d * (5 * d + 2) + 1))
     u = -sqrt((-c + 3 * d + 1) / T(2 + 2 * d))
-    w = (c - d + 1) / sqrt((1 + d) * (-2 * c + 6 * d + 2))
+    w = -u * (d + 1 + c) / (2 * d)
     return (u, w)
 end
