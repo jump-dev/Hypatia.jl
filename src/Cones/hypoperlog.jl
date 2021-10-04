@@ -130,7 +130,7 @@ function update_hess(cone::HypoPerLog)
     @. H[1, 3:end] = vζi2 / w
     @. H[2, 3:end] = c1 / w
 
-    # w
+    # w, w
     @inbounds for j in eachindex(wivζi)
         j2 = 2 + j
         wivζij = wivζi[j]
@@ -187,20 +187,29 @@ function update_inv_hess(cone::HypoPerLog)
     ϕ = cone.ϕ
     ζv = ζ + v
     ζζvi = ζ / ζv
-    v2dζv = v^2 / (ζ + (1 + d) * v)
+    c1 = v / (ζv + d * v) * v
+    c3 = c1 / ζv
 
-    H12 = Hi[1, 2] = v2dζv * (ζv * ϕ - d * ζ)
-    Hi[1, 1] = ζζvi * d * v^2 + ζ^2 + (ϕ - ζζvi * d) * H12
-    Hi[2, 2] = v2dζv * ζv
+    # u, v
+    Hi12 = Hi[1, 2] = c1 * (ζv * ϕ - d * ζ)
+    c2 = (v * ζ + Hi12) / ζv
+    Hi[1, 1] = ζζvi * d * v^2 + ζ^2 + (ϕ - ζζvi * d) * Hi12
+    Hi[2, 2] = c1 * ζv
 
-    @. Hi[1, 3:end] = (v * ζ + H12) / ζv * w
-    @. Hi[2, 3:end] = v2dζv * w
+    # u, v, w
+    @. Hi[1, 3:end] = c2 * w
+    @. Hi[2, 3:end] = c1 * w
 
+    # w, w
     @inbounds for j in eachindex(w)
         j2 = 2 + j
-        Hi[j2, j2] += abs2(w[j])
+        wj = w[j]
+        c4 = c3 * wj
+        for i in 1:j
+            Hi[2 + i, j2] = c4 * w[i]
+        end
+        Hi[j2, j2] += wj * ζζvi * wj
     end
-    @views mul!(Hi[3:end, 3:end], w, w', v2dζv / ζv, ζζvi)
 
     cone.inv_hess_updated = true
     return cone.inv_hess
@@ -220,7 +229,7 @@ function inv_hess_prod!(
     ζv = ζ + v
     ζζvi = ζ / ζv
     rw = cone.tempw
-    v2dζv = v / (ζ + (1 + d) * v) * v
+    c1 = v / (ζv + d * v) * v
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
@@ -228,11 +237,11 @@ function inv_hess_prod!(
         @. @views rw = arr[3:end, j] * w
         trrw = sum(rw)
 
-        c1 = v2dζv * (ζv * (ϕ * p + q) - d * ζ * p + trrw)
-        c2 = (c1 + ζ * v * p) / ζv
-        prod[1, j] = ζ * ((v * (d * p * v + trrw) - d * c1) / ζv + ζ * p) + ϕ * c1
-        prod[2, j] = c1
-        @. prod[3:end, j] = (c2 + ζζvi * rw) * w
+        c2 = c1 * (ζv * (ϕ * p + q) - d * ζ * p + trrw)
+        c3 = (c2 + ζ * v * p) / ζv
+        prod[1, j] = ζ * ((v * (d * p * v + trrw) - d * c2) / ζv + ζ * p) + ϕ * c2
+        prod[2, j] = c2
+        @. prod[3:end, j] = (c3 + ζζvi * rw) * w
     end
 
     return prod

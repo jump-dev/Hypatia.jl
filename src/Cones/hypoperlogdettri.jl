@@ -32,12 +32,10 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
 
     ϕ::T
     ζ::T
-    ζi::T
     mat::Matrix{R}
     fact_W::Cholesky{R}
     Wi::Matrix{R}
     Wi_vec::Vector{T}
-    tempw::Vector{T}
     mat2::Matrix{R}
     mat3::Matrix{R}
     mat4::Matrix{R}
@@ -65,7 +63,6 @@ function setup_extra_data!(
     cone.mat = zeros(R, d, d)
     cone.Wi = zeros(R, d, d)
     cone.Wi_vec = zeros(T, dim - 2)
-    cone.tempw = zeros(T, dim - 2)
     cone.mat2 = zeros(R, d, d)
     cone.mat3 = zeros(R, d, d)
     cone.mat4 = zeros(R, d, d)
@@ -133,7 +130,7 @@ function update_grad(cone::HypoPerLogdetTri)
     v = cone.point[2]
     g = cone.grad
     ζ = cone.ζ
-    ζi = cone.ζi = inv(ζ)
+    ζi = inv(ζ)
 
     g[1] = ζi
     g[2] = -inv(v) - (cone.ϕ - cone.d) / ζ
@@ -154,14 +151,11 @@ function update_hess(cone::HypoPerLogdetTri)
     H = cone.hess.data
     d = cone.d
     ζ = cone.ζ
-    ζi = cone.ζi
+    ζi = inv(ζ)
     σ = cone.ϕ - d
     Wi_vec = cone.Wi_vec
-    Wivζi = cone.tempw
     ζiσ = σ / ζ
     vζi = v / ζ
-    ζvζi = 1 + vζi
-    @. Wivζi = vζi * Wi_vec
 
     # u, v
     H[1, 1] = abs2(ζi)
@@ -180,9 +174,10 @@ function update_hess(cone::HypoPerLogdetTri)
 
     @inbounds for j in eachindex(Wi_vec)
         j2 = 2 + j
-        Wivζij = Wivζi[j]
+        c3 = vζi * Wi_vec[j]
         for i in 1:j
-            H[2 + i, j2] = ζvζi * H[2 + i, j2] + Wivζi[i] * Wivζij
+            i2 = 2 + i
+            H[i2, j2] += vζi * (H[i2, j2] + c3 * Wi_vec[i])
         end
     end
 
