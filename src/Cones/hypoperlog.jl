@@ -220,7 +220,7 @@ function inv_hess_prod!(
     ζv = ζ + v
     ζζvi = ζ / ζv
     rw = cone.tempw
-    v2dζv = v^2 / (ζ + (1 + d) * v)
+    v2dζv = v / (ζ + (1 + d) * v) * v
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
@@ -228,10 +228,11 @@ function inv_hess_prod!(
         @. @views rw = arr[3:end, j] * w
         trrw = sum(rw)
 
-        cv = v2dζv * (ζv * (ϕ * p + q) - d * ζ * p + trrw)
-        prod[1, j] = ζζvi * (d * v^2 * p - d * cv + v * trrw) + ζ^2 * p + ϕ * cv
-        prod[2, j] = cv
-        @. prod[3:end, j] = ((rw + p * v) * ζ + cv) * w / ζv
+        c1 = v2dζv * (ζv * (ϕ * p + q) - d * ζ * p + trrw)
+        c2 = (c1 + ζ * v * p) / ζv
+        prod[1, j] = ζ * ((v * (d * p * v + trrw) - d * c1) / ζv + ζ * p) + ϕ * c1
+        prod[2, j] = c1
+        @. prod[3:end, j] = (c2 + ζζvi * rw) * w
     end
 
     return prod
