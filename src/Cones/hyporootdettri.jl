@@ -95,11 +95,11 @@ end
 
 function update_feas(cone::HypoRootdetTri{T}) where {T <: Real}
     @assert !cone.feas_updated
-
     @views svec_to_smat!(cone.mat, cone.point[2:end], cone.rt2)
+
     fact = cone.fact_W = cholesky!(Hermitian(cone.mat, :U), check = false)
     if isposdef(fact)
-        cone.ϕ = exp(logdet(fact) / cone.d)
+        cone.ϕ = exp(cone.di * logdet(fact))
         cone.ζ = cone.ϕ - cone.point[1]
         cone.is_feas = (cone.ζ > eps(T))
     else
@@ -117,7 +117,7 @@ function is_dual_feas(cone::HypoRootdetTri{T}) where {T <: Real}
         @views svec_to_smat!(cone.mat2, cone.dual_point[2:end], cone.rt2)
         fact = cholesky!(Hermitian(cone.mat2, :U), check = false)
         if isposdef(fact)
-            return (logdet(fact) - cone.d * log(-u / cone.d) > eps(T))
+            return (logdet(fact) - cone.d * log(-u * cone.di) > eps(T))
         end
     end
 
@@ -193,14 +193,13 @@ function hess_prod!(
         χ = c1 - p / ζ
         ητ = η * χ - di * c1
 
+        prod[1, j] = χ / -ζ
         lmul!(θ, w_aux)
         for i in diagind(w_aux)
             w_aux[i] += ητ
         end
         rdiv!(w_aux, FU')
         ldiv!(FU, w_aux)
-
-        prod[1, j] = χ / -ζ
         @views smat_to_svec!(prod[2:end, j], w_aux, cone.rt2)
     end
 
@@ -251,10 +250,10 @@ function inv_hess_prod!(
     W = Hermitian(cone.mat4, :U)
     ζ = cone.ζ
     ϕ = cone.ϕ
-    η = cone.η
     di = cone.di
+    η = cone.η
     diϕ = ϕ * di
-    θi = inv(1 + cone.η)
+    θi = inv(1 + η)
     c1 = di * η * θi
     c2 = abs2(ζ) + diϕ * ϕ
     w_aux = cone.mat2
@@ -268,8 +267,8 @@ function inv_hess_prod!(
 
         c3 = dot(w, r)
         c4 = diϕ * p + c1 * c3
-        prod[1, j] = c2 * p + diϕ * c3
 
+        prod[1, j] = c2 * p + diϕ * c3
         mul!(w_aux2, w_aux, W)
         mul!(w_aux, W, w_aux2)
         @views prod_w = prod[2:end, j]
