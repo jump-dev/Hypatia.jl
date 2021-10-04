@@ -55,6 +55,10 @@ function test_oracles(
     end
     init_only && return
 
+    hess = Cones.hess(cone)
+    inv_hess = Cones.inv_hess(cone)
+    @test hess * inv_hess ≈ I atol=tol rtol=tol
+
     # perturb and scale the initial point
     perturb_scale!(point, noise, scale)
     perturb_scale!(dual_point, noise, inv(scale))
