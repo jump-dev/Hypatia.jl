@@ -111,18 +111,15 @@ function update_hess(cone::HypoPerLog)
     v = cone.point[2]
     @views w = cone.point[3:end]
     H = cone.hess.data
-    g = cone.grad
     ζ = cone.ζ
-    wivζi = cone.tempw
     d = length(w)
     σζi = (cone.ϕ - d) / ζ
     vζi = v / ζ
-    @. wivζi = vζi / w
 
     # u, v
     H[1, 1] = ζ^-2
     H[1, 2] = -σζi / ζ
-    H[2, 2] = v^-2 + abs2(σζi) + d / ζ / v
+    H[2, 2] = v^-2 + abs2(σζi) + d / (ζ * v)
 
     # u, v, w
     vζi2 = -vζi / ζ
@@ -131,13 +128,14 @@ function update_hess(cone::HypoPerLog)
     @. H[2, 3:end] = c1 / w
 
     # w, w
-    @inbounds for j in eachindex(wivζi)
+    @inbounds for j in eachindex(w)
         j2 = 2 + j
-        wivζij = wivζi[j]
-        for i in 1:j
-            H[2 + i, j2] = wivζi[i] * wivζij
+        wj = w[j]
+        c2 = vζi / wj
+        for i in 1:(j - 1)
+            H[2 + i, j2] = vζi / w[i] * c2
         end
-        H[j2, j2] -= g[j2] / w[j]
+        H[j2, j2] = (c2 + c2 * vζi + inv(wj)) / wj
     end
 
     cone.hess_updated = true
@@ -151,11 +149,11 @@ function hess_prod!(
     )
     v = cone.point[2]
     @views w = cone.point[3:end]
-    ζ = cone.ζ
     d = length(w)
+    ζ = cone.ζ
     σ = cone.ϕ - d
-    rwi = cone.tempw
     vζi1 = v / ζ + 1
+    rwi = cone.tempw
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
@@ -163,12 +161,13 @@ function hess_prod!(
         @. @views rwi = arr[3:end, j] / w
 
         qζi = q / ζ
-        c0 = sum(rwi) / ζ
-        # ∇ϕ[r] = v * c0
-        c1 = (v * c0 - p / ζ + σ * qζi) / ζ
-        c3 = c1 * v - qζi
-        prod[1, j] = -c1
-        prod[2, j] = c1 * σ - c0 + (qζi * d + q / v) / v
+        c1 = sum(rwi) / ζ
+        # ∇ϕ[r] = v * c1
+        c2 = (v * c1 - p / ζ + σ * qζi) / ζ
+        c3 = c2 * v - qζi
+
+        prod[1, j] = -c2
+        prod[2, j] = c2 * σ - c1 + (qζi * d + q / v) / v
         @. prod[3:end, j] = (c3 + vζi1 * rwi) / w
     end
 
@@ -188,23 +187,23 @@ function update_inv_hess(cone::HypoPerLog)
     ζv = ζ + v
     ζζvi = ζ / ζv
     c1 = v / (ζv + d * v) * v
-    c3 = c1 / ζv
+    c2 = c1 / ζv
 
     # u, v
     Hi12 = Hi[1, 2] = c1 * (ζv * ϕ - d * ζ)
-    c2 = (v * ζ + Hi12) / ζv
     Hi[1, 1] = ζζvi * d * v^2 + ζ^2 + (ϕ - ζζvi * d) * Hi12
     Hi[2, 2] = c1 * ζv
 
     # u, v, w
-    @. Hi[1, 3:end] = c2 * w
+    c3 = (v * ζ + Hi12) / ζv
+    @. Hi[1, 3:end] = c3 * w
     @. Hi[2, 3:end] = c1 * w
 
     # w, w
     @inbounds for j in eachindex(w)
         j2 = 2 + j
         wj = w[j]
-        c4 = c3 * wj
+        c4 = c2 * wj
         for i in 1:j
             Hi[2 + i, j2] = c4 * w[i]
         end
@@ -228,17 +227,18 @@ function inv_hess_prod!(
     ϕ = cone.ϕ
     ζv = ζ + v
     ζζvi = ζ / ζv
-    rw = cone.tempw
     c1 = v / (ζv + d * v) * v
+    rw = cone.tempw
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
         q = arr[2, j]
         @. @views rw = arr[3:end, j] * w
-        trrw = sum(rw)
 
+        trrw = sum(rw)
         c2 = c1 * (ζv * (ϕ * p + q) - d * ζ * p + trrw)
         c3 = (c2 + ζ * v * p) / ζv
+
         prod[1, j] = ζ * ((v * (d * p * v + trrw) - d * c2) / ζv + ζ * p) + ϕ * c2
         prod[2, j] = c2
         @. prod[3:end, j] = (c3 + ζζvi * rw) * w
@@ -259,24 +259,25 @@ function dder3(cone::HypoPerLog{T}, dir::AbstractVector{T}) where {T <: Real}
     σ = cone.ϕ - d
     viq = q / v
     viq2 = abs2(viq)
-    rwi = cone.tempw
     vζi = v / ζ
     vζi1 = vζi + 1
+    rwi = cone.tempw
 
     @. @views rwi = dir[3:end] / w
-    c0 = sum(rwi)
-    c7 = sum(abs2, rwi)
-    ζiχ = (-p + σ * q + c0 * v) / ζ
-    c4 = (viq * (-viq * d + 2 * c0) - c7) / ζ / 2
-    c1 = (abs2(ζiχ) - v * c4) / ζ
-    c3 = -(ζiχ + viq) / ζ
-    c5 = c3 * q + vζi * viq2
-    c6 = -2 * vζi * viq - c3 * v
-    c8 = c5 + c1 * v
+    tr1 = sum(rwi)
+    tr2 = sum(abs2, rwi)
 
-    dder3[1] = -c1
-    dder3[2] = c1 * σ + (viq2 - (d * c5 + c6 * c0 + vζi * c7)) / v - c4
-    @. dder3[3:end] = (c8 + rwi * (c6 + vζi1 * rwi)) / w
+    χ = (-p + σ * q + tr1 * v) / ζ
+    c1 = (viq * (-viq * d + 2 * tr1) - tr2) / ζ / 2
+    c2 = (abs2(χ) - v * c1) / ζ
+    c3 = -(χ + viq) / ζ
+    c4 = c3 * q + vζi * viq2
+    c5 = -2 * vζi * viq - c3 * v
+    c6 = c4 + c2 * v
+
+    dder3[1] = -c2
+    dder3[2] = c2 * σ + (viq2 - (d * c4 + c5 * tr1 + vζi * tr2)) / v - c1
+    @. dder3[3:end] = (c6 + rwi * (c5 + vζi1 * rwi)) / w
 
     return dder3
 end
