@@ -117,7 +117,7 @@ function is_dual_feas(cone::HypoRootdetTri{T}) where {T <: Real}
         @views svec_to_smat!(cone.mat2, cone.dual_point[2:end], cone.rt2)
         fact = cholesky!(Hermitian(cone.mat2, :U), check = false)
         if isposdef(fact)
-            return (logdet(fact) - cone.d * log(-u * cone.di) > eps(T))
+            return (exp(cone.di * logdet(fact)) + cone.di * u > eps(T))
         end
     end
 
@@ -252,10 +252,9 @@ function inv_hess_prod!(
     ϕ = cone.ϕ
     di = cone.di
     η = cone.η
-    diϕ = ϕ * di
-    θi = inv(1 + η)
-    c1 = di * η * θi
-    c2 = abs2(ζ) + diϕ * ϕ
+    θ = 1 + η
+    θi = inv(θ)
+    c1 = η / θ
     w_aux = cone.mat2
     w_aux2 = cone.mat3
 
@@ -265,10 +264,11 @@ function inv_hess_prod!(
         svec_to_smat!(w_aux, r, cone.rt2)
         copytri!(w_aux, 'U', true)
 
-        c3 = dot(w, r)
-        c4 = diϕ * p + c1 * c3
+        c2 = di * dot(w, r)
+        c3 = ϕ * p * di
+        c4 = c3 + c1 * c2
 
-        prod[1, j] = c2 * p + diϕ * c3
+        prod[1, j] = ζ * p * ζ + ϕ * (c3 + c2)
         mul!(w_aux2, w_aux, W)
         mul!(w_aux, W, w_aux2)
         @views prod_w = prod[2:end, j]
