@@ -84,7 +84,7 @@ inst_sets = [
     ("nat", hyp_solver),
     ("ext", hyp_solver),
     ("ext", mosek_solver),
-    # for nonparametricdistr:
+    # for nonparametricdistr
     ("vecext", hyp_solver),
     ("vecext", mosek_solver),
     ("vecext", ecos_solver),
@@ -93,6 +93,11 @@ inst_sets = [
     ("sepspec", hyp_solver),
     ("direct", hyp_solver),
     ("direct", mosek_solver),
+    # for classicalquantum
+    ("compnat", hyp_solver),
+    ("realnat", hyp_solver),
+    ("realext", hyp_solver),
+    ("realext", mosek_solver),
     ]
 
 # models to run
