@@ -26,13 +26,13 @@ centralpolymat_insts(ext::MatSpecExt) = [
 
 insts = OrderedDict()
 insts["nat"] = (nothing, vcat(
-    centralpolymat_insts(MatNegSqrtConj()),
+    centralpolymat_insts(MatNegGeom()),
     centralpolymat_insts(MatNegEntropyConj()),
     centralpolymat_insts(MatPower12(1.5)),
     centralpolymat_insts(MatPower12Conj(1.5)),
     ))
 insts["ext"] = (nothing, vcat(
-    centralpolymat_insts(MatNegSqrtConjDirect()),
+    centralpolymat_insts(MatNegGeomEFExp()),
     centralpolymat_insts(MatNegEntropyConjEigOrd()),
     centralpolymat_insts(MatPower12EigOrd(1.5)),
     centralpolymat_insts(MatPower12ConjEigOrd(1.5)),
