@@ -1,7 +1,7 @@
 
 classicalquantum_insts(use_EF::Bool) = [
     [(d, false, use_EF)
-    for d in vcat(3, 20:20:100, 150:50:450)] # includes compile run
+    for d in vcat(3, 25:25:100, 150:50:500)] # includes compile run
     ]
 
 insts = OrderedDict()
