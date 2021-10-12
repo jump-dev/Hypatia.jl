@@ -84,7 +84,7 @@ function is_dual_feas(cone::HypoGeoMean{T}) where {T <: Real}
     @views w = cone.dual_point[2:end]
 
     if (u < -eps(T)) && all(>(eps(T)), w)
-        return (sum(log, w) - length(w) * log(-u * cone.di) > eps(T))
+        return (exp(cone.di * sum(log, w)) + cone.di * u > eps(T))
     end
 
     return false
@@ -208,10 +208,9 @@ function inv_hess_prod!(
     ϕ = cone.ϕ
     di = cone.di
     η = cone.η
-    diϕ = ϕ * di
-    θi = inv(1 + η)
-    c1 = di * η * θi
-    c2 = abs2(ζ) + diϕ * ϕ
+    θ = 1 + η
+    θi = inv(θ)
+    c1 = η / θ
     rw = cone.tempw
 
     @inbounds for j in 1:size(prod, 2)
@@ -219,10 +218,11 @@ function inv_hess_prod!(
         @views r = arr[2:end, j]
         @. rw = r * w
 
-        c3 = dot(w, r)
-        c4 = diϕ * p + c1 * c3
+        c2 = di * sum(rw)
+        c3 = ϕ * p * di
+        c4 = c3 + c1 * c2
 
-        prod[1, j] = c2 * p + diϕ * c3
+        prod[1, j] = ζ * p * ζ + ϕ * (c3 + c2)
         @. prod[2:end, j] = (c4 + θi * rw) * w
     end
 

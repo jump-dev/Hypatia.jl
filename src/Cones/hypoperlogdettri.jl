@@ -332,7 +332,7 @@ function dder3(cone::HypoPerLogdetTri, dir::AbstractVector)
     tr2 = sum(abs2, rwi)
 
     χ = (-p + σ * q + tr1 * v) / ζ
-    c1 = (viq * (-viq * d + 2 * tr1) - tr2) / ζ / 2
+    c1 = (viq * (-viq * d + 2 * tr1) - tr2) / (2 * ζ)
     c2 = (abs2(χ) - v * c1) / ζ
     c3 = -(χ + viq) / ζ
     c4 = c3 * q + vζi * viq2
