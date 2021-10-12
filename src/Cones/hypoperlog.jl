@@ -152,7 +152,7 @@ function hess_prod!(
     d = length(w)
     ζ = cone.ζ
     σ = cone.ϕ - d
-    vζi1 = v / ζ + 1
+    vζi1 = (v + ζ) / ζ
     rwi = cone.tempw
 
     @inbounds for j in 1:size(arr, 2)
@@ -227,7 +227,7 @@ function inv_hess_prod!(
     ϕ = cone.ϕ
     ζv = ζ + v
     ζζvi = ζ / ζv
-    c1 = v / (ζv + d * v) * v
+    c1 = ζv / v + d
     rw = cone.tempw
 
     @inbounds for j in 1:size(arr, 2)
@@ -236,7 +236,7 @@ function inv_hess_prod!(
         @. @views rw = arr[3:end, j] * w
 
         trrw = sum(rw)
-        c2 = c1 * (ζv * (ϕ * p + q) - d * ζ * p + trrw)
+        c2 = v * (ζv * (ϕ * p + q) - d * ζ * p + trrw) / c1
         c3 = (c2 + ζ * v * p) / ζv
 
         prod[1, j] = ζ * ((v * (d * p * v + trrw) - d * c2) / ζv + ζ * p) + ϕ * c2
@@ -258,9 +258,7 @@ function dder3(cone::HypoPerLog{T}, dir::AbstractVector{T}) where {T <: Real}
     d = length(w)
     σ = cone.ϕ - d
     viq = q / v
-    viq2 = abs2(viq)
-    vζi = v / ζ
-    vζi1 = vζi + 1
+    vζi1 = (v + ζ) / ζ
     rwi = cone.tempw
 
     @. @views rwi = dir[3:end] / w
@@ -268,16 +266,15 @@ function dder3(cone::HypoPerLog{T}, dir::AbstractVector{T}) where {T <: Real}
     tr2 = sum(abs2, rwi)
 
     χ = (-p + σ * q + tr1 * v) / ζ
-    c1 = (viq * (-viq * d + 2 * tr1) - tr2) / (2 * ζ)
+    c1 = (viq * (2 * tr1 - viq * d) - tr2) / (2 * ζ)
     c2 = (abs2(χ) - v * c1) / ζ
-    c3 = -(χ + viq) / ζ
-    c4 = c3 * q + vζi * viq2
-    c5 = -2 * vζi * viq - c3 * v
-    c6 = c4 + c2 * v
+    c3 = -q * χ / ζ
+    c4 = (χ * v - q) / ζ
+    c5 = c3 + c2 * v
 
     dder3[1] = -c2
-    dder3[2] = c2 * σ + (viq2 - (d * c4 + c5 * tr1 + vζi * tr2)) / v - c1
-    @. dder3[3:end] = (c6 + rwi * (c5 + vζi1 * rwi)) / w
+    dder3[2] = c2 * σ + (abs2(viq) - d * c3 - c4 * tr1) / v - tr2 / ζ - c1
+    @. dder3[3:end] = (c5 + rwi * (c4 + vζi1 * rwi)) / w
 
     return dder3
 end
