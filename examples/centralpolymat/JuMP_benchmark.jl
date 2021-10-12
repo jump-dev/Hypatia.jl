@@ -9,6 +9,7 @@ centralpolymat_m_ks = [
     (1, 125),
     (1, 150),
     (1, 175),
+    (1, 200),
     ],
     [
     (3, 2), # compile run
@@ -17,6 +18,7 @@ centralpolymat_m_ks = [
     (4, 4),
     (4, 5),
     (4, 6),
+    (4, 7),
     ],
     ]
 centralpolymat_insts(ext::MatSpecExt) = [
