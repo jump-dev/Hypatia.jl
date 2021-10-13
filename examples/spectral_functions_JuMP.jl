@@ -388,24 +388,45 @@ function add_spectral(
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     )
-    W = get_smat_U(d, aff[3:end])
-
-    # eigenvalue ordering
     λ = JuMP.@variable(model, [1:d])
     JuMP.@constraint(model, [i in 1:(d - 1)], λ[i] >= λ[i + 1])
-    JuMP.@constraint(model, tr(W) == sum(λ))
 
-    for i in 1:(d - 1)
-        Z_i = JuMP.@variable(model, [1:d, 1:d], PSD)
-        s_i = JuMP.@variable(model)
-        JuMP.@constraint(model, sum(λ[1:i]) - i * s_i - tr(Z_i) >= 0)
-        mat_i = Symmetric(Z_i - W + s_i * Matrix(I, d, d), :U)
-        JuMP.@SDconstraint(model, mat_i >= 0)
-    end
-
-    # vector separable spectral constraint
     vec_aff = vcat(aff[1], aff[2], λ)
     add_spectral(get_vec_ef(ext), d, vec_aff, model)
+
+    w = aff[3:end]
+    R = get_R(d, length(w))
+
+    if R <: Real
+        W = get_smat(d, w)
+        trW = tr(W)
+        for i in 1:(d - 1)
+            Z = JuMP.@variable(model, [1:d, 1:d], PSD)
+            s = JuMP.@variable(model)
+            JuMP.@constraint(model, sum(λ[1:i]) - i * s - tr(Z) >= 0)
+            mat = Symmetric(Z - W + s * Matrix(I, d, d), :U)
+            JuMP.@SDconstraint(model, mat >= 0)
+        end
+    else
+        (Wr, Wi) = get_smat_complex(d, w)
+        trW = tr(Wr)
+        for i in 1:(d - 1)
+            Zr = JuMP.@variable(model, [1:d, 1:d], Symmetric)
+            Zia = JuMP.@variable(model, [1:(d - 1), 1:(d - 1)], Symmetric)
+            Zi = make_skewsymm(d, 1.0 * Zia)
+            Z2 = Symmetric(hvcat((2, 2), Zr, Zi', Zi, Zr), :U)
+            JuMP.@SDconstraint(model, Z2 >= 0)
+
+            s = JuMP.@variable(model)
+            JuMP.@constraint(model, sum(λ[1:i]) - i * s - tr(Zr) >= 0)
+
+            Mr = Symmetric(Zr - Wr + s * Matrix(I, d, d), :U)
+            Mi = Zi - Wi
+            mat = Symmetric(hvcat((2, 2), Mr, Mi', Mi, Mr), :U)
+            JuMP.@SDconstraint(model, mat >= 0)
+        end
+    end
+    JuMP.@constraint(model, trW == sum(λ))
 
     return
 end
@@ -441,14 +462,26 @@ function add_spectral(
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     )
-    W = get_smat_U(d, aff[3:end])
+    w = aff[3:end]
+    R = get_R(d, length(w))
 
+    JuMP.@constraint(model, aff[1] >= 0)
     Z = JuMP.@variable(model, [1:d, 1:d], Symmetric)
     JuMP.@constraint(model, 4 * aff[2] >= tr(Z))
-    JuMP.@constraint(model, aff[1] >= 0)
 
     uI = aff[1] * Matrix(I, d, d)
-    mat = Symmetric(hvcat((2, 2), Z, uI, uI, W), :U)
+    if R <: Real
+        W = get_smat(d, w)
+        mat = Symmetric(hvcat((2, 2), Z, uI, uI, W), :U)
+    else
+        (Wr, Wi) = get_smat_complex(d, w)
+        Zia = JuMP.@variable(model, [1:(d - 1), 1:(d - 1)], Symmetric)
+        Zi = make_skewsymm(d, 1.0 * Zia)
+
+        Mr = Symmetric(hvcat((2, 2), Z, uI, uI, Wr), :U)
+        Mi = hvcat((2, 2), Zi, zeros(d, d), zeros(d, d), Wi)
+        mat = Symmetric(hvcat((2, 2), Mr, Mi', Mi, Mr), :U)
+    end
     JuMP.@SDconstraint(model, mat >= 0)
 
     return
@@ -462,15 +495,6 @@ helpers
 swap_if_dual(x, y, ext::SepSpecDualAll) = (y, x)
 swap_if_dual(x, y, ext::SepSpecAll) = (x, y)
 
-# check dimension and get symmetric matrix W (upper triangle) of vectorized w
-function get_smat_U(d::Int, w::Vector{JuMP.AffExpr})
-    @assert Cones.svec_length(d) == length(w)
-    W = zeros(JuMP.AffExpr, d, d)
-    Cones.svec_to_smat!(W, w, sqrt(2))
-    @assert istriu(W)
-    return W
-end
-
 # get real or complex type from length of affine expression
 function get_R(d::Int, w_len::Int)
     if w_len == d^2
@@ -481,43 +505,20 @@ function get_R(d::Int, w_len::Int)
     end
 end
 
-# construct the matrix part of the det EF, return δ like eigenvalues
-# real case
-function extend_det(
-    R::Type{Float64},
-    d::Int,
-    w::Vector{JuMP.AffExpr},
-    model::JuMP.Model,
-    )
-    u = JuMP.@variable(model, [1:length(w)])
-    U = get_smat_U(d, 1.0 * u)
-    δ = diag(U)
-
-    W = get_smat_U(d, w)
-    mat = Symmetric(hvcat((2, 2), W, U', U, Diagonal(δ)), :U)
-    JuMP.@SDconstraint(model, mat >= 0)
-
-    return δ
+# get upper triangle of symmetric matrix W from vectorized w
+function get_smat(d::Int, w::Vector{JuMP.AffExpr})
+    @assert Cones.svec_length(d) == length(w)
+    W = zeros(JuMP.AffExpr, d, d)
+    Cones.svec_to_smat!(W, w, sqrt(2))
+    return W
 end
 
-# complex case
-function extend_det(
-    R::Type{ComplexF64},
-    d::Int,
-    w::Vector{JuMP.AffExpr},
-    model::JuMP.Model,
-    )
-    ur = JuMP.@variable(model, [1:Cones.svec_length(d)])
-    Ur = get_smat_U(d, 1.0 * ur)
-    δ = diag(Ur)
-    ui = JuMP.@variable(model, [1:Cones.svec_length(d - 1)])
-    Ui = zero(Ur)
-    Ui[1:(d - 1), 2:d] = get_smat_U(d - 1, 1.0 * ui)
-    @assert all(iszero, diag(Ui))
-
+# get real and imaginary matrix parts from vectorized w
+function get_smat_complex(d::Int, w::Vector)
+    @assert d^2 == length(w)
     rt2 = sqrt(2)
-    Wr = zero(Ur)
-    Wi = zero(Ui)
+    Wr = zeros(eltype(w), d, d)
+    Wi = zero(Wr)
     idx = 1
     for j in 1:d
         for i in 1:(j - 1)
@@ -529,6 +530,51 @@ function extend_det(
         Wr[j, j] = w[idx]
         idx += 1
     end
+    return (Wr, Wi)
+end
+
+# make a skew-symmetric matrix
+function make_skewsymm(d::Int, U::Symmetric)
+    Z = zeros(eltype(U), d, d)
+    Z[1:(d - 1), 2:d] = UpperTriangular(U)
+    @assert istriu(Z)
+    Z .-= Z'
+    @assert all(iszero, diag(Z))
+    return Z
+end
+
+# construct the real matrix part of the det EF, return δ like eigenvalues
+function extend_det(
+    R::Type{Float64},
+    d::Int,
+    w::Vector{JuMP.AffExpr},
+    model::JuMP.Model,
+    )
+    u = JuMP.@variable(model, [1:length(w)])
+    U = get_smat(d, 1.0 * u)
+    δ = diag(U)
+
+    W = get_smat(d, w)
+    mat = Symmetric(hvcat((2, 2), W, U', U, Diagonal(δ)), :U)
+    JuMP.@SDconstraint(model, mat >= 0)
+
+    return δ
+end
+
+# construct the complex matrix part of the det EF, return δ like eigenvalues
+function extend_det(
+    R::Type{ComplexF64},
+    d::Int,
+    w::Vector{JuMP.AffExpr},
+    model::JuMP.Model,
+    )
+    (Wr, Wi) = get_smat_complex(d, w)
+
+    Ur = UpperTriangular(JuMP.@variable(model, [1:d, 1:d], Symmetric))
+    δ = diag(Ur)
+    Uia = JuMP.@variable(model, [1:(d - 1), 1:(d - 1)], Symmetric)
+    Ui = zero(Wi)
+    Ui[1:(d - 1), 2:d] = UpperTriangular(Uia)
 
     Mr = Symmetric(hvcat((2, 2), Wr, Ur', Ur, Diagonal(δ)), :U)
     Mi = hvcat((2, 2), Wi, -Ui', Ui, zeros(d, d))

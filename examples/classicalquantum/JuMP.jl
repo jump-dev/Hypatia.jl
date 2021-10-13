@@ -12,7 +12,6 @@ end
 
 function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     d = inst.d
-    @assert !(inst.complex && inst.use_EF) # TODO
     ext = (inst.use_EF ? MatNegEntropyEigOrd() : MatNegEntropy())
     rt2 = sqrt(T(2))
     R = (inst.complex ? Complex{T} : T)

@@ -16,6 +16,13 @@ insts["minimal"] = [
     ((3, true, MatNegGeomEFExp()),),
     ((3, false, MatNegGeomEFPow()),),
     ((3, true, MatNegGeomEFPow()),),
+    # tr negsqrtconj
+    ((3, false, MatNegSqrtConj()),),
+    ((3, false, MatNegSqrtConjDirect()),),
+    ((3, false, MatNegSqrtConjEigOrd()),),
+    ((3, true, MatNegSqrtConj()),),
+    ((3, true, MatNegSqrtConjDirect()),),
+    ((3, true, MatNegSqrtConjEigOrd()),),
     # tr negentropy
     ((3, false, MatNegEntropy()),),
     ((3, false, MatNegEntropyEigOrd()),),
@@ -34,8 +41,9 @@ insts["fast"] = [
     ((15, false, MatNegGeomEFExp()),),
     ((15, false, MatNegGeomEFPow()),),
     ((40, false, MatNegSqrtConj()),),
-    ((8, false, MatNegSqrtConjEigOrd()),),
+    ((8, true, MatNegSqrtConjEigOrd()),),
     ((20, false, MatNegSqrtConjDirect()),),
+    ((15, true, MatNegSqrtConjDirect()),),
     ((50, false, MatLogdetCone()),),
     ((30, false, MatNegLog()),),
     ((20, true, MatNegLog()),),
@@ -43,7 +51,7 @@ insts["fast"] = [
     ((15, false, MatNegLogDirect()),),
     ((10, true, MatNegLogDirect()),),
     ((30, false, MatNegEntropy()),),
-    ((8, false, MatNegEntropyEigOrd()),),
+    ((8, true, MatNegEntropyEigOrd()),),
     ((30, false, MatPower12(1.5)),),
     ((7, false, MatPower12EigOrd(1.5)),),
     ]
@@ -55,6 +63,7 @@ insts["various"] = [
     ((100, false, MatNegSqrtConj()),),
     ((12, false, MatNegSqrtConjEigOrd()),),
     ((50, false, MatNegSqrtConjDirect()),),
+    ((30, true, MatNegSqrtConjDirect()),),
     ((150, false, MatLogdetCone()),),
     ((80, true, MatLogdetCone()),),
     ((100, false, MatNegLog()),),
@@ -65,6 +74,6 @@ insts["various"] = [
     ((75, false, MatNegEntropy()),),
     ((14, false, MatNegEntropyEigOrd()),),
     ((30, false, MatPower12(1.5)),),
-    ((6, false, MatPower12EigOrd(1.5)),),
+    ((6, true, MatPower12EigOrd(1.5)),),
     ]
 return (CovarianceEstJuMP, insts)

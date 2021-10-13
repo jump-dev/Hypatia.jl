@@ -33,7 +33,7 @@ function build(inst::CentralPolyMatJuMP{T}) where {T <: Float64}
     add_homog_spectral(inst.ext, L, vcat(1.0 * epi, Q_vec), model)
 
     # coefficients equal
-    Q = Symmetric(get_smat_U(L, 1.0 * Q_vec), :U)
+    Q = Symmetric(get_smat(L, 1.0 * Q_vec), :U)
     poly_eq = basis' * Q * basis - poly
     JuMP.@constraint(model, DynamicPolynomials.coefficients(poly_eq) .== 0)
 

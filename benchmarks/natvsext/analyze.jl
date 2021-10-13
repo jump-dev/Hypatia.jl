@@ -69,7 +69,7 @@ examples_params = Dict(
         ),
     "classicalquantum" => (
         [:d], [1],
-        [:compnat, :realnat, :realext], Symbol[]
+        [:nat, :ext], Symbol[]
         ),
     "covarianceest" => (
         [:d], [1],
