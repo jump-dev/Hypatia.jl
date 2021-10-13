@@ -12,14 +12,15 @@ end
 
 function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     d = inst.d
-    @assert !(inst.complex && inst.use_EF)
+    @assert !(inst.complex && inst.use_EF) # TODO
+    ext = (inst.use_EF ? MatNegEntropyEigOrd() : MatNegEntropy())
     rt2 = sqrt(T(2))
     R = (inst.complex ? Complex{T} : T)
 
     function hermtr1()
         P = randn(R, d, d)
-        P = P * P'
-        P ./= tr(P)
+        P = Hermitian(P * P', :U)
+        P.data ./= tr(P)
         return Hermitian(P)
     end
     Ps = [hermtr1() for _ in 1:d]
@@ -31,20 +32,14 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
     JuMP.@variable(model, epi)
     JuMP.@objective(model, Max, -epi + dot(ρ, Hs))
 
-    entr = JuMP.AffExpr.(zeros(Cones.svec_length(R, d)))
-    P_vec = zeros(T, length(entr))
+    vec_dim = Cones.svec_length(R, d)
+    entr = JuMP.AffExpr.(zeros(vec_dim))
+    P_vec = zeros(T, vec_dim)
     for (Pi, ρi) in zip(Ps, ρ)
         Cones.smat_to_svec!(P_vec, Pi, rt2)
         JuMP.add_to_expression!.(entr, ρi, P_vec)
     end
-
-    aff = vcat(epi, 1, entr)
-    if inst.use_EF
-        add_spectral(MatNegEntropyEigOrd(), d, aff, model)
-    else
-        JuMP.@constraint(model, aff in Hypatia.EpiPerSepSpectralCone{Float64}(
-            Cones.NegEntropySSF(), Cones.MatrixCSqr{T, R}, d))
-    end
+    add_homog_spectral(ext, d, vcat(epi, entr), model)
 
     # save for use in tests
     model.ext[:epi] = epi

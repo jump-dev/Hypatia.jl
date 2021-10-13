@@ -320,10 +320,10 @@ function add_homog_spectral(
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     )
-    @assert 1 + Cones.svec_length(d) == length(aff)
     aff_new = vcat(-aff[1], aff[2:end])
+    R = get_R(d, length(aff) - 1)
     JuMP.@constraint(model, aff_new in
-        Hypatia.HypoRootdetTriCone{Float64, Float64}(length(aff)))
+        Hypatia.HypoRootdetTriCone{Float64, R}(length(aff)))
     return
 end
 
@@ -339,7 +339,8 @@ function add_homog_spectral(
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     )
-    δ = extend_det(d, aff[2:end], model) # checks dimension
+    R = get_R(d, length(aff) - 1)
+    δ = extend_det(R, d, aff[2:end], model)
     add_homog_spectral(get_vec_ef(ext), d, vcat(aff[1], δ), model)
     return
 end
@@ -353,10 +354,10 @@ function add_spectral(
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     )
-    @assert 2 + Cones.svec_length(d) == length(aff)
     aff_new = vcat(-aff[1], aff[2], aff[3:end])
+    R = get_R(d, length(aff) - 2)
     JuMP.@constraint(model, aff_new in
-        Hypatia.HypoPerLogdetTriCone{Float64, Float64}(length(aff)))
+        Hypatia.HypoPerLogdetTriCone{Float64, R}(length(aff)))
     return
 end
 
@@ -369,10 +370,10 @@ function add_spectral(
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     )
-    @assert 2 + Cones.svec_length(d) == length(aff)
+    R = get_R(d, length(aff) - 2)
     is_dual = (ext isa MatSepSpecDualAll)
     cone = Hypatia.EpiPerSepSpectralCone{Float64}(get_ssf(ext),
-        Cones.MatrixCSqr{Float64, Float64}, d, is_dual)
+        Cones.MatrixCSqr{Float64, R}, d, is_dual)
     JuMP.@constraint(model, aff in cone)
     return
 end
@@ -387,7 +388,7 @@ function add_spectral(
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     )
-    W = get_smat_U(d, aff[3:end]) # checks dimension
+    W = get_smat_U(d, aff[3:end])
 
     # eigenvalue ordering
     λ = JuMP.@variable(model, [1:d])
@@ -421,7 +422,8 @@ function add_spectral(
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     )
-    δ = extend_det(d, aff[3:end], model) # checks dimension
+    R = get_R(d, length(aff) - 2)
+    δ = extend_det(R, d, aff[3:end], model)
     vec_aff = vcat(aff[1], aff[2], δ)
     add_spectral(VecNegLogEF(), d, vec_aff, model)
     return
@@ -439,7 +441,7 @@ function add_spectral(
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     )
-    W = get_smat_U(d, aff[3:end]) # checks dimension
+    W = get_smat_U(d, aff[3:end])
 
     Z = JuMP.@variable(model, [1:d, 1:d], Symmetric)
     JuMP.@constraint(model, 4 * aff[2] >= tr(Z))
@@ -465,24 +467,72 @@ function get_smat_U(d::Int, w::Vector{JuMP.AffExpr})
     @assert Cones.svec_length(d) == length(w)
     W = zeros(JuMP.AffExpr, d, d)
     Cones.svec_to_smat!(W, w, sqrt(2))
+    @assert istriu(W)
     return W
 end
 
+# get real or complex type from length of affine expression
+function get_R(d::Int, w_len::Int)
+    if w_len == d^2
+        return ComplexF64
+    else
+        @assert w_len == Cones.svec_length(d)
+        return Float64
+    end
+end
+
 # construct the matrix part of the det EF, return δ like eigenvalues
+# real case
 function extend_det(
+    R::Type{Float64},
     d::Int,
     w::Vector{JuMP.AffExpr},
     model::JuMP.Model,
     )
-    @assert Cones.svec_length(d) == length(w)
-
     u = JuMP.@variable(model, [1:length(w)])
     U = get_smat_U(d, 1.0 * u)
-    @assert istriu(U)
     δ = diag(U)
 
     W = get_smat_U(d, w)
     mat = Symmetric(hvcat((2, 2), W, U', U, Diagonal(δ)), :U)
+    JuMP.@SDconstraint(model, mat >= 0)
+
+    return δ
+end
+
+# complex case
+function extend_det(
+    R::Type{ComplexF64},
+    d::Int,
+    w::Vector{JuMP.AffExpr},
+    model::JuMP.Model,
+    )
+    ur = JuMP.@variable(model, [1:Cones.svec_length(d)])
+    Ur = get_smat_U(d, 1.0 * ur)
+    δ = diag(Ur)
+    ui = JuMP.@variable(model, [1:Cones.svec_length(d - 1)])
+    Ui = zero(Ur)
+    Ui[1:(d - 1), 2:d] = get_smat_U(d - 1, 1.0 * ui)
+    @assert all(iszero, diag(Ui))
+
+    rt2 = sqrt(2)
+    Wr = zero(Ur)
+    Wi = zero(Ui)
+    idx = 1
+    for j in 1:d
+        for i in 1:(j - 1)
+            Wr[i, j] = Wr[j, i] = w[idx] / rt2
+            Wi[i, j] = w[idx + 1] / rt2
+            Wi[j, i] = -Wi[i, j]
+            idx += 2
+        end
+        Wr[j, j] = w[idx]
+        idx += 1
+    end
+
+    Mr = Symmetric(hvcat((2, 2), Wr, Ur', Ur, Diagonal(δ)), :U)
+    Mi = hvcat((2, 2), Wi, -Ui', Ui, zeros(d, d))
+    mat = Symmetric(hvcat((2, 2), Mr, Mi', Mi, Mr), :U)
     JuMP.@SDconstraint(model, mat >= 0)
 
     return δ
