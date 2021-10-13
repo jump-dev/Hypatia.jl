@@ -93,11 +93,6 @@ inst_sets = [
     ("sepspec", hyp_solver),
     ("direct", hyp_solver),
     ("direct", mosek_solver),
-    # for classicalquantum
-    ("compnat", hyp_solver),
-    ("realnat", hyp_solver),
-    ("realext", hyp_solver),
-    ("realext", mosek_solver),
     ]
 
 # models to run

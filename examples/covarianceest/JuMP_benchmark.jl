@@ -1,6 +1,6 @@
 
 covarianceest_insts(ext::MatSpecExt) = [
-    [(d, ext)
+    [(d, true, ext) # complex
     for d in vcat(3, 25:25:250)] # includes compile run
     ]
 
