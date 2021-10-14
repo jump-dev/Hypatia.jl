@@ -1,7 +1,8 @@
 # natural vs extended formulation comparisons
 
 Scripts in this directory are used for comparing _natural_ and _extended_
-formulations for problems in the `examples/` folder using Hypatia and Mosek.
+formulations for problems in the `examples/` folder using Hypatia and other 
+solvers.
 The following instructions should work from a Linux/macOS shell/terminal.
 
 ## install Julia and dependencies
@@ -18,7 +19,7 @@ and run update:
 ```julia
 pkg> add Hypatia#v0.5.0
 pkg> add Combinatorics CSV DataFrames DataStructures DelimitedFiles Distributions
-pkg> add DynamicPolynomials ForwardDiff JuMP PolyJuMP Random SemialgebraicSets
+pkg> add DynamicPolynomials ECOS ForwardDiff JuMP PolyJuMP Random SemialgebraicSets
 pkg> add SpecialFunctions SumOfSquares Test Printf MosekTools Distributed
 pkg> up
 ```
@@ -29,6 +30,19 @@ cd ~/.julia/dev/Hypatia/benchmarks/natvsext
 ```
 
 ## run.jl script
+
+### Choose examples to run
+
+Open `run.jl` with a code editor. 
+To run the examples from _"Solving natural conic formulations with Hypatia.jl"_
+uncomment (by deleting #) the example names under the header:
+```#= natural formulations paper =#```
+and comment (add #) the examples under the header:
+'''#= spectral function cones paper =#'''
+To run the examples from "_Conic optimization with spectral functions on 
+Euclidean Jordan algebras_", do the opposite.
+
+### Run the script
 
 This script spawns a process for each instance and each solver, one at a time.
 It kills the process if a memory or time limit is reached (see the options at
