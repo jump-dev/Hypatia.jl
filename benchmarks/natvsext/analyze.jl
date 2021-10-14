@@ -71,10 +71,6 @@ examples_params = Dict(
         [:d], [1],
         [:nat, :ext], Symbol[]
         ),
-    "covarianceest" => (
-        [:d], [1],
-        [:logdet, :sepspec, :direct], Symbol[]
-        ),
     "experimentdesign" => (
         [:func, :d], [2, 1],
         [:nat, :ext], Symbol[]
@@ -123,6 +119,7 @@ status_map = Dict(
     "SetupModelKilledMemory" => "m",
     "Optimal" => "co",
     "TimeLimit" => "tl",
+    "IterationLimit" => "il",
     "SolveCheckKilledTime" => "tl",
     "SolveCheckKilledMemory" => "rl",
     "SolveCheckCaughtError" => "rl", # rare, seems to be memory error

@@ -88,11 +88,6 @@ inst_sets = [
     ("vecext", hyp_solver),
     ("vecext", mosek_solver),
     ("vecext", ecos_solver),
-    # for covarianceest
-    ("logdet", hyp_solver),
-    ("sepspec", hyp_solver),
-    ("direct", hyp_solver),
-    ("direct", mosek_solver),
     ]
 
 # models to run
@@ -111,7 +106,6 @@ JuMP_examples = [
     #= spectral function cones paper =#
     "centralpolymat",
     "classicalquantum",
-    "covarianceest",
     "experimentdesign",
     "nonparametricdistr",
     ]
