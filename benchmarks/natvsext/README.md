@@ -1,7 +1,7 @@
 # natural vs extended formulation comparisons
 
 Scripts in this directory are used for comparing _natural_ and _extended_
-formulations for problems in the `examples/` folder using Hypatia and other 
+formulations for problems in the `examples/` folder using Hypatia and other
 solvers.
 The following instructions should work from a Linux/macOS shell/terminal.
 
@@ -33,7 +33,7 @@ cd ~/.julia/dev/Hypatia/benchmarks/natvsext
 
 ### Choose examples
 
-Open `run.jl` with a code editor. 
+Open `run.jl` with a code editor.
 To run the examples from _"Solving natural conic formulations with Hypatia.jl"_
 uncomment (by deleting #) the example names under the header:
 ```jl
@@ -43,7 +43,7 @@ and comment (add #) the examples names under the header:
 ```jl
 #= spectral function cones paper =#
 ```
-To run the examples from "_Conic optimization with spectral functions on 
+To run the examples from "_Conic optimization with spectral functions on
 Euclidean Jordan algebras_", do the opposite.
 
 ### Run the script
@@ -78,13 +78,6 @@ tail -f raw/bench.txt
 The script should take several days to finish.
 
 ## analyze.jl script
-
-### Choose examples
-
-Open `analyze.jl` with a code editor. 
-Comment/uncomment the lines under the same two headers as in `run.jl`.
-
-### Run the script
 
 This script reads the csv output of the run.jl script, `raw/bench.csv`, and
 analyzes these results, outputting analysis/summaries into files in the

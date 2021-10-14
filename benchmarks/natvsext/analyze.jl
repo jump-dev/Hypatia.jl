@@ -22,7 +22,7 @@ print_table_solvers =
 
 # uncomment examples to process
 examples_params = Dict(
-    # Hypatia paper examples:
+    #= natural formulations paper =#
     # "densityest" => (
     #     [:m, :twok], [2, 3],
     #     [:SEP,], [:nu_nat, :n_nat, :n_SEP]
@@ -62,7 +62,7 @@ examples_params = Dict(
     #     [:L1, :n, :d, :m], [5, 1, 3, 4],
     #     [:SEP,], Symbol[]
     #     ),
-    # spectral paper examples:
+    #= spectral function cones paper =#
     "centralpolymat" => (
         [:func, :m, :k], [3, 1, 2],
         [:nat, :ext], Symbol[]
