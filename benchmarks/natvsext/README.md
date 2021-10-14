@@ -31,7 +31,7 @@ cd ~/.julia/dev/Hypatia/benchmarks/natvsext
 
 ## run.jl script
 
-### Choose examples to run
+### Choose examples
 
 Open `run.jl` with a code editor. 
 To run the examples from _"Solving natural conic formulations with Hypatia.jl"_
@@ -39,7 +39,7 @@ uncomment (by deleting #) the example names under the header:
 ```jl
 #= natural formulations paper =#
 ```
-and comment (add #) the examples under the header:
+and comment (add #) the examples names under the header:
 ```jl
 #= spectral function cones paper =#
 ```
@@ -78,6 +78,13 @@ tail -f raw/bench.txt
 The script should take several days to finish.
 
 ## analyze.jl script
+
+### Choose examples
+
+Open `analyze.jl` with a code editor. 
+Comment/uncomment the lines under the same two headers as in `run.jl`.
+
+### Run the script
 
 This script reads the csv output of the run.jl script, `raw/bench.csv`, and
 analyzes these results, outputting analysis/summaries into files in the
