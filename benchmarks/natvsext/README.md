@@ -35,14 +35,8 @@ cd ~/.julia/dev/Hypatia/benchmarks/natvsext
 
 Open `run.jl` with a code editor.
 To run the examples from _"Solving natural conic formulations with Hypatia.jl"_
-uncomment (by deleting #) the example names under the header:
-```jl
-#= natural formulations paper =#
-```
-and comment (add #) the examples names under the header:
-```jl
-#= spectral function cones paper =#
-```
+uncomment the example names under the "natural formulations paper" header and
+comment (add #) the names under the "spectral function cones paper" header.
 To run the examples from "_Conic optimization with spectral functions on
 Euclidean Jordan algebras_", do the opposite.
 
