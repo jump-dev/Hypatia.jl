@@ -166,7 +166,7 @@ function make_wide_csv(ex_df, ex_name, ex_params)
     exts = string.(ex_params[3])
     inst_solvers = filter(s -> !any(startswith(s, e) for e in exts), s_temp)
     for e in exts
-        s_e = filter(s -> startswith(s, e), s_temp)
+        s_e = filter(s -> startswith(s, e * "_"), s_temp)
         append!(inst_solvers, s_e)
     end
     @assert length(inst_solvers) == length(s_temp)
