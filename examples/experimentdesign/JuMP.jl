@@ -1,17 +1,15 @@
 #=
 choose the frequency of experiments to minimize a given convex spectral function
-of the information matrix and satisfy an experiment budget constraint and other
-side constraints
+of the information matrix and satisfy an experiment budget constraint
 
 adapted from Boyd and Vandenberghe, "Convex Optimization", section 7.5
 
 minimize    f(V × Diagonal(x) × V')
 subject to  x ≥ 0
             e'x = k
-            A x = b
 where k = 2d, variable x ∈ ℝᵏ is the frequency of each experiment, k is the
 number of experiments to run, the columns of V ∈ ℝ^(d × k) correspond to each
-experiment, f is a convex spectral function, and A x = b are side constraints
+experiment, and f is a convex spectral function
 =#
 
 struct ExperimentDesignJuMP{T <: Real} <: ExampleInstanceJuMP{T}
@@ -26,14 +24,11 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     k = 2 * d
 
     V = randn(T, d, k)
-    V .*= d / sum(svdvals(V))
-    A = randn(T, round(Int, sqrt(k - 1)), k)
-    b = sum(A, dims = 2)
+    V .*= sqrt(d / sum(eigvals(Symmetric(V * V'))))
 
     model = JuMP.Model()
     JuMP.@variable(model, x[1:k] >= 0)
     JuMP.@constraint(model, sum(x) == k)
-    JuMP.@constraint(model, A * x .== b)
 
     vec_dim = Cones.svec_length(d)
     Q = V * diagm(x) * V' # information matrix

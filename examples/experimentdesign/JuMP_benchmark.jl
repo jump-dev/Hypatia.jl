@@ -5,17 +5,18 @@ experimentdesign_insts(ext::MatSpecExt) = [
     ]
 
 insts = OrderedDict()
-insts["nat"] = (nothing, vcat(
-    experimentdesign_insts(MatLogdetCone()),
-    experimentdesign_insts(MatNegLog()),
-    experimentdesign_insts(MatNegSqrt()),
-    experimentdesign_insts(MatNegSqrtConj()),
-    experimentdesign_insts(MatNegPower01(1/3)),
-    ))
-insts["ext"] = (nothing, vcat(
-    experimentdesign_insts(MatNegLogDirect()),
-    experimentdesign_insts(MatNegSqrtEigOrd()),
-    experimentdesign_insts(MatNegSqrtConjDirect()),
-    experimentdesign_insts(MatNegPower01EigOrd(1/3)),
-    ))
+insts["nat"] = (nothing, vcat(experimentdesign_insts.([
+    MatNegGeom(),
+    MatNegLog(),
+    MatNegSqrtConj(),
+    MatNegPower01(1/3),
+    ])...))
+insts["natlog"] = (nothing, experimentdesign_insts(
+    MatLogdetCone()))
+insts["ext"] = (nothing, vcat(experimentdesign_insts.([
+    MatNegGeomEFExp(),
+    MatNegLogDirect(),
+    MatNegSqrtConjDirect(),
+    MatNegPower01EigOrd(1/3),
+    ])...))
 return (ExperimentDesignJuMP, insts)

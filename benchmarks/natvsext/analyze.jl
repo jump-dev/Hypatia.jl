@@ -73,11 +73,11 @@ examples_params = Dict(
         ),
     "experimentdesign" => (
         [:func, :d], [2, 1],
-        [:nat, :ext], Symbol[]
+        [:nat, :natlog, :ext], Symbol[]
         ),
     "nonparametricdistr" => (
         [:func, :d], [2, 1],
-        [:nat, :vecext], Symbol[]
+        [:nat, :natlog, :vecext], Symbol[]
         ),
     )
 

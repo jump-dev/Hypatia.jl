@@ -77,14 +77,14 @@ h_val(xs::Vector{T}, ::NegSqrtSSF) where {T <: Real} =
 h_conj_dom_pos(::NegSqrtSSF) = true
 
 h_conj(xs::Vector{T}, ::NegSqrtSSF) where {T <: Real} =
-    sum(inv, xs) / 4
+    T(0.25) * sum(inv, xs)
 
 h_der1(ds::Vector{T}, xs::Vector{T}, ::NegSqrtSSF) where {T <: Real} =
-    (@. ds = inv(-2 * sqrt(xs)))
+    (@. ds = T(-0.5) * inv(sqrt(xs)))
 h_der2(ds::Vector{T}, xs::Vector{T}, ::NegSqrtSSF) where {T <: Real} =
-    (@. ds = inv(4 * xs * sqrt(xs)))
+    (@. ds = T(0.25) * xs ^ T(-1.5))
 h_der3(ds::Vector{T}, xs::Vector{T}, ::NegSqrtSSF) where {T <: Real} =
-    (@. ds = -3 / (8 * abs2(xs) * sqrt(xs)))
+    (@. ds = T(-3 / 8) * xs ^ T(-2.5))
 
 function get_initial_point(d::Int, ::NegSqrtSSF)
     # TODO initial central point
