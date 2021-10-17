@@ -82,9 +82,10 @@ inst_sets = [
     # ("extSEP", mosek_solver), # SOCExpPSD extender
     #= spectral function cones paper =#
     ("nat", hyp_solver),
+    ("natlog", hyp_solver),
     ("ext", hyp_solver),
     ("ext", mosek_solver),
-    # for nonparametricdistr
+    # for nonparametricdistr (allows ECOS)
     ("vecext", hyp_solver),
     ("vecext", mosek_solver),
     ("vecext", ecos_solver),
