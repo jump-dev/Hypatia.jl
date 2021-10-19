@@ -9,13 +9,13 @@ insts["minimal"] = [
     ((3, false, MatNegLogDirect()),),
     ((3, true, MatNegLogDirect()),),
     ((3, false, MatNegLogEigOrd()),),
-    # neggeom
-    ((3, false, MatNegGeom()),),
-    ((3, true, MatNegGeom()),),
-    ((3, false, MatNegGeomEFExp()),),
-    ((3, true, MatNegGeomEFExp()),),
-    ((3, false, MatNegGeomEFPow()),),
-    ((3, true, MatNegGeomEFPow()),),
+    # negrtdet
+    ((3, false, MatNegRtdet()),),
+    ((3, true, MatNegRtdet()),),
+    ((3, false, MatNegRtdetEFExp()),),
+    ((3, true, MatNegRtdetEFExp()),),
+    ((3, false, MatNegRtdetEFPow()),),
+    ((3, true, MatNegRtdetEFPow()),),
     # tr negsqrtconj
     ((3, false, MatNegSqrtConj()),),
     ((3, false, MatNegSqrtConjDirect()),),
@@ -37,9 +37,9 @@ insts["minimal"] = [
     ((3, false, MatPower12EigOrd(1.3)),),
     ]
 insts["fast"] = [
-    ((30, true, MatNegGeom()),),
-    ((15, false, MatNegGeomEFExp()),),
-    ((15, false, MatNegGeomEFPow()),),
+    ((30, true, MatNegRtdet()),),
+    ((15, false, MatNegRtdetEFExp()),),
+    ((15, false, MatNegRtdetEFPow()),),
     ((40, false, MatNegSqrtConj()),),
     ((8, true, MatNegSqrtConjEigOrd()),),
     ((20, false, MatNegSqrtConjDirect()),),
@@ -56,10 +56,10 @@ insts["fast"] = [
     ((7, false, MatPower12EigOrd(1.5)),),
     ]
 insts["various"] = [
-    ((100, false, MatNegGeom()),),
-    ((60, true, MatNegGeom()),),
-    ((50, false, MatNegGeomEFExp()),),
-    ((30, true, MatNegGeomEFPow()),),
+    ((100, false, MatNegRtdet()),),
+    ((60, true, MatNegRtdet()),),
+    ((50, false, MatNegRtdetEFExp()),),
+    ((30, true, MatNegRtdetEFPow()),),
     ((100, false, MatNegSqrtConj()),),
     ((12, false, MatNegSqrtConjEigOrd()),),
     ((50, false, MatNegSqrtConjDirect()),),

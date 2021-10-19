@@ -2,6 +2,7 @@
 centralpolymat_m_ks = [
     [
     (1, 4), # compile run
+    (1, 15),
     (1, 25),
     (1, 50),
     (1, 75),

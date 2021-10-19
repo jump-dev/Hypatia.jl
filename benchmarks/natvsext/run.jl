@@ -25,8 +25,8 @@ results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
 # setup_model_anyway = true
 setup_model_anyway = false
 
-verbose = true # make solvers print output
-# verbose = false
+# verbose = true # make solvers print output
+verbose = false
 
 iter_limit = 250
 num_threads = 16 # number of threads for BLAS and Julia processes running instances
