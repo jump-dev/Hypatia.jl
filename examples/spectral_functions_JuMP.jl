@@ -9,11 +9,11 @@ abstract type SpectralExtender end
 abstract type VecSpecExt <: SpectralExtender end
 
 # vector negative geomean formulations
-struct VecNegGeom <: VecSpecExt end
-struct VecNegGeomEFExp <: VecSpecExt end
-struct VecNegGeomEFPow <: VecSpecExt end
+struct VecNegRtdet <: VecSpecExt end
+struct VecNegRtdetEFExp <: VecSpecExt end
+struct VecNegRtdetEFPow <: VecSpecExt end
 
-const VecNegGeomAll = Union{VecNegGeom, VecNegGeomEFExp, VecNegGeomEFPow}
+const VecNegRtdetAll = Union{VecNegRtdet, VecNegRtdetEFExp, VecNegRtdetEFPow}
 
 # vector separable spectral primal formulations
 struct VecLogCone <: VecSpecExt end
@@ -57,11 +57,11 @@ const VecSepSpecEF = Union{VecSepSpecPrimEF, VecSepSpecDualEF}
 abstract type MatSpecExt <: SpectralExtender end
 
 # matrix negative geomean formulations
-struct MatNegGeom <: MatSpecExt end
-struct MatNegGeomEFExp <: MatSpecExt end
-struct MatNegGeomEFPow <: MatSpecExt end
+struct MatNegRtdet <: MatSpecExt end
+struct MatNegRtdetEFExp <: MatSpecExt end
+struct MatNegRtdetEFPow <: MatSpecExt end
 
-const MatNegGeomAll = Union{MatNegGeom, MatNegGeomEFExp, MatNegGeomEFPow}
+const MatNegRtdetAll = Union{MatNegRtdet, MatNegRtdetEFExp, MatNegRtdetEFPow}
 
 # matrix separable spectral primal formulations
 struct MatLogdetCone <: MatSpecExt end
@@ -107,14 +107,14 @@ const MatSepSpecEigOrd = Union{MatNegLogEigOrd, MatNegEntropyEigOrd,
     MatNegEntropyConjEigOrd, MatNegSqrtConjEigOrd, MatNegPower01ConjEigOrd,
     MatPower12ConjEigOrd}
 
-const NegGeomAll = Union{VecNegGeomAll, MatNegGeomAll}
+const NegRtdetAll = Union{VecNegRtdetAll, MatNegRtdetAll}
 const SepSpecPrimAll = Union{VecSepSpecPrimAll, MatSepSpecPrimAll}
 const SepSpecDualAll = Union{VecSepSpecDualAll, MatSepSpecDualAll}
 const SepSpecAll = Union{SepSpecPrimAll, SepSpecDualAll}
 
 # helpers
-get_vec_ef(::MatNegGeomEFExp) = VecNegGeomEFExp()
-get_vec_ef(::MatNegGeomEFPow) = VecNegGeomEFPow()
+get_vec_ef(::MatNegRtdetEFExp) = VecNegRtdetEFExp()
+get_vec_ef(::MatNegRtdetEFPow) = VecNegRtdetEFPow()
 get_vec_ef(::MatNegLogEigOrd) = VecNegLogEF()
 get_vec_ef(::MatNegEntropyEigOrd) = VecNegEntropyEF()
 get_vec_ef(::MatNegSqrtEigOrd) = VecNegSqrtEF()
@@ -144,7 +144,7 @@ get_ssf(ext::Union{VecPower12, VecPower12EF, VecPower12Conj, VecPower12ConjEF,
     MatPower12, MatPower12EigOrd, MatPower12Conj, MatPower12ConjEigOrd}) =
     Cones.Power12SSF(ext.p)
 
-nat_name(::NegGeomAll) = "NegGeom"
+nat_name(::NegRtdetAll) = "NegRtdet"
 get_name_ssf(ext::SepSpecAll) = string(nameof(typeof(get_ssf(ext))))
 nat_name(ext::SepSpecPrimAll) = get_name_ssf(ext)
 nat_name(ext::SepSpecDualAll) = get_name_ssf(ext) * "Conj"
@@ -152,7 +152,7 @@ nat_name(ext::SepSpecDualAll) = get_name_ssf(ext) * "Conj"
 is_domain_pos(::SpectralExtender) = true
 is_domain_pos(ext::SepSpecDualAll) = Cones.h_conj_dom_pos(get_ssf(ext))
 
-get_val(x::Vector, ::NegGeomAll) = -exp(sum(log, x) / length(x))
+get_val(x::Vector, ::NegRtdetAll) = -exp(sum(log, x) / length(x))
 get_val(x::Vector, ext::SepSpecPrimAll) = Cones.h_val(x, get_ssf(ext))
 get_val(x::Vector, ext::SepSpecDualAll) = Cones.h_conj(x, get_ssf(ext))
 
@@ -175,11 +175,11 @@ function add_homog_spectral(
 end
 
 #=
-VecNegGeom
+VecNegRtdet
 (u, w > 0) : u > -(Πᵢ wᵢ)^(1/d)
 =#
 function add_homog_spectral(
-    ::VecNegGeom,
+    ::VecNegRtdet,
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
@@ -191,13 +191,13 @@ function add_homog_spectral(
 end
 
 #=
-VecNegGeomEFExp
+VecNegRtdetEFExp
 negative geometric mean -> exponential cone EF
 (u, w > 0) : u > -(Πᵢ wᵢ)^(1/d)
 ↔ ∃ y > 0, x ∈ ℝᵈ : e'x < 0, (-xᵢ, y - u, wᵢ) ∈ MOI.ExponentialCone, ∀i
 =#
 function add_homog_spectral(
-    ::VecNegGeomEFExp,
+    ::VecNegRtdetEFExp,
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
@@ -218,7 +218,7 @@ function add_homog_spectral(
 end
 
 #=
-VecNegGeomEFPow
+VecNegRtdetEFPow
 negative geometric mean -> power cone EF
 (u, w > 0) : u > -(Πᵢ wᵢ)^(1/d)
 ↔ ∃ y > 0, x ∈ ℝᵈ⁻² : (w₁, w₂, x₁) ∈ MOI.PowerCone(1/2),
@@ -226,7 +226,7 @@ negative geometric mean -> power cone EF
 (w[d], x[d-2], y - u) ∈ MOI.PowerCone(1/d)
 =#
 function add_homog_spectral(
-    ::VecNegGeomEFPow,
+    ::VecNegRtdetEFPow,
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
@@ -312,10 +312,10 @@ function add_spectral(
 end
 
 #=
-MatNegGeom
+MatNegRtdet
 =#
 function add_homog_spectral(
-    ::MatNegGeom,
+    ::MatNegRtdet,
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
@@ -328,13 +328,13 @@ function add_homog_spectral(
 end
 
 #=
-MatNegGeomEF
+MatNegRtdetEF
 (u, W ≻ 0) : u > -rootdet(W)
 ↔ ∃ upper triangular U : [W U'; U Diag(δ)] ≻ 0, δ = diag(U),
-(u, δ) ∈ NegGeomean
+(u, δ) ∈ NegRtdetean
 =#
 function add_homog_spectral(
-    ext::Union{MatNegGeomEFExp, MatNegGeomEFPow},
+    ext::Union{MatNegRtdetEFExp, MatNegRtdetEFPow},
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,

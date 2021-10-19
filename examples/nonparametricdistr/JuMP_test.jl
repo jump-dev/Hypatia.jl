@@ -3,9 +3,9 @@ relaxed_tols = (default_tol_relax = 1000,)
 insts = OrderedDict()
 insts["minimal"] = [
     # geomean
-    ((3, VecNegGeom()),),
-    ((3, VecNegGeomEFExp()),),
-    ((3, VecNegGeomEFPow()),),
+    ((3, VecNegRtdet()),),
+    ((3, VecNegRtdetEFExp()),),
+    ((3, VecNegRtdetEFPow()),),
     # sum neglog
     ((2, VecLogCone()),),
     ((2, VecNegLog()),),
@@ -23,7 +23,7 @@ insts["minimal"] = [
     ((2, VecPower12(1.5)),),
     ((2, VecPower12EF(1.5)),),
     # mixture
-    ((2, VecNegGeom()),),
+    ((2, VecNegRtdet()),),
     ((3, VecPower12(1.5)),),
     ((3, VecNegLogEF()),),
     ]
