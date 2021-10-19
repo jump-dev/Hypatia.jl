@@ -85,8 +85,10 @@ insts["nat"] = (nothing, vcat(
     ))
 insts["ext"] = (nothing, vcat(
     polynorm_insts(false, false, true, [1, 2]),
-    polynorm_insts(false, false, false, [1, 2]),
     polynorm_insts(true, false, true, [1,]),
+    ))
+insts["extmat"] = (nothing, vcat(
+    polynorm_insts(false, false, false, [1, 2]),
     ))
 
 return (PolyNormJuMP, insts)

@@ -80,15 +80,19 @@ inst_sets = [
     # ("extSEP", hyp_solver), # SOCExpPSD extender
     # ("extEP", mosek_solver), # ExpPSD extender
     # ("extSEP", mosek_solver), # SOCExpPSD extender
-    #= spectral function cones paper =#
+    #= WSOS cones paper =#
     ("nat", hyp_solver),
-    ("natlog", hyp_solver),
     ("ext", hyp_solver),
-    ("ext", mosek_solver),
+    ("extmat", hyp_solver),
+    #= spectral function cones paper =#
+    # ("nat", hyp_solver),
+    # ("natlog", hyp_solver),
+    # ("ext", hyp_solver),
+    # ("ext", mosek_solver),
     # for nonparametricdistr (allows ECOS)
-    ("vecext", hyp_solver),
-    ("vecext", mosek_solver),
-    ("vecext", ecos_solver),
+    # ("vecext", hyp_solver),
+    # ("vecext", mosek_solver),
+    # ("vecext", ecos_solver),
     ]
 
 # models to run
@@ -102,13 +106,12 @@ JuMP_examples = [
     # "portfolio",
     # "shapeconregr",
     #= WSOS cones paper =#
-    # "nearestpolymat",
-    # "polynorm",
+    "polynorm",
     #= spectral function cones paper =#
-    "centralpolymat",
-    "classicalquantum",
-    "experimentdesign",
-    "nonparametricdistr",
+    # "centralpolymat",
+    # "classicalquantum",
+    # "experimentdesign",
+    # "nonparametricdistr",
     ]
 
 interrupt()
