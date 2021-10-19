@@ -34,11 +34,15 @@ cd ~/.julia/dev/Hypatia/benchmarks/natvsext
 ### Choose examples
 
 Open `run.jl` with a code editor.
-To run the examples from _"Solving natural conic formulations with Hypatia.jl"_
-uncomment the example names under the "natural formulations paper" header and
-comment (add #) the names under the "spectral function cones paper" header.
-To run the examples from "_Conic optimization with spectral functions on
-Euclidean Jordan algebras_", do the opposite.
+Under `inst_sets =` and `JuMP_examples = `:
+* To run examples from "_Solving natural conic formulations with Hypatia.jl_"
+uncomment the items under the "natural formulations paper" header and
+comment (add #) the remaining
+* To run examples from "_Conic optimization with spectral functions on
+Euclidean Jordan algebras_" uncomment the items under "spectral function cones
+paper" and comment the remaining
+* To run examples from "_Sum of squares generalizations for conic sets_"
+uncomment the items under "WSOS cones paper" and comment the remaining
 
 ### Run the script
 
