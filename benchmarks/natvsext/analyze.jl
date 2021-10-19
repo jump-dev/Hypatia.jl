@@ -280,7 +280,6 @@ function transform_plot_cols(ex_df_wide, inst_solver)
 end
 
 function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
-    ex_name == "polynorm" && return
     @info("making plot csv for $ex_name")
     inst_keys = ex_params[1]
     num_params = length(inst_keys)
