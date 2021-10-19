@@ -1,20 +1,18 @@
 
 nonparametricdistr_insts(ext::VecSpecExt) = [
     [(d, ext)
-    for d in vcat(10, 500, 1000, 2500, 5000:5000:25000)] # includes compile run
+    for d in vcat(10, 500, 1000, 2500, 5000:5000:30000)] # includes compile run
     ]
 
 insts = OrderedDict()
 insts["nat"] = (nothing, vcat(nonparametricdistr_insts.([
-    VecNegGeom(),
+    VecNegRtdet(),
     VecNegLog(),
     VecNegSqrt(),
     VecNegEntropy(),
     ])...))
-insts["natlog"] = (nothing, nonparametricdistr_insts(
-    VecLogCone()))
 insts["vecext"] = (nothing, vcat(nonparametricdistr_insts.([
-    VecNegGeomEFExp(),
+    VecNegRtdetEFExp(),
     VecNegLogEF(),
     VecNegSqrtEF(),
     VecNegEntropyEF(),

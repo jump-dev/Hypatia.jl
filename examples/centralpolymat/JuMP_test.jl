@@ -3,9 +3,9 @@ relaxed_tols = (default_tol_relax = 100,)
 insts = OrderedDict()
 insts["minimal"] = [
     # rootdet
-    ((2, 2, MatNegGeom()),),
-    ((2, 2, MatNegGeomEFExp()),),
-    ((2, 2, MatNegGeomEFPow()),),
+    ((2, 2, MatNegRtdet()),),
+    ((2, 2, MatNegRtdetEFExp()),),
+    ((2, 2, MatNegRtdetEFPow()),),
     # tr negentropyconj (domain not positive)
     ((1, 2, MatNegEntropyConj()),),
     ((1, 2, MatNegEntropyConjEigOrd()),),
@@ -21,9 +21,9 @@ insts["minimal"] = [
     ((1, 2, MatPower12ConjEigOrd(1.7)),),
     ]
 insts["fast"] = [
-    ((1, 10, MatNegGeomEFExp()),),
-    ((1, 15, MatNegGeom()),),
-    ((2, 3, MatNegGeomEFPow()),),
+    ((1, 10, MatNegRtdetEFExp()),),
+    ((1, 15, MatNegRtdet()),),
+    ((2, 3, MatNegRtdetEFPow()),),
     ((2, 3, MatNegSqrtEigOrd()),),
     ((2, 6, MatNegSqrt()),),
     ((2, 5, MatNegSqrtConjDirect()),),
@@ -37,7 +37,7 @@ insts["fast"] = [
     ((3, 2, MatNegPower01ConjEigOrd(0.3)),),
     ((3, 2, MatPower12EigOrd(1.5)),),
     ((3, 4, MatPower12(1.5)),),
-    ((3, 4, MatNegGeom()),),
+    ((3, 4, MatNegRtdet()),),
     ((7, 2, MatNegLog()),),
     ((7, 2, MatPower12(1.5)),),
     ((7, 2, MatNegPower01(0.7)),),
@@ -47,9 +47,9 @@ insts["various"] = [
     ((2, 5, MatNegLogEigOrd()),),
     ((2, 4, MatPower12EigOrd(1.5)), nothing, relaxed_tols),
     ((2, 4, MatNegEntropyEigOrd()),),
-    ((2, 10, MatNegGeomEFExp()),),
-    ((2, 8, MatNegGeomEFPow()),),
-    ((2, 14, MatNegGeom()),),
+    ((2, 10, MatNegRtdetEFExp()),),
+    ((2, 8, MatNegRtdetEFPow()),),
+    ((2, 14, MatNegRtdet()),),
     ((2, 12, MatNegSqrtConj()),),
     ((2, 10, MatLogdetCone()),),
     ((2, 8, MatNegEntropy()),),
@@ -64,7 +64,7 @@ insts["various"] = [
     ((5, 2, MatPower12ConjEigOrd(1.5)),),
     ((5, 3, MatNegSqrtConjDirect()),),
     ((5, 3, MatNegLogDirect()),),
-    ((6, 3, MatNegGeom()),),
+    ((6, 3, MatNegRtdet()),),
     ((6, 3, MatNegSqrt()),),
     ]
 return (CentralPolyMatJuMP, insts)
