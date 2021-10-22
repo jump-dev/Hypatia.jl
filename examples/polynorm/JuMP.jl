@@ -27,7 +27,7 @@ function build(inst::PolyNormJuMP{T}) where {T <: Float64}
 
     model = JuMP.Model()
     JuMP.@variable(model, f[1:U])
-    JuMP.@objective(model, Min, dot(w, f))
+    JuMP.@objective(model, Min, dot(w, f) / U)
 
     if inst.use_norm_cone
         cone = (inst.use_l1 ? Hypatia.WSOSInterpEpiNormOneCone :
