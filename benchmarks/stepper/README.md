@@ -24,9 +24,10 @@ Install the selected version of Hypatia (e.g. v0.5.1) and script dependencies
 and run update:
 ```julia
 pkg> add Hypatia#v0.5.1
-pkg> add CSV DataFrames DataStructures DelimitedFiles Distributions
+pkg> dev Hypatia
+pkg> add Combinatorics CSV DataFrames DataStructures DelimitedFiles Distributions
 pkg> add DynamicPolynomials ForwardDiff JuMP PolyJuMP Random SemialgebraicSets
-pkg> add SumOfSquares Test Printf BenchmarkProfiles
+pkg> add SpecialFunctions SumOfSquares Test Printf BenchmarkProfiles
 pkg> up
 ```
 
@@ -47,6 +48,7 @@ Start a GNU Screen from the shell by typing `screen`
 
 Run (from the benchmarks/stepper directory):
 ```shell
+mkdir raw
 killall julia; ~/julia/julia run.jl &> raw/bench.txt
 ```
 If the script errors in the next few minutes, follow the error messages to debug,
