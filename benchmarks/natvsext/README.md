@@ -18,6 +18,7 @@ Install the selected version of Hypatia (e.g. v0.5.0) and script dependencies
 and run update:
 ```julia
 pkg> add Hypatia#v0.5.0
+pkg> dev Hypatia
 pkg> add Combinatorics CSV DataFrames DataStructures DelimitedFiles Distributions
 pkg> add DynamicPolynomials ECOS ForwardDiff JuMP PolyJuMP Random SemialgebraicSets
 pkg> add SpecialFunctions SumOfSquares Test Printf MosekTools Distributed
@@ -57,6 +58,7 @@ Start a GNU Screen from the shell by typing `screen`
 
 Run (from the benchmarks/natvsext directory):
 ```shell
+mkdir raw
 killall julia; ~/julia/julia run.jl &> raw/bench.txt
 ```
 If the script errors in the next few minutes, follow the error messages to debug,
