@@ -48,7 +48,7 @@ Start a GNU Screen from the shell by typing `screen`
 
 Run (from the benchmarks/stepper directory):
 ```shell
-mkdir raw
+mkdir -p raw
 killall julia; ~/julia/julia run.jl &> raw/bench.txt
 ```
 If the script errors in the next few minutes, follow the error messages to debug,
