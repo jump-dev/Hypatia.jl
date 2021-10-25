@@ -20,8 +20,8 @@ and run update:
 pkg> add Hypatia#v0.5.0
 pkg> dev Hypatia
 pkg> add Combinatorics CSV DataFrames DataStructures DelimitedFiles Distributions
-pkg> add DynamicPolynomials ECOS ForwardDiff JuMP PolyJuMP Random SemialgebraicSets
-pkg> add SpecialFunctions SumOfSquares Test Printf MosekTools Distributed
+pkg> add DynamicPolynomials ForwardDiff JuMP PolyJuMP Random SemialgebraicSets
+pkg> add SpecialFunctions SumOfSquares Test Printf Distributed ECOS MosekTools
 pkg> up
 ```
 
