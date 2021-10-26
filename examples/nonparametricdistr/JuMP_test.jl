@@ -54,12 +54,17 @@ insts["various"] = [
     # ((100, VecNegLogEF()), nothing, relaxed_tols),
     # ((400, VecNegEntropy()), nothing, relaxed_tols),
     # ((4000, VecNegEntropy()), nothing, relaxed_tols),
-    ((3, VecNegLog()),),
-    ((10, VecNegLog()),),
-    ((30, VecNegLog()),),
-    ((100, VecNegLog()),),
-    ((300, VecNegLog()),),
-    ((1000, VecNegLog()),),
-    ((3000, VecNegLog()),),
+    # compile
+    ((3, VecNegEntropy()),),
+    ((30, VecNegEntropy()),),
+    # runs
+    ((3, VecNegEntropy()),),
+    ((10, VecNegEntropy()),),
+    ((30, VecNegEntropy()),),
+    ((100, VecNegEntropy()),),
+    ((300, VecNegEntropy()),),
+    ((1000, VecNegEntropy()),),
+    ((3000, VecNegEntropy()),),
+    ((10000, VecNegEntropy()),),
     ]
 return (NonparametricDistrJuMP, insts)

@@ -10,13 +10,20 @@ import Hypatia
 import Hypatia.Solvers
 
 # script verbosity
-script_verbose = false
+script_verbose = true
 
 # default options to solvers
+tol_loose = 1e-5
+tol_tight = 1e-3 * tol_loose
+
 default_options = (
-    verbose = false,
-    # verbose = true,
-    default_tol_relax = 1000,
+    # verbose = false,
+    verbose = true,
+    # default_tol_relax = 1000,
+    tol_abs_opt = tol_tight,
+    tol_rel_opt = tol_loose,
+    tol_feas = tol_loose,
+    tol_infeas = tol_tight,
     # stepper = Solvers.CombinedStepper{Float64}(),
     # stepper = Solvers.PredOrCentStepper{Float64}(),
     iter_limit = 250,
@@ -28,7 +35,7 @@ inst_sets = [
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
     # ("fast", Float64, 60),
-    ("various", Float64, 120),
+    ("various", Float64, 3600),
     ]
 
 perf = Examples.setup_benchmark_dataframe()

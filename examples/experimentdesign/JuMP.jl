@@ -61,6 +61,8 @@ function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where T
     obj_result = get_val(pos_only(λ), inst.ext)
     @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
 
+
+
     # inv hess prod oracle vs explicit hess factorization and solve
     # timing and numerics checks at final point already loaded in cone
     @assert stat == MOI.OPTIMAL # has to be feasible point
@@ -74,13 +76,15 @@ function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where T
     g = copy(Hypatia.Cones.grad(cone))
     nu = Hypatia.Cones.get_nu(cone)
 
+    LHviol(Hig) = Float64(abs(1 - dot(Hig, BigFloat.(g)) / nu)) + eps()
+
     println("\ninv hess prod oracle")
     cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated =
         cone.inv_hess_aux_updated = cone.hess_fact_updated = false
     stats1 = @timed begin
         Hig = Hypatia.Cones.inv_hess_prod!(cone.vec1, g, cone)
     end
-    LHviol1 = abs(1 - dot(Hig, g) / nu)
+    LHviol1 = LHviol(Hig)
     println("LH viol:\n$LHviol1")
     println("time:\n$(stats1.time)")
     println("bytes:\n$(stats1.bytes)")
@@ -101,7 +105,7 @@ function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where T
         end
     end
     if fact_ok
-        LHviol2 = abs(1 - dot(Hig, g) / nu)
+        LHviol2 = LHviol(Hig)
         println("LH viol:\n$LHviol2")
         println("time:\n$(stats2.time)")
         println("bytes:\n$(stats2.bytes)")
@@ -117,10 +121,13 @@ function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where T
     # print output line for table
     println()
     open("invhess.csv", "a") do io
-        @printf(io, "%d,%.2f,%.2f,%.2f,%.2f,%s\n", d,
-            log10(stats1.time), log10(LHviol1), log10(stats2.time), log10(LHviol2),
-            fact_str)
+        # @printf(io, "%d,%f,%f,%f,%f,%s\n", d,
+        #     stats1.time, LHviol1, stats2.time, LHviol2,
+        #     fact_str)
+        println(io,
+            "$d,$(stats1.time),$LHviol1,$(stats2.time),$LHviol2,$fact_str")
     end
     println("\n")
-        return
+
+    return
 end

@@ -59,9 +59,16 @@ insts["various"] = [
     # ((40, MatNegPower01Conj(0.6)),),
     # ((15, MatPower12(1.5)),),
     # ((9, MatPower12EigOrd(1.5)), nothing, (default_tol_relax = 100,)),
-    ((3, MatNegEntropy()),),
+    # compile
+    ((2, MatNegEntropy()),),
+    ((20, MatNegEntropy()),),
+    # runs
+    ((2, MatNegEntropy()),),
+    ((5, MatNegEntropy()),),
     ((10, MatNegEntropy()),),
-    ((30, MatNegEntropy()),),
+    ((20, MatNegEntropy()),),
+    ((50, MatNegEntropy()),),
     ((100, MatNegEntropy()),),
+    ((200, MatNegEntropy()),),
     ]
 return (ExperimentDesignJuMP, insts)
