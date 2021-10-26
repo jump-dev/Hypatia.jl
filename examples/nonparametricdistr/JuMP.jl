@@ -57,5 +57,65 @@ function test_extra(inst::NonparametricDistrJuMP{T}, model::JuMP.Model) where T
     p_opt = pos_only(p_opt)
     obj_result = get_val(p_opt, inst.ext)
     @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
+
+    # inv hess prod oracle vs explicit hess factorization and solve
+    # timing and numerics checks at final point already loaded in cone
+    @assert stat == MOI.OPTIMAL # has to be feasible point
+    println("\noracle timings results")
+    d = inst.d
+    println("d = $d")
+
+    # get the EpiPerSepSpectral cone
+    cone = JuMP.backend(model).optimizer.model.cones[end]
+    @assert cone isa Hypatia.Cones.EpiPerSepSpectral
+    g = copy(Hypatia.Cones.grad(cone))
+    nu = Hypatia.Cones.get_nu(cone)
+
+    println("\ninv hess prod oracle")
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated =
+        cone.inv_hess_aux_updated = cone.hess_fact_updated = false
+    stats1 = @timed begin
+        Hig = Hypatia.Cones.inv_hess_prod!(cone.vec1, g, cone)
+    end
+    LHviol1 = abs(1 - dot(Hig, g) / nu)
+    println("LH viol:\n$LHviol1")
+    println("time:\n$(stats1.time)")
+    println("bytes:\n$(stats1.bytes)")
+
+    println("\nexplicit hess factorization and solve")
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated =
+        cone.inv_hess_aux_updated = cone.hess_fact_updated = false
+    println("allocate")
+    @time begin
+        Hypatia.Cones.alloc_hess!(cone)
+        cone.hess_fact_mat = zero(cone.hess)
+    end
+    println("compute Hessian, factorize, and solve")
+    stats2 = @timed begin
+        fact_ok = Hypatia.Cones.update_hess_fact(cone)
+        if fact_ok
+            Hig = ldiv!(cone.vec1, cone.hess_fact, g)
+        end
+    end
+    if fact_ok
+        LHviol2 = abs(1 - dot(Hig, g) / nu)
+        println("LH viol:\n$LHviol2")
+        println("time:\n$(stats2.time)")
+        println("bytes:\n$(stats2.bytes)")
+    else
+        println("hess fact failed")
+        LHviol2 = Inf
+    end
+    fact_name = nameof(typeof(cone.hess_fact))
+    println(fact_name)
+    @assert fact_name in (:Cholesky, :BunchKaufman)
+    fact_str = (fact_name == :Cholesky ? "Ch" : "BK")
+
+    # print output line for table
+    println()
+    @printf("& %d & %.2f & %.2f & %.2f & %.2f & %s \\\\", d,
+        log10(stats1.time), log10(LHviol1), log10(stats2.time), log10(LHviol2),
+        fact_str)
+    println("\n")
     return
 end
