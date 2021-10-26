@@ -276,6 +276,7 @@ function hess_prod!(
     cone::EpiPerSepSpectral{<:MatrixCSqr{T}},
     ) where T
     cone.hess_aux_updated || update_hess_aux(cone)
+    d = cone.d
     v = cone.point[2]
     cache = cone.cache
     ζi = cache.ζi
@@ -286,7 +287,7 @@ function hess_prod!(
     ∇h = cache.∇h
     Δh = cache.Δh
     r_X = cache.w1
-    w_aux = cache.w2
+    w2 = cache.w2
     w3 = cache.w3
     D_λi = Diagonal(w_λi)
     D_viw_λ = Diagonal(viw_λ)
@@ -297,22 +298,22 @@ function hess_prod!(
         p = arr[1, j]
         q = arr[2, j]
         @views svec_to_smat!(r_X, arr[3:end, j], cache.rt2)
-        mul!(w_aux, Hermitian(r_X, :U), viw_X)
-        mul!(r_X, viw_X', w_aux)
+        mul!(w2, Hermitian(r_X, :U), viw_X)
+        mul!(r_X, viw_X', w2)
 
-        sum1 = sum(∇h[i] * real(r_X[i, i]) for i in 1:cone.d)
+        sum1 = sum(∇h[i] * real(r_X[i, i]) for i in 1:d)
         c1 = -ζi * (p - σ * q - sum1) * ζi
-        @. w_aux = ζivi * Δh * (r_X - q * D_viw_λ)
-        c2 = sum(viw_λ[i] * real(w_aux[i, i]) for i in 1:cone.d)
+        @. w2 = ζivi * Δh * (r_X - q * D_viw_λ)
+        c2 = sum(viw_λ[i] * real(w2[i, i]) for i in 1:d)
 
         rmul!(r_X, D_λi)
-        @. w_aux += w_λi * r_X + c1 * D_∇h
-        mul!(w3, Hermitian(w_aux, :U), viw_X')
-        mul!(w_aux, viw_X, w3)
+        @. w2 += w_λi * r_X + c1 * D_∇h
+        mul!(w3, viw_X, Hermitian(w2, :U))
+        mul!(w2, w3, viw_X')
 
         prod[1, j] = -c1
         prod[2, j] = c1 * σ - c2 + q / v / v
-        @views smat_to_svec!(prod[3:end, j], w_aux, cache.rt2)
+        @views smat_to_svec!(prod[3:end, j], w2, cache.rt2)
     end
 
     return prod
@@ -403,30 +404,29 @@ function inv_hess_prod!(
     c1 = cache.c1
     c4 = cache.c4
     ζ2β = cache.ζ2β
-    r_X = Hermitian(cache.w1, :U)
+    r_X = cache.w1
     w2 = cache.w2
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
         q = arr[2, j]
-        @views svec_to_smat!(r_X.data, arr[3:end, j], cache.rt2)
-        mul!(w2, r_X, viw_X)
-        mul!(r_X.data, viw_X', w2)
+        @views svec_to_smat!(r_X, arr[3:end, j], cache.rt2)
+        mul!(w2, Hermitian(r_X, :U), viw_X)
+        mul!(r_X, viw_X', w2)
 
-        qγr = q + sum(γ[i] * r_X[i, i] for i in 1:d)
+        qγr = q + sum(γ[i] * real(r_X[i, i]) for i in 1:d)
         cv = c4 * (c1 * p + qγr)
 
-        prod[1, j] = ζ2β * p + c1 * cv + sum(α[i] * r_X[i, i] for i in 1:d)
+        prod[1, j] = ζ2β * p + c1 * cv + sum(α[i] * real(r_X[i, i]) for i in 1:d)
         prod[2, j] = cv
 
-        w_prod = r_X
-        w_prod.data ./= cache.θ
+        r_X ./= cache.θ
         for i in 1:d
-            w_prod.data[i, i] += p * α[i] + cv * γ[i]
+            r_X[i, i] += p * α[i] + cv * γ[i]
         end
-        mul!(w2, w_prod, viw_X')
-        mul!(w_prod.data, viw_X, w2)
-        @views smat_to_svec!(prod[3:end, j], w_prod.data, cache.rt2)
+        mul!(w2, viw_X, Hermitian(r_X, :U))
+        mul!(r_X, w2, viw_X')
+        @views smat_to_svec!(prod[3:end, j], r_X, cache.rt2)
     end
 
     return prod
@@ -447,13 +447,13 @@ function update_dder3_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
 
     # setup Δ2h
     i6 = inv(T(6))
-    idx_jk = 0
-    @inbounds for k in 1:d
+    @inbounds Threads.@threads for k in 1:d
+        idx_jk = sum(1:(k - 1))
         ∇3h_k = ∇3h[k]
         idx_ij = 1
         kd = d * (k - 1)
         for j in 1:k
-            ∇3h_j = ∇3h[j]
+            ∇3h_jk = ∇3h[j] + ∇3h_k
             Δh_jk = Δh[j, k]
             ijk = d * (idx_jk - 1 + j)
             jik = d * idx_jk + j
@@ -462,25 +462,24 @@ function update_dder3_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
 
             @inbounds for i in 1:j
                 denom_ij = viw_λ_Δ[idx_ij]
-                if iszero(denom_ij)
-                    denom_ik = viw_λ_Δ[idx_jk + i]
-                    if iszero(denom_ik)
-                        t = (∇3h[i] + ∇3h_j + ∇3h_k) * i6
+                Δ2h[ijk + i] = Δ2h[jik] = Δ2h[kij] = begin
+                    if iszero(denom_ij)
+                        denom_ik = viw_λ_Δ[idx_jk + i]
+                        if iszero(denom_ik)
+                            (∇3h[i] + ∇3h_jk) * i6
+                        else
+                            (Δh[jd + i] - Δh_jk) / denom_ik
+                        end
                     else
-                        t = (Δh[jd + i] - Δh_jk) / denom_ik
+                        (Δh[kd + i] - Δh_jk) / denom_ij
                     end
-                else
-                    t = (Δh[kd + i] - Δh_jk) / denom_ij
                 end
-
-                Δ2h[ijk + i] = Δ2h[jik] = Δ2h[kij] = t
 
                 idx_ij += 1
                 jik += d
                 kij += d
             end
         end
-        idx_jk += k
     end
 
     cone.dder3_aux_updated = true
@@ -511,6 +510,7 @@ function dder3(
     r_X = cache.w1
     ξ_X = cache.w2
     ξb = cache.w3
+    w4 = cache.w4
     wd = cache.wd
 
     p = dir[1]
@@ -530,17 +530,12 @@ function dder3(
     c1 = -ζi * (ζiχ^2 + v * ξbξ)
 
     w_aux = ξb
-    w_aux .*= ζiχ + viq
-    ξ_X_views = [view(ξ_X, :, j) for j in 1:d]
+    lmul!(ζiχ + viq, w_aux)
     col = 1
     @inbounds for j in 1:d
-        ξ_Xj = ξ_X_views[j]
-        for i in 1:j
-            ξ_Xi = ξ_X_views[i]
-            @views Δ2h_ij = Δ2h[:, col]
-            w_aux[i, j] -= ζi * dot(ξ_Xi, Diagonal(Δ2h_ij), ξ_Xj)
-            col += 1
-        end
+        @views @. w4[:, 1:j] = ξ_X[:, 1:j] * Δ2h[:, col:(col + j - 1)]
+        @views mul!(w_aux[1:j, j], w4[:, 1:j]', ξ_X[:, j], -ζi, true)
+        col += j
     end
     @inbounds c2 = sum(viw_λ[i] * real(w_aux[i, i]) for i in 1:d)
 
@@ -550,8 +545,8 @@ function dder3(
     mul!(w_aux, r_X, r_X', true, true)
     D_∇h = Diagonal(∇h)
     @. w_aux += c1 * D_∇h
-    mul!(ξ_X, Hermitian(w_aux, :U), viw_X')
-    mul!(w_aux, viw_X, ξ_X)
+    mul!(ξ_X, viw_X, Hermitian(w_aux, :U))
+    mul!(w_aux, ξ_X, viw_X')
 
     dder3[1] = -c1
     @inbounds dder3[2] = c1 * σ - c2 + ξbξ + viq^2 / v
