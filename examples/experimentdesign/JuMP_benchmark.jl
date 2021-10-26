@@ -1,7 +1,7 @@
 
 experimentdesign_insts(ext::MatSpecExt) = [
     [(d, ext)
-    for d in vcat(3, 25:25:100, 150, 200:100:1100)] # includes compile run
+    for d in vcat(3, 25:25:100, 150, 200:100:900)] # includes compile run
     ]
 
 insts = OrderedDict()
