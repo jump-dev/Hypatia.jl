@@ -116,9 +116,11 @@ function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where T
 
     # print output line for table
     println()
-    @printf("& %d & %.2f & %.2f & %.2f & %.2f & %s \\\\", d,
-        log10(stats1.time), log10(LHviol1), log10(stats2.time), log10(LHviol2),
-        fact_str)
+    open("invhess.csv", "a") do io
+        @printf(io, "%d,%.2f,%.2f,%.2f,%.2f,%s\n", d,
+            log10(stats1.time), log10(LHviol1), log10(stats2.time), log10(LHviol2),
+            fact_str)
+    end
     println("\n")
         return
 end

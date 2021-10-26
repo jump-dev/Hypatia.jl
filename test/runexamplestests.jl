@@ -33,6 +33,10 @@ inst_sets = [
 
 perf = Examples.setup_benchmark_dataframe()
 
+open("invhess.csv", "w") do io
+    println(io, "d,t1,v1,t2,v2,fact")
+end
+
 @testset "examples tests" begin
 test_insts = Examples.get_test_instances()
 
