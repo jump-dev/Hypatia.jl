@@ -14,17 +14,23 @@ Install the selected version of MOSEK (e.g. version 9) by following the
 instructions at https://github.com/MOSEK/Mosek.jl.
 
 Start Julia from the shell and enter Julia's pkg mode by typing `]`.
-Install the selected version of Hypatia (e.g. v0.5.0) and script dependencies
-and run update:
+Install Hypatia and the script dependencies:
 ```julia
-pkg> add Hypatia#v0.5.0
 pkg> dev Hypatia
 pkg> add Combinatorics CSV DataFrames DataStructures DelimitedFiles Distributions
 pkg> add DynamicPolynomials ForwardDiff JuMP PolyJuMP Random SemialgebraicSets
 pkg> add SpecialFunctions SumOfSquares Test Printf Distributed ECOS MosekTools
+```
+Exit Julia.
+Set the desired version of Hypatia (e.g. v0.5.0) with:
+```shell
+cd ~/.julia/dev/Hypatia
+git checkout v0.5.0
+```
+Update packages by starting Julia again and typing `]`, then:
+```julia
 pkg> up
 ```
-
 Exit Julia, and change directory to the benchmarks/natvsext folder:
 ```shell
 cd ~/.julia/dev/Hypatia/benchmarks/natvsext
