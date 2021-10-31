@@ -18,19 +18,21 @@ mutable struct VectorCSqrCache{T <: Real} <: CSqrCache{T}
     ϕ::T
     ζ::T
     ζi::T
+    ζivi::T
     σ::T
     ∇h::Vector{T}
     ∇2h::Vector{T}
     ∇3h::Vector{T}
-    w1::Vector{T}
-    w2::Vector{T}
-    # inv hess aux
+
     m::Vector{T}
     α::Vector{T}
     γ::Vector{T}
-    c1::T
-    c4::T
-    ζ2β::T
+    k1::T
+    k2::T
+    k3::T
+
+    w1::Vector{T}
+    w2::Vector{T}
 
     VectorCSqrCache{T}() where {T <: Real} = new{T}()
 end
@@ -111,7 +113,9 @@ end
 function update_hess_aux(cone::EpiPerSepSpectral{<:VectorCSqr})
     @assert !cone.hess_aux_updated
     @assert cone.grad_updated
-    h_der2(cone.cache.∇2h, cone.cache.viw, cone.h)
+    cache = cone.cache
+    cache.ζivi = inv(cache.ζ * cone.point[2])
+    h_der2(cache.∇2h, cache.viw, cone.h)
     cone.hess_aux_updated = true
 end
 
@@ -122,12 +126,12 @@ function update_hess(cone::EpiPerSepSpectral{<:VectorCSqr})
     H = cone.hess.data
     cache = cone.cache
     ζi = cache.ζi
+    ζivi = cache.ζivi
     σ = cache.σ
     viw = cache.viw
     wi = cache.wi
     ∇h = cache.∇h
     ∇2h = cache.∇2h
-    ζivi = ζi / v
 
     # Huu
     Huu = H[1, 1] = abs2(ζi)
@@ -176,12 +180,12 @@ function hess_prod!(
     w = cone.w_view
     cache = cone.cache
     ζi = cache.ζi
+    ζivi = cache.ζivi
     viw = cache.viw
     wi = cache.wi
     σ = cache.σ
     ∇h = cache.∇h
     ∇2h = cache.∇2h
-    ζivi = ζi / v
     ξb = cache.w1
 
     @inbounds for j in 1:size(arr, 2)
@@ -206,30 +210,21 @@ function update_inv_hess_aux(cone::EpiPerSepSpectral{<:VectorCSqr})
     cone.hess_aux_updated || update_hess_aux(cone)
     v = cone.point[2]
     cache = cone.cache
-    σ = cache.σ
-    viw = cache.viw
     ∇h = cache.∇h
-    ∇2h = cache.∇2h
     wi = cache.wi
-    ζivi = cache.ζi / v
     w1 = cache.w1
     m = cache.m
     α = cache.α
     γ = cache.γ
 
-    @. w1 = ζivi * ∇2h
+    @. w1 = cache.ζivi * cache.∇2h
     @. m = inv(w1 + abs2(wi))
     @. α = m * ∇h
-    w1 .*= viw
-    @. γ = m * w1
+    @. γ = m * cache.viw * w1
 
-    ζ2β = abs2(cache.ζ) + dot(∇h, α)
-    c1 = σ + dot(∇h, γ)
-    @inbounds c4 = inv(v^-2 + sum((viw[i] - γ[i]) * w1[i] for i in 1:cone.d))
-
-    cache.c1 = c1
-    cache.c4 = c4
-    cache.ζ2β = ζ2β
+    cache.k1 = abs2(cache.ζ) + dot(∇h, α)
+    cache.k2 = cache.σ + dot(∇h, γ)
+    cache.k3 = (inv(v) + dot(wi, γ)) / v
 
     cone.inv_hess_aux_updated = true
 end
@@ -242,23 +237,23 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr})
     m = cache.m
     α = cache.α
     γ = cache.γ
-    c1 = cache.c1
-    c4 = cache.c4
-    ζ2β = cache.ζ2β
+    k2 = cache.k2
+    k3 = cache.k3
 
     # Hiuu, Hiuv, Hivv
-    Hi[1, 1] = ζ2β + c1 * c4 * c1
-    Hi[1, 2] = c4 * c1
-    Hi[2, 2] = c4
+    k23i = k2 / k3
+    Hi[1, 1] = cache.k1 + k23i * k2
+    Hi[1, 2] = k23i
+    Hi[2, 2] = inv(k3)
 
     @inbounds for j in 1:cone.d
         j2 = 2 + j
 
         # Hivw
-        Hivj = Hi[2, j2] = c4 * γ[j]
+        Hivj = Hi[2, j2] = γ[j] / k3
 
         # Hiuw
-        Hi[1, j2] = α[j] + c1 * Hivj
+        Hi[1, j2] = α[j] + k2 * Hivj
 
         # Hiww
         for i in 1:j
@@ -281,19 +276,17 @@ function inv_hess_prod!(
     m = cache.m
     α = cache.α
     γ = cache.γ
-    c1 = cache.c1
-    c4 = cache.c4
-    ζ2β = cache.ζ2β
+    k1 = cache.k1
+    k2 = cache.k2
+    k3 = cache.k3
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
-        q = arr[2, j]
         @views r = arr[3:end, j]
 
-        qγr = q + dot(γ, r)
-        cv = c4 * (c1 * p + qγr)
+        cv = (k2 * p + arr[2, j] + dot(γ, r)) / k3
 
-        prod[1, j] = ζ2β * p + c1 * cv + dot(α, r)
+        prod[1, j] = k1 * p + k2 * cv + dot(α, r)
         prod[2, j] = cv
         @. @views prod[3:end, j] = p * α + cv * γ + m * r
     end
@@ -318,15 +311,12 @@ function dder3(
     dder3 = cone.dder3
     cache = cone.cache
     ζi = cache.ζi
-    viw = cache.viw
     σ = cache.σ
     ∇h = cache.∇h
     ∇2h = cache.∇2h
-    ∇3h = cache.∇3h
     wi = cache.wi
     ξ = cache.w1
     ξb = cache.w2
-    ζivi = ζi / v
 
     p = dir[1]
     q = dir[2]
@@ -334,7 +324,7 @@ function dder3(
 
     viq = q / v
     @. ξ = r - viq * w
-    @. ξb = ζivi * ∇2h * ξ
+    @. ξb = cache.ζivi * ∇2h * ξ
     ζiχ = ζi * (p - σ * q - dot(∇h, r))
     ξbξ = dot(ξb, ξ) / 2
     c1 = -ζi * (ζiχ^2 + ξbξ)
@@ -343,10 +333,10 @@ function dder3(
     ξ ./= v
     w_aux = ξb
     w_aux .*= ζiχ + viq
-    @. w_aux += c2 * ∇3h * ξ * ξ
+    @. w_aux += c2 * ξ * cache.∇3h * ξ
 
     dder3[1] = -c1
-    dder3[2] = c1 * σ - dot(viw, w_aux) + (ξbξ + viq^2) / v
+    dder3[2] = c1 * σ - dot(cache.viw, w_aux) + (ξbξ + viq^2) / v
     @. dder3[3:end] = c1 * ∇h + w_aux + abs2(r * wi) * wi
 
     return dder3

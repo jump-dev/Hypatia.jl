@@ -22,6 +22,7 @@ mutable struct MatrixCSqrCache{T <: Real, R <: RealOrComplex{T}} <: CSqrCache{T}
     ϕ::T
     ζ::T
     ζi::T
+    ζivi::T
     σ::T
     ∇h::Vector{T}
     ∇2h::Vector{T}
@@ -30,18 +31,19 @@ mutable struct MatrixCSqrCache{T <: Real, R <: RealOrComplex{T}} <: CSqrCache{T}
     Δh::Matrix{T}
     Δ2h::Matrix{T}
     θ::Matrix{T}
-    # TODO try delete some aux fields
+
+    α::Vector{T}
+    γ::Vector{T}
+    k1::T
+    k2::T
+    k3::T
+
     wd::Vector{T}
     wT::Matrix{T}
     w1::Matrix{R}
     w2::Matrix{R}
     w3::Matrix{R}
     w4::Matrix{R}
-    α::Vector{T}
-    γ::Vector{T}
-    c1::T
-    c4::T
-    ζ2β::T
 
     MatrixCSqrCache{T, R}() where {T <: Real, R <: RealOrComplex{T}} = new{T, R}()
 end
@@ -87,7 +89,6 @@ function set_initial_point!(
     return arr
 end
 
-# TODO check whether it is faster to do chol before eigdecomp
 function update_feas(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     @assert !cone.feas_updated
     cache = cone.cache
@@ -96,6 +97,7 @@ function update_feas(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     cone.is_feas = false
     if v > eps(T)
         w = viw_X = cache.viw_X
+        # try cholesky before eigdecomp
         svec_to_smat!(w, cone.w_view, cache.rt2)
         w_chol = cholesky!(Hermitian(w, :U), check = false)
         if isposdef(w_chol)
@@ -114,8 +116,6 @@ function update_feas(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     return cone.is_feas
 end
 
-# TODO check whether it is faster to do chol before eigdecomp
-# TODO check if this is faster or slower than only using prox check
 function is_dual_feas(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R}
     u = cone.dual_point[1]
     (u < eps(T)) && return false
@@ -131,9 +131,8 @@ function is_dual_feas(cone::EpiPerSepSpectral{MatrixCSqr{T, R}}) where {T, R}
 
     svec_to_smat!(uiw, w, cone.cache.rt2)
     uiw ./= u
-    # TODO in-place and dispatch to GLA or LAPACK.geevx! directly for efficiency
-    uiw_eigen = eigen(Hermitian(uiw, :U))
-    return (cone.dual_point[2] - u * h_conj(uiw_eigen.values, cone.h) > eps(T))
+    uiw_λ = eigvals!(Hermitian(uiw, :U))
+    return (cone.dual_point[2] - u * h_conj(uiw_λ, cone.h) > eps(T))
 end
 
 function update_grad(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
@@ -153,8 +152,8 @@ function update_grad(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     grad[1] = -ζi
     grad[2] = -inv(v) + ζi * cache.σ
     @. cache.wd = ζi * ∇h - cache.w_λi
-    mul!(cache.w1, Diagonal(cache.wd), viw_X') # TODO check efficient
-    gw = mul!(cache.w2, viw_X, cache.w1)
+    mul!(cache.w1, viw_X, Diagonal(cache.wd))
+    gw = mul!(cache.w2, cache.w1, viw_X')
     @views smat_to_svec!(cone.grad[3:end], gw, cache.rt2)
 
     cone.grad_updated = true
@@ -172,6 +171,7 @@ function update_hess_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     viw_λ_Δ = cache.viw_λ_Δ
     Δh = cache.Δh
 
+    cache.ζivi = inv(cache.ζ * cone.point[2])
     h_der2(∇2h, viw_λ, cone.h)
 
     # setup viw_λ_Δ
@@ -225,6 +225,7 @@ function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     cache = cone.cache
     rt2 = cache.rt2
     ζi = cache.ζi
+    ζivi = cache.ζivi
     σ = cache.σ
     viw_X = cache.viw_X
     viw_λ = cache.viw_λ
@@ -234,7 +235,6 @@ function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     w1 = cache.w1
     w2 = cache.w2
     ζi2 = abs2(ζi)
-    ζivi = ζi / v
 
     # Huu
     H[1, 1] = ζi2
@@ -280,6 +280,7 @@ function hess_prod!(
     v = cone.point[2]
     cache = cone.cache
     ζi = cache.ζi
+    ζivi = cache.ζivi
     σ = cache.σ
     viw_X = cache.viw_X
     viw_λ = cache.viw_λ
@@ -292,7 +293,6 @@ function hess_prod!(
     D_λi = Diagonal(w_λi)
     D_viw_λ = Diagonal(viw_λ)
     D_∇h = Diagonal(∇h)
-    ζivi = ζi / v
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
@@ -324,28 +324,19 @@ function update_inv_hess_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     cone.hess_aux_updated || update_hess_aux(cone)
     v = cone.point[2]
     cache = cone.cache
-    σ = cache.σ
-    viw_X = cache.viw_X
-    viw_λ = cache.viw_λ
     ∇h = cache.∇h
     wd = cache.wd
     α = cache.α
     γ = cache.γ
-    ζivi = cache.ζi / v
 
+    @. wd = cache.ζivi * cache.∇2h
     @views diag_θ = cache.θ[1:(1 + cone.d):end]
-    @. wd = ζivi * cache.∇2h
     @. α = ∇h / diag_θ
-    wd .*= viw_λ
-    @. γ = wd / diag_θ
+    @. γ = cache.viw_λ / diag_θ * wd
 
-    ζ2β = abs2(cache.ζ) + dot(∇h, α)
-    c1 = σ + dot(∇h, γ)
-    @inbounds c4 = inv(v^-2 + sum((viw_λ[i] - γ[i]) * wd[i] for i in 1:cone.d))
-
-    cache.c1 = c1
-    cache.c4 = c4
-    cache.ζ2β = ζ2β
+    cache.k1 = abs2(cache.ζ) + dot(∇h, α)
+    cache.k2 = cache.σ + dot(∇h, γ)
+    cache.k3 = (inv(v) + dot(cache.w_λi, γ)) / v
 
     cone.inv_hess_aux_updated = true
 end
@@ -357,16 +348,16 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     cache = cone.cache
     rt2 = cache.rt2
     viw_X = cache.viw_X
-    c1 = cache.c1
-    c4 = cache.c4
-    ζ2β = cache.ζ2β
+    k2 = cache.k2
+    k3 = cache.k3
     wT = cache.wT
     w1 = cache.w1
     w2 = cache.w2
 
-    Hi[1, 1] = ζ2β + c1 * c4 * c1
-    Hiuv = Hi[1, 2] = c4 * c1
-    Hi[2, 2] = c4
+    k23i = k2 / k3
+    Hi[1, 1] = cache.k1 + k23i * k2
+    Hi[1, 2] = k23i
+    Hi[2, 2] = inv(k3)
 
     # Hiuw, Hivw
     @views HiuW = Hi[1, 3:end]
@@ -374,17 +365,17 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     mul!(w2, Diagonal(cache.γ), viw_X')
     mul!(w1, viw_X, w2)
     smat_to_svec!(γ_vec, w1, rt2)
-    @. Hi[2, 3:end] = c4 * γ_vec
+    @. Hi[2, 3:end] = γ_vec / k3
     mul!(w2, Diagonal(cache.α), viw_X')
     mul!(w1, viw_X, w2)
     smat_to_svec!(HiuW, w1, rt2)
-    @. HiuW += Hiuv * γ_vec
+    @. HiuW += k23i * γ_vec
 
     # Hiww
     @views Hiww = Hi[3:end, 3:end]
     @. wT = inv(cache.θ)
     eig_dot_kron!(Hiww, wT, viw_X, w1, w2, cache.w3, cache.w4, rt2)
-    mul!(Hiww, γ_vec, γ_vec', c4, true)
+    mul!(Hiww, γ_vec, γ_vec', inv(k3), true)
 
     cone.inv_hess_updated = true
     return cone.inv_hess
@@ -401,23 +392,21 @@ function inv_hess_prod!(
     viw_X = cache.viw_X
     α = cache.α
     γ = cache.γ
-    c1 = cache.c1
-    c4 = cache.c4
-    ζ2β = cache.ζ2β
+    k1 = cache.k1
+    k2 = cache.k2
+    k3 = cache.k3
     r_X = cache.w1
     w2 = cache.w2
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
-        q = arr[2, j]
         @views svec_to_smat!(r_X, arr[3:end, j], cache.rt2)
         mul!(w2, Hermitian(r_X, :U), viw_X)
         mul!(r_X, viw_X', w2)
 
-        qγr = q + sum(γ[i] * real(r_X[i, i]) for i in 1:d)
-        cv = c4 * (c1 * p + qγr)
+        cv = (k2 * p + arr[2, j] + sum(γ[i] * real(r_X[i, i]) for i in 1:d)) / k3
 
-        prod[1, j] = ζ2β * p + c1 * cv + sum(α[i] * real(r_X[i, i]) for i in 1:d)
+        prod[1, j] = k1 * p + k2 * cv + sum(α[i] * real(r_X[i, i]) for i in 1:d)
         prod[2, j] = cv
 
         r_X ./= cache.θ
@@ -502,11 +491,7 @@ function dder3(
     σ = cache.σ
     ∇h = cache.∇h
     ∇2h = cache.∇2h
-    ∇3h = cache.∇3h
-    Δh = cache.Δh
     Δ2h = cache.Δ2h
-    vi = inv(v)
-
     r_X = cache.w1
     ξ_X = cache.w2
     ξb = cache.w3
@@ -520,10 +505,10 @@ function dder3(
     mul!(r_X, viw_X', ξ_X)
     LinearAlgebra.copytri!(r_X, 'U', true)
 
-    viq = vi * q
+    viq = q / v
     D = Diagonal(viw_λ)
-    @. ξ_X = vi * r_X - viq * D
-    @. ξb = ζi * Δh * ξ_X
+    @. ξ_X = (r_X - q * D) / v
+    @. ξb = ζi * cache.Δh * ξ_X
     @inbounds sum1 = sum(∇h[i] * real(r_X[i, i]) for i in 1:d)
     ζiχ = ζi * (p - σ * q - sum1)
     ξbξ = dot(Hermitian(ξb, :U), Hermitian(ξ_X, :U)) / 2
