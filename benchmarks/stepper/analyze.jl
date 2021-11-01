@@ -191,10 +191,15 @@ function preprocess_df()
     all_df = combine(groupby(all_df, :inst_key), names(all_df),
         :conv => all => :every_conv)
 
-    # assert all instances are solved by at least one stepper (removes noise)
+    # remove instances where none of the steppers converged (removes noise)
     none_df = combine(groupby(all_df, :inst_key), :inst_key,
         :conv => (x -> !any(x)) => :none_conv)
-    @assert isempty(filter(t -> t.none_conv, none_df))
+    filter!(t -> t.none_conv, none_df)
+    if !isempty(none_df)
+        @info "removing $(nrow(none_df)) instances where no stepper converged"
+        none_insts = none_df[!, :inst_key]
+        filter!(!(t -> t.inst_key in none_insts), all_df)
+    end
 
     # assert all instances took at least one iteration
     @assert minimum(all_df[!, :iters]) >= 1
