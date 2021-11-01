@@ -81,9 +81,9 @@ inst_sets = [
     # ("extEP", mosek_solver), # ExpPSD extender
     # ("extSEP", mosek_solver), # SOCExpPSD extender
     #= WSOS cones paper =#
-    ("nat", hyp_solver),
-    ("ext", hyp_solver),
-    ("extmat", hyp_solver),
+    # ("nat", hyp_solver),
+    # ("ext", hyp_solver),
+    # ("extmat", hyp_solver),
     #= spectral function cones paper =#
     # ("nat", hyp_solver),
     # ("natlog", hyp_solver),
@@ -106,7 +106,7 @@ JuMP_examples = [
     # "portfolio",
     # "shapeconregr",
     #= WSOS cones paper =#
-    "polynorm",
+    # "polynorm",
     #= spectral function cones paper =#
     # "centralpolymat",
     # "classicalquantum",
