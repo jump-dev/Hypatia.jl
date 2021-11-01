@@ -86,6 +86,10 @@ inst_sets = [
     # ("extmat", hyp_solver),
     #= spectral function cones paper =#
     # ("nat", hyp_solver),
+    # ("ext", hyp_solver),
+    # ("extmat", hyp_solver),
+    #= spectral function cones paper =#
+    # ("nat", hyp_solver),
     # ("natlog", hyp_solver),
     # ("ext", hyp_solver),
     # ("ext", mosek_solver),
