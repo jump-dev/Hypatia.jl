@@ -21,7 +21,7 @@ ignored) are in a new folder `~/cblib/cblib.zib.de/download/all/`.
 Install the selected version of Julia (e.g. v1.7) from
 https://julialang.org/downloads/.
 
-Start Julia from the shell and enter Julia's pkg mode by typing `]`.
+Start Julia (e.g. `~/julia/julia`) from the shell and enter Julia's pkg mode by typing `]`.
 Install Hypatia and the script dependencies:
 ```julia
 pkg> dev Hypatia
