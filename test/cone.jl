@@ -154,6 +154,9 @@ function test_barrier(
     prod_vec = zero(dir)
     @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
 
+    @test Cones.inv_hess_prod!(prod_vec, fd_hess_dir, cone) ≈ dir atol=tol rtol=tol
+
+
     if Cones.use_dder3(cone)
         fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s ->
             ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), TFD_point)
