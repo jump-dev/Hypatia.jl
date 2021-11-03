@@ -200,10 +200,10 @@ function show_time_alloc(
 
     println("grad")
     @time Cones.grad(cone)
-    println("hess")
-    @time Cones.hess(cone)
-    println("inv_hess")
-    @time Cones.inv_hess(cone)
+    # println("hess")
+    # @time Cones.hess(cone)
+    # println("inv_hess")
+    # @time Cones.inv_hess(cone)
 
     point1 = randn(T, dim)
     point2 = zero(point1)
@@ -212,19 +212,19 @@ function show_time_alloc(
     println("inv_hess_prod")
     @time Cones.inv_hess_prod!(point2, point1, cone)
 
-    if hasproperty(cone, :use_hess_prod_slow)
-        cone.use_hess_prod_slow_updated = true
-        cone.use_hess_prod_slow = true
-        println("hess_prod_slow")
-        @time Cones.hess_prod_slow!(point2, point1, cone)
-    end
-
-    if Cones.use_sqrt_hess_oracles(dim + 1, cone)
-        println("sqrt_hess_prod")
-        @time Cones.sqrt_hess_prod!(point2, point1, cone)
-        println("inv_sqrt_hess_prod")
-        @time Cones.inv_sqrt_hess_prod!(point2, point1, cone)
-    end
+    # if hasproperty(cone, :use_hess_prod_slow)
+    #     cone.use_hess_prod_slow_updated = true
+    #     cone.use_hess_prod_slow = true
+    #     println("hess_prod_slow")
+    #     @time Cones.hess_prod_slow!(point2, point1, cone)
+    # end
+    #
+    # if Cones.use_sqrt_hess_oracles(dim + 1, cone)
+    #     println("sqrt_hess_prod")
+    #     @time Cones.sqrt_hess_prod!(point2, point1, cone)
+    #     println("inv_sqrt_hess_prod")
+    #     @time Cones.inv_sqrt_hess_prod!(point2, point1, cone)
+    # end
 
     if Cones.use_dder3(cone)
         println("dder3")
@@ -516,7 +516,7 @@ function test_barrier(C::Type{Cones.EpiNormSpectral{T, R}}) where {T, R}
     test_barrier(C(dr, ds), barrier)
 end
 
-show_time_alloc(C::Type{<:Cones.EpiNormSpectral}) = show_time_alloc(C(2, 2))
+show_time_alloc(C::Type{<:Cones.EpiNormSpectral}) = show_time_alloc(C(100, 10000))
 
 
 # MatrixEpiPerSquare

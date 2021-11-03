@@ -14,12 +14,12 @@ insts["fast"] = [
     ((5, 3), :SOCExpPSD),
     ]
 insts["various"] = [
-    ((10, 20),),
-    ((10, 15), :ExpPSD),
-    ((10, 15), :SOCExpPSD),
+    # ((10, 20),),
+    # ((10, 15), :ExpPSD),
+    # ((10, 15), :SOCExpPSD),
     ((10, 25),),
-    ((10, 20), :ExpPSD),
-    ((10, 20), :SOCExpPSD),
-    ((10, 30),),
+    # ((10, 20), :ExpPSD),
+    # ((10, 20), :SOCExpPSD),
+    # ((10, 30),),
     ]
 return (MatrixCompletionJuMP, insts)
