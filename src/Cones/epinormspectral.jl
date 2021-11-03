@@ -87,7 +87,7 @@ function setup_extra_data!(
     return cone
 end
 
-get_nu(cone::EpiNormSpectral) = cone.d1 + 1
+get_nu(cone::EpiNormSpectral) = 1 + cone.d1
 
 function set_initial_point!(
     arr::AbstractVector{T},
