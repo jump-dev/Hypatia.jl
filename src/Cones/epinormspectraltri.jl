@@ -347,23 +347,18 @@ function dder3(cone::EpiNormSpectralTri, dir::AbstractVector)
     @views svec_to_smat!(cone.tempdd, dir[2:end], cone.rt2)
     W_dir = Hermitian(cone.tempdd, :U)
 
-
-# TODO simplify for symm/herm
-
     u2 = abs2(u)
     zi = inv.(z)
     c1 = abs2.(2 * u ./ z) - zi
     udzi = u_dir ./ z
-    szi = s ./ z
     Ds = Diagonal(s)
     Dzi = Diagonal(zi)
-    Dszi = Diagonal(szi)
 
     simV = V' * W_dir
-    sims = (simV * V) * Ds
+    sim = simV * V
+    sims = sim * Ds
 
-    M3 = sims + sims'
-    M2 = Hermitian(Dzi * M3 * Dzi)
+    M2 = Hermitian(Dzi * (sims + sims') * Dzi)
 
     M4a = Dzi * M2
     D1 = Diagonal(udzi .* c1)
@@ -373,14 +368,13 @@ function dder3(cone::EpiNormSpectralTri, dir::AbstractVector)
     simVa = Dzi * simV
     M5 = Hermitian(simVa * simVa', :U)
     tr1 = tr(M5)
-
     M5 += u_dir * M6
-    M7 = M2 * M3 * Dszi + M5 * Ds
 
-    M2 += Diagonal(-2 * u * udzi .* zi)
-    M8 = M2 * simV
-
-    Wcorr = -2 * V * (M8 + M7 * V')
+    Wcorr = -2 * V * (
+        Diagonal(-2 * u * udzi ./ z) * simV + (
+        M2 * (u2 * sim + Ds * sim * Ds) * Dzi +
+        M5 * Ds
+        ) * V')
     @views smat_to_svec!(dder3[2:end], Wcorr, cone.rt2)
 
     c1 .-= 2 * zi
@@ -389,3 +383,80 @@ function dder3(cone::EpiNormSpectralTri, dir::AbstractVector)
 
     return dder3
 end
+
+# function dder3(cone::EpiNormSpectralTri, dir::AbstractVector)
+#     @assert cone.grad_updated
+#     u = cone.point[1]
+#     s = cone.s
+#     V = cone.V
+#     z = cone.z
+#     dder3 = cone.dder3
+#
+#     u_dir = dir[1]
+#     @views svec_to_smat!(cone.tempdd, dir[2:end], cone.rt2)
+#     W_dir = Hermitian(cone.tempdd, :U)
+#
+#     u2 = abs2(u)
+#     zi = inv.(z)
+#     c1 = abs2.(2 * u ./ z) - zi
+#     udzi = u_dir ./ z
+#     szi = s ./ z
+#     Ds = Diagonal(s)
+#     Dzi = Diagonal(zi)
+#     Dszi = Diagonal(szi)
+#
+#     simV = V' * W_dir
+#     sims = (simV * V) * Ds
+#
+#     M3 = sims + sims'
+#     M2 = Hermitian(Dzi * M3 * Dzi)
+#
+#     M4a = Dzi * M2
+#     D1 = Diagonal(udzi .* c1)
+#     M6 = -2 * u * Hermitian(M4a + M4a') + D1
+#     tr2 = real(dot(sims, M6 + 3 * D1))
+#
+#     simVa = Dzi * simV
+#     M5 = Hermitian(simVa * simVa', :U)
+#     tr1 = tr(M5)
+#
+#     M5 += u_dir * M6
+#     M7 = M2 * M3 * Dszi + M5 * Ds
+#
+#     M2 += Diagonal(-2 * u * udzi .* zi)
+#     M8 = M2 * simV
+#
+#     Wcorr = -2 * V * (M8 + M7 * V')
+#     @views smat_to_svec!(dder3[2:end], Wcorr, cone.rt2)
+#
+# @assert Wcorr ≈ -2 * V * (
+#     Diagonal(-2 * u * udzi .* zi) * simV + (
+#     M2 * (u2 * sim + Ds * sim * Ds) * Dzi +
+#     M5 * Ds
+#     ) * V')
+
+# @assert Wcorr ≈ -2 * V * (
+#     Diagonal(-2 * u * udzi .* zi) * sim +
+#     M2 * (u2 * sim + Ds * sim * Ds) * Dzi +
+#     M5 * Ds
+#     ) * V'
+
+# @assert Wcorr ≈ -2 * V * (
+#     Diagonal(-2 * u * udzi .* zi) * V' * W_dir * V +
+#     M2 * (V' * W_dir * V * (I + Ds * Dszi) +
+#     sims' * Dszi) +
+#     M5 * Ds
+#     ) * V'
+
+# @assert Wcorr ≈ -2 * V * (
+#     (M2 + Diagonal(-2 * u * udzi .* zi)) * V' * W_dir * V +
+#     M2 * (sims + sims') * Dszi +
+#     M5 * Ds
+#     ) * V'
+
+#     c1 .-= 2 * zi
+#     dder3[1] = 2 * u * (tr1 + u_dir * sum(udzi .* c1)) -
+#         cone.cu * abs2(u_dir / u) - tr2
+#
+#     return dder3
+# end

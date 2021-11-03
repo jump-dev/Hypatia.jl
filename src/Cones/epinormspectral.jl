@@ -212,7 +212,7 @@ function hess_prod!(
     U = cone.U
     Vt = cone.Vt
     z = cone.z
-    temp12 = cone.temp12
+    W_dir = cone.temp12
 
     # TODO refac hess
     zi = inv.(z)
@@ -226,9 +226,9 @@ function hess_prod!(
 
     @inbounds for j in 1:size(prod, 2)
         arr_1j = arr[1, j]
-        @views vec_copyto!(temp12, arr[2:end, j])
+        @views vec_copyto!(W_dir, arr[2:end, j])
         # sim
-        simU = Uzi' * temp12
+        simU = Uzi' * W_dir
         sim = simU * sziVt'
         # u
         @inbounds prod[1, j] = Huu * arr_1j - 2 * u *
@@ -236,6 +236,13 @@ function hess_prod!(
         # W
         HW1 = Diagonal(huw * arr_1j) + (sim + sim') * Diagonal(s)
         HW = U * (simU + HW1 * Vt)
+
+        # @assert HW ≈ 2 * U * Diagonal(zi) * U' * W_dir + U * (
+        #     Diagonal(huw * arr_1j) + 2 * (
+        #     Diagonal(zi) * U' * W_dir * Vt' * Diagonal(szi) * Diagonal(s) +
+        #     Diagonal(szi) * Vt * W_dir' * U * Diagonal(szi)
+        #     )) * Vt
+
         @views vec_copyto!(prod[2:end, j], HW)
     end
 
