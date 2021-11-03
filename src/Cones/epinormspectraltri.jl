@@ -294,6 +294,10 @@ function inv_hess_prod!(
     z = cone.z
     tempdd = cone.tempdd
 
+
+# simplify for symm
+
+
     u2 = abs2(u)
     t = u2 .+ abs2.(s)
     sigma = -cone.cu / u + 2 * sum(inv, t)
@@ -301,6 +305,9 @@ function inv_hess_prod!(
 
     Vzi = V * (T(0.5) * Diagonal(z)) # factor 1/2
     sVt = Diagonal(s) * V'
+
+    @show s
+    @show z
 
     d = cone.d
     Den = zeros(T, d, d)
@@ -313,6 +320,54 @@ function inv_hess_prod!(
         Den[j, j] = s_j / t[j]
     end
 
+    Den2 = zeros(T, d, d)
+    for j in 1:d
+        s_j = s[j]
+        z_j = z[j]
+        for i in 1:d
+            sij = s[i] * s_j
+            zs = s[i] * z_j + z[i] * s_j
+            # Den2[i, j] = z[i] - zs * z[i] * s_j / ((u2 - sij) * (u2 + sij))
+            # Den2[i, j] = z[i] * (1 - zs * s_j / ((u2 - sij) * (u2 + sij)))
+            numa = z[i] * (u2 - sij) * (u2 + sij) - z[i] * s_j * s[i] * z_j - (z[i] * s_j)^2
+            # Den2[i, j] = num / ((u2 - sij) * (u2 + sij))
+            # num = z[i] * u2^2 - z[i] * sij^2 - z[i] * s_j * s[i] * z_j - (z[i] * s_j)^2
+            # num = z[i] * u2^2 - z[i] * sij * (sij + z_j) - (z[i] * s_j)^2
+            # num = z[i] * u2^2 - z[i] * sij * (sij + z_j) - (u2 * s_j - s[i] * sij)^2
+            # num = z[i] * u2^2 - z[i] * sij * (sij + z_j) - (u2^2 * s_j^2 - 2 * u2 * sij^2 + s[i]^2 * sij^2)
+            # num = z[i] * u2^2 - u2 * sij^2 - z[i] * z_j * sij - u2^2 * s_j^2 + 2 * u2 * sij^2
+            # num = u2^2 * (u2 - s[i]^2 - s_j^2) - z[i] * z_j * sij + u2 * sij^2
+            # num = u2^2 * (u2 - (s[i] + s_j)^2 + 2 * sij) - z[i] * z_j * sij + u2 * sij^2
+            # num = u2^3 - u2^2 * (s[i]^2 + s_j^2) - u2^2 * sij + u2 * sij * (s[i]^2 + s_j^2) + u2 * sij^2 - sij^3
+            # num = u2^3 - u2^2 * (s[i] + s_j)^2 + u2^2 * sij + u2 * sij * (s[i] + s_j)^2 - u2 * sij^2 - sij^3
+            # num = u2 * (sij - u2) * (s[i] + s_j)^2 + u2^3 + u2^2 * sij - u2 * sij^2 - sij^3
+            # num = u2 * (sij - u2) * (s[i] + s_j)^2 + (u2^2 - sij^2) * (u2 + sij)
+            num = u2 * (sij - u2) * (s[i] + s_j)^2 + (u2 - sij) * (u2 + sij) * (u2 + sij)
+            @assert numa ≈ num
+            dij = num / ((u2 - sij) * (u2 + sij))
+            @assert dij ≈ -u2 * (s[i] + s_j)^2 / (u2 + sij) + (u2 + sij)
+            @assert dij ≈ ((u2 + sij)^2 - u2 * (s[i] + s_j)^2) / (u2 + sij)
+            # num = (u2 + sij)^2 - u2 * (s[i] + s_j)^2
+            num2 = u2^2 + sij^2 - u2 * (s[i]^2 + s_j^2)
+            num2 = z[i] * z[j]
+            # num2 = u2 * (u2 * (sij^2 - 2) + z[i] + z[j])
+            # num2 = u2 * (u2 * sij^2 - (s[i] + s_j)^2 + 2sij)
+            @assert dij ≈ num2 / (u2 + sij)
+            # Den2[i, j] = num / ((u2 - sij) * (u2 + sij))
+            Den2[i, j] = z[i] * z[j] / (u2 + sij)
+        end
+        # Den2[j, j] = z_j - 2 * z_j * s_j^2 / t[j]
+        # Den2[j, j] = z_j * (1 - 2 * s_j^2 / t[j])
+        Den2[j, j] = z_j^2 / t[j]
+    end
+    Den2 .*= T(0.5)
+    @assert Den2 ≈ Den2'
+    @assert Den2 ≈ T(0.5) * (z .- Den .* (z * s' + s * z'))
+
+    Den3 = [u2 + s[i] * s[j] for i in 1:d, j in 1:d]
+
+Vz1 = V * Diagonal(z)
+
     @inbounds for j in 1:size(prod, 2)
         arr_1j = arr[1, j]
         @views svec_to_smat!(tempdd, arr[2:end, j], cone.rt2)
@@ -320,16 +375,36 @@ function inv_hess_prod!(
 
         # sim
         simV = Vzi' * W_dir
-        sim = simV * sVt'
+        sims = simV * sVt'
         c1 = arr_1j / sigma +
-            sum(hiuw2[i] * real(sim[i, i]) for i in eachindex(s))
+            sum(hiuw2[i] * real(sims[i, i]) for i in eachindex(s))
         # u
         prod[1, j] = c1
         # W
         dconst = 2 * u * c1
-        HiW1 = Den .* (dconst * I - (sim + sim'))
+        HiW1 = Den .* (dconst * I - (sims + sims'))
         HiW = V * (simV + HiW1 * V')
         @views smat_to_svec!(prod[2:end, j], HiW, cone.rt2)
+
+        sim = V' * W_dir * V
+        @assert sims + sims' ≈ 0.5 * (z * s' + s * z') .* sim
+
+        @assert HiW ≈ V * (dconst * Diagonal(s ./ t) + Den2 .* sim) * V'
+
+        simz = Vz1' * W_dir * Vz1
+        @assert HiW ≈ V * (dconst * Diagonal(s ./ t) + T(0.5) * simz ./ Den3) * V'
+        @assert HiW ≈ V * ((dconst * Diagonal(s) + T(0.5) * simz) ./ Den3) * V'
+
+
+        @assert HiW ≈ V * (
+            dconst * Diagonal(Den) + 0.5 * (
+            Diagonal(z) * sim - Den .* (z * s' + s * z') .* sim
+            )) * V'
+
+        @assert HiW ≈ V * (
+            (T(0.5) * Diagonal(z)) * sim + Den .* (dconst * I - (sims + sims'))
+            ) * V'
+
     end
 
     return prod

@@ -23,7 +23,7 @@ function cone_types(T::Type{<:Real})
 
         Cones.EpiNormSpectralTri{T, T},
         # Cones.EpiNormSpectralTri{T, Complex{T}},
-        Cones.EpiNormSpectral{T, T},
+        # Cones.EpiNormSpectral{T, T},
         # Cones.EpiNormSpectral{T, Complex{T}},
 
         # Cones.MatrixEpiPerSquare{T, T},
