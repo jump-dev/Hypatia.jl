@@ -25,6 +25,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
+    hess_aux_updated::Bool
     is_feas::Bool
     hess::Symmetric{T, Matrix{T}}
     inv_hess::Symmetric{T, Matrix{T}}
@@ -36,10 +37,15 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     U::Matrix{R}
     Vt::Matrix{R}
     z::Vector{T}
-    trZi::T
-    trZi2::T
-    trZi3::T
-    cu::T
+    zi::Vector{T}
+    szi::Vector{T}
+
+    huu::T
+    huw::Vector{T}
+    hiuui::T
+    hiuw::Vector{T}
+    hiuw2::Vector{T}
+    hiww::Matrix{T}
 
     temp12::Matrix{R}
 
@@ -60,30 +66,22 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
 end
 
 reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
+    cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated =
+    cone.hess_fact_updated = false)
 
-# TODO only allocate the fields we use
 function setup_extra_data!(
     cone::EpiNormSpectral{T, R},
     ) where {T <: Real, R <: RealOrComplex{T}}
     dim = cone.dim
     (d1, d2) = (cone.d1, cone.d2)
     cone.z = zeros(T, d1)
-
+    cone.zi = zeros(T, d1)
+    cone.szi = zeros(T, d1)
+    cone.huw = zeros(T, d1)
+    cone.hiuw = zeros(T, d1)
+    cone.hiuw2 = zeros(T, d1)
+    cone.hiww = zeros(T, d1, d1)
     cone.temp12 = zeros(R, d1, d2)
-
-    # cone.Z = zeros(R, d1, d1)
-    # cone.Zi = zeros(R, d1, d1)
-    # cone.SZi = zeros(R, d1, d2)
-    # cone.HuW = zeros(R, d1, d2)
-    # cone.S2Zi = zeros(R, d2, d2)
-    # cone.ZiSZi = zeros(R, d1, d2)
-    # cone.temp12b = zeros(R, d1, d2)
-    # cone.temp12c = zeros(R, d1, d2)
-    # cone.temp12d = zeros(R, d1, d2)
-    # cone.tempd1d1 = zeros(R, d1, d1)
-    # cone.tempd2d2 = zeros(R, d2, d2)
-    # cone.tempd2d2b = zeros(R, d2, d2)
     return cone
 end
 
@@ -134,67 +132,93 @@ function update_grad(cone::EpiNormSpectral)
     U = cone.U = cone.W_svd.U
     Vt = cone.Vt = cone.W_svd.Vt
     z = cone.z
+    zi = cone.zi
+    szi = cone.szi
     g = cone.grad
 
-    @. z = abs2(u) - abs2(s)
-    cone.trZi = sum(inv, z)
-    cone.cu = (cone.d1 - 1) / u
-    # cone.szi =
+    u2 = abs2(u)
+    @. z = u2 - abs2(s)
+    @. zi = inv(z)
+    @. szi = 2 * s / z
 
-    g[1] = -2 * u * cone.trZi + cone.cu
-    szi2 = 2 * s ./ z
-    gW = U * Diagonal(szi2) * Vt
+    g[1] = -2 * u * sum(zi) + (cone.d1 - 1) / u
+    gW = U * Diagonal(szi) * Vt
     @views vec_copyto!(g[2:end], gW)
 
     cone.grad_updated = true
     return cone.grad
 end
 
-function update_hess(cone::EpiNormSpectral)
-    # cone.hess_aux_updated || update_hess_aux(cone)
+function update_hess_aux(cone::EpiNormSpectral)
+    @assert !cone.hess_aux_updated
     @assert cone.grad_updated
-    isdefined(cone, :hess) || alloc_hess!(cone)
-    d1 = cone.d1
-    d2 = cone.d2
-    H = cone.hess.data
     u = cone.point[1]
     s = cone.s
     U = cone.U
     Vt = cone.Vt
     z = cone.z
+    zi = cone.zi
+    szi = cone.szi
+    d1 = cone.d1
+    d2 = cone.d2
+    hiww = cone.hiww
 
-    trZi2 = sum(zi -> abs2(inv(zi)), z)
-    Huu = 4 * abs2(u) * trZi2 - 2 * cone.trZi - cone.cu / u
-    huw = -4 * u * s ./ abs2.(z)
-    Huw = U * Diagonal(huw) * Vt
+    u2 = abs2(u)
+    cu = (cone.d1 - 1) / u2
+    t = u2 .+ abs2.(s) # TODO
+    cone.huu = 2 * sum(t[i] / z[i] * zi[i] for i in 1:d1) - cu
+    @. cone.huw = -2 * u / z * szi
+    cone.hiuui = 2 * sum(inv, t) - cu
+    @. cone.hiuw = 2 * u / cone.hiuui * s ./ t
+    @. cone.hiuw2 = 4 * u / t * zi
+
+    for j in 1:d1
+        s_j = s[j]
+        for i in 1:d1
+            sij = s[i] * s_j
+            hiww[i, j] = z[i] * s_j / ((u2 - sij) * (u2 + sij))
+        end
+        hiww[j, j] = s_j / t[j]
+    end
+
+    cone.hess_aux_updated = true
+end
+
+function update_hess(cone::EpiNormSpectral)
+    cone.hess_aux_updated || update_hess_aux(cone)
+    isdefined(cone, :hess) || alloc_hess!(cone)
+    d1 = cone.d1
+    d2 = cone.d2
+    U = cone.U
+    Vt = cone.Vt
+    s = cone.s
+    zi = cone.zi
+    szi = cone.szi
+    huw = cone.huw
+    temp12 = cone.temp12
+    H = cone.hess.data
+
+    # u, u
+    H[1, 1] = cone.huu
 
     # u, w
-    H[1, 1] = Huu
+    Huw = U * Diagonal(huw) * Vt
     @views vec_copyto!(H[1, 2:end], Huw)
 
     # w, w
-    U_irtz = U * Diagonal(inv.(sqrt.(z)))
-    sirtz_Vt = Diagonal(s ./ sqrt.(z)) * Vt
-    Zi = U_irtz * U_irtz'
-    SZi = U_irtz * sirtz_Vt
-    S2Zi = sirtz_Vt' * sirtz_Vt + I # TODO d2^2, don't allocate unless allocating hess
-
-    idx_incr = (cone.is_complex ? 2 : 1)
-    r_idx = 2
-    for i in 1:d2, j in 1:d1
-        c_idx = r_idx
-        for k in i:d2
-            S2Ziik = 2 * S2Zi[i, k]
-            SZijk = 2 * SZi[j, k]
-            lstart = (i == k ? j : 1)
-            for l in lstart:d1
-                term1 = Zi[l, j] * S2Ziik
-                term2 = SZi[l, i] * SZijk
-                spectral_kron_element!(H, r_idx, c_idx, term1, term2)
-                c_idx += idx_incr
-            end
-        end
-        r_idx += idx_incr
+    ziUt = Diagonal(zi) * U'
+    sziVt = Diagonal(szi) * Vt
+    c_idx = 2
+    reim1s = (cone.is_complex ? [1, im] : [1,])
+    for j in 1:d2, i in 1:d1, reim1 in reim1s
+        ziUt_i = reim1 * ziUt[:, i]
+        simszi2 = ziUt_i * sziVt[:, j]'
+        HW1 = (simszi2 + simszi2') * Diagonal(s)
+        HW2 = HW1 * Vt
+        HW2[:, j] += 2 * ziUt_i
+        HW = U * HW2
+        @views vec_copyto!(H[2:end, c_idx], HW)
+        c_idx += 1
     end
 
     cone.hess_updated = true
@@ -206,43 +230,27 @@ function hess_prod!(
     arr::AbstractVecOrMat,
     cone::EpiNormSpectral,
     )
-    @assert cone.grad_updated
-    u = cone.point[1]
-    s = cone.s
+    cone.hess_aux_updated || update_hess_aux(cone)
     U = cone.U
     Vt = cone.Vt
-    z = cone.z
+    u = cone.point[1]
+    s = cone.s
+    zi = cone.zi
+    szi = cone.szi
+    huw = cone.huw
+    huu = cone.huu
     W_dir = cone.temp12
 
-    # TODO refac hess
-    zi = inv.(z)
-    trZi2 = sum(abs2, zi)
-    uzi = u ./ z
-    Huu = 4 * sum(abs2, uzi) - 2 * cone.trZi - cone.cu / u
-    szi = s ./ z
-    huw = -4 * uzi .* szi
-    Uzi = U * (2 * Diagonal(zi)) # factor 2
-    sziVt = Diagonal(szi) * Vt
-
     @inbounds for j in 1:size(prod, 2)
-        arr_1j = arr[1, j]
+        u_dir = arr[1, j]
         @views vec_copyto!(W_dir, arr[2:end, j])
-        # sim
-        simU = Uzi' * W_dir
-        sim = simU * sziVt'
-        # u
-        @inbounds prod[1, j] = Huu * arr_1j - 2 * u *
-            sum(real(sim[i, i]) for i in eachindex(s))
-        # W
-        HW1 = Diagonal(huw * arr_1j) + (sim + sim') * Diagonal(s)
-        HW = U * (simU + HW1 * Vt)
+        simUzi = Diagonal(zi) * U' * W_dir
+        simszi2 = (simUzi * Vt') * Diagonal(szi)
 
-        # @assert HW ≈ 2 * U * Diagonal(zi) * U' * W_dir + U * (
-        #     Diagonal(huw * arr_1j) + 2 * (
-        #     Diagonal(zi) * U' * W_dir * Vt' * Diagonal(szi) * Diagonal(s) +
-        #     Diagonal(szi) * Vt * W_dir' * U * Diagonal(szi)
-        #     )) * Vt
+        prod[1, j] = huu * u_dir - 2 * u * tr(Hermitian(simszi2))
 
+        HW1 = Diagonal(huw * u_dir) + (simszi2 + simszi2') * Diagonal(s)
+        HW = U * (2 * simUzi + HW1 * Vt)
         @views vec_copyto!(prod[2:end, j], HW)
     end
 
@@ -250,108 +258,79 @@ function hess_prod!(
 end
 
 function update_inv_hess(cone::EpiNormSpectral{T}) where {T <: Real}
-    # cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-    @assert cone.grad_updated
+    cone.hess_aux_updated || update_hess_aux(cone)
     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     d1 = cone.d1
     d2 = cone.d2
-    Hi = cone.inv_hess.data
-    u = cone.point[1]
-    s = cone.s
     U = cone.U
     Vt = cone.Vt
+    u = cone.point[1]
+    s = cone.s
     z = cone.z
+    hiuui = cone.hiuui
+    hiuw = cone.hiuw
+    hiww = cone.hiww
     temp12 = cone.temp12
+    Hi = cone.inv_hess.data
 
-    u2 = abs2(u)
-    t = u2 .+ abs2.(s)
-    sigma = -cone.cu / u + 2 * sum(inv, t)
-    hiuw = 2 * u / sigma * s ./ t
-    Hiuw = U * Diagonal(hiuw) * Vt
-    hiuw2 = 8 * u2 / sigma ./ (t .* z)
-
-    Den = zeros(T, d1, d1)
-    for j in 1:d1
-        s_j = s[j]
-        for i in 1:d1
-            sij = s[i] * s_j
-            Den[i, j] = z[i] * s_j / ((u2 - sij) * (u2 + sij))
-        end
-        Den[j, j] = s_j / t[j]
-    end
-
-    ziUt = (T(0.5) * Diagonal(z)) * U'
-    Vs = Diagonal(s) * Vt
+    # u, u
+    Hi[1, 1] = inv(hiuui)
 
     # u, w
-    Hi[1, 1] = inv(sigma)
-    @views vec_copyto!(Hi[1, 2:end], Hiuw)
+    HiuW = U * Diagonal(hiuw) * Vt
+    @views Hiuwvec = Hi[1, 2:end]
+    @views vec_copyto!(Hiuwvec, HiuW)
 
     # w, w
+    zUt = (T(0.5) * Diagonal(z)) * U'
+    sVt = Diagonal(s) * Vt
     c_idx = 2
     reim1s = (cone.is_complex ? [1, im] : [1,])
-    for i in 1:d2, j in 1:d1, reim1 in reim1s
-        ziUtj = reim1 * ziUt[:, j]
-        sim = ziUtj * Vs[:, i]'
-        dconst = dot(hiuw2, real.(diag(sim)))
-        HiW1 = Den .* (dconst * I - (sim + sim')) # TODO @. ?
-        tempij = HiW1 * Vt
-        tempij[:, i] += ziUtj
-        HiW = U * tempij
+    for j in 1:d2, i in 1:d1, reim1 in reim1s
+        zUt_i = reim1 * zUt[:, i]
+        sim = zUt_i * sVt[:, j]'
+        HiW1 = hiww .* (sim + sim')
+        HiW2 = -HiW1 * Vt
+        HiW2[:, j] += zUt_i
+        HiW = U * HiW2
         @views vec_copyto!(Hi[2:end, c_idx], HiW)
         c_idx += 1
     end
+    @views mul!(Hi[2:end, 2:end], Hiuwvec, Hiuwvec', hiuui, true)
 
     cone.inv_hess_updated = true
     return cone.inv_hess
 end
 
 function inv_hess_prod!(
-    prod::AbstractVecOrMat{T},
-    arr::AbstractVecOrMat{T},
-    cone::EpiNormSpectral{T},
-    ) where T
-    @assert cone.grad_updated
-    u = cone.point[1]
-    s = cone.s
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::EpiNormSpectral,
+    )
+    cone.hess_aux_updated || update_hess_aux(cone)
+    d1 = cone.d1
     U = cone.U
     Vt = cone.Vt
+    u = cone.point[1]
+    s = cone.s
     z = cone.z
-    temp12 = cone.temp12
-
-    u2 = abs2(u)
-    t = u2 .+ abs2.(s)
-    sigma = -cone.cu / u + 2 * sum(inv, t)
-    hiuw2 = 4 * u / sigma ./ (t .* z)
-
-    Uzi = U * (T(0.5) * Diagonal(z)) # factor 1/2
-    sVt = Diagonal(s) * Vt
-
-    d1 = cone.d1
-    Den = zeros(T, d1, d1)
-    for j in 1:d1
-        s_j = s[j]
-        for i in 1:d1
-            sij = s[i] * s_j
-            Den[i, j] = z[i] * s_j / ((u2 - sij) * (u2 + sij))
-        end
-        Den[j, j] = s_j / t[j]
-    end
+    hiuui = cone.hiuui
+    hiuw2 = cone.hiuw2
+    hiww = cone.hiww
+    W_dir = cone.temp12
 
     @inbounds for j in 1:size(prod, 2)
-        arr_1j = arr[1, j]
-        @views vec_copyto!(temp12, arr[2:end, j])
-        # sim
-        simU = Uzi' * temp12
-        sim = simU * sVt'
-        c1 = arr_1j / sigma +
-            sum(hiuw2[i] * real(sim[i, i]) for i in eachindex(s))
-        # u
+        u_dir = arr[1, j]
+        @views vec_copyto!(W_dir, arr[2:end, j])
+        simUz = Diagonal(z / 2) * U' * W_dir
+        simsz = (simUz * Vt') * Diagonal(s)
+
+        c1 = (u_dir + sum(hiuw2[i] * real(simsz[i, i]) for i in 1:d1)) / hiuui
         prod[1, j] = c1
-        # W
+
         dconst = 2 * u * c1
-        HiW1 = Den .* (dconst * I - (sim + sim'))
-        HiW = U * (simU + HiW1 * Vt)
+        HiW1 = hiww .* (dconst * I - (simsz + simsz'))
+        HiW = U * (simUz + HiW1 * Vt)
         @views vec_copyto!(prod[2:end, j], HiW)
     end
 
@@ -361,23 +340,22 @@ end
 function dder3(cone::EpiNormSpectral, dir::AbstractVector)
     @assert cone.grad_updated
     u = cone.point[1]
-    s = cone.s
     U = cone.U
     Vt = cone.Vt
+    s = cone.s
     z = cone.z
+    zi = cone.zi
     dder3 = cone.dder3
 
     u_dir = dir[1]
     @views W_dir = vec_copyto!(cone.temp12, dir[2:end])
 
-    u2 = abs2(u)
-    zi = inv.(z)
+    # TODO
     c1 = abs2.(2 * u ./ z) - zi
     udzi = u_dir ./ z
     szi = s ./ z
     Ds = Diagonal(s)
     Dzi = Diagonal(zi)
-    Dszi = Diagonal(szi)
 
     simU = U' * W_dir
     sims = (simU * Vt') * Ds
@@ -395,7 +373,7 @@ function dder3(cone::EpiNormSpectral, dir::AbstractVector)
     tr1 = tr(M5)
 
     M5 += u_dir * M6
-    M7 = M2 * M3 * Dszi + M5 * Ds
+    M7 = (M2 * M3 * Dzi + M5) * Ds
 
     M2 += Diagonal(-2 * u * udzi .* zi)
     M8 = M2 * simU
@@ -405,7 +383,7 @@ function dder3(cone::EpiNormSpectral, dir::AbstractVector)
 
     c1 .-= 2 * zi
     dder3[1] = 2 * u * (tr1 + u_dir * sum(udzi .* c1)) -
-        cone.cu * abs2(u_dir / u) - tr2
+        tr2 - (cone.d1 - 1) / u * abs2(u_dir / u)
 
     return dder3
 end

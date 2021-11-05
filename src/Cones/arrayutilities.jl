@@ -321,7 +321,12 @@ function symm_kron!(
                 for i in 1:(j - 1)
                     a = mat[i, k] * mat[l, j]
                     b = mat[j, k] * mat[l, i]
-                    spectral_kron_element!(skr, row_idx, col_idx, a, b)
+                    apb = a + b
+                    amb = a - b
+                    skr[row_idx, col_idx] = real(apb)
+                    skr[row_idx + 1, col_idx] = -imag(amb)
+                    skr[row_idx, col_idx + 1] = imag(apb)
+                    skr[row_idx + 1, col_idx + 1] = real(amb)
                     row_idx += 2
                 end
                 c = rt2 * mat[j, k] * mat[l, j]
@@ -348,37 +353,6 @@ function symm_kron!(
         col_idx += 1
     end
 
-    return skr
-end
-
-# compute an element of the real spectral Kronecker in-place
-function spectral_kron_element!(
-    skr::AbstractMatrix{T},
-    i::Int,
-    j::Int,
-    a::T,
-    b::T,
-    ) where {T <: Real}
-    @inbounds skr[i, j] = a + b
-    return skr
-end
-
-# compute an element of the complex spectral Kronecker in-place
-function spectral_kron_element!(
-    skr::AbstractMatrix{T},
-    i::Int,
-    j::Int,
-    a::Complex{T},
-    b::Complex{T},
-    ) where {T <: Real}
-    apb = a + b
-    amb = a - b
-    @inbounds begin
-        skr[i, j] = real(apb)
-        skr[i + 1, j] = -imag(amb)
-        skr[i, j + 1] = imag(apb)
-        skr[i + 1, j + 1] = real(amb)
-    end
     return skr
 end
 

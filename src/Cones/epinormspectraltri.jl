@@ -34,11 +34,8 @@ mutable struct EpiNormSpectralTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     s::Vector{T}
     V::Matrix{R}
     z::Vector{T}
+    zi::Vector{T}
     szi::Vector{T}
-    trZi::T
-    # trZi2::T
-    # trZi3::T
-    cu::T
 
     huu::T
     huw::Vector{T}
@@ -59,7 +56,6 @@ mutable struct EpiNormSpectralTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone.rt2 = sqrt(T(2))
         cone.is_complex = (R <: Complex)
         cone.d = svec_side(R, dim - 1)
-        @show cone.d
         return cone
     end
 end
@@ -74,14 +70,13 @@ function setup_extra_data!(
     dim = cone.dim
     d = cone.d
     cone.z = zeros(T, d)
+    cone.zi = zeros(T, d)
     cone.szi = zeros(T, d)
     cone.V = zeros(R, d, d)
-
     cone.huw = zeros(T, d)
     cone.hiuw = zeros(T, d)
     cone.hiww = zeros(T, d, d)
     cone.tempdd = zeros(R, d, d)
-
     return cone
 end
 
@@ -128,18 +123,19 @@ end
 function update_grad(cone::EpiNormSpectralTri)
     @assert cone.is_feas
     u = cone.point[1]
-    s = cone.s
     V = cone.V
+    s = cone.s
     z = cone.z
+    zi = cone.zi
     szi = cone.szi
     g = cone.grad
 
-    @. z = abs2(u) - abs2(s)
+    u2 = abs2(u)
+    @. z = u2 - abs2(s)
+    @. zi = inv(z)
     @. szi = 2 * s / z
-    cone.trZi = sum(inv, z)
-    cone.cu = (cone.d - 1) / u
 
-    g[1] = -2 * u * cone.trZi + cone.cu
+    g[1] = -2 * u * sum(zi) + (cone.d - 1) / u
     gW = V * Diagonal(szi) * V'
     @views smat_to_svec!(g[2:end], gW, cone.rt2)
 
@@ -153,21 +149,18 @@ function update_hess_aux(cone::EpiNormSpectralTri)
     u = cone.point[1]
     s = cone.s
     z = cone.z
+    zi = cone.zi
     szi = cone.szi
     d = cone.d
     hiww = cone.hiww
 
     u2 = abs2(u)
-    zi = inv.(z) # TODO
-    # trZi2 = sum(abs2, zi)
-    uzi = u ./ z # TODO
-
-    cone.huu = 4 * sum(abs2, uzi) - 2 * cone.trZi - cone.cu / u
-    cone.huw = -2 * uzi .* szi # TODO
-
+    cu = (cone.d - 1) / u2
     t = u2 .+ abs2.(s) # TODO
-    cone.hiuui = -cone.cu / u + 2 * sum(inv, t)
-    cone.hiuw = 2 * u * s ./ t # TODO
+    cone.huu = 2 * sum(t[i] / z[i] * zi[i] for i in 1:d) - cu
+    @. cone.huw = -2 * u / z * szi
+    cone.hiuui = 2 * sum(inv, t) - cu
+    @. cone.hiuw = 2 * u * s ./ t
 
     for j in 1:d
         s_j = s[j]
@@ -204,8 +197,8 @@ function update_hess(cone::EpiNormSpectralTri)
     w2 = zero(tempdd)
     w3 = zero(tempdd)
     w4 = zero(tempdd)
-    hwwscal = Matrix(Symmetric(inv.(hiww), :U)) # TODO
-    @views Hww = H[2:end, 2:end] # TODO maybe pass below a starting index 2
+    hwwscal = Matrix(Symmetric(inv.(hiww), :U)) # TODO maybe form hww directly
+    @views Hww = H[2:end, 2:end]
     eig_dot_kron!(Hww, hwwscal, V, w1, w2, w3, w4, cone.rt2)
 
     cone.hess_updated = true
@@ -223,16 +216,16 @@ function hess_prod!(
     huw = cone.huw
     hiww = cone.hiww
     huu = cone.huu
-    tempdd = cone.tempdd
+    W_dir = cone.tempdd
 
     @inbounds for j in 1:size(prod, 2)
         u_dir = arr[1, j]
-        @views svec_to_smat!(tempdd, arr[2:end, j], cone.rt2)
-        sim = V' * Hermitian(tempdd, :U) * V
+        @views svec_to_smat!(W_dir, arr[2:end, j], cone.rt2)
+        sim = V' * Hermitian(W_dir, :U) * V
 
         prod[1, j] = huu * u_dir + sum(huw[i] * real(sim[i, i]) for i in 1:d)
 
-        HW = V * Hermitian(Diagonal(u_dir * huw) + sim ./ hiww, :U) * V'
+        HW = V * Hermitian(Diagonal(huw * u_dir) + sim ./ hiww, :U) * V' # TODO maybe form hww directly
         @views smat_to_svec!(prod[2:end, j], HW, cone.rt2)
     end
 
@@ -284,12 +277,12 @@ function inv_hess_prod!(
     hiuui = cone.hiuui
     hiuw = cone.hiuw
     hiww = cone.hiww
-    tempdd = cone.tempdd
+    W_dir = cone.tempdd
 
     @inbounds for j in 1:size(prod, 2)
         u_dir = arr[1, j]
-        @views svec_to_smat!(tempdd, arr[2:end, j], cone.rt2)
-        sim = V' * Hermitian(tempdd, :U) * V
+        @views svec_to_smat!(W_dir, arr[2:end, j], cone.rt2)
+        sim = V' * Hermitian(W_dir, :U) * V
 
         c1 = (u_dir + sum(hiuw[i] * real(sim[i, i]) for i in 1:d)) / hiuui
         prod[1, j] = c1
@@ -304,15 +297,17 @@ end
 function dder3(cone::EpiNormSpectralTri, dir::AbstractVector)
     @assert cone.grad_updated
     u = cone.point[1]
-    s = cone.s
     V = cone.V
+    s = cone.s
     z = cone.z
+    zi = cone.zi
     dder3 = cone.dder3
 
     u_dir = dir[1]
     @views svec_to_smat!(cone.tempdd, dir[2:end], cone.rt2)
     W_dir = Hermitian(cone.tempdd, :U)
 
+    # TODO
     u2 = abs2(u)
     zi = inv.(z)
     c1 = abs2.(2 * u ./ z) - zi
