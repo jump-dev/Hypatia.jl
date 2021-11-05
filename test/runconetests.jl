@@ -21,8 +21,8 @@ function cone_types(T::Type{<:Real})
         # Cones.EpiNormEucl{T},
         # Cones.EpiPerSquare{T},
 
-        Cones.EpiNormSpectralTri{T, T},
-        # Cones.EpiNormSpectralTri{T, Complex{T}},
+        # Cones.EpiNormSpectralTri{T, T},
+        Cones.EpiNormSpectralTri{T, Complex{T}},
         # Cones.EpiNormSpectral{T, T},
         # Cones.EpiNormSpectral{T, Complex{T}},
 
