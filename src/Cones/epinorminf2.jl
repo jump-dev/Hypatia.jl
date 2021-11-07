@@ -210,11 +210,17 @@ function hess_prod!(
     @inbounds for j in 1:size(prod, 2)
         p = arr[1, j]
         @views vec_copyto!(r, arr[2:end, j])
+
+
         @. simszi = real(Vszi * r)
-
         prod[1, j] = huu * p - dot(uzi, simszi)
-
         @. HW = 2 * (r + (simszi - p * uzi) * w) / z
+
+
+
+        # prod[1, j] =
+
+
         @views vec_copyto!(prod[2:end, j], HW)
     end
 
@@ -268,7 +274,6 @@ function dder3(cone::EpiNormInf, dir::AbstractVector)
     cone.hess_aux_updated || update_hess_aux(cone)
     u = cone.point[1]
     w = cone.w
-    d = cone.d
     z = cone.z
     dder3 = cone.dder3
     r = cone.w1
@@ -281,7 +286,7 @@ function dder3(cone::EpiNormInf, dir::AbstractVector)
     @. s1 = -2 * (u * p - real(conj(w) * r)) / z
     @. s2 = (abs2(r) - abs2(p)) / z + abs2(s1)
 
-    dder3[1] = 2 * sum((p * s1[i] + u * s2[i]) / z[i] for i in 1:d) -
+    dder3[1] = 2 * sum((p * s1[i] + u * s2[i]) / z[i] for i in 1:cone.d) -
         (cone.d - 1) / u * abs2(p / u)
 
     @. cone.w2 = -2 * (s1 * r + s2 * w) / z
