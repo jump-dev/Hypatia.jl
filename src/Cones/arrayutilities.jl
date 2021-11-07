@@ -373,7 +373,7 @@ function eig_dot_kron!(
     d = size(inner, 1)
     copyto!(V, vecs') # allows fast column slices
     V_views = [view(V, :, i) for i in 1:size(inner, 1)]
-    scals = (R <: Complex{T} ? (rt2i, rt2i * im) : (rt2i,)) # real and imag parts
+    scals = (R <: Complex{T} ? [rt2i, rt2i * im] : [rt2i,]) # real and imag parts
 
     col_idx = 1
     @inbounds for (j, V_j) in enumerate(V_views)

@@ -314,7 +314,12 @@ include("possemideftri.jl")
 include("doublynonnegativetri.jl")
 include("possemideftrisparse/possemideftrisparse.jl")
 include("linmatrixineq.jl")
-include("epinorminf.jl")
+
+
+# include("epinorminf.jl")
+include("epinorminf2.jl")
+
+
 include("epinormeucl.jl")
 include("epipersquare.jl")
 include("epinormspectraltri.jl")

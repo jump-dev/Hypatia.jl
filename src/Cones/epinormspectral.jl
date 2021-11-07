@@ -38,6 +38,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     Vt::Matrix{R}
     z::Vector{T}
     zi::Vector{T}
+    uzi::Vector{T}
     szi::Vector{T}
 
     huu::T
@@ -72,10 +73,10 @@ reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated =
 function setup_extra_data!(
     cone::EpiNormSpectral{T, R},
     ) where {T <: Real, R <: RealOrComplex{T}}
-    dim = cone.dim
     (d1, d2) = (cone.d1, cone.d2)
     cone.z = zeros(T, d1)
     cone.zi = zeros(T, d1)
+    cone.uzi = zeros(T, d1)
     cone.szi = zeros(T, d1)
     cone.huw = zeros(T, d1)
     cone.hiuw = zeros(T, d1)
@@ -128,20 +129,20 @@ end
 function update_grad(cone::EpiNormSpectral)
     @assert cone.is_feas
     u = cone.point[1]
-    s = cone.s = cone.W_svd.S
     U = cone.U = cone.W_svd.U
     Vt = cone.Vt = cone.W_svd.Vt
+    s = cone.s = cone.W_svd.S
     z = cone.z
-    zi = cone.zi
+    uzi = cone.uzi
     szi = cone.szi
     g = cone.grad
 
     u2 = abs2(u)
     @. z = u2 - abs2(s)
-    @. zi = inv(z)
+    @. uzi = 2 * u / z
     @. szi = 2 * s / z
 
-    g[1] = -2 * u * sum(zi) + (cone.d1 - 1) / u
+    g[1] = -sum(uzi) + (cone.d1 - 1) / u
     gW = U * Diagonal(szi) * Vt
     @views vec_copyto!(g[2:end], gW)
 
@@ -158,19 +159,21 @@ function update_hess_aux(cone::EpiNormSpectral)
     Vt = cone.Vt
     z = cone.z
     zi = cone.zi
+    uzi = cone.uzi
     szi = cone.szi
     d1 = cone.d1
     d2 = cone.d2
     hiww = cone.hiww
 
+    @. zi = inv(z)
     u2 = abs2(u)
     cu = (cone.d1 - 1) / u2
     t = u2 .+ abs2.(s) # TODO
     cone.huu = 2 * sum(t[i] / z[i] * zi[i] for i in 1:d1) - cu
-    @. cone.huw = -2 * u / z * szi
+    @. cone.huw = -uzi * szi
     cone.hiuui = 2 * sum(inv, t) - cu
     @. cone.hiuw = 2 * u / cone.hiuui * s ./ t
-    @. cone.hiuw2 = 4 * u / t * zi
+    @. cone.hiuw2 = 2 * uzi / t
 
     for j in 1:d1
         s_j = s[j]
@@ -338,20 +341,21 @@ function inv_hess_prod!(
 end
 
 function dder3(cone::EpiNormSpectral, dir::AbstractVector)
-    @assert cone.grad_updated
+    cone.hess_aux_updated || update_hess_aux(cone)
     u = cone.point[1]
     U = cone.U
     Vt = cone.Vt
     s = cone.s
     z = cone.z
     zi = cone.zi
+    uzi = cone.uzi
     dder3 = cone.dder3
 
     u_dir = dir[1]
     @views W_dir = vec_copyto!(cone.temp12, dir[2:end])
 
     # TODO
-    c1 = abs2.(2 * u ./ z) - zi
+    c1 = abs2.(uzi) - zi # TODO s^2/z?
     udzi = u_dir ./ z
     szi = s ./ z
     Ds = Diagonal(s)
@@ -375,7 +379,7 @@ function dder3(cone::EpiNormSpectral, dir::AbstractVector)
     M5 += u_dir * M6
     M7 = (M2 * M3 * Dzi + M5) * Ds
 
-    M2 += Diagonal(-2 * u * udzi .* zi)
+    M2 += Diagonal(-uzi * udzi)
     M8 = M2 * simU
 
     Wcorr = -2 * U * (M8 + M7 * Vt)

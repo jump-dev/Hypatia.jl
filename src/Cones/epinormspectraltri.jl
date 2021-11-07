@@ -35,6 +35,7 @@ mutable struct EpiNormSpectralTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     V::Matrix{R}
     z::Vector{T}
     zi::Vector{T}
+    uzi::Vector{T}
     szi::Vector{T}
 
     huu::T
@@ -67,10 +68,10 @@ reset_data(cone::EpiNormSpectralTri) = (cone.feas_updated = cone.grad_updated =
 function setup_extra_data!(
     cone::EpiNormSpectralTri{T, R},
     ) where {T <: Real, R <: RealOrComplex{T}}
-    dim = cone.dim
     d = cone.d
     cone.z = zeros(T, d)
     cone.zi = zeros(T, d)
+    cone.uzi = zeros(T, d)
     cone.szi = zeros(T, d)
     cone.V = zeros(R, d, d)
     cone.huw = zeros(T, d)
@@ -126,16 +127,16 @@ function update_grad(cone::EpiNormSpectralTri)
     V = cone.V
     s = cone.s
     z = cone.z
-    zi = cone.zi
+    uzi = cone.uzi
     szi = cone.szi
     g = cone.grad
 
     u2 = abs2(u)
     @. z = u2 - abs2(s)
-    @. zi = inv(z)
+    @. uzi = 2 * u / z
     @. szi = 2 * s / z
 
-    g[1] = -2 * u * sum(zi) + (cone.d - 1) / u
+    g[1] = -sum(uzi) + (cone.d - 1) / u
     gW = V * Diagonal(szi) * V'
     @views smat_to_svec!(g[2:end], gW, cone.rt2)
 
@@ -150,15 +151,17 @@ function update_hess_aux(cone::EpiNormSpectralTri)
     s = cone.s
     z = cone.z
     zi = cone.zi
+    uzi = cone.uzi
     szi = cone.szi
     d = cone.d
     hiww = cone.hiww
 
+    @. zi = inv(z)
     u2 = abs2(u)
     cu = (cone.d - 1) / u2
     t = u2 .+ abs2.(s) # TODO
     cone.huu = 2 * sum(t[i] / z[i] * zi[i] for i in 1:d) - cu
-    @. cone.huw = -2 * u / z * szi
+    @. cone.huw = -uzi * szi
     cone.hiuui = 2 * sum(inv, t) - cu
     @. cone.hiuw = 2 * u * s ./ t
 
@@ -295,12 +298,13 @@ function inv_hess_prod!(
 end
 
 function dder3(cone::EpiNormSpectralTri, dir::AbstractVector)
-    @assert cone.grad_updated
+    cone.hess_aux_updated || update_hess_aux(cone)
     u = cone.point[1]
     V = cone.V
     s = cone.s
     z = cone.z
     zi = cone.zi
+    uzi = cone.uzi
     dder3 = cone.dder3
 
     u_dir = dir[1]
@@ -308,9 +312,7 @@ function dder3(cone::EpiNormSpectralTri, dir::AbstractVector)
     W_dir = Hermitian(cone.tempdd, :U)
 
     # TODO
-    u2 = abs2(u)
-    zi = inv.(z)
-    c1 = abs2.(2 * u ./ z) - zi
+    c1 = abs2.(uzi) - zi # TODO s^2/z?
     udzi = u_dir ./ z
     Ds = Diagonal(s)
     Dzi = Diagonal(zi)
@@ -332,8 +334,8 @@ function dder3(cone::EpiNormSpectralTri, dir::AbstractVector)
     M5 += u_dir * M6
 
     Wcorr = -2 * V * (
-        Diagonal(-2 * u * udzi ./ z) * simV + (
-        M2 * (u2 * sim + Ds * sim * Ds) * Dzi +
+        Diagonal(-uzi * udzi) * simV + (
+        M2 * (abs2(u) * sim + Ds * sim * Ds) * Dzi +
         M5 * Ds
         ) * V')
     @views smat_to_svec!(dder3[2:end], Wcorr, cone.rt2)
