@@ -40,7 +40,10 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hiuw::Vector{T}
     hiww #?
 
-    tempd::Vector{R}
+    w1::Vector{R}
+    w2::Vector{R}
+    s1::Vector{T}
+    s2::Vector{T}
 
     function EpiNormInf{T, R}(
         dim::Int;
@@ -75,7 +78,11 @@ function setup_extra_data!(
     cone.huw = zeros(T, d)
     cone.hiuw = zeros(T, d)
     # cone.hiww = zeros(T, d, d)
-    cone.tempd = zeros(R, d)
+
+    cone.w1 = zeros(R, d)
+    cone.w2 = zeros(R, d)
+    cone.s1 = zeros(T, d)
+    cone.s2 = zeros(T, d)
     return cone
 end
 
@@ -108,8 +115,8 @@ end
 function is_dual_feas(cone::EpiNormInf{T}) where T
     u = cone.dual_point[1]
     if u > eps(T)
-        @views svec_to_smat!(cone.tempd, cone.dual_point[2:end])
-        return (u - sum(abs, cone.tempd) > eps(T))
+        @views svec_to_smat!(cone.w1, cone.dual_point[2:end])
+        return (u - sum(abs, cone.w1) > eps(T))
     end
     return false
 end
@@ -120,7 +127,7 @@ function update_grad(cone::EpiNormInf)
     w = cone.w
     z = cone.z
     uzi = cone.uzi
-    tempd = cone.tempd
+    w1 = cone.w1
     g = cone.grad
 
     u2 = abs2(u)
@@ -128,8 +135,8 @@ function update_grad(cone::EpiNormInf)
     @. uzi = 2 * u / z
 
     g[1] = -sum(uzi) + (cone.d - 1) / u
-    @. tempd = 2 * w / z
-    @views vec_copyto!(g[2:end], tempd)
+    @. w1 = 2 * w / z
+    @views vec_copyto!(g[2:end], w1)
 
     cone.grad_updated = true
     return cone.grad
@@ -191,7 +198,7 @@ function hess_prod!(
     szi = cone.szi
     huw = cone.huw
     huu = cone.huu
-    w_dir = cone.tempd
+    r = cone.w1
 
     simszi = zero(s)
     HW = zero(w)
@@ -201,13 +208,13 @@ function hess_prod!(
 
     # TODO try to do not column by column, like old code
     @inbounds for j in 1:size(prod, 2)
-        u_dir = arr[1, j]
-        @views vec_copyto!(w_dir, arr[2:end, j])
-        @. simszi = real(Vszi * w_dir)
+        p = arr[1, j]
+        @views vec_copyto!(r, arr[2:end, j])
+        @. simszi = real(Vszi * r)
 
-        prod[1, j] = huu * u_dir - dot(uzi, simszi)
+        prod[1, j] = huu * p - dot(uzi, simszi)
 
-        @. HW = 2 * (w_dir + (simszi - u_dir * uzi) * w) / z
+        @. HW = 2 * (r + (simszi - p * uzi) * w) / z
         @views vec_copyto!(prod[2:end, j], HW)
     end
 
@@ -230,7 +237,7 @@ function inv_hess_prod!(
     uzi = cone.uzi
     szi = cone.szi
     hiuui = cone.hiuui
-    w_dir = cone.tempd
+    r = cone.w1
 
     u2 = abs2(u)
     t = u2 .+ abs2.(s)
@@ -242,15 +249,15 @@ function inv_hess_prod!(
 
     # TODO try to do not column by column, like old code
     @inbounds for j in 1:size(prod, 2)
-        u_dir = arr[1, j]
-        @views vec_copyto!(w_dir, arr[2:end, j])
-        @. simsz = real(conj(wti) * w_dir)
+        p = arr[1, j]
+        @views vec_copyto!(r, arr[2:end, j])
+        @. simsz = real(conj(wti) * r)
 
-        c1 = (u_dir + 2 * u * sum(simsz)) / hiuui
+        c1 = (p + 2 * u * sum(simsz)) / hiuui
         prod[1, j] = c1
 
         dconst = 2 * u * c1
-        @. HiW = dconst * wti + z * (T(0.5) * w_dir - simsz * w)
+        @. HiW = dconst * wti + z * (T(0.5) * r - simsz * w)
         @views vec_copyto!(prod[2:end, j], HiW)
     end
 
@@ -259,38 +266,26 @@ end
 
 function dder3(cone::EpiNormInf, dir::AbstractVector)
     cone.hess_aux_updated || update_hess_aux(cone)
-    V = cone.V
     u = cone.point[1]
     w = cone.w
-    s = cone.s
+    d = cone.d
     z = cone.z
-    # TODO delete not using
-    zi = cone.zi
-    uzi = cone.uzi
-    szi = cone.szi
     dder3 = cone.dder3
-    Wcorr = zero(V) # TODO
+    r = cone.w1
+    s1 = cone.s1
+    s2 = cone.s2
 
-    u_dir = dir[1]
-    @views w_dir = vec_copyto!(cone.tempd, dir[2:end])
+    p = dir[1]
+    @views vec_copyto!(r, dir[2:end])
 
-    udzi = u_dir ./ z
-    wdzi = w_dir ./ z
+    @. s1 = -2 * (u * p - real(conj(w) * r)) / z
+    @. s2 = (abs2(r) - abs2(p)) / z + abs2(s1)
 
-    M1 = udzi .* (2 * u * uzi .- 1)
-    M3 = real.(conj(w) .* wdzi)
-    tr2 = dot(4 * M3, M1 - uzi .* M3)
-    M5 = abs2.(wdzi)
-    tr1 = sum(M5)
+    dder3[1] = 2 * sum((p * s1[i] + u * s2[i]) / z[i] for i in 1:d) -
+        (cone.d - 1) / u * abs2(p / u)
 
-    @. Wcorr = -2 * (
-        2 * (M3 - u * udzi) * wdzi +
-        (4 * abs2.(M3) * zi + M5 + (M1 - 4 * uzi * M3) * udzi
-        ) * w)
-    @views vec_copyto!(dder3[2:end], Wcorr)
-
-    dder3[1] = 2 * u * (tr1 + u_dir * dot(zi, M1 - 2 * udzi)) -
-        tr2 - (cone.d - 1) / u * abs2.(u_dir / u)
+    @. cone.w2 = -2 * (s1 * r + s2 * w) / z
+    @views vec_copyto!(dder3[2:end], cone.w2)
 
     return dder3
 end
