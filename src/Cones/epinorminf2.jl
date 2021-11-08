@@ -169,6 +169,7 @@ function update_inv_hess_aux(cone::EpiNormInf)
     cone.inv_hess_aux_updated = true
 end
 
+
 function inv_hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
@@ -224,3 +225,141 @@ function dder3(cone::EpiNormInf{T}, dir::AbstractVector{T}) where T
 
     return dder3
 end
+
+
+
+
+function update_hess(cone::EpiNormInf{T}) where T
+    isdefined(cone, :hess) || alloc_hess!(cone)
+    d = cone.d
+
+    # modify nonzeros of upper triangle of Hessian
+    nzval = cone.hess.data.nzval
+    # nzval[1] = cone.Huu
+
+    if !cone.is_complex
+        nz_idx = 2
+        @inbounds for i in 1:d
+            # nzval[nz_idx] = cone.Hure[i]
+            # nzval[nz_idx + 1] = cone.Hrere[i]
+            nz_idx += 2
+        end
+    else
+        nz_idx = 1
+        @inbounds for i in 1:d
+            # @. nzval[nz_idx .+ (1:5)] = (cone.Hure[i], cone.Hrere[i],
+                # cone.Huim[i], cone.Hreim[i], cone.Himim[i])
+            nz_idx += 5
+        end
+    end
+
+    cone.hess_updated = true
+    return cone.hess
+end
+
+function update_inv_hess(cone::EpiNormInf)
+    cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
+    Hi = cone.inv_hess.data
+
+    # wden = cone.wden
+    # u = cone.point[1]
+    # schur = cone.schur
+    #
+    # Hi[1, 1] = inv(schur)
+    # @inbounds for j in 1:d
+    #     if cone.is_complex
+    #         Hi[2j, 1] = cone.Hiure[j]
+    #         Hi[2j + 1, 1] = cone.Hiuim[j]
+    #     else
+    #         Hi[j + 1, 1] = cone.Hiure[j]
+    #     end
+    # end
+    # @. Hi[1, 2:end] = Hi[2:end, 1] / schur
+    #
+    # @inbounds for j in 2:cone.dim, i in 2:j
+    #     Hi[i, j] = Hi[j, 1] * Hi[1, i]
+    # end
+    #
+    # if cone.is_complex
+    #     @inbounds for j in 1:d
+    #         detj = cone.idet[j]
+    #         vj = 2j
+    #         wj = vj + 1
+    #         Hi[vj, vj] += cone.Himim[j] / detj
+    #         Hi[wj, wj] += cone.Hrere[j] / detj
+    #         Hi[vj, wj] -= cone.Hreim[j] / detj
+    #     end
+    # else
+    #     @inbounds for (j, rerej) in enumerate(cone.Hrere)
+    #         vj = j + 1
+    #         Hi[vj, vj] += inv(rerej)
+    #     end
+    # end
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
+
+function alloc_hess!(cone::EpiNormInf{T, T}) where {T <: Real}
+    # initialize sparse idxs for upper triangle of Hessian
+    dim = cone.dim
+    nnz_tri = 2 * dim - 1
+    I = Vector{Int}(undef, nnz_tri)
+    J = Vector{Int}(undef, nnz_tri)
+    idxs1 = 1:dim
+    @views I[idxs1] .= 1
+    @views J[idxs1] .= idxs1
+    idxs2 = (dim + 1):(2 * dim - 1)
+    @views I[idxs2] .= 2:dim
+    @views J[idxs2] .= 2:dim
+    V = ones(T, nnz_tri)
+    cone.hess = Symmetric(sparse(I, J, V, dim, dim), :U)
+    return
+end
+
+function alloc_hess!(cone::EpiNormInf{T, Complex{T}}) where {T <: Real}
+    # initialize sparse idxs for upper triangle of Hessian
+    dim = cone.dim
+    nnz_tri = 2 * dim - 1 + cone.d
+    I = Vector{Int}(undef, nnz_tri)
+    J = Vector{Int}(undef, nnz_tri)
+    idxs1 = 1:dim
+    @views I[idxs1] .= 1
+    @views J[idxs1] .= idxs1
+    idxs2 = (dim + 1):(2 * dim - 1)
+    @views I[idxs2] .= 2:dim
+    @views J[idxs2] .= 2:dim
+    idxs3 = (2 * dim):nnz_tri
+    @views I[idxs3] .= 2:2:dim
+    @views J[idxs3] .= 3:2:dim
+    V = ones(T, nnz_tri)
+    cone.hess = Symmetric(sparse(I, J, V, dim, dim), :U)
+    return
+end
+
+# TODO remove this in favor of new hess_nz_count etc functions
+# that directly use uu, uw, ww etc
+hess_nz_count(cone::EpiNormInf{<:Real, <:Real}) =
+    3 * cone.dim - 2
+
+hess_nz_count(cone::EpiNormInf{<:Real, <:Complex}) =
+    3 * cone.dim - 2 + 2 * cone.d
+
+hess_nz_count_tril(cone::EpiNormInf{<:Real, <:Real}) =
+    2 * cone.dim - 1
+
+hess_nz_count_tril(cone::EpiNormInf{<:Real, <:Complex}) =
+    2 * cone.dim - 1 + cone.d
+
+hess_nz_idxs_col(cone::EpiNormInf{<:Real, <:Real}, j::Int) =
+    (j == 1 ? (1:cone.dim) : [1, j])
+
+hess_nz_idxs_col(cone::EpiNormInf{<:Real, <:Complex}, j::Int) =
+    (j == 1 ? (1:cone.dim) : (iseven(j) ? [1, j, j + 1] : [1, j - 1, j]))
+
+hess_nz_idxs_col_tril(cone::EpiNormInf{<:Real, <:Real}, j::Int) =
+    (j == 1 ? (1:cone.dim) : [j])
+
+hess_nz_idxs_col_tril(cone::EpiNormInf{<:Real, <:Complex}, j::Int) =
+    (j == 1 ? (1:cone.dim) : (iseven(j) ? [j, j + 1] : [j]))
