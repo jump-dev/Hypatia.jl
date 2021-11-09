@@ -224,6 +224,8 @@ function inv_hess_prod!(
     z2tidd = cone.z2tidd
     r = cone.w1
 
+# TODO use rtzh * V
+
     @inbounds for j in 1:size(prod, 2)
         p = arr[1, j]
         @views svec_to_smat!(r, arr[2:end, j], cone.rt2)

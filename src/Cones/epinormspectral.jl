@@ -217,14 +217,14 @@ function hess_prod!(
     zh = cone.zh
     cu = cone.cu
     r = cone.w1
-
+    uzi = cone.uzi
 # TODO
     s = cone.s
     U = cone.U
     Vt = cone.Vt
     u2 = abs2(u)
-    t = u2 .+ abs2.(s)
-#
+    tdd = 0.5 * (u2 .+ s * s')
+
     rtzh = sqrt.(zh)
     U2 = U * Diagonal(inv.(rtzh))
     Vt2 = Diagonal(s ./ rtzh) * Vt
@@ -236,10 +236,10 @@ function hess_prod!(
         simU = U2' * r
         sims = simU * Vt2'
 
-        prod[1, j] = sum((0.5 * p * t[i] / zh[i] - u * real(sims[i, i])) /
+        prod[1, j] = sum((p * tdd[i, i] / zh[i] - u * real(sims[i, i])) /
             zh[i] for i in 1:d1) - cu * p / u
 
-        w3 = Diagonal(-p * u ./ zh) + 0.5 * (sims + sims')
+        w3 = Diagonal(-p * uzi) + 0.5 * (sims + sims')
         w2 = U2 * (simU + w3 * Vt2)
         @views vec_copyto!(prod[2:end, j], w2)
     end
@@ -293,6 +293,7 @@ end
 
 function dder3(cone::EpiNormSpectral, dir::AbstractVector)
     cone.hess_aux_updated || update_hess_aux(cone)
+    d1 = cone.d1
     u = cone.point[1]
     U = cone.U
     Vt = cone.Vt
@@ -305,40 +306,31 @@ function dder3(cone::EpiNormSpectral, dir::AbstractVector)
     p = dir[1]
     @views r = vec_copyto!(cone.w1, dir[2:end])
 
-    # TODO
-    c1 = abs2.(uzi) - zi # TODO s^2/z?
-    udzi = p ./ z
-    szi = s ./ z
     Ds = Diagonal(s)
     Dzi = Diagonal(zi)
 
     simU = U' * r
-    sims = (simU * Vt') * Ds
-
+    sims = simU * Vt' * Ds #
     M3 = sims + sims'
-    M2 = Hermitian(Dzi * M3 * Dzi)
+    M4 = Dzi * M3
+    M5 = M4 + M4'
+    simUsqr = simU * simU'
 
-    M4a = Dzi * M2
-    D1 = Diagonal(udzi .* c1)
-    M6 = -2 * u * Hermitian(M4a + M4a') + D1
-    tr2 = real(dot(sims, M6 + 3 * D1))
+    M7 = M3 * Dzi * M3 + simUsqr +
+        -2 * p * u * M5 +
+        p * Diagonal(p * (2 * u * uzi .- 1))
 
-    simUa = Dzi * simU
-    M5 = Hermitian(simUa * simUa', :U)
-    tr1 = tr(M5)
+    M8 = M3 - 2 * u * p * I
 
-    M5 += p * M6
-    M7 = (M2 * M3 * Dzi + M5) * Ds
+    Wcorr = -2 * U * Dzi * (M8 * Dzi * simU + M7 * Dzi * Ds * Vt)
 
-    M2 += Diagonal(-uzi * udzi)
-    M8 = M2 * simU
-
-    Wcorr = -2 * U * (M8 + M7 * Vt)
     @views vec_copyto!(dder3[2:end], Wcorr)
 
-    c1 .-= 2 * zi
-    dder3[1] = 2 * u * (tr1 + p * sum(udzi .* c1)) -
-        tr2 - (cone.d1 - 1) / u * abs2(p / u)
+    dder3[1] = u * real(dot(M3, Dzi * M5 * Dzi)) + 2 * sum(
+        (-p * real(M3[i, i]) / z[i] * (2 * u * uzi[i] - 1) +
+        u * (real(simUsqr[i, i]) / z[i] + p * (2 * u * uzi[i] - 3) * p / z[i])
+        ) / z[i] for i in 1:d1) -
+        cone.cu * abs2(p / u)
 
     return dder3
 end
