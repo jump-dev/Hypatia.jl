@@ -33,17 +33,14 @@ mutable struct EpiNormSpectralTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
 
     s::Vector{T}
     V::Matrix{R}
-    z::Vector{T} #
-    zh::Vector{T}
     V2::Matrix{R}
+    zh::Vector{T}
+    uzi::Vector{T}
+    szi::Vector{T}
     cu::T
     tdd::Matrix{T}
     uzti1::T
     usti::Vector{T}
-
-    uzi::Vector{T}
-    szi::Vector{T}
-
     z2tidd::Matrix{T}
 
     w1::Matrix{R}
@@ -71,17 +68,14 @@ function setup_extra_data!(
     cone::EpiNormSpectralTri{T, R},
     ) where {T <: Real, R <: RealOrComplex{T}}
     d = cone.d
-    cone.z = zeros(T, d)
-    cone.zh = zeros(T, d)
-
-    cone.uzi = zeros(T, d)
-    cone.szi = zeros(T, d)
     cone.V = zeros(R, d, d)
     cone.V2 = zeros(R, d, d)
+    cone.zh = zeros(T, d)
+    cone.uzi = zeros(T, d)
+    cone.szi = zeros(T, d)
     cone.usti = zeros(T, d)
     cone.tdd = zeros(T, d, d)
     cone.z2tidd = zeros(T, d, d)
-
     cone.w1 = zeros(R, d, d)
     return cone
 end
@@ -156,16 +150,12 @@ function update_hess_aux(cone::EpiNormSpectralTri{T}) where T
     d = cone.d
     u = cone.point[1]
     s = cone.s
-    z = cone.z
     zh = cone.zh
-    uzi = cone.uzi
-    szi = cone.szi
-    V2 = cone.V2
     tdd = cone.tdd
     z2tidd = cone.z2tidd
 
     irtzh = inv.(sqrt.(zh))
-    mul!(V2, cone.V, Diagonal(irtzh))
+    mul!(cone.V2, cone.V, Diagonal(irtzh))
 
     u2 = abs2(u)
     th = u2 .- zh
