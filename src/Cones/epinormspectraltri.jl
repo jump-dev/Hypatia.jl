@@ -373,7 +373,8 @@ function dder3(cone::EpiNormSpectralTri, dir::AbstractVector)
     tr1 = tr(DD1)
     @assert tr1 ≈ 2 * sum((
         u * p^2 * (4 * u^2 * zi[i] - 3) +
-        u * real(DD0[i, i]) +
+        # u * real(DD0[i, i]) +
+        2 * u * s[i] * real(T5[i, i]) + (u^2 + s[i]^2) * real(T6[i, i]) +
         -p * (4 * u^2 * zi[i] - 1) * real(T3[i, i])
         ) * zi[i] * zi[i] for i in 1:d)
 
