@@ -273,138 +273,35 @@ function dder3(cone::EpiNormSpectralTri, dir::AbstractVector)
     Dzi = Diagonal(zi)
     Dszi = Diagonal(s ./ z)
     Drtzi = Diagonal(inv.(sqrt.(z)))
-    Dsrtzi = Diagonal(s ./ sqrt.(z))
-    Ds2zi = Diagonal(abs2.(s) ./ z)
 
-    # TODO change to V2, but careful of rt2 factor
-    simV = V' * r
-    sim = simV * V
+    u2 = abs2(u)
+    sim = V' * r * V
 
-    T1 = p^2 * Diagonal(4 * u^2 * zi .- 3) + simV * simV'
-
-    T3 = sim * Ds + Ds * sim
-
-
-    M5 = Dzi * T3
-    T2 = Hermitian(Dzi * T3 * Dzi)
-
-    W1 = Ds * sim * Dszi * sim * Ds + p^2 * Diagonal(4 * u^2 * zi .- 1) * Ds
-    W2 = u^2 * (sim * Dzi * sim * Ds + sim * Dszi * sim + Ds * sim * Dzi * sim)
-    W3 = -2 * u * p * Dzi * (Dzi * T3 * Dszi + T3 * Dzi * Dszi + Dzi * sim)
-
-    try1 = Dzi * (Dzi * T3 * Dszi + T3 * Dzi * Dszi + Dzi * sim)
-    @assert try1 ≈ Dzi^2 * T3 * Dszi + Dzi * T3 * Dszi * Dzi + Dzi^2 * sim
-    @assert try1 ≈ Dzi^2 * (T3 * Dszi + sim) + Dzi * T3 * Dszi * Dzi
-    @assert try1 ≈ Dzi^2 * (sim * Ds + Ds * sim) * Dszi + Dzi * (sim * Ds + Ds * sim) * Dszi * Dzi + Dzi^2 * sim
-    @assert try1 ≈ Dzi^2 * sim * Ds2zi + Dzi * Dszi * sim * Dszi +
-        (Dzi * sim * Ds2zi + Dszi * sim * Dszi) * Dzi + Dzi^2 * sim
-    @assert try1 ≈ Dzi * (-sim +
-        u^2 * (Dzi * sim + sim * Dzi) +
-        Ds * (Dzi * sim + sim * Dzi) * Ds
-        ) * Dzi
-
-    u2s2 = u^2 .+ s * s'
-    T4 = (Dzi * u2s2 + u2s2 * Dzi .- 1) .* sim
-    @assert try1 ≈ Dzi * T4 * Dzi
-    @assert W3 ≈ -2 * u * p * Dzi * T4 * Dzi
-
-    # Wcorr = -2 * V * Hermitian(Dzi * Hermitian(W1 + W2) * Dzi + W3) * V'
-
-    vec1 = (4 * u^2 * zi .- 1) .* s
-
-    # wc0a = sim * Dszi * sim
-    # wc0 = Ds * wc0a * Ds
-    wc1 = Diagonal(vec1)
-    # wc2a = sim * Dzi * sim * Ds
-    wc2b = sim * Dzi * sim
-    # wc2 = wc2a + wc2a' + wc0a
-    # wc3 = (Dzi * u2s2 + u2s2 * Dzi .- 1) .* sim
-    # @assert wc3 ≈ u2s2 .* (Dzi * sim + sim * Dzi) - sim
+    u2s2 = u2 .+ s * s'
+    sims = sim * Ds
+    zisim = Dzi * sim
+    T5 = sims * zisim
+    T6 = sim * zisim
+    T7 = T5 - 2 * u * p * (zisim + zisim')
+    T8 = Ds * T6 # not herm
+    v1 = p * (4 * u2 * zi .- 1) .* s
 
     Wcorr = -2 * V * Dzi * Hermitian(
-        u2s2 .* (sim * Dszi * sim - 2 * u * p * (Dzi * sim + sim * Dzi)) +
-        p^2 * wc1 + 2 * u * p * sim + u^2 * (Ds * wc2b + wc2b * Ds)
+        u2s2 .* T7 +
+        p * Diagonal(v1) +
+        u * (2 * p * sim + u * (T8 + T8'))
         ) * Dzi * V'
 
     @views smat_to_svec!(dder3[2:end], Wcorr, cone.rt2)
 
-    vec2 = 4 * u^2 * zi .- 3
-    T1 = p^2 * Diagonal(vec2) + simV * simV'
-    T3 = Ds * sim + sim * Ds
-    T2 = Hermitian(Dzi * T3 * Dzi)
-
-    M8 = T3 * Drtzi
-    M9 = Dzi * (T1 + M8 * M8') * Dzi
-    M9 = Dzi * (p^2 * Diagonal(vec2) + simV * simV' + T3 * Dzi * T3) * Dzi
-
-
-    # @assert M8 ≈ Dzi * (p^2 * Diagonal(vec2) + simV * simV' + T3 * Dzi * T3) * Dzi
-    @assert T3 * Dzi * T3 ≈ (Ds * sim + sim * Ds) * Dzi * (Ds * sim + sim * Ds)
-    @assert T3 * Dzi * T3 ≈ (Ds * sim * Dzi + sim * Dszi) * (Ds * sim + sim * Ds)
-    @assert T3 * Dzi * T3 ≈ (Ds * sim * Dzi + sim * Dszi) * Ds * sim +
-        (Ds * sim * Dzi + sim * Dszi) * sim * Ds
-    @assert T3 * Dzi * T3 ≈
-        Ds * sim * Dszi * sim + sim * Dszi * sim * Ds +
-        sim * Ds2zi * sim +
-        Ds * sim * Dzi * sim * Ds
-
-    T5 = sim * Dszi * sim
-    T6 = sim * Dzi * sim
-    @assert T3 * Dzi * T3 ≈
-        Ds * T5 + T5 * Ds +
-        sim * (u^2 * Dzi - I) * sim +
-        Ds * sim * Dzi * sim * Ds
-    @assert T3 * Dzi * T3 ≈
-        Ds * T5 + T5 * Ds +
-        u2s2 .* T6 - simV * simV'
-
-
-    T5 = sim * Dszi * sim
-    T6 = sim * Dzi * sim
-    DD0 = Ds * T5 + T5 * Ds + u2s2 .* T6
-    T3 = Ds * sim + sim * Ds
-
-    DD1 = Hermitian(Dzi * (
-        2 * u * p^2 * Diagonal(4 * u^2 * zi .- 3) +
-        2 * u * DD0 +
-        -2 * p * T3 * Diagonal(4 * u^2 * zi .- 1)
-        ) * Dzi)
-
-    tr1 = tr(DD1)
-    @assert tr1 ≈ 2 * sum((
-        u * p^2 * (4 * u^2 * zi[i] - 3) +
-        # u * real(DD0[i, i]) +
-        2 * u * s[i] * real(T5[i, i]) + (u^2 + s[i]^2) * real(T6[i, i]) +
-        -p * (4 * u^2 * zi[i] - 1) * real(T3[i, i])
+    tr1 = 2 * sum((
+        u * p^2 * (4 * u2 * zi[i] - 3) +
+        -2 * v1[i] * real(sim[i, i]) +
+        2 * u * s[i] * real(T5[i, i]) +
+        u * u2s2[i, i] * real(T6[i, i]) +
         ) * zi[i] * zi[i] for i in 1:d)
 
     dder3[1] = tr1 - cone.cu * abs2(p / u)
-
-        # 2 * u * real(tr9) -
-        # 2 * p * dot(T2, Diagonal(4 * u^2 * zi .- 1))
-        # 4 * p * sum(real(sim[i, i]) * vec1[i] * zi[i] * zi[i] for i in 1:d)
-
-
-
-    # dder3[1] = 2 * u * tr(M9) -
-    #     2 * p * dot(T2, Diagonal(4 * u^2 * zi .- 1)) -
-    #     cone.cu * abs2(p / u)
-
-
-    # Wcorr = -2 * V * Dzi * Hermitian(
-    #     u2s2 .* wc0a +
-    #     p^2 * wc1 - 2 * u * p * wc3 + u^2 * (wc2a + wc2a')
-    #     ) * Dzi * V'
-
-    # @show Wcorr
-
-    # M8 = Drtzi * T3 * Drtzi
-    #
-    # M9 = Drtzi * Hermitian(Drtzi * T1 * Drtzi + M8 * M8', :U) * Drtzi
-    #
-    # dder3[1] = 2 * u * tr(M9) -
-    #     2 * p * dot(T2, Diagonal(4 * u^2 * zi .- 1)) -
-    #     cone.cu * abs2(p / u)
 
 println("ok")
     return dder3
