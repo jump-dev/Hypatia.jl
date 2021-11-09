@@ -255,233 +255,41 @@ function dder3(cone::EpiNormSpectralTri, dir::AbstractVector)
     cone.hess_aux_updated || update_hess_aux(cone)
     d = cone.d
     u = cone.point[1]
-    V = cone.V
     V2 = cone.V2
     s = cone.s
     zh = cone.zh
     uzi = cone.uzi
+    szi = cone.szi
+    tdd = cone.tdd
     dder3 = cone.dder3
+    Ds = Diagonal(s)
 
     p = dir[1]
     @views svec_to_smat!(cone.w1, dir[2:end], cone.rt2)
-    r = Hermitian(cone.w1, :U)
+    sim = 0.5 * V2' * Hermitian(cone.w1, :U) * V2
 
-    # TODO
-    z = 2 * zh
-    zi = inv.(z)
-    Ds = Diagonal(s)
-    Dzi = Diagonal(zi)
-    Dszi = Diagonal(s ./ z)
-    Drtzi = Diagonal(inv.(sqrt.(z)))
-
-    u2 = abs2(u)
-    sim = V' * r * V
-
-    u2s2 = u2 .+ s * s'
-    sims = sim * Ds
-    zisim = Dzi * sim
-    T5 = sims * zisim
-    T6 = sim * zisim
-    T7 = T5 - 2 * u * p * (zisim + zisim')
+    T5 = sim * Ds * sim
+    T6 = sim * sim
+    zisim = Diagonal(inv.(zh)) * sim # not herm
+    T7 = T5 - u * p * (zisim + zisim')
     T8 = Ds * T6 # not herm
-    v1 = p * (4 * u2 * zi .- 1) .* s
+    v1 = p * (2 * u * uzi .- 1) .* szi
 
-    Wcorr = -2 * V * Dzi * Hermitian(
-        u2s2 .* T7 +
-        p * Diagonal(v1) +
+    Wcorr = -V2 * Hermitian(
+        2 * tdd .* T7 +
+        0.5 * p * Diagonal(v1) +
         u * (2 * p * sim + u * (T8 + T8'))
-        ) * Dzi * V'
-
+        ) * V2'
     @views smat_to_svec!(dder3[2:end], Wcorr, cone.rt2)
 
-    tr1 = 2 * sum((
-        u * p^2 * (4 * u2 * zi[i] - 3) +
-        -2 * v1[i] * real(sim[i, i]) +
-        2 * u * s[i] * real(T5[i, i]) +
-        u * u2s2[i, i] * real(T6[i, i]) +
-        ) * zi[i] * zi[i] for i in 1:d)
-
+    tr1 = sum(-2 * v1[i] * real(sim[i, i]) + u * (
+        p * (u * uzi[i] - 1.5) / zh[i] * p +
+        2 * (s[i] * real(T5[i, i]) + tdd[i, i] * real(T6[i, i]))
+        ) / zh[i] for i in 1:d)
     dder3[1] = tr1 - cone.cu * abs2(p / u)
 
-println("ok")
     return dder3
 end
-
-#
-# # TODO
-# z = 2 * zh
-# zi = inv.(z)
-# Ds = Diagonal(s)
-# Dzi = Diagonal(zi)
-# Dszi = Diagonal(s ./ z)
-# Drtzi = Diagonal(inv.(sqrt.(z)))
-# Dsrtzi = Diagonal(s ./ sqrt.(z))
-# Ds2zi = Diagonal(abs2.(s) ./ z)
-#
-# # TODO change to V2, but careful of rt2 factor
-# simV = V' * r
-# sim = simV * V
-#
-# T1 = p^2 * (u^2 * Dzi + 3 * Ds2zi) + simV * simV'
-#
-# T3 = sim * Ds + Ds * sim
-#
-#
-# M5 = Dzi * T3
-# T2 = Hermitian(Dzi * T3 * Dzi)
-#
-# W1 = Ds * sim * Dszi * sim * Ds + p^2 * (3 * Ds + 4 * Ds2zi * Ds)
-# W2 = u^2 * (sim * Dzi * sim * Ds + sim * Dszi * sim + Ds * sim * Dzi * sim)
-# W3 = -2 * u * p * Dzi * (Dzi * T3 * Dszi + T3 * Dzi * Dszi + Dzi * sim)
-#
-# try1 = Dzi * (Dzi * T3 * Dszi + T3 * Dzi * Dszi + Dzi * sim)
-# @assert try1 ≈ Dzi^2 * T3 * Dszi + Dzi * T3 * Dszi * Dzi + Dzi^2 * sim
-# @assert try1 ≈ Dzi^2 * (T3 * Dszi + sim) + Dzi * T3 * Dszi * Dzi
-# @assert try1 ≈ Dzi^2 * (sim * Ds + Ds * sim) * Dszi + Dzi * (sim * Ds + Ds * sim) * Dszi * Dzi + Dzi^2 * sim
-# @assert try1 ≈ Dzi^2 * sim * Ds2zi + Dzi * Dszi * sim * Dszi +
-#     (Dzi * sim * Ds2zi + Dszi * sim * Dszi) * Dzi + Dzi^2 * sim
-# @assert try1 ≈ Dzi * (-sim +
-#     u^2 * (Dzi * sim + sim * Dzi) +
-#     Ds * (Dzi * sim + sim * Dzi) * Ds
-#     ) * Dzi
-#
-# u2s2 = u^2 .+ s * s'
-# T4 = (Dzi * u2s2 + u2s2 * Dzi .- 1) .* sim
-# @assert try1 ≈ Dzi * T4 * Dzi
-# @assert W3 ≈ -2 * u * p * Dzi * T4 * Dzi
-#
-# Wcorr = -2 * V * Hermitian(Dzi * Hermitian(W1 + W2) * Dzi + W3) * V'
-#
-# # Wcorr = -2 * V * (
-# #     Dzi * (
-# #     Ds * sim * Dszi * sim * Ds +
-# #     p^2 * (3 * Ds + 4 * Ds2zi * Ds)
-# #     ) * Dzi +
-# #     -2 * u * p * Dzi * (Dzi * T3 * Dszi + T3 * Dzi * Dszi + Dzi * sim)
-# #     ) * V' +
-# #     # herm parts:
-# #     -2 * V * Dzi * Hermitian(
-# #     u^2 * (sim * Dzi * sim * Ds + sim * Dszi * sim + Ds * sim * Dzi * sim)
-# #     ) * Dzi * V'
-#
-# # Wcorr = -2 * V * Drtzi * ((
-# #     Drtzi * simV * simV' * Drtzi +
-# #     Drtzi * sim * Ds2zi * sim * Drtzi +
-# #     Dsrtzi * sim * Dszi * sim * Drtzi +
-# #     p^2 * Drtzi * (3 * I + 4 * Ds2zi) * Drtzi +
-# #     -2 * u * p * Drtzi * (Dzi * T3 + T3 * Dzi) * Drtzi
-# #     ) * Ds +
-# #     u^2 * Drtzi * T3 * Dzi * sim * Drtzi
-# #     ) * Drtzi * V' +
-# #     V * Diagonal(2 * p * uzi .* zi) * simV
-#
-# @views smat_to_svec!(dder3[2:end], Wcorr, cone.rt2)
-# # @show Wcorr
-#
-# M8 = Drtzi * T3 * Drtzi
-#
-# @assert M8 ≈ Drtzi * sim * Dsrtzi + Dsrtzi * sim * Drtzi
-# M8a = Drtzi * sim * Dsrtzi
-# M8b = Dsrtzi * sim * Drtzi
-# # @show M8a * M8b'
-# # @show M8a' * M8b
-# @assert M8a * M8a' ≈ Drtzi * sim * Ds2zi * sim * Drtzi
-# @assert M8a * M8b' ≈ Drtzi * sim * Dszi * sim * Dsrtzi
-# @assert M8b * M8b' ≈ Dsrtzi * sim * Drtzi * Drtzi * sim * Dsrtzi
-# @assert M8 * M8' ≈ M8a * M8a' + M8a * M8b' + M8a' * M8b + M8b * M8b'
-#
-# M9 = Drtzi * Hermitian(Drtzi * T1 * Drtzi + M8 * M8', :U) * Drtzi
-#
-# dder3[1] = 2 * u * tr(M9) -
-#     2 * p * dot(T2, Diagonal(4 * u^2 * zi .- 1)) -
-#     cone.cu * abs2(p / u)
-#
-# println("ok")
-# return dder3
-# end
-
-
-# Wcorr = -2 * V * (
-#     # Dzi * (sims + sims') * Dzi * (u^2 * sim + Ds * sim * Ds') * Dzi +
-#     Dzi * (sims + sims') * Dzi * Ds * sim * Ds' * Dzi +
-#     # Dzi * (sim * sim' + p * (-2 * u * M5 + p * Diagonal(2 * u * uzi .- 1))) * Ds * Dzi
-#     Dzi * (sim * sim') * Dzi * Ds +
-#     # p * Dzi * (-2 * u * M5 + p * Diagonal(2 * u * uzi .- 1)) * Ds * Dzi
-#     #
-#     # u^2 * Dzi * (sims + sims') * Dzi * sim * Dzi +
-#     # -2 * u * p * Dzi * (Dzi * (sims + sims') + (sims + sims') * Dzi) * Dzi * Ds +
-#     # Diagonal(-p * uzi .* zi) * sim +
-#     # p^2 * Dzi * Diagonal(2 * u * uzi .- 1) * Dzi * Ds
-#     u^2 * Dzi * (sims + sims') * Dzi * sim * Dzi +
-#     -2 * u * p * Dzi * M5 * Dzi * Ds +
-#     -2 * u * p * Dzi^2 * sim +
-#     4 * u^2 * p^2 * Dzi^3 * Ds -
-#     p^2 * Dzi^2 * Ds
-#     #
-#     ) * V'
-
-# M9 = Dzi * Hermitian(
-# 2 * u * (Diagonal(p^2 * (4 * u^2 * zi .- 3)) + sim * sim')
-# , :U) * Dzi
-#
-# dder3[1] = tr(M9) -
-#     dot(Dzi * (sims + sims') * Dzi, -u * M5 + 2 * p * Diagonal(4 * u^2 * zi .- 1)) -
-#     cone.cu * abs2(p / u)
-
-
-# function dder3(cone::EpiNormSpectralTri, dir::AbstractVector)
-#     cone.hess_aux_updated || update_hess_aux(cone)
-#     u = cone.point[1]
-#     V = cone.V
-#     V2 = cone.V2
-#     s = cone.s
-#     zh = cone.zh
-#     uzi = cone.uzi
-#     dder3 = cone.dder3
-#
-#     z = 2 * zh #
-#     zi = inv.(z)
-#
-#     p = dir[1]
-#     @views svec_to_smat!(cone.w1, dir[2:end], cone.rt2)
-#     r = Hermitian(cone.w1, :U)
-#
-#     # TODO
-#     c1 = abs2.(uzi) - zi # TODO s^2/z?
-#     Ds = Diagonal(s)
-#     Dzi = Diagonal(zi)
-#
-#     simV = V' * r
-#     sim = simV * V
-#     sims = sim * Ds
-#
-#     M2 = Hermitian(Dzi * (sims + sims') * Dzi)
-#
-#     M4a = Dzi * M2
-#     D1 = Diagonal(p ./ z .* c1)
-#     M6 = -2 * u * Hermitian(M4a + M4a') + D1
-#     tr2 = real(dot(sims, M6 + 3 * D1))
-#
-#     simVa = Dzi * simV
-#     M5 = Hermitian(simVa * simVa', :U)
-#     tr1 = tr(M5)
-#     M5 += p * M6
-#
-#     Wcorr = -2 * V * (
-#         Diagonal(-p * uzi) * Dzi * simV + (
-#         M2 * (abs2(u) * sim + Ds * sim * Ds) * Dzi +
-#         M5 * Ds
-#         ) * V')
-#     @views smat_to_svec!(dder3[2:end], Wcorr, cone.rt2)
-#
-#     c1 .-= 2 * zi
-#     dder3[1] = 2 * u * (tr1 + p * sum(p ./ z .* c1)) -
-#         cone.cu * abs2(p / u) - tr2
-#
-#     return dder3
-# end
-
-
 
 function update_hess(cone::EpiNormSpectralTri)
     cone.hess_aux_updated || update_hess_aux(cone)
