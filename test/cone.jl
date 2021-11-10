@@ -140,10 +140,10 @@ function test_barrier(
 
     TFD_point = TFD.(point)
 
-    # fd_grad = ForwardDiff.gradient(barrier, TFD_point)
-    # @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
+    fd_grad = ForwardDiff.gradient(barrier, TFD_point)
+    @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
 
-Cones.grad(cone)
+# Cones.grad(cone)
 
 # fd_hess = ForwardDiff.hessian(barrier, TFD_point)
 # @show fd_hess
