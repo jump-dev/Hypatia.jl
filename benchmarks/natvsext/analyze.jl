@@ -22,47 +22,47 @@ print_table_solvers =
 
 # uncomment examples to process
 examples_params = Dict(
-    # Hypatia paper examples:
-    # "densityest" => (
-    #     [:m, :twok], [2, 3],
-    #     [:SEP,], [:nu_nat, :n_nat, :n_SEP]
-    #     ),
-    # "doptimaldesign" => (
-    #     [:logdet, :k], [5, 1],
-    #     # [:EP,], [:n_EP, :q_nat, :q_EP]
-    #     [:EP, :SEP],
-    #     Symbol[]
-    #     # [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
-    #     ),
-    # "matrixcompletion" => (
-    #     [:m, :k], [1, 2],
-    #     [:EP, :SEP],
-    #     Symbol[]
-    #     # [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP,
-    #     # :n_SEP, :q_SEP]
-    #     ),
-    # "matrixregression" => (
-    #     [:m, :k], [2, 1],
-    #     [:SEP,], [:n_SEP, :q_nat]
-    #     ),
-    # "polymin" => (
-    #     [:m, :k], [1, 2],
-    #     [:SEP,], [:nu_nat, :n_nat, :q_SEP]
-    #     ),
-    # "portfolio" => (
-    #     [:k], [1],
-    #     [:SEP,], Symbol[]
-    #     ),
-    # "shapeconregr" => (
-    #     [:m, :twok], [1, 5],
-    #     [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
-    #     ),
-    # SOS paper example:
-    # "polynorm" => (
-    #     [:L1, :n, :d, :m], [5, 1, 3, 4],
-    #     [:SEP,], Symbol[]
-    #     ),
-    # spectral paper examples:
+    #= natural formulations paper =#
+    "densityest" => (
+        [:m, :twok], [2, 3],
+        [:SEP,], [:nu_nat, :n_nat, :n_SEP]
+        ),
+    "doptimaldesign" => (
+        [:logdet, :k], [5, 1],
+        # [:EP,], [:n_EP, :q_nat, :q_EP]
+        [:EP, :SEP],
+        Symbol[]
+        # [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
+        ),
+    "matrixcompletion" => (
+        [:m, :k], [1, 2],
+        [:EP, :SEP],
+        Symbol[]
+        # [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP,
+        # :n_SEP, :q_SEP]
+        ),
+    "matrixregression" => (
+        [:m, :k], [2, 1],
+        [:SEP,], [:n_SEP, :q_nat]
+        ),
+    "polymin" => (
+        [:m, :k], [1, 2],
+        [:SEP,], [:nu_nat, :n_nat, :q_SEP]
+        ),
+    "portfolio" => (
+        [:k], [1],
+        [:SEP,], Symbol[]
+        ),
+    "shapeconregr" => (
+        [:m, :twok], [1, 5],
+        [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
+        ),
+    #= WSOS cones paper =#
+    "polynorm" => (
+        [:L1, :n, :d, :m], [5, 1, 3, 4],
+        [:SEP,], Symbol[]
+        ),
+    #= spectral function cones paper =#
     "centralpolymat" => (
         [:func, :m, :k], [3, 1, 2],
         [:nat, :ext], Symbol[]
@@ -71,17 +71,13 @@ examples_params = Dict(
         [:d], [1],
         [:nat, :ext], Symbol[]
         ),
-    "covarianceest" => (
-        [:d], [1],
-        [:logdet, :sepspec, :direct], Symbol[]
-        ),
     "experimentdesign" => (
         [:func, :d], [2, 1],
-        [:nat, :ext], Symbol[]
+        [:nat, :natlog, :ext], Symbol[]
         ),
     "nonparametricdistr" => (
         [:func, :d], [2, 1],
-        [:nat, :vecext], Symbol[]
+        [:nat, :natlog, :vecext], Symbol[]
         ),
     )
 
@@ -123,6 +119,7 @@ status_map = Dict(
     "SetupModelKilledMemory" => "m",
     "Optimal" => "co",
     "TimeLimit" => "tl",
+    "IterationLimit" => "il",
     "SolveCheckKilledTime" => "tl",
     "SolveCheckKilledMemory" => "rl",
     "SolveCheckCaughtError" => "rl", # rare, seems to be memory error
@@ -169,7 +166,7 @@ function make_wide_csv(ex_df, ex_name, ex_params)
     exts = string.(ex_params[3])
     inst_solvers = filter(s -> !any(startswith(s, e) for e in exts), s_temp)
     for e in exts
-        s_e = filter(s -> startswith(s, e), s_temp)
+        s_e = filter(s -> startswith(s, e * "_"), s_temp)
         append!(inst_solvers, s_e)
     end
     @assert length(inst_solvers) == length(s_temp)
@@ -283,7 +280,6 @@ function transform_plot_cols(ex_df_wide, inst_solver)
 end
 
 function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
-    ex_name == "polynorm" && return
     @info("making plot csv for $ex_name")
     inst_keys = ex_params[1]
     num_params = length(inst_keys)

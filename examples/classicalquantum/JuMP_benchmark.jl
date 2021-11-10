@@ -1,10 +1,10 @@
 
-classicalquantum_insts(use_EF::Bool) = [
-    [(d, false, use_EF)
-    for d in vcat(3, 20:20:100, 150:50:450)] # includes compile run
+classicalquantum_insts(complex::Bool, use_EF::Bool) = [
+    [(d, complex, use_EF)
+    for d in vcat(3, 10:10:40, 50:25:100, 150:50:750)] # includes compile run
     ]
 
 insts = OrderedDict()
-insts["nat"] = (nothing, classicalquantum_insts(false))
-insts["ext"] = (nothing, classicalquantum_insts(true))
+insts["nat"] = (nothing, classicalquantum_insts(true, false))
+insts["ext"] = (nothing, classicalquantum_insts(true, true))
 return (ClassicalQuantum, insts)

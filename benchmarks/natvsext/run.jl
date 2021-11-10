@@ -25,8 +25,8 @@ results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
 # setup_model_anyway = true
 setup_model_anyway = false
 
-verbose = true # make solvers print output
-# verbose = false
+# verbose = true # make solvers print output
+verbose = false
 
 iter_limit = 250
 num_threads = 16 # number of threads for BLAS and Julia processes running instances
@@ -80,19 +80,23 @@ inst_sets = [
     # ("extSEP", hyp_solver), # SOCExpPSD extender
     # ("extEP", mosek_solver), # ExpPSD extender
     # ("extSEP", mosek_solver), # SOCExpPSD extender
+    #= WSOS cones paper =#
+    # ("nat", hyp_solver),
+    # ("ext", hyp_solver),
+    # ("extmat", hyp_solver),
     #= spectral function cones paper =#
-    ("nat", hyp_solver),
-    ("ext", hyp_solver),
-    ("ext", mosek_solver),
-    # for nonparametricdistr:
-    ("vecext", hyp_solver),
-    ("vecext", mosek_solver),
-    ("vecext", ecos_solver),
-    # for covarianceest
-    ("logdet", hyp_solver),
-    ("sepspec", hyp_solver),
-    ("direct", hyp_solver),
-    ("direct", mosek_solver),
+    # ("nat", hyp_solver),
+    # ("ext", hyp_solver),
+    # ("extmat", hyp_solver),
+    #= spectral function cones paper =#
+    # ("nat", hyp_solver),
+    # ("natlog", hyp_solver),
+    # ("ext", hyp_solver),
+    # ("ext", mosek_solver),
+    # for nonparametricdistr (allows ECOS)
+    # ("vecext", hyp_solver),
+    # ("vecext", mosek_solver),
+    # ("vecext", ecos_solver),
     ]
 
 # models to run
@@ -106,14 +110,12 @@ JuMP_examples = [
     # "portfolio",
     # "shapeconregr",
     #= WSOS cones paper =#
-    # "nearestpolymat",
     # "polynorm",
     #= spectral function cones paper =#
-    "centralpolymat",
-    "classicalquantum",
-    "covarianceest",
-    "experimentdesign",
-    "nonparametricdistr",
+    # "centralpolymat",
+    # "classicalquantum",
+    # "experimentdesign",
+    # "nonparametricdistr",
     ]
 
 interrupt()

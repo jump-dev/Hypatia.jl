@@ -11,6 +11,8 @@ for the CBLIB example (at `Hypatia/examples/CBLIB/JuMP_test.jl`) by running in
 the shell (from the home directory):
 ```shell
 cd ~
+mkdir -p cblib
+cd cblib
 wget -r -l1 -np http://cblib.zib.de/download/all/ -A expdesign_D_8_4.cbf.gz,port_12_9_3_a_1.cbf.gz,tls4.cbf.gz,ck_n25_m10_o1_1.cbf.gz,rsyn0805h.cbf.gz,2x3_3bars.cbf.gz,HMCR-n20-m400.cbf.gz,classical_20_0.cbf.gz,achtziger_stolpe06-6.1flowc.cbf.gz,LogExpCR-n100-m400.cbf.gz
 ```
 Check that these `.cbf.gz` files (and possibly some extra files that can be
@@ -19,17 +21,24 @@ ignored) are in a new folder `~/cblib/cblib.zib.de/download/all/`.
 Install the selected version of Julia (e.g. v1.7) from
 https://julialang.org/downloads/.
 
-Start Julia from the shell and enter Julia's pkg mode by typing `]`.
-Install the selected version of Hypatia (e.g. v0.5.1) and script dependencies
-and run update:
+Start Julia (e.g. `~/julia/julia`) from the shell and enter Julia's pkg mode by typing `]`.
+Install Hypatia and the script dependencies:
 ```julia
-pkg> add Hypatia#v0.5.1
-pkg> add CSV DataFrames DataStructures DelimitedFiles Distributions
+pkg> dev Hypatia
+pkg> add Combinatorics CSV DataFrames DataStructures DelimitedFiles Distributions
 pkg> add DynamicPolynomials ForwardDiff JuMP PolyJuMP Random SemialgebraicSets
-pkg> add SumOfSquares Test Printf BenchmarkProfiles
+pkg> add SpecialFunctions SumOfSquares Test Printf BenchmarkProfiles
+```
+Exit Julia.
+Set the desired version of Hypatia (e.g. v0.5.2) with:
+```shell
+cd ~/.julia/dev/Hypatia
+git checkout v0.5.2
+```
+Update packages by starting Julia again and typing `]`, then:
+```julia
 pkg> up
 ```
-
 Exit Julia, and change directory to the benchmarks/stepper folder:
 ```shell
 cd ~/.julia/dev/Hypatia/benchmarks/stepper
@@ -47,6 +56,7 @@ Start a GNU Screen from the shell by typing `screen`
 
 Run (from the benchmarks/stepper directory):
 ```shell
+mkdir -p raw
 killall julia; ~/julia/julia run.jl &> raw/bench.txt
 ```
 If the script errors in the next few minutes, follow the error messages to debug,

@@ -2,9 +2,9 @@
 insts = OrderedDict()
 insts["minimal"] = [
     # rootdet
-    ((3, MatNegGeom()),),
-    ((3, MatNegGeomEFExp()),),
-    ((3, MatNegGeomEFPow()),),
+    ((3, MatNegRtdet()),),
+    ((3, MatNegRtdetEFExp()),),
+    ((3, MatNegRtdetEFPow()),),
     # tr neglog
     ((2, MatLogdetCone()),),
     ((2, MatNegLog()),),
@@ -23,9 +23,9 @@ insts["minimal"] = [
     ((3, MatPower12EigOrd(1.3)),),
     ]
 insts["fast"] = [
-    ((50, MatNegGeom()),),
-    ((12, MatNegGeomEFExp()),),
-    ((8, MatNegGeomEFPow()),),
+    ((50, MatNegRtdet()),),
+    ((12, MatNegRtdetEFExp()),),
+    ((8, MatNegRtdetEFPow()),),
     ((40, MatNegSqrt()),),
     ((5, MatNegSqrtEigOrd()),),
     ((6, MatNegSqrtConjEigOrd()),),
@@ -43,9 +43,9 @@ insts["fast"] = [
     ((5, MatNegPower01EigOrd(0.4)),),
     ]
 insts["various"] = [
-    ((400, MatNegGeom()),),
-    ((70, MatNegGeomEFExp()),),
-    ((40, MatNegGeomEFPow()), nothing, (default_tol_relax = 100,)),
+    ((400, MatNegRtdet()),),
+    ((70, MatNegRtdetEFExp()),),
+    ((40, MatNegRtdetEFPow()), nothing, (default_tol_relax = 100,)),
     ((200, MatNegSqrt()),),
     ((10, MatNegSqrtConjEigOrd()),),
     ((125, MatNegSqrtConjDirect()),),

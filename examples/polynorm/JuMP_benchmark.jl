@@ -22,6 +22,7 @@ polynorm_l2_n_d_ms = [
     (4, 2, 8),
     (4, 2, 16),
     (4, 2, 32),
+    (4, 2, 64),
     ],
     [
     (3, 1, 2), # compile run
@@ -29,6 +30,7 @@ polynorm_l2_n_d_ms = [
     (4, 4, 8),
     (4, 4, 16),
     (4, 4, 32),
+    (4, 4, 64),
     ],
     ]
 
@@ -59,11 +61,11 @@ polynorm_l1_n_d_ms = [
     ],
     [
     (3, 1, 2), # compile run
-    (4, 4, 4),
     (4, 4, 8),
     (4, 4, 16),
     (4, 4, 32),
     (4, 4, 64),
+    (4, 4, 128),
     ],
     ]
 
@@ -85,8 +87,10 @@ insts["nat"] = (nothing, vcat(
     ))
 insts["ext"] = (nothing, vcat(
     polynorm_insts(false, false, true, [1, 2]),
-    polynorm_insts(false, false, false, [1, 2]),
     polynorm_insts(true, false, true, [1,]),
+    ))
+insts["extmat"] = (nothing, vcat(
+    polynorm_insts(false, false, false, [1, 2]),
     ))
 
 return (PolyNormJuMP, insts)

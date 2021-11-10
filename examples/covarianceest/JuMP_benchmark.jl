@@ -1,7 +1,7 @@
 
 covarianceest_insts(ext::MatSpecExt) = [
-    [(d, ext)
-    for d in vcat(3, 20:20:220)] # includes compile run
+    [(d, true, ext) # complex
+    for d in vcat(3, 25:25:250)] # includes compile run
     ]
 
 insts = OrderedDict()
