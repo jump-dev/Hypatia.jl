@@ -305,7 +305,7 @@ function update_inv_hess(cone::EpiNormSpectral{T}) where {T <: Real}
         w2 = sim_ij .* hiww2
         w3 = -w2 * Vt
         w3[:, j] += z .* U_i
-        w4 = 0.5 * U * w3
+        w4 = T(0.5) * U * w3
         @views vec_copyto!(Hi[2:end, c_idx], w4)
         c_idx += 1
     end
@@ -320,10 +320,10 @@ function update_inv_hess(cone::EpiNormSpectral{T}) where {T <: Real}
 end
 
 function inv_hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::EpiNormSpectral,
-    )
+    prod::AbstractVecOrMat{T},
+    arr::AbstractVecOrMat{T},
+    cone::EpiNormSpectral{T},
+    ) where T
     cone.hess_aux_updated || update_hess_aux(cone)
     d1 = cone.d1
     u = cone.point[1]
@@ -350,7 +350,7 @@ function inv_hess_prod!(
         w3 = Diagonal(2 * c1 * usti) - sim2 .* hiww2
 
         lmul!(Diagonal(z), simU)
-        w2 = 0.5 * U * (simU + w3 * Vt)
+        w2 = T(0.5) * U * (simU + w3 * Vt)
         @views vec_copyto!(prod[2:end, j], w2)
     end
 

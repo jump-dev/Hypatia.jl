@@ -70,22 +70,8 @@ sep_spectral_funs = [
 
 @testset "cone tests" begin
 
-# println("starting oracle tests")
-# @testset "oracle tests" begin
-# real_types = [
-#     Float64,
-#     # Float32,
-#     # BigFloat,
-#     ]
-# @testset "$cone" for T in real_types, cone in cone_types(T)
-#     println("$cone")
-#     test_time = @elapsed test_oracles(cone)
-#     @printf("%8.2e seconds\n", test_time)
-# end
-# end
-
-println("\nstarting barrier tests")
-@testset "barrier tests" begin
+println("starting oracle tests")
+@testset "oracle tests" begin
 real_types = [
     Float64,
     # Float32,
@@ -93,10 +79,24 @@ real_types = [
     ]
 @testset "$cone" for T in real_types, cone in cone_types(T)
     println("$cone")
-    test_time = @elapsed test_barrier(cone)
+    test_time = @elapsed test_oracles(cone)
     @printf("%8.2e seconds\n", test_time)
 end
 end
+
+# println("\nstarting barrier tests")
+# @testset "barrier tests" begin
+# real_types = [
+#     Float64,
+#     # Float32,
+#     # BigFloat,
+#     ]
+# @testset "$cone" for T in real_types, cone in cone_types(T)
+#     println("$cone")
+#     test_time = @elapsed test_barrier(cone)
+#     @printf("%8.2e seconds\n", test_time)
+# end
+# end
 
 # println("\nstarting time/allocation measurements")
 # @testset "allocation tests" begin

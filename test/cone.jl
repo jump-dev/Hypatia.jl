@@ -43,8 +43,8 @@ function test_oracles(
     Cones.load_dual_point(cone, dual_point)
     @test Cones.is_dual_feas(cone)
     @test cone.dual_point == dual_point
-    # @test Cones.get_proxsqr(cone, one(T), true) <= 1 # max proximity
-    # @test Cones.get_proxsqr(cone, one(T), false) <= dim # sum proximity
+    @test Cones.get_proxsqr(cone, one(T), true) <= 1 # max proximity
+    @test Cones.get_proxsqr(cone, one(T), false) <= dim # sum proximity
 
     prod_vec = zero(point)
     @test Cones.hess_prod!(prod_vec, point, cone) ≈ dual_point atol=tol rtol=tol
@@ -55,9 +55,10 @@ function test_oracles(
     end
     init_only && return
 
-    # hess = Cones.hess(cone)
-    # inv_hess = Cones.inv_hess(cone)
-    # @test hess * inv_hess ≈ I atol=tol rtol=tol
+    hess = Cones.hess(cone)
+    inv_hess = Cones.inv_hess(cone)
+    @show hess * inv_hess
+    @test hess * inv_hess ≈ I atol=tol rtol=tol
 
     # perturb and scale the initial point
     perturb_scale!(point, noise, scale)
@@ -74,45 +75,45 @@ function test_oracles(
     grad = Cones.grad(cone)
     @test dot(point, grad) ≈ -nu atol=tol rtol=tol
 
-    # hess = Matrix(Cones.hess(cone))
-    # inv_hess = Matrix(Cones.inv_hess(cone))
-    # @test hess * inv_hess ≈ I atol=tol rtol=tol
-    #
-    # @test hess * point ≈ -grad atol=tol rtol=tol
+    hess = Matrix(Cones.hess(cone))
+    inv_hess = Matrix(Cones.inv_hess(cone))
+    @test hess * inv_hess ≈ I atol=tol rtol=tol
+
+    @test hess * point ≈ -grad atol=tol rtol=tol
     @test Cones.hess_prod!(prod_vec, point, cone) ≈ -grad atol=tol rtol=tol
     @test Cones.inv_hess_prod!(prod_vec, grad, cone) ≈ -point atol=tol rtol=tol
 
-    # prod_mat = zeros(T, dim, dim)
-    # @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
-    # @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
-    #
-    # psi = dual_point + grad
-    # proxsqr = dot(psi, Cones.inv_hess_prod!(prod_vec, psi, cone))
-    # @test Cones.get_proxsqr(cone, one(T), false) ≈ proxsqr atol=tol rtol=tol
-    #
-    # if hasproperty(cone, :use_hess_prod_slow)
-    #     Cones.update_use_hess_prod_slow(cone)
-    #     @test cone.use_hess_prod_slow_updated
-    #     @test !cone.use_hess_prod_slow
-    #     cone.use_hess_prod_slow = true
-    #     @test Cones.hess_prod_slow!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
-    # end
-    #
-    # if Cones.use_sqrt_hess_oracles(dim + 1, cone)
-    #     prod_mat2 = Matrix(Cones.sqrt_hess_prod!(prod_mat, inv_hess, cone)')
-    #     @test Cones.sqrt_hess_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
-    #     Cones.inv_sqrt_hess_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
-    #     @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
-    # end
+    prod_mat = zeros(T, dim, dim)
+    @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
 
-    # # test third order deriv oracle
-    # if Cones.use_dder3(cone)
-    #     @test -Cones.dder3(cone, point) ≈ grad atol=tol rtol=tol
-    #
-    #     dir = perturb_scale!(zeros(T, dim), noise, one(T))
-    #     dder3 = Cones.dder3(cone, dir)
-    #     @test dot(dder3, point) ≈ dot(dir, hess * dir) atol=tol rtol=tol
-    # end
+    psi = dual_point + grad
+    proxsqr = dot(psi, Cones.inv_hess_prod!(prod_vec, psi, cone))
+    @test Cones.get_proxsqr(cone, one(T), false) ≈ proxsqr atol=tol rtol=tol
+
+    if hasproperty(cone, :use_hess_prod_slow)
+        Cones.update_use_hess_prod_slow(cone)
+        @test cone.use_hess_prod_slow_updated
+        @test !cone.use_hess_prod_slow
+        cone.use_hess_prod_slow = true
+        @test Cones.hess_prod_slow!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+    end
+
+    if Cones.use_sqrt_hess_oracles(dim + 1, cone)
+        prod_mat2 = Matrix(Cones.sqrt_hess_prod!(prod_mat, inv_hess, cone)')
+        @test Cones.sqrt_hess_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+        Cones.inv_sqrt_hess_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
+        @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+    end
+
+    # test third order deriv oracle
+    if Cones.use_dder3(cone)
+        @test -Cones.dder3(cone, point) ≈ grad atol=tol rtol=tol
+
+        dir = perturb_scale!(zeros(T, dim), noise, one(T))
+        dder3 = Cones.dder3(cone, dir)
+        @test dot(dder3, point) ≈ dot(dir, hess * dir) atol=tol rtol=tol
+    end
 
     return
 end
@@ -140,10 +141,10 @@ function test_barrier(
 
     TFD_point = TFD.(point)
 
-    # fd_grad = ForwardDiff.gradient(barrier, TFD_point)
-    # @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
+    fd_grad = ForwardDiff.gradient(barrier, TFD_point)
+    @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
 
-Cones.grad(cone)
+# Cones.grad(cone)
 
 hi = inv(Cones.hess(cone))
 hi2 = Cones.inv_hess(cone)
