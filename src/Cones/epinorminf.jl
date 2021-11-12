@@ -113,57 +113,66 @@ function update_grad(cone::EpiNormInf{T}) where T
     u = cone.point[1]
     w = cone.w
     zh = cone.zh
+    s1 = cone.s1
     w1 = cone.w1
     g = cone.grad
 
-    cone.cu = (cone.d - 1) / u
-    @. w1 = abs(w)
-    @. zh = T(0.5) * (u + w1) * (u - w1)
+    mu = zero(w)
+    phi = zero(w)
+    tpi = zero(w)
+    ui = inv(u)
+    gw = zero(w)
 
-    g[1] = cone.cu - sum(u / zh[i] for i in 1:cone.d)
-    @. w1 = w / zh
-    @views vec_copyto!(g[2:end], w1)
+    @. mu = w / u
+    @. phi = u - mu * w
+    @. tpi = 2 / phi - ui
+
+    gu = -ui - sum(tpi)
+    @. gw = 2 * mu / phi
+
+    g[1] = gu
+    @views vec_copyto!(g[2:end], gw)
 
     cone.grad_updated = true
     return cone.grad
 end
 
-function update_hess(cone::EpiNormInf)
-    isdefined(cone, :hess) || alloc_hess!(cone)
-    d = cone.d
-    u = cone.point[1]
-    w = cone.w
-    zh = cone.zh
-    Hnz = cone.hess.data.nzval # modify nonzeros of upper triangle
-
-    u2 = abs2(u)
-    @inbounds Hnz[1] = -cone.cu / u + sum((u2 / zh[i] - 1) / zh[i] for i in 1:d)
-
-    k = 2
-    @inbounds for i in 1:d
-        w_i = w[i]
-        zh_i = zh[i]
-        uzi_i = -u / zh_i
-        wzi_i = w_i / zh_i
-        if cone.is_complex
-            (wr, wi) = reim(w_i)
-            (wzir, wzii) = reim(wzi_i)
-            Hnz[k] = uzi_i * wzir
-            Hnz[k + 1] = (wr * wzir + 1) / zh_i
-            Hnz[k + 2] = uzi_i * wzii
-            Hnz[k + 3] = wzir * wzii
-            Hnz[k + 4] = (wi * wzii + 1) / zh_i
-            k += 5
-        else
-            Hnz[k] = uzi_i * wzi_i
-            Hnz[k + 1] = (w_i * wzi_i + 1) / zh_i
-            k += 2
-        end
-    end
-
-    cone.hess_updated = true
-    return cone.hess
-end
+# function update_hess(cone::EpiNormInf)
+#     isdefined(cone, :hess) || alloc_hess!(cone)
+#     d = cone.d
+#     u = cone.point[1]
+#     w = cone.w
+#     zh = cone.zh
+#     Hnz = cone.hess.data.nzval # modify nonzeros of upper triangle
+#
+#     u2 = abs2(u)
+#     @inbounds Hnz[1] = -cone.cu / u + sum((u2 / zh[i] - 1) / zh[i] for i in 1:d)
+#
+#     k = 2
+#     @inbounds for i in 1:d
+#         w_i = w[i]
+#         zh_i = zh[i]
+#         uzi_i = -u / zh_i
+#         wzi_i = w_i / zh_i
+#         if cone.is_complex
+#             (wr, wi) = reim(w_i)
+#             (wzir, wzii) = reim(wzi_i)
+#             Hnz[k] = uzi_i * wzir
+#             Hnz[k + 1] = (wr * wzir + 1) / zh_i
+#             Hnz[k + 2] = uzi_i * wzii
+#             Hnz[k + 3] = wzir * wzii
+#             Hnz[k + 4] = (wi * wzii + 1) / zh_i
+#             k += 5
+#         else
+#             Hnz[k] = uzi_i * wzi_i
+#             Hnz[k + 1] = (w_i * wzi_i + 1) / zh_i
+#             k += 2
+#         end
+#     end
+#
+#     cone.hess_updated = true
+#     return cone.hess
+# end
 
 function hess_prod!(
     prod::AbstractVecOrMat,
@@ -180,15 +189,47 @@ function hess_prod!(
     w2 = cone.w2
     s1 = cone.s1
 
+    rtzh = zero(w)
+    @. rtzh = sqrt(0.5 * (u + w)) * sqrt((u - w))
+
+    zhui = zero(w)
+    @. zhui = 0.5 * (u - w / u * w)
+
+    wui = w ./ u
+    wui21 = zero(w)
+    @. wui21 = (1 - wui) * (1 + wui)
+    thzhi = zero(w)
+    @. thzhi = (2 - wui21) / wui21
+
+    zhuwi = zero(w)
+    @. zhuwi = -0.5 * (u / w - w / u)
+
+    uwzhi = zero(w)
+    @. uwzhi = -2 / (u / w - w / u)
+
+    # uzi = u ./ zh
+    # @assert zhui ≈ inv.(uzi)
+
+    rtzhi = inv.(rtzh)
+
+    wrtzi = w ./ rtzh
+
     @inbounds for j in 1:size(prod, 2)
         p = arr[1, j]
         @views vec_copyto!(r, arr[2:end, j])
 
-        @. s1 = (real(conj(w) * r) - u * p) / zh
+        # rrtzi = r ./ rtzh
+        # @. s1 = wrtzi * rrtzi - p / zhui
+        # @. s1 = (w * r - u * p) / zh
 
-        prod[1, j] = -sum((p + u * s1[i]) / zh[i] for i in 1:d) - cu * p / u
+        prod[1, j] = sum(
+            # rtzhi[i] * (p + u * s1[i]) / rtzh[i]
+            # (p + u * ((w[i] * r[i] - u * p)) / zh[i]) / zh[i]
+            (p * thzhi[i] + r[i] / zhuwi[i]) / zh[i]
+            for i in 1:d) - cu * p / u
 
-        @. w2 = (r + s1 * w) / zh
+        @. w2 = (p / zhuwi + r * thzhi) / zh
+
         @views vec_copyto!(prod[2:end, j], w2)
     end
 
@@ -220,7 +261,7 @@ function update_inv_hess(cone::EpiNormInf)
     zhthi = cone.zhthi
     w1 = cone.w1
     Hi = cone.inv_hess.data
-    
+
     @. w1 = w * cone.u2ti
     rtzti1 = sqrt(zti1)
     urtzti1 = u / rtzti1
@@ -259,36 +300,120 @@ function update_inv_hess(cone::EpiNormInf)
     return cone.inv_hess
 end
 
-function inv_hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::EpiNormInf,
-    )
-    cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-    u = cone.point[1]
-    w = cone.w
-    zh = cone.zh
-    zti1 = cone.zti1
-    u2ti = cone.u2ti
-    r = cone.w1
-    w2 = cone.w2
-    s1 = cone.s1
-
-    @inbounds for j in 1:size(prod, 2)
-        p = arr[1, j]
-        @views vec_copyto!(r, arr[2:end, j])
-
-        @. s1 = real(conj(w) * r)
-
-        c1 = (u * p + dot(u2ti, s1)) / zti1
-        prod[1, j] = c1 * u
-
-        @. w2 = zh * r + ((c1 - s1) * u2ti + s1) * w
-        @views vec_copyto!(prod[2:end, j], w2)
-    end
-
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormInf)
+    cone.inv_hess_updated || update_inv_hess(cone)
+    mul!(prod, cone.inv_hess, arr)
     return prod
 end
+
+# function inv_hess_prod!(
+#     prod::AbstractVecOrMat,
+#     arr::AbstractVecOrMat,
+#     cone::EpiNormInf,
+#     )
+#     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
+#     u = cone.point[1]
+#     w = cone.w
+#     zh = cone.zh
+#     zti1 = cone.zti1
+#     u2ti = cone.u2ti
+#     r = cone.w1
+#     w2 = cone.w2
+#     s1 = cone.s1
+#
+#     zhthi = cone.zhthi
+#     @. u2ti = 2 * inv(1 + abs2(w / u))
+#     @. zhthi = u2ti - 1
+#     zti1 = 1 + sum(zhthi)
+#
+#     @. zhthi = 2 * inv(1 + abs2(w / u)) - 1
+#
+#     wui = w ./ u
+#     wui21 = zero(zhthi)
+#     @. wui21 = (1 - wui) * (1 + wui)
+#     @. zhthi = wui21 / (2 - wui21)
+#
+#
+#     zh2thi = zero(zhthi)
+#     @. zh2thi = 2 * zh / (1 + abs2(w / u)) - zh
+#     @. zh2thi = zh * (1 - abs2(w / u)) / (1 + abs2(w / u))
+#     @assert zh2thi ≈ zh .* zhthi
+#     @. zh2thi = zh * zhthi
+#
+#     rtzh = zero(w)
+#     @. rtzh = sqrt(0.5 * (u + w)) * sqrt((u - w))
+#
+#     zhui = zero(w)
+#     @. zhui = 0.5 * (u - w / u * w)
+#
+#     # uzi = u ./ zh
+#     # @assert zhui ≈ inv.(uzi)
+#
+#
+#     th = u^2 .- zh
+#     u2ti2i = zero(th)
+#     # @show abs2.(w ./ u)
+#     @. u2ti2i = 0.5 * (1 + abs2(w / u))
+#     # @assert inv.(u2ti2i) ≈ u2ti
+#
+#     tui = zero(w)
+#     @. tui = 0.5 * (u + w / u * w) # = u - zhui
+#
+#     @assert -zh ./ th ≈ 1 .- u2ti
+#     @assert zh ./ th ≈ zhthi
+#
+#     uwthi = zero(w)
+#     @. uwthi = 2 / (u / w + w / u)
+#     @assert uwthi ≈ u * w ./ th
+#
+#
+#     thuwi = zero(w)
+#     @. thuwi = 0.5 * (u / w + w / u)
+#
+#     @inbounds for j in 1:size(prod, 2)
+#         p = arr[1, j]
+#         @views vec_copyto!(r, arr[2:end, j])
+#
+#         # @. s1 = w * r
+#
+#         # c1 = (u * p + dot(u2ti, s1)) / zti1
+#         c1 = u * (p + sum(r ./ thuwi)) / zti1 * u
+#         prod[1, j] = c1
+#
+#         # @. w2 = zh * r + ((c1 - s1) * u2ti + s1) * w
+#         # @. w2 = zh * r + (c1 * u2ti + s1 * (1 - u2ti)) * w
+#         # @. w2 = zh * r + (c1 * u - s1 * zh) / th * w
+#
+#         # @. w2 = zh * zh / th * r + c1 * u * w / th
+#         @. w2 = zh2thi * r + c1 / thuwi
+#
+#         # c1 = (u * p + sum(s1 ./ u2ti2i)) / zti1
+#         # prod[1, j] = c1 * u
+#         #
+#         # @. w2 = zh * r + ((c1 - s1) / u2ti2i + s1) * w
+#
+#         # c1 = (u * p + u * sum(u * s1[i] / th[i] for i in 1:cone.d)) / zti1 * u
+#         # prod[1, j] = c1
+#         #
+#         # @. w2 = zh * r + ((c1 * u - zh * s1) / th) * w
+#
+#         @views vec_copyto!(prod[2:end, j], w2)
+#     end
+#
+#     res = arr - hess_prod!(zero(arr), prod, cone)
+#     if norm(res) > 1e-1
+#         # @show zh
+#         # @show u ./ zh
+#         @show u
+#         # @show u2ti
+#         # println()
+#         # @show u ./ th
+#         # println()
+#         # @show res
+#     end
+#
+#     return prod
+# end
 
 function dder3(cone::EpiNormInf{T}, dir::AbstractVector{T}) where T
     @assert cone.grad_updated
@@ -304,7 +429,9 @@ function dder3(cone::EpiNormInf{T}, dir::AbstractVector{T}) where T
     @views vec_copyto!(r, dir[2:end])
 
     @. s1 = (u * p - real(conj(w) * r)) / zh
-    @. s2 = T(0.5) * (abs2(p) - abs2(r)) / zh - abs2(s1)
+    # @. s2 = T(0.5) * (abs2(p) - abs2(r)) / zh - abs2(s1)
+    ar = abs.(r)
+    @. s2 = T(0.5) * (p + ar) * (p - ar) / zh - abs2(s1)
 
     @inbounds c1 = sum((p * s1[i] + u * s2[i]) / zh[i] for i in 1:cone.d)
     dder3[1] = -c1 - cone.cu * abs2(p / u)

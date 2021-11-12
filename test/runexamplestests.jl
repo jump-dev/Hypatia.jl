@@ -14,8 +14,8 @@ script_verbose = false
 
 # default options to solvers
 default_options = (
-    verbose = false,
-    # verbose = true,
+    # verbose = false,
+    verbose = true,
     default_tol_relax = 10,
     # stepper = Solvers.CombinedStepper{Float64}(),
     # stepper = Solvers.PredOrCentStepper{Float64}(),
@@ -24,10 +24,10 @@ default_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 inst_sets = [
-    ("minimal", Float64, 60),
+    # ("minimal", Float64, 60),
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
-    # ("fast", Float64, 60),
+    ("fast", Float64, 60),
     # ("various", Float64, 120),
     ]
 
