@@ -16,12 +16,12 @@ function cone_types(T::Type{<:Real})
         # Cones.PosSemidefTriSparse{Cones.PSDSparseDense, T, T},
         # Cones.PosSemidefTriSparse{Cones.PSDSparseDense, T, Complex{T}},
         # Cones.LinMatrixIneq{T},
-        Cones.EpiNormInf{T, T},
-        Cones.EpiNormInf{T, Complex{T}},
+        # Cones.EpiNormInf{T, T},
+        # Cones.EpiNormInf{T, Complex{T}},
         # Cones.EpiNormEucl{T},
         # Cones.EpiPerSquare{T},
-        # Cones.EpiNormSpectral{T, T},
-        # Cones.EpiNormSpectral{T, Complex{T}},
+        Cones.EpiNormSpectral{T, T},
+        Cones.EpiNormSpectral{T, Complex{T}},
         # Cones.MatrixEpiPerSquare{T, T},
         # Cones.MatrixEpiPerSquare{T, Complex{T}},
         # Cones.GeneralizedPower{T},
@@ -64,19 +64,19 @@ sep_spectral_funs = [
 
 @testset "cone tests" begin
 
-println("starting oracle tests")
-@testset "oracle tests" begin
-real_types = [
-    Float64,
-    # Float32,
-    # BigFloat,
-    ]
-@testset "$cone" for T in real_types, cone in cone_types(T)
-    println("$cone")
-    test_time = @elapsed test_oracles(cone)
-    @printf("%8.2e seconds\n", test_time)
-end
-end
+# println("starting oracle tests")
+# @testset "oracle tests" begin
+# real_types = [
+#     Float64,
+#     # Float32,
+#     # BigFloat,
+#     ]
+# @testset "$cone" for T in real_types, cone in cone_types(T)
+#     println("$cone")
+#     test_time = @elapsed test_oracles(cone)
+#     @printf("%8.2e seconds\n", test_time)
+# end
+# end
 
 println("\nstarting barrier tests")
 @testset "barrier tests" begin

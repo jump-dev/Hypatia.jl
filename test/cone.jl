@@ -140,9 +140,10 @@ function test_barrier(
 
     TFD_point = TFD.(point)
 
-    fd_grad = ForwardDiff.gradient(barrier, TFD_point)
-    @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
+    # fd_grad = ForwardDiff.gradient(barrier, TFD_point)
+    # @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
 
+Cones.grad(cone)
     dir = 10 * randn(T, dim)
     TFD_dir = TFD.(dir)
 
@@ -151,8 +152,8 @@ function test_barrier(
     fd_hess_dir = ForwardDiff.gradient(s -> ForwardDiff.derivative(t ->
         barrier_dir(s, t), 0), TFD_point)
 
-    @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
-    @test Cones.inv_hess(cone) * fd_hess_dir ≈ dir atol=tol rtol=tol
+    # @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
+    # @test Cones.inv_hess(cone) * fd_hess_dir ≈ dir atol=tol rtol=tol
     prod_vec = zero(dir)
     @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
     @test Cones.inv_hess_prod!(prod_vec, fd_hess_dir, cone) ≈ dir atol=tol rtol=tol
