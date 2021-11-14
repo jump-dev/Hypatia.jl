@@ -27,11 +27,11 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_hess::Symmetric{T, Matrix{T}}
 
     w::Vector{R}
-    zh::Vector{T}
+    mu::Vector{R}
+    zeta::Vector{T}
     cu::T
-    zhthi::Vector{T}
-    u2ti::Vector{T}
-    zti1::T
+    Zu::T
+    umz::Vector{T}
 
     w1::Vector{R}
     w2::Vector{R}
@@ -63,9 +63,10 @@ function setup_extra_data!(
     ) where {T <: Real, R <: RealOrComplex{T}}
     d = cone.d
     cone.w = zeros(R, d)
-    cone.zh = zeros(T, d)
-    cone.zhthi = zeros(T, d)
-    cone.u2ti = zeros(T, d)
+    cone.mu = zeros(R, d)
+    cone.zeta = zeros(T, d)
+    cone.umz = zeros(T, d)
+    # TODO dont alloc if not using for real case
     cone.w1 = zeros(R, d)
     cone.w2 = zeros(R, d)
     cone.s1 = zeros(T, d)
@@ -100,33 +101,44 @@ function update_feas(cone::EpiNormInf{T}) where T
 end
 
 function is_dual_feas(cone::EpiNormInf{T}) where T
-    u = cone.dual_point[1]
+    dp = cone.dual_point
+    u = dp[1]
     if u > eps(T)
-        @views vec_copyto!(cone.w1, cone.dual_point[2:end])
-        return (u - sum(abs, cone.w1) > eps(T))
+        if cone.is_complex
+            @inbounds norm1 = sum(hypot(dp[2i], dp[2i + 1]) for i in 1:cone.d)
+        else
+            @views norm1 = sum(abs, dp[2:end])
+        end
+        return (u - norm1 > eps(T))
     end
     return false
 end
+
+remul(a::T, b::T) where {T <: Real} = a * b
+
+remul(a::Complex{T}, b::Complex{T}) where {T <: Real} =
+    (real(a) * real(b) + imag(a) * imag(b))
 
 function update_grad(cone::EpiNormInf{T}) where T
     @assert cone.is_feas
     u = cone.point[1]
     w = cone.w
-    zh = cone.zh
-    s1 = cone.s1
-    w1 = cone.w1
+    mu = cone.mu
+    zeta = cone.zeta
     g = cone.grad
 
-    mu = zero(w)
-    zeta = zero(w)
     @. mu = w / u
-    @. zeta = 0.5 * (u - mu * w)
-
+    @. zeta = T(0.5) * (u - remul(mu, w))
     cone.cu = (cone.d - 1) / u
+
     g[1] = cone.cu - sum(inv, zeta)
 
-    @. w1 = mu / zeta
-    @views vec_copyto!(g[2:end], w1)
+    if cone.is_complex
+        @. cone.w1 = mu / zeta
+        @views vec_copyto!(g[2:end], cone.w1)
+    else
+        @. g[2:end] = mu / zeta
+    end
 
     cone.grad_updated = true
     return cone.grad
@@ -172,31 +184,52 @@ end
 function hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
-    cone::EpiNormInf,
-    )
+    cone::EpiNormInf{T, T},
+    ) where T
     @assert cone.grad_updated
-    d = cone.d
     u = cone.point[1]
-    w = cone.w
-    zh = cone.zh
-    cu = cone.cu
+    mu = cone.mu
+    zeta = cone.zeta
+    s1 = cone.s1
+
+    @inbounds for j in 1:size(prod, 2)
+        p = arr[1, j]
+        @views r = arr[2:end, j]
+
+        pui = p / u
+        @. s1 = (p - mu * r) / zeta
+
+        prod[1, j] = -sum((pui - s1[i]) / zeta[i] for i in 1:cone.d) -
+            cone.cu * pui
+
+        @. prod[2:end, j] = (r / u - s1 * mu) / zeta
+    end
+
+    return prod
+end
+
+function hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::EpiNormInf{T, Complex{T}},
+    ) where T
+    @assert cone.grad_updated
+    u = cone.point[1]
+    mu = cone.mu
+    zeta = cone.zeta
     r = cone.w1
     w2 = cone.w2
     s1 = cone.s1
-
-    mu = zero(w)
-    zeta = zero(w)
-    @. mu = w / u
-    @. zeta = 0.5 * (u - mu * w)
 
     @inbounds for j in 1:size(prod, 2)
         p = arr[1, j]
         @views vec_copyto!(r, arr[2:end, j])
 
         pui = p / u
-        @. s1 = (p - mu * r) / zeta
+        @. s1 = (p - remul(mu, r)) / zeta
 
-        prod[1, j] = -sum((pui - s1[i]) / zeta[i] for i in 1:d) - cu * pui
+        prod[1, j] = -sum((pui - s1[i]) / zeta[i] for i in 1:cone.d) -
+            cone.cu * pui
 
         @. w2 = (r / u - s1 * mu) / zeta
         @views vec_copyto!(prod[2:end, j], w2)
@@ -208,103 +241,116 @@ end
 function update_inv_hess_aux(cone::EpiNormInf)
     @assert !cone.inv_hess_aux_updated
     @assert cone.grad_updated
-    zh = cone.zh
-    zhthi = cone.zhthi
+    u = cone.point[1]
+    umz = cone.umz
 
-    # u2 = abs2(cone.point[1])
-    # @. zhthi = zh / (u2 - zh)
-    # @. cone.u2ti = zhthi + 1
-    # cone.zti1 = 1 + sum(zhthi)
+    @. umz = u - cone.zeta
+    @inbounds cone.Zu = -cone.cu + sum(inv, umz)
 
     cone.inv_hess_aux_updated = true
 end
 
-function update_inv_hess(cone::EpiNormInf)
+# function update_inv_hess(cone::EpiNormInf)
+#     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
+#     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
+#     d = cone.d
+#     u = cone.point[1]
+#     w = cone.w
+#     zh = cone.zh
+#     zti1 = cone.zti1
+#     zhthi = cone.zhthi
+#     w1 = cone.w1
+#     Hi = cone.inv_hess.data
+#
+#     @. w1 = w * cone.u2ti
+#     rtzti1 = sqrt(zti1)
+#     urtzti1 = u / rtzti1
+#
+#     Hi[1, 1] = abs2(urtzti1)
+#
+#     @views Hiuw = Hi[1, 2:end]
+#     vec_copyto!(Hiuw, w1)
+#     Hiuw ./= rtzti1
+#     @views mul!(Hi[2:end, 2:end], Hiuw, Hiuw')
+#     Hiuw .*= urtzti1
+#
+#     @inbounds for i in 1:d
+#         zh_i = zh[i]
+#         if cone.is_complex
+#             w_i = w[i]
+#             (wr, wi) = reim(w_i)
+#             (wzir, wzii) = reim(w_i / zh_i)
+#             Hrere = wr * wzir + 1
+#             Himim = wi * wzii + 1
+#             Hreim = wr * wzii
+#             zdi = zh_i / (Hrere * Himim - abs2(Hreim))
+#
+#             k = 2 * i
+#             k1 = k + 1
+#             Hi[k, k] += Himim * zdi
+#             Hi[k1, k1] += Hrere * zdi
+#             Hi[k, k1] -= Hreim * zdi
+#         else
+#             k = 1 + i
+#             Hi[k, k] += zh_i * zhthi[i]
+#         end
+#     end
+#
+#     cone.inv_hess_updated = true
+#     return cone.inv_hess
+# end
+
+function inv_hess_prod!(
+    prod::AbstractVecOrMat,
+    arr::AbstractVecOrMat,
+    cone::EpiNormInf{T, T},
+    ) where T
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
-    d = cone.d
     u = cone.point[1]
     w = cone.w
-    zh = cone.zh
-    zti1 = cone.zti1
-    zhthi = cone.zhthi
-    w1 = cone.w1
-    Hi = cone.inv_hess.data
+    zeta = cone.zeta
+    umz = cone.umz
+    s1 = cone.s1
 
-    @. w1 = w * cone.u2ti
-    rtzti1 = sqrt(zti1)
-    urtzti1 = u / rtzti1
+    @inbounds for j in 1:size(prod, 2)
+        p = arr[1, j]
+        @views r = arr[2:end, j]
 
-    Hi[1, 1] = abs2(urtzti1)
+        @. s1 = w * r / umz
 
-    @views Hiuw = Hi[1, 2:end]
-    vec_copyto!(Hiuw, w1)
-    Hiuw ./= rtzti1
-    @views mul!(Hi[2:end, 2:end], Hiuw, Hiuw')
-    Hiuw .*= urtzti1
+        c1 = u * (p + sum(s1)) / cone.Zu
+        prod[1, j] = c1
 
-    @inbounds for i in 1:d
-        zh_i = zh[i]
-        if cone.is_complex
-            w_i = w[i]
-            (wr, wi) = reim(w_i)
-            (wzir, wzii) = reim(w_i / zh_i)
-            Hrere = wr * wzir + 1
-            Himim = wi * wzii + 1
-            Hreim = wr * wzii
-            zdi = zh_i / (Hrere * Himim - abs2(Hreim))
-
-            k = 2 * i
-            k1 = k + 1
-            Hi[k, k] += Himim * zdi
-            Hi[k1, k1] += Hrere * zdi
-            Hi[k, k1] -= Hreim * zdi
-        else
-            k = 1 + i
-            Hi[k, k] += zh_i * zhthi[i]
-        end
+        @. prod[2:end, j] = c1 / umz * w + zeta * (u * r - s1 * w)
     end
 
-    cone.inv_hess_updated = true
-    return cone.inv_hess
+    return prod
 end
 
 function inv_hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
-    cone::EpiNormInf,
-    )
+    cone::EpiNormInf{T, Complex{T}},
+    ) where T
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     u = cone.point[1]
     w = cone.w
-    d = cone.d
-    zh = cone.zh
-    zti1 = cone.zti1
-    u2ti = cone.u2ti
+    zeta = cone.zeta
+    umz = cone.umz
     r = cone.w1
     w2 = cone.w2
     s1 = cone.s1
-
-    mu = zero(w)
-    zeta = zero(w)
-    tzi = zero(w)
-    phi = zero(w)
-
-    @. mu = w / u
-    @. zeta = 0.5 * (u - mu * w)
-    @. tzi = inv(zeta) - inv(u)
-    @. phi = 0.5 * (u ./ w + mu)
-    @inbounds Zu = -cone.cu + sum(inv(u - zeta[i]) for i in 1:d)
 
     @inbounds for j in 1:size(prod, 2)
         p = arr[1, j]
         @views vec_copyto!(r, arr[2:end, j])
 
-        c1 = (u * p + sum(u * r[i] / phi[i] for i in 1:d)) / Zu
+        @. s1 = remul(w, r) / umz
+
+        c1 = u * (p + sum(s1)) / cone.Zu
         prod[1, j] = c1
 
-        @. w2 = c1 / phi + r * zeta / tzi
-
+        @. w2 = c1 / umz * w + zeta * (u * r - s1 * w)
         @views vec_copyto!(prod[2:end, j], w2)
     end
 
@@ -315,30 +361,27 @@ function dder3(cone::EpiNormInf{T}, dir::AbstractVector{T}) where T
     @assert cone.grad_updated
     u = cone.point[1]
     w = cone.w
-    zh = cone.zh
-    dder3 = cone.dder3
-    r = cone.w1
+    mu = cone.mu
+    zeta = cone.zeta
+    rui = cone.w1
+    r = w2 = cone.w2
     s1 = cone.s1
     s2 = cone.s2
-
-    mu = zero(w)
-    zeta = zero(w)
-    @. mu = w / u
-    @. zeta = 0.5 * (u - mu * w)
+    dder3 = cone.dder3
 
     p = dir[1]
     @views vec_copyto!(r, dir[2:end])
 
     pui = p / u
-    rui = r ./ u
-    @. s1 = (p - mu * r) / zeta
-    @. s2 = 0.5 * (pui + rui) * (p - r) / zeta - abs2(s1)
+    @. rui = r / u
+    @. s1 = (p - remul(mu, r)) / zeta
+    @. s2 = 0.5 * (p * pui - remul(rui, r)) / zeta - abs2(s1)
 
     @inbounds c1 = sum((s1[i] * pui + s2[i]) / zeta[i] for i in 1:cone.d)
     dder3[1] = -c1 - cone.cu * abs2(pui)
 
-    @. cone.w2 = (s1 * rui + s2 * mu) / zeta
-    @views vec_copyto!(dder3[2:end], cone.w2)
+    @. w2 = (s1 * rui + s2 * mu) / zeta
+    @views vec_copyto!(dder3[2:end], w2)
 
     return dder3
 end

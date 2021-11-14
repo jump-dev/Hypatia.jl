@@ -17,7 +17,7 @@ function cone_types(T::Type{<:Real})
         # Cones.PosSemidefTriSparse{Cones.PSDSparseDense, T, Complex{T}},
         # Cones.LinMatrixIneq{T},
         Cones.EpiNormInf{T, T},
-        # Cones.EpiNormInf{T, Complex{T}},
+        Cones.EpiNormInf{T, Complex{T}},
         # Cones.EpiNormEucl{T},
         # Cones.EpiPerSquare{T},
         # Cones.EpiNormSpectral{T, T},
