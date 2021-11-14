@@ -151,12 +151,12 @@ function test_barrier(
     fd_hess_dir = ForwardDiff.gradient(s -> ForwardDiff.derivative(t ->
         barrier_dir(s, t), 0), TFD_point)
 
-    # @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
-    # @test Cones.inv_hess(cone) * fd_hess_dir ≈ dir atol=tol rtol=tol
+    @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
+    @test Cones.inv_hess(cone) * fd_hess_dir ≈ dir atol=tol rtol=tol
     prod_vec = zero(dir)
     @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
     @test Cones.inv_hess_prod!(prod_vec, fd_hess_dir, cone) ≈ dir atol=tol rtol=tol
-    
+
     if Cones.use_dder3(cone)
         fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s ->
             ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), TFD_point)
@@ -455,7 +455,7 @@ function test_oracles(C::Type{Cones.EpiNormInf{T, R}}) where {T, R}
 end
 
 function test_barrier(C::Type{Cones.EpiNormInf{T, R}}) where {T, R}
-    dw = 2
+    dw = 3
     function barrier(s)
         u = s[1]
         w = new_vec(s[2:end], dw, R)

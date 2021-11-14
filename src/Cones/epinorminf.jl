@@ -33,10 +33,10 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     Zu::T
     umz::Vector{T}
 
-    w1::Vector{R}
-    w2::Vector{R}
     s1::Vector{T}
     s2::Vector{T}
+    w1::Vector{R}
+    w2::Vector{R}
 
     function EpiNormInf{T, R}(
         dim::Int;
@@ -66,11 +66,12 @@ function setup_extra_data!(
     cone.mu = zeros(R, d)
     cone.zeta = zeros(T, d)
     cone.umz = zeros(T, d)
-    # TODO dont alloc if not using for real case
-    cone.w1 = zeros(R, d)
-    cone.w2 = zeros(R, d)
     cone.s1 = zeros(T, d)
     cone.s2 = zeros(T, d)
+    cone.w1 = zeros(R, d)
+    if cone.is_complex
+        cone.w2 = zeros(R, d)
+    end
     return cone
 end
 
@@ -144,42 +145,45 @@ function update_grad(cone::EpiNormInf{T}) where T
     return cone.grad
 end
 
-# function update_hess(cone::EpiNormInf)
-#     isdefined(cone, :hess) || alloc_hess!(cone)
-#     d = cone.d
-#     u = cone.point[1]
-#     w = cone.w
-#     zh = cone.zh
-#     Hnz = cone.hess.data.nzval # modify nonzeros of upper triangle
-#
-#     u2 = abs2(u)
-#     @inbounds Hnz[1] = -cone.cu / u + sum((u2 / zh[i] - 1) / zh[i] for i in 1:d)
-#
-#     k = 2
-#     @inbounds for i in 1:d
-#         w_i = w[i]
-#         zh_i = zh[i]
-#         uzi_i = -u / zh_i
-#         wzi_i = w_i / zh_i
-#         if cone.is_complex
-#             (wr, wi) = reim(w_i)
-#             (wzir, wzii) = reim(wzi_i)
-#             Hnz[k] = uzi_i * wzir
-#             Hnz[k + 1] = (wr * wzir + 1) / zh_i
-#             Hnz[k + 2] = uzi_i * wzii
-#             Hnz[k + 3] = wzir * wzii
-#             Hnz[k + 4] = (wi * wzii + 1) / zh_i
-#             k += 5
-#         else
-#             Hnz[k] = uzi_i * wzi_i
-#             Hnz[k + 1] = (w_i * wzi_i + 1) / zh_i
-#             k += 2
-#         end
-#     end
-#
-#     cone.hess_updated = true
-#     return cone.hess
-# end
+function update_hess(cone::EpiNormInf)
+    isdefined(cone, :hess) || alloc_hess!(cone)
+    d = cone.d
+    u = cone.point[1]
+    mu = cone.mu
+    zeta = cone.zeta
+    tzi2 = cone.s1
+    g = cone.grad
+    Hnz = cone.hess.data.nzval # modify nonzeros of upper triangle
+
+    ui = inv(u)
+    @. tzi2 = (inv(zeta) - ui) / zeta
+    Hnz[1] = sum(tzi2) - cone.cu / u
+
+    k = 2
+    if cone.is_complex
+        @inbounds for i in 1:d
+            z_i = zeta[i]
+            (mur, mui) = reim(mu[i])
+            mzir = g[2i]
+            mzii = g[2i + 1]
+            Hnz[k] = -mzir / z_i
+            Hnz[k + 1] = (mur * mzir + ui) / z_i
+            Hnz[k + 2] = -mzii / z_i
+            Hnz[k + 3] = mzir * mzii
+            Hnz[k + 4] = (mui * mzii + ui) / z_i
+            k += 5
+        end
+    else
+        @inbounds for i in 1:d
+            Hnz[k] = -g[1 + i] / zeta[i]
+            Hnz[k + 1] = tzi2[i]
+            k += 2
+        end
+    end
+
+    cone.hess_updated = true
+    return cone.hess
+end
 
 function hess_prod!(
     prod::AbstractVecOrMat,
@@ -250,55 +254,59 @@ function update_inv_hess_aux(cone::EpiNormInf)
     cone.inv_hess_aux_updated = true
 end
 
-# function update_inv_hess(cone::EpiNormInf)
-#     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-#     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
-#     d = cone.d
-#     u = cone.point[1]
-#     w = cone.w
-#     zh = cone.zh
-#     zti1 = cone.zti1
-#     zhthi = cone.zhthi
-#     w1 = cone.w1
-#     Hi = cone.inv_hess.data
-#
-#     @. w1 = w * cone.u2ti
-#     rtzti1 = sqrt(zti1)
-#     urtzti1 = u / rtzti1
-#
-#     Hi[1, 1] = abs2(urtzti1)
-#
-#     @views Hiuw = Hi[1, 2:end]
-#     vec_copyto!(Hiuw, w1)
-#     Hiuw ./= rtzti1
-#     @views mul!(Hi[2:end, 2:end], Hiuw, Hiuw')
-#     Hiuw .*= urtzti1
-#
-#     @inbounds for i in 1:d
-#         zh_i = zh[i]
-#         if cone.is_complex
-#             w_i = w[i]
-#             (wr, wi) = reim(w_i)
-#             (wzir, wzii) = reim(w_i / zh_i)
-#             Hrere = wr * wzir + 1
-#             Himim = wi * wzii + 1
-#             Hreim = wr * wzii
-#             zdi = zh_i / (Hrere * Himim - abs2(Hreim))
-#
-#             k = 2 * i
-#             k1 = k + 1
-#             Hi[k, k] += Himim * zdi
-#             Hi[k1, k1] += Hrere * zdi
-#             Hi[k, k1] -= Hreim * zdi
-#         else
-#             k = 1 + i
-#             Hi[k, k] += zh_i * zhthi[i]
-#         end
-#     end
-#
-#     cone.inv_hess_updated = true
-#     return cone.inv_hess
-# end
+function update_inv_hess(cone::EpiNormInf)
+    cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
+    isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
+    d = cone.d
+    u = cone.point[1]
+    w = cone.w
+    mu = cone.mu
+    zeta = cone.zeta
+    umz = cone.umz
+    Zu = cone.Zu
+    w1 = cone.w1
+    tzi = cone.s1
+    g = cone.grad
+    Hi = cone.inv_hess.data
+
+    hiuu = Hi[1, 1] = u / Zu
+
+    @. w1 = w / umz
+
+    @views Hiuw = Hi[1, 2:end]
+    @views Hiuw2 = Hi[2:end, 1]
+    vec_copyto!(Hiuw2, w1)
+    @. Hiuw = Hiuw2 * hiuu
+    @views mul!(Hi[2:end, 2:end], Hiuw, Hiuw2')
+
+    ui = inv(u)
+    @. tzi = inv(zeta) - ui
+
+    if cone.is_complex
+        @inbounds for i in 1:d
+            z_i = zeta[i]
+            (mur, mui) = reim(mu[i])
+            mzii = g[2i + 1]
+            Hrr = mur * g[2i] + ui
+            Hii = mui * mzii + ui
+            Hri = mur * mzii
+            zdi = z_i / (Hrr * Hii - abs2(Hri))
+            k = 2 * i
+            k1 = k + 1
+            Hi[k, k] += Hii * zdi
+            Hi[k1, k1] += Hrr * zdi
+            Hi[k, k1] -= Hri * zdi
+        end
+    else
+        @inbounds for i in 1:d
+            k = 1 + i
+            Hi[k, k] += zeta[i] / tzi[i]
+        end
+    end
+
+    cone.inv_hess_updated = true
+    return cone.inv_hess
+end
 
 function inv_hess_prod!(
     prod::AbstractVecOrMat,
@@ -357,10 +365,35 @@ function inv_hess_prod!(
     return prod
 end
 
-function dder3(cone::EpiNormInf{T}, dir::AbstractVector{T}) where T
+function dder3(cone::EpiNormInf{T, T}, dir::AbstractVector{T}) where T
     @assert cone.grad_updated
     u = cone.point[1]
-    w = cone.w
+    mu = cone.mu
+    zeta = cone.zeta
+    rui = cone.w1
+    s1 = cone.s1
+    s2 = cone.s2
+    dder3 = cone.dder3
+
+    p = dir[1]
+    @views r = dir[2:end]
+
+    pui = p / u
+    @. rui = r / u
+    @. s1 = (p - mu * r) / zeta
+    @. s2 = 0.5 * (p * pui - rui * r) / zeta - abs2(s1)
+
+    @inbounds c1 = sum((s1[i] * pui + s2[i]) / zeta[i] for i in 1:cone.d)
+    dder3[1] = -c1 - cone.cu * abs2(pui)
+
+    @. dder3[2:end] = (s1 * rui + s2 * mu) / zeta
+
+    return dder3
+end
+
+function dder3(cone::EpiNormInf{T, Complex{T}}, dir::AbstractVector{T}) where T
+    @assert cone.grad_updated
+    u = cone.point[1]
     mu = cone.mu
     zeta = cone.zeta
     rui = cone.w1
