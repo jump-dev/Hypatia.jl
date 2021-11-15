@@ -111,13 +111,18 @@ function set_initial_point!(
 end
 
 function update_feas(cone::EpiNormSpectral{T}) where {T <: Real}
-    # TODO speed up using norm bounds, cholesky of Z?
     @assert !cone.feas_updated
     u = cone.point[1]
 
     if u > eps(T)
-        @views vec_copyto!(cone.w1, cone.point[2:end])
-        cone.W_svd = svd(cone.w1, full = false) # TODO in place
+        W = @views vec_copyto!(cone.w1, cone.point[2:end])
+        # Frobenius norm upper bounds spectral norm
+        if !(u - norm(W, 2) > eps(T))
+            # might be feasible or infeasible
+            # TODO use other bounds and chol of Z here
+            # TODO only do svd below if feas
+        end
+        cone.W_svd = svd(W, full = false) # TODO in place
         cone.is_feas = (u - maximum(cone.W_svd.S) > eps(T))
     else
         cone.is_feas = false
@@ -128,11 +133,16 @@ function update_feas(cone::EpiNormSpectral{T}) where {T <: Real}
 end
 
 function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: Real}
-    # TODO speed up using norm bound, sum sqrt eigvals of WW'?
     u = cone.dual_point[1]
     if u > eps(T)
         W = @views vec_copyto!(cone.w1, cone.dual_point[2:end])
-        return (u - sum(svdvals!(W)) > eps(T))
+        # Frobenius norm lower bounds nuclear norm
+        (u - norm(W, 2) > eps(T)) || return false
+        # nuclear norm is trace of sqrt of W*W' (rescale by inv(u))
+        lmul!(inv(sqrt(u)), W)
+        WWui = mul!(cone.U1, W, W')
+        λ = eigvals!(Hermitian(WWui, :U))
+        return (sqrt(u) - sum(sqrt(abs(λ_i)) for λ_i in λ) > eps(T))
     end
     return false
 end
