@@ -140,36 +140,29 @@ function test_barrier(
 
     TFD_point = TFD.(point)
 
-    # fd_grad = ForwardDiff.gradient(barrier, TFD_point)
-    # @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
+    fd_grad = ForwardDiff.gradient(barrier, TFD_point)
+    @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
 
-Cones.grad(cone)
+    dir = 10 * randn(T, dim)
+    TFD_dir = TFD.(dir)
 
-h = Cones.hess(cone)
-println()
-fdh = ForwardDiff.hessian(barrier, TFD_point)
-println()
-@test h ≈ fdh atol=tol rtol=tol
-    # dir = 10 * randn(T, dim)
-    # TFD_dir = TFD.(dir)
-    #
-    # barrier_dir(s, t) = barrier(s + t * TFD_dir)
-    #
-    # fd_hess_dir = ForwardDiff.gradient(s -> ForwardDiff.derivative(t ->
-    #     barrier_dir(s, t), 0), TFD_point)
-    #
-    # @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
-    # @test Cones.inv_hess(cone) * fd_hess_dir ≈ dir atol=tol rtol=tol
-    # prod_vec = zero(dir)
-    # @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
-    # @test Cones.inv_hess_prod!(prod_vec, fd_hess_dir, cone) ≈ dir atol=tol rtol=tol
-    #
-    # if Cones.use_dder3(cone)
-    #     fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s ->
-    #         ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), TFD_point)
-    #
-    #     @test -2 * Cones.dder3(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
-    # end
+    barrier_dir(s, t) = barrier(s + t * TFD_dir)
+
+    fd_hess_dir = ForwardDiff.gradient(s -> ForwardDiff.derivative(t ->
+        barrier_dir(s, t), 0), TFD_point)
+
+    @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
+    @test Cones.inv_hess(cone) * fd_hess_dir ≈ dir atol=tol rtol=tol
+    prod_vec = zero(dir)
+    @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
+    @test Cones.inv_hess_prod!(prod_vec, fd_hess_dir, cone) ≈ dir atol=tol rtol=tol
+
+    if Cones.use_dder3(cone)
+        fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s ->
+            ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), TFD_point)
+
+        @test -2 * Cones.dder3(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
+    end
 
     return
 end
@@ -211,9 +204,9 @@ function show_time_alloc(
 
     println("grad")
     @time Cones.grad(cone)
-    println("hess")
+    println("hess (with allocate)")
     @time Cones.hess(cone)
-    println("inv_hess")
+    println("inv_hess (with allocate)")
     @time Cones.inv_hess(cone)
 
     point1 = randn(T, dim)
@@ -527,7 +520,7 @@ function test_barrier(C::Type{Cones.EpiNormSpectral{T, R}}) where {T, R}
     test_barrier(C(dr, ds), barrier)
 end
 
-show_time_alloc(C::Type{<:Cones.EpiNormSpectral}) = show_time_alloc(C(2, 2))
+show_time_alloc(C::Type{<:Cones.EpiNormSpectral}) = show_time_alloc(C(2, 3))
 
 
 # MatrixEpiPerSquare

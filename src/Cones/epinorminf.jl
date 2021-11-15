@@ -31,7 +31,8 @@ mutable struct EpiNormInf{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     zeta::Vector{T}
     cu::T
     Zu::T
-    umz::Vector{T}
+    wumzi::Vector{R}
+    zti::Vector{T}
 
     s1::Vector{T}
     s2::Vector{T}
@@ -65,12 +66,14 @@ function setup_extra_data!(
     cone.w = zeros(R, d)
     cone.mu = zeros(R, d)
     cone.zeta = zeros(T, d)
-    cone.umz = zeros(T, d)
+    cone.wumzi = zeros(R, d)
     cone.s1 = zeros(T, d)
     cone.s2 = zeros(T, d)
     cone.w1 = zeros(R, d)
     if cone.is_complex
         cone.w2 = zeros(R, d)
+    else
+        cone.zti = zeros(T, d)
     end
     return cone
 end
@@ -149,7 +152,6 @@ function update_hess(cone::EpiNormInf)
     isdefined(cone, :hess) || alloc_hess!(cone)
     d = cone.d
     u = cone.point[1]
-    mu = cone.mu
     zeta = cone.zeta
     tzi2 = cone.s1
     g = cone.grad
@@ -163,7 +165,7 @@ function update_hess(cone::EpiNormInf)
     if cone.is_complex
         @inbounds for i in 1:d
             z_i = zeta[i]
-            (mur, mui) = reim(mu[i])
+            (mur, mui) = reim(cone.mu[i])
             mzir = g[2i]
             mzii = g[2i + 1]
             Hnz[k] = -mzir / z_i
@@ -203,7 +205,7 @@ function hess_prod!(
         pui = p / u
         @. s1 = (p - mu * r) / zeta
 
-        prod[1, j] = -sum((pui - s1[i]) / zeta[i] for i in 1:cone.d) -
+        prod[1, j] = sum((s1[i] - pui) / zeta[i] for i in 1:cone.d) -
             cone.cu * pui
 
         @. prod[2:end, j] = (r / u - s1 * mu) / zeta
@@ -232,7 +234,7 @@ function hess_prod!(
         pui = p / u
         @. s1 = (p - remul(mu, r)) / zeta
 
-        prod[1, j] = -sum((pui - s1[i]) / zeta[i] for i in 1:cone.d) -
+        prod[1, j] = sum((s1[i] - pui) / zeta[i] for i in 1:cone.d) -
             cone.cu * pui
 
         @. w2 = (r / u - s1 * mu) / zeta
@@ -246,10 +248,18 @@ function update_inv_hess_aux(cone::EpiNormInf)
     @assert !cone.inv_hess_aux_updated
     @assert cone.grad_updated
     u = cone.point[1]
-    umz = cone.umz
+    w = cone.w
+    wumzi = cone.wumzi
+    umz = cone.s1
 
     @. umz = u - cone.zeta
-    @inbounds cone.Zu = -cone.cu + sum(inv, umz)
+    cone.Zu = -cone.cu + sum(inv, umz)
+
+    @. wumzi = w / umz
+
+    if !cone.is_complex
+        @. cone.zti = u - wumzi * w
+    end
 
     cone.inv_hess_aux_updated = true
 end
@@ -260,47 +270,33 @@ function update_inv_hess(cone::EpiNormInf)
     d = cone.d
     u = cone.point[1]
     w = cone.w
-    mu = cone.mu
     zeta = cone.zeta
-    umz = cone.umz
-    Zu = cone.Zu
-    w1 = cone.w1
-    tzi = cone.s1
-    g = cone.grad
+    wumzi = cone.wumzi
     Hi = cone.inv_hess.data
 
-    hiuu = Hi[1, 1] = u / Zu
-
-    @. w1 = w / umz
+    hiuu = Hi[1, 1] = u / cone.Zu
 
     @views Hiuw = Hi[1, 2:end]
     @views Hiuw2 = Hi[2:end, 1]
-    vec_copyto!(Hiuw2, w1)
+    vec_copyto!(Hiuw2, wumzi)
     @. Hiuw = Hiuw2 * hiuu
-    @views mul!(Hi[2:end, 2:end], Hiuw, Hiuw2')
-
-    ui = inv(u)
-    @. tzi = inv(zeta) - ui
+    @views mul!(Hi[2:end, 2:end], Hiuw2, Hiuw')
 
     if cone.is_complex
         @inbounds for i in 1:d
             z_i = zeta[i]
-            (mur, mui) = reim(mu[i])
-            mzii = g[2i + 1]
-            Hrr = mur * g[2i] + ui
-            Hii = mui * mzii + ui
-            Hri = mur * mzii
-            zdi = z_i / (Hrr * Hii - abs2(Hri))
+            (wr, wi) = reim(w[i])
+            (wumzir, wumzii) = reim(wumzi[i])
             k = 2 * i
             k1 = k + 1
-            Hi[k, k] += Hii * zdi
-            Hi[k1, k1] += Hrr * zdi
-            Hi[k, k1] -= Hri * zdi
+            Hi[k, k] += z_i * (u - wumzir * wr)
+            Hi[k1, k1] += z_i * (u - wumzii * wi)
+            Hi[k, k1] -= z_i * wumzir * wi
         end
     else
         @inbounds for i in 1:d
             k = 1 + i
-            Hi[k, k] += zeta[i] / tzi[i]
+            Hi[k, k] += zeta[i] * cone.zti[i]
         end
     end
 
@@ -315,21 +311,16 @@ function inv_hess_prod!(
     ) where T
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     u = cone.point[1]
-    w = cone.w
-    zeta = cone.zeta
-    umz = cone.umz
-    s1 = cone.s1
+    wumzi = cone.wumzi
 
     @inbounds for j in 1:size(prod, 2)
         p = arr[1, j]
         @views r = arr[2:end, j]
 
-        @. s1 = w * r / umz
-
-        c1 = u * (p + sum(s1)) / cone.Zu
+        c1 = u * (p + dot(wumzi, r)) / cone.Zu
         prod[1, j] = c1
 
-        @. prod[2:end, j] = c1 / umz * w + zeta * (u * r - s1 * w)
+        @. prod[2:end, j] = c1 * wumzi + cone.zeta * r * cone.zti
     end
 
     return prod
@@ -343,22 +334,21 @@ function inv_hess_prod!(
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     u = cone.point[1]
     w = cone.w
-    zeta = cone.zeta
-    umz = cone.umz
+    wumzi = cone.wumzi
+    s1 = cone.s1
     r = cone.w1
     w2 = cone.w2
-    s1 = cone.s1
 
     @inbounds for j in 1:size(prod, 2)
         p = arr[1, j]
         @views vec_copyto!(r, arr[2:end, j])
 
-        @. s1 = remul(w, r) / umz
+        @. s1 = remul(wumzi, r)
 
         c1 = u * (p + sum(s1)) / cone.Zu
         prod[1, j] = c1
 
-        @. w2 = c1 / umz * w + zeta * (u * r - s1 * w)
+        @. w2 = c1 * wumzi + cone.zeta * (u * r - s1 * w)
         @views vec_copyto!(prod[2:end, j], w2)
     end
 
