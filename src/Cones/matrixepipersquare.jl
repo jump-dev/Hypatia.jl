@@ -395,34 +395,3 @@ function dder3(cone::MatrixEpiPerSquare, dir::AbstractVector)
 
     return dder3
 end
-
-# compute an element of the real spectral Kronecker in-place
-function spectral_kron_element!(
-    skr::AbstractMatrix{T},
-    i::Int,
-    j::Int,
-    a::T,
-    b::T,
-    ) where {T <: Real}
-    @inbounds skr[i, j] = a + b
-    return skr
-end
-
-# compute an element of the complex spectral Kronecker in-place
-function spectral_kron_element!(
-    skr::AbstractMatrix{T},
-    i::Int,
-    j::Int,
-    a::Complex{T},
-    b::Complex{T},
-    ) where {T <: Real}
-    apb = a + b
-    amb = a - b
-    @inbounds begin
-        skr[i, j] = real(apb)
-        skr[i + 1, j] = -imag(amb)
-        skr[i, j + 1] = imag(apb)
-        skr[i + 1, j + 1] = real(amb)
-    end
-    return skr
-end
