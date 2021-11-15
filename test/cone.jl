@@ -46,17 +46,20 @@ function test_oracles(
     @test Cones.get_proxsqr(cone, one(T), true) <= 1 # max proximity
     @test Cones.get_proxsqr(cone, one(T), false) <= dim # sum proximity
 
-    prod_vec = zero(point)
-    @test Cones.hess_prod!(prod_vec, point, cone) ≈ dual_point atol=tol rtol=tol
-
     # test centrality of initial point
     if isfinite(init_tol)
         @test point ≈ dual_point atol=init_tol rtol=init_tol
     end
     init_only && return
 
+    # test at initial point
+    prod_vec = zero(point)
     hess = Cones.hess(cone)
+    @test hess * point ≈ dual_point atol=tol rtol=tol
+    @test Cones.hess_prod!(prod_vec, point, cone) ≈ dual_point atol=tol rtol=tol
     inv_hess = Cones.inv_hess(cone)
+    @test inv_hess * dual_point ≈ point atol=tol rtol=tol
+    @test Cones.inv_hess_prod!(prod_vec, dual_point, cone) ≈ point atol=tol rtol=tol
     @test hess * inv_hess ≈ I atol=tol rtol=tol
 
     # perturb and scale the initial point
