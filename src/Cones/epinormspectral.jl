@@ -209,7 +209,7 @@ function update_hess(cone::EpiNormSpectral{T, R}) where {T, R}
     Zi = mul!(U1, Urzi, Urzi')
     ZiW = mul!(w1, Urzi, mrziVt)
     WZiWI = mul!(cone.VVt, mrziVt', mrziVt, T(0.5), false)
-    for i in 1:d2
+    @inbounds for i in 1:d2
         WZiWI[i, i] += ui
     end
 
