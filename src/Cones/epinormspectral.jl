@@ -116,8 +116,16 @@ function update_feas(cone::EpiNormSpectral{T}) where {T <: Real}
 
     if u > eps(T)
         W = @views vec_copyto!(cone.w1, cone.point[2:end])
+
+        # TODO bounds
+        frob = norm(W, 2)
+        op1 = opnorm(W, 1)
+        opinf = opnorm(W, Inf)
+        elmax = maximum(abs, W)
+
+
         # Frobenius norm upper bounds spectral norm
-        if !(u - norm(W, 2) > eps(T))
+        if !(u - frob > eps(T))
             # might be feasible or infeasible
             # TODO use other bounds and chol of Z here
             # TODO only do svd below if feas
@@ -134,17 +142,20 @@ end
 
 function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: Real}
     u = cone.dual_point[1]
-    if u > eps(T)
-        W = @views vec_copyto!(cone.w1, cone.dual_point[2:end])
-        # Frobenius norm lower bounds nuclear norm
-        (u - norm(W, 2) > eps(T)) || return false
-        # nuclear norm is trace of sqrt of W*W' (rescale by inv(u))
-        lmul!(inv(sqrt(u)), W)
-        WWui = mul!(cone.U1, W, W')
-        λ = eigvals!(Hermitian(WWui, :U))
-        return (sqrt(u) - sum(sqrt(abs(λ_i)) for λ_i in λ) > eps(T))
-    end
-    return false
+    (u > eps(T)) || return false
+    W = @views vec_copyto!(cone.w1, cone.dual_point[2:end])
+
+    # frob <= nuc <= sqrt(d1) * frob
+    frob = norm(W, 2)
+    (u - sqrt(cone.d1) * frob > eps(T)) && return true
+    (u - frob > eps(T)) || return false
+
+    # nuc = tr(sqrt(W*W')), but rescale by W*W' by inv(u) for numerics
+    rtu = sqrt(u)
+    W ./= rtu
+    WWui = mul!(cone.U1, W, W')
+    λ = eigvals!(Hermitian(WWui, :U))
+    return (rtu - sum(sqrt(abs(λ_i)) for λ_i in λ) > eps(T))
 end
 
 function update_grad(cone::EpiNormSpectral{T}) where T
