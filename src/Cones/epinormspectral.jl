@@ -113,30 +113,44 @@ end
 function update_feas(cone::EpiNormSpectral{T}) where {T <: Real}
     @assert !cone.feas_updated
     u = cone.point[1]
+    cone.feas_updated = true
+    cone.is_feas = false
+    (u > eps(T)) || return false
+    W = @views vec_copyto!(cone.w1, cone.point[2:end])
 
-    if u > eps(T)
-        W = @views vec_copyto!(cone.w1, cone.point[2:end])
+    # fast bounds:
+    # spec <= frob <= spec * rtd1
+    # opinf / rtd2 <= spec <= opinf * rtd1
+    # op1 / rtd1 <= spec <= op1 * rtd2
+    # spec <= sqrt(op1 * opinf)
+    frob = norm(W, 2)
+    op1 = opnorm(W, 1)
+    opinf = opnorm(W, Inf)
+    rtd1 = sqrt(cone.d1)
+    rtd2 = sqrt(cone.d2)
 
-        # TODO bounds
-        frob = norm(W, 2)
-        op1 = opnorm(W, 1)
-        opinf = opnorm(W, Inf)
-        elmax = maximum(abs, W)
+    # lower bounds
+    lb = max(frob / rtd1, opinf / rtd2, op1 / rtd1)
+    (u - lb > eps(T)) || return false
 
-
-        # Frobenius norm upper bounds spectral norm
-        if !(u - frob > eps(T))
-            # might be feasible or infeasible
-            # TODO use other bounds and chol of Z here
-            # TODO only do svd below if feas
+    # upper bounds
+    ub = min(frob, opinf * rtd1, op1 * rtd2, sqrt(op1 * opinf))
+    if u - ub < eps(T)
+        # use fast Cholesky-based feasibility check, rescale W*W' by inv(u)
+        rtu = sqrt(u)
+        Wrui = cone.w2
+        @. Wrui = W / rtu
+        Z = mul!(cone.U1, Wrui, Wrui', -1, false)
+        @inbounds for i in 1:cone.d1
+            Z[i, i] += u
         end
-        cone.W_svd = svd(W, full = false) # TODO in place
-        cone.is_feas = (u - maximum(cone.W_svd.S) > eps(T))
-    else
-        cone.is_feas = false
+        isposdef(cholesky!(Hermitian(Z, :U), check = false)) || return false
     end
 
-    cone.feas_updated = true
+    # compute SVD and final feasibility check
+    cone.W_svd = svd(W, full = false) # TODO in place
+    cone.is_feas = (u - maximum(cone.W_svd.S) > eps(T))
+
     return cone.is_feas
 end
 
@@ -145,12 +159,12 @@ function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: Real}
     (u > eps(T)) || return false
     W = @views vec_copyto!(cone.w1, cone.dual_point[2:end])
 
-    # frob <= nuc <= sqrt(d1) * frob
+    # fast bounds: frob <= nuc <= frob * rtd1
     frob = norm(W, 2)
     (u - sqrt(cone.d1) * frob > eps(T)) && return true
     (u - frob > eps(T)) || return false
 
-    # nuc = tr(sqrt(W*W')), but rescale by W*W' by inv(u) for numerics
+    # nuc = tr(sqrt(W*W')), rescale W*W' by inv(u)
     rtu = sqrt(u)
     W ./= rtu
     WWui = mul!(cone.U1, W, W')
