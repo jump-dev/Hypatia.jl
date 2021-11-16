@@ -126,8 +126,8 @@ function update_feas(cone::EpiNormSpectral{T}) where {T <: Real}
     frob = norm(W, 2)
     op1 = opnorm(W, 1)
     opinf = opnorm(W, Inf)
-    rtd1 = sqrt(cone.d1)
-    rtd2 = sqrt(cone.d2)
+    rtd1 = sqrt(T(cone.d1))
+    rtd2 = sqrt(T(cone.d2))
 
     # lower bounds
     lb = max(frob / rtd1, opinf / rtd2, op1 / rtd1)
@@ -161,7 +161,7 @@ function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: Real}
 
     # fast bounds: frob <= nuc <= frob * rtd1
     frob = norm(W, 2)
-    (u - sqrt(cone.d1) * frob > eps(T)) && return true
+    (u - sqrt(T(cone.d1)) * frob > eps(T)) && return true
     (u - frob > eps(T)) || return false
 
     # nuc = tr(sqrt(W*W')), rescale W*W' by inv(u)
