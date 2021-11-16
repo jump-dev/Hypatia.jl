@@ -263,7 +263,7 @@ function update_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
 
     # Hww
     @views Hww = H[3:end, 3:end]
-    eig_dot_kron!(Hww, cache.θ, viw_X, w1, w2, cache.w3, cache.w4, rt2)
+    eig_dot_kron!(Hww, cache.θ, viw_X, w1, w2, cache.w3, rt2)
     mul!(Hww, Hwu, Hwu', true, true)
 
     cone.hess_updated = true
@@ -374,7 +374,7 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where T
     # Hiww
     @views Hiww = Hi[3:end, 3:end]
     @. wT = inv(cache.θ)
-    eig_dot_kron!(Hiww, wT, viw_X, w1, w2, cache.w3, cache.w4, rt2)
+    eig_dot_kron!(Hiww, wT, viw_X, w1, w2, cache.w3, rt2)
     mul!(Hiww, γ_vec, γ_vec', inv(k3), true)
 
     cone.inv_hess_updated = true
