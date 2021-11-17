@@ -52,7 +52,7 @@ mutable struct EpiNormSpectralTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     s2::Vector{T}
 
     function EpiNormSpectralTri{T, R}(
-        dim::Int,
+        dim::Int;
         use_dual::Bool = false,
         ) where {T <: Real, R <: RealOrComplex{T}}
         @assert dim >= 2
