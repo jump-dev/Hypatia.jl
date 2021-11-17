@@ -351,6 +351,8 @@ function symm_kron!(
     return skr
 end
 
+# compute a real symmetric Kronecker-like outer product of a real or complex
+# matrix of eigenvectors and a real symmetric matrix
 function eig_dot_kron!(
     skr::AbstractMatrix{T},
     inner::Matrix{T},
