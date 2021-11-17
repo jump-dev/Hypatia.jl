@@ -2,8 +2,8 @@
 insts = OrderedDict()
 insts["minimal"] = [
     # nonsymmetric:
-    ((false, false, false, 2, 3, 0.5),),
-    ((false, false, false, 2, 3, 0.5), :ExpPSD),
+    ((false, false, false, 3, 3, 0.8),),
+    ((false, false, false, 3, 3, 0.8), :ExpPSD),
     ((true, false, false, 2, 4, 0.7),),
     ((true, false, false, 2, 4, 0.7), :SOCExpPSD),
     # symmetric:
