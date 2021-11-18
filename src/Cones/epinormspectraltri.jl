@@ -104,26 +104,54 @@ end
 function update_feas(cone::EpiNormSpectralTri{T}) where {T <: Real}
     @assert !cone.feas_updated
     u = cone.point[1]
+    cone.feas_updated = true
+    cone.is_feas = false
+    (u > eps(T)) || return false
+    @views W = svec_to_smat!(cone.V, cone.point[2:end], cone.rt2)
+    copytri!(W, 'U', true)
 
-    if u > eps(T)
-        @views svec_to_smat!(cone.V, cone.point[2:end], cone.rt2)
-        cone.s = update_eigen!(cone.V)
-        cone.is_feas = (u - maximum(abs, cone.s) > eps(T))
-    else
-        cone.is_feas = false
+    # fast bounds (note opinf = op1):
+    # spec <= frob <= spec * rtd
+    # op1 / rtd <= spec <= op1
+    frob = norm(W, 2)
+    op1 = opnorm(W, 1)
+    rtd = sqrt(T(cone.d))
+
+    # lower bounds
+    lb = max(frob, op1) / rtd
+    (u - lb > eps(T)) || return false
+
+    # upper bounds
+    ub = min(frob, op1)
+    if u - ub < eps(T)
+        # use fast Cholesky-based feasibility check, rescale W*W' by inv(u)
+        Z = mul!(cone.w1, W, W', -inv(u), false)
+        @inbounds for i in 1:cone.d
+            Z[i, i] += u
+        end
+        isposdef(cholesky!(Hermitian(Z, :U), check = false)) || return false
     end
 
-    cone.feas_updated = true
+    # compute eigendecomposition and final feasibility check
+    cone.s = update_eigen!(cone.V)
+    cone.is_feas = (u - maximum(abs, cone.s) > eps(T))
+
     return cone.is_feas
 end
 
 function is_dual_feas(cone::EpiNormSpectralTri{T}) where {T <: Real}
     u = cone.dual_point[1]
-    if u > eps(T)
-        W = @views svec_to_smat!(cone.w1, cone.dual_point[2:end], cone.rt2)
-        return (u - sum(abs, eigvals!(Hermitian(W, :U))) > eps(T))
-    end
-    return false
+    (u > eps(T)) || return false
+    @views W = svec_to_smat!(cone.w1, cone.dual_point[2:end], cone.rt2)
+    copytri!(W, 'U', true)
+
+    # fast bounds: frob <= nuc <= frob * rtd
+    frob = norm(W, 2)
+    (u - sqrt(T(cone.d)) * frob > eps(T)) && return true
+    (u - frob > eps(T)) || return false
+
+    # final feasibility check
+    return (u - sum(abs, eigvals!(Hermitian(W, :U))) > eps(T))
 end
 
 function update_grad(cone::EpiNormSpectralTri{T}) where T
