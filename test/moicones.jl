@@ -228,6 +228,18 @@ function test_moi_cones(T::Type{<:Real})
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 4
     end
 
+    @testset "EpiNormSpectralTri" begin
+        moi_cone = Hypatia.EpiNormSpectralTriCone{T, T}(4)
+        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa Cones.EpiNormSpectralTri{T, T}
+        @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 4
+
+        moi_cone = Hypatia.EpiNormSpectralTriCone{T, Complex{T}}(5)
+        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa Cones.EpiNormSpectralTri{T, Complex{T}}
+        @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 5
+    end
+
     @testset "EpiNormSpectral" begin
         moi_cone = Hypatia.EpiNormSpectralCone{T, T}(2, 3)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)

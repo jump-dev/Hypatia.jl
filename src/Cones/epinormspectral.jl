@@ -346,10 +346,9 @@ function update_inv_hess(cone::EpiNormSpectral)
     d2 = cone.d2
     u = cone.point[1]
     U = cone.U
-    zeta = cone.zeta
-    umzdd = cone.umzdd
     Uz = cone.Uz
     sVt = cone.sVt
+    umzdd = cone.umzdd
     s1 = cone.s1
     w1 = cone.w1
     w2 = cone.w2

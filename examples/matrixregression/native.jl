@@ -284,9 +284,9 @@ function test_extra(
     @views Cones.vec_copyto!(A_opt, solution.x[1 .+ (1:A_len)])
     loss = (sum(abs2, X * A_opt) / 2 - real(dot(X' * Y, A_opt))) / size(Y, 1)
     obj_result = loss +
-        inst.lam_fro * norm(vec(A_opt), 2) +
+        inst.lam_fro * norm(A_opt, 2) +
         inst.lam_nuc * sum(svd(A_opt).S) +
-        inst.lam_las * norm(vec(A_opt), 1) +
+        inst.lam_las * norm(A_opt, 1) +
         inst.lam_glr * sum(norm, eachrow(A_opt)) +
         inst.lam_glc * sum(norm, eachcol(A_opt))
     tol = eps(T)^0.25

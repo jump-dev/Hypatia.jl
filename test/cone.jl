@@ -506,6 +506,27 @@ end
 show_time_alloc(C::Type{<:Cones.EpiPerSquare}) = show_time_alloc(C(9))
 
 
+# EpiNormSpectralTri
+function test_oracles(C::Type{Cones.EpiNormSpectralTri{T, R}}) where {T, R}
+   for d in [1, 2, 3, 5]
+       test_oracles(C(1 + Cones.svec_length(R, d)))
+   end
+end
+
+function test_barrier(C::Type{Cones.EpiNormSpectralTri{T, R}}) where {T, R}
+   d = 3
+   function barrier(s)
+       u = s[1]
+       W = Hermitian(new_herm(s[2:end], d, R), :U)
+       return -logdet_pd(Hermitian(abs2(u) * I - W * W')) + (d - 1) * log(u)
+   end
+   test_barrier(C(1 + Cones.svec_length(R, d)), barrier)
+end
+
+show_time_alloc(C::Type{Cones.EpiNormSpectralTri{T, R}}) where {T, R} =
+   show_time_alloc(C(1 + Cones.svec_length(R, 4)))
+
+
 # EpiNormSpectral
 function test_oracles(C::Type{<:Cones.EpiNormSpectral})
     for (dr, ds) in [(1, 1), (1, 2), (2, 2), (2, 4), (3, 4)]

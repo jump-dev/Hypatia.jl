@@ -59,7 +59,6 @@ mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
     mat::Matrix{T}
     mat2::Matrix{T}
     mat3::Matrix{T}
-    mat4::Matrix{T}
     ten3d::Array{T, 3}
     matd2::Matrix{T}
 
@@ -110,7 +109,6 @@ function setup_extra_data!(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     cone.mat = zeros(T, d, d)
     cone.mat2 = zeros(T, d, d)
     cone.mat3 = zeros(T, d, d)
-    cone.mat4 = zeros(T, d, d)
     cone.ten3d = zeros(T, d, d, d)
     cone.matd2 = zeros(T, d^2, d^2)
     return
@@ -226,7 +224,6 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     mat = cone.mat
     mat2 = cone.mat2
     mat3 = cone.mat3
-    mat4 = cone.mat4
     H = cone.hess.data
 
     # u
@@ -249,14 +246,14 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     @. Hvv += zi * d2zdV2
 
     # vw
-    eig_dot_kron!(d2zdVW, Δ2_V, V_vecs, mat, mat2, mat3, mat4, rt2)
+    eig_dot_kron!(d2zdVW, Δ2_V, V_vecs, mat, mat2, mat3, rt2)
     @views Hvw = H[V_idxs, W_idxs]
     @. Hvw = -zi * d2zdVW
     mul!(Hvw, dzdVzi, dzdW', true, true)
 
     # ww
     Δ2!(Δ2_W, W_λ, cone.W_λ_log)
-    eig_dot_kron!(d2zdW2, Δ2_W, W_vecs, mat, mat2, mat3, mat4, rt2)
+    eig_dot_kron!(d2zdW2, Δ2_W, W_vecs, mat, mat2, mat3, rt2)
     @views Hww = H[W_idxs, W_idxs]
     symm_kron!(Hww, cone.Wi, rt2)
     mul!(Hww, dzdW, dzdW', true, true)

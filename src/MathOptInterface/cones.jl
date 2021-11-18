@@ -306,6 +306,27 @@ cone_from_moi(::Type{T}, cone::EpiPerSquareCone{T}) where {T <: Real} =
 """
 $(TYPEDEF)
 
+See [`Cones.EpiNormSpectralTri`](@ref).
+
+$(TYPEDFIELDS)
+"""
+struct EpiNormSpectralTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
+    dim::Int
+    use_dual::Bool
+end
+export EpiNormSpectralTriCone
+
+EpiNormSpectralTriCone{T, R}(dim::Int) where {T <: Real, R <: RealOrComplex{T}} =
+    EpiNormSpectralTriCone{T, R}(dim, false)
+
+MOI.dimension(cone::EpiNormSpectralTriCone) = cone.dim
+
+cone_from_moi(::Type{T}, cone::EpiNormSpectralTriCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
+    Cones.EpiNormSpectralTri{T, R}(cone.dim, use_dual = cone.use_dual)
+
+"""
+$(TYPEDEF)
+
 See [`Cones.EpiNormSpectral`](@ref).
 
 $(TYPEDFIELDS)
@@ -645,6 +666,8 @@ const HypatiaCones{T <: Real} = Union{
     EpiNormInfCone{T, Complex{T}},
     EpiNormEuclCone{T},
     EpiPerSquareCone{T},
+    EpiNormSpectralTriCone{T, T},
+    EpiNormSpectralTriCone{T, Complex{T}},
     EpiNormSpectralCone{T, T},
     EpiNormSpectralCone{T, Complex{T}},
     MatrixEpiPerSquareCone{T, T},

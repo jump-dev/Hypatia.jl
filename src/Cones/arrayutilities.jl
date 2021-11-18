@@ -359,7 +359,6 @@ function eig_dot_kron!(
     vecs::Matrix{R},
     temp1::Matrix{R},
     temp2::Matrix{R},
-    temp3::Matrix{R},
     V::Matrix{R},
     rt2::T,
     ) where {T <: Real, R <: RealOrComplex{T}}
@@ -373,8 +372,8 @@ function eig_dot_kron!(
     col_idx = 1
     @inbounds for (j, V_j) in enumerate(V_views)
         for i in 1:(j - 1), scal in scals
-            mul!(temp3, V_j, V_views[i]', scal, false)
-            @. temp2 = inner * (temp3 + temp3')
+            mul!(temp1, V_j, V_views[i]', scal, false)
+            @. temp2 = inner * (temp1 + temp1')
             mul!(temp1, Hermitian(temp2, :U), V)
             mul!(temp2, V', temp1)
             @views smat_to_svec!(skr[:, col_idx], temp2, rt2)
