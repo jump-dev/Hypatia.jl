@@ -32,18 +32,10 @@ SpecialFunctions = "1.4, 2"
 julia = "1.5"
 
 [extras]
-CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
-DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
-Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DynamicPolynomials = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
-PolyJuMP = "ddf597a6-d67e-5340-b84c-e37d84115374"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
-SemialgebraicSets = "8e049039-38e8-557d-ae3a-bc521ccf6204"
-SumOfSquares = "4b9e565b-77fc-50a5-a571-1244f986bda1"
 
 [targets]
-test = ["CSV", "DataFrames", "DataStructures", "DelimitedFiles", "Distributions", "DynamicPolynomials", "ForwardDiff", "JuMP", "PolyJuMP", "Random", "SemialgebraicSets", "SumOfSquares"]
+test = ["DynamicPolynomials", "ForwardDiff", "JuMP", "Random"]

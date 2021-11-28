@@ -11,7 +11,7 @@ test_files = [
     "cone",
     "native",
     "moi",
-    "examples",
+    # "examples", # CI runs examples separately
     # require optional dependencies:
     # "pardiso",
     # "hsl",

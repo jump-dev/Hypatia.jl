@@ -4,8 +4,7 @@ run examples tests from the examples folder
 
 using Test
 import DataFrames
-include(joinpath(@__DIR__, "../examples/Examples.jl"))
-using Main.Examples
+include(joinpath(@__DIR__, "Examples.jl"))
 import Hypatia
 import Hypatia.Solvers
 
