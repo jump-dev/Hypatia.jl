@@ -1,9 +1,7 @@
-name: Doc Preview Cleanup
-
+name: DocPreviewCleanup
 on:
   pull_request:
     types: [closed]
-
 jobs:
   doc-preview-cleanup:
     runs-on: ubuntu-latest
