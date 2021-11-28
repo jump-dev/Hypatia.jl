@@ -13,6 +13,6 @@ jobs:
         with:
           version: '1'
       - name: Install dependencies
-        run: julia --project=docs -e 'using Pkg; Pkg.instantiate(); Pkg.develop(PackageSpec(path=pwd()))'
+        run: julia --project=examples -e 'using Pkg; Pkg.instantiate(); Pkg.develop(PackageSpec(path=pwd()))'
       - name: Run examples
-        run: julia --project=docs --color=yes examples/runexamplestests.jl
+        run: julia --project=examples --color=yes runexamplestests.jl
