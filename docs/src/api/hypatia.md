@@ -25,6 +25,7 @@ LinMatrixIneqCone
 EpiNormInfCone
 EpiNormEuclCone
 EpiPerSquareCone
+EpiNormSpectralTriCone
 EpiNormSpectralCone
 MatrixEpiPerSquareCone
 GeneralizedPowerCone

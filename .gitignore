@@ -3,6 +3,5 @@ Manifest.toml
 *.jl.cov
 *.jl.*.cov
 *.jl.mem
-deps/deps.jl
 benchmarks/*/analysis/*
 benchmarks/*/raw/*

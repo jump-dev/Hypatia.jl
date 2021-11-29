@@ -20,6 +20,8 @@ function cone_types(T::Type{<:Real})
         Cones.EpiNormInf{T, Complex{T}},
         Cones.EpiNormEucl{T},
         Cones.EpiPerSquare{T},
+        Cones.EpiNormSpectralTri{T, T},
+        Cones.EpiNormSpectralTri{T, Complex{T}},
         Cones.EpiNormSpectral{T, T},
         Cones.EpiNormSpectral{T, Complex{T}},
         Cones.MatrixEpiPerSquare{T, T},
@@ -91,7 +93,7 @@ end
 #     @printf("%8.2e seconds\n", test_time)
 # end
 # end
-
+#
 # println("\nstarting time/allocation measurements")
 # @testset "allocation tests" begin
 # real_types = [

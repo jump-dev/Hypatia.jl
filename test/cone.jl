@@ -46,17 +46,20 @@ function test_oracles(
     @test Cones.get_proxsqr(cone, one(T), true) <= 1 # max proximity
     @test Cones.get_proxsqr(cone, one(T), false) <= dim # sum proximity
 
-    prod_vec = zero(point)
-    @test Cones.hess_prod!(prod_vec, point, cone) ≈ dual_point atol=tol rtol=tol
-
     # test centrality of initial point
     if isfinite(init_tol)
         @test point ≈ dual_point atol=init_tol rtol=init_tol
     end
     init_only && return
 
+    # test at initial point
+    prod_vec = zero(point)
     hess = Cones.hess(cone)
+    @test hess * point ≈ dual_point atol=tol rtol=tol
+    @test Cones.hess_prod!(prod_vec, point, cone) ≈ dual_point atol=tol rtol=tol
     inv_hess = Cones.inv_hess(cone)
+    @test inv_hess * dual_point ≈ point atol=tol rtol=tol
+    @test Cones.inv_hess_prod!(prod_vec, dual_point, cone) ≈ point atol=tol rtol=tol
     @test hess * inv_hess ≈ I atol=tol rtol=tol
 
     # perturb and scale the initial point
@@ -150,13 +153,17 @@ function test_barrier(
 
     fd_hess_dir = ForwardDiff.gradient(s -> ForwardDiff.derivative(t ->
         barrier_dir(s, t), 0), TFD_point)
+
     @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
+    @test Cones.inv_hess(cone) * fd_hess_dir ≈ dir atol=tol rtol=tol
     prod_vec = zero(dir)
     @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
+    @test Cones.inv_hess_prod!(prod_vec, fd_hess_dir, cone) ≈ dir atol=tol rtol=tol
 
     if Cones.use_dder3(cone)
         fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s ->
             ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), TFD_point)
+
         @test -2 * Cones.dder3(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
     end
 
@@ -200,9 +207,9 @@ function show_time_alloc(
 
     println("grad")
     @time Cones.grad(cone)
-    println("hess")
+    println("hess (with allocate)")
     @time Cones.hess(cone)
-    println("inv_hess")
+    println("inv_hess (with allocate)")
     @time Cones.inv_hess(cone)
 
     point1 = randn(T, dim)
@@ -451,7 +458,7 @@ function test_oracles(C::Type{Cones.EpiNormInf{T, R}}) where {T, R}
 end
 
 function test_barrier(C::Type{Cones.EpiNormInf{T, R}}) where {T, R}
-    dw = 2
+    dw = 3
     function barrier(s)
         u = s[1]
         w = new_vec(s[2:end], dw, R)
@@ -499,6 +506,27 @@ end
 show_time_alloc(C::Type{<:Cones.EpiPerSquare}) = show_time_alloc(C(9))
 
 
+# EpiNormSpectralTri
+function test_oracles(C::Type{Cones.EpiNormSpectralTri{T, R}}) where {T, R}
+   for d in [1, 2, 3, 5]
+       test_oracles(C(1 + Cones.svec_length(R, d)))
+   end
+end
+
+function test_barrier(C::Type{Cones.EpiNormSpectralTri{T, R}}) where {T, R}
+   d = 3
+   function barrier(s)
+       u = s[1]
+       W = Hermitian(new_herm(s[2:end], d, R), :U)
+       return -logdet_pd(Hermitian(abs2(u) * I - W * W')) + (d - 1) * log(u)
+   end
+   test_barrier(C(1 + Cones.svec_length(R, d)), barrier)
+end
+
+show_time_alloc(C::Type{Cones.EpiNormSpectralTri{T, R}}) where {T, R} =
+   show_time_alloc(C(1 + Cones.svec_length(R, 4)))
+
+
 # EpiNormSpectral
 function test_oracles(C::Type{<:Cones.EpiNormSpectral})
     for (dr, ds) in [(1, 1), (1, 2), (2, 2), (2, 4), (3, 4)]
@@ -516,7 +544,7 @@ function test_barrier(C::Type{Cones.EpiNormSpectral{T, R}}) where {T, R}
     test_barrier(C(dr, ds), barrier)
 end
 
-show_time_alloc(C::Type{<:Cones.EpiNormSpectral}) = show_time_alloc(C(2, 2))
+show_time_alloc(C::Type{<:Cones.EpiNormSpectral}) = show_time_alloc(C(2, 3))
 
 
 # MatrixEpiPerSquare

@@ -22,11 +22,11 @@ import Hypatia.Cones
 import Hypatia.Models
 import Hypatia.Solvers
 
-include("common.jl")
-include("common_native.jl")
-include("common_JuMP.jl")
+include("model_utils.jl")
+include("native_utils.jl")
+include("JuMP_utils.jl")
 include("spectral_functions_JuMP.jl")
-include("setup.jl")
+include("benchmark_utils.jl")
 
 const model_types = [
     "native",

@@ -1,6 +1,6 @@
 
 matrixcompletion_insts = [
-    [(k, d) for d in vcat(2, 5:5:max_d)] # includes compile run
+    [(false, false, false, d, k * d, 0.8) for d in vcat(2, 5:5:max_d)] # includes compile run
     for (k, max_d) in ((10, 45), (20, 30))
     ]
 

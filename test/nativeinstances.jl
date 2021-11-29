@@ -1036,6 +1036,98 @@ function epipersquare4(T; options...)
         rt2inv3, rt2inv3, -2 * inv3] atol=tol rtol=tol
 end
 
+function epinormspectraltri1(T; options...)
+    tol = test_tol(T)
+    Random.seed!(1)
+    rt2 = sqrt(T(2))
+    Xd = 4
+    for is_complex in (false, true)
+        R = (is_complex ? Complex{T} : T)
+        dim = Cones.svec_length(R, Xd)
+        c = vcat(one(T), zeros(T, dim))
+        A = hcat(zeros(T, dim, 1), Matrix{T}(I, dim, dim))
+        b = rand(T, dim)
+        G = -one(T) * I
+        h = vcat(zero(T), rand(T, dim))
+
+        for use_dual in (false, true)
+            cones = Cone{T}[Cones.EpiNormSpectralTri{T, R}(1 + dim,
+                use_dual = use_dual)]
+
+            r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+            @test r.status == Solvers.Optimal
+
+            S = zeros(R, Xd, Xd)
+            @views Cones.svec_to_smat!(S, r.s[2:end], rt2)
+            prim_eigvals = eigvals(Hermitian(S, :U))
+            Z = zero(S)
+            @views Cones.svec_to_smat!(Z, r.z[2:end], rt2)
+            dual_eigvals = eigvals(Hermitian(Z, :U))
+            if use_dual
+                @test sum(abs, prim_eigvals) ≈ r.s[1] atol=tol rtol=tol
+                @test maximum(abs, dual_eigvals) ≈ r.z[1] atol=tol rtol=tol
+            else
+                @test maximum(abs, prim_eigvals) ≈ r.s[1] atol=tol rtol=tol
+                @test sum(abs, dual_eigvals) ≈ r.z[1] atol=tol rtol=tol
+            end
+        end
+    end
+end
+
+function epinormspectraltri2(T; options...)
+    tol = test_tol(T)
+    Random.seed!(1)
+    rt2 = sqrt(T(2))
+    Xd = 4
+    for is_complex in (false, true)
+        R = (is_complex ? Complex{T} : T)
+        dim = Cones.svec_length(R, Xd)
+        mat = rand(R, Xd, Xd)
+        c = zeros(T, dim)
+        Cones.smat_to_svec!(c, mat, rt2)
+        c .*= -1
+        A = zeros(T, 0, dim)
+        b = T[]
+        G = vcat(zeros(T, 1, dim), Matrix{T}(-I, dim, dim))
+        h = vcat(one(T), zeros(T, dim))
+
+        for use_dual in (false, true)
+            cones = Cone{T}[Cones.EpiNormSpectralTri{T, R}(1 + dim,
+                use_dual = use_dual)]
+            r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+            @test r.status == Solvers.Optimal
+            vals = eigvals(Hermitian(mat, :U))
+            if use_dual
+                @test r.primal_obj ≈ -maximum(abs, vals) atol=tol rtol=tol
+            else
+                @test r.primal_obj ≈ -sum(abs, vals) atol=tol rtol=tol
+            end
+        end
+    end
+end
+
+function epinormspectraltri3(T; options...)
+    tol = test_tol(T)
+    for is_complex in (false, true), Xd in (1, 2, 3, 5)
+        R = (is_complex ? Complex{T} : T)
+        dim = Cones.svec_length(R, Xd)
+        c = fill(-one(T), dim)
+        A = zeros(T, 0, dim)
+        b = T[]
+        G = vcat(zeros(T, 1, dim), Matrix{T}(-I, dim, dim))
+        h = zeros(T, dim + 1)
+
+        for use_dual in (false, true)
+            cones = Cone{T}[Cones.EpiNormSpectralTri{T, R}(1 + dim,
+                use_dual = use_dual)]
+            r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+            @test r.status == Solvers.Optimal
+            @test r.primal_obj ≈ 0 atol=tol rtol=tol
+            @test norm(r.x) ≈ 0 atol=tol rtol=tol
+        end
+    end
+end
+
 function epinormspectral1(T; options...)
     tol = test_tol(T)
     Random.seed!(1)

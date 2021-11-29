@@ -53,6 +53,7 @@ LinMatrixIneq
 EpiNormInf
 EpiNormEucl
 EpiPerSquare
+EpiNormSpectralTri
 EpiNormSpectral
 MatrixEpiPerSquare
 GeneralizedPower
