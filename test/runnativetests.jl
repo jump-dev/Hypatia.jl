@@ -4,7 +4,6 @@ run native instance tests from test/nativeinstances.jl and display basic benchma
 
 using Test
 using Printf
-import DataFrames
 import Hypatia
 import Hypatia.Solvers
 include(joinpath(@__DIR__, "nativeinstances.jl"))
@@ -29,8 +28,6 @@ diff_reals = [
 
 string_nameof(T) = string(nameof(T))
 
-type_name(::T) where T = string_nameof(T)
-
 function test_instance_solver(
     inst_name::String,
     T::Type{<:Real},
@@ -42,26 +39,10 @@ function test_instance_solver(
         println(test_info, " ...")
         solver = Solvers.Solver{T}(; options...)
         test_time = @elapsed eval(Symbol(inst_name))(T, solver = solver)
-        push!(perf, (inst_name, string(T), type_name(solver.stepper),
-            type_name(solver.syssolver), solver.init_use_indirect,
-            solver.preprocess, solver.reduce, test_time,
-            string(Solvers.get_status(solver))))
         @printf("%8.2e seconds\n", test_time)
     end
     return nothing
 end
-
-perf = DataFrames.DataFrame(
-    inst_name = String[],
-    real_T = String[],
-    stepper = String[],
-    syssolver = String[],
-    init_use_indirect = Bool[],
-    preprocess = Bool[],
-    reduce = Bool[],
-    test_time = Float64[],
-    status = String[],
-    )
 
 @testset "native tests" begin
 
@@ -156,8 +137,5 @@ end
     end
 end
 
-# println("\n")
-# DataFrames.show(perf, allrows = true, allcols = true)
-# println("\n")
 end
 ;
