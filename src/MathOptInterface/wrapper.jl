@@ -107,10 +107,8 @@ MOI.supports_constraint(
 # build representation as min c'x s.t. A*x = b, h - G*x in K
 function MOI.copy_to(
     opt::Optimizer{T},
-    src::MOI.ModelLike;
-    copy_names::Bool = false,
+    src::MOI.ModelLike,
     ) where {T <: Real}
-    @assert !copy_names
     idx_map = MOI.Utilities.IndexMap()
 
     # variables
@@ -574,10 +572,7 @@ function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
     return ((opt.obj_sense == MOI.MAX_SENSE) ? -1 : 1) * raw_obj_val
 end
 
-function MOI.get(
-    opt::Optimizer,
-    ::Union{MOI.DualObjectiveValue, MOI.ObjectiveBound},
-    )
+function MOI.get(opt::Optimizer, ::MOI.DualObjectiveValue)
     raw_dual_obj_val = Solvers.get_dual_obj(opt.solver)
     return ((opt.obj_sense == MOI.MAX_SENSE) ? -1 : 1) * raw_dual_obj_val
 end

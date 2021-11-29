@@ -32,7 +32,7 @@ end
         (Float64, Solvers.CombinedStepper, false),
         # (Float64, Solvers.CombinedStepper, true),
         # (Float32, Solvers.CombinedStepper, true),
-        (BigFloat, Solvers.PredOrCentStepper, true),
+        # (BigFloat, Solvers.PredOrCentStepper, true), # TODO re-enable
         ]
     for (T, stepper, use_dense_model) in options
         default_options = (
