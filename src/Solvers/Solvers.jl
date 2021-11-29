@@ -77,6 +77,7 @@ mutable struct Solver{T <: Real}
     init_tol_qr::T
     stepper::Stepper{T}
     syssolver::SystemSolver{T}
+    use_dense_model::Bool # make the model use dense A and G data instead of sparse
 
     # current status of the solver object and info
     status::Status
@@ -178,6 +179,7 @@ mutable struct Solver{T <: Real}
         init_tol_qr::Real = 1000 * eps(T),
         stepper::Stepper{T} = default_stepper(T),
         syssolver::SystemSolver{T} = default_syssolver(T),
+        use_dense_model::Bool = false,
         ) where {T <: Real}
         if isa(syssolver, QRCholSystemSolver{T})
             @assert preprocess # require preprocessing for QRCholSystemSolver # TODO only need primal eq preprocessing or reduction
@@ -234,10 +236,32 @@ mutable struct Solver{T <: Real}
         solver.stepper = stepper
         solver.syssolver = syssolver
         solver.status = NotLoaded
+        solver.use_dense_model = use_dense_model
 
         return solver
     end
 end
+
+# TODO:
+# if !haskey(solver_options, :syssolver)
+#     # choose default system solver based on use_dense_model
+#     sstype = (use_dense_model ? Solvers.QRCholDenseSystemSolver :
+#         Solvers.SymIndefSparseSystemSolver)
+#     solver_options = (solver_options..., syssolver = sstype{T}())
+# end
+# if !haskey(solver_options, :preprocess)
+#     # only preprocess if using dense model # TODO maybe should preprocess if sparse
+#     solver_options = (solver_options..., preprocess = use_dense_model)
+# end
+# if !haskey(solver_options, :reduce)
+#     # only reduce if using dense model
+#     solver_options = (solver_options..., reduce = use_dense_model)
+# end
+# if !haskey(solver_options, :init_use_indirect)
+#     # only use indirect if not using dense model
+#     solver_options = (solver_options...,
+#         init_use_indirect = !use_dense_model)
+# end
 
 default_stepper(T) = CombinedStepper{T}()
 default_syssolver(T) = QRCholDenseSystemSolver{T}()
