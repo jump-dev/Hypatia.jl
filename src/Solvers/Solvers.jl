@@ -162,7 +162,7 @@ mutable struct Solver{T <: Real}
 
     function Solver{T}(;
         verbose::Bool = true,
-        iter_limit::Int = 250,
+        iter_limit::Int = 1000,
         time_limit::Real = Inf,
         tol_rel_opt::RealOrNothing = nothing,
         tol_abs_opt::RealOrNothing = nothing,
