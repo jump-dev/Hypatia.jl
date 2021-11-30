@@ -3,11 +3,9 @@ run MOI tests
 =#
 
 using Test
-using Printf
 import MathOptInterface
 const MOI = MathOptInterface
 import Hypatia
-import Hypatia.Solvers
 include(joinpath(@__DIR__, "moicones.jl"))
 
 @testset "MathOptInterface wrapper tests" begin

@@ -51,11 +51,7 @@ MOI.empty!(opt::Optimizer) = (opt.solver.status = Solvers.NotLoaded)
 
 MOI.supports(
     ::Optimizer{T},
-    ::Union{
-        MOI.ObjectiveSense,
-        MOI.ObjectiveFunction{VI}, # TODO maybe just SAF
-        MOI.ObjectiveFunction{SAF{T}},
-        },
+    ::Union{MOI.ObjectiveSense, MOI.ObjectiveFunction{SAF{T}}},
     ) where {T <: Real} = true
 
 MOI.supports_constraint(
@@ -81,40 +77,39 @@ function MOI.copy_to(
     @assert j == n
     for attr in MOI.get(src, MOI.ListOfVariableAttributesSet())
         if attr == MOI.VariableName() || attr == MOI.VariablePrimalStart()
-            continue  # It's okay to skip these for now.
+            continue
         end
         throw(MOI.UnsupportedAttribute(attr))
     end
+
+    # objective
     opt.obj_sense = MOI.MIN_SENSE
-    Jc, Vc = Int[], T[]
+    (Jc, Vc) = (Int[], T[])
     obj_offset = 0.0
     for attr in MOI.get(src, MOI.ListOfModelAttributesSet())
         if attr == MOI.Name()
-            continue  # It's okay to skip this for now.
+            continue
         elseif attr == MOI.ObjectiveSense()
             opt.obj_sense = MOI.get(src, MOI.ObjectiveSense())
         elseif attr isa MOI.ObjectiveFunction
             F = MOI.get(src, MOI.ObjectiveFunctionType())
-            obj = if F == VI
-                SAF{T}(MOI.get(src, MOI.ObjectiveFunction{F}()))
-            elseif F == SAF{T}
-                MOI.get(src, MOI.ObjectiveFunction{F}())
-            else
+            if F != SAF{T}
                 error("function type $F not supported")
             end
-            for t in obj.terms
-                push!(Jc, idx_map[t.variable].value)
-                push!(Vc, t.coefficient)
-            end
+            obj = MOI.get(src, MOI.ObjectiveFunction{F}())
+            append!(Jc, (idx_map[t.variable].value for t in obj.terms))
+            append!(Vc, (t.coefficient for t in obj.terms))
             obj_offset = obj.constant
-            if opt.obj_sense == MOI.MAX_SENSE
-                Vc .*= -1
-                obj_offset *= -1
-            end
+        else
+            throw(MOI.UnsupportedAttribute(attr))
         end
-        throw(MOI.UnsupportedAttribute(attr))
+    end
+    if opt.obj_sense == MOI.MAX_SENSE
+        Vc .*= -1
+        obj_offset *= -1
     end
     model_c = Vector(sparsevec(Jc, Vc, n))
+
     # constraints
     get_src_cons(F, S) = MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
     get_con_fun(con_idx) = MOI.get(src, MOI.ConstraintFunction(), con_idx)
@@ -196,14 +191,11 @@ function MOI.copy_to(
         if !MOI.supports_constraint(opt, F, S)
             throw(MOI.UnsupportedConstraint{F,S}())
         end
-        for attr in MOI.get(
-            src,
-            MOI.ListOfConstraintAttributesSet{F,S}(),
-        )
+        for attr in MOI.get(src, MOI.ListOfConstraintAttributesSet{F,S}())
             if attr == MOI.ConstraintName() ||
                attr == MOI.ConstraintPrimalStart() ||
-               attr == MOI.ConstraintDualStart() ||
-                continue  # It's okay to skip these for now.
+               attr == MOI.ConstraintDualStart()
+                continue
             end
             throw(MOI.UnsupportedAttribute(attr))
         end
