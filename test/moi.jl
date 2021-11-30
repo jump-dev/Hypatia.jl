@@ -30,7 +30,6 @@ function test_moi(T::Type{<:Real}; solver_options...)
         "test_attribute_SolverVersion",
         # TODO fix:
         "test_model_copy_to_Unsupported",
-        "test_solve_ObjectiveBound_MAX_SENSE_LP",
         "test_unbounded",
         "test_solve_result_index",
     ]
