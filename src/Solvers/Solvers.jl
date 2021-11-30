@@ -162,7 +162,7 @@ mutable struct Solver{T <: Real}
 
     function Solver{T}(;
         verbose::Bool = true,
-        iter_limit::Int = 1000,
+        iter_limit::Int = 250,
         time_limit::Real = Inf,
         tol_rel_opt::RealOrNothing = nothing,
         tol_abs_opt::RealOrNothing = nothing,
@@ -172,14 +172,14 @@ mutable struct Solver{T <: Real}
         default_tol_power::RealOrNothing = nothing,
         default_tol_relax::RealOrNothing = nothing,
         tol_slow::Real = 1e-3,
+        preprocess::Bool = true,
+        reduce::Bool = true,
         rescale::Bool = true,
+        init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
         stepper::Stepper{T} = CombinedStepper{T}(),
         syssolver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         use_dense_model::Bool = (syssolver isa QRCholDenseSystemSolver{T}),
-        preprocess::Bool = use_dense_model,
-        reduce::Bool = use_dense_model,
-        init_use_indirect::Bool = !preprocess,
         ) where {T <: Real}
         if isa(syssolver, QRCholSystemSolver{T})
             @assert preprocess # require preprocessing for QRCholSystemSolver # TODO only need primal eq preprocessing or reduction
