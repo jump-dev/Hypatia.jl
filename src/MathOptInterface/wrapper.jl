@@ -459,18 +459,12 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     # build and solve the model
     model = opt.model
     solver = opt.solver
-
     Solvers.load(solver, model)
     Solvers.solve(solver)
-
-    status = Solvers.get_status(solver)
-    primal_obj = Solvers.get_primal_obj(solver)
-    dual_obj = Solvers.get_dual_obj(solver)
     opt.x = Solvers.get_x(solver)
     opt.y = Solvers.get_y(solver)
     opt.s = Solvers.get_s(solver)
     opt.z = Solvers.get_z(solver)
-
     # transform solution for MOI conventions
     opt.constr_prim_eq += model.b - model.A * opt.x
     opt.s[opt.nonpos_idxs] .*= -1
@@ -488,22 +482,29 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     end
     opt.constr_prim_cone .+= opt.s
     opt.z[opt.interval_idxs] .*= opt.interval_scales
-
     return
 end
 
 MOI.supports(::Optimizer, ::MOI.Silent) = true
-MOI.set(opt::Optimizer, ::MOI.Silent, value::Bool) = (opt.solver.verbose = !value)
+
+function MOI.set(opt::Optimizer, ::MOI.Silent, value::Bool)
+    opt.solver.verbose = !value
+    return
+end
+
 MOI.get(opt::Optimizer, ::MOI.Silent) = !opt.solver.verbose
 
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
-MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Real) =
-    (opt.solver.time_limit = value)
-MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, ::Nothing) =
-    (opt.solver.time_limit = Inf)
+
+function MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Union{Real,Nothing})
+    opt.solver.time_limit = something(value, Inf)
+    return
+end
 
 function MOI.get(opt::Optimizer, ::MOI.TimeLimitSec)
-    isfinite(opt.solver.time_limit) && return opt.solver.time_limit
+    if isfinite(opt.solver.time_limit)
+        return opt.solver.time_limit
+    end
     return
 end
 
@@ -579,13 +580,13 @@ end
 function MOI.get(opt::Optimizer, attr::MOI.ObjectiveValue)
     MOI.check_result_index_bounds(opt, attr)
     raw_obj_val = Solvers.get_primal_obj(opt.solver)
-    return ((opt.obj_sense == MOI.MAX_SENSE) ? -1 : 1) * raw_obj_val
+    return opt.obj_sense == MOI.MAX_SENSE ? -raw_obj_val : raw_obj_val
 end
 
 function MOI.get(opt::Optimizer, attr::MOI.DualObjectiveValue)
     MOI.check_result_index_bounds(opt, attr)
     raw_dual_obj_val = Solvers.get_dual_obj(opt.solver)
-    return ((opt.obj_sense == MOI.MAX_SENSE) ? -1 : 1) * raw_dual_obj_val
+    return opt.obj_sense == MOI.MAX_SENSE ? -raw_dual_obj_val : raw_dual_obj_val
 end
 
 MOI.get(opt::Optimizer, ::MOI.ResultCount) = 1
@@ -597,15 +598,6 @@ function MOI.get(
     )
     MOI.check_result_index_bounds(opt, attr)
     return opt.x[vi.value]
-end
-
-function MOI.get(
-    opt::Optimizer,
-    attr::MOI.VariablePrimal,
-    vi::Vector{MOI.VariableIndex},
-    )
-    MOI.check_result_index_bounds(opt, attr)
-    return MOI.get.(opt, attr, vi)
 end
 
 function MOI.get(
@@ -648,15 +640,6 @@ end
 
 function MOI.get(
     opt::Optimizer,
-    attr::MOI.ConstraintDual,
-    ci::Vector{MOI.ConstraintIndex},
-    )
-    MOI.check_result_index_bounds(opt, attr)
-    return MOI.get.(opt, attr, ci)
-end
-
-function MOI.get(
-    opt::Optimizer,
     attr::MOI.ConstraintPrimal,
     ci::MOI.ConstraintIndex{F, S},
     ) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
@@ -691,13 +674,4 @@ function MOI.get(
         os = opt.constr_offset_cone
         return opt.constr_prim_cone[(os[i] + 1):os[i + 1]]
     end
-end
-
-function MOI.get(
-    opt::Optimizer,
-    attr::MOI.ConstraintPrimal,
-    ci::Vector{MOI.ConstraintIndex},
-    )
-    MOI.check_result_index_bounds(opt, attr)
-    return MOI.get.(opt, a, ci)
 end
