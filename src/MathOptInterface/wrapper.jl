@@ -15,8 +15,6 @@ $(TYPEDEF)
 A MathOptInterface optimizer type for Hypatia.
 """
 mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
-    use_dense_model::Bool # make the model use dense A and G data instead of sparse
-
     solver::Solvers.Solver{T} # Hypatia solver object
     model::Models.Model{T} # Hypatia model object
 
@@ -28,42 +26,14 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
 
     # data for transforming certificates
     obj_sense::MOI.OptimizationSense
-    num_eq_constrs::Int
-    constr_offset_eq::Vector{Int}
-    constr_prim_eq::Vector{T}
-    constr_offset_cone::Vector{Int}
-    constr_prim_cone::Vector{T}
-    nonpos_idxs::UnitRange{Int}
-    interval_idxs::UnitRange{Int}
-    interval_scales::Vector{T}
-    moi_other_cones_start::Int
-    moi_other_cones::Vector{MOI.AbstractVectorSet}
+    zeros_idxs::Vector{UnitRange{Int}}
+    zeros_primal::Vector{T}
+    cones_idxs::Vector{UnitRange{Int}}
+    other_cones_start::Int
+    other_cones::Vector{MOI.AbstractVectorSet}
 
-    function Optimizer{T}(;
-        use_dense_model::Bool = true, # TODO should depend on the size and sparsity of A, G in the model
-        solver_options... # TODO allow passing in a solver?
-        ) where {T <: Real}
+    function Optimizer{T}(; solver_options...) where {T <: Real}
         opt = new{T}()
-        opt.use_dense_model = use_dense_model
-        if !haskey(solver_options, :syssolver)
-            # choose default system solver based on use_dense_model
-            sstype = (use_dense_model ? Solvers.QRCholDenseSystemSolver :
-                Solvers.SymIndefSparseSystemSolver)
-            solver_options = (solver_options..., syssolver = sstype{T}())
-        end
-        if !haskey(solver_options, :preprocess)
-            # only preprocess if using dense model # TODO maybe should preprocess if sparse
-            solver_options = (solver_options..., preprocess = use_dense_model)
-        end
-        if !haskey(solver_options, :reduce)
-            # only reduce if using dense model
-            solver_options = (solver_options..., reduce = use_dense_model)
-        end
-        if !haskey(solver_options, :init_use_indirect)
-            # only use indirect if not using dense model
-            solver_options = (solver_options...,
-                init_use_indirect = !use_dense_model)
-        end
         opt.solver = Solvers.Solver{T}(; solver_options...)
         return opt
     end
@@ -72,6 +42,7 @@ end
 Optimizer(; options...) = Optimizer{Float64}(; options...) # default to Float64
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
+
 MOI.get(opt::Optimizer, ::MOI.RawSolver) = opt.solver
 
 MOI.is_empty(opt::Optimizer) = (opt.solver.status == Solvers.NotLoaded)
@@ -82,20 +53,9 @@ MOI.supports(
     ::Optimizer{T},
     ::Union{
         MOI.ObjectiveSense,
-        MOI.ObjectiveFunction{VI},
+        MOI.ObjectiveFunction{VI}, # TODO maybe just SAF
         MOI.ObjectiveFunction{SAF{T}},
         },
-    ) where {T <: Real} = true
-
-MOI.supports_constraint(
-    ::Optimizer{T},
-    ::Type{<:Union{VI, SAF{T}}},
-    ::Type{<:Union{
-        MOI.EqualTo{T},
-        MOI.GreaterThan{T},
-        MOI.LessThan{T},
-        MOI.Interval{T},
-        }},
     ) where {T <: Real} = true
 
 MOI.supports_constraint(
@@ -114,9 +74,9 @@ function MOI.copy_to(
     # variables
     n = MOI.get(src, MOI.NumberOfVariables()) # columns of A
     j = 0
-    for vj in MOI.get(src, MOI.ListOfVariableIndices()) # MOI.VariableIndex
+    for vj in MOI.get(src, MOI.ListOfVariableIndices())
         j += 1
-        idx_map[vj] = MOI.VariableIndex(j)
+        idx_map[vj] = VI(j)
     end
     @assert j == n
 
@@ -146,44 +106,16 @@ function MOI.copy_to(
     get_src_cons(F, S) = MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
     get_con_fun(con_idx) = MOI.get(src, MOI.ConstraintFunction(), con_idx)
     get_con_set(con_idx) = MOI.get(src, MOI.ConstraintSet(), con_idx)
-    i = 0 # MOI constraint index
 
     # equality constraints
+    i = 1 # MOI constraint index
     p = 0 # rows of A (equality constraint matrix)
     (IA, JA, VA) = (Int[], Int[], T[])
     (Ib, Vb) = (Int[], T[])
-    (Icpe, Vcpe) = (Int[], T[]) # constraint set constants for opt.constr_prim_eq
-    constr_offset_eq = Vector{Int}()
-
-    for F in (VI, SAF{T}), ci in get_src_cons(F, MOI.EqualTo{T})
-        i += 1
-        idx_map[ci] = MOI.ConstraintIndex{F, MOI.EqualTo{T}}(i)
-        push!(constr_offset_eq, p)
-        p += 1
-        fi = get_con_fun(ci)
-        si = get_con_set(ci)
-        if F == VI
-            push!(IA, p)
-            push!(JA, idx_map[fi].value)
-            push!(VA, -1)
-            push!(Vb, -si.value)
-        else
-            for vt in fi.terms
-                push!(IA, p)
-                push!(JA, idx_map[vt.variable].value)
-                push!(VA, -vt.coefficient)
-            end
-            push!(Vb, fi.constant - si.value)
-        end
-        push!(Ib, p)
-        push!(Icpe, p)
-        push!(Vcpe, si.value)
-    end
+    zeros_idxs = Vector{UnitRange{Int}}()
 
     for F in (VV, VAF{T}), ci in get_src_cons(F, MOI.Zeros)
-        i += 1
         idx_map[ci] = MOI.ConstraintIndex{F, MOI.Zeros}(i)
-        push!(constr_offset_eq, p)
         fi = get_con_fun(ci)
         dim = MOI.output_dimension(fi)
         if F == VV
@@ -199,216 +131,72 @@ function MOI.copy_to(
             append!(Ib, (p + 1):(p + dim))
             append!(Vb, fi.constants)
         end
+        push!(zeros_idxs, p .+ (1:dim))
         p += dim
+        i += 1
     end
 
-    push!(constr_offset_eq, p)
     model_A = dropzeros!(sparse(IA, JA, VA, p, n))
     model_b = Vector(sparsevec(Ib, Vb, p))
-    opt.num_eq_constrs = i
-    opt.constr_prim_eq = Vector(sparsevec(Icpe, Vcpe, p))
-    opt.constr_offset_eq = constr_offset_eq
+    opt.zeros_idxs = zeros_idxs
 
     # conic constraints
+    other_cones = MOI.AbstractVectorSet[]
+    i = 1 # MOI constraint index
     q = 0 # rows of G (cone constraint matrix)
     (IG, JG, VG) = (Int[], Int[], T[])
     (Ih, Vh) = (Int[], T[])
-    (Icpc, Vcpc) = (Int[], T[]) # constraint set constants for opt.constr_prim_eq
-    constr_offset_cone = Vector{Int}()
+    cones_idxs = Vector{UnitRange{Int}}()
     cones = Cones.Cone{T}[]
 
-    # build up one nonnegative cone from LP constraints
-    nonneg_start = q
-
-    # nonnegative-like constraints
-    for F in (VI, SAF{T}), ci in get_src_cons(F, MOI.GreaterThan{T})
-        i += 1
-        idx_map[ci] = MOI.ConstraintIndex{F, MOI.GreaterThan{T}}(i)
-        push!(constr_offset_cone, q)
-        q += 1
-        fi = get_con_fun(ci)
-        si = get_con_set(ci)
-        if F == VI
-            push!(IG, q)
-            push!(JG, idx_map[fi].value)
-            push!(VG, -1)
-            push!(Vh, -si.lower)
-        else
-            for vt in fi.terms
-                push!(IG, q)
-                push!(JG, idx_map[vt.variable].value)
-                push!(VG, -vt.coefficient)
-            end
-            push!(Vh, fi.constant - si.lower)
-        end
-        push!(Ih, q)
-        push!(Vcpc, si.lower)
-        push!(Icpc, q)
-    end
-
+    # build up one nonnegative cone
     for F in (VV, VAF{T}), ci in get_src_cons(F, MOI.Nonnegatives)
-        i += 1
         idx_map[ci] = MOI.ConstraintIndex{F, MOI.Nonnegatives}(i)
-        push!(constr_offset_cone, q)
         fi = get_con_fun(ci)
+        dim = MOI.output_dimension(fi)
+        idxs = q .+ (1:dim)
         if F == VV
-            for vj in fi.variables
-                q += 1
-                push!(IG, q)
-                push!(JG, idx_map[vj].value)
-                push!(VG, -1)
-            end
+            append!(IG, idxs)
+            append!(JG, (idx_map[vj].value for vj in fi.variables))
+            append!(VG, fill(-one(T), dim))
         else
-            dim = MOI.output_dimension(fi)
             for vt in fi.terms
                 push!(IG, q + vt.output_index)
                 push!(JG, idx_map[vt.scalar_term.variable].value)
                 push!(VG, -vt.scalar_term.coefficient)
             end
-            append!(Ih, (q + 1):(q + dim))
+            append!(Ih, idxs)
             append!(Vh, fi.constants)
-            q += dim
         end
-    end
-
-    # nonpositive-like constraints
-    nonpos_start = q
-
-    for F in (VI, SAF{T}), ci in get_src_cons(F, MOI.LessThan{T})
+        push!(cones_idxs, idxs)
+        q += dim
         i += 1
-        idx_map[ci] = MOI.ConstraintIndex{F, MOI.LessThan{T}}(i)
-        push!(constr_offset_cone, q)
-        q += 1
-        fi = get_con_fun(ci)
-        si = get_con_set(ci)
-        if F == VI
-            push!(IG, q)
-            push!(JG, idx_map[fi].value)
-            push!(VG, 1)
-            push!(Vh, si.upper)
-        else
-            for vt in fi.terms
-                push!(IG, q)
-                push!(JG, idx_map[vt.variable].value)
-                push!(VG, vt.coefficient)
-            end
-            push!(Vh, -fi.constant + si.upper)
-        end
-        push!(Ih, q)
-        push!(Vcpc, si.upper)
-        push!(Icpc, q)
     end
 
-    for F in (VV, VAF{T}), ci in get_src_cons(F, MOI.Nonpositives)
-        i += 1
-        idx_map[ci] = MOI.ConstraintIndex{F, MOI.Nonpositives}(i)
-        push!(constr_offset_cone, q)
-        fi = get_con_fun(ci)
-        if F == VV
-            for vj in fi.variables
-                q += 1
-                push!(IG, q)
-                push!(JG, idx_map[vj].value)
-                push!(VG, 1)
-            end
-        else
-            dim = MOI.output_dimension(fi)
-            for vt in fi.terms
-                push!(IG, q + vt.output_index)
-                push!(JG, idx_map[vt.scalar_term.variable].value)
-                push!(VG, vt.scalar_term.coefficient)
-            end
-            append!(Ih, (q + 1):(q + dim))
-            append!(Vh, -fi.constants)
-            q += dim
-        end
+    if q > 0
+        push!(cones, cone_from_moi(T, MOI.Nonnegatives(q)))
     end
 
-    # single nonnegative cone
-    opt.nonpos_idxs = (nonpos_start + 1):q
-    if q > nonneg_start
-        push!(cones, Cones.Nonnegative{T}(q - nonneg_start))
-    end
-
-    # build up one L_infinity norm cone from two-sided interval constraints
-    interval_start = q
-    SV_intvl = get_src_cons(VI, MOI.Interval{T})
-    SAF_intvl = get_src_cons(SAF{T}, MOI.Interval{T})
-    num_intervals = length(SV_intvl) + length(SAF_intvl)
-    interval_scales = zeros(T, num_intervals)
-
-    if num_intervals > 0
-        i += 1
-        push!(constr_offset_cone, q)
-        q += 1
-        push!(Ih, q)
-        push!(Vh, 1)
-    end
-
-    interval_count = 0
-    for (F, Cs) in ((VI, SV_intvl), (SAF{T}, SAF_intvl)), ci in Cs
-        i += 1
-        idx_map[ci] = MOI.ConstraintIndex{F, MOI.Interval{T}}(i)
-        push!(constr_offset_cone, q)
-        q += 1
-
-        upper = get_con_set(ci).upper
-        lower = get_con_set(ci).lower
-        @assert isfinite(upper) && isfinite(lower)
-        @assert upper > lower
-        mid = (upper + lower) / T(2)
-        scal = 2 / (upper - lower)
-
-        fi = get_con_fun(ci)
-        if F == VI
-            push!(IG, q)
-            push!(JG, idx_map[fi.variable].value)
-            push!(VG, -scal)
-            push!(Vh, -mid * scal)
-        else
-            for vt in fi.terms
-                push!(IG, q)
-                push!(JG, idx_map[vt.variable].value)
-                push!(VG, -vt.coefficient * scal)
-            end
-            push!(Vh, (fi.constant - mid) * scal)
-        end
-        push!(Ih, q)
-        push!(Vcpc, mid)
-        push!(Icpc, q)
-        interval_count += 1
-        interval_scales[interval_count] = scal
-    end
-
-    opt.interval_idxs = (interval_start + 2):q
-    opt.interval_scales = interval_scales
-    if q > interval_start
-        # exists at least one interval-type constraint
-        push!(cones, Cones.EpiNormInf{T, T}(q - interval_start))
-    end
-
-    # non-LP conic constraints
-    moi_other_cones_start = i + 1
-    moi_other_cones = MOI.AbstractVectorSet[]
+    # other conic constraints
+    opt.other_cones_start = i
 
     for (F, S) in MOI.get(src, MOI.ListOfConstraintTypesPresent())
-        if S <: LinearCones{T}
+        if S == MOI.Zeros || S == MOI.Nonnegatives
             continue # already copied these constraints
         end
         @assert S <: SupportedCones{T}
 
         for ci in get_src_cons(F, S)
-            i += 1
             idx_map[ci] = MOI.ConstraintIndex{F, S}(i)
-            push!(constr_offset_cone, q)
             fi = get_con_fun(ci)
             si = get_con_set(ci)
-            push!(moi_other_cones, si)
+            push!(other_cones, si)
             dim = MOI.output_dimension(fi)
+            idxs = q .+ (1:dim)
 
             if F == VV
                 JGi = (idx_map[vj].value for vj in fi.variables)
-                IGi = permute_affine(si, 1:dim)
+                IGi = permute_affine(si, idxs)
                 VGi = rescale_affine(si, fill(-one(T), dim))
             else
                 JGi = (idx_map[vt.scalar_term.variable].value
@@ -416,23 +204,22 @@ function MOI.copy_to(
                 IGi = permute_affine(si, [vt.output_index for vt in fi.terms])
                 VGi = rescale_affine(si, [-vt.scalar_term.coefficient
                     for vt in fi.terms], IGi)
-                Ihi = permute_affine(si, 1:dim)
+                IGi .+= q
+                Ihi = permute_affine(si, idxs)
                 Vhi = rescale_affine(si, fi.constants)
-                Ihi = q .+ Ihi
                 append!(Ih, Ihi)
                 append!(Vh, Vhi)
             end
 
-            IGi = q .+ IGi
             append!(IG, IGi)
             append!(JG, JGi)
             append!(VG, VGi)
             push!(cones, cone_from_moi(T, si))
+            push!(cones_idxs, idxs)
             q += dim
+            i += 1
         end
     end
-
-    push!(constr_offset_cone, q)
 
     # finalize model
     model_G = dropzeros!(sparse(IG, JG, VG, q, n))
@@ -440,14 +227,9 @@ function MOI.copy_to(
 
     opt.model = Models.Model{T}(model_c, model_A, model_b, model_G, model_h,
         cones; obj_offset = obj_offset)
-    if opt.use_dense_model # convert A and G to dense
-        Models.densify!(opt.model)
-    end
 
-    opt.constr_offset_cone = constr_offset_cone
-    opt.constr_prim_cone = Vector(sparsevec(Icpc, Vcpc, q))
-    opt.moi_other_cones_start = moi_other_cones_start
-    opt.moi_other_cones = moi_other_cones
+    opt.cones_idxs = cones_idxs
+    opt.other_cones = other_cones
 
     return idx_map
 end
@@ -460,31 +242,24 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     Solvers.load(solver, model)
     Solvers.solve(solver)
 
-    status = Solvers.get_status(solver)
-    primal_obj = Solvers.get_primal_obj(solver)
-    dual_obj = Solvers.get_dual_obj(solver)
     opt.x = Solvers.get_x(solver)
     opt.y = Solvers.get_y(solver)
     opt.s = Solvers.get_s(solver)
     opt.z = Solvers.get_z(solver)
 
     # transform solution for MOI conventions
-    opt.constr_prim_eq += model.b - model.A * opt.x
-    opt.s[opt.nonpos_idxs] .*= -1
-    opt.z[opt.nonpos_idxs] .*= -1
-    opt.s[opt.interval_idxs] ./= opt.interval_scales
-    i = opt.moi_other_cones_start - opt.num_eq_constrs
-    for cone in opt.moi_other_cones
+    opt.zeros_primal = copy(model.b) 
+    mul!(opt.zeros_primal, model.A, opt.x, -1, true)
+    i = opt.other_cones_start
+    for cone in opt.other_cones
         if needs_untransform(cone)
-            os = opt.constr_offset_cone
-            idxs = (os[i] + 1):os[i + 1]
+            idxs = opt.cones_idxs[i]
+            @assert length(idxs) == MOI.dimension(cone)
             @views untransform_affine(cone, opt.s[idxs])
             @views untransform_affine(cone, opt.z[idxs])
         end
         i += 1
     end
-    opt.constr_prim_cone .+= opt.s
-    opt.z[opt.interval_idxs] .*= opt.interval_scales
 
     return
 end
@@ -515,15 +290,23 @@ MOI.get(opt::Optimizer, ::MOI.RawStatusString) = string(opt.solver.status)
 
 MOI.get(opt::Optimizer, ::MOI.BarrierIterations) = opt.solver.num_iters
 
+function MOI.set(opt::Optimizer, param::MOI.RawOptimizerAttribute, value)
+    return setproperty!(opt.solver, Symbol(param.name), value)
+end
+
+function MOI.get(opt::Optimizer, param::MOI.RawOptimizerAttribute)
+    return getproperty(opt.solver, Symbol(param.name))
+end
+
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     status = opt.solver.status
     if status in (Solvers.NotLoaded, Solvers.Loaded)
         return MOI.OPTIMIZE_NOT_CALLED
     elseif status == Solvers.Optimal
         return MOI.OPTIMAL
-    elseif status == Solvers.PrimalInfeasible
+    elseif status == Solvers.PrimalInfeasible || status == Solvers.PrimalInconsistent
         return MOI.INFEASIBLE
-    elseif status == Solvers.DualInfeasible
+    elseif status == Solvers.DualInfeasible || status == Solvers.DualInconsistent
         return MOI.DUAL_INFEASIBLE
     elseif status == Solvers.SlowProgress
         return MOI.SLOW_PROGRESS
@@ -567,110 +350,52 @@ function MOI.get(opt::Optimizer, ::MOI.DualStatus)
     end
 end
 
+_sense_val(sense::MOI.OptimizationSense) = (sense == MOI.MAX_SENSE ? -1 : 1)
+
 function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
-    raw_obj_val = Solvers.get_primal_obj(opt.solver)
-    return ((opt.obj_sense == MOI.MAX_SENSE) ? -1 : 1) * raw_obj_val
+    return _sense_val(opt.obj_sense) * Solvers.get_primal_obj(opt.solver)
 end
 
 function MOI.get(opt::Optimizer, ::MOI.DualObjectiveValue)
-    raw_dual_obj_val = Solvers.get_dual_obj(opt.solver)
-    return ((opt.obj_sense == MOI.MAX_SENSE) ? -1 : 1) * raw_dual_obj_val
+    return _sense_val(opt.obj_sense) * Solvers.get_dual_obj(opt.solver)
 end
 
 MOI.get(opt::Optimizer, ::MOI.ResultCount) = 1
 
-MOI.get(
-    opt::Optimizer,
-    ::MOI.VariablePrimal,
-    vi::MOI.VariableIndex,
-    ) = opt.x[vi.value]
-
-MOI.get(
-    opt::Optimizer,
-    a::MOI.VariablePrimal,
-    vi::Vector{MOI.VariableIndex},
-    ) = MOI.get.(opt, a, vi)
+MOI.get(opt::Optimizer, ::MOI.VariablePrimal, vi::VI) = opt.x[vi.value]
 
 function MOI.get(
-    opt::Optimizer,
-    ::MOI.ConstraintDual,
-    ci::MOI.ConstraintIndex{F, S},
-    ) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
-    # scalar set
-    i = ci.value
-    if i <= opt.num_eq_constrs
-        # constraint is an equality
-        return opt.y[opt.constr_offset_eq[i] + 1]
-    else
-        # constraint is conic
-        i -= opt.num_eq_constrs
-        return opt.z[opt.constr_offset_cone[i] + 1]
-    end
+    opt::Optimizer{T}, 
+    ::MOI.ConstraintDual, 
+    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, MOI.Zeros},
+    ) where T
+    # constraint is an equality
+    return opt.y[opt.zeros_idxs[ci.value]]
 end
 
 function MOI.get(
-    opt::Optimizer,
-    ::MOI.ConstraintDual,
-    ci::MOI.ConstraintIndex{F, S},
-    ) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
-    # vector set
-    i = ci.value
-    if i <= opt.num_eq_constrs
-        # constraint is an equality
-        os = opt.constr_offset_eq
-        return opt.y[(os[i] + 1):os[i + 1]]
-    else
-        # constraint is conic
-        i -= opt.num_eq_constrs
-        os = opt.constr_offset_cone
-        return opt.z[(os[i] + 1):os[i + 1]]
-    end
-end
-
-MOI.get(
-    opt::Optimizer,
-    a::MOI.ConstraintDual,
-    ci::Vector{MOI.ConstraintIndex},
-    ) = MOI.get.(opt, a, ci)
-
-function MOI.get(
-    opt::Optimizer,
-    ::MOI.ConstraintPrimal,
-    ci::MOI.ConstraintIndex{F, S},
-    ) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
-    # scalar set
-    i = ci.value
-    if i <= opt.num_eq_constrs
-        # constraint is an equality
-        return opt.constr_prim_eq[opt.constr_offset_eq[i] + 1]
-    else
-        # constraint is conic
-        i -= opt.num_eq_constrs
-        return opt.constr_prim_cone[opt.constr_offset_cone[i] + 1]
-    end
+    opt::Optimizer{T}, 
+    ::MOI.ConstraintDual, 
+    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCones{T}},
+    ) where T
+    # constraint is conic
+    return opt.z[opt.cones_idxs[ci.value]]
 end
 
 function MOI.get(
-    opt::Optimizer,
-    ::MOI.ConstraintPrimal,
-    ci::MOI.ConstraintIndex{F, S},
-    ) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
-    # vector set
-    i = ci.value
-    if i <= opt.num_eq_constrs
-        # constraint is an equality
-        os = opt.constr_offset_eq
-        return opt.constr_prim_eq[(os[i] + 1):os[i + 1]]
-    else
-        # constraint is conic
-        i -= opt.num_eq_constrs
-        os = opt.constr_offset_cone
-        return opt.constr_prim_cone[(os[i] + 1):os[i + 1]]
-    end
+    opt::Optimizer{T}, 
+    ::MOI.ConstraintPrimal, 
+    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, MOI.Zeros},
+    ) where T
+    # constraint is an equality
+    return opt.zeros_primal[opt.zeros_idxs[ci.value]]
 end
 
-MOI.get(
-    opt::Optimizer,
-    a::MOI.ConstraintPrimal,
-    ci::Vector{MOI.ConstraintIndex},
-    ) = MOI.get.(opt, a, ci)
+function MOI.get(
+    opt::Optimizer{T}, 
+    ::MOI.ConstraintPrimal, 
+    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCones{T}},
+    ) where T
+    # constraint is conic
+    return opt.s[opt.cones_idxs[ci.value]]
+end
