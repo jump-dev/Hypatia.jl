@@ -8,34 +8,28 @@ const MOI = MathOptInterface
 import Hypatia
 
 function test_moi(T::Type{<:Real}; solver_options...)
-    optimizer = MOI.Utilities.CachingOptimizer(
-        MOI.Utilities.UniversalFallback(MOI.Utilities.Model{T}()),
-        Hypatia.Optimizer{T}(; solver_options...),
-    )
-
-    tol = 2 * sqrt(sqrt(eps(T)))
-    config = MOI.Test.Config(
-        T,
-        atol = tol,
-        rtol = tol,
-        exclude = Any[
-            MOI.ConstraintBasisStatus,
-            MOI.VariableBasisStatus,
-            MOI.ObjectiveBound,
+    MOI.Test.runtests(
+        MOI.Utilities.CachingOptimizer(
+            MOI.Utilities.UniversalFallback(MOI.Utilities.Model{T}()),
+            Hypatia.Optimizer{T}(; solver_options...),
+        ),
+        MOI.Test.Config(
+            T,
+            atol = 2 * sqrt(sqrt(eps(T))),
+            rtol = 2 * sqrt(sqrt(eps(T))),
+            exclude = Any[
+                MOI.ConstraintBasisStatus,
+                MOI.VariableBasisStatus,
+                MOI.ObjectiveBound,
+            ],
+        ),
+        exclude = String[
+            # not implemented:
+            "test_attribute_SolverVersion",
+            # TODO fix:
+            "test_model_copy_to_Unsupported",
         ],
     )
-
-    excludes = String[
-        # not implemented:
-        "test_attribute_SolverVersion",
-        # TODO fix:
-        "test_model_copy_to_Unsupported",
-        "test_unbounded",
-        "test_solve_result_index",
-    ]
-    includes = String[]
-
-    MOI.Test.runtests(optimizer, config, include = includes, exclude = excludes)
 
     return
 end

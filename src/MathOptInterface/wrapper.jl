@@ -540,7 +540,10 @@ function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     end
 end
 
-function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
+function MOI.get(opt::Optimizer, attr::MOI.PrimalStatus)
+    if attr.result_index != 1
+        return MOI.NO_SOLUTION
+    end
     status = opt.solver.status
     if status == Solvers.Optimal
         return MOI.FEASIBLE_POINT
@@ -555,7 +558,10 @@ function MOI.get(opt::Optimizer, ::MOI.PrimalStatus)
     end
 end
 
-function MOI.get(opt::Optimizer, ::MOI.DualStatus)
+function MOI.get(opt::Optimizer, attr::MOI.DualStatus)
+    if attr.result_index != 1
+        return MOI.NO_SOLUTION
+    end
     status = opt.solver.status
     if status == Solvers.Optimal
         return MOI.FEASIBLE_POINT
@@ -570,35 +576,44 @@ function MOI.get(opt::Optimizer, ::MOI.DualStatus)
     end
 end
 
-function MOI.get(opt::Optimizer, ::MOI.ObjectiveValue)
+function MOI.get(opt::Optimizer, attr::MOI.ObjectiveValue)
+    MOI.check_result_index_bounds(opt, attr)
     raw_obj_val = Solvers.get_primal_obj(opt.solver)
     return ((opt.obj_sense == MOI.MAX_SENSE) ? -1 : 1) * raw_obj_val
 end
 
-function MOI.get(opt::Optimizer, ::MOI.DualObjectiveValue)
+function MOI.get(opt::Optimizer, attr::MOI.DualObjectiveValue)
+    MOI.check_result_index_bounds(opt, attr)
     raw_dual_obj_val = Solvers.get_dual_obj(opt.solver)
     return ((opt.obj_sense == MOI.MAX_SENSE) ? -1 : 1) * raw_dual_obj_val
 end
 
 MOI.get(opt::Optimizer, ::MOI.ResultCount) = 1
 
-MOI.get(
+function MOI.get(
     opt::Optimizer,
-    ::MOI.VariablePrimal,
+    attr::MOI.VariablePrimal,
     vi::MOI.VariableIndex,
-    ) = opt.x[vi.value]
-
-MOI.get(
-    opt::Optimizer,
-    a::MOI.VariablePrimal,
-    vi::Vector{MOI.VariableIndex},
-    ) = MOI.get.(opt, a, vi)
+    )
+    MOI.check_result_index_bounds(opt, attr)
+    return opt.x[vi.value]
+end
 
 function MOI.get(
     opt::Optimizer,
-    ::MOI.ConstraintDual,
+    attr::MOI.VariablePrimal,
+    vi::Vector{MOI.VariableIndex},
+    )
+    MOI.check_result_index_bounds(opt, attr)
+    return MOI.get.(opt, attr, vi)
+end
+
+function MOI.get(
+    opt::Optimizer,
+    attr::MOI.ConstraintDual,
     ci::MOI.ConstraintIndex{F, S},
     ) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
+    MOI.check_result_index_bounds(opt, attr)
     # scalar set
     i = ci.value
     if i <= opt.num_eq_constrs
@@ -613,9 +628,10 @@ end
 
 function MOI.get(
     opt::Optimizer,
-    ::MOI.ConstraintDual,
+    attr::MOI.ConstraintDual,
     ci::MOI.ConstraintIndex{F, S},
     ) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
+    MOI.check_result_index_bounds(opt, attr)
     # vector set
     i = ci.value
     if i <= opt.num_eq_constrs
@@ -630,17 +646,21 @@ function MOI.get(
     end
 end
 
-MOI.get(
+function MOI.get(
     opt::Optimizer,
-    a::MOI.ConstraintDual,
+    attr::MOI.ConstraintDual,
     ci::Vector{MOI.ConstraintIndex},
-    ) = MOI.get.(opt, a, ci)
+    )
+    MOI.check_result_index_bounds(opt, attr)
+    return MOI.get.(opt, attr, ci)
+end
 
 function MOI.get(
     opt::Optimizer,
-    ::MOI.ConstraintPrimal,
+    attr::MOI.ConstraintPrimal,
     ci::MOI.ConstraintIndex{F, S},
     ) where {F <: MOI.AbstractFunction, S <: MOI.AbstractScalarSet}
+    MOI.check_result_index_bounds(opt, attr)
     # scalar set
     i = ci.value
     if i <= opt.num_eq_constrs
@@ -655,9 +675,10 @@ end
 
 function MOI.get(
     opt::Optimizer,
-    ::MOI.ConstraintPrimal,
+    attr::MOI.ConstraintPrimal,
     ci::MOI.ConstraintIndex{F, S},
     ) where {F <: MOI.AbstractFunction, S <: MOI.AbstractVectorSet}
+    MOI.check_result_index_bounds(opt, attr)
     # vector set
     i = ci.value
     if i <= opt.num_eq_constrs
@@ -672,8 +693,11 @@ function MOI.get(
     end
 end
 
-MOI.get(
+function MOI.get(
     opt::Optimizer,
-    a::MOI.ConstraintPrimal,
+    attr::MOI.ConstraintPrimal,
     ci::Vector{MOI.ConstraintIndex},
-    ) = MOI.get.(opt, a, ci)
+    )
+    MOI.check_result_index_bounds(opt, attr)
+    return MOI.get.(opt, a, ci)
+end
