@@ -67,10 +67,14 @@ end
 
 get_cone_idxs(model::Model) = model.cone_idxs
 
-# make the model's A and G matrices dense
+# convert sparse A and G matrices to dense
 function densify!(model::Model{T}) where {T <: Real}
-    model.A = convert(Matrix{T}, model.A)
-    model.G = convert(Matrix{T}, model.G)
+    if model.A isa AbstractArray
+        model.A = convert(Matrix{T}, model.A)
+    end
+    if model.G isa AbstractArray
+        model.G = convert(Matrix{T}, model.G)
+    end
     return model
 end
 

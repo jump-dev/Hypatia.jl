@@ -77,6 +77,7 @@ mutable struct Solver{T <: Real}
     init_tol_qr::T
     stepper::Stepper{T}
     syssolver::SystemSolver{T}
+    use_dense_model::Bool # make the model use dense A and G data instead of sparse
 
     # current status of the solver object and info
     status::Status
@@ -176,8 +177,9 @@ mutable struct Solver{T <: Real}
         rescale::Bool = true,
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
-        stepper::Stepper{T} = default_stepper(T),
-        syssolver::SystemSolver{T} = default_syssolver(T),
+        stepper::Stepper{T} = CombinedStepper{T}(),
+        syssolver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
+        use_dense_model::Bool = (syssolver isa QRCholDenseSystemSolver{T}),
         ) where {T <: Real}
         if isa(syssolver, QRCholSystemSolver{T})
             @assert preprocess # require preprocessing for QRCholSystemSolver # TODO only need primal eq preprocessing or reduction
@@ -234,13 +236,11 @@ mutable struct Solver{T <: Real}
         solver.stepper = stepper
         solver.syssolver = syssolver
         solver.status = NotLoaded
+        solver.use_dense_model = use_dense_model
 
         return solver
     end
 end
-
-default_stepper(T) = CombinedStepper{T}()
-default_syssolver(T) = QRCholDenseSystemSolver{T}()
 
 function solve(solver::Solver{T}) where {T <: Real}
     @assert solver.status == Loaded
@@ -282,6 +282,9 @@ function solve(solver::Solver{T}) where {T <: Real}
 
     # preprocess and find initial point
     orig_model = solver.orig_model
+    if solver.use_dense_model
+        Models.densify!(orig_model)
+    end
     result = solver.result = Point(orig_model)
     # copy original model to solver.model, which may be modified
     model = solver.model = Models.Model{T}(

@@ -8,6 +8,9 @@ cone_from_moi(::Type{<:Real}, cone::MOI.AbstractVectorSet) =
 
 # MOI predefined cones
 
+cone_from_moi(::Type{T}, cone::MOI.Nonnegatives) where {T <: Real} =
+    Cones.Nonnegative{T}(MOI.dimension(cone))
+
 cone_from_moi(::Type{T}, cone::MOI.PositiveSemidefiniteConeTriangle) where {T <: Real} =
     Cones.PosSemidefTri{T, T}(MOI.dimension(cone))
 
@@ -694,7 +697,6 @@ const SupportedCones{T <: Real} = Union{
     HypatiaCones{T},
     MOI.Zeros,
     MOI.Nonnegatives,
-    MOI.Nonpositives,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.NormInfinityCone,
     MOI.NormOneCone,
@@ -710,16 +712,6 @@ const SupportedCones{T <: Real} = Union{
     MOI.DualExponentialCone,
     MOI.LogDetConeTriangle,
     MOI.RelativeEntropyCone,
-    }
-
-const LinearCones{T <: Real} = Union{
-    MOI.EqualTo{T},
-    MOI.GreaterThan{T},
-    MOI.LessThan{T},
-    MOI.Interval{T},
-    MOI.Zeros,
-    MOI.Nonnegatives,
-    MOI.Nonpositives,
     }
 
 Base.copy(cone::HypatiaCones) = cone # maybe should deep copy the cone struct, but this is expensive
