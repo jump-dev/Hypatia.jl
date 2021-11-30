@@ -12,26 +12,26 @@ include(joinpath(@__DIR__, "moicones.jl"))
 
 @testset "MathOptInterface wrapper tests" begin
 
-@testset "MOI cone tests" begin
-    println("starting MOI wrapper cone tests")
-    real_types = [
-        Float64,
-        # Float32,
-        BigFloat,
-        ]
-    for T in real_types
-        @testset "$T" begin
-            println(T, " ...")
-            test_moi_cones(T)
-        end
-    end
-end
+# @testset "MOI cone tests" begin
+#     println("starting MOI wrapper cone tests")
+#     real_types = [
+#         Float64,
+#         # Float32,
+#         BigFloat,
+#         ]
+#     for T in real_types
+#         @testset "$T" begin
+#             println(T, " ...")
+#             test_moi_cones(T)
+#         end
+#     end
+# end
 
 @testset "MOI.Test tests" begin
     println("\nstarting MOI.Test tests")
     # TODO test other real types
     T = Float64
-    optimizer = Hypatia.Optimizer{T}()
+    optimizer = Hypatia.Optimizer{T}(; default_tol_relax = 4)
     MOI.set(optimizer, MOI.Silent(), true)
     model = MOI.Bridges.full_bridge_optimizer(
         MOI.Utilities.CachingOptimizer(
@@ -66,7 +66,7 @@ end
         "test_model_LowerBoundAlreadySet",
         "test_model_UpperBoundAlreadySet",
     ]
-    includes = String[]
+    includes = String["test_conic"]
 
     MOI.Test.runtests(model, config, include = includes, exclude = excludes)
 end
