@@ -8,6 +8,9 @@ cone_from_moi(::Type{<:Real}, cone::MOI.AbstractVectorSet) =
 
 # MOI predefined cones
 
+cone_from_moi(::Type{T}, cone::MOI.Nonnegatives) where {T <: Real} =
+    Cones.Nonnegative{T}(MOI.dimension(cone))
+
 cone_from_moi(::Type{T}, cone::MOI.PositiveSemidefiniteConeTriangle) where {T <: Real} =
     Cones.PosSemidefTri{T, T}(MOI.dimension(cone))
 
