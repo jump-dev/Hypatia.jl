@@ -291,11 +291,11 @@ MOI.get(opt::Optimizer, ::MOI.RawStatusString) = string(opt.solver.status)
 MOI.get(opt::Optimizer, ::MOI.BarrierIterations) = opt.solver.num_iters
 
 function MOI.set(opt::Optimizer, param::MOI.RawOptimizerAttribute, value)
-    return setfield!(opt.solver, Symbol(param.name), value)
+    return setproperty!(opt.solver, Symbol(param.name), value)
 end
 
 function MOI.get(opt::Optimizer, param::MOI.RawOptimizerAttribute)
-    return getfield(opt.solver, Symbol(param.name))
+    return getproperty(opt.solver, Symbol(param.name))
 end
 
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
