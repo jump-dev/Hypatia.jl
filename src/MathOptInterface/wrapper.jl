@@ -392,6 +392,9 @@ function MOI.copy_to(
     moi_other_cones = MOI.AbstractVectorSet[]
 
     for (F, S) in MOI.get(src, MOI.ListOfConstraintTypesPresent())
+        if !MOI.supports_constraint(opt, F, S)
+            throw(MOI.UnsupportedConstraint{F,S}())
+        end
         if S <: LinearCones{T}
             continue # already copied these constraints
         end

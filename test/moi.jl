@@ -21,8 +21,6 @@ function test_moi(T::Type{<:Real}; solver_options...)
         exclude = Any[
             MOI.ConstraintBasisStatus,
             MOI.VariableBasisStatus,
-            MOI.ConstraintName,
-            MOI.VariableName,
             MOI.ObjectiveBound,
         ],
     )
@@ -30,10 +28,6 @@ function test_moi(T::Type{<:Real}; solver_options...)
     excludes = String[
         # not implemented:
         "test_attribute_SolverVersion",
-        # TODO investigate why these run at all:
-        "Indicator", 
-        "Integer",
-        "ZeroOne",
         # TODO fix:
         "test_model_copy_to_Unsupported",
         "test_solve_ObjectiveBound_MAX_SENSE_LP",
