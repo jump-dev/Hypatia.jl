@@ -16,6 +16,8 @@ relative_residual(residual::Vector{T}, constant::Vector{T}) where {T <: Real} =
 # calculate violations for Hypatia certificate equalities
 function certificate_violations(
     status::Solvers.Status,
+    primal_obj::T,
+    dual_obj::T,
     model::Models.Model{T},
     x::Vector{T},
     y::Vector{T},
@@ -50,7 +52,10 @@ function certificate_violations(
         z_viol = relative_residual(z_res, h)
     end
 
-    return (x_viol, y_viol, z_viol)
+    compl = dot(s, z)
+    rel_obj_diff = (primal_obj - dual_obj) / (1 + abs(dual_obj))
+
+    return (x_viol, y_viol, z_viol, compl, rel_obj_diff)
 end
 
 # return solve information and certificate violations
@@ -61,16 +66,15 @@ function process_result(
     status = Solvers.get_status(solver)
     solve_time = Solvers.get_solve_time(solver)
     iters = Solvers.get_num_iters(solver)
+
     primal_obj = Solvers.get_primal_obj(solver)
     dual_obj = Solvers.get_dual_obj(solver)
-    rel_obj_diff = (primal_obj - dual_obj) / (1 + abs(dual_obj))
-
     z = Solvers.get_z(solver)
     s = Solvers.get_s(solver)
     x = Solvers.get_x(solver)
     y = Solvers.get_y(solver)
-    compl = dot(s, z)
-    (x_viol, y_viol, z_viol) = certificate_violations(status, model, x, y, z, s)
+    (x_viol, y_viol, z_viol, compl, rel_obj_diff) =
+        certificate_violations(status, primal_obj, dual_obj, model, x, y, z, s)
 
     flush(stdout); flush(stderr)
 

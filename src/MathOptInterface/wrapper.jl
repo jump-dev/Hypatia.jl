@@ -28,9 +28,8 @@ mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     obj_sense::MOI.OptimizationSense
     zeros_idxs::Vector{UnitRange{Int}}
     zeros_primal::Vector{T}
-    cones_idxs::Vector{UnitRange{Int}}
-    other_cones_start::Int
-    other_cones::Vector{MOI.AbstractVectorSet}
+    moi_cones::Vector{MOI.AbstractVectorSet}
+    moi_cone_idxs::Vector{UnitRange{Int}}
 
     function Optimizer{T}(; solver_options...) where {T <: Real}
         opt = new{T}()
@@ -149,12 +148,12 @@ function MOI.copy_to(
     opt.zeros_idxs = zeros_idxs
 
     # conic constraints
-    other_cones = MOI.AbstractVectorSet[]
+    moi_cones = MOI.AbstractVectorSet[]
     i = 1 # MOI constraint index
     q = 0 # rows of G (cone constraint matrix)
     (IG, JG, VG) = (Int[], Int[], T[])
     (Ih, Vh) = (Int[], T[])
-    cones_idxs = Vector{UnitRange{Int}}()
+    moi_cone_idxs = Vector{UnitRange{Int}}()
     cones = Cones.Cone{T}[]
 
     # build up one nonnegative cone
@@ -162,6 +161,7 @@ function MOI.copy_to(
         idx_map[ci] = MOI.ConstraintIndex{F, MOI.Nonnegatives}(i)
         fi = get_con_fun(ci)
         dim = MOI.output_dimension(fi)
+
         idxs = q .+ (1:dim)
         if F == VV
             append!(IG, idxs)
@@ -176,7 +176,9 @@ function MOI.copy_to(
             append!(Ih, idxs)
             append!(Vh, fi.constants)
         end
-        push!(cones_idxs, idxs)
+
+        push!(moi_cones, get_con_set(ci))
+        push!(moi_cone_idxs, idxs)
         q += dim
         i += 1
     end
@@ -185,8 +187,6 @@ function MOI.copy_to(
     end
 
     # other conic constraints
-    opt.other_cones_start = i
-
     for (F, S) in MOI.get(src, MOI.ListOfConstraintTypesPresent())
         if !MOI.supports_constraint(opt, F, S)
             throw(MOI.UnsupportedConstraint{F,S}())
@@ -208,10 +208,9 @@ function MOI.copy_to(
             idx_map[ci] = MOI.ConstraintIndex{F, S}(i)
             fi = get_con_fun(ci)
             si = get_con_set(ci)
-            push!(other_cones, si)
             dim = MOI.output_dimension(fi)
-            perm_idxs = q .+ permute_affine(si, 1:dim)
 
+            perm_idxs = q .+ permute_affine(si, 1:dim)
             if F == VV
                 JGi = (idx_map[vj].value for vj in fi.variables)
                 IGi = perm_idxs
@@ -226,12 +225,14 @@ function MOI.copy_to(
                 append!(Ih, perm_idxs)
                 append!(Vh, rescale_affine(si, fi.constants))
             end
-
             append!(IG, IGi)
             append!(JG, JGi)
             append!(VG, VGi)
+
             push!(cones, cone_from_moi(T, si))
-            push!(cones_idxs, q .+ (1:dim))
+            push!(moi_cones, si)
+            push!(moi_cone_idxs, q .+ (1:dim))
+
             q += dim
             i += 1
         end
@@ -244,8 +245,8 @@ function MOI.copy_to(
     opt.model = Models.Model{T}(model_c, model_A, model_b, model_G, model_h,
         cones; obj_offset = obj_offset)
 
-    opt.cones_idxs = cones_idxs
-    opt.other_cones = other_cones
+    opt.moi_cone_idxs = moi_cone_idxs
+    opt.moi_cones = moi_cones
     return idx_map
 end
 
@@ -264,15 +265,12 @@ function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
     # transform solution for MOI conventions
     opt.zeros_primal = copy(model.b)
     mul!(opt.zeros_primal, model.A, opt.x, -1, true)
-    i = opt.other_cones_start
-    for cone in opt.other_cones
+    for (cone, idxs) in zip(opt.moi_cones, opt.moi_cone_idxs)
         if needs_untransform(cone)
-            idxs = opt.cones_idxs[i]
             @assert length(idxs) == MOI.dimension(cone)
             @views untransform_affine(cone, opt.s[idxs])
             @views untransform_affine(cone, opt.z[idxs])
         end
-        i += 1
     end
     return
 end
@@ -411,7 +409,7 @@ function MOI.get(
     ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCones{T}},
     ) where T
     MOI.check_result_index_bounds(opt, attr)
-    return opt.z[opt.cones_idxs[ci.value]]
+    return opt.z[opt.moi_cone_idxs[ci.value]]
 end
 
 function MOI.get(
@@ -429,5 +427,5 @@ function MOI.get(
     ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCones{T}},
     ) where T
     MOI.check_result_index_bounds(opt, attr)
-    return opt.s[opt.cones_idxs[ci.value]]
+    return opt.s[opt.moi_cone_idxs[ci.value]]
 end
