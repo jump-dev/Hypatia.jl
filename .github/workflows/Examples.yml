@@ -18,9 +18,9 @@ jobs:
         shell: julia --project=examples --color=yes {0}
         run: |
           using Pkg
-          Pkg.instantiate()
           Pkg.develop(PackageSpec(path=pwd()))
           Pkg.add(PackageSpec(path=joinpath(pwd(), "../../Hypatia"))
           Pkg.status()
+          Pkg.instantiate()
           include("examples/runexamplestests.jl")
           exit(1)
