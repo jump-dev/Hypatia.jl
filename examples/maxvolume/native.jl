@@ -14,7 +14,7 @@ function build(inst::MaxVolumeNative{T}) where {T <: Real}
     n = inst.n
 
     poly_hrep = Matrix{T}(I, n, n)
-    poly_hrep .+= T.(randn(n, n)) / n
+    poly_hrep .+= randn(T, n, n) / n
     c = vcat(-1, zeros(T, n))
     A = hcat(zeros(T, n), poly_hrep)
     b = ones(T, n)

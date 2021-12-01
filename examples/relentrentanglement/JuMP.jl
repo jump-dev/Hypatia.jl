@@ -30,7 +30,7 @@ function build(inst::RelEntrEntanglementJuMP{T}) where {T <: Float64}
     JuMP.@constraint(model, vcat(y, tau_vec, rho_vec) in
         Hypatia.EpiTrRelEntropyTriCone{T}(1 + 2 * vec_dim))
     pt = partial_transpose(Symmetric(Tau), 2, [na, nb])
-    JuMP.@SDconstraint(model, Symmetric(pt) >= 0)
+    JuMP.@constraint(model, Symmetric(pt) in JuMP.PSDCone())
 
     return model
 end

@@ -54,7 +54,7 @@ function build(inst::PolyMinJuMP{T}) where {T <: Float64}
                     # Mosek cannot handle 1x1 PSD constraints
                     JuMP.@constraint(model, psd_r[1, 1] >= 0)
                 else
-                    JuMP.@SDconstraint(model, psd_r >= 0)
+                    JuMP.@constraint(model, psd_r in JuMP.PSDCone())
                 end
                 push!(psd_vars, psd_r)
             end

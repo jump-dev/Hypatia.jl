@@ -60,7 +60,7 @@ function build(inst::NearestPSDJuMP{T}) where {T <: Float64}
                 col_idxs, inst.use_completable))
         else
             X_sparse = sparse(row_idxs, col_idxs, X)
-            JuMP.@SDconstraint(model, Symmetric(Matrix(X_sparse), :L) >= 0)
+            JuMP.@constraint(model, Symmetric(Matrix(X_sparse), :L) in JuMP.PSDCone())
         end
     else
         @assert inst.use_completable

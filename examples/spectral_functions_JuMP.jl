@@ -405,7 +405,7 @@ function add_spectral(
             s = JuMP.@variable(model)
             JuMP.@constraint(model, sum(λ[1:i]) - i * s - tr(Z) >= 0)
             mat = Symmetric(Z - W + s * Matrix(I, d, d), :U)
-            JuMP.@SDconstraint(model, mat >= 0)
+            JuMP.@constraint(model, mat in JuMP.PSDCone())
         end
     else
         (Wr, Wi) = get_smat_complex(d, w)
@@ -415,7 +415,7 @@ function add_spectral(
             Zia = JuMP.@variable(model, [1:(d - 1), 1:(d - 1)], Symmetric)
             Zi = make_skewsymm(d, 1.0 * Zia)
             Z2 = Symmetric(hvcat((2, 2), Zr, Zi', Zi, Zr), :U)
-            JuMP.@SDconstraint(model, Z2 >= 0)
+            JuMP.@constraint(model, Z2 in JuMP.PSDCone())
 
             s = JuMP.@variable(model)
             JuMP.@constraint(model, sum(λ[1:i]) - i * s - tr(Zr) >= 0)
@@ -423,7 +423,7 @@ function add_spectral(
             Mr = Symmetric(Zr - Wr + s * Matrix(I, d, d), :U)
             Mi = Zi - Wi
             mat = Symmetric(hvcat((2, 2), Mr, Mi', Mi, Mr), :U)
-            JuMP.@SDconstraint(model, mat >= 0)
+            JuMP.@constraint(model, mat in JuMP.PSDCone())
         end
     end
     JuMP.@constraint(model, trW == sum(λ))
@@ -482,7 +482,7 @@ function add_spectral(
         Mi = hvcat((2, 2), Zi, zeros(d, d), zeros(d, d), Wi)
         mat = Symmetric(hvcat((2, 2), Mr, Mi', Mi, Mr), :U)
     end
-    JuMP.@SDconstraint(model, mat >= 0)
+    JuMP.@constraint(model, mat in JuMP.PSDCone())
 
     return
 end
@@ -556,7 +556,7 @@ function extend_det(
 
     W = get_smat(d, w)
     mat = Symmetric(hvcat((2, 2), W, U', U, Diagonal(δ)), :U)
-    JuMP.@SDconstraint(model, mat >= 0)
+    JuMP.@constraint(model, mat in JuMP.PSDCone())
 
     return δ
 end
@@ -579,7 +579,7 @@ function extend_det(
     Mr = Symmetric(hvcat((2, 2), Wr, Ur', Ur, Diagonal(δ)), :U)
     Mi = hvcat((2, 2), Wi, -Ui', Ui, zeros(d, d))
     mat = Symmetric(hvcat((2, 2), Mr, Mi', Mi, Mr), :U)
-    JuMP.@SDconstraint(model, mat >= 0)
+    JuMP.@constraint(model, mat in JuMP.PSDCone())
 
     return δ
 end

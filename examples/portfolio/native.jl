@@ -20,8 +20,8 @@ function build(inst::PortfolioNative{T}) where {T <: Real}
     num_stocks = inst.num_stocks
 
     returns = rand(T, num_stocks)
-    sigma_half = T.(randn(num_stocks, num_stocks))
-    x = T.(randn(num_stocks))
+    sigma_half = randn(T, num_stocks, num_stocks)
+    x = randn(T, num_stocks)
     x ./= norm(x)
     gamma = sum(abs, sigma_half * x) / sqrt(T(num_stocks))
 
