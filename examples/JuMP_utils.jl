@@ -76,27 +76,29 @@ function setup_model(
     inst = ex_type(inst_data...)
     model = build(inst)
 
-    is_hypatia_opt = (solver_type == Hypatia.Optimizer)
-    opt = hyp_opt = (is_hypatia_opt ? Hypatia.Optimizer(; solver_options...) :
-        Hypatia.Optimizer(use_dense_model = false))
+    hyp_opt = Hypatia.Optimizer(; solver_options...)
+    extT = if isnothing(extender)
+        MOIU.UniversalFallback(MOIU.Model{Float64}())
+    else
+        @eval $extender{Float64}()
+    end
+    opt = MOI.Bridges.full_bridge_optimizer(
+        MOIU.CachingOptimizer(extT, hyp_opt), Float64)
     if !isnothing(extender)
-        # use MOI automated extended formulation
-        extT = @eval $extender{Float64}()
-        opt = MOI.Bridges.full_bridge_optimizer(
-            MOIU.CachingOptimizer(extT, opt), Float64)
         # for PolyJuMP/SumOfSquares models
         for B in model.bridge_types
             MOI.Bridges.add_bridge(opt, B{Float64})
         end
     end
+
     backend = JuMP.backend(model)
     MOIU.reset_optimizer(backend, opt)
     MOIU.attach_optimizer(backend)
-    isnothing(extender) || MOIU.attach_optimizer(backend.optimizer.model)
+    MOIU.attach_optimizer(backend.optimizer.model)
     flush(stdout); flush(stderr)
 
     hyp_model = hyp_opt.model
-    if is_hypatia_opt
+    if solver_type == Hypatia.Optimizer
         model.ext[:inst] = inst
     else
         # not using Hypatia to solve, so setup new JuMP model with Hypatia data
@@ -145,7 +147,7 @@ function solve_check(
 
     opt = JuMP.backend(model).optimizer
     if !isa(opt, Hypatia.Optimizer)
-        backend_model = JuMP.backend(model).optimizer.model
+        backend_model = opt.model
         if backend_model isa MOIU.CachingOptimizer
             opt = backend_model.optimizer
         end

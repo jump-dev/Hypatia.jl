@@ -126,7 +126,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64}
                     Lr = size(Pr, 2)
                     psd_r = JuMP.@variable(model, [1:Lr, 1:Lr], Symmetric)
                     push!(psd_vars, psd_r)
-                    JuMP.@SDconstraint(model, psd_r >= 0)
+                    JuMP.@constraint(model, psd_r in JuMP.PSDCone())
                 end
                 coeffs_lhs = JuMP.@expression(model, [u in 1:mono_U],
                     sum(sum(Pr[u, k] * Pr[u, l] * psd_r[k, l] * (k == l ? 1 : 2)
@@ -179,7 +179,7 @@ function build(inst::ShapeConRegrJuMP{T}) where {T <: Float64}
                 Lr = size(Pr, 2)
                 psd_r = JuMP.@variable(model, [1:(Lr * n), 1:(Lr * n)], Symmetric)
                 push!(psd_vars, psd_r)
-                JuMP.@SDconstraint(model, psd_r >= 0)
+                JuMP.@constraint(model, psd_r in JuMP.PSDCone())
             end
             # for readability
             Ls = [size(Pr, 2) for Pr in conv_Ps]

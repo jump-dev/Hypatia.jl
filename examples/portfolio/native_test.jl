@@ -1,9 +1,9 @@
 
 insts = OrderedDict()
 insts["minimal"] = [
-    ((3, true, false, true),),
-    ((3, false, true, true),),
-    ((3, false, true, false),),
+    ((4, true, false, true),),
+    ((4, false, true, true),),
+    ((4, false, true, false),),
     ]
 insts["fast"] = [
     ((10, true, false, true),),

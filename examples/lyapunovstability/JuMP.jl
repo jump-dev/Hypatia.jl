@@ -22,7 +22,7 @@ Lyapunov function for the system x_dot = A*x+g(x), norm(g(x)) <= gamma*norm(x)
 
 struct LyapunovStabilityJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     num_rows::Int
-    num_cols::Int
+    num_cols::Int # ignored if linear_dynamics
     linear_dynamics::Bool # solve problem 1 in the description, else problem 2
     use_matrixepipersquare::Bool # use matrixepipersquare cone, else PSD cone
 end
@@ -34,19 +34,16 @@ function build(inst::LyapunovStabilityJuMP{T}) where {T <: Float64}
     JuMP.@variable(model, t)
     JuMP.@objective(model, Min, t)
 
+    A = randn(num_rows, num_rows)
+    A = -A * A' - I
     if inst.linear_dynamics
-        A = randn(num_rows, num_rows)
-        A = -A * A'
         B = randn(num_rows, num_cols)
         C = randn(num_rows, num_rows)
         JuMP.@variable(model, P[1:num_rows, 1:num_rows], PSD)
         U = -A' * P - P * A - C' * C / 100
         W = P * B
     else
-        @assert num_rows == num_cols
         # P = -A is a feasible solution, with alpha and gamma sufficiently small
-        A = randn(num_rows, num_rows)
-        A = -A * A' - I
         alpha = 0.01
         gamma = 0.01
         JuMP.@variable(model, P[1:num_rows, 1:num_rows], Symmetric)

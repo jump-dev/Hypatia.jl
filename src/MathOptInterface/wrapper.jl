@@ -210,11 +210,11 @@ function MOI.copy_to(
             si = get_con_set(ci)
             push!(other_cones, si)
             dim = MOI.output_dimension(fi)
-            idxs = q .+ (1:dim)
+            perm_idxs = q .+ permute_affine(si, 1:dim)
 
             if F == VV
                 JGi = (idx_map[vj].value for vj in fi.variables)
-                IGi = permute_affine(si, idxs)
+                IGi = perm_idxs
                 VGi = rescale_affine(si, fill(-one(T), dim))
             else
                 JGi = (idx_map[vt.scalar_term.variable].value
@@ -223,17 +223,15 @@ function MOI.copy_to(
                 VGi = rescale_affine(si, [-vt.scalar_term.coefficient
                     for vt in fi.terms], IGi)
                 IGi .+= q
-                Ihi = permute_affine(si, idxs)
-                Vhi = rescale_affine(si, fi.constants)
-                append!(Ih, Ihi)
-                append!(Vh, Vhi)
+                append!(Ih, perm_idxs)
+                append!(Vh, rescale_affine(si, fi.constants))
             end
 
             append!(IG, IGi)
             append!(JG, JGi)
             append!(VG, VGi)
             push!(cones, cone_from_moi(T, si))
-            push!(cones_idxs, idxs)
+            push!(cones_idxs, q .+ (1:dim))
             q += dim
             i += 1
         end
