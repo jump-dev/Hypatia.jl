@@ -11,11 +11,10 @@ insts["minimal"] = [
     ((1, 2, MatNegEntropyConjEigOrd()),),
     # tr negsqrtconj
     ((1, 2, MatNegSqrtConj()),),
-    ((1, 2, MatNegSqrtConjEigOrd()),),
     ((1, 2, MatNegSqrtConjDirect()),),
     # tr negpower01conj
     ((1, 2, MatNegPower01Conj(0.3)),),
-    ((1, 2, MatNegPower01ConjEigOrd(0.3)),),
+    ((1, 2, MatNegPower01ConjEigOrd(0.3)), nothing, relaxed_tols),
     # tr power12conj (domain not positive)
     ((1, 2, MatPower12Conj(1.7)),),
     ((1, 2, MatPower12ConjEigOrd(1.7)),),
