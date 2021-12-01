@@ -84,13 +84,12 @@ function setup_model(
     end
     opt = MOI.Bridges.full_bridge_optimizer(
         MOIU.CachingOptimizer(extT, hyp_opt), Float64)
-    # # TODO is this still needed?
-    # if !isnothing(extender)
-    # # for PolyJuMP/SumOfSquares models
-    #     for B in model.bridge_types
-    #         MOI.Bridges.add_bridge(opt, B{Float64})
-    #     end
-    # end
+    if !isnothing(extender)
+        # for PolyJuMP/SumOfSquares models
+        for B in model.bridge_types
+            MOI.Bridges.add_bridge(opt, B{Float64})
+        end
+    end
 
     backend = JuMP.backend(model)
     MOIU.reset_optimizer(backend, opt)
