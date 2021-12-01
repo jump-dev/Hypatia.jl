@@ -15,6 +15,6 @@ jobs:
       - name: Dev package
         run: julia -e 'using Pkg; Pkg.instantiate(); Pkg.develop(PackageSpec(path=pwd()))'
       - name: Install dependencies
-        run: julia --project=examples -e 'using Pkg; Pkg.instantiate()'
+        run: julia --project=examples -e 'using Pkg; Pkg.instantiate(); Pkg.develop(PackageSpec(path=pwd()))'
       - name: Run examples
         run: julia --project=examples --color=yes examples/runexamplestests.jl
