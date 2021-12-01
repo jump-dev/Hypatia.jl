@@ -12,7 +12,9 @@ jobs:
       - uses: julia-actions/setup-julia@latest
         with:
           version: '1'
+      - name: Dev package
+        run: julia -e 'using Pkg; Pkg.instantiate(); Pkg.develop(PackageSpec(path=pwd()))'
       - name: Install dependencies
-        run: julia --project=examples -e 'using Pkg; Pkg.instantiate(); Pkg.develop(PackageSpec(path=pwd()))'
+        run: julia --project=examples -e 'using Pkg; Pkg.instantiate()'
       - name: Run examples
         run: julia --project=examples --color=yes examples/runexamplestests.jl
