@@ -33,7 +33,7 @@ function build(inst::DiscreteMaxLikelihood{T}) where {T <: Float64}
     return model
 end
 
-function test_extra(inst::DiscreteMaxLikelihood{T}, model::JuMP.Model) where T
+function test_extra(inst::DiscreteMaxLikelihood{T}, model::JuMP.Model) where {T}
     stat = JuMP.termination_status(model)
     @test stat == MOI.OPTIMAL
     (stat == MOI.OPTIMAL) || return
@@ -42,10 +42,10 @@ function test_extra(inst::DiscreteMaxLikelihood{T}, model::JuMP.Model) where T
     tol = eps(T)^0.2
     freq = model.ext[:freq]
     p_opt = JuMP.value.(model.ext[:p_var])
-    @test sum(p_opt) ≈ 1 atol=tol rtol=tol
+    @test sum(p_opt) ≈ 1 atol = tol rtol = tol
     @test minimum(p_opt) >= -tol
     p_opt = pos_only(p_opt)
     obj_result = exp(sum(f_i * log(p_i) for (f_i, p_i) in zip(freq, p_opt)))
-    @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
+    @test JuMP.objective_value(model) ≈ obj_result atol = tol rtol = tol
     return
 end

@@ -49,22 +49,23 @@ MOI.is_empty(opt::Optimizer) = (opt.solver.status == Solvers.NotLoaded)
 
 MOI.empty!(opt::Optimizer) = (opt.solver.status = Solvers.NotLoaded)
 
-MOI.supports(
+function MOI.supports(
     ::Optimizer{T},
     ::Union{MOI.ObjectiveSense, MOI.ObjectiveFunction{SAF{T}}},
-    ) where {T <: Real} = true
+) where {T <: Real}
+    return true
+end
 
-MOI.supports_constraint(
+function MOI.supports_constraint(
     ::Optimizer{T},
     ::Type{<:Union{VV, VAF{T}}},
     ::Type{<:SupportedCones{T}},
-    ) where {T <: Real} = true
+) where {T <: Real}
+    return true
+end
 
 # build representation as min c'x s.t. A*x = b, h - G*x in K
-function MOI.copy_to(
-    opt::Optimizer{T},
-    src::MOI.ModelLike,
-    ) where {T <: Real}
+function MOI.copy_to(opt::Optimizer{T}, src::MOI.ModelLike) where {T <: Real}
     idx_map = MOI.Utilities.IndexMap()
 
     # variables
@@ -189,9 +190,9 @@ function MOI.copy_to(
 
     for (F, S) in MOI.get(src, MOI.ListOfConstraintTypesPresent())
         if !MOI.supports_constraint(opt, F, S)
-            throw(MOI.UnsupportedConstraint{F,S}())
+            throw(MOI.UnsupportedConstraint{F, S}())
         end
-        for attr in MOI.get(src, MOI.ListOfConstraintAttributesSet{F,S}())
+        for attr in MOI.get(src, MOI.ListOfConstraintAttributesSet{F, S}())
             if attr == MOI.ConstraintName() ||
                attr == MOI.ConstraintPrimalStart() ||
                attr == MOI.ConstraintDualStart()
@@ -217,11 +218,13 @@ function MOI.copy_to(
                 IGi = perm_idxs
                 VGi = rescale_affine(si, fill(-one(T), dim))
             else
-                JGi = (idx_map[vt.scalar_term.variable].value
-                    for vt in fi.terms)
+                JGi = (idx_map[vt.scalar_term.variable].value for vt in fi.terms)
                 IGi = permute_affine(si, [vt.output_index for vt in fi.terms])
-                VGi = rescale_affine(si, [-vt.scalar_term.coefficient
-                    for vt in fi.terms], IGi)
+                VGi = rescale_affine(
+                    si,
+                    [-vt.scalar_term.coefficient for vt in fi.terms],
+                    IGi,
+                )
                 IGi .+= q
                 append!(Ih, perm_idxs)
                 append!(Vh, rescale_affine(si, fi.constants))
@@ -241,8 +244,15 @@ function MOI.copy_to(
     model_G = dropzeros!(sparse(IG, JG, VG, q, n))
     model_h = Vector(sparsevec(Ih, Vh, q))
 
-    opt.model = Models.Model{T}(model_c, model_A, model_b, model_G, model_h,
-        cones; obj_offset = obj_offset)
+    opt.model = Models.Model{T}(
+        model_c,
+        model_A,
+        model_b,
+        model_G,
+        model_h,
+        cones;
+        obj_offset = obj_offset,
+    )
 
     opt.cones_idxs = cones_idxs
     opt.other_cones = other_cones
@@ -400,7 +410,7 @@ function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintDual,
     ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, MOI.Zeros},
-    ) where T
+) where {T}
     MOI.check_result_index_bounds(opt, attr)
     return opt.y[opt.zeros_idxs[ci.value]]
 end
@@ -409,7 +419,7 @@ function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintDual,
     ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCones{T}},
-    ) where T
+) where {T}
     MOI.check_result_index_bounds(opt, attr)
     return opt.z[opt.cones_idxs[ci.value]]
 end
@@ -418,7 +428,7 @@ function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintPrimal,
     ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, MOI.Zeros},
-    ) where T
+) where {T}
     MOI.check_result_index_bounds(opt, attr)
     return opt.zeros_primal[opt.zeros_idxs[ci.value]]
 end
@@ -427,7 +437,7 @@ function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintPrimal,
     ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCones{T}},
-    ) where T
+) where {T}
     MOI.check_result_index_bounds(opt, attr)
     return opt.s[opt.cones_idxs[ci.value]]
 end

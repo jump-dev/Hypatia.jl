@@ -60,14 +60,17 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
 
         # add first row and column for epigraph variable
         G_norm = [
-            -one(T)    zeros(T, 1, num_unknown);
-            zeros(T, mn)    G_norm;
-            ]
+            -one(T) zeros(T, 1, num_unknown)
+            zeros(T, mn) G_norm
+        ]
         h_norm_x = vcat(zero(T), h_norm_x)
         h_norm = h_norm_x
 
-        cones = Cones.Cone{T}[Cones.EpiNormSpectral{T, T}(m, n,
-            use_dual = inst.nuclearnorm_obj)]
+        cones = Cones.Cone{T}[Cones.EpiNormSpectral{T, T}(
+            m,
+            n,
+            use_dual = inst.nuclearnorm_obj,
+        )]
     else
         # build an extended formulation for the norm used in the objective
         if inst.nuclearnorm_obj
@@ -112,17 +115,14 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
                 for j in 1:i
                     idx += 1
                     W2_var_idx += 1
-                    G_norm[offset + idx,
-                        num_unknown + num_W1_vars + W2_var_idx] = -1
+                    G_norm[offset + idx, num_unknown + num_W1_vars + W2_var_idx] = -1
                 end
             end
             Cones.scale_svec!(G_norm, rt2)
             Cones.scale_svec!(h_norm, rt2)
             cones = Cones.Cone{T}[Cones.PosSemidefTri{T, T}(num_rows)]
-            c_W1 = Cones.smat_to_svec!(zeros(T, num_W1_vars),
-                Diagonal(one(T) * I, m), rt2)
-            c_W2 = Cones.smat_to_svec!(zeros(T, num_W2_vars),
-                Diagonal(one(T) * I, n), rt2)
+            c_W1 = Cones.smat_to_svec!(zeros(T, num_W1_vars), Diagonal(one(T) * I, m), rt2)
+            c_W2 = Cones.smat_to_svec!(zeros(T, num_W2_vars), Diagonal(one(T) * I, n), rt2)
             c = vcat(zeros(T, num_unknown), c_W1, c_W2) / 2
         else
             # extended formulation for spectral norm
@@ -169,8 +169,7 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
     if inst.geomean_constr
         if inst.use_hypogeomean
             # hypogeomean for values to be filled
-            G_geo = vcat(zeros(T, 1, num_unknown), Matrix{T}(-I,
-                num_unknown, num_unknown))
+            G_geo = vcat(zeros(T, 1, num_unknown), Matrix{T}(-I, num_unknown, num_unknown))
             h = vcat(h_norm, one(T), zeros(T, num_unknown))
 
             # if using extended with spectral objective G_geo needs to be
@@ -181,17 +180,13 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
                     postpad = zeros(T, num_unknown + 1, 0)
                 else
                     prepad = zeros(T, num_unknown + 1, 0)
-                    postpad = zeros(T, num_unknown + 1,
-                        size(G_norm, 2) - num_unknown)
+                    postpad = zeros(T, num_unknown + 1, size(G_norm, 2) - num_unknown)
                 end
             else
                 prepad = zeros(T, num_unknown + 1, 1)
                 postpad = zeros(T, num_unknown + 1, 0)
             end
-            G = [
-                G_norm;
-                prepad  G_geo  postpad
-                ]
+            G = [G_norm; prepad G_geo postpad]
             push!(cones, Cones.HypoGeoMean{T}(1 + num_unknown))
         else
             # number of 3-dimensional power cones needed is num_unknown - 1,
@@ -215,16 +210,23 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
                 G_geo_newvars[offset + 2, i + 1] = -1
                 G_geo_newvars[offset + 1, i] = -1
                 G_geo_unknown[offset, i + 2] = -1
-                push!(cones, Cones.GeneralizedPower{T}([inv(T(i + 2)),
-                    T(i + 1) / T(i + 2)], 1))
+                push!(
+                    cones,
+                    Cones.GeneralizedPower{T}([inv(T(i + 2)), T(i + 1) / T(i + 2)], 1),
+                )
                 offset += 3
             end
 
             # last row also special because hypograph variable is fixed
             G_geo_unknown[offset, num_unknown] = -1
             G_geo_newvars[offset + 1, num_unknown - 2] = -1
-            push!(cones, Cones.GeneralizedPower{T}([inv(T(num_unknown)),
-                T(num_unknown - 1) / T(num_unknown)], 1))
+            push!(
+                cones,
+                Cones.GeneralizedPower{T}(
+                    [inv(T(num_unknown)), T(num_unknown - 1) / T(num_unknown)],
+                    1,
+                ),
+            )
             h = vcat(h_norm, zeros(T, 3 * (num_unknown - 2)), T[0, 0, 1])
 
             # if using extended with spectral objective G_geo needs to be
@@ -242,9 +244,9 @@ function build(inst::MatrixCompletionNative{T}) where {T <: Real}
                 postpad = zeros(T, len_power, 0)
             end
             G = [
-                G_norm  zeros(T, size(G_norm, 1), num_unknown - 2);
-                prepad  G_geo_unknown  postpad  G_geo_newvars
-                ]
+                G_norm zeros(T, size(G_norm, 1), num_unknown - 2)
+                prepad G_geo_unknown postpad G_geo_newvars
+            ]
 
             c = vcat(c, zeros(T, num_unknown - 2))
         end

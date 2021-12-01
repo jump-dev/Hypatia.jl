@@ -46,7 +46,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     function HypoRootdetTri{T, R}(
         dim::Int;
         use_dual::Bool = false,
-        ) where {T <: Real, R <: RealOrComplex{T}}
+    ) where {T <: Real, R <: RealOrComplex{T}}
         @assert dim >= 2
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
@@ -60,7 +60,7 @@ end
 
 function setup_extra_data!(
     cone::HypoRootdetTri{T, R},
-    ) where {T <: Real, R <: RealOrComplex{T}}
+) where {T <: Real, R <: RealOrComplex{T}}
     dim = cone.dim
     d = cone.d
     cone.di = inv(T(d))
@@ -79,7 +79,7 @@ get_nu(cone::HypoRootdetTri) = 1 + cone.d
 function set_initial_point!(
     arr::AbstractVector{T},
     cone::HypoRootdetTri{T, R},
-    ) where {T <: Real, R <: RealOrComplex{T}}
+) where {T <: Real, R <: RealOrComplex{T}}
     d = cone.d
     arr .= 0
     # central point data are the same as for hypogeomean
@@ -173,7 +173,7 @@ function hess_prod!(
     prod::AbstractVecOrMat{T},
     arr::AbstractVecOrMat{T},
     cone::HypoRootdetTri{T},
-    ) where {T <: Real}
+) where {T <: Real}
     @assert cone.grad_updated
     di = cone.di
     ζ = cone.ζ
@@ -243,7 +243,7 @@ function inv_hess_prod!(
     prod::AbstractVecOrMat{T},
     arr::AbstractVecOrMat{T},
     cone::HypoRootdetTri{T},
-    ) where {T <: Real}
+) where {T <: Real}
     @assert cone.grad_updated
     @views w = cone.point[2:end]
     svec_to_smat!(cone.mat4, w, cone.rt2)

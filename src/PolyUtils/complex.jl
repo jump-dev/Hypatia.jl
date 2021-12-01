@@ -18,7 +18,7 @@ function interpolate(
     g_halfdegs::Vector{Int};
     sample_factor::Int = 10,
     use_qr::Bool = false,
-    ) where {T <: Real}
+) where {T <: Real}
     # generate interpolation
     # TODO use more numerically-stable basis for columns, and evaluate in a more
     # numerically stable way by multiplying the columns
@@ -26,8 +26,10 @@ function interpolate(
     U = L^2
     L_basis = [a for t in 0:halfdeg for a in Combinatorics.multiexponents(n, t)]
     mon_pow(z, ex) = prod(z[i]^ex[i] for i in eachindex(ex))
-    V_basis = [z -> mon_pow(z, L_basis[k]) * mon_pow(conj(z), L_basis[l]) for
-        l in eachindex(L_basis) for k in eachindex(L_basis)]
+    V_basis = [
+        z -> mon_pow(z, L_basis[k]) * mon_pow(conj(z), L_basis[l]) for
+        l in eachindex(L_basis) for k in eachindex(L_basis)
+    ]
     @assert length(V_basis) == U
 
     # sample from domain (inefficient for general domains, only samples from

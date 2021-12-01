@@ -26,25 +26,33 @@ function build(inst::MatrixQuadraticJuMP{T}) where {T <: Float64}
     C = randn(num_cols, num_rows)
     P = randn(num_rows, num_rows)
     P = Symmetric(P * P')
-    (row_idxs, col_idxs, _) = findnz(tril!(sprand(Bool, num_rows,
-        num_rows, inv(sqrt(num_rows)))) + I)
+    (row_idxs, col_idxs, _) =
+        findnz(tril!(sprand(Bool, num_rows, num_rows, inv(sqrt(num_rows)))) + I)
 
     model = JuMP.Model()
     JuMP.@variable(model, X[1:num_rows, 1:num_cols])
     JuMP.@variable(model, Y[1:num_rows, 1:num_rows], Symmetric)
     JuMP.@objective(model, Max, tr(C * X))
-    JuMP.@constraint(model, [(row, col) in zip(row_idxs, col_idxs)],
-        Y[row, col] == P[row, col])
+    JuMP.@constraint(
+        model,
+        [(row, col) in zip(row_idxs, col_idxs)],
+        Y[row, col] == P[row, col]
+    )
 
     if inst.use_matrixepipersquare
-        U_svec = zeros(JuMP.GenericAffExpr{T, JuMP.VariableRef},
-            Cones.svec_length(num_rows))
+        U_svec =
+            zeros(JuMP.GenericAffExpr{T, JuMP.VariableRef}, Cones.svec_length(num_rows))
         U_svec = Cones.smat_to_svec!(U_svec, 1.0 * Y, sqrt(2))
-        JuMP.@constraint(model, vcat(U_svec, 0.5, vec(X)) in
-            Hypatia.MatrixEpiPerSquareCone{T, T}(num_rows, num_cols))
+        JuMP.@constraint(
+            model,
+            vcat(U_svec, 0.5, vec(X)) in
+            Hypatia.MatrixEpiPerSquareCone{T, T}(num_rows, num_cols)
+        )
     else
-        JuMP.@constraint(model, Symmetric(
-            [Matrix(I, num_cols, num_cols) X'; X Y]) in JuMP.PSDCone())
+        JuMP.@constraint(
+            model,
+            Symmetric([Matrix(I, num_cols, num_cols) X'; X Y]) in JuMP.PSDCone()
+        )
     end
 
     return model

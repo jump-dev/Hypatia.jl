@@ -44,10 +44,7 @@ end
 PardisoSparseCache = Union{PardisoSymCache{Float64}, PardisoNonSymCache{Float64}}
 int_type(::PardisoSparseCache) = Int32
 
-function update_fact(
-    cache::PardisoSparseCache{Float64},
-    A::SparseMatrixCSC{Float64, Int32},
-    )
+function update_fact(cache::PardisoSparseCache{Float64}, A::SparseMatrixCSC{Float64, Int32})
     pardiso = cache.pardiso
 
     if !cache.analyzed
@@ -70,7 +67,7 @@ function inv_prod(
     x::Vector{Float64},
     A::SparseMatrixCSC{Float64, Int32},
     b::Vector{Float64},
-    )
+)
     pardiso = cache.pardiso
 
     Pardiso.set_phase!(pardiso, Pardiso.SOLVE_ITERATIVE_REFINE)

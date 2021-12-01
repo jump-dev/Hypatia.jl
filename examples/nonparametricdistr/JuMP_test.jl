@@ -26,7 +26,7 @@ insts["minimal"] = [
     ((2, VecNegRtdet()),),
     ((3, VecPower12(1.5)),),
     ((3, VecNegLogEF()),),
-    ]
+]
 insts["fast"] = [
     ((1000, VecNegLog()),),
     ((500, VecLogCone()),),
@@ -35,7 +35,7 @@ insts["fast"] = [
     ((200, VecNegLogEF()), nothing, relaxed_tols),
     ((1000, VecNegPower01(0.3)), nothing, relaxed_tols),
     ((1000, VecPower12(1.5)), nothing, relaxed_tols),
-    ]
+]
 insts["various"] = [
     ((1000, VecNegLog()),),
     ((3000, VecLogCone()),),
@@ -54,5 +54,5 @@ insts["various"] = [
     ((100, VecNegLogEF()), nothing, relaxed_tols),
     ((400, VecNegEntropy()), nothing, relaxed_tols),
     ((4000, VecNegEntropy()), nothing, relaxed_tols),
-    ]
+]
 return (NonparametricDistrJuMP, insts)

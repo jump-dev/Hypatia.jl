@@ -20,8 +20,7 @@ function build(inst::PolyEnvelopeNative{T}) where {T <: Real}
     domain = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n))
 
     # generate interpolation
-    (U, pts, Ps, _, w) = PolyUtils.interpolate(domain,
-        inst.env_halfdeg, get_quadr = true)
+    (U, pts, Ps, _, w) = PolyUtils.interpolate(domain, inst.env_halfdeg, get_quadr = true)
 
     # generate random data
     L = binomial(n + inst.rand_halfdeg, n)
@@ -43,8 +42,10 @@ function build(inst::PolyEnvelopeNative{T}) where {T <: Real}
         h = zeros(T, num_polys * U)
     end
 
-    cones = Cones.Cone{T}[Cones.WSOSInterpNonnegative{T, T}(U, Ps,
-        use_dual = !inst.primal_wsos) for k in 1:num_polys]
+    cones = Cones.Cone{T}[
+        Cones.WSOSInterpNonnegative{T, T}(U, Ps, use_dual = !inst.primal_wsos) for
+        k in 1:num_polys
+    ]
 
     model = Models.Model{T}(c, A, b, G, h, cones)
     return model

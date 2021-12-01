@@ -42,7 +42,7 @@ mutable struct GeneralizedPower{T <: Real} <: Cone{T}
         α::Vector{T},
         n::Int;
         use_dual::Bool = false,
-        ) where {T <: Real}
+    ) where {T <: Real}
         @assert n >= 1
         dim = length(α) + n
         @assert dim >= 3
@@ -60,7 +60,7 @@ end
 function setup_extra_data!(cone::GeneralizedPower{T}) where {T <: Real}
     m = length(cone.α)
     cone.u_idxs = 1:m
-    cone.w_idxs = (m + 1):cone.dim
+    cone.w_idxs = (m + 1):(cone.dim)
     cone.tempu1 = zeros(T, m)
     cone.tempu2 = zeros(T, m)
     return cone
@@ -208,12 +208,7 @@ function update_inv_hess(cone::GeneralizedPower{T}) where {T <: Real}
     return cone.inv_hess
 end
 
-
-function hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::GeneralizedPower,
-    )
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::GeneralizedPower)
     @assert cone.grad_updated
     u_idxs = cone.u_idxs
     w_idxs = cone.w_idxs
@@ -247,12 +242,11 @@ function hess_prod!(
     return prod
 end
 
-
 function inv_hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::GeneralizedPower,
-    )
+)
     @assert cone.grad_updated
     u_idxs = cone.u_idxs
     w_idxs = cone.w_idxs

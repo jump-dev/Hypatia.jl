@@ -45,8 +45,7 @@ function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64}
         wsos_cone2 = Hypatia.WSOSInterpNonnegativeCone{T, T}(U2, Ps2)
         wsos_cone3 = Hypatia.WSOSInterpNonnegativeCone{T, T}(U3, Ps3)
 
-        JuMP.@objective(model, Min, sum(quad_weights[u] * w(pts1[u, :])
-            for u in 1:U1))
+        JuMP.@objective(model, Min, sum(quad_weights[u] * w(pts1[u, :]) for u in 1:U1))
         JuMP.@constraints(model, begin
             [-dvdt(pts2[u, :]) for u in 1:U2] in wsos_cone2
             [diffwv(pts1[u, :]) for u in 1:U1] in wsos_cone1
@@ -54,22 +53,22 @@ function build(inst::RegionOfAttrJuMP{T}) where {T <: Float64}
             [w(pts1[u, :]) for u in 1:U1] in wsos_cone1
         end)
     else
-        int_box_mon(mon) = prod(1 / (p + 1) - (-1)^(p + 1) / (p + 1)
-            for p in DP.exponents(mon))
-        int_box(pol) = sum(DP.coefficient(t) * int_box_mon(t)
-            for t in DP.terms(pol))
+        function int_box_mon(mon)
+            return prod(1 / (p + 1) - (-1)^(p + 1) / (p + 1) for p in DP.exponents(mon))
+        end
+        int_box(pol) = sum(DP.coefficient(t) * int_box_mon(t) for t in DP.terms(pol))
 
         PolyJuMP.setpolymodule!(model, SumOfSquares)
         JuMP.@objective(model, Min, int_box(w))
 
-        JuMP.@constraint(model, -dvdt >= 0, domain =
-            (SAS.@set -1 <= x  && x <= 1 && 0 <= t && t <= 1))
-        JuMP.@constraint(model, diffwv >= 0, domain =
-            (SAS.@set -1 <= x && x <= 1))
-        JuMP.@constraint(model, vT >= 0, domain =
-            (SAS.@set -0.01 <= x && x <= 0.01))
-        JuMP.@constraint(model, w >= 0, domain =
-            (SAS.@set -1 <= x && x <= 1))
+        JuMP.@constraint(
+            model,
+            -dvdt >= 0,
+            domain = (SAS.@set -1 <= x && x <= 1 && 0 <= t && t <= 1)
+        )
+        JuMP.@constraint(model, diffwv >= 0, domain = (SAS.@set -1 <= x && x <= 1))
+        JuMP.@constraint(model, vT >= 0, domain = (SAS.@set -0.01 <= x && x <= 0.01))
+        JuMP.@constraint(model, w >= 0, domain = (SAS.@set -1 <= x && x <= 1))
     end
 
     return model

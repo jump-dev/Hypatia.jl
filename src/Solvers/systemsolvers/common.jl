@@ -15,8 +15,8 @@ mu/(taubar^2)*tau + kap = kaprhs
 function get_directions(
     stepper::Stepper{T},
     solver::Solver{T},
-    min_impr_tol::T = T(0.5) # improvement tolerance for iterative refinement
-    ) where {T <: Real}
+    min_impr_tol::T = T(0.5), # improvement tolerance for iterative refinement
+) where {T <: Real}
     rhs = stepper.rhs
     dir = stepper.dir
     dir_temp = stepper.dir_temp
@@ -76,10 +76,7 @@ function get_directions(
 end
 
 # calculate residual on 6x6 linear system
-function apply_lhs(
-    stepper::Stepper{T},
-    solver::Solver{T},
-    ) where {T <: Real}
+function apply_lhs(stepper::Stepper{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
     dir = stepper.dir
     res = stepper.temp
@@ -127,12 +124,15 @@ include("qrchol.jl")
 
 # reduce to 4x4 subsystem
 function solve_system(
-    syssolver::Union{NaiveElimSystemSolver{T}, SymIndefSystemSolver{T},
-        QRCholSystemSolver{T}},
+    syssolver::Union{
+        NaiveElimSystemSolver{T},
+        SymIndefSystemSolver{T},
+        QRCholSystemSolver{T},
+    },
     solver::Solver{T},
     sol::Point{T},
     rhs::Point{T},
-    ) where {T <: Real}
+) where {T <: Real}
     model = solver.model
 
     solve_subsystem4(syssolver, solver, sol, rhs)
@@ -156,7 +156,7 @@ function solve_subsystem4(
     solver::Solver{T},
     sol::Point{T},
     rhs::Point{T},
-    ) where {T <: Real}
+) where {T <: Real}
     model = solver.model
     rhs_sub = syssolver.rhs_sub
     sol_sub = syssolver.sol_sub
@@ -184,7 +184,7 @@ end
 function setup_point_sub(
     syssolver::Union{QRCholSystemSolver{T}, SymIndefSystemSolver{T}},
     model::Models.Model{T},
-    ) where {T <: Real}
+) where {T <: Real}
     (n, p, q) = (model.n, model.p, model.q)
     dim_sub = n + p + q
     z_start = model.n + model.p
@@ -207,5 +207,6 @@ function setup_point_sub(
     return
 end
 
-dot_obj(model::Models.Model, point::Point) = dot(model.c, point.x) +
-    dot(model.b, point.y) + dot(model.h, point.z)
+function dot_obj(model::Models.Model, point::Point)
+    return dot(model.c, point.x) + dot(model.b, point.y) + dot(model.h, point.z)
+end

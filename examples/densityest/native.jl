@@ -24,11 +24,17 @@ function DensityEstNative{T}(
     use_wsos::Bool,
     hypogeomean_obj::Bool,
     use_hypogeomean::Bool,
-    ) where {T <: Real}
+) where {T <: Real}
     X = DelimitedFiles.readdlm(joinpath(@__DIR__, "data", "$dataset_name.txt"))
     X = convert(Matrix{T}, X)
-    return DensityEstNative{T}(dataset_name, X, deg, use_wsos,
-        hypogeomean_obj, use_hypogeomean)
+    return DensityEstNative{T}(
+        dataset_name,
+        X,
+        deg,
+        use_wsos,
+        hypogeomean_obj,
+        use_hypogeomean,
+    )
 end
 
 function DensityEstNative{T}(num_obs::Int, n::Int, args...) where {T <: Real}
@@ -49,8 +55,8 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
 
     # setup interpolation
     halfdeg = div(inst.deg + 1, 2)
-    (U, _, Ps, V, w) = PolyUtils.interpolate(domain, halfdeg,
-        calc_V = true, get_quadr = true)
+    (U, _, Ps, V, w) =
+        PolyUtils.interpolate(domain, halfdeg, calc_V = true, get_quadr = true)
     F = qr!(Array(V'), ColumnNorm())
     V_X = PolyUtils.make_chebyshev_vandermonde(X, 2halfdeg)
     X_pts_polys = (F \ V_X')'
@@ -87,8 +93,7 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
             # relevant columns (not rows) in A need to be scaled by sqrt(2) also
             for k in 1:L
                 for l in 1:(k - 1)
-                    psd_var_list[i][:, idx] = Ps[i][:, k] .*
-                        Ps[i][:, l] * sqrt(T(2))
+                    psd_var_list[i][:, idx] = Ps[i][:, k] .* Ps[i][:, l] * sqrt(T(2))
                     idx += 1
                 end
                 psd_var_list[i][:, idx] = Ps[i][:, k] .* Ps[i][:, k]
@@ -109,7 +114,7 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
             G_likl = [
                 -one(T) zeros(T, 1, U)
                 zeros(T, num_obs) -X_pts_polys
-                ]
+            ]
             h_likl = zeros(T, 1 + num_obs)
             push!(cones, Cones.HypoGeoMean{T}(1 + num_obs))
             A_ext = zeros(T, 0, num_obs)

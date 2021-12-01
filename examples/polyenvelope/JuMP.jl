@@ -15,8 +15,7 @@ function build(inst::PolyEnvelopeJuMP{T}) where {T <: Float64}
     domain = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n))
 
     # generate interpolation
-    (U, pts, Ps, _, w) = PolyUtils.interpolate(domain, inst.env_halfdeg,
-        get_quadr = true)
+    (U, pts, Ps, _, w) = PolyUtils.interpolate(domain, inst.env_halfdeg, get_quadr = true)
 
     # generate random polynomials
     L = binomial(n + inst.rand_halfdeg, n)
@@ -26,8 +25,7 @@ function build(inst::PolyEnvelopeJuMP{T}) where {T <: Float64}
     JuMP.@variable(model, fpv[j in 1:U]) # values at Fekete points
     JuMP.@objective(model, Max, dot(fpv, w)) # integral over domain (quadrature)
     wsosT = Hypatia.WSOSInterpNonnegativeCone{T, T}
-    JuMP.@constraint(model, [i in 1:inst.num_polys],
-        polys[:, i] .- fpv in wsosT(U, Ps))
+    JuMP.@constraint(model, [i in 1:(inst.num_polys)], polys[:, i] .- fpv in wsosT(U, Ps))
 
     return model
 end

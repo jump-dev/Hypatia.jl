@@ -51,23 +51,23 @@ function build(inst::SparsePCANative{T}) where {T <: Real}
         Gl1vec = fill(-one(T), dimx)
         Cones.scale_svec!(Gl1vec, sqrt(T(2)))
         G = [
-            sparse(-one(T) * I, dimx, dimx);
-            spzeros(T, 1, dimx);
-            Diagonal(Gl1vec);
-            ]
+            sparse(-one(T) * I, dimx, dimx)
+            spzeros(T, 1, dimx)
+            Diagonal(Gl1vec)
+        ]
         h = vcat(hpsd, T(k), zeros(T, dimx))
         push!(cones, Cones.EpiNormInf{T, T}(1 + dimx, use_dual = true))
     else
         l1 = Cones.scale_svec!(ones(T, dimx), sqrt(T(2)))
         G = [
-            -I    spzeros(T, dimx, 2 * dimx);
-            spzeros(T, 2 * dimx, dimx)    -I;
-            spzeros(T, 1, dimx)    repeat(l1', 1, 2);
-            ]
+            -I spzeros(T, dimx, 2 * dimx)
+            spzeros(T, 2 * dimx, dimx) -I
+            spzeros(T, 1, dimx) repeat(l1', 1, 2)
+        ]
         A = [
-            sparse(A)    spzeros(T, 1, 2 * dimx);
-            -I    -I    I;
-            ]
+            sparse(A) spzeros(T, 1, 2 * dimx)
+            -I -I I
+        ]
         c = vcat(c, zeros(T, 2 * dimx))
         b = vcat(b, zeros(T, dimx))
         h = vcat(hpsd, zeros(T, 2 * dimx), k)
@@ -82,11 +82,11 @@ function test_extra(
     inst::SparsePCANative{T},
     solve_stats::NamedTuple,
     ::NamedTuple,
-    ) where T
+) where {T}
     @test solve_stats.status == Solvers.Optimal
     if solve_stats.status == Solvers.Optimal && iszero(inst.noise_ratio)
         # check objective value is correct
         tol = eps(T)^0.25
-        @test solve_stats.primal_obj ≈ -1 atol=tol rtol=tol
+        @test solve_stats.primal_obj ≈ -1 atol = tol rtol = tol
     end
 end

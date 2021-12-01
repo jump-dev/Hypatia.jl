@@ -32,10 +32,7 @@ mutable struct HypoGeoMean{T <: Real} <: Cone{T}
     η::T
     tempw::Vector{T}
 
-    function HypoGeoMean{T}(
-        dim::Int;
-        use_dual::Bool = false,
-        ) where {T <: Real}
+    function HypoGeoMean{T}(dim::Int; use_dual::Bool = false) where {T <: Real}
         @assert dim >= 2
         cone = new{T}()
         cone.use_dual_barrier = use_dual
@@ -53,10 +50,7 @@ end
 
 get_nu(cone::HypoGeoMean) = cone.dim
 
-function set_initial_point!(
-    arr::AbstractVector{T},
-    cone::HypoGeoMean{T},
-    ) where {T <: Real}
+function set_initial_point!(arr::AbstractVector{T}, cone::HypoGeoMean{T}) where {T <: Real}
     (u, w) = get_central_ray_hypogeomean(T, cone.dim - 1)
     arr[1] = u
     arr[2:end] .= w
@@ -138,7 +132,7 @@ function hess_prod!(
     prod::AbstractVecOrMat{T},
     arr::AbstractVecOrMat{T},
     cone::HypoGeoMean{T},
-    ) where {T <: Real}
+) where {T <: Real}
     @assert cone.grad_updated
     @views w = cone.point[2:end]
     di = cone.di
@@ -201,7 +195,7 @@ function inv_hess_prod!(
     prod::AbstractVecOrMat{T},
     arr::AbstractVecOrMat{T},
     cone::HypoGeoMean{T},
-    ) where {T <: Real}
+) where {T <: Real}
     @assert cone.grad_updated
     @views w = cone.point[2:end]
     ζ = cone.ζ

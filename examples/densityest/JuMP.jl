@@ -35,8 +35,8 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64}
 
     # setup interpolation
     halfdeg = div(inst.deg + 1, 2)
-    (U, _, Ps, V, w) = PolyUtils.interpolate(domain, halfdeg,
-        calc_V = true, get_quadr = true)
+    (U, _, Ps, V, w) =
+        PolyUtils.interpolate(domain, halfdeg, calc_V = true, get_quadr = true)
     F = qr!(Array(V'), ColumnNorm())
     V_X = PolyUtils.make_chebyshev_vandermonde(X, 2 * halfdeg)
     X_pts_polys = F \ V_X'
@@ -49,17 +49,21 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64}
     # objective epigraph
     obj_vec = X_pts_polys' * f_pts
     if inst.geomean_obj
-        JuMP.@constraint(model, vcat(z, obj_vec) in
-            MOI.GeometricMeanCone(1 + num_obs))
+        JuMP.@constraint(model, vcat(z, obj_vec) in MOI.GeometricMeanCone(1 + num_obs))
     elseif inst.use_nlog
-        JuMP.@constraint(model, vcat(z, 1, obj_vec) in
-            Hypatia.HypoPerLogCone{T}(2 + num_obs))
+        JuMP.@constraint(
+            model,
+            vcat(z, 1, obj_vec) in Hypatia.HypoPerLogCone{T}(2 + num_obs)
+        )
     else
         # EF for big log cone using 3-dim log cones
         JuMP.@variable(model, y[1:num_obs])
         JuMP.@constraint(model, z <= sum(y))
-        JuMP.@constraint(model, [i in 1:num_obs],
-            [y[i], 1, obj_vec[i]] in MOI.ExponentialCone())
+        JuMP.@constraint(
+            model,
+            [i in 1:num_obs],
+            [y[i], 1, obj_vec[i]] in MOI.ExponentialCone()
+        )
     end
 
     # density integrates to 1
@@ -68,8 +72,7 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64}
     # density nonnegative
     if inst.use_wsos
         # WSOS formulation
-        JuMP.@constraint(model, f_pts in
-            Hypatia.WSOSInterpNonnegativeCone{T, T}(U, Ps))
+        JuMP.@constraint(model, f_pts in Hypatia.WSOSInterpNonnegativeCone{T, T}(U, Ps))
     else
         # PSD formulation
         psd_vars = []
@@ -84,10 +87,16 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64}
             end
             push!(psd_vars, psd_r)
         end
-        coeffs_lhs = JuMP.@expression(model, [u in 1:U],
-            sum(sum(Pr[u, k] * Pr[u, l] * psd_r[k, l] * (k == l ? 1 : 2)
-            for k in 1:size(Pr, 2) for l in 1:k)
-            for (Pr, psd_r) in zip(Ps, psd_vars)))
+        coeffs_lhs = JuMP.@expression(
+            model,
+            [u in 1:U],
+            sum(
+                sum(
+                    Pr[u, k] * Pr[u, l] * psd_r[k, l] * (k == l ? 1 : 2) for
+                    k in 1:size(Pr, 2) for l in 1:k
+                ) for (Pr, psd_r) in zip(Ps, psd_vars)
+            )
+        )
         JuMP.@constraint(model, coeffs_lhs .== f_pts)
     end
 

@@ -7,7 +7,7 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
     use_curve_search::Bool
     max_cent_steps::Int
     pred_prox_bound::T
-    searcher_options
+    searcher_options::Any
 
     prev_alpha::T
     cent_count::Int
@@ -27,8 +27,8 @@ mutable struct PredOrCentStepper{T <: Real} <: Stepper{T}
         use_curve_search::Bool = use_adjustment,
         max_cent_steps::Int = 4,
         pred_prox_bound::T = T(0.0332), # from Alfonso solver
-        searcher_options...
-        ) where {T <: Real}
+        searcher_options...,
+    ) where {T <: Real}
         stepper = new{T}()
         if use_curve_search
             # can only use curve search if using adjustment
@@ -80,7 +80,8 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
     solver.time_upsys += @elapsed update_lhs(solver.syssolver, solver)
 
     # decide whether to predict or center
-    is_pred = (stepper.cent_count >= stepper.max_cent_steps) ||
+    is_pred =
+        (stepper.cent_count >= stepper.max_cent_steps) ||
         (stepper.searcher.prox < stepper.pred_prox_bound)
     stepper.cent_count = (is_pred ? 0 : stepper.cent_count + 1)
     rhs_fun_noadj = (is_pred ? update_rhs_pred : update_rhs_cent)
@@ -102,8 +103,7 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
         if stepper.use_curve_search
             # do single curve search with adjustment
             stepper.unadj_only = false
-            solver.time_search += @elapsed alpha = search_alpha(point, model,
-                stepper)
+            solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
 
             if iszero(alpha)
                 # try not using adjustment
@@ -118,22 +118,20 @@ function step(stepper::PredOrCentStepper{T}, solver::Solver{T}) where {T <: Real
             # do two line searches, first for unadjusted alpha, then for corrected alpha
             try_noadj = false
             stepper.unadj_only = true
-            solver.time_search += @elapsed alpha = search_alpha(point, model,
-                stepper)
+            solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
             stepper.unadj_alpha = alpha
             unadj_sched = stepper.searcher.prev_sched
 
             if !iszero(alpha)
                 stepper.unadj_only = false
-                solver.time_search += @elapsed alpha = search_alpha(point,
-                    model, stepper)
+                solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
 
                 if iszero(alpha)
                     # use unadjusted direction: start at alpha found
                     # during unadjusted direction search
                     stepper.unadj_only = true
-                    solver.time_search += @elapsed alpha = search_alpha(point,
-                        model, stepper, sched = unadj_sched)
+                    solver.time_search += @elapsed alpha =
+                        search_alpha(point, model, stepper, sched = unadj_sched)
                     # check alpha didn't decrease more
                     @assert stepper.searcher.prev_sched == unadj_sched
                 end
@@ -172,7 +170,7 @@ function update_stepper_points(
     point::Point{T},
     stepper::PredOrCentStepper{T},
     ztsk_only::Bool,
-    ) where {T <: Real}
+) where {T <: Real}
     if ztsk_only
         cand = stepper.temp.ztsk
         copyto!(cand, point.ztsk)
@@ -185,16 +183,16 @@ function update_stepper_points(
     @. cand += alpha * dir_noadj
     if !stepper.unadj_only
         dir_adj = (ztsk_only ? stepper.dir_adj.ztsk : stepper.dir_adj.vec)
-        adj_factor = (stepper.use_curve_search ? abs2(alpha) :
-            alpha * stepper.unadj_alpha)
+        adj_factor = (stepper.use_curve_search ? abs2(alpha) : alpha * stepper.unadj_alpha)
         @. cand += adj_factor * dir_adj
     end
 
     return
 end
 
-print_header_more(stepper::PredOrCentStepper, solver::Solver) =
+function print_header_more(stepper::PredOrCentStepper, solver::Solver)
     @printf("%5s %9s", "step", "alpha")
+end
 
 function print_iteration_more(stepper::PredOrCentStepper, solver::Solver)
     step = (iszero(stepper.cent_count) ? "pred" : "cent")

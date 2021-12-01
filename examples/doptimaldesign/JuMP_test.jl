@@ -8,7 +8,7 @@ insts["minimal"] = [
     ((2, 3, 4, 2, false, true, false), :ExpPSD),
     ((2, 3, 4, 2, false, false, true),),
     ((2, 3, 4, 2, false, false, true), :ExpPSD),
-    ]
+]
 insts["fast"] = [
     ((3, 5, 7, 2, true, false, false),),
     ((3, 5, 7, 2, true, false, false), :SOCExpPSD),
@@ -25,7 +25,7 @@ insts["fast"] = [
     ((25, 75, 125, 10, true, false, false),),
     ((25, 75, 125, 10, false, true, false),),
     ((25, 75, 125, 10, false, false, true),),
-    ]
+]
 insts["various"] = [
     ((25, 45, 75, 10, true, false, false),),
     ((25, 45, 75, 10, true, false, false), :SOCExpPSD),
@@ -43,5 +43,5 @@ insts["various"] = [
     ((50, 90, 150, 10, false, false, true),),
     ((100, 180, 300, 10, true, false, false),),
     ((100, 180, 300, 10, false, true, false),),
-    ]
+]
 return (DOptimalDesignJuMP, insts)

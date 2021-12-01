@@ -9,9 +9,9 @@ function get_psdpoly_data(matpoly::Symbol)
     if matpoly == :matpoly1
         DP.@polyvar x
         M = [
-            (x + 2x^3)  1;
-            (-x^2 + 2)  (3x^2 - x + 1);
-            ]
+            (x+2x^3) 1
+            (-x^2+2) (3x^2 - x+1)
+        ]
         MM = M' * M
         return ([x], MM, true)
     elseif matpoly == :matpoly2
@@ -39,9 +39,9 @@ function get_psdpoly_data(matpoly::Symbol)
         # Semidefinite optimization and convex algebraic geometry SIAM 2013
         DP.@polyvar x
         P = [
-            (x^2 - 2x + 2)  x;
-            x               x^2;
-            ]
+            (x^2 - 2x+2) x
+            x x^2
+        ]
         return ([x], P, true)
     elseif matpoly == :matpoly6
         # example modified from
@@ -50,10 +50,11 @@ function get_psdpoly_data(matpoly::Symbol)
         # see Choi, M. D., "Positive semidefinite biquadratic forms",
         # Linear Algebra and its Applications, 1975, 12(2), 95-100
         DP.@polyvar x y z
-        P = [
-            (x^2 + 2y^2)    (-x * y)        (-x * z);
-            (-x * y)        (y^2 + 2z^2)    (-y * z);
-            (-x * z)        (-y * z)        (z^2 + 2x^2);
+        P =
+            [
+                (x^2+2y^2) (-x*y) (-x*z)
+                (-x*y) (y^2+2z^2) (-y*z)
+                (-x*z) (-y*z) (z^2+2x^2)
             ] .* (x * y * z)^0
         # TODO the (x * y * z)^0 can be removed when
         # https://github.com/JuliaOpt/SumOfSquares.jl/issues/106 is fixed
@@ -64,11 +65,13 @@ function get_psdpoly_data(matpoly::Symbol)
         # Section 3.9 of SOSTOOLS User's Manual, see
         # https://www.cds.caltech.edu/sostools/
         DP.@polyvar x y z
-        P = hvcat((2, 2),
+        P = hvcat(
+            (2, 2),
             (x^4 + x^2 * y^2 + x^2 * z^2),
             (x * y * z^2 - x^3 * y - x * y * (y^2 + 2 * z^2)),
             (x * y * z^2 - x^3 * y - x * y * (y^2 + 2 * z^2)),
-            (x^2 * y^2 + y^2 * z^2 + (y^2 + 2 * z^2)^2))
+            (x^2 * y^2 + y^2 * z^2 + (y^2 + 2 * z^2)^2),
+        )
         return ([x, y, z], P, true)
     end
 end

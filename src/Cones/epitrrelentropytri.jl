@@ -62,10 +62,7 @@ mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
     ten3d::Array{T, 3}
     matd2::Matrix{T}
 
-    function EpiTrRelEntropyTri{T}(
-        dim::Int;
-        use_dual::Bool = false,
-        ) where {T <: Real}
+    function EpiTrRelEntropyTri{T}(dim::Int; use_dual::Bool = false) where {T <: Real}
         @assert dim > 2
         @assert isodd(dim)
         cone = new{T}()
@@ -77,16 +74,22 @@ mutable struct EpiTrRelEntropyTri{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiTrRelEntropyTri) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
-    cone.dder3_aux_updated = false)
+function reset_data(cone::EpiTrRelEntropyTri)
+    return (
+        cone.feas_updated =
+            cone.grad_updated =
+                cone.hess_updated =
+                    cone.inv_hess_updated =
+                        cone.hess_fact_updated = cone.dder3_aux_updated = false
+    )
+end
 
 function setup_extra_data!(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
     vw_dim = cone.vw_dim
     d = cone.d
     cone.rt2 = sqrt(T(2))
     cone.V_idxs = 2:(vw_dim + 1)
-    cone.W_idxs = (vw_dim + 2):cone.dim
+    cone.W_idxs = (vw_dim + 2):(cone.dim)
     cone.V = zeros(T, d, d)
     cone.W = zeros(T, d, d)
     cone.Vi = zeros(T, d, d)
@@ -119,12 +122,12 @@ get_nu(cone::EpiTrRelEntropyTri) = 2 * cone.d + 1
 function set_initial_point!(
     arr::AbstractVector{T},
     cone::EpiTrRelEntropyTri{T},
-    ) where {T <: Real}
+) where {T <: Real}
     arr .= 0
     # at the initial point V and W are diagonal, equivalent to epirelentropy
     (arr[1], v, w) = get_central_ray_epirelentropy(cone.d)
     k = 1
-    for i in 1:cone.d
+    for i in 1:(cone.d)
         arr[1 + k] = v
         arr[cone.vw_dim + 1 + k] = w
         k += i + 1
@@ -147,8 +150,11 @@ function update_feas(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
         V_fact = cone.V_fact = eigen(VH)
         W_fact = cone.W_fact = eigen(WH)
         if isposdef(V_fact) && isposdef(W_fact)
-            for (fact, λ_log, X_log) in zip((V_fact, W_fact),
-                (cone.V_λ_log, cone.W_λ_log), (cone.V_log, cone.W_log))
+            for (fact, λ_log, X_log) in zip(
+                (V_fact, W_fact),
+                (cone.V_λ_log, cone.W_λ_log),
+                (cone.V_log, cone.W_log),
+            )
                 (λ, vecs) = fact
                 @. λ_log = log(λ)
                 spectral_outer!(X_log, vecs, λ_log, cone.mat)
@@ -236,8 +242,7 @@ function update_hess(cone::EpiTrRelEntropyTri{T}) where {T <: Real}
 
     # vv
     Δ3!(Δ3_V, Δ2_V, V_λ)
-    d2zdV2!(d2zdV2, V_vecs, cone.W_sim, Δ3_V, cone.ten3d, cone.matd2,
-        mat, mat2, rt2)
+    d2zdV2!(d2zdV2, V_vecs, cone.W_sim, Δ3_V, cone.ten3d, cone.matd2, mat, mat2, rt2)
 
     @. d2zdV2 *= -1
     @views Hvv = H[V_idxs, V_idxs]
@@ -271,10 +276,7 @@ function update_dder3_aux(cone::EpiTrRelEntropyTri)
     return
 end
 
-function dder3(
-    cone::EpiTrRelEntropyTri{T},
-    dir::AbstractVector{T},
-    ) where {T <: Real}
+function dder3(cone::EpiTrRelEntropyTri{T}, dir::AbstractVector{T}) where {T <: Real}
     cone.dder3_aux_updated || update_dder3_aux(cone)
     rt2 = cone.rt2
     V_idxs = cone.V_idxs
@@ -301,8 +303,8 @@ function dder3(
     VWwd = d2zdVW * w_dir
 
     const0 = zi * (u_dir + dot(v_dir, dzdV)) + dot(w_dir, dzdW)
-    const1 = abs2(const0) + zi * (-dot(v_dir, VWwd) +
-        (dot(v_dir, Vvd) + dot(w_dir, Wwd)) / 2)
+    const1 =
+        abs2(const0) + zi * (-dot(v_dir, VWwd) + (dot(v_dir, Vvd) + dot(w_dir, Wwd)) / 2)
 
     V_part_1a = const0 * (Vvd - VWwd)
     W_part_1a = Wwd - d2zdVW * v_dir
@@ -330,7 +332,7 @@ function dder3(
     spectral_outer!(W_dir_sim, W_vecs', W_dir, mat)
     spectral_outer!(VW_dir_sim, V_vecs', W_dir, mat)
 
-    @inbounds @views for j in 1:cone.d
+    @inbounds @views for j in 1:(cone.d)
         Vds_j = V_dir_sim[:, j]
         Wds_j = W_dir_sim[:, j]
         for i in 1:j
@@ -341,7 +343,7 @@ function dder3(
             diff_dot_V_VV[i, j] = dot(Vds_j, DΔ3_V_ij, Vds_i)
             diff_dot_W_WW[i, j] = dot(Wds_j, DΔ3_W_ij, Wds_i)
         end
-        for i in 1:cone.d
+        for i in 1:(cone.d)
             VWds_i = VW_dir_sim[:, i]
             DΔ3_V_ij = Diagonal(Δ3_V[:, i, j])
             diff_dot_V_VW[i, j] = dot(Vds_j, DΔ3_V_ij, VWds_i)
@@ -379,11 +381,7 @@ function dder3(
     return dder3
 end
 
-function Δ2!(
-    Δ2::Matrix{T},
-    λ::Vector{T},
-    log_λ::Vector{T},
-    ) where {T <: Real}
+function Δ2!(Δ2::Matrix{T}, λ::Vector{T}, log_λ::Vector{T}) where {T <: Real}
     rteps = sqrt(eps(T))
     d = length(λ)
 
@@ -407,11 +405,7 @@ function Δ2!(
     return Δ2
 end
 
-function Δ3!(
-    Δ3::Array{T, 3},
-    Δ2::Matrix{T},
-    λ::Vector{T},
-    ) where {T <: Real}
+function Δ3!(Δ3::Array{T, 3}, Δ2::Matrix{T}, λ::Vector{T}) where {T <: Real}
     @assert issymmetric(Δ2) # must be symmetric (wrapper is less efficient)
     rteps = sqrt(eps(T))
     d = length(λ)
@@ -432,8 +426,8 @@ function Δ3!(
             t = (Δ2[i, j] - Δ2[i, k]) / λ_jk
         end
 
-        Δ3[i, j, k] = Δ3[i, k, j] = Δ3[j, i, k] =
-            Δ3[j, k, i] = Δ3[k, i, j] = Δ3[k, j, i] = t
+        Δ3[i, j, k] =
+            Δ3[i, k, j] = Δ3[j, i, k] = Δ3[j, k, i] = Δ3[k, i, j] = Δ3[k, j, i] = t
     end
 
     return Δ3
@@ -449,7 +443,7 @@ function d2zdV2!(
     mat::Matrix{T}, # temp
     mat2::Matrix{T}, # temp
     rt2::T,
-    ) where {T <: Real}
+) where {T <: Real}
     d = size(vecs, 1)
 
     @inbounds for i in 1:d
@@ -478,9 +472,9 @@ function d2zdV2!(
             dkl = d * (k - 1) + l
             dji = dj + i
             dij = di + j
-            d2zdV2[row_idx, col_idx] = rho * (
-                matd2[dji, dlk] + matd2[dij, dlk] +
-                matd2[dji, dkl] + matd2[dij, dkl])
+            d2zdV2[row_idx, col_idx] =
+                rho *
+                (matd2[dji, dlk] + matd2[dij, dlk] + matd2[dji, dkl] + matd2[dij, dkl])
             col_idx += 1
         end
         row_idx += 1
@@ -496,7 +490,7 @@ function VdWs_element(
     l::Int,
     Vds::Matrix{T},
     Ws::Matrix{T},
-    ) where {T <: Real}
+) where {T <: Real}
     @inbounds begin
         a = Vds[l, j] * Ws[i, k] + Vds[l, i] * Ws[j, k]
         b = Vds[k, i] * Vds[l, j] * Ws[k, l]
@@ -512,7 +506,7 @@ function d3WlogVdV!(
     Vds::Matrix{T},
     Ws::Matrix{T},
     Δ4_ij::Matrix{T}, # temp
-    ) where {T <: Real}
+) where {T <: Real}
     d = length(λ)
 
     @inbounds for j in 1:d, i in 1:j
@@ -520,8 +514,9 @@ function d3WlogVdV!(
         t = zero(T)
         for l in 1:d
             for k in 1:(l - 1)
-                t += Δ4_ij[k, l] * (VdWs_element(i, j, k, l, Vds, Ws) +
-                    VdWs_element(i, j, l, k, Vds, Ws))
+                t +=
+                    Δ4_ij[k, l] *
+                    (VdWs_element(i, j, k, l, Vds, Ws) + VdWs_element(i, j, l, k, Vds, Ws))
             end
             t += Δ4_ij[l, l] * VdWs_element(i, j, l, l, Vds, Ws)
         end
@@ -538,7 +533,7 @@ function Δ4_ij!(
     j::Int,
     Δ3::Array{T, 3},
     λ::Vector{T},
-    ) where {T <: Real}
+) where {T <: Real}
     rteps = sqrt(eps(T))
     d = length(λ)
     λ_i = λ[i]

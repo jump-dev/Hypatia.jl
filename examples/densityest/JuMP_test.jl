@@ -7,7 +7,7 @@ insts["minimal"] = [
     ((5, 1, 2, true, false, false), :ExpPSD),
     ((5, 1, 2, true, false, false), :SOCExpPSD),
     ((:iris, 2, true, false, true),),
-    ]
+]
 insts["fast"] = [
     ((10, 1, 10, true, false, false), :ExpPSD),
     ((10, 1, 10, true, false, false), :SOCExpPSD),
@@ -28,7 +28,7 @@ insts["fast"] = [
     ((:iris, 5, true, false, false),),
     ((:iris, 6, true, true, true),),
     ((:cancer, 4, true, true, true),),
-    ]
+]
 insts["various"] = [
     ((50, 2, 16, true, false, false),),
     ((50, 2, 16, true, false, false), :ExpPSD),
@@ -45,5 +45,5 @@ insts["various"] = [
     ((50, 32, 2, true, false, false), :SOCExpPSD),
     ((:iris, 6, true, true, true),),
     ((:cancer, 4, true, true, true),),
-    ]
+]
 return (DensityEstJuMP, insts)

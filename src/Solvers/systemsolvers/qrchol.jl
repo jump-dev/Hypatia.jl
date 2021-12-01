@@ -19,7 +19,7 @@ function setup_rhs3(
     rhs::Point{T},
     sol::Point{T},
     rhs_sub::Point{T},
-    ) where {T <: Real}
+) where {T <: Real}
     @inbounds for (k, cone_k) in enumerate(model.cones)
         rhs_z_k = rhs.z_views[k]
         rhs_s_k = rhs.s_views[k]
@@ -41,7 +41,7 @@ function solve_subsystem3(
     solver::Solver{T},
     sol::Point{T},
     rhs::Point{T},
-    ) where {T <: Real}
+) where {T <: Real}
     model = solver.model
     copyto!(sol.vec, rhs.vec)
     x = sol.x
@@ -54,7 +54,7 @@ function solve_subsystem3(
 
     if !iszero(model.p)
         ldiv!(solver.Ap_R', y)
-        @views copyto!(sol.vec[1:model.p], y)
+        @views copyto!(sol.vec[1:(model.p)], y)
 
         if !isempty(syssolver.Q2div)
             mul!(syssolver.GQ1x, syssolver.GQ1, y)
@@ -64,7 +64,7 @@ function solve_subsystem3(
     end
 
     if !isempty(syssolver.Q2div)
-        @views x_sub2 = sol.vec[(model.p + 1):model.n]
+        @views x_sub2 = sol.vec[(model.p + 1):(model.n)]
         ldiv!(x_sub2, syssolver.fact, syssolver.Q2div)
     end
 
@@ -88,7 +88,7 @@ function block_hess_prod!(
     prod_k::AbstractVecOrMat{T},
     arr_k::AbstractVecOrMat{T},
     cone_k::Cones.Cone{T},
-    ) where {T <: Real}
+) where {T <: Real}
     if Cones.use_dual_barrier(cone_k)
         Cones.inv_hess_prod!(prod_k, arr_k, cone_k)
     else
@@ -135,10 +135,7 @@ mutable struct QRCholDenseSystemSolver{T <: Real} <: QRCholSystemSolver{T}
     end
 end
 
-function load(
-    syssolver::QRCholDenseSystemSolver{T},
-    solver::Solver{T},
-    ) where {T <: Real}
+function load(syssolver::QRCholDenseSystemSolver{T}, solver::Solver{T}) where {T <: Real}
     model = solver.model
     (n, p, q) = (model.n, model.p, model.q)
     nmp = n - p
@@ -181,7 +178,7 @@ end
 function update_lhs(
     syssolver::QRCholDenseSystemSolver{T},
     solver::Solver{T},
-    ) where {T <: Real}
+) where {T <: Real}
     model = solver.model
 
     # update LHS and factorization
@@ -201,7 +198,7 @@ end
 function update_lhs_fact(
     syssolver::QRCholDenseSystemSolver{T},
     solver::Solver{T},
-    ) where {T <: Real}
+) where {T <: Real}
     model = solver.model
     lhs = syssolver.lhs_sub.data
     cones = model.cones

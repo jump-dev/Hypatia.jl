@@ -30,8 +30,7 @@ function build(inst::MaxVolumeJuMP{T}) where {T <: Float64}
     end
     if inst.epinorminf_constrs
         JuMP.@constraint(model, vcat(gamma, A * x) in MOI.NormInfinityCone(n + 1))
-        JuMP.@constraint(model, vcat(sqrt(n) * gamma, A * x) in
-            MOI.NormOneCone(n + 1))
+        JuMP.@constraint(model, vcat(sqrt(n) * gamma, A * x) in MOI.NormOneCone(n + 1))
     end
 
     return model

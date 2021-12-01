@@ -15,11 +15,11 @@ end
 function build(inst::EntanglementAssisted{T}) where {T <: Float64}
     gamma = 0.2
     ampl_damp = [
-        1 0;
-        0 sqrt(gamma);
-        0 sqrt(1 - gamma);
-        0 0;
-        ]
+        1 0
+        0 sqrt(gamma)
+        0 sqrt(1 - gamma)
+        0 0
+    ]
     ampl_dim = 4
     na = 2
     nb = inst.nb
@@ -44,8 +44,8 @@ function build(inst::EntanglementAssisted{T}) where {T <: Float64}
     Q2_vec = Cones.smat_to_svec!(zeros(JuMP.AffExpr, sa), Q2, rt2)
     Q3_vec = Cones.smat_to_svec!(zeros(JuMP.AffExpr, sb), Q3, rt2)
     RE_cone = Hypatia.EpiTrRelEntropyTriCone{T}(1 + 2 * sa)
-    E_cone = Hypatia.EpiPerSepSpectralCone{T}(Cones.NegEntropySSF(),
-        Cones.MatrixCSqr{T, T}, nb)
+    E_cone =
+        Hypatia.EpiPerSepSpectralCone{T}(Cones.NegEntropySSF(), Cones.MatrixCSqr{T, T}, nb)
 
     JuMP.@constraints(model, begin
         tr(ρ) == 1
@@ -59,22 +59,13 @@ function build(inst::EntanglementAssisted{T}) where {T <: Float64}
 end
 
 # partial trace of Q over system i given subsystem dimensions subs
-function partial_trace(
-    Q::Symmetric,
-    i::Int,
-    subs::Vector{Int},
-    )
+function partial_trace(Q::Symmetric, i::Int, subs::Vector{Int})
     @assert 1 <= i <= length(subs)
     @assert size(Q, 1) == prod(subs)
     return sum(partial_trace_j(j, Q, i, subs) for j in 1:subs[i])
 end
 
-function partial_trace_j(
-    j::Int,
-    Q::Symmetric,
-    i::Int,
-    subs::Vector{Int},
-    )
+function partial_trace_j(j::Int, Q::Symmetric, i::Int, subs::Vector{Int})
     X1 = sparse(I, 1, 1)
     X2 = copy(X1)
     for (k, dim) in enumerate(subs)

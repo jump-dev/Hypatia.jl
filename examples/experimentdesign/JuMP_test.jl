@@ -21,7 +21,7 @@ insts["minimal"] = [
     # tr power12
     ((3, MatPower12(1.3)),),
     ((3, MatPower12EigOrd(1.3)),),
-    ]
+]
 insts["fast"] = [
     ((50, MatNegRtdet()),),
     ((12, MatNegRtdetEFExp()),),
@@ -41,7 +41,7 @@ insts["fast"] = [
     ((50, MatNegPower01(0.4)),),
     ((40, MatNegPower01Conj(0.4)),),
     ((5, MatNegPower01EigOrd(0.4)),),
-    ]
+]
 insts["various"] = [
     ((400, MatNegRtdet()),),
     ((70, MatNegRtdetEFExp()),),
@@ -59,5 +59,5 @@ insts["various"] = [
     ((40, MatNegPower01Conj(0.6)),),
     ((15, MatPower12(1.5)),),
     ((9, MatPower12EigOrd(1.5)), nothing, (default_tol_relax = 100,)),
-    ]
+]
 return (ExperimentDesignJuMP, insts)

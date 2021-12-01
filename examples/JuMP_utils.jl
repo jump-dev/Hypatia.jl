@@ -6,32 +6,47 @@ import JuMP
 const MOI = JuMP.MOI
 const MOIU = MOI.Utilities
 
-MOIU.@model(SOCExpPSD,
+MOIU.@model(
+    SOCExpPSD,
     (),
-    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
-    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-    MOI.SecondOrderCone, MOI.RotatedSecondOrderCone,
-    MOI.ExponentialCone, MOI.PositiveSemidefiniteConeTriangle,),
+    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan),
+    (
+        MOI.Reals,
+        MOI.Zeros,
+        MOI.Nonnegatives,
+        MOI.Nonpositives,
+        MOI.SecondOrderCone,
+        MOI.RotatedSecondOrderCone,
+        MOI.ExponentialCone,
+        MOI.PositiveSemidefiniteConeTriangle,
+    ),
     (),
     (),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),
     (MOI.VectorAffineFunction,),
     true,
-    )
+)
 
-MOIU.@model(ExpPSD,
+MOIU.@model(
+    ExpPSD,
     (),
-    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan,),
-    (MOI.Reals, MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives,
-    MOI.ExponentialCone, MOI.PositiveSemidefiniteConeTriangle,),
+    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan),
+    (
+        MOI.Reals,
+        MOI.Zeros,
+        MOI.Nonnegatives,
+        MOI.Nonpositives,
+        MOI.ExponentialCone,
+        MOI.PositiveSemidefiniteConeTriangle,
+    ),
     (),
     (),
     (MOI.ScalarAffineFunction,),
     (MOI.VectorOfVariables,),
     (MOI.VectorAffineFunction,),
     true,
-    )
+)
 
 abstract type ExampleInstanceJuMP{T <: Real} <: ExampleInstance{T} end
 
@@ -49,7 +64,7 @@ function run_instance(
     default_options::NamedTuple = NamedTuple(),
     test::Bool = true,
     verbose::Bool = true,
-    )
+)
     new_options = merge(default_options, inst_options)
 
     verbose && println("setup model")
@@ -59,8 +74,13 @@ function run_instance(
     verbose && println("solve and check")
     check_time = @elapsed solve_stats = solve_check(model, test = test)
 
-    return (; model_stats..., solve_stats..., setup_time,
-        check_time, :script_status => "Success")
+    return (;
+        model_stats...,
+        solve_stats...,
+        setup_time,
+        check_time,
+        :script_status => "Success",
+    )
 end
 
 function setup_model(
@@ -70,7 +90,7 @@ function setup_model(
     solver_options::NamedTuple,
     solver_type;
     rseed::Int = 1,
-    )
+)
     # setup example instance and JuMP model
     Random.seed!(rseed)
     inst = ex_type(inst_data...)
@@ -82,8 +102,7 @@ function setup_model(
     else
         @eval $extender{Float64}()
     end
-    opt = MOI.Bridges.full_bridge_optimizer(
-        MOIU.CachingOptimizer(extT, hyp_opt), Float64)
+    opt = MOI.Bridges.full_bridge_optimizer(MOIU.CachingOptimizer(extT, hyp_opt), Float64)
     if !isnothing(extender)
         # for PolyJuMP/SumOfSquares models
         for B in model.bridge_types
@@ -95,15 +114,15 @@ function setup_model(
     MOIU.reset_optimizer(backend, opt)
     MOIU.attach_optimizer(backend)
     MOIU.attach_optimizer(backend.optimizer.model)
-    flush(stdout); flush(stderr)
+    flush(stdout)
+    flush(stderr)
 
     hyp_model = hyp_opt.model
     if solver_type == Hypatia.Optimizer
         model.ext[:inst] = inst
     else
         # not using Hypatia to solve, so setup new JuMP model with Hypatia data
-        (A, b, c, G, h) =
-            (hyp_model.A, hyp_model.b, hyp_model.c, hyp_model.G, hyp_model.h)
+        (A, b, c, G, h) = (hyp_model.A, hyp_model.b, hyp_model.c, hyp_model.G, hyp_model.h)
         (cones, cone_idxs) = (hyp_model.cones, hyp_model.cone_idxs)
         new_model = JuMP.Model()
         new_model.ext[:hyp_data] = hyp_model
@@ -131,19 +150,18 @@ function setup_model(
         opt = solver_type(; solver_options...)
         JuMP.set_optimizer(new_model, () -> opt)
         model = new_model
-        flush(stdout); flush(stderr)
+        flush(stdout)
+        flush(stderr)
     end
 
     model_stats = get_model_stats(hyp_model)
     return (model, model_stats)
 end
 
-function solve_check(
-    model::JuMP.Model;
-    test::Bool = true,
-    )
+function solve_check(model::JuMP.Model; test::Bool = true)
     JuMP.optimize!(model) # TODO make sure it doesn't copy again
-    flush(stdout); flush(stderr)
+    flush(stdout)
+    flush(stderr)
 
     opt = JuMP.backend(model).optimizer
     if !isa(opt, Hypatia.Optimizer)
@@ -155,7 +173,8 @@ function solve_check(
 
     if opt isa Hypatia.Optimizer
         test && test_extra(model.ext[:inst], model)
-        flush(stdout); flush(stderr)
+        flush(stdout)
+        flush(stderr)
         (solve_stats, _) = process_result(opt.model, opt.solver)
         return solve_stats
     end
@@ -194,14 +213,22 @@ function solve_check(
 
     rel_obj_diff = (primal_obj - dual_obj) / (1 + abs(dual_obj))
     compl = dot(s, z)
-    (x_viol, y_viol, z_viol) =
-        certificate_violations(hyp_status, hyp_data, x, y, z, s)
-    flush(stdout); flush(stderr)
+    (x_viol, y_viol, z_viol) = certificate_violations(hyp_status, hyp_data, x, y, z, s)
+    flush(stdout)
+    flush(stderr)
 
     solve_stats = (;
-        :status => hyp_status, solve_time, iters, primal_obj, dual_obj,
-        rel_obj_diff, compl, x_viol, y_viol, z_viol,
-        )
+        :status => hyp_status,
+        solve_time,
+        iters,
+        primal_obj,
+        dual_obj,
+        rel_obj_diff,
+        compl,
+        x_viol,
+        y_viol,
+        z_viol,
+    )
     return solve_stats
 end
 
@@ -214,45 +241,52 @@ moi_hyp_status_map = Dict(
     MOI.ITERATION_LIMIT => Solvers.IterationLimit,
     MOI.TIME_LIMIT => Solvers.TimeLimit,
     MOI.OTHER_ERROR => Solvers.UnknownStatus,
-    )
+)
 
 # get MOI cones (defined in MOI itself, not Hypatia) from some Hypatia cones
-cone_from_hyp(cone::Cones.Cone) =
-    error("cannot transform Hypatia cone of type $(typeof(cone)) to MOI cone")
+function cone_from_hyp(cone::Cones.Cone)
+    return error("cannot transform Hypatia cone of type $(typeof(cone)) to MOI cone")
+end
 
 cone_from_hyp(cone::Cones.Nonnegative) = MOI.Nonnegatives(Cones.dimension(cone))
 
-cone_from_hyp(cone::Cones.EpiNormInf{T, T}) where {T <: Real} =
-    (Cones.use_dual_barrier(cone) ? MOI.NormOneCone :
-    MOI.NormInfinityCone)(Cones.dimension(cone))
+function cone_from_hyp(cone::Cones.EpiNormInf{T, T}) where {T <: Real}
+    return (Cones.use_dual_barrier(cone) ? MOI.NormOneCone : MOI.NormInfinityCone)(
+        Cones.dimension(cone),
+    )
+end
 
-cone_from_hyp(cone::Cones.EpiNormEucl) =
-    MOI.SecondOrderCone(Cones.dimension(cone))
+cone_from_hyp(cone::Cones.EpiNormEucl) = MOI.SecondOrderCone(Cones.dimension(cone))
 
-cone_from_hyp(cone::Cones.EpiPerSquare) =
-    MOI.RotatedSecondOrderCone(Cones.dimension(cone))
+cone_from_hyp(cone::Cones.EpiPerSquare) = MOI.RotatedSecondOrderCone(Cones.dimension(cone))
 
-cone_from_hyp(cone::Cones.HypoPerLog) =
-    (@assert Cones.dimension(cone) == 3; MOI.ExponentialCone())
+function cone_from_hyp(cone::Cones.HypoPerLog)
+    return (@assert Cones.dimension(cone) == 3; MOI.ExponentialCone())
+end
 
-cone_from_hyp(cone::Cones.EpiRelEntropy) =
-    MOI.RelativeEntropyCone(Cones.dimension(cone))
+cone_from_hyp(cone::Cones.EpiRelEntropy) = MOI.RelativeEntropyCone(Cones.dimension(cone))
 
-cone_from_hyp(cone::Cones.HypoGeoMean) =
-    MOI.GeometricMeanCone(Cones.dimension(cone))
+cone_from_hyp(cone::Cones.HypoGeoMean) = MOI.GeometricMeanCone(Cones.dimension(cone))
 
-cone_from_hyp(cone::Cones.GeneralizedPower) =
-    (@assert Cones.dimension(cone) == 3; MOI.PowerCone{Float64}(cone.α[1]))
+function cone_from_hyp(cone::Cones.GeneralizedPower)
+    return (@assert Cones.dimension(cone) == 3; MOI.PowerCone{Float64}(cone.α[1]))
+end
 
-cone_from_hyp(cone::Cones.EpiNormSpectral{T, T}) where {T <: Real} =
-    (Cones.use_dual_barrier(cone) ? MOI.NormNuclearCone :
-    MOI.NormSpectralCone)(cone.n, cone.m)
+function cone_from_hyp(cone::Cones.EpiNormSpectral{T, T}) where {T <: Real}
+    return (Cones.use_dual_barrier(cone) ? MOI.NormNuclearCone : MOI.NormSpectralCone)(
+        cone.n,
+        cone.m,
+    )
+end
 
-cone_from_hyp(cone::Cones.PosSemidefTri{T, T}) where {T <: Real} =
-    MOI.PositiveSemidefiniteConeTriangle(cone.side)
+function cone_from_hyp(cone::Cones.PosSemidefTri{T, T}) where {T <: Real}
+    return MOI.PositiveSemidefiniteConeTriangle(cone.side)
+end
 
-cone_from_hyp(cone::Cones.HypoPerLogdetTri{T, T}) where {T <: Real} =
-    MOI.LogDetConeTriangle(cone.side)
+function cone_from_hyp(cone::Cones.HypoPerLogdetTri{T, T}) where {T <: Real}
+    return MOI.LogDetConeTriangle(cone.side)
+end
 
-cone_from_hyp(cone::Cones.HypoRootdetTri{T, T}) where {T <: Real} =
-    MOI.RootDetConeTriangle(cone.side)
+function cone_from_hyp(cone::Cones.HypoRootdetTri{T, T}) where {T <: Real}
+    return MOI.RootDetConeTriangle(cone.side)
+end

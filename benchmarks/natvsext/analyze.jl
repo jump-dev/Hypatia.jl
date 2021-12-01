@@ -16,70 +16,41 @@ tex_dir = mkpath(joinpath(output_dir, "tex"))
 stats_dir = mkpath(joinpath(output_dir, "stats"))
 csv_dir = mkpath(joinpath(output_dir, "csvs"))
 
-print_table_solvers =
-    true # add solver results to tex tables
-    # false # just put formulation sizes in tex tables
+print_table_solvers = true # add solver results to tex tables
+# false # just put formulation sizes in tex tables
 
 # uncomment examples to process
 examples_params = Dict(
     #= natural formulations paper =#
-    "densityest" => (
-        [:m, :twok], [2, 3],
-        [:SEP,], [:nu_nat, :n_nat, :n_SEP]
-        ),
+    "densityest" => ([:m, :twok], [2, 3], [:SEP], [:nu_nat, :n_nat, :n_SEP]),
     "doptimaldesign" => (
-        [:logdet, :k], [5, 1],
+        [:logdet, :k],
+        [5, 1],
         # [:EP,], [:n_EP, :q_nat, :q_EP]
         [:EP, :SEP],
-        Symbol[]
+        Symbol[],
         # [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
-        ),
+    ),
     "matrixcompletion" => (
-        [:m, :k], [1, 2],
+        [:m, :k],
+        [1, 2],
         [:EP, :SEP],
-        Symbol[]
+        Symbol[],
         # [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP,
         # :n_SEP, :q_SEP]
-        ),
-    "matrixregression" => (
-        [:m, :k], [2, 1],
-        [:SEP,], [:n_SEP, :q_nat]
-        ),
-    "polymin" => (
-        [:m, :k], [1, 2],
-        [:SEP,], [:nu_nat, :n_nat, :q_SEP]
-        ),
-    "portfolio" => (
-        [:k], [1],
-        [:SEP,], Symbol[]
-        ),
-    "shapeconregr" => (
-        [:m, :twok], [1, 5],
-        [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
-        ),
+    ),
+    "matrixregression" => ([:m, :k], [2, 1], [:SEP], [:n_SEP, :q_nat]),
+    "polymin" => ([:m, :k], [1, 2], [:SEP], [:nu_nat, :n_nat, :q_SEP]),
+    "portfolio" => ([:k], [1], [:SEP], Symbol[]),
+    "shapeconregr" => ([:m, :twok], [1, 5], [:SEP], [:nu_nat, :n_nat, :n_SEP, :q_nat]),
     #= WSOS cones paper =#
-    "polynorm" => (
-        [:L1, :n, :d, :m], [5, 1, 3, 4],
-        [:SEP,], Symbol[]
-        ),
+    "polynorm" => ([:L1, :n, :d, :m], [5, 1, 3, 4], [:SEP], Symbol[]),
     #= spectral function cones paper =#
-    "centralpolymat" => (
-        [:func, :m, :k], [3, 1, 2],
-        [:nat, :ext], Symbol[]
-        ),
-    "classicalquantum" => (
-        [:d], [1],
-        [:nat, :ext], Symbol[]
-        ),
-    "experimentdesign" => (
-        [:func, :d], [2, 1],
-        [:nat, :natlog, :ext], Symbol[]
-        ),
-    "nonparametricdistr" => (
-        [:func, :d], [2, 1],
-        [:nat, :natlog, :vecext], Symbol[]
-        ),
-    )
+    "centralpolymat" => ([:func, :m, :k], [3, 1, 2], [:nat, :ext], Symbol[]),
+    "classicalquantum" => ([:d], [1], [:nat, :ext], Symbol[]),
+    "experimentdesign" => ([:func, :d], [2, 1], [:nat, :natlog, :ext], Symbol[]),
+    "nonparametricdistr" => ([:func, :d], [2, 1], [:nat, :natlog, :vecext], Symbol[]),
+)
 
 @info("analyzing examples: $(keys(examples_params))")
 
@@ -90,8 +61,12 @@ function post_process()
 
     for (ex_name, ex_params) in examples_params
         println()
-        ex_df = filter(t -> (t.example == ex_name) && (ismissing(t.extender) ||
-            t.extender in string.(ex_params[3])), all_df)
+        ex_df = filter(
+            t ->
+                (t.example == ex_name) &&
+                    (ismissing(t.extender) || t.extender in string.(ex_params[3])),
+            all_df,
+        )
         if isempty(ex_df)
             @info("no data for $ex_name with params: $ex_params")
             continue
@@ -108,10 +83,7 @@ function post_process()
     @info("finished all")
 end
 
-extender_map = Dict(
-    "ExpPSD" => "EP",
-    "SOCExpPSD" => "SEP",
-    )
+extender_map = Dict("ExpPSD" => "EP", "SOCExpPSD" => "SEP")
 
 status_map = Dict(
     "SetupModelCaughtError" => "m",
@@ -126,13 +98,13 @@ status_map = Dict(
     "SlowProgress" => "sp",
     "NumericalFailure" => "er",
     "SkippedSolveCheck" => "sk",
-    )
+)
 
-residual_tol_satisfied(a, tol = 1e-5) =
-    (all(isfinite, a) && (maximum(abs, a) < tol))
+residual_tol_satisfied(a, tol = 1e-5) = (all(isfinite, a) && (maximum(abs, a) < tol))
 
-relative_tol_satisfied(a::T, b::T, tol::T = 1e-4) where {T <: Real} =
-    (abs(a - b) / (1 + max(abs(a), abs(b))) < tol)
+function relative_tol_satisfied(a::T, b::T, tol::T = 1e-4) where {T <: Real}
+    return (abs(a - b) / (1 + max(abs(a), abs(b))) < tol)
+end
 
 get_name(x::Any) = string(x)
 get_name(x::Main.Examples.SpectralExtender) = Main.Examples.nat_name(x)
@@ -144,21 +116,26 @@ function make_wide_csv(ex_df, ex_name, ex_params)
 
     # add columns
     inst_ext_name(inst_set, ext) = (ismissing(ext) ? inst_set : ext)
-    transform!(ex_df, [:inst_set, :extender] => ((x, y) ->
-        inst_ext_name.(x, y)) => :inst_ext)
+    transform!(
+        ex_df,
+        [:inst_set, :extender] => ((x, y) -> inst_ext_name.(x, y)) => :inst_ext,
+    )
 
     inst_solver_name(inst_ext, solver) = (inst_ext * "_" * solver)
-    transform!(ex_df,
-        [:inst_ext, :solver] => ((x, y) -> inst_solver_name.(x, y)) =>
-        :inst_solver,
-        [:x_viol, :y_viol, :z_viol, :rel_obj_diff] => ByRow((res...) ->
-        residual_tol_satisfied(coalesce.(res, NaN))) => :converged,
-        [:status, :script_status] => ByRow((x, y) ->
-        (y == "Success" ? status_map[x] : status_map[y])) => :status)
+    transform!(
+        ex_df,
+        [:inst_ext, :solver] => ((x, y) -> inst_solver_name.(x, y)) => :inst_solver,
+        [:x_viol, :y_viol, :z_viol, :rel_obj_diff] =>
+            ByRow((res...) -> residual_tol_satisfied(coalesce.(res, NaN))) => :converged,
+        [:status, :script_status] =>
+            ByRow((x, y) -> (y == "Success" ? status_map[x] : status_map[y])) => :status,
+    )
 
     for (name, pos) in zip(inst_keys, ex_params[2])
-        transform!(ex_df, :inst_data => ByRow(x ->
-            get_name(eval(Meta.parse(x))[pos])) => name)
+        transform!(
+            ex_df,
+            :inst_data => ByRow(x -> get_name(eval(Meta.parse(x))[pos])) => name,
+        )
     end
 
     # get solver combinations and reorder
@@ -175,8 +152,7 @@ function make_wide_csv(ex_df, ex_name, ex_params)
     # check objectives if solver claims optimality
     for group_df in groupby(ex_df, inst_keys)
         # check all pairs of verified converged results
-        co_idxs = findall((group_df[:, :status] .== "co") .&
-            group_df[:, :converged])
+        co_idxs = findall((group_df[:, :status] .== "co") .& group_df[:, :converged])
         (length(co_idxs) < 2) && continue
 
         first_optval = group_df[co_idxs[1], :primal_obj]
@@ -184,23 +160,47 @@ function make_wide_csv(ex_df, ex_name, ex_params)
         if !all(relative_tol_satisfied.(other_optvals, first_optval))
             dat = group_df[!, :inst_data][1]
             println("$ex_name $dat primal optimal objective values disagree:")
-            show(group_df[!, [:inst_set, :inst_num, :extender, :solver,
-                :status, :primal_obj, :dual_obj, :rel_obj_diff]],
-                show_row_number=false, eltypes=false)
+            show(
+                group_df[
+                    !,
+                    [
+                        :inst_set,
+                        :inst_num,
+                        :extender,
+                        :solver,
+                        :status,
+                        :primal_obj,
+                        :dual_obj,
+                        :rel_obj_diff,
+                    ],
+                ],
+                show_row_number = false,
+                eltypes = false,
+            )
             println("\n")
         end
     end
 
     unstacked_dims = [
-        unstack(ex_df, inst_keys, :inst_ext, v, renamecols = x ->
-        Symbol(v, :_, x), allowduplicates=true)
-        for v in [:nu, :n, :p, :q]
-        ]
+        unstack(
+            ex_df,
+            inst_keys,
+            :inst_ext,
+            v,
+            renamecols = x -> Symbol(v, :_, x),
+            allowduplicates = true,
+        ) for v in [:nu, :n, :p, :q]
+    ]
     unstacked_res = [
-        unstack(ex_df, inst_keys, :inst_solver, v, renamecols = x ->
-        Symbol(v, :_, x), allowduplicates=true)
-        for v in [:status, :converged, :iters, :solve_time]
-        ]
+        unstack(
+            ex_df,
+            inst_keys,
+            :inst_solver,
+            v,
+            renamecols = x -> Symbol(v, :_, x),
+            allowduplicates = true,
+        ) for v in [:status, :converged, :iters, :solve_time]
+    ]
     ex_df_wide = outerjoin(unstacked_dims..., unstacked_res..., on = inst_keys)
     (:func in inst_keys) && sort!(ex_df_wide, :func)
 
@@ -223,15 +223,17 @@ function process_entry(x::Float64)
     end
 end
 
-process_entry(st::String, converged::Bool) =
-    (converged ? "\\underline{$(st)}" : st)
+process_entry(st::String, converged::Bool) = (converged ? "\\underline{$(st)}" : st)
 
 process_entry(x) = string(x)
 
 function process_inst_solver(row, inst_solver)
     sep = " & "
-    row_str = sep * process_entry(row[Symbol(:status_, inst_solver)],
-        row[Symbol(:converged_, inst_solver)])
+    row_str =
+        sep * process_entry(
+            row[Symbol(:status_, inst_solver)],
+            row[Symbol(:converged_, inst_solver)],
+        )
     row_str *= sep * process_entry(row[Symbol(:iters_, inst_solver)])
     row_str *= sep * process_entry(row[Symbol(:solve_time_, inst_solver)])
     return row_str
@@ -275,8 +277,10 @@ end
 
 function transform_plot_cols(ex_df_wide, inst_solver)
     old_cols = Symbol.([:converged_, :solve_time_], inst_solver)
-    transform!(ex_df_wide, old_cols => ByRow((x, y) ->
-        ((!ismissing(x) && x) ? y : missing)) => inst_solver)
+    return transform!(
+        ex_df_wide,
+        old_cols => ByRow((x, y) -> ((!ismissing(x) && x) ? y : missing)) => inst_solver,
+    )
 end
 
 function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
@@ -297,13 +301,14 @@ function make_plot_csv(ex_name, ex_params, ex_df_wide, inst_solvers)
         group_name = first(inst_keys)
         success_df = select(ex_df_wide, axis_name, group_name, inst_solvers...)
         for (group_id, group_df) in pairs(groupby(success_df, group_name))
-            CSV.write(plot_file_start * "_$(group_id[1]).csv",
-                select(group_df, Not(group_name)))
+            CSV.write(
+                plot_file_start * "_$(group_id[1]).csv",
+                select(group_df, Not(group_name)),
+            )
         end
     end
 
     return
 end
 
-post_process()
-;
+post_process();

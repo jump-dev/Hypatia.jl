@@ -23,11 +23,11 @@ sep_spectral_funs = [
     Cones.NegLogSSF(),
     Cones.NegEntropySSF(),
     Cones.NegSqrtSSF(),
-    Cones.NegPower01SSF(3//10),
+    Cones.NegPower01SSF(3 // 10),
     Cones.Power12SSF(1.5),
-    ]
+]
 
-test_tol(::Type{T}) where T = sqrt(sqrt(eps(T)))
+test_tol(::Type{T}) where {T} = sqrt(sqrt(eps(T)))
 
 # build model, solve, test conic certificates, and return solve information
 function build_solve_check(
@@ -41,7 +41,7 @@ function build_solve_check(
     ;
     obj_offset::T = zero(T),
     solver::Solvers.Solver{T} = Solvers.Solver{T}(),
-    ) where {T <: Real}
+) where {T <: Real}
     model = Hypatia.Models.Model{T}(c, A, b, G, h, cones, obj_offset = obj_offset)
 
     Solvers.load(solver, model)
@@ -57,22 +57,22 @@ function build_solve_check(
 
     rt_tol = sqrt(tol)
     if status == Solvers.Optimal
-        @test primal_obj ≈ dual_obj atol=tol rtol=tol
-        @test dot(c, x) + obj_offset ≈ primal_obj atol=tol rtol=tol
-        @test -dot(b, y) - dot(h, z) + obj_offset ≈ dual_obj atol=tol rtol=tol
-        @test A * x ≈ b atol=tol rtol=tol
-        @test G * x + s ≈ h atol=tol rtol=tol
-        @test G' * z + A' * y ≈ -c atol=tol rtol=tol
-        @test dot(s, z) ≈ zero(T) atol=rt_tol rtol=rt_tol
+        @test primal_obj ≈ dual_obj atol = tol rtol = tol
+        @test dot(c, x) + obj_offset ≈ primal_obj atol = tol rtol = tol
+        @test -dot(b, y) - dot(h, z) + obj_offset ≈ dual_obj atol = tol rtol = tol
+        @test A * x ≈ b atol = tol rtol = tol
+        @test G * x + s ≈ h atol = tol rtol = tol
+        @test G' * z + A' * y ≈ -c atol = tol rtol = tol
+        @test dot(s, z) ≈ zero(T) atol = rt_tol rtol = rt_tol
     elseif status == Solvers.PrimalInfeasible
-        @test -dot(b, y) - dot(h, z) ≈ dual_obj atol=tol rtol=tol
+        @test -dot(b, y) - dot(h, z) ≈ dual_obj atol = tol rtol = tol
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
-        @test G' * z ≈ -A' * y atol=rt_tol rtol=rt_tol
+        @test G' * z ≈ -A' * y atol = rt_tol rtol = rt_tol
     elseif status == Solvers.DualInfeasible
-        @test dot(c, x) ≈ primal_obj atol=tol rtol=tol
+        @test dot(c, x) ≈ primal_obj atol = tol rtol = tol
         # TODO conv check causes us to stop before this is satisfied to sufficient tolerance - maybe add option to keep going
-        @test G * x ≈ -s atol=rt_tol rtol=rt_tol
-        @test A * x ≈ zeros(T, length(y)) atol=rt_tol rtol=rt_tol
+        @test G * x ≈ -s atol = rt_tol rtol = rt_tol
+        @test A * x ≈ zeros(T, length(y)) atol = rt_tol rtol = rt_tol
     elseif status == Solvers.IllPosed
         # TODO primal vs dual ill-posed statuses and conditions
     end
@@ -80,10 +80,19 @@ function build_solve_check(
     solve_time = Solvers.get_solve_time(solver)
     num_iters = Solvers.get_num_iters(solver)
 
-    return (solver = solver, model = model, status = status,
-        solve_time = solve_time, num_iters = num_iters,
-        primal_obj = primal_obj, dual_obj = dual_obj,
-        x = x, y = y, s = s, z = z)
+    return (
+        solver = solver,
+        model = model,
+        status = status,
+        solve_time = solve_time,
+        num_iters = num_iters,
+        primal_obj = primal_obj,
+        dual_obj = dual_obj,
+        x = x,
+        y = y,
+        s = s,
+        z = z,
+    )
 end
 
 function dimension1(T; options...)
@@ -102,8 +111,8 @@ function dimension1(T; options...)
         end
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ -1 atol=tol rtol=tol
-        @test r.x ≈ [1, 0] atol=tol rtol=tol
+        @test r.primal_obj ≈ -1 atol = tol rtol = tol
+        @test r.x ≈ [1, 0] atol = tol rtol = tol
         @test isempty(r.y)
     end
 end
@@ -157,8 +166,8 @@ function inconsistent2(T; options...)
     b = rand(T, p)
     rnd1 = rand(T)
     rnd2 = rand(T)
-    A[:,11:15] = rnd1 * A[:,1:5] - rnd2 * A[:,6:10]
-    G[:,11:15] = rnd1 * G[:,1:5] - rnd2 * G[:,6:10]
+    A[:, 11:15] = rnd1 * A[:, 1:5] - rnd2 * A[:, 6:10]
+    G[:, 11:15] = rnd1 * G[:, 1:5] - rnd2 * G[:, 6:10]
     c[11:15] = 2 * (rnd1 * c[1:5] - rnd2 * c[6:10])
     h = zeros(T, q)
     cones = Cone{T}[Cones.Nonnegative{T}(q)]
@@ -185,8 +194,7 @@ function primalinfeas2(T; options...)
     c = T[1, 1, 1]
     A = zeros(T, 0, 3)
     b = T[]
-    G = vcat(SparseMatrixCSC(-one(T) * I, 3, 3),
-        Diagonal([one(T), one(T), -one(T)]))
+    G = vcat(SparseMatrixCSC(-one(T) * I, 3, 3), Diagonal([one(T), one(T), -one(T)]))
     h = vcat(zeros(T, 3), one(T), one(T), -T(2))
     cones = Cone{T}[Cones.EpiNormEucl{T}(3), Cones.Nonnegative{T}(3)]
 
@@ -214,8 +222,7 @@ function dualinfeas1(T; options...)
     b = T[]
     G = repeat(SparseMatrixCSC(-one(T) * I, 3, 3), 2, 1)
     h = zeros(T, 6)
-    cones = Cone{T}[Cones.EpiNormInf{T, T}(3),
-        Cones.EpiNormInf{T, T}(3, use_dual = true)]
+    cones = Cone{T}[Cones.EpiNormInf{T, T}(3), Cones.EpiNormInf{T, T}(3, use_dual = true)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.DualInfeasible
@@ -258,8 +265,7 @@ function nonnegative1(T; options...)
     h = zeros(T, q)
     cones = Cone{T}[Cones.Nonnegative{T}(q)]
 
-    r = build_solve_check(c, A, b, G, h, cones, tol;
-        obj_offset = one(T), options...)
+    r = build_solve_check(c, A, b, G, h, cones, tol; obj_offset = one(T), options...)
     @test r.status == Solvers.Optimal
 end
 
@@ -304,10 +310,10 @@ function nonnegative4(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -4 atol=tol rtol=tol
-    @test r.x ≈ [2, 2] atol=tol rtol=tol
-    @test r.s ≈ [0, 0, 2] atol=tol rtol=tol
-    @test r.z ≈ [2, 2, 0] atol=tol rtol=tol
+    @test r.primal_obj ≈ -4 atol = tol rtol = tol
+    @test r.x ≈ [2, 2] atol = tol rtol = tol
+    @test r.s ≈ [0, 0, 2] atol = tol rtol = tol
+    @test r.z ≈ [2, 2, 0] atol = tol rtol = tol
 end
 
 function possemideftri1(T; options...)
@@ -321,8 +327,8 @@ function possemideftri1(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -one(T) atol=tol rtol=tol
-    @test r.x[2] ≈ one(T) atol=tol rtol=tol
+    @test r.primal_obj ≈ -one(T) atol = tol rtol = tol
+    @test r.x[2] ≈ one(T) atol = tol rtol = tol
 end
 
 function possemideftri2(T; options...)
@@ -336,8 +342,8 @@ function possemideftri2(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
-    @test norm(r.x) ≈ 0 atol=tol rtol=tol
+    @test r.primal_obj ≈ 0 atol = tol rtol = tol
+    @test norm(r.x) ≈ 0 atol = tol rtol = tol
 end
 
 function possemideftri3(T; options...)
@@ -355,8 +361,8 @@ function possemideftri3(T; options...)
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
     eig_max = maximum(eigvals(rand_mat))
-    @test r.primal_obj ≈ eig_max atol=tol rtol=tol
-    @test r.x[1] ≈ eig_max atol=tol rtol=tol
+    @test r.primal_obj ≈ eig_max atol = tol rtol = tol
+    @test r.x[1] ≈ eig_max atol = tol rtol = tol
 end
 
 function possemideftri4(T; options...)
@@ -367,8 +373,7 @@ function possemideftri4(T; options...)
     rand_mat = Hermitian(rand(T, s, s), :U)
     dim = sum(1:s)
     c = -Cones.smat_to_svec!(zeros(T, dim), rand_mat, rt2)
-    A = reshape(Cones.smat_to_svec!(zeros(T, dim),
-        Matrix{T}(I, s, s), rt2), 1, dim)
+    A = reshape(Cones.smat_to_svec!(zeros(T, dim), Matrix{T}(I, s, s), rt2), 1, dim)
     b = T[1]
     G = Diagonal(-one(T) * I, dim)
     h = zeros(T, dim)
@@ -377,7 +382,7 @@ function possemideftri4(T; options...)
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
     eig_max = maximum(eigvals(rand_mat))
-    @test r.primal_obj ≈ -eig_max atol=tol rtol=tol
+    @test r.primal_obj ≈ -eig_max atol = tol rtol = tol
 end
 
 function possemideftri5(T; options...)
@@ -393,8 +398,8 @@ function possemideftri5(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ Trt2 atol=tol rtol=tol
-    @test r.x ≈ [Trt2i, 0, 1, Trt2i] atol=tol rtol=tol
+    @test r.primal_obj ≈ Trt2 atol = tol rtol = tol
+    @test r.x ≈ [Trt2i, 0, 1, Trt2i] atol = tol rtol = tol
 end
 
 function possemideftri6(T; options...)
@@ -412,8 +417,8 @@ function possemideftri6(T; options...)
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
     eig_max = maximum(eigvals(rand_mat))
-    @test r.primal_obj ≈ eig_max atol=tol rtol=tol
-    @test r.x[1] ≈ eig_max atol=tol rtol=tol
+    @test r.primal_obj ≈ eig_max atol = tol rtol = tol
+    @test r.x[1] ≈ eig_max atol = tol rtol = tol
 end
 
 function possemideftri7(T; options...)
@@ -424,8 +429,11 @@ function possemideftri7(T; options...)
     rand_mat = Hermitian(rand(Complex{T}, side, side), :U)
     dim = abs2(side)
     c = -Cones.smat_to_svec!(zeros(T, dim), rand_mat, rt2)
-    A = reshape(Cones.smat_to_svec!(zeros(T, dim),
-        Matrix{Complex{T}}(I, side, side), rt2), 1, dim)
+    A = reshape(
+        Cones.smat_to_svec!(zeros(T, dim), Matrix{Complex{T}}(I, side, side), rt2),
+        1,
+        dim,
+    )
     b = T[1]
     G = Diagonal(-one(T) * I, dim)
     h = zeros(T, dim)
@@ -434,7 +442,7 @@ function possemideftri7(T; options...)
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
     eig_max = maximum(eigvals(rand_mat))
-    @test r.primal_obj ≈ -eig_max atol=tol rtol=tol
+    @test r.primal_obj ≈ -eig_max atol = tol rtol = tol
 end
 
 function possemideftri8(T; options...)
@@ -452,14 +460,29 @@ function possemideftri8(T; options...)
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
     rt3 = sqrt(T(3))
-    @test r.primal_obj ≈ rt3 atol=tol rtol=tol
-    @test r.s ≈ [rt3, 0, rt3, 0, 0, rt3, rt2, rt2, 0, rt3, rt2, -rt2, rt2,
-        0, rt3] atol=tol rtol=tol
+    @test r.primal_obj ≈ rt3 atol = tol rtol = tol
+    @test r.s ≈ [rt3, 0, rt3, 0, 0, rt3, rt2, rt2, 0, rt3, rt2, -rt2, rt2, 0, rt3] atol =
+        tol rtol = tol
     inv6 = inv(T(6))
     rt2inv6 = rt2 / 6
     invrt6 = inv(rt2 * rt3)
-    @test r.z ≈ [inv6, -rt2inv6, inv6, rt2inv6, -rt2inv6, inv6, 0, 0, 0, 0,
-        -invrt6, invrt6, -invrt6, 0, inv(T(2))] atol=tol rtol=tol
+    @test r.z ≈ [
+        inv6,
+        -rt2inv6,
+        inv6,
+        rt2inv6,
+        -rt2inv6,
+        inv6,
+        0,
+        0,
+        0,
+        0,
+        -invrt6,
+        invrt6,
+        -invrt6,
+        0,
+        inv(T(2)),
+    ] atol = tol rtol = tol
 end
 
 function possemideftri9(T; options...)
@@ -480,15 +503,46 @@ function possemideftri9(T; options...)
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
     rt3 = sqrt(T(3))
-    @test r.primal_obj ≈ rt2 + rt3 atol=tol rtol=tol
+    @test r.primal_obj ≈ rt2 + rt3 atol = tol rtol = tol
     invrt2 = inv(rt2)
     invrt3 = inv(rt3)
-    @test r.s ≈ [0, invrt2 + invrt3, 1 - rt2 / rt3, invrt2 + invrt3, rt2 * invrt3,
-        -rt2 * invrt3, invrt3, rt2, rt2, 0, rt2, rt2, -rt2,
-        rt2, 0, rt3] atol=tol rtol=tol
+    @test r.s ≈ [
+        0,
+        invrt2 + invrt3,
+        1 - rt2 / rt3,
+        invrt2 + invrt3,
+        rt2 * invrt3,
+        -rt2 * invrt3,
+        invrt3,
+        rt2,
+        rt2,
+        0,
+        rt2,
+        rt2,
+        -rt2,
+        rt2,
+        0,
+        rt3,
+    ] atol = tol rtol = tol
     invrt6 = invrt2 * invrt3
-    @test r.z ≈ [1, inv2, 0, inv2, 0, 0, inv2, -inv2, -inv2, 0, inv2, -invrt6,
-        invrt6, -invrt6, 0, inv2] atol=tol rtol=tol
+    @test r.z ≈ [
+        1,
+        inv2,
+        0,
+        inv2,
+        0,
+        0,
+        inv2,
+        -inv2,
+        -inv2,
+        0,
+        inv2,
+        -invrt6,
+        invrt6,
+        -invrt6,
+        0,
+        inv2,
+    ] atol = tol rtol = tol
 end
 
 function doublynonnegativetri1(T; options...)
@@ -505,9 +559,9 @@ function doublynonnegativetri1(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ 0 atol=tol rtol=tol
-        @test r.x ≈ T[1, 0, 1] atol=tol rtol=tol
-        @test r.s ≈ T[1, 0, 1] atol=tol rtol=tol
+        @test r.primal_obj ≈ 0 atol = tol rtol = tol
+        @test r.x ≈ T[1, 0, 1] atol = tol rtol = tol
+        @test r.s ≈ T[1, 0, 1] atol = tol rtol = tol
     end
 end
 
@@ -522,8 +576,8 @@ function doublynonnegativetri2(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -one(T) atol=tol rtol=tol
-    @test r.x[2] ≈ one(T) atol=tol rtol=tol
+    @test r.primal_obj ≈ -one(T) atol = tol rtol = tol
+    @test r.x[2] ≈ one(T) atol = tol rtol = tol
 end
 
 function doublynonnegativetri3(T; options...)
@@ -537,8 +591,8 @@ function doublynonnegativetri3(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
-    @test norm(r.x) ≈ 0 atol=tol rtol=tol
+    @test r.primal_obj ≈ 0 atol = tol rtol = tol
+    @test norm(r.x) ≈ 0 atol = tol rtol = tol
 end
 
 function possemideftrisparse1(T; options...)
@@ -553,13 +607,13 @@ function possemideftrisparse1(T; options...)
         h = zeros(T, 3)
         row_idxs = [1, 2, 2]
         col_idxs = [1, 1, 2]
-        cones = Cone{T}[Cones.PosSemidefTriSparse{psdsparseimpl, T, T}(
-            2, row_idxs, col_idxs)]
+        cones =
+            Cone{T}[Cones.PosSemidefTriSparse{psdsparseimpl, T, T}(2, row_idxs, col_idxs)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ -one(T) atol=tol rtol=tol
-        @test r.x[2] ≈ one(T) atol=tol rtol=tol
+        @test r.primal_obj ≈ -one(T) atol = tol rtol = tol
+        @test r.x[2] ≈ one(T) atol = tol rtol = tol
     end
 end
 
@@ -578,12 +632,15 @@ function possemideftrisparse2(T; options...)
         row_idxs = [1, 2, 2]
         col_idxs = [1, 1, 2]
         cones = Cone{T}[Cones.PosSemidefTriSparse{psdsparseimpl, T, Complex{T}}(
-            2, row_idxs, col_idxs)]
+            2,
+            row_idxs,
+            col_idxs,
+        )]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ Trt2 atol=tol rtol=tol
-        @test r.x ≈ [Trt2i, 0, 1, Trt2i] atol=tol rtol=tol
+        @test r.primal_obj ≈ Trt2 atol = tol rtol = tol
+        @test r.x ≈ [Trt2i, 0, 1, Trt2i] atol = tol rtol = tol
     end
 end
 
@@ -618,13 +675,17 @@ function possemideftrisparse3(T; options...)
             b = T[1]
             G = Diagonal(-one(T) * I, dim)
             h = zeros(T, dim)
-            cones = Cone{T}[Cones.PosSemidefTriSparse{psdsparseimpl, T, R}(side,
-                row_idxs, col_idxs, use_dual = true)]
+            cones = Cone{T}[Cones.PosSemidefTriSparse{psdsparseimpl, T, R}(
+                side,
+                row_idxs,
+                col_idxs,
+                use_dual = true,
+            )]
 
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
             eig_max = maximum(eigvals(Hermitian(Matrix(rand_mat_L), :L)))
-            @test r.primal_obj ≈ -eig_max atol=tol rtol=tol
+            @test r.primal_obj ≈ -eig_max atol = tol rtol = tol
         end
     end
 end
@@ -644,20 +705,20 @@ function possemideftrisparse4(T; options...)
         @. h[[4, 5, 7, 8, 9]] = rt2 * [1, 1, 1, -1, 1]
         row_idxs = [1, 2, 3, 4, 4, 4, 5, 5, 5, 5]
         col_idxs = [1, 2, 3, 1, 2, 4, 1, 2, 3, 5]
-        cones = Cone{T}[Cones.PosSemidefTriSparse{psdsparseimpl, T, T}(
-            5, row_idxs, col_idxs)]
+        cones =
+            Cone{T}[Cones.PosSemidefTriSparse{psdsparseimpl, T, T}(5, row_idxs, col_idxs)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
         rt3 = sqrt(T(3))
-        @test r.primal_obj ≈ rt3 atol=tol rtol=tol
-        @test r.s ≈ [rt3, rt3, rt3, rt2, rt2, rt3, rt2, -rt2,
-            rt2, rt3] atol=tol rtol=tol
+        @test r.primal_obj ≈ rt3 atol = tol rtol = tol
+        @test r.s ≈ [rt3, rt3, rt3, rt2, rt2, rt3, rt2, -rt2, rt2, rt3] atol = tol rtol =
+            tol
         inv6 = inv(T(6))
         rt2inv6 = rt2 / 6
         invrt6 = inv(rt2 * rt3)
-        @test r.z ≈ [inv6, inv6, inv6, 0, 0, 0, -invrt6, invrt6,
-            -invrt6, inv(T(2))] atol=tol rtol=tol
+        @test r.z ≈ [inv6, inv6, inv6, 0, 0, 0, -invrt6, invrt6, -invrt6, inv(T(2))] atol =
+            tol rtol = tol
     end
 end
 
@@ -676,21 +737,40 @@ function possemideftrisparse5(T; options...)
         h = vcat(zeros(T, 6), rt2 * [1, 1, 0, 1, -1, 1])
         row_idxs = [1, 2, 3, 4, 5, 4, 4, 4, 5, 5, 5]
         col_idxs = [1, 2, 3, 4, 5, 1, 2, 3, 1, 2, 3]
-        cones = Cone{T}[Cones.Nonnegative{T}(1),
+        cones = Cone{T}[
+            Cones.Nonnegative{T}(1),
             Cones.PosSemidefTriSparse{psdsparseimpl, T, T}(
-            5, row_idxs, col_idxs, use_dual = true)]
+                5,
+                row_idxs,
+                col_idxs,
+                use_dual = true,
+            ),
+        ]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
         rt3 = sqrt(T(3))
-        @test r.primal_obj ≈ rt2 + rt3 atol=tol rtol=tol
+        @test r.primal_obj ≈ rt2 + rt3 atol = tol rtol = tol
         invrt2 = inv(rt2)
         invrt3 = inv(rt3)
-        @test r.s ≈ [0, invrt2 + invrt3, invrt2 + invrt3, invrt3, rt2, rt3, rt2,
-            rt2, 0, rt2, -rt2, rt2] atol=tol rtol=tol
+        @test r.s ≈ [
+            0,
+            invrt2 + invrt3,
+            invrt2 + invrt3,
+            invrt3,
+            rt2,
+            rt3,
+            rt2,
+            rt2,
+            0,
+            rt2,
+            -rt2,
+            rt2,
+        ] atol = tol rtol = tol
         invrt6 = invrt2 * invrt3
-        @test r.z ≈ [1, inv2, inv2, inv2, inv2, inv2, -inv2, -inv2, 0, -invrt6,
-            invrt6, -invrt6] atol=tol rtol=tol
+        @test r.z ≈
+              [1, inv2, inv2, inv2, inv2, inv2, -inv2, -inv2, 0, -invrt6, invrt6, -invrt6] atol =
+            tol rtol = tol
     end
 end
 
@@ -714,8 +794,8 @@ function linmatrixineq1(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ 2 / val_1 atol=tol rtol=tol
-        @test r.s ≈ [2 / val_1, 2] atol=tol rtol=tol
+        @test r.primal_obj ≈ 2 / val_1 atol = tol rtol = tol
+        @test r.s ≈ [2 / val_1, 2] atol = tol rtol = tol
     end
 end
 
@@ -767,7 +847,7 @@ function linmatrixineq3(T; options...)
         [I, dense2],
         # [I, sparse2],
         # [I, diag2],
-        ]
+    ]
 
     for As in As_list
         if !(T <: BlasReal) && any(a -> a isa SparseMatrixCSC, As)
@@ -784,8 +864,8 @@ function linmatrixineq3(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ 1 atol=tol rtol=tol
-        @test r.s ≈ [1, -1] atol=tol rtol=tol
+        @test r.primal_obj ≈ 1 atol = tol rtol = tol
+        @test r.s ≈ [1, -1] atol = tol rtol = tol
     end
 end
 
@@ -801,32 +881,40 @@ function epinorminf1(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -1 - Tirt2 atol=tol rtol=tol
-    @test r.x ≈ [1, Tirt2, 1] atol=tol rtol=tol
-    @test r.y ≈ [1, 1] atol=tol rtol=tol
+    @test r.primal_obj ≈ -1 - Tirt2 atol = tol rtol = tol
+    @test r.x ≈ [1, Tirt2, 1] atol = tol rtol = tol
+    @test r.y ≈ [1, 1] atol = tol rtol = tol
 end
 
 function epinorminf2(T; options...)
     tol = 10 * test_tol(T)
     l = 3
     L = 2l + 1
-    c = collect(T, -l:l)
+    c = collect(T, (-l):l)
     A = spzeros(T, 2, L)
-    A[1, 1] = A[1, L] = A[2, 1] = 1; A[2, L] = -1
+    A[1, 1] = A[1, L] = A[2, 1] = 1
+    A[2, L] = -1
     b = T[0, 0]
-    G = [spzeros(T, 1, L); sparse(one(T) * I, L, L); spzeros(T, 1, L);
-        sparse(T(2) * I, L, L)]
-    h = zeros(T, 2L + 2); h[1] = 1; h[L + 2] = 1
-    cones = Cone{T}[Cones.EpiNormInf{T, T}(L + 1, use_dual = true),
-        Cones.EpiNormInf{T, T}(L + 1, use_dual = false)]
+    G = [
+        spzeros(T, 1, L)
+        sparse(one(T) * I, L, L)
+        spzeros(T, 1, L)
+        sparse(T(2) * I, L, L)
+    ]
+    h = zeros(T, 2L + 2)
+    h[1] = 1
+    h[L + 2] = 1
+    cones = Cone{T}[
+        Cones.EpiNormInf{T, T}(L + 1, use_dual = true),
+        Cones.EpiNormInf{T, T}(L + 1, use_dual = false),
+    ]
 
-    r = build_solve_check(c, A, b, G, h, cones, tol;
-        obj_offset = one(T), options...)
+    r = build_solve_check(c, A, b, G, h, cones, tol; obj_offset = one(T), options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -l + 2 atol=tol rtol=tol
-    @test r.x[2] ≈ 0.5 atol=tol rtol=tol
-    @test r.x[end - 1] ≈ -0.5 atol=tol rtol=tol
-    @test sum(abs, r.x) ≈ 1 atol=tol rtol=tol
+    @test r.primal_obj ≈ -l + 2 atol = tol rtol = tol
+    @test r.x[2] ≈ 0.5 atol = tol rtol = tol
+    @test r.x[end - 1] ≈ -0.5 atol = tol rtol = tol
+    @test sum(abs, r.x) ≈ 1 atol = tol rtol = tol
 end
 
 function epinorminf3(T; options...)
@@ -842,8 +930,8 @@ function epinorminf3(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ 0 atol=tol rtol=tol
-        @test norm(r.x) ≈ 0 atol=tol rtol=tol
+        @test r.primal_obj ≈ 0 atol = tol rtol = tol
+        @test norm(r.x) ≈ 0 atol = tol rtol = tol
     end
 end
 
@@ -858,9 +946,9 @@ function epinorminf4(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -1 atol=tol rtol=tol
-    @test r.x ≈ [1, -0.4, 0.6] atol=tol rtol=tol
-    @test r.y ≈ [1, 0] atol=tol rtol=tol
+    @test r.primal_obj ≈ -1 atol = tol rtol = tol
+    @test r.x ≈ [1, -0.4, 0.6] atol = tol rtol = tol
+    @test r.y ≈ [1, 0] atol = tol rtol = tol
 end
 
 function epinorminf5(T; options...)
@@ -874,8 +962,8 @@ function epinorminf5(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -3 atol=tol rtol=tol
-    @test r.x ≈ [2, 0, 2, 1, 0] atol=tol rtol=tol
+    @test r.primal_obj ≈ -3 atol = tol rtol = tol
+    @test r.x ≈ [2, 0, 2, 1, 0] atol = tol rtol = tol
 end
 
 function epinorminf6(T; options...)
@@ -891,15 +979,15 @@ function epinorminf6(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ 0 atol=tol rtol=tol
-        @test norm(r.x) ≈ 0 atol=tol rtol=tol
+        @test r.primal_obj ≈ 0 atol = tol rtol = tol
+        @test norm(r.x) ≈ 0 atol = tol rtol = tol
     end
 end
 
 function epinorminf7(T; options...)
-    tol = eps(T) ^ 0.2
+    tol = eps(T)^0.2
     c = T[1, -1, 1, 1]
-    A = T[1 0 0 0 ; 0 1 0 0; 0 0 1 0]
+    A = T[1 0 0 0; 0 1 0 0; 0 0 1 0]
     b = T[-0.4, 0.3, -0.3]
     G = vcat(zeros(T, 1, 4), Diagonal(T[-1, -1, -1, -1]))
     h = T[1, 0, 0, 0, 0]
@@ -907,10 +995,10 @@ function epinorminf7(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -1.4 atol=tol rtol=tol
-    @test r.x ≈ [-0.4, 0.3, -0.3, -0.4] atol=tol rtol=tol
-    @test r.y ≈ [0, 0.25, -0.25] atol=tol rtol=tol
-    @test r.z ≈ [1.25, 1, -0.75, 0.75, 1] atol=tol rtol=tol
+    @test r.primal_obj ≈ -1.4 atol = tol rtol = tol
+    @test r.x ≈ [-0.4, 0.3, -0.3, -0.4] atol = tol rtol = tol
+    @test r.y ≈ [0, 0.25, -0.25] atol = tol rtol = tol
+    @test r.z ≈ [1.25, 1, -0.75, 0.75, 1] atol = tol rtol = tol
 end
 
 function epinormeucl1(T; options...)
@@ -926,9 +1014,9 @@ function epinormeucl1(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -Trt2 atol=tol rtol=tol
-    @test r.x ≈ [1, Tirt2, Tirt2] atol=tol rtol=tol
-    @test r.y ≈ [Trt2 / 10, 0] atol=tol rtol=tol
+    @test r.primal_obj ≈ -Trt2 atol = tol rtol = tol
+    @test r.x ≈ [1, Tirt2, Tirt2] atol = tol rtol = tol
+    @test r.y ≈ [Trt2 / 10, 0] atol = tol rtol = tol
 end
 
 function epinormeucl2(T; options...)
@@ -942,8 +1030,8 @@ function epinormeucl2(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
-    @test norm(r.x) ≈ 0 atol=tol rtol=tol
+    @test r.primal_obj ≈ 0 atol = tol rtol = tol
+    @test norm(r.x) ≈ 0 atol = tol rtol = tol
 end
 
 function epinormeucl3(T; options...)
@@ -957,8 +1045,8 @@ function epinormeucl3(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 1 atol=tol rtol=tol
-    @test r.x ≈ [1, 1, 0] atol=tol rtol=tol
+    @test r.primal_obj ≈ 1 atol = tol rtol = tol
+    @test r.x ≈ [1, 1, 0] atol = tol rtol = tol
 end
 
 function epipersquare1(T; options...)
@@ -972,8 +1060,8 @@ function epipersquare1(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -sqrt(T(2)) atol=tol rtol=tol
-    @test r.x[3:4] ≈ [1, 1] / sqrt(T(2)) atol=tol rtol=tol
+    @test r.primal_obj ≈ -sqrt(T(2)) atol = tol rtol = tol
+    @test r.x[3:4] ≈ [1, 1] / sqrt(T(2)) atol = tol rtol = tol
 end
 
 function epipersquare2(T; options...)
@@ -986,11 +1074,10 @@ function epipersquare2(T; options...)
     h = zeros(T, 3)
     cones = Cone{T}[Cones.EpiPerSquare{T}(3)]
 
-    r = build_solve_check(c, A, b, G, h, cones, tol;
-        obj_offset = -one(T), options...)
+    r = build_solve_check(c, A, b, G, h, cones, tol; obj_offset = -one(T), options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -Tirt2 - 1 atol=tol rtol=tol
-    @test r.x[2] ≈ Tirt2 atol=tol rtol=tol
+    @test r.primal_obj ≈ -Tirt2 - 1 atol = tol rtol = tol
+    @test r.x[2] ≈ Tirt2 atol = tol rtol = tol
 end
 
 function epipersquare3(T; options...)
@@ -1004,8 +1091,8 @@ function epipersquare3(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
-    @test norm(r.x) ≈ 0 atol=tol rtol=tol
+    @test r.primal_obj ≈ 0 atol = tol rtol = tol
+    @test norm(r.x) ≈ 0 atol = tol rtol = tol
 end
 
 function epipersquare4(T; options...)
@@ -1018,22 +1105,29 @@ function epipersquare4(T; options...)
         [1, 1, 2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
         [1, 7, 2, 3, 4, 2, 3, 5, 4, 7, 6, 5, 6, 7],
         T[1, -0.5, 1, 1, 1, -1, -1, -1, -1, -0.5, -1, -1, -1, -1],
-        11, 7)
+        11,
+        7,
+    )
     h = zeros(T, 11)
     h[2] = 3
-    cones = Cone{T}[Cones.Nonnegative{T}(2), Cones.EpiPerSquare{T}(3),
-        Cones.EpiPerSquare{T}(3), Cones.EpiPerSquare{T}(3)]
+    cones = Cone{T}[
+        Cones.Nonnegative{T}(2),
+        Cones.EpiPerSquare{T}(3),
+        Cones.EpiPerSquare{T}(3),
+        Cones.EpiPerSquare{T}(3),
+    ]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    @test r.primal_obj ≈ -1 atol = tol rtol = tol
     rt2 = sqrt(T(2))
-    @test r.x ≈ [1, 1, 1, 1, rt2, rt2, 2] atol=tol rtol=tol
-    @test r.s ≈ [0, 0, 1, 1, rt2, 1, 1, rt2, rt2, rt2, 2] atol=tol rtol=tol
+    @test r.x ≈ [1, 1, 1, 1, rt2, rt2, 2] atol = tol rtol = tol
+    @test r.s ≈ [0, 0, 1, 1, rt2, 1, 1, rt2, rt2, rt2, 2] atol = tol rtol = tol
     inv3 = inv(T(3))
     rt2inv3 = inv3 * rt2
-    @test r.z ≈ [1, inv3, inv3, inv3, -rt2inv3, inv3, inv3, -rt2inv3,
-        rt2inv3, rt2inv3, -2 * inv3] atol=tol rtol=tol
+    @test r.z ≈
+          [1, inv3, inv3, inv3, -rt2inv3, inv3, inv3, -rt2inv3, rt2inv3, rt2inv3, -2 * inv3] atol =
+        tol rtol = tol
 end
 
 function epinormspectraltri1(T; options...)
@@ -1051,8 +1145,7 @@ function epinormspectraltri1(T; options...)
         h = vcat(zero(T), rand(T, dim))
 
         for use_dual in (false, true)
-            cones = Cone{T}[Cones.EpiNormSpectralTri{T, R}(1 + dim,
-                use_dual = use_dual)]
+            cones = Cone{T}[Cones.EpiNormSpectralTri{T, R}(1 + dim, use_dual = use_dual)]
 
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
@@ -1064,11 +1157,11 @@ function epinormspectraltri1(T; options...)
             @views Cones.svec_to_smat!(Z, r.z[2:end], rt2)
             dual_eigvals = eigvals(Hermitian(Z, :U))
             if use_dual
-                @test sum(abs, prim_eigvals) ≈ r.s[1] atol=tol rtol=tol
-                @test maximum(abs, dual_eigvals) ≈ r.z[1] atol=tol rtol=tol
+                @test sum(abs, prim_eigvals) ≈ r.s[1] atol = tol rtol = tol
+                @test maximum(abs, dual_eigvals) ≈ r.z[1] atol = tol rtol = tol
             else
-                @test maximum(abs, prim_eigvals) ≈ r.s[1] atol=tol rtol=tol
-                @test sum(abs, dual_eigvals) ≈ r.z[1] atol=tol rtol=tol
+                @test maximum(abs, prim_eigvals) ≈ r.s[1] atol = tol rtol = tol
+                @test sum(abs, dual_eigvals) ≈ r.z[1] atol = tol rtol = tol
             end
         end
     end
@@ -1092,15 +1185,14 @@ function epinormspectraltri2(T; options...)
         h = vcat(one(T), zeros(T, dim))
 
         for use_dual in (false, true)
-            cones = Cone{T}[Cones.EpiNormSpectralTri{T, R}(1 + dim,
-                use_dual = use_dual)]
+            cones = Cone{T}[Cones.EpiNormSpectralTri{T, R}(1 + dim, use_dual = use_dual)]
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
             vals = eigvals(Hermitian(mat, :U))
             if use_dual
-                @test r.primal_obj ≈ -maximum(abs, vals) atol=tol rtol=tol
+                @test r.primal_obj ≈ -maximum(abs, vals) atol = tol rtol = tol
             else
-                @test r.primal_obj ≈ -sum(abs, vals) atol=tol rtol=tol
+                @test r.primal_obj ≈ -sum(abs, vals) atol = tol rtol = tol
             end
         end
     end
@@ -1118,12 +1210,11 @@ function epinormspectraltri3(T; options...)
         h = zeros(T, dim + 1)
 
         for use_dual in (false, true)
-            cones = Cone{T}[Cones.EpiNormSpectralTri{T, R}(1 + dim,
-                use_dual = use_dual)]
+            cones = Cone{T}[Cones.EpiNormSpectralTri{T, R}(1 + dim, use_dual = use_dual)]
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
-            @test r.primal_obj ≈ 0 atol=tol rtol=tol
-            @test norm(r.x) ≈ 0 atol=tol rtol=tol
+            @test r.primal_obj ≈ 0 atol = tol rtol = tol
+            @test norm(r.x) ≈ 0 atol = tol rtol = tol
         end
     end
 end
@@ -1142,8 +1233,7 @@ function epinormspectral1(T; options...)
         h = vcat(zero(T), rand(T, dim))
 
         for use_dual in (false, true)
-            cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm,
-                use_dual = use_dual)]
+            cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm, use_dual = use_dual)]
 
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
@@ -1155,11 +1245,11 @@ function epinormspectral1(T; options...)
             @views Cones.vec_copyto!(Z, r.z[2:end])
             dual_svdvals = svdvals(Z)
             if use_dual
-                @test sum(prim_svdvals) ≈ r.s[1] atol=tol rtol=tol
-                @test dual_svdvals[1] ≈ r.z[1] atol=tol rtol=tol
+                @test sum(prim_svdvals) ≈ r.s[1] atol = tol rtol = tol
+                @test dual_svdvals[1] ≈ r.z[1] atol = tol rtol = tol
             else
-                @test prim_svdvals[1] ≈ r.s[1] atol=tol rtol=tol
-                @test sum(dual_svdvals) ≈ r.z[1] atol=tol rtol=tol
+                @test prim_svdvals[1] ≈ r.s[1] atol = tol rtol = tol
+                @test sum(dual_svdvals) ≈ r.z[1] atol = tol rtol = tol
             end
         end
     end
@@ -1182,14 +1272,13 @@ function epinormspectral2(T; options...)
         h = vcat(one(T), zeros(T, dim))
 
         for use_dual in (false, true)
-            cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm,
-                use_dual = use_dual)]
+            cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm, use_dual = use_dual)]
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
             if use_dual
-                @test r.primal_obj ≈ -svdvals(mat)[1] atol=tol rtol=tol
+                @test r.primal_obj ≈ -svdvals(mat)[1] atol = tol rtol = tol
             else
-                @test r.primal_obj ≈ -sum(svdvals(mat)) atol=tol rtol=tol
+                @test r.primal_obj ≈ -sum(svdvals(mat)) atol = tol rtol = tol
             end
         end
     end
@@ -1207,12 +1296,11 @@ function epinormspectral3(T; options...)
         h = zeros(T, dim + 1)
 
         for use_dual in (false, true)
-            cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm,
-                use_dual = use_dual)]
+            cones = Cone{T}[Cones.EpiNormSpectral{T, R}(Xn, Xm, use_dual = use_dual)]
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
-            @test r.primal_obj ≈ 0 atol=tol rtol=tol
-            @test norm(r.x) ≈ 0 atol=tol rtol=tol
+            @test r.primal_obj ≈ 0 atol = tol rtol = tol
+            @test norm(r.x) ≈ 0 atol = tol rtol = tol
         end
     end
 end
@@ -1235,14 +1323,14 @@ function epinormspectral4(T; options...)
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
         if use_dual
-            @test r.primal_obj ≈ rt2 + rt3 atol=tol rtol=tol
-            @test r.s ≈ T[rt2 + rt3, 1, 1, 1, -1, 0, 1] atol=tol rtol=tol
-            @test r.z ≈ T[1, -invrt2, -invrt3, -invrt2, invrt3,
-                0, -invrt3] atol=tol rtol=tol
+            @test r.primal_obj ≈ rt2 + rt3 atol = tol rtol = tol
+            @test r.s ≈ T[rt2 + rt3, 1, 1, 1, -1, 0, 1] atol = tol rtol = tol
+            @test r.z ≈ T[1, -invrt2, -invrt3, -invrt2, invrt3, 0, -invrt3] atol = tol rtol =
+                tol
         else
-            @test r.primal_obj ≈ rt3 atol=tol rtol=tol
-            @test r.s ≈ T[rt3, 1, 1, 1, -1, 0, 1] atol=tol rtol=tol
-            @test r.z ≈ T[1, 0, -invrt3, 0, invrt3, 0, -invrt3] atol=tol rtol=tol
+            @test r.primal_obj ≈ rt3 atol = tol rtol = tol
+            @test r.s ≈ T[rt3, 1, 1, 1, -1, 0, 1] atol = tol rtol = tol
+            @test r.z ≈ T[1, 0, -invrt3, 0, invrt3, 0, -invrt3] atol = tol rtol = tol
         end
     end
 end
@@ -1260,8 +1348,7 @@ function matrixepipersquare1(T; options...)
         G = zeros(T, dim, 1)
         G[per_idx] = -1
         h = zeros(T, dim)
-        @views Cones.smat_to_svec!(h[1:(per_idx - 1)],
-            Matrix{R}(I, Xn, Xn), sqrt(T(2)))
+        @views Cones.smat_to_svec!(h[1:(per_idx - 1)], Matrix{R}(I, Xn, Xn), sqrt(T(2)))
         W = rand(R, Xn, Xm)
         @views Cones.vec_copyto!(h[(per_idx + 1):end], W)
         WWt = Hermitian(W * W')
@@ -1269,19 +1356,18 @@ function matrixepipersquare1(T; options...)
         primal_epi = svdvals(WWt)[1] / 2
 
         for use_dual in (false, true)
-            cones = Cone{T}[Cones.MatrixEpiPerSquare{T, R}(Xn, Xm,
-                use_dual = use_dual)]
+            cones = Cone{T}[Cones.MatrixEpiPerSquare{T, R}(Xn, Xm, use_dual = use_dual)]
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
             @test r.primal_obj >= 0
             if use_dual
-                @test r.primal_obj ≈ dual_epi atol=tol rtol=tol
-                @test r.s[per_idx] ≈ dual_epi atol=tol rtol=tol
-                @test r.z[per_idx] ≈ 1 atol=tol rtol=tol
+                @test r.primal_obj ≈ dual_epi atol = tol rtol = tol
+                @test r.s[per_idx] ≈ dual_epi atol = tol rtol = tol
+                @test r.z[per_idx] ≈ 1 atol = tol rtol = tol
             else
-                @test r.primal_obj ≈ primal_epi atol=tol rtol=tol
-                @test r.s[per_idx] ≈ primal_epi atol=tol rtol=tol
-                @test r.z[per_idx] ≈ 1 atol=tol rtol=tol
+                @test r.primal_obj ≈ primal_epi atol = tol rtol = tol
+                @test r.s[per_idx] ≈ primal_epi atol = tol rtol = tol
+                @test r.z[per_idx] ≈ 1 atol = tol rtol = tol
             end
         end
     end
@@ -1308,16 +1394,15 @@ function matrixepipersquare2(T; options...)
         @views Cones.vec_copyto!(h[(per_idx + 1):end], W)
 
         for use_dual in (false, true)
-            cones = Cone{T}[Cones.MatrixEpiPerSquare{T, R}(Xn, Xm,
-                use_dual = use_dual)]
+            cones = Cone{T}[Cones.MatrixEpiPerSquare{T, R}(Xn, Xm, use_dual = use_dual)]
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
             @test r.primal_obj >= 0
             if use_dual
-                @test 2 * r.s[per_idx] ≈ tr(W' * (U \ W)) atol=tol rtol=tol
+                @test 2 * r.s[per_idx] ≈ tr(W' * (U \ W)) atol = tol rtol = tol
             else
                 primal_viol = Hermitian(2 * r.s[per_idx] * U - W * W')
-                @test minimum(eigvals(primal_viol)) ≈ 0 atol=tol rtol=tol
+                @test minimum(eigvals(primal_viol)) ≈ 0 atol = tol rtol = tol
             end
         end
     end
@@ -1342,11 +1427,10 @@ function matrixepipersquare3(T; options...)
         @views Cones.smat_to_svec!(h[1:(per_idx - 1)], U.data, sqrt(T(2)))
 
         for use_dual in (false, true)
-            cones = Cone{T}[Cones.MatrixEpiPerSquare{T, R}(Xn, Xm,
-                use_dual = use_dual)]
+            cones = Cone{T}[Cones.MatrixEpiPerSquare{T, R}(Xn, Xm, use_dual = use_dual)]
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
-            @test norm(r.x) ≈ 0 atol=2tol rtol=2tol
+            @test norm(r.x) ≈ 0 atol = 2tol rtol = 2tol
         end
     end
 end
@@ -1360,16 +1444,14 @@ function generalizedpower1(T; options...)
     h = zeros(T, 3)
 
     for use_dual in (false, true)
-        cones = Cone{T}[Cones.GeneralizedPower{T}(ones(T, 2) / 2, 1,
-            use_dual = use_dual)]
+        cones = Cone{T}[Cones.GeneralizedPower{T}(ones(T, 2) / 2, 1, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈
-            (use_dual ? -sqrt(T(2)) : -inv(sqrt(T(2)))) atol=tol rtol=tol
-        @test r.x[3] ≈
-            (use_dual ? -sqrt(T(2)) : -inv(sqrt(T(2)))) atol=tol rtol=tol
-        @test r.x[1:2] ≈ [0.5, 1] atol=tol rtol=tol
+        @test r.primal_obj ≈ (use_dual ? -sqrt(T(2)) : -inv(sqrt(T(2)))) atol = tol rtol =
+            tol
+        @test r.x[3] ≈ (use_dual ? -sqrt(T(2)) : -inv(sqrt(T(2)))) atol = tol rtol = tol
+        @test r.x[1:2] ≈ [0.5, 1] atol = tol rtol = tol
     end
 end
 
@@ -1382,17 +1464,15 @@ function generalizedpower2(T; options...)
     h = zeros(T, 4)
 
     for use_dual in (false, true)
-        cones = Cone{T}[Cones.GeneralizedPower{T}(ones(T, 2) / 2, 2,
-            use_dual = use_dual)]
+        cones = Cone{T}[Cones.GeneralizedPower{T}(ones(T, 2) / 2, 2, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ (use_dual ? -T(2) : -1) atol=tol rtol=tol
-        @test norm(r.x[3:4]) ≈
-            (use_dual ? sqrt(T(2)) : inv(sqrt(T(2)))) atol=tol rtol=tol
-        @test r.x[3:4] ≈
-            (use_dual ? ones(T, 2) : fill(inv(T(2)), 2)) atol=tol rtol=tol
-        @test r.x[1:2] ≈ [1, 0.5] atol=tol rtol=tol
+        @test r.primal_obj ≈ (use_dual ? -T(2) : -1) atol = tol rtol = tol
+        @test norm(r.x[3:4]) ≈ (use_dual ? sqrt(T(2)) : inv(sqrt(T(2)))) atol = tol rtol =
+            tol
+        @test r.x[3:4] ≈ (use_dual ? ones(T, 2) : fill(inv(T(2)), 2)) atol = tol rtol = tol
+        @test r.x[1:2] ≈ [1, 0.5] atol = tol rtol = tol
     end
 end
 
@@ -1406,14 +1486,13 @@ function generalizedpower3(T; options...)
 
     for use_dual in (false, true)
         b = [one(T), zero(T)]
-        cones = Cone{T}[Cones.GeneralizedPower{T}(
-            fill(inv(T(l)), l), 2, use_dual = use_dual)]
+        cones =
+            Cone{T}[Cones.GeneralizedPower{T}(fill(inv(T(l)), l), 2, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ (use_dual ? 10 : 10 * T(l)) atol=tol rtol=tol
-        @test r.x[1:l] ≈
-            (use_dual ? fill(inv(T(l)), l) : ones(l)) atol=tol rtol=tol
+        @test r.primal_obj ≈ (use_dual ? 10 : 10 * T(l)) atol = tol rtol = tol
+        @test r.x[1:l] ≈ (use_dual ? fill(inv(T(l)), l) : ones(l)) atol = tol rtol = tol
     end
 end
 
@@ -1427,13 +1506,13 @@ function generalizedpower4(T; options...)
     h = zeros(T, l + 3)
 
     for use_dual in (false, true)
-        cones = Cone{T}[Cones.GeneralizedPower{T}(
-            fill(inv(T(l)), l), 3, use_dual = use_dual)]
+        cones =
+            Cone{T}[Cones.GeneralizedPower{T}(fill(inv(T(l)), l), 3, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ 0 atol=tol rtol=tol
-        @test norm(r.x) ≈ 0 atol=tol rtol=tol
+        @test r.primal_obj ≈ 0 atol = tol rtol = tol
+        @test norm(r.x) ≈ 0 atol = tol rtol = tol
     end
 end
 # TODO test with non-equal αs
@@ -1446,13 +1525,12 @@ function hypopowermean1(T; options...)
     h = zeros(T, 3)
 
     for use_dual in (false, true)
-        cones = Cone{T}[Cones.HypoPowerMean{T}(ones(T, 2) / 2,
-            use_dual = use_dual)]
+        cones = Cone{T}[Cones.HypoPowerMean{T}(ones(T, 2) / 2, use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ (use_dual ? 0 : -inv(sqrt(T(2)))) atol=tol rtol=tol
-        @test r.x[2:3] ≈ [1, 0.5] atol=tol rtol=tol
+        @test r.primal_obj ≈ (use_dual ? 0 : -inv(sqrt(T(2)))) atol = tol rtol = tol
+        @test r.x[2:3] ≈ [1, 0.5] atol = tol rtol = tol
     end
 end
 
@@ -1466,14 +1544,12 @@ function hypopowermean2(T; options...)
 
     for use_dual in (false, true)
         b = use_dual ? [-one(T)] : [one(T)]
-        cones = Cone{T}[Cones.HypoPowerMean{T}(fill(inv(T(l)), l),
-            use_dual = use_dual)]
+        cones = Cone{T}[Cones.HypoPowerMean{T}(fill(inv(T(l)), l), use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ (use_dual ? 1 : l) atol=tol rtol=tol
-        @test r.x[2:end] ≈
-            (use_dual ? fill(inv(T(l)), l) : ones(l)) atol=tol rtol=tol
+        @test r.primal_obj ≈ (use_dual ? 1 : l) atol = tol rtol = tol
+        @test r.x[2:end] ≈ (use_dual ? fill(inv(T(l)), l) : ones(l)) atol = tol rtol = tol
     end
 end
 
@@ -1487,13 +1563,12 @@ function hypopowermean3(T; options...)
     h = zeros(T, l + 1)
 
     for use_dual in (false, true)
-        cones = Cone{T}[Cones.HypoPowerMean{T}(fill(inv(T(l)), l),
-            use_dual = use_dual)]
+        cones = Cone{T}[Cones.HypoPowerMean{T}(fill(inv(T(l)), l), use_dual = use_dual)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ 0 atol=tol rtol=tol
-        @test norm(r.x) ≈ 0 atol=tol rtol=tol
+        @test r.primal_obj ≈ 0 atol = tol rtol = tol
+        @test norm(r.x) ≈ 0 atol = tol rtol = tol
     end
 end
 
@@ -1504,15 +1579,14 @@ function hypopowermean4(T; options...)
     b = zeros(T, 0)
     G = vcat(Matrix{T}(-I, 4, 4), T[0, 1, 1, 1]')
     h = T[0, 0, 0, 0, 3]
-    cones = Cone{T}[Cones.HypoPowerMean{T}(fill(inv(T(3)), 3)),
-        Cones.Nonnegative{T}(1)]
+    cones = Cone{T}[Cones.HypoPowerMean{T}(fill(inv(T(3)), 3)), Cones.Nonnegative{T}(1)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -1 atol=tol rtol=tol
-    @test r.x ≈ [1, 1, 1, 1] atol=tol rtol=tol
-    @test r.s ≈ [1, 1, 1, 1, 0] atol=tol rtol=tol
-    @test r.z ≈ vcat(-1, fill(inv(T(3)), 4)) atol=tol rtol=tol
+    @test r.primal_obj ≈ -1 atol = tol rtol = tol
+    @test r.x ≈ [1, 1, 1, 1] atol = tol rtol = tol
+    @test r.s ≈ [1, 1, 1, 1, 0] atol = tol rtol = tol
+    @test r.z ≈ vcat(-1, fill(inv(T(3)), 4)) atol = tol rtol = tol
 end
 
 function hypopowermean5(T; options...)
@@ -1526,10 +1600,10 @@ function hypopowermean5(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -4 atol=tol rtol=tol
-    @test r.x ≈ [2, 2] atol=tol rtol=tol
-    @test r.s ≈ [2, 2, 0] atol=tol rtol=tol
-    @test r.z ≈ [-2, 2, 2] atol=tol rtol=tol
+    @test r.primal_obj ≈ -4 atol = tol rtol = tol
+    @test r.x ≈ [2, 2] atol = tol rtol = tol
+    @test r.s ≈ [2, 2, 0] atol = tol rtol = tol
+    @test r.z ≈ [-2, 2, 2] atol = tol rtol = tol
 end
 
 function hypopowermean6(T; options...)
@@ -1544,10 +1618,10 @@ function hypopowermean6(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -1 atol=tol rtol=tol
-    @test r.x ≈ ones(T, 10) atol=tol rtol=tol
-    @test r.z ≈ vcat(-one(T), fill(inv(T(9)), 9)) atol=tol rtol=tol
-    @test r.y ≈ fill(inv(T(9)), 9) atol=tol rtol=tol
+    @test r.primal_obj ≈ -1 atol = tol rtol = tol
+    @test r.x ≈ ones(T, 10) atol = tol rtol = tol
+    @test r.z ≈ vcat(-one(T), fill(inv(T(9)), 9)) atol = tol rtol = tol
+    @test r.y ≈ fill(inv(T(9)), 9) atol = tol rtol = tol
 end
 
 function hypogeomean1(T; options...)
@@ -1563,8 +1637,8 @@ function hypogeomean1(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ (use_dual ? 0 : -inv(sqrt(T(2)))) atol=tol rtol=tol
-        @test r.x[2:3] ≈ [1, 0.5] atol=tol rtol=tol
+        @test r.primal_obj ≈ (use_dual ? 0 : -inv(sqrt(T(2)))) atol = tol rtol = tol
+        @test r.x[2:3] ≈ [1, 0.5] atol = tol rtol = tol
     end
 end
 
@@ -1582,9 +1656,8 @@ function hypogeomean2(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ (use_dual ? 1 : l) atol=tol rtol=tol
-        @test r.x[2:end] ≈
-            (use_dual ? fill(inv(T(l)), l) : ones(l)) atol=tol rtol=tol
+        @test r.primal_obj ≈ (use_dual ? 1 : l) atol = tol rtol = tol
+        @test r.x[2:end] ≈ (use_dual ? fill(inv(T(l)), l) : ones(l)) atol = tol rtol = tol
     end
 end
 
@@ -1602,8 +1675,8 @@ function hypogeomean3(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ 0 atol=tol rtol=tol
-        @test norm(r.x) ≈ 0 atol=tol rtol=tol
+        @test r.primal_obj ≈ 0 atol = tol rtol = tol
+        @test norm(r.x) ≈ 0 atol = tol rtol = tol
     end
 end
 
@@ -1618,10 +1691,10 @@ function hypogeomean4(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -1 atol=tol rtol=tol
-    @test r.x ≈ [1, 1, 1, 1] atol=tol rtol=tol
-    @test r.s ≈ [1, 1, 1, 1, 0] atol=tol rtol=tol
-    @test r.z ≈ vcat(-1, fill(inv(T(3)), 4)) atol=tol rtol=tol
+    @test r.primal_obj ≈ -1 atol = tol rtol = tol
+    @test r.x ≈ [1, 1, 1, 1] atol = tol rtol = tol
+    @test r.s ≈ [1, 1, 1, 1, 0] atol = tol rtol = tol
+    @test r.z ≈ vcat(-1, fill(inv(T(3)), 4)) atol = tol rtol = tol
 end
 
 function hypogeomean5(T; options...)
@@ -1635,10 +1708,10 @@ function hypogeomean5(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -4 atol=tol rtol=tol
-    @test r.x ≈ [2, 2] atol=tol rtol=tol
-    @test r.s ≈ [2, 2, 0] atol=tol rtol=tol
-    @test r.z ≈ [-2, 2, 2] atol=tol rtol=tol
+    @test r.primal_obj ≈ -4 atol = tol rtol = tol
+    @test r.x ≈ [2, 2] atol = tol rtol = tol
+    @test r.s ≈ [2, 2, 0] atol = tol rtol = tol
+    @test r.z ≈ [-2, 2, 2] atol = tol rtol = tol
 end
 
 function hypogeomean6(T; options...)
@@ -1653,10 +1726,10 @@ function hypogeomean6(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -1 atol=tol rtol=tol
-    @test r.x ≈ ones(T, 10) atol=tol rtol=tol
-    @test r.z ≈ vcat(-one(T), fill(inv(T(9)), 9)) atol=tol rtol=tol
-    @test r.y ≈ fill(inv(T(9)), 9) atol=tol rtol=tol
+    @test r.primal_obj ≈ -1 atol = tol rtol = tol
+    @test r.x ≈ ones(T, 10) atol = tol rtol = tol
+    @test r.z ≈ vcat(-one(T), fill(inv(T(9)), 9)) atol = tol rtol = tol
+    @test r.y ≈ fill(inv(T(9)), 9) atol = tol rtol = tol
 end
 
 function hyporootdettri1(T; options...)
@@ -1679,14 +1752,14 @@ function hyporootdettri1(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
+        @test r.x[1] ≈ -r.primal_obj atol = tol rtol = tol
         sol_mat = zeros(R, side, side)
         Cones.svec_to_smat!(sol_mat, r.s[2:end], rt2)
-        @test det(cholesky!(Hermitian(sol_mat, :U))) ^ inv(T(side)) ≈
-            r.s[1] atol=tol rtol=tol
+        @test det(cholesky!(Hermitian(sol_mat, :U)))^inv(T(side)) ≈ r.s[1] atol = tol rtol =
+            tol
         Cones.svec_to_smat!(sol_mat, r.z[2:end] .* T(side), rt2)
-        @test det(cholesky!(Hermitian(sol_mat, :U))) ^ inv(T(side)) ≈
-            -r.z[1] atol=tol rtol=tol
+        @test det(cholesky!(Hermitian(sol_mat, :U)))^inv(T(side)) ≈ -r.z[1] atol = tol rtol =
+            tol
     end
 end
 
@@ -1710,20 +1783,20 @@ function hyporootdettri2(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.x[1] ≈ r.primal_obj atol=tol rtol=tol
+        @test r.x[1] ≈ r.primal_obj atol = tol rtol = tol
         sol_mat = zeros(R, side, side)
         Cones.svec_to_smat!(sol_mat, r.s[2:end] .* T(side), rt2)
-        @test det(cholesky!(Hermitian(sol_mat, :U))) ^ inv(T(side)) ≈
-            -r.s[1] atol=tol rtol=tol
+        @test det(cholesky!(Hermitian(sol_mat, :U)))^inv(T(side)) ≈ -r.s[1] atol = tol rtol =
+            tol
         Cones.svec_to_smat!(sol_mat, r.z[2:end], rt2)
-        @test det(cholesky!(Hermitian(sol_mat, :U))) ^ inv(T(side)) ≈
-            r.z[1] atol=tol rtol=tol
+        @test det(cholesky!(Hermitian(sol_mat, :U)))^inv(T(side)) ≈ r.z[1] atol = tol rtol =
+            tol
     end
 end
 
 function hyporootdettri3(T; options...)
     # max u: u <= rootdet(W) where W is not full rank
-    tol = eps(T) ^ 0.15
+    tol = eps(T)^0.15
     rt2 = sqrt(T(2))
     Random.seed!(1)
     side = 3
@@ -1742,8 +1815,8 @@ function hyporootdettri3(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ 0 atol=tol rtol=tol
-        @test r.x[1] ≈ zero(T) atol=tol rtol=tol
+        @test r.primal_obj ≈ 0 atol = tol rtol = tol
+        @test r.x[1] ≈ zero(T) atol = tol rtol = tol
     end
 end
 
@@ -1762,9 +1835,9 @@ function hyporootdettri4(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -1 atol=tol rtol=tol
-    @test r.x ≈ [1, 1, 0, 1] atol=tol rtol=tol
-    @test r.z ≈ [-1, 0.5, 0, 0.5, 0.5, 0.5] atol=tol rtol=tol
+    @test r.primal_obj ≈ -1 atol = tol rtol = tol
+    @test r.x ≈ [1, 1, 0, 1] atol = tol rtol = tol
+    @test r.z ≈ [-1, 0.5, 0, 0.5, 0.5, 0.5] atol = tol rtol = tol
 end
 
 function hypoperlog1(T; options...)
@@ -1779,10 +1852,10 @@ function hypoperlog1(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 2 * Texph + 3 atol=tol rtol=tol
-    @test r.x ≈ [1, 2, 2 * Texph] atol=tol rtol=tol
-    @test r.y ≈ -[1 + Texph / 2, 1 + Texph] atol=tol rtol=tol
-    @test r.z ≈ c + A' * r.y atol=tol rtol=tol
+    @test r.primal_obj ≈ 2 * Texph + 3 atol = tol rtol = tol
+    @test r.x ≈ [1, 2, 2 * Texph] atol = tol rtol = tol
+    @test r.y ≈ -[1 + Texph / 2, 1 + Texph] atol = tol rtol = tol
+    @test r.z ≈ c + A' * r.y atol = tol rtol = tol
 end
 
 function hypoperlog2(T; options...)
@@ -1796,7 +1869,7 @@ function hypoperlog2(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
+    @test r.primal_obj ≈ 0 atol = tol rtol = tol
 end
 
 function hypoperlog3(T; options...)
@@ -1810,8 +1883,8 @@ function hypoperlog3(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
-    @test norm(r.x) ≈ 0 atol=tol rtol=tol
+    @test r.primal_obj ≈ 0 atol = tol rtol = tol
+    @test norm(r.x) ≈ 0 atol = tol rtol = tol
     @test isempty(r.y)
 end
 
@@ -1827,8 +1900,8 @@ function hypoperlog4(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ Texp2 atol=tol rtol=tol
-    @test r.x ≈ [-1, 1, Texp2] atol=tol rtol=tol
+    @test r.primal_obj ≈ Texp2 atol = tol rtol = tol
+    @test r.x ≈ [-1, 1, Texp2] atol = tol rtol = tol
 end
 
 function hypoperlog5(T; options...)
@@ -1843,9 +1916,9 @@ function hypoperlog5(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -Tlogq atol=tol rtol=tol
-    @test r.x ≈ [Tlogq, 0.5, 0.5] atol=tol rtol=tol
-    @test r.y ≈ [2] atol=tol rtol=tol
+    @test r.primal_obj ≈ -Tlogq atol = tol rtol = tol
+    @test r.x ≈ [Tlogq, 0.5, 0.5] atol = tol rtol = tol
+    @test r.y ≈ [2] atol = tol rtol = tol
 end
 
 function hypoperlog6(T; options...)
@@ -1859,8 +1932,8 @@ function hypoperlog6(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
-    @test r.x[1] ≈ 0 atol=tol rtol=tol
+    @test r.primal_obj ≈ 0 atol = tol rtol = tol
+    @test r.x[1] ≈ 0 atol = tol rtol = tol
     @test isempty(r.y)
 end
 
@@ -1874,17 +1947,19 @@ function hypoperlog7(T; options...)
         [1, 2, 2, 3, 4, 5, 6],
         [2, 1, 3, 4, 4, 3, 2],
         T[1, 1, -1, -1, -1, -1, -1],
-        6, 4)
+        6,
+        4,
+    )
     h = zeros(T, 6)
     h[1] = 2
     cones = Cone{T}[Cones.Nonnegative{T}(3), Cones.HypoPerLog{T}(3)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -4 atol=tol rtol=tol
-    @test r.x ≈ [2, 2, 2, 0] atol=tol rtol=tol
-    @test r.s ≈ [0, 0, 0, 0, 2, 2] atol=tol rtol=tol
-    @test r.z ≈ [2, 2, 2, -2, -2, 2] atol=tol rtol=tol
+    @test r.primal_obj ≈ -4 atol = tol rtol = tol
+    @test r.x ≈ [2, 2, 2, 0] atol = tol rtol = tol
+    @test r.s ≈ [0, 0, 0, 0, 2, 2] atol = tol rtol = tol
+    @test r.z ≈ [2, 2, 2, -2, -2, 2] atol = tol rtol = tol
 end
 
 function hypoperlogdettri1(T; options...)
@@ -1907,15 +1982,15 @@ function hypoperlogdettri1(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
-        @test r.x[2] ≈ 1 atol=tol rtol=tol
+        @test r.x[1] ≈ -r.primal_obj atol = tol rtol = tol
+        @test r.x[2] ≈ 1 atol = tol rtol = tol
         sol_mat = zeros(R, side, side)
         Cones.svec_to_smat!(sol_mat, r.s[3:end] / r.s[2], rt2)
-        @test r.s[2] * logdet(cholesky!(Hermitian(sol_mat, :U))) ≈
-            r.s[1] atol=tol rtol=tol
+        @test r.s[2] * logdet(cholesky!(Hermitian(sol_mat, :U))) ≈ r.s[1] atol = tol rtol =
+            tol
         Cones.svec_to_smat!(sol_mat, -r.z[3:end] / r.z[1], rt2)
-        @test r.z[1] * (logdet(cholesky!(Hermitian(sol_mat, :U))) + T(side)) ≈
-            r.z[2] atol=tol rtol=tol
+        @test r.z[1] * (logdet(cholesky!(Hermitian(sol_mat, :U))) + T(side)) ≈ r.z[2] atol =
+            tol rtol = tol
     end
 end
 
@@ -1939,15 +2014,15 @@ function hypoperlogdettri2(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.x[2] ≈ r.primal_obj atol=tol rtol=tol
-        @test r.x[1] ≈ -1 atol=tol rtol=tol
+        @test r.x[2] ≈ r.primal_obj atol = tol rtol = tol
+        @test r.x[1] ≈ -1 atol = tol rtol = tol
         sol_mat = zeros(R, side, side)
         Cones.svec_to_smat!(sol_mat, -r.s[3:end] / r.s[1], rt2)
-        @test r.s[1] * (logdet(cholesky!(Hermitian(sol_mat, :U))) + T(side)) ≈
-            r.s[2] atol=tol rtol=tol
+        @test r.s[1] * (logdet(cholesky!(Hermitian(sol_mat, :U))) + T(side)) ≈ r.s[2] atol =
+            tol rtol = tol
         Cones.svec_to_smat!(sol_mat, r.z[3:end] / r.z[2], rt2)
-        @test r.z[2] * logdet(cholesky!(Hermitian(sol_mat, :U))) ≈
-            r.z[1] atol=tol rtol=tol
+        @test r.z[2] * logdet(cholesky!(Hermitian(sol_mat, :U))) ≈ r.z[1] atol = tol rtol =
+            tol
     end
 end
 
@@ -1971,8 +2046,8 @@ function hypoperlogdettri3(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.x[1] ≈ -r.primal_obj atol=tol rtol=tol
-        @test norm(r.x) ≈ 0 atol=tol rtol=tol
+        @test r.x[1] ≈ -r.primal_obj atol = tol rtol = tol
+        @test norm(r.x) ≈ 0 atol = tol rtol = tol
     end
 end
 
@@ -1992,10 +2067,10 @@ function hypoperlogdettri4(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
-    @test r.x ≈ [0, 1, 1, 0, 1] atol=tol rtol=tol
-    @test r.y ≈ [-2] atol=tol rtol=tol
-    @test r.z ≈ [-1, -2, 1, 0, 1, 1, 1] atol=tol rtol=tol
+    @test r.primal_obj ≈ 0 atol = tol rtol = tol
+    @test r.x ≈ [0, 1, 1, 0, 1] atol = tol rtol = tol
+    @test r.y ≈ [-2] atol = tol rtol = tol
+    @test r.z ≈ [-1, -2, 1, 0, 1, 1, 1] atol = tol rtol = tol
 end
 
 function epipersepspectral_vector1(T; options...)
@@ -2014,12 +2089,11 @@ function epipersepspectral_vector1(T; options...)
         h[3:end] .= w
 
         for h_fun in sep_spectral_funs
-            cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, T}(
-                h_fun, d)]
+            cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, T}(h_fun, d)]
 
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
-            @test r.primal_obj ≈ Cones.h_val(w, h_fun) atol=tol rtol=tol
+            @test r.primal_obj ≈ Cones.h_val(w, h_fun) atol = tol rtol = tol
         end
     end
 end
@@ -2038,12 +2112,15 @@ function epipersepspectral_vector2(T; options...)
 
         for h_fun in sep_spectral_funs
             cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, T}(
-                h_fun, d, use_dual = true)]
+                h_fun,
+                d,
+                use_dual = true,
+            )]
 
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
-            @test r.primal_obj ≈ 0 atol=tol rtol=tol
-            @test r.x[1:2] ≈ [0, 1] atol=tol rtol=tol
+            @test r.primal_obj ≈ 0 atol = tol rtol = tol
+            @test r.x[1:2] ≈ [0, 1] atol = tol rtol = tol
         end
     end
 end
@@ -2062,12 +2139,12 @@ function epipersepspectral_vector3(T; options...)
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
         val = 5 * Cones.h_val([2, 3] ./ T(5), h_fun)
-        @test r.primal_obj ≈ val atol=tol rtol=tol
-        @test r.s ≈ T[val, 5, 2, 3] atol=tol rtol=tol
-        @test r.z[1] ≈ 1 atol=tol rtol=tol
-        @test r.z[3:4] ≈ -Cones.h_der1(zeros(T, 2),
-            [2, 3] ./ T(5), h_fun) atol=tol rtol=tol
-        @test r.z[2] ≈ Cones.h_conj(r.z[3:4], h_fun) atol=tol rtol=tol
+        @test r.primal_obj ≈ val atol = tol rtol = tol
+        @test r.s ≈ T[val, 5, 2, 3] atol = tol rtol = tol
+        @test r.z[1] ≈ 1 atol = tol rtol = tol
+        @test r.z[3:4] ≈ -Cones.h_der1(zeros(T, 2), [2, 3] ./ T(5), h_fun) atol = tol rtol =
+            tol
+        @test r.z[2] ≈ Cones.h_conj(r.z[3:4], h_fun) atol = tol rtol = tol
     end
 end
 
@@ -2087,15 +2164,18 @@ function epipersepspectral_vector4(T; options...)
         h = T[5, 0, w...]
 
         cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.VectorCSqr{T}, T}(
-            h_fun, 2, use_dual = true)]
+            h_fun,
+            2,
+            use_dual = true,
+        )]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
         val = 5 * Cones.h_conj(w ./ T(5), h_fun)
-        @test r.primal_obj ≈ val atol=tol rtol=tol
-        @test r.s ≈ T[5, val, w...] atol=tol rtol=tol
-        @test r.z[2] ≈ 1 atol=tol rtol=tol
-        @test r.z[1] ≈ Cones.h_val(r.z[3:4], h_fun) atol=tol rtol=tol
+        @test r.primal_obj ≈ val atol = tol rtol = tol
+        @test r.s ≈ T[5, val, w...] atol = tol rtol = tol
+        @test r.z[2] ≈ 1 atol = tol rtol = tol
+        @test r.z[1] ≈ Cones.h_val(r.z[3:4], h_fun) atol = tol rtol = tol
     end
 end
 
@@ -2118,13 +2198,12 @@ function epipersepspectral_matrix1(T; options...)
         @views Cones.smat_to_svec!(h[3:end], W, rt2)
 
         for h_fun in sep_spectral_funs
-            cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}, T}(
-                h_fun, d)]
+            cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}, T}(h_fun, d)]
 
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
-            @test r.primal_obj ≈ Cones.h_val(
-                eigvals(Hermitian(W, :U)), h_fun) atol=tol rtol=tol
+            @test r.primal_obj ≈ Cones.h_val(eigvals(Hermitian(W, :U)), h_fun) atol = tol rtol =
+                tol
         end
     end
 end
@@ -2152,12 +2231,15 @@ function epipersepspectral_matrix2(T; options...)
             @views Cones.smat_to_svec!(h[3:end], W, rt2)
 
             cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}, T}(
-                h_fun, d, use_dual = true)]
+                h_fun,
+                d,
+                use_dual = true,
+            )]
 
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
-            @test r.primal_obj ≈ Cones.h_conj(
-                eigvals(Hermitian(W, :U)), h_fun) atol=tol rtol=tol
+            @test r.primal_obj ≈ Cones.h_conj(eigvals(Hermitian(W, :U)), h_fun) atol = tol rtol =
+                tol
         end
     end
 end
@@ -2176,13 +2258,12 @@ function epipersepspectral_matrix3(T; options...)
         h = zeros(T, dim)
 
         for h_fun in sep_spectral_funs
-            cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}, T}(
-                h_fun, d)]
+            cones = Cone{T}[Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}, T}(h_fun, d)]
 
             r = build_solve_check(c, A, b, G, h, cones, tol; options...)
             @test r.status == Solvers.Optimal
-            @test r.primal_obj ≈ 0 atol=tol rtol=tol
-            @test r.x[2] ≈ 0 atol=tol rtol=tol
+            @test r.primal_obj ≈ 0 atol = tol rtol = tol
+            @test r.x[2] ≈ 0 atol = tol rtol = tol
         end
     end
 end
@@ -2206,7 +2287,7 @@ function epirelentropy1(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ sum(wi * log(wi) for wi in w) atol=tol rtol=tol
+        @test r.primal_obj ≈ sum(wi * log(wi) for wi in w) atol = tol rtol = tol
     end
 end
 
@@ -2227,8 +2308,8 @@ function epirelentropy2(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ -w_dim atol=tol rtol=tol
-        @test r.x ≈ fill(1, w_dim) atol=tol rtol=tol
+        @test r.primal_obj ≈ -w_dim atol = tol rtol = tol
+        @test r.x ≈ fill(1, w_dim) atol = tol rtol = tol
     end
 end
 
@@ -2249,8 +2330,8 @@ function epirelentropy3(T; options...)
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
-        @test r.primal_obj ≈ -dim atol=tol rtol=tol
-        @test r.x ≈ fill(dim / w_dim, w_dim) atol=tol rtol=tol
+        @test r.primal_obj ≈ -dim atol = tol rtol = tol
+        @test r.x ≈ fill(dim / w_dim, w_dim) atol = tol rtol = tol
     end
 end
 
@@ -2266,10 +2347,10 @@ function epirelentropy4(T; options...)
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
     entr = 2 * log(T(2)) + 3 * log(3 / T(5))
-    @test r.primal_obj ≈ entr atol=tol rtol=tol
-    @test r.s ≈ [entr, 1, 5, 2, 3] atol=tol rtol=tol
-    @test r.z ≈ [1, 2, 3 / T(5), log(inv(T(2))) - 1,
-        log(5 / T(3)) - 1] atol=tol rtol=tol
+    @test r.primal_obj ≈ entr atol = tol rtol = tol
+    @test r.s ≈ [entr, 1, 5, 2, 3] atol = tol rtol = tol
+    @test r.z ≈ [1, 2, 3 / T(5), log(inv(T(2))) - 1, log(5 / T(3)) - 1] atol = tol rtol =
+        tol
 end
 
 function epirelentropy5(T; options...)
@@ -2284,9 +2365,9 @@ function epirelentropy5(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -1 atol=tol rtol=tol
-    @test r.s ≈ [0, 1, 1, 1, 1, 1, 1, 0] atol=tol rtol=tol
-    @test r.z ≈ inv(T(3)) * [1, 1, 1, 1, -1, -1, -1, 3] atol=tol rtol=tol
+    @test r.primal_obj ≈ -1 atol = tol rtol = tol
+    @test r.s ≈ [0, 1, 1, 1, 1, 1, 1, 0] atol = tol rtol = tol
+    @test r.z ≈ inv(T(3)) * [1, 1, 1, 1, -1, -1, -1, 3] atol = tol rtol = tol
 end
 
 function epitrrelentropytri1(T; options...)
@@ -2303,15 +2384,18 @@ function epitrrelentropytri1(T; options...)
     W = W * W'
     V = rand(T, side, side)
     V = V * V'
-    h = vcat(zero(T), Cones.smat_to_svec!(zeros(T, svec_dim), V, rt2),
-        Cones.smat_to_svec!(zeros(T, svec_dim), W, rt2))
+    h = vcat(
+        zero(T),
+        Cones.smat_to_svec!(zeros(T, svec_dim), V, rt2),
+        Cones.smat_to_svec!(zeros(T, svec_dim), W, rt2),
+    )
     G = zeros(T, dim, 1)
     G[1, 1] = -1
     cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ dot(W, log(W) - log(V)) atol=tol rtol=tol
+    @test r.primal_obj ≈ dot(W, log(W) - log(V)) atol = tol rtol = tol
 end
 
 function epitrrelentropytri2(T; options...)
@@ -2331,9 +2415,11 @@ function epitrrelentropytri2(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    W = Hermitian(Cones.svec_to_smat!(zeros(T, side, side),
-        r.s[(svec_dim + 2):end], rt2), :U)
-    @test dot(W, log(W)) ≈ T(5) atol=tol rtol=tol
+    W = Hermitian(
+        Cones.svec_to_smat!(zeros(T, side, side), r.s[(svec_dim + 2):end], rt2),
+        :U,
+    )
+    @test dot(W, log(W)) ≈ T(5) atol = tol rtol = tol
 end
 
 function epitrrelentropytri3(T; options...)
@@ -2351,9 +2437,9 @@ function epitrrelentropytri3(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
-    @test r.s[1] ≈ zero(T) atol=tol rtol=tol
-    @test r.s[(svec_dim + 2):end] ≈ zeros(T, svec_dim) atol=tol rtol=tol
+    @test r.primal_obj ≈ zero(T) atol = tol rtol = tol
+    @test r.s[1] ≈ zero(T) atol = tol rtol = tol
+    @test r.s[(svec_dim + 2):end] ≈ zeros(T, svec_dim) atol = tol rtol = tol
 end
 
 function epitrrelentropytri4(T; options...)
@@ -2371,16 +2457,16 @@ function epitrrelentropytri4(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
-    @test r.s ≈ zeros(T, dim) atol=tol rtol=tol
+    @test r.primal_obj ≈ zero(T) atol = tol rtol = tol
+    @test r.s ≈ zeros(T, dim) atol = tol rtol = tol
 end
 
 function wsosinterpnonnegative1(T; options...)
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
-        -zeros(T, 2), ones(T, 2)), 2)
+    (U, pts, Ps) =
+        PolyUtils.interpolate(PolyUtils.BoxDomain{T}(-zeros(T, 2), ones(T, 2)), 2)
     DynamicPolynomials.@polyvar x y
-    fn = x ^ 4 + x ^ 2 * y ^ 2 + 4 * y ^ 2 + 4
+    fn = x^4 + x^2 * y^2 + 4 * y^2 + 4
 
     c = T[-1]
     A = zeros(T, 0, 1)
@@ -2391,16 +2477,16 @@ function wsosinterpnonnegative1(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -T(4) atol=tol rtol=tol
-    @test r.x[1] ≈ T(4) atol=tol rtol=tol
+    @test r.primal_obj ≈ -T(4) atol = tol rtol = tol
+    @test r.x[1] ≈ T(4) atol = tol rtol = tol
 end
 
 function wsosinterpnonnegative2(T; options...)
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
-        zeros(T, 2), fill(T(3), 2)), 2)
+    (U, pts, Ps) =
+        PolyUtils.interpolate(PolyUtils.BoxDomain{T}(zeros(T, 2), fill(T(3), 2)), 2)
     DynamicPolynomials.@polyvar x y
-    fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
+    fn = (x - 2)^2 + (x * y - 3)^2
 
     c = T[-1]
     A = zeros(T, 0, 1)
@@ -2411,16 +2497,16 @@ function wsosinterpnonnegative2(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
-    @test r.x[1] ≈ zero(T) atol=tol rtol=tol
+    @test r.primal_obj ≈ zero(T) atol = tol rtol = tol
+    @test r.x[1] ≈ zero(T) atol = tol rtol = tol
 end
 
 function wsosinterpnonnegative3(T; options...)
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
-        zeros(T, 2), fill(T(3), 2)), 2)
+    (U, pts, Ps) =
+        PolyUtils.interpolate(PolyUtils.BoxDomain{T}(zeros(T, 2), fill(T(3), 2)), 2)
     DynamicPolynomials.@polyvar x y
-    fn = (x - 2) ^ 2 + (x * y - 3) ^ 2
+    fn = (x - 2)^2 + (x * y - 3)^2
 
     c = T[fn(pts[j, :]...) for j in 1:U]
     A = ones(T, 1, U)
@@ -2431,7 +2517,7 @@ function wsosinterpnonnegative3(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ zero(T) atol=tol rtol=tol
+    @test r.primal_obj ≈ zero(T) atol = tol rtol = tol
 end
 
 function wsosinterpnonnegative4(T; options...)
@@ -2446,12 +2532,11 @@ function wsosinterpnonnegative4(T; options...)
     b = T[]
     G = ones(T, U, 1)
     h = f.(points)
-    cones = Cone{T}[Cones.WSOSInterpNonnegative{T, Complex{T}}(
-        U, Ps, use_dual = false)]
+    cones = Cone{T}[Cones.WSOSInterpNonnegative{T, Complex{T}}(U, Ps, use_dual = false)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -1 atol=tol rtol=tol
+    @test r.primal_obj ≈ -1 atol = tol rtol = tol
 end
 
 function wsosinterpnonnegative5(T; options...)
@@ -2466,21 +2551,19 @@ function wsosinterpnonnegative5(T; options...)
     b = T[1]
     G = -one(T) * I
     h = zeros(T, U)
-    cones = Cone{T}[Cones.WSOSInterpNonnegative{T, Complex{T}}(
-        U, Ps, use_dual = true)]
+    cones = Cone{T}[Cones.WSOSInterpNonnegative{T, Complex{T}}(U, Ps, use_dual = true)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 1 atol=tol rtol=tol
+    @test r.primal_obj ≈ 1 atol = tol rtol = tol
 end
 
 function wsosinterppossemideftri1(T; options...)
     # convexity parameter for (x + 1) ^ 2 * (x - 1) ^ 2
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
-        [-one(T)], [one(T)]), 1)
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}([-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
-    fn = (x + 1) ^ 2 * (x - 1) ^ 2
+    fn = (x + 1)^2 * (x - 1)^2
     H = DynamicPolynomials.differentiate(fn, x, 2)
 
     c = T[-1]
@@ -2492,8 +2575,8 @@ function wsosinterppossemideftri1(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ T(4) atol=tol rtol=tol
-    @test r.x[1] ≈ -T(4) atol=tol rtol=tol
+    @test r.primal_obj ≈ T(4) atol = tol rtol = tol
+    @test r.x[1] ≈ -T(4) atol = tol rtol = tol
 end
 
 function wsosinterppossemideftri2(T; options...)
@@ -2501,7 +2584,7 @@ function wsosinterppossemideftri2(T; options...)
     tol = test_tol(T)
     (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.FreeDomain{T}(2), 1)
     DynamicPolynomials.@polyvar x[1:2]
-    fn = x[1] ^ 4 - 3 * x[2] ^ 2
+    fn = x[1]^4 - 3 * x[2]^2
     H = DynamicPolynomials.differentiate(fn, x, 2)
 
     c = T[-1]
@@ -2514,8 +2597,8 @@ function wsosinterppossemideftri2(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ T(6) atol=tol rtol=tol
-    @test r.x[1] ≈ -T(6) atol=tol rtol=tol
+    @test r.primal_obj ≈ T(6) atol = tol rtol = tol
+    @test r.x[1] ≈ -T(6) atol = tol rtol = tol
 end
 
 function wsosinterppossemideftri3(T; options...)
@@ -2523,9 +2606,9 @@ function wsosinterppossemideftri3(T; options...)
     (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.FreeDomain{T}(1), 3)
     DynamicPolynomials.@polyvar x
     M = [
-        (x + 2x^3)  1;
-        (-x^2 + 2)  (3x^2 - x + 1);
-        ]
+        (x+2x^3) 1
+        (-x^2+2) (3x^2 - x+1)
+    ]
     M = M' * M / 10
 
     c = T[]
@@ -2538,17 +2621,16 @@ function wsosinterppossemideftri3(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
+    @test r.primal_obj ≈ 0 atol = tol rtol = tol
 end
 
 function wsosinterpepinormone1(T; options...)
     # min t(x) : t(x) >= abs(x ^ 2) on [-1, 1] where t(x) a constant
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
-        [-one(T)], [one(T)]), 1)
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}([-one(T)], [one(T)]), 1)
     @assert U == 3
     DynamicPolynomials.@polyvar x
-    fn = x ^ 2
+    fn = x^2
 
     c = ones(T, U)
     A = T[1 -1 0; 1 0 -1]
@@ -2559,39 +2641,44 @@ function wsosinterpepinormone1(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ T(U) atol=tol rtol=tol
-    @test r.x ≈ ones(T, U) atol=tol rtol=tol
+    @test r.primal_obj ≈ T(U) atol = tol rtol = tol
+    @test r.x ≈ ones(T, U) atol = tol rtol = tol
 end
 
 function wsosinterpepinormone2(T; options...)
     # min t(x) : t(x) >= abs(x ^ 2) + abs(x - 1) on [-1, 1] where t(x) a constant
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
-        [-one(T)], [one(T)]), 1)
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}([-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
-    fn1 = x ^ 2
+    fn1 = x^2
     fn2 = (x - 1)
 
     c = ones(T, U)
     A = T[1 -1 0; 1 0 -1]
     b = zeros(T, 2)
     G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U), zeros(T, U, U))
-    h = vcat(zeros(T, U), T[fn1(pts[u, :]...) for u in 1:U],
-        T[fn2(pts[u, :]...) for u in 1:U])
+    h = vcat(
+        zeros(T, U),
+        T[fn1(pts[u, :]...) for u in 1:U],
+        T[fn2(pts[u, :]...) for u in 1:U],
+    )
     cones = Cone{T}[Cones.WSOSInterpEpiNormOne{T}(3, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ T(3) * U atol=tol rtol=tol
-    @test r.x ≈ fill(T(3), U) atol=tol rtol=tol
+    @test r.primal_obj ≈ T(3) * U atol = tol rtol = tol
+    @test r.x ≈ fill(T(3), U) atol = tol rtol = tol
 end
 
 function wsosinterpepinormone3(T; options...)
     (T <: BlasReal) || return # get_quadr only works with BlasReal
     # max: w'f: 5x^2 >= abs(f(x)) + abs(3x^2) on [-1, 1], soln is +/- 2x^2
     tol = test_tol(T)
-    (U, pts, Ps, _, w) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
-        [-one(T)], [one(T)]), 1, get_quadr = true)
+    (U, pts, Ps, _, w) = PolyUtils.interpolate(
+        PolyUtils.BoxDomain{T}([-one(T)], [one(T)]),
+        1,
+        get_quadr = true,
+    )
     DynamicPolynomials.@polyvar x
     fn1 = 5x^2
     fn2 = 3x^2
@@ -2600,25 +2687,27 @@ function wsosinterpepinormone3(T; options...)
     A = zeros(T, 0, U)
     b = T[]
     G = vcat(spzeros(T, U, U), Diagonal(-one(T) * I, U), spzeros(T, U, U))
-    h = vcat(T[fn1(pts[u, :]...) for u in 1:U], zeros(T, U),
-        T[fn2(pts[u, :]...) for u in 1:U])
+    h = vcat(
+        T[fn1(pts[u, :]...) for u in 1:U],
+        zeros(T, U),
+        T[fn2(pts[u, :]...) for u in 1:U],
+    )
     cones = Cone{T}[Cones.WSOSInterpEpiNormOne{T}(3, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -4 / 3 atol=tol rtol=tol
+    @test r.primal_obj ≈ -4 / 3 atol = tol rtol = tol
     fn_sol = 2x^2
-    @test abs.(r.x) ≈ abs.([fn_sol(pts[u, :]...) for u in 1:U]) atol=tol rtol=tol
+    @test abs.(r.x) ≈ abs.([fn_sol(pts[u, :]...) for u in 1:U]) atol = tol rtol = tol
 end
 
 function wsosinterpepinormeucl1(T; options...)
     # min t(x) : t(x) ^ 2 >= x ^ 4 on [-1, 1] where t(x) a constant
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
-        [-one(T)], [one(T)]), 1)
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}([-one(T)], [one(T)]), 1)
     @assert U == 3
     DynamicPolynomials.@polyvar x
-    fn = x ^ 2
+    fn = x^2
 
     c = ones(T, U)
     A = T[1 -1 0; 1 0 -1]
@@ -2629,39 +2718,44 @@ function wsosinterpepinormeucl1(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ T(U) atol=tol rtol=tol
-    @test r.x ≈ ones(T, U) atol=tol rtol=tol
+    @test r.primal_obj ≈ T(U) atol = tol rtol = tol
+    @test r.x ≈ ones(T, U) atol = tol rtol = tol
 end
 
 function wsosinterpepinormeucl2(T; options...)
     # min t(x) : t(x) ^ 2 >= x ^ 4 + (x - 1) ^ 2 on [-1, 1] where t(x) a constant
     tol = test_tol(T)
-    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
-        [-one(T)], [one(T)]), 1)
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}([-one(T)], [one(T)]), 1)
     DynamicPolynomials.@polyvar x
-    fn1 = x ^ 2
+    fn1 = x^2
     fn2 = (x - 1)
 
     c = ones(T, U)
     A = T[1 -1 0; 1 0 -1]
     b = zeros(T, 2)
     G = vcat(-Matrix{T}(I, U, U), zeros(T, U, U), zeros(T, U, U))
-    h = vcat(zeros(T, U), T[fn1(pts[u, :]...) for u in 1:U],
-        T[fn2(pts[u, :]...) for u in 1:U])
+    h = vcat(
+        zeros(T, U),
+        T[fn1(pts[u, :]...) for u in 1:U],
+        T[fn2(pts[u, :]...) for u in 1:U],
+    )
     cones = Cone{T}[Cones.WSOSInterpEpiNormEucl{T}(3, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ sqrt(T(5)) * U atol=tol rtol=tol
-    @test r.x ≈ fill(sqrt(T(5)), U) atol=tol rtol=tol
+    @test r.primal_obj ≈ sqrt(T(5)) * U atol = tol rtol = tol
+    @test r.x ≈ fill(sqrt(T(5)), U) atol = tol rtol = tol
 end
 
 function wsosinterpepinormeucl3(T; options...)
     (T <: BlasReal) || return # get_quadr only works with BlasReal
     # max: w'f: 25x^4 >= f(x)^2 + 9x^4 on [-1, 1], soln is +/- 4x^2
     tol = test_tol(T)
-    (U, pts, Ps, _, w) = PolyUtils.interpolate(PolyUtils.BoxDomain{T}(
-        [-one(T)], [one(T)]), 1, get_quadr = true)
+    (U, pts, Ps, _, w) = PolyUtils.interpolate(
+        PolyUtils.BoxDomain{T}([-one(T)], [one(T)]),
+        1,
+        get_quadr = true,
+    )
     DynamicPolynomials.@polyvar x
     fn1 = 5x^2
     fn2 = 3x^2
@@ -2670,15 +2764,18 @@ function wsosinterpepinormeucl3(T; options...)
     A = zeros(T, 0, U)
     b = T[]
     G = vcat(spzeros(T, U, U), Diagonal(-one(T) * I, U), spzeros(T, U, U))
-    h = vcat(T[fn1(pts[u, :]...) for u in 1:U], zeros(T, U),
-        T[fn2(pts[u, :]...) for u in 1:U])
+    h = vcat(
+        T[fn1(pts[u, :]...) for u in 1:U],
+        zeros(T, U),
+        T[fn2(pts[u, :]...) for u in 1:U],
+    )
     cones = Cone{T}[Cones.WSOSInterpEpiNormEucl{T}(3, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -8 / 3 atol=tol rtol=tol
+    @test r.primal_obj ≈ -8 / 3 atol = tol rtol = tol
     fn_sol = 4x^2
-    @test abs2.(r.x) ≈ abs2.([fn_sol(pts[u, :]...) for u in 1:U]) atol=tol rtol=tol
+    @test abs2.(r.x) ≈ abs2.([fn_sol(pts[u, :]...) for u in 1:U]) atol = tol rtol = tol
 end
 
 function indirect1(T; options...)
@@ -2692,8 +2789,7 @@ function indirect1(T; options...)
     h = zeros(T, n)
     cones = Cone{T}[Cones.Nonnegative{T}(n)]
 
-    r = build_solve_check(c, A, b, G, h, cones, tol;
-        obj_offset = one(T), options...)
+    r = build_solve_check(c, A, b, G, h, cones, tol; obj_offset = one(T), options...)
     @test r.status == Solvers.Optimal
 end
 
@@ -2708,8 +2804,8 @@ function indirect2(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ -sqrt(T(2)) atol=tol rtol=tol
-    @test r.x[3:4] ≈ [1, 1] / sqrt(T(2)) atol=tol rtol=tol
+    @test r.primal_obj ≈ -sqrt(T(2)) atol = tol rtol = tol
+    @test r.x[3:4] ≈ [1, 1] / sqrt(T(2)) atol = tol rtol = tol
 end
 
 function indirect3(T; options...)
@@ -2725,7 +2821,7 @@ function indirect3(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 1 atol=tol rtol=tol
+    @test r.primal_obj ≈ 1 atol = tol rtol = tol
 end
 
 function indirect4(T; options...)

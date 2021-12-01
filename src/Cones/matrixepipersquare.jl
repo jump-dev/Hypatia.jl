@@ -39,7 +39,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     U::Hermitian{R, Matrix{R}}
     W::Matrix{R}
     Z::Hermitian{R, Matrix{R}}
-    fact_Z
+    fact_Z::Any
     Zi::Hermitian{R, Matrix{R}}
     ZiW::Matrix{R}
     ZiUZi::Hermitian{R, Matrix{R}}
@@ -57,7 +57,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         d1::Int,
         d2::Int;
         use_dual::Bool = false,
-        ) where {T <: Real, R <: RealOrComplex{T}}
+    ) where {T <: Real, R <: RealOrComplex{T}}
         @assert 1 <= d1 <= d2
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
@@ -68,18 +68,24 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone.d2 = d2
         cone.rt2 = sqrt(T(2))
         cone.U_idxs = 1:(cone.v_idx - 1)
-        cone.W_idxs = (cone.v_idx + 1):cone.dim
+        cone.W_idxs = (cone.v_idx + 1):(cone.dim)
         return cone
     end
 end
 
-reset_data(cone::MatrixEpiPerSquare) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
-    cone.hess_aux_updated = false)
+function reset_data(cone::MatrixEpiPerSquare)
+    return (
+        cone.feas_updated =
+            cone.grad_updated =
+                cone.hess_updated =
+                    cone.inv_hess_updated =
+                        cone.hess_fact_updated = cone.hess_aux_updated = false
+    )
+end
 
 function setup_extra_data!(
     cone::MatrixEpiPerSquare{T, R},
-    ) where {T <: Real, R <: RealOrComplex{T}}
+) where {T <: Real, R <: RealOrComplex{T}}
     (d1, d2) = (cone.d1, cone.d2)
     cone.U = Hermitian(zeros(R, d1, d1), :U)
     cone.W = zeros(R, d1, d2)
@@ -103,11 +109,11 @@ get_nu(cone::MatrixEpiPerSquare) = cone.d1 + 1
 function set_initial_point!(
     arr::AbstractVector,
     cone::MatrixEpiPerSquare{T, R},
-    ) where {T <: Real, R <: RealOrComplex{T}}
+) where {T <: Real, R <: RealOrComplex{T}}
     incr = (cone.is_complex ? 2 : 1)
     arr .= 0
     k = 1
-    @inbounds for i in 1:cone.d1
+    @inbounds for i in 1:(cone.d1)
         arr[k] = 1
         k += incr * i + 1
     end
@@ -115,7 +121,7 @@ function set_initial_point!(
     return arr
 end
 
-function update_feas(cone::MatrixEpiPerSquare{T}) where T
+function update_feas(cone::MatrixEpiPerSquare{T}) where {T}
     @assert !cone.feas_updated
     v = cone.point[cone.v_idx]
 
@@ -134,11 +140,10 @@ function update_feas(cone::MatrixEpiPerSquare{T}) where T
     return cone.is_feas
 end
 
-function is_dual_feas(cone::MatrixEpiPerSquare{T}) where T
+function is_dual_feas(cone::MatrixEpiPerSquare{T}) where {T}
     v = cone.dual_point[cone.v_idx]
     if v > eps(T)
-        @views svec_to_smat!(cone.tempd1d1b, cone.dual_point[cone.U_idxs],
-            cone.rt2)
+        @views svec_to_smat!(cone.tempd1d1b, cone.dual_point[cone.U_idxs], cone.rt2)
         F = cholesky!(Hermitian(cone.tempd1d1b, :U), check = false)
         isposdef(F) || return false
         @views W = vec_copyto!(cone.tempd1d2, cone.dual_point[cone.W_idxs])
@@ -278,11 +283,7 @@ function update_hess(cone::MatrixEpiPerSquare)
     return cone.hess
 end
 
-function hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::MatrixEpiPerSquare,
-    )
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::MatrixEpiPerSquare)
     cone.hess_aux_updated || update_hess_aux(cone)
     U_idxs = cone.U_idxs
     v_idx = cone.v_idx
@@ -314,8 +315,8 @@ function hess_prod!(
 
         copyto!(tempd1d1, ZiUZi)
         axpby!(-2, cone.Zi.data, 2 * v2, tempd1d1.data)
-        prod[v_idx, i] = real(dot(tempd1d1, temp_U)) - 4 *
-            real(dot(cone.U, temp_U3)) + cone.Hvv * v_arr
+        prod[v_idx, i] =
+            real(dot(tempd1d1, temp_U)) - 4 * real(dot(cone.U, temp_U3)) + cone.Hvv * v_arr
         axpby!(-v2, temp_U2.data, v_arr, tempd1d1.data)
         smat_to_svec!(U_prod, tempd1d1, cone.rt2)
     end
@@ -377,20 +378,40 @@ function dder3(cone::MatrixEpiPerSquare, dir::AbstractVector)
     ZiUZiWdWZiWI = ZiUZi * WdWtZiWI + ZiWdWZiUZi2 * W
     vZiUZiUdZi2 = v * ZiUZiUdZi2 - ZiUdZi
 
-    Utemp = vd2 * (-vd2 * ZiUZi2v + ZiWdWZi2 - v2 * (ZiUZiWdWZi + ZiWdWZiUZi2 -
-        2 * vZiUZiUdZi2)) + v2 * (ZiWdWZi * WdWZi + WdWZi' * ZiWdWZi2 +
-        ZiWdWtZiWI * ZiWd' + v2 * (v2 * ZiUd * ZiUdZi - ZiUdZiWdWZi - ZiUdZiWdWZi'))
+    Utemp =
+        vd2 *
+        (-vd2 * ZiUZi2v + ZiWdWZi2 - v2 * (ZiUZiWdWZi + ZiWdWZiUZi2 - 2 * vZiUZiUdZi2)) +
+        v2 * (
+            ZiWdWZi * WdWZi +
+            WdWZi' * ZiWdWZi2 +
+            ZiWdWtZiWI * ZiWd' +
+            v2 * (v2 * ZiUd * ZiUdZi - ZiUdZiWdWZi - ZiUdZiWdWZi')
+        )
     smat_to_svec!(U_dder3, Utemp, cone.rt2)
 
     v_Wd_dot = -4 * (v * ZiUZiUdZiW + vdZiUZiUZiW) + ZiUZiWdWZiWI + 2 * ZiUdZiW
-    dder3[v_idx] = v_dir * (-8 * dot(ZiUZi2v, U_dir) + v_dir *
-        (8 * real(dot(ZiUZiUZi, U)) - (d1 - 1) / v / v / v)) +
-        4 * v * real(dot(vZiUZiUdZi2, U_dir)) + 2 * real(dot(v_Wd_dot, W_dir))
+    dder3[v_idx] =
+        v_dir * (
+            -8 * dot(ZiUZi2v, U_dir) +
+            v_dir * (8 * real(dot(ZiUZiUZi, U)) - (d1 - 1) / v / v / v)
+        ) +
+        4 * v * real(dot(vZiUZiUdZi2, U_dir)) +
+        2 * real(dot(v_Wd_dot, W_dir))
 
-    Wtemp = 4 * v_dir * (ZiUdZiW - v2 * ZiUZiUdZiW + ZiUZiWdWZiWI - vdZiUZiUZiW) +
-        4 * v * (ZiUdZiW * WdZiW + ZiWdWZi * UdZiW + WdWZi' * ZiUdZiW +
-        ZiUdZi * WdWtZiWI - v2 * ZiUd * ZiUdZiW) + -2 * (ZiW * WdZiW * WdZiW +
-        WdWZi' * ZiWdWtZiWI + ZiWdWtZiWI * WdZiW + ZiWd * WdZiW' * WtZiWI)
+    Wtemp =
+        4 * v_dir * (ZiUdZiW - v2 * ZiUZiUdZiW + ZiUZiWdWZiWI - vdZiUZiUZiW) +
+        4 *
+        v *
+        (
+            ZiUdZiW * WdZiW + ZiWdWZi * UdZiW + WdWZi' * ZiUdZiW + ZiUdZi * WdWtZiWI -
+            v2 * ZiUd * ZiUdZiW
+        ) +
+        -2 * (
+            ZiW * WdZiW * WdZiW +
+            WdWZi' * ZiWdWtZiWI +
+            ZiWdWtZiWI * WdZiW +
+            ZiWd * WdZiW' * WtZiWI
+        )
     vec_copyto!(W_dder3, Wtemp)
 
     return dder3

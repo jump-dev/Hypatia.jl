@@ -29,7 +29,7 @@ int_type(::UMFPACKNonSymCache) = SuiteSparseInt
 function update_fact(
     cache::UMFPACKNonSymCache{Float64},
     A::SparseMatrixCSC{Float64, SuiteSparseInt},
-    )
+)
     if !cache.analyzed
         cache.umfpack = lu(A) # symbolic and numeric factorization
         cache.analyzed = true
@@ -44,7 +44,7 @@ function inv_prod(
     x::Vector{Float64},
     A::SparseMatrixCSC{Float64, SuiteSparseInt},
     b::Vector{Float64},
-    )
+)
     ldiv!(x, cache.umfpack, b) # does not repeat symbolic or numeric factorization
     return x
 end
@@ -59,7 +59,7 @@ symmetric
 abstract type SparseSymCache{T <: Real} end
 
 # helper for symmetric solvers that need nonzero diagonal
-diag_min(::SparseSymCache{T}) where T = zero(T)
+diag_min(::SparseSymCache{T}) where {T} = zero(T)
 
 # only works with Float64
 mutable struct CHOLMODSymCache{Float64} <: SparseSymCache{Float64}
@@ -79,7 +79,7 @@ diag_min(::SparseSymCache{Float64}) = sqrt(eps())
 function update_fact(
     cache::CHOLMODSymCache{Float64},
     A::SparseMatrixCSC{Float64, SuiteSparseInt},
-    )
+)
     A_symm = Symmetric(A, :L)
 
     if !cache.analyzed
@@ -104,7 +104,7 @@ function inv_prod(
     x::Vector{Float64},
     A::SparseMatrixCSC{Float64, SuiteSparseInt},
     b::Vector{Float64},
-    )
+)
     x .= cache.cholmod \ b # TODO try to make this in-place
     return x
 end
@@ -116,7 +116,4 @@ SparseSymCache{Float64}() = CHOLMODSymCache{Float64}()
 helpers
 =#
 
-free_memory(::Union{
-    UMFPACKNonSymCache{Float64},
-    CHOLMODSymCache{Float64},
-    }) = nothing
+free_memory(::Union{UMFPACKNonSymCache{Float64}, CHOLMODSymCache{Float64}}) = nothing

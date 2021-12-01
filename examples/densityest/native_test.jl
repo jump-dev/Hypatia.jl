@@ -7,7 +7,7 @@ insts["minimal"] = [
     ((5, 1, 2, true, false, true), (default_tol_relax = 100,)),
     ((5, 1, 2, true, true, false),),
     ((:iris, 2, true, true, true),),
-    ]
+]
 insts["fast"] = [
     ((50, 1, 4, true, true, true),),
     ((50, 1, 10, true, true, true),),
@@ -38,5 +38,5 @@ insts["fast"] = [
     ((:cancer, 4, true, true, true),),
     ((:cancer, 4, false, true, true),),
     ((:cancer, 4, true, false, true),),
-    ]
+]
 return (DensityEstNative, insts)

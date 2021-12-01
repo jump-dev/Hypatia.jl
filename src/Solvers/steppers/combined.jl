@@ -4,7 +4,7 @@ combined predict and center stepper
 
 mutable struct CombinedStepper{T <: Real} <: Stepper{T}
     shift_sched::Int
-    searcher_options
+    searcher_options::Any
 
     prev_alpha::T
     rhs::Point{T}
@@ -22,8 +22,8 @@ mutable struct CombinedStepper{T <: Real} <: Stepper{T}
 
     function CombinedStepper{T}(;
         shift_sched::Int = 0,
-        searcher_options...
-        ) where {T <: Real}
+        searcher_options...,
+    ) where {T <: Real}
         stepper = new{T}()
         stepper.shift_sched = shift_sched
         stepper.searcher_options = searcher_options
@@ -93,14 +93,12 @@ function step(stepper::CombinedStepper{T}, solver::Solver{T}) where {T <: Real}
             solver.verbose && println("trying centering with adjustment")
             stepper.cent_only = true
             stepper.unadj_only = false
-            solver.time_search += @elapsed alpha =
-                search_alpha(point, model, stepper)
+            solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
 
             if iszero(alpha)
                 solver.verbose && println("trying centering without adjustment")
                 stepper.unadj_only = true
-                solver.time_search += @elapsed alpha =
-                    search_alpha(point, model, stepper)
+                solver.time_search += @elapsed alpha = search_alpha(point, model, stepper)
 
                 if iszero(alpha)
                     @warn("cannot step in centering direction")
@@ -126,7 +124,7 @@ function update_stepper_points(
     point::Point{T},
     stepper::CombinedStepper{T},
     ztsk_only::Bool,
-    ) where {T <: Real}
+) where {T <: Real}
     if ztsk_only
         cand = stepper.temp.ztsk
         copyto!(cand, point.ztsk)
@@ -150,20 +148,21 @@ function update_stepper_points(
         end
     else
         # adjustment
-        dir_centadj = (ztsk_only ? stepper.dir_centadj.ztsk :
-            stepper.dir_centadj.vec)
+        dir_centadj = (ztsk_only ? stepper.dir_centadj.ztsk : stepper.dir_centadj.vec)
         alpha_sqr = abs2(alpha)
         if stepper.cent_only
             # centering
             @. cand += alpha * dir_cent + alpha_sqr * dir_centadj
         else
             # combined
-            dir_predadj = (ztsk_only ? stepper.dir_predadj.ztsk :
-                stepper.dir_predadj.vec)
+            dir_predadj = (ztsk_only ? stepper.dir_predadj.ztsk : stepper.dir_predadj.vec)
             alpha_m1 = 1 - alpha
             alpha_m1sqr = abs2(alpha_m1)
-            @. cand += alpha * dir_pred + alpha_sqr * dir_predadj +
-                alpha_m1 * dir_cent + alpha_m1sqr * dir_centadj
+            @. cand +=
+                alpha * dir_pred +
+                alpha_sqr * dir_predadj +
+                alpha_m1 * dir_cent +
+                alpha_m1sqr * dir_centadj
         end
     end
 
@@ -175,8 +174,9 @@ function start_sched(stepper::CombinedStepper, searcher::StepSearcher)
     return max(1, searcher.prev_sched - stepper.shift_sched)
 end
 
-print_header_more(stepper::CombinedStepper, solver::Solver) =
+function print_header_more(stepper::CombinedStepper, solver::Solver)
     @printf("%5s %9s", "step", "alpha")
+end
 
 function print_iteration_more(stepper::CombinedStepper, solver::Solver)
     if stepper.cent_only

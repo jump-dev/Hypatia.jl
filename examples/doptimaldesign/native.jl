@@ -36,8 +36,7 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
     A = ones(T, 1, p)
     b = T[n]
 
-    if (inst.logdet_obj && inst.use_logdet) ||
-        (inst.rootdet_obj && inst.use_rootdet)
+    if (inst.logdet_obj && inst.use_logdet) || (inst.rootdet_obj && inst.use_rootdet)
         # maximize the hypograph variable of the cone
         c = vcat(-one(T), zeros(T, p))
 
@@ -64,19 +63,19 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
             h_detcone = vcat(zero(T), one(T), zeros(T, dimvec))
             # include perspective variable
             G_detcone = [
-                -one(T)    zeros(T, 1, p);
-                zeros(T, 1, p + 1);
-                zeros(T, dimvec)    G_detcone;
-                ]
+                -one(T) zeros(T, 1, p)
+                zeros(T, 1, p + 1)
+                zeros(T, dimvec) G_detcone
+            ]
         else
             push!(cones, Cones.HypoRootdetTri{T, T}(dimvec + 1))
             # pad with hypograph variable
             h_detcone = zeros(T, dimvec + 1)
             # include perspective variable
             G_detcone = [
-                -one(T)    zeros(T, 1, p);
-                zeros(T, dimvec)    G_detcone;
-                ]
+                -one(T) zeros(T, 1, p)
+                zeros(T, dimvec) G_detcone
+            ]
         end
 
         # all conic constraints
@@ -88,7 +87,7 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
         # auxiliary matrix variable has pq elements stored row-major, auxiliary
         # lower tri variable has svec_length(q) elements, also stored row-major
         pq = p * q
-        qq = q ^ 2
+        qq = q^2
         num_trivars = Cones.svec_length(q)
         c = vcat(-one(T), zeros(T, p + pq + num_trivars))
 
@@ -98,8 +97,8 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
         row_idx = 1
         for i in 1:q
             col_offset = sum(1:(i - 1)) + 1
-            A_lowertri[row_idx:(row_idx + i - 1),
-                col_offset:(col_offset + i - 1)] = -Matrix{T}(-I, i, i)
+            A_lowertri[row_idx:(row_idx + i - 1), col_offset:(col_offset + i - 1)] =
+                -Matrix{T}(-I, i, i)
             for j in 1:q
                 for k in 1:p
                     # columns index (k, j)
@@ -110,9 +109,9 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
             end
         end
         A = [
-            zero(T)    A    zeros(T, 1, pq + num_trivars);
-            zeros(T, qq, 1 + p)    A_VW    A_lowertri;
-            ]
+            zero(T) A zeros(T, 1, pq + num_trivars)
+            zeros(T, qq, 1 + p) A_VW A_lowertri
+        ]
         b = vcat(b, zeros(T, qq))
 
         G_geo = zeros(T, q, num_trivars)
@@ -135,16 +134,15 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
         zero1 = zeros(T, size(G_norminf, 1), pq + num_trivars)
         zero2 = zeros(T, pq + p, num_trivars)
         G = [
-            zeros(T, size(G_norminf, 1))    G_norminf    zero1;
-            -one(T)    zeros(T, 1, p + pq + num_trivars); # geomean
-            zeros(T, q, 1 + p + pq)    G_geo; # geomean
-            zeros(T, pq + p)    G_soc_epi    G_soc    zero2; # epinormeucl
-            ]
+            zeros(T, size(G_norminf, 1)) G_norminf zero1
+            -one(T) zeros(T, 1, p + pq + num_trivars) # geomean
+            zeros(T, q, 1 + p + pq) G_geo # geomean
+            zeros(T, pq + p) G_soc_epi G_soc zero2 # epinormeucl
+        ]
         h = vcat(h_norminf, zeros(T, p + 1 + q + pq))
     end
 
-    if (inst.rootdet_obj && !inst.use_rootdet) ||
-        (inst.logdet_obj && !inst.use_logdet)
+    if (inst.rootdet_obj && !inst.use_rootdet) || (inst.logdet_obj && !inst.use_logdet)
         # extended formulations require an upper tri matrix of additional vars
         # we will store this matrix row-major
         num_trivars = Cones.svec_length(q)
@@ -197,11 +195,11 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
         push!(cones, Cones.HypoGeoMean{T}(1 + q))
         # all conic constraints
         G = [
-            G_norminf   zeros(T, size(G_norminf, 1), num_trivars + 1);
-            G_psd    zeros(T, dimvec, 1); # psd
-            zeros(T, 1, p)    zeros(T, 1, num_trivars)    -one(T); # hypogeomean
-            zeros(T, q, p)    G_geo    zeros(T, q); # hypogeomean
-            ]
+            G_norminf zeros(T, size(G_norminf, 1), num_trivars + 1)
+            G_psd zeros(T, dimvec, 1) # psd
+            zeros(T, 1, p) zeros(T, 1, num_trivars) -one(T) # hypogeomean
+            zeros(T, q, p) G_geo zeros(T, q) # hypogeomean
+        ]
         h = vcat(h_norminf, h_psd, h_geo)
     end
 
@@ -232,10 +230,10 @@ function build(inst::DOptimalDesignNative{T}) where {T <: Real}
         A = [A zeros(T, 1, padx)]
         # all conic constraints
         G = [
-            G_norminf    zeros(T, size(G_norminf, 1), padx);
-            G_psd    zeros(T, dimvec, num_hypo);
-            G_log;
-            ]
+            G_norminf zeros(T, size(G_norminf, 1), padx)
+            G_psd zeros(T, dimvec, num_hypo)
+            G_log
+        ]
         h = vcat(h_norminf, h_psd, h_log)
     end
 

@@ -21,7 +21,7 @@ mutable struct StepSearcher{T <: Real}
         prox_bound::T = T(0.99),
         use_max_prox::Bool = true,
         alpha_sched::Vector{T} = default_alpha_sched(T),
-        ) where {T <: Real}
+    ) where {T <: Real}
         cones = model.cones
         searcher = new{T}()
         searcher.min_prox = min_prox
@@ -38,17 +38,36 @@ mutable struct StepSearcher{T <: Real}
     end
 end
 
-default_alpha_sched(T::Type{<:Real}) = T[
-    0.9999, 0.999, 0.99, 0.97, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5,
-    0.3, 0.1, 0.05, 0.01, 0.005, 0.001, 0.0005]
+function default_alpha_sched(T::Type{<:Real})
+    return T[
+        0.9999,
+        0.999,
+        0.99,
+        0.97,
+        0.95,
+        0.9,
+        0.85,
+        0.8,
+        0.7,
+        0.6,
+        0.5,
+        0.3,
+        0.1,
+        0.05,
+        0.01,
+        0.005,
+        0.001,
+        0.0005,
+    ]
+end
 
 # backwards search on alphas in alpha schedule
 function search_alpha(
     point::Point{T},
     model::Models.Model{T},
     stepper::Stepper{T};
-    sched::Int = start_sched(stepper, stepper.searcher)
-    ) where {T <: Real}
+    sched::Int = start_sched(stepper, stepper.searcher),
+) where {T <: Real}
     searcher = stepper.searcher
 
     while sched <= length(searcher.alpha_sched)
@@ -71,10 +90,7 @@ end
 # fallback starts at first alpha in schedule
 start_sched(stepper::Stepper, searcher::StepSearcher) = 1
 
-function check_cone_points(
-    model::Models.Model{T},
-    stepper::Stepper{T};
-    ) where {T <: Real}
+function check_cone_points(model::Models.Model{T}, stepper::Stepper{T};) where {T <: Real}
     searcher = stepper.searcher
     cand = stepper.temp
     szk = searcher.szk
@@ -123,8 +139,9 @@ function check_cone_points(
         Cones.reset_data(cone_k)
 
         in_prox_k = false
-        if Cones.is_feas(cone_k) && Cones.is_dual_feas(cone_k) &&
-            Cones.check_numerics(cone_k)
+        if Cones.is_feas(cone_k) &&
+           Cones.is_dual_feas(cone_k) &&
+           Cones.check_numerics(cone_k)
             proxsqr_k = Cones.get_proxsqr(cone_k, irtmu, use_max_prox)
             agg_proxsqr = aggfun(agg_proxsqr, proxsqr_k)
             in_prox_k = (agg_proxsqr < proxsqr_bound)
