@@ -93,6 +93,42 @@ MOI.supports_constraint(
     ::Type{<:Union{MOI.Zeros, SupportedCone{T}}},
     ) where {T <: Real} = true
 
+function con_IJV(
+    IM::Vector{Int},
+    JM::Vector{Int},
+    VM::Vector{T},
+    ::Vector{Int},
+    ::Vector{T},
+    func::VV,
+    start::Int,
+    dim::Int,
+    idx_map::MOI.IndexMap,
+    ) where {T <: Real}
+    append!(IM, start .+ (1:dim))
+    append!(JM, idx_map[vi].value for vi in func.variables)
+    append!(VM, -one(T) for _ in 1:dim)
+    return
+end
+
+function con_IJV(
+    IM::Vector{Int},
+    JM::Vector{Int},
+    VM::Vector{T},
+    Iv::Vector{Int},
+    Vv::Vector{T},
+    func::VAF{T},
+    start::Int,
+    dim::Int,
+    idx_map::MOI.IndexMap,
+    ) where {T <: Real}
+    append!(IM, start + vt.output_index for vt in func.terms)
+    append!(JM, idx_map[vt.scalar_term.variable].value for vt in func.terms)
+    append!(VM, -vt.scalar_term.coefficient for vt in func.terms)
+    append!(Iv, start .+ (1:dim))
+    append!(Vv, func.constants)
+    return
+end
+
 # build representation as min c'x s.t. A*x = b, h - G*x in K
 function MOI.copy_to(
     opt::Optimizer{T},
@@ -159,19 +195,7 @@ function MOI.copy_to(
         idx_map[ci] = MOI.ConstraintIndex{F, MOI.Zeros}(i)
         fi = get_con_fun(ci)
         dim = MOI.output_dimension(fi)
-        if F == VV
-            append!(IA, (p + 1):(p + dim))
-            append!(JA, idx_map[vi].value for vi in fi.variables)
-            append!(VA, -ones(T, dim))
-        else
-            for vt in fi.terms
-                push!(IA, p + vt.output_index)
-                push!(JA, idx_map[vt.scalar_term.variable].value)
-                push!(VA, -vt.scalar_term.coefficient)
-            end
-            append!(Ib, (p + 1):(p + dim))
-            append!(Vb, fi.constants)
-        end
+        con_IJV(IA, JA, VA, Ib, Vb, fi, p, dim, idx_map)
         push!(zeros_idxs, p .+ (1:dim))
         p += dim
         i += 1
@@ -195,24 +219,9 @@ function MOI.copy_to(
         idx_map[ci] = MOI.ConstraintIndex{F, MOI.Nonnegatives}(i)
         fi = get_con_fun(ci)
         dim = MOI.output_dimension(fi)
-
-        idxs = q .+ (1:dim)
-        if F == VV
-            append!(IG, idxs)
-            append!(JG, (idx_map[vj].value for vj in fi.variables))
-            append!(VG, fill(-one(T), dim))
-        else
-            for vt in fi.terms
-                push!(IG, q + vt.output_index)
-                push!(JG, idx_map[vt.scalar_term.variable].value)
-                push!(VG, -vt.scalar_term.coefficient)
-            end
-            append!(Ih, idxs)
-            append!(Vh, fi.constants)
-        end
-
+        con_IJV(IG, JG, VG, Ih, Vh, fi, q, dim, idx_map)
         push!(moi_cones, get_con_set(ci))
-        push!(moi_cone_idxs, idxs)
+        push!(moi_cone_idxs, q .+ (1:dim))
         q += dim
         i += 1
     end
@@ -384,15 +393,6 @@ function MOI.get(
     return _transform_sz(z_i, opt.moi_cones[i])
 end
 
-# function MOI.get(
-#     opt::Optimizer{T},
-#     attr::MOI.ConstraintPrimal,
-#     ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, MOI.Zeros},
-#     ) where {T}
-#     MOI.check_result_index_bounds(opt, attr)
-#     return opt.zeros_primal[opt.zeros_idxs[ci.value]]
-# end
-
 function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintPrimal,
@@ -411,27 +411,3 @@ function _transform_sz(sz::Vector{T}, cone::SupportedCone{T}) where {T}
     end
     return sz
 end
-
-# get_s(solver::Solver) = copy(solver.result.s)
-# get_z(solver::Solver) = copy(solver.result.z)
-# get_x(solver::Solver) = copy(solver.result.x)
-# get_y(solver::Solver) = copy(solver.result.y)
-
-#     Solvers.solve(solver)
-
-#     opt.x = Solvers.get_x(solver)
-#     opt.y = Solvers.get_y(solver)
-#     opt.s = Solvers.get_s(solver)
-#     opt.z = Solvers.get_z(solver)
-
-#     # transform solution for MOI conventions
-#     opt.zeros_primal = copy(model.b)
-#     mul!(opt.zeros_primal, model.A, opt.x, -1, true)
-#     for (cone, idxs) in zip(opt.moi_cones, opt.moi_cone_idxs)
-#         if needs_untransform(cone)
-#             @assert length(idxs) == MOI.dimension(cone)
-#             @views untransform_affine(cone, opt.s[idxs])
-#             @views untransform_affine(cone, opt.z[idxs])
-#         end
-#     end
-#     return
