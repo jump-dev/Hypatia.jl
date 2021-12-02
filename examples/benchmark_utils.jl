@@ -35,7 +35,6 @@ function setup_benchmark_dataframe()
         time_rescale = Float64[],
         time_initx = Float64[],
         time_inity = Float64[],
-        time_unproc = Float64[],
         time_loadsys = Float64[],
         time_upsys = Float64[],
         time_upfact = Float64[],

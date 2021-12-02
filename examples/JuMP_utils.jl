@@ -76,7 +76,12 @@ function setup_model(
     inst = ex_type(inst_data...)
     model = build(inst)
 
-    hyp_opt = Hypatia.Optimizer()
+    hyp_opt = if solver_type == Hypatia.Optimizer
+        Hypatia.Optimizer(; solver_options...)
+    else
+        Hypatia.Optimizer()
+    end
+
     extT = if isnothing(extender)
         MOIU.UniversalFallback(MOIU.Model{Float64}())
     else
@@ -97,16 +102,16 @@ function setup_model(
     MOIU.attach_optimizer(backend.optimizer.model)
     flush(stdout); flush(stderr)
 
-    hyp_model = hyp_opt.model
+    hyp_model = hyp_opt.solver.orig_model
     if solver_type == Hypatia.Optimizer
         model.ext[:inst] = inst
     else
         # not using Hypatia to solve, so setup new JuMP model with Hypatia data
-        new_model = JuMP.Model()
+        model = JuMP.Model()
         c = hyp_model.c
-        JuMP.@variable(new_model, x[1:length(c)])
-        JuMP.@objective(new_model, Min, dot(c, x) + hyp_model.obj_offset)
-        eq_refs = JuMP.@constraint(new_model, hyp_model.A * x .== hyp_model.b)
+        JuMP.@variable(model, x[1:length(c)])
+        JuMP.@objective(model, Min, dot(c, x) + hyp_model.obj_offset)
+        eq_refs = JuMP.@constraint(model, hyp_model.A * x .== hyp_model.b)
         cone_refs = JuMP.ConstraintRef[]
         for (cone, idxs) in zip(hyp_opt.moi_cones, hyp_opt.moi_cone_idxs)
             h_i = hyp_model.h[idxs]
@@ -117,24 +122,22 @@ function setup_model(
                     Hypatia.untransform_affine(cone, G_i[:, j])
                 end
             end
-            con_i = JuMP.@constraint(new_model, h_i - G_i * x in cone)
+            con_i = JuMP.@constraint(model, h_i - G_i * x in cone)
             push!(cone_refs, con_i)
         end
 
-        new_model.ext[:moi_cones] = hyp_opt.moi_cones
-        new_model.ext[:hyp_model] = hyp_model
-        new_model.ext[:x_var] = x
-        new_model.ext[:eq_refs] = eq_refs
-        new_model.ext[:cone_refs] = cone_refs
+        model.ext[:moi_cones] = hyp_opt.moi_cones
+        model.ext[:hyp_model] = hyp_model
+        model.ext[:x_var] = x
+        model.ext[:eq_refs] = eq_refs
+        model.ext[:cone_refs] = cone_refs
 
-        JuMP.set_optimizer(new_model, solver_type)
-        model = new_model
-        flush(stdout); flush(stderr)
+        JuMP.set_optimizer(model, solver_type)
+        for (option, value) in pairs(solver_options)
+            JuMP.set_optimizer_attribute(model, string(option), value)
+        end
     end
-
-    for (option, value) in pairs(solver_options)
-        JuMP.set_optimizer_attribute(model, string(option), value)
-    end
+    flush(stdout); flush(stderr)
 
     return (model, get_model_stats(hyp_model))
 end
@@ -150,7 +153,7 @@ function solve_check(
     if opt isa Hypatia.Optimizer
         test && test_extra(model.ext[:inst], model)
         flush(stdout); flush(stderr)
-        (solve_stats, _) = process_result(opt.model, opt.solver)
+        (solve_stats, _) = process_result(opt.solver.orig_model, opt.solver)
         return solve_stats
     elseif test
         @info("cannot run example tests if solver is not Hypatia")

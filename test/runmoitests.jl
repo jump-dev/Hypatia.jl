@@ -50,6 +50,7 @@ end
                 MOI.SolverVersion,
             ],
         ),
+        # include = String[],
         exclude = String[
             # TODO(odow): unexpected failure. But this is probably in the bridge
             # layer, not Hypatia.

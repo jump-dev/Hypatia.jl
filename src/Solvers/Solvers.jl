@@ -88,7 +88,6 @@ mutable struct Solver{T <: Real}
     time_rescale::Float64 # rescale affine data
     time_initx::Float64 # preprocess dual equalities and finding initial x point
     time_inity::Float64 # preprocess primal equalities and finding initial y point
-    time_unproc::Float64 # unprocess final point
     time_loadsys::Float64 # initialize/load system solver
     time_upsys::Float64 # update LHS and factorization etc for directions solving
     time_upfact::Float64 # update inner factorization for directions solving only
@@ -243,16 +242,37 @@ mutable struct Solver{T <: Real}
 end
 
 function solve(solver::Solver{T}) where {T <: Real}
-    @assert solver.status == Loaded
+    (solver.status == Loaded) || return solver
+    setup_solver(solver)
+    setup_point(solver)
+
+    if solver.status == SolveCalled
+        setup_stepping(solver)
+        while true
+            step_and_check(solver) && break
+        end
+        postprocess(solver)
+    end
+
+    solver.solve_time = time() - solver.solve_time
+    if solver.verbose
+        println("\nstatus is $(solver.status) after $(solver.num_iters) " *
+            "iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
+    end
+
+    free_memory(solver.syssolver)
+    flush(stdout)
+    return solver
+end
+
+function setup_solver(solver::Solver{T}) where {T <: Real}
     solver.status = SolveCalled
-    start_time = time()
     solver.num_iters = 0
-    solver.solve_time = NaN
+    solver.solve_time = time()
 
     solver.time_rescale = 0
     solver.time_initx = 0
     solver.time_inity = 0
-    solver.time_unproc = 0
     solver.time_loadsys = 0
     solver.time_upsys = 0
     solver.time_upfact = 0
@@ -280,18 +300,22 @@ function solve(solver::Solver{T}) where {T <: Real}
     solver.z_feas = NaN
     solver.tau_feas = NaN
 
-    # preprocess and find initial point
     orig_model = solver.orig_model
     if solver.use_dense_model
         Models.densify!(orig_model)
     end
-    result = solver.result = Point(orig_model)
+    solver.result = Point(orig_model)
+
     # copy original model to solver.model, which may be modified
-    model = solver.model = Models.Model{T}(
+    solver.model = Models.Model{T}(
         orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h,
         orig_model.cones, obj_offset = orig_model.obj_offset)
-    (init_z, init_s) = initialize_cone_point(solver.orig_model)
+    return
+end
 
+function setup_point(solver::Solver{T}) where {T <: Real}
+    # preprocess and find initial point
+    (init_z, init_s) = initialize_cone_point(solver.orig_model)
     solver.time_rescale = @elapsed solver.used_rescaling = rescale_data(solver)
 
     if solver.reduce
@@ -304,6 +328,7 @@ function solve(solver::Solver{T}) where {T <: Real}
     end
 
     if solver.status == SolveCalled
+        model = solver.model
         point = solver.point = Point(model)
         point.x .= init_x
         point.y .= init_y
@@ -311,6 +336,7 @@ function solve(solver::Solver{T}) where {T <: Real}
         point.s .= init_s
         point.tau[] = one(T)
         point.kap[] = one(T)
+
         calc_mu(solver)
         if isnan(solver.mu) || abs(one(T) - solver.mu) > sqrt(eps(T))
             @warn("initial mu is $(solver.mu) but should be 1 (this could " *
@@ -318,104 +344,91 @@ function solve(solver::Solver{T}) where {T <: Real}
         end
         Cones.load_point.(model.cones, point.primal_views)
         Cones.load_dual_point.(model.cones, point.dual_views)
-
-        # setup iteration helpers
-        solver.x_residual = zero(model.c)
-        solver.y_residual = zero(model.b)
-        solver.z_residual = zero(model.h)
-        solver.tau_residual = 0
-
-        solver.x_conv_tol = inv(1 + norm(model.c, Inf))
-        solver.y_conv_tol = inv(1 + norm(model.b, Inf))
-        solver.z_conv_tol = inv(1 + norm(model.h, Inf))
-        solver.prev_is_slow = false
-        solver.prev2_is_slow = false
-        solver.worst_dir_res = 0
-
-        stepper = solver.stepper
-        load(stepper, solver)
-        solver.time_loadsys = @elapsed load(solver.syssolver, solver)
-
-        solver.verbose && print_header(stepper, solver)
-        flush(stdout)
-
-        # iterate from initial point
-        while true
-            improv = calc_convergence_params(solver)
-
-            if solver.verbose
-                print_iteration(stepper, solver)
-                flush(stdout)
-            end
-
-            check_convergence(solver) && break
-
-            if solver.num_iters == solver.iter_limit
-                solver.verbose && println("iteration limit reached; terminating")
-                solver.status = IterationLimit
-                break
-            end
-
-            if time() - start_time >= solver.time_limit
-                solver.verbose && println("time limit reached; terminating")
-                solver.status = TimeLimit
-                break
-            end
-
-            if expect_improvement(stepper)
-                if improv < solver.tol_slow
-                    if solver.prev_is_slow && solver.prev2_is_slow
-                        if solver.verbose
-                            println("slow progress in consecutive " *
-                                "iterations; terminating")
-                        end
-                        solver.status = SlowProgress
-                        break
-                    else
-                        solver.prev2_is_slow = solver.prev_is_slow
-                        solver.prev_is_slow = true
-                    end
-                else
-                    solver.prev2_is_slow = solver.prev_is_slow
-                    solver.prev_is_slow = false
-                end
-            end
-
-            solver.res_norm_cutoff = T(1e-4) * max(solver.x_norm_res,
-                solver.y_norm_res, solver.z_norm_res, solver.tau_feas)
-            solver.worst_dir_res = 0
-
-            step(stepper, solver) || break
-            flush(stdout)
-            calc_mu(solver)
-
-            if min(point.tau[], point.kap[], solver.mu) <= 0
-                @warn("numerical failure: tau is $(point.tau[]), " *
-                    "kappa is $(point.kap[]), mu is $(solver.mu); terminating")
-                solver.status = NumericalFailure
-                break
-            end
-
-            flush(stdout)
-            solver.num_iters += 1
-        end
-
-        # finalize result point
-        solver.time_unproc = @elapsed postprocess(solver)
     end
+    return
+end
 
-    solver.solve_time = time() - start_time
+function setup_stepping(solver::Solver{T}) where {T <: Real}
+    model = solver.model
+    # setup iteration helpers
+    solver.x_residual = zero(model.c)
+    solver.y_residual = zero(model.b)
+    solver.z_residual = zero(model.h)
+    solver.tau_residual = 0
 
-    # free memory used by some system solvers
-    free_memory(solver.syssolver)
+    solver.x_conv_tol = inv(1 + norm(model.c, Inf))
+    solver.y_conv_tol = inv(1 + norm(model.b, Inf))
+    solver.z_conv_tol = inv(1 + norm(model.h, Inf))
+    solver.prev_is_slow = false
+    solver.prev2_is_slow = false
+    solver.worst_dir_res = 0
+
+    load(solver.stepper, solver)
+    solver.time_loadsys = @elapsed load(solver.syssolver, solver)
+
+    solver.verbose && print_header(solver.stepper, solver)
+    flush(stdout)
+    return
+end
+
+function step_and_check(solver::Solver{T}) where {T <: Real}
+    stepper = solver.stepper
+    improv = calc_convergence_params(solver)
 
     if solver.verbose
-        println("\nstatus is $(solver.status) after $(solver.num_iters) " *
-            "iterations and $(trunc(solver.solve_time, digits=3)) seconds\n")
+        print_iteration(stepper, solver)
+        flush(stdout)
     end
-    flush(stdout)
 
-    return solver
+    check_convergence(solver) && return true
+
+    if solver.num_iters == solver.iter_limit
+        solver.verbose && println("iteration limit reached; terminating")
+        solver.status = IterationLimit
+        return true
+    end
+
+    if time() - solver.solve_time >= solver.time_limit
+        solver.verbose && println("time limit reached; terminating")
+        solver.status = TimeLimit
+        return true
+    end
+
+    if expect_improvement(stepper)
+        if improv < solver.tol_slow
+            if solver.prev_is_slow && solver.prev2_is_slow
+                if solver.verbose
+                    println("slow progress in consecutive " *
+                        "iterations; terminating")
+                end
+                solver.status = SlowProgress
+                return true
+            else
+                solver.prev2_is_slow = solver.prev_is_slow
+                solver.prev_is_slow = true
+            end
+        else
+            solver.prev2_is_slow = solver.prev_is_slow
+            solver.prev_is_slow = false
+        end
+    end
+
+    solver.res_norm_cutoff = T(1e-4) * max(solver.x_norm_res,
+        solver.y_norm_res, solver.z_norm_res, solver.tau_feas)
+    solver.worst_dir_res = 0
+
+    step(stepper, solver) || return true
+    calc_mu(solver)
+
+    if min(solver.point.tau[], solver.point.kap[], solver.mu) <= 0
+        @warn("tau, kappa, or mu is nonpositive; terminating")
+        solver.status = NumericalFailure
+        return true
+    end
+
+    flush(stdout)
+    solver.num_iters += 1
+    return false
 end
 
 function calc_mu(solver::Solver{T}) where {T <: Real}
@@ -567,7 +580,6 @@ get_kappa(solver::Solver) = solver.point.kap[]
 get_mu(solver::Solver) = solver.mu
 
 function load(solver::Solver{T}, model::Models.Model{T}) where {T <: Real}
-    # @assert solver.status == NotLoaded # TODO maybe want a reset function that just keeps options
     solver.orig_model = model
     solver.status = Loaded
     return solver

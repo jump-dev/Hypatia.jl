@@ -16,47 +16,81 @@ A MathOptInterface optimizer type for Hypatia.
 """
 mutable struct Optimizer{T <: Real} <: MOI.AbstractOptimizer
     solver::Solvers.Solver{T} # Hypatia solver object
-    model::Models.Model{T} # Hypatia model object
-
-    # result data
-    x::Vector{T}
-    s::Vector{T}
-    y::Vector{T}
-    z::Vector{T}
 
     # data for transforming certificates
     obj_sense::MOI.OptimizationSense
     zeros_idxs::Vector{UnitRange{Int}}
-    zeros_primal::Vector{T}
     moi_cones::Vector{MOI.AbstractVectorSet}
     moi_cone_idxs::Vector{UnitRange{Int}}
 
-    function Optimizer{T}(; solver_options...) where {T <: Real}
+    function Optimizer{T}(; options...) where {T <: Real}
         opt = new{T}()
-        opt.solver = Solvers.Solver{T}(; solver_options...)
+        opt.solver = Solvers.Solver{T}(; options...)
         return opt
     end
 end
 
 Optimizer(; options...) = Optimizer{Float64}(; options...) # default to Float64
 
-MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
-
-MOI.get(opt::Optimizer, ::MOI.RawSolver) = opt.solver
-
 MOI.is_empty(opt::Optimizer) = (opt.solver.status == Solvers.NotLoaded)
 
 MOI.empty!(opt::Optimizer) = (opt.solver.status = Solvers.NotLoaded)
 
+MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
+
+MOI.get(opt::Optimizer, ::MOI.RawSolver) = opt.solver
+
+MOI.supports(::Optimizer, ::MOI.Silent) = true
+
+function MOI.set(opt::Optimizer, ::MOI.Silent, value::Bool)
+    opt.solver.verbose = !value
+    return
+end
+
+MOI.get(opt::Optimizer, ::MOI.Silent) = !opt.solver.verbose
+
+MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
+
+function MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Union{Real, Nothing})
+    opt.solver.time_limit = something(value, Inf)
+    return
+end
+
+function MOI.get(opt::Optimizer, ::MOI.TimeLimitSec)
+    if isfinite(opt.solver.time_limit)
+        return opt.solver.time_limit
+    end
+    return
+end
+
+function MOI.get(opt::Optimizer, ::MOI.SolveTimeSec)
+    if opt.solver.status == Solvers.NotLoaded
+        error("solve has not been called")
+    end
+    return opt.solver.solve_time
+end
+
+MOI.get(opt::Optimizer, ::MOI.RawStatusString) = string(opt.solver.status)
+
+MOI.get(opt::Optimizer, ::MOI.BarrierIterations) = opt.solver.num_iters
+
+function MOI.set(opt::Optimizer, param::MOI.RawOptimizerAttribute, value)
+    return setproperty!(opt.solver, Symbol(param.name), value)
+end
+
+function MOI.get(opt::Optimizer, param::MOI.RawOptimizerAttribute)
+    return getproperty(opt.solver, Symbol(param.name))
+end
+
 MOI.supports(
     ::Optimizer{T},
-    ::Union{MOI.ObjectiveSense, MOI.ObjectiveFunction{SAF{T}}},
+    ::Union{MOI.ObjectiveSense, MOI.ObjectiveFunction{<:Union{VI, SAF{T}}}},
     ) where {T <: Real} = true
 
 MOI.supports_constraint(
     ::Optimizer{T},
     ::Type{<:Union{VV, VAF{T}}},
-    ::Type{<:SupportedCones{T}},
+    ::Type{<:Union{MOI.Zeros, SupportedCone{T}}},
     ) where {T <: Real} = true
 
 # build representation as min c'x s.t. A*x = b, h - G*x in K
@@ -83,7 +117,7 @@ function MOI.copy_to(
 
     # objective
     opt.obj_sense = MOI.MIN_SENSE
-    (Jc, Vc) = (Int[], T[])
+    model_c = zeros(T, n)
     obj_offset = 0.0
     for attr in MOI.get(src, MOI.ListOfModelAttributesSet())
         if attr == MOI.Name()
@@ -92,22 +126,22 @@ function MOI.copy_to(
             opt.obj_sense = MOI.get(src, MOI.ObjectiveSense())
         elseif attr isa MOI.ObjectiveFunction
             F = MOI.get(src, MOI.ObjectiveFunctionType())
-            if F != SAF{T}
-                error("function type $F not supported")
+            if !(F <: Union{VI, SAF{T}})
+                error("objective function type $F not supported")
             end
-            obj = MOI.get(src, MOI.ObjectiveFunction{F}())
-            append!(Jc, (idx_map[t.variable].value for t in obj.terms))
-            append!(Vc, (t.coefficient for t in obj.terms))
+            obj = convert(SAF{T}, MOI.get(src, MOI.ObjectiveFunction{F}()))
+            for t in obj.terms
+                model_c[idx_map[t.variable].value] += t.coefficient
+            end
             obj_offset = obj.constant
         else
             throw(MOI.UnsupportedAttribute(attr))
         end
     end
     if opt.obj_sense == MOI.MAX_SENSE
-        Vc .*= -1
+        model_c .*= -1
         obj_offset *= -1
     end
-    model_c = Vector(sparsevec(Jc, Vc, n))
 
     # constraints
     get_src_cons(F, S) = MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
@@ -202,7 +236,7 @@ function MOI.copy_to(
         if S == MOI.Zeros || S == MOI.Nonnegatives
             continue # already copied these constraints
         end
-        @assert S <: SupportedCones{T}
+        @assert S <: SupportedCone{T}
 
         for ci in get_src_cons(F, S)
             idx_map[ci] = MOI.ConstraintIndex{F, S}(i)
@@ -238,84 +272,20 @@ function MOI.copy_to(
         end
     end
 
-    # finalize model
     model_G = dropzeros!(sparse(IG, JG, VG, q, n))
     model_h = Vector(sparsevec(Ih, Vh, q))
-
-    opt.model = Models.Model{T}(model_c, model_A, model_b, model_G, model_h,
-        cones; obj_offset = obj_offset)
-
     opt.moi_cone_idxs = moi_cone_idxs
     opt.moi_cones = moi_cones
+
+    # finalize model and load into solver
+    model = Models.Model{T}(model_c, model_A, model_b, model_G, model_h,
+        cones; obj_offset = obj_offset)
+    Solvers.load(opt.solver, model)
+
     return idx_map
 end
 
-function MOI.optimize!(opt::Optimizer{T}) where {T <: Real}
-    # build and solve the model
-    model = opt.model
-    solver = opt.solver
-    Solvers.load(solver, model)
-    Solvers.solve(solver)
-
-    opt.x = Solvers.get_x(solver)
-    opt.y = Solvers.get_y(solver)
-    opt.s = Solvers.get_s(solver)
-    opt.z = Solvers.get_z(solver)
-
-    # transform solution for MOI conventions
-    opt.zeros_primal = copy(model.b)
-    mul!(opt.zeros_primal, model.A, opt.x, -1, true)
-    for (cone, idxs) in zip(opt.moi_cones, opt.moi_cone_idxs)
-        if needs_untransform(cone)
-            @assert length(idxs) == MOI.dimension(cone)
-            @views untransform_affine(cone, opt.s[idxs])
-            @views untransform_affine(cone, opt.z[idxs])
-        end
-    end
-    return
-end
-
-MOI.supports(::Optimizer, ::MOI.Silent) = true
-
-function MOI.set(opt::Optimizer, ::MOI.Silent, value::Bool)
-    opt.solver.verbose = !value
-    return
-end
-
-MOI.get(opt::Optimizer, ::MOI.Silent) = !opt.solver.verbose
-
-MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
-
-function MOI.set(opt::Optimizer, ::MOI.TimeLimitSec, value::Union{Real, Nothing})
-    opt.solver.time_limit = something(value, Inf)
-    return
-end
-
-function MOI.get(opt::Optimizer, ::MOI.TimeLimitSec)
-    if isfinite(opt.solver.time_limit)
-        return opt.solver.time_limit
-    end
-    return
-end
-
-function MOI.get(opt::Optimizer, ::MOI.SolveTimeSec)
-    if opt.solver.status in (:NotLoaded, :Loaded)
-        error("solve has not been called")
-    end
-    return Solvers.get_solve_time(opt.solver)
-end
-
-MOI.get(opt::Optimizer, ::MOI.RawStatusString) = string(opt.solver.status)
-
-MOI.get(opt::Optimizer, ::MOI.BarrierIterations) = opt.solver.num_iters
-
-function MOI.set(opt::Optimizer, param::MOI.RawOptimizerAttribute, value)
-    return setproperty!(opt.solver, Symbol(param.name), value)
-end
-
-function MOI.get(opt::Optimizer, param::MOI.RawOptimizerAttribute)
-    return getproperty(opt.solver, Symbol(param.name))
-end
+MOI.optimize!(opt::Optimizer) = Solvers.solve(opt.solver)
 
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     status = opt.solver.status
@@ -379,53 +349,89 @@ _sense_val(sense::MOI.OptimizationSense) = (sense == MOI.MAX_SENSE ? -1 : 1)
 
 function MOI.get(opt::Optimizer, attr::MOI.ObjectiveValue)
     MOI.check_result_index_bounds(opt, attr)
-    return _sense_val(opt.obj_sense) * Solvers.get_primal_obj(opt.solver)
+    return _sense_val(opt.obj_sense) * opt.solver.primal_obj
 end
 
 function MOI.get(opt::Optimizer, attr::MOI.DualObjectiveValue)
     MOI.check_result_index_bounds(opt, attr)
-    return _sense_val(opt.obj_sense) * Solvers.get_dual_obj(opt.solver)
+    return _sense_val(opt.obj_sense) * opt.solver.dual_obj
 end
 
 MOI.get(opt::Optimizer, ::MOI.ResultCount) = 1
 
 function MOI.get(opt::Optimizer, attr::MOI.VariablePrimal, vi::VI)
     MOI.check_result_index_bounds(opt, attr)
-    return opt.x[vi.value]
+    return opt.solver.result.x[vi.value]
 end
 
 function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintDual,
     ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, MOI.Zeros},
-    ) where T
+    ) where {T}
     MOI.check_result_index_bounds(opt, attr)
-    return opt.y[opt.zeros_idxs[ci.value]]
+    return opt.solver.result.y[opt.zeros_idxs[ci.value]]
 end
 
 function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintDual,
-    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCones{T}},
-    ) where T
+    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCone{T}},
+    ) where {T}
     MOI.check_result_index_bounds(opt, attr)
-    return opt.z[opt.moi_cone_idxs[ci.value]]
+    i = ci.value
+    z_i = opt.solver.result.z[opt.moi_cone_idxs[i]]
+    return _transform_sz(z_i, opt.moi_cones[i])
 end
+
+# function MOI.get(
+#     opt::Optimizer{T},
+#     attr::MOI.ConstraintPrimal,
+#     ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, MOI.Zeros},
+#     ) where {T}
+#     MOI.check_result_index_bounds(opt, attr)
+#     return opt.zeros_primal[opt.zeros_idxs[ci.value]]
+# end
 
 function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintPrimal,
-    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, MOI.Zeros},
-    ) where T
+    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCone{T}},
+    ) where {T}
     MOI.check_result_index_bounds(opt, attr)
-    return opt.zeros_primal[opt.zeros_idxs[ci.value]]
+    i = ci.value
+    s_i = opt.solver.result.s[opt.moi_cone_idxs[i]]
+    return _transform_sz(s_i, opt.moi_cones[i])
 end
 
-function MOI.get(
-    opt::Optimizer{T},
-    attr::MOI.ConstraintPrimal,
-    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCones{T}},
-    ) where T
-    MOI.check_result_index_bounds(opt, attr)
-    return opt.s[opt.moi_cone_idxs[ci.value]]
+function _transform_sz(sz::Vector{T}, cone::SupportedCone{T}) where {T}
+    if needs_untransform(cone)
+        @assert length(sz) == MOI.dimension(cone)
+        untransform_affine(cone, sz)
+    end
+    return sz
 end
+
+# get_s(solver::Solver) = copy(solver.result.s)
+# get_z(solver::Solver) = copy(solver.result.z)
+# get_x(solver::Solver) = copy(solver.result.x)
+# get_y(solver::Solver) = copy(solver.result.y)
+
+#     Solvers.solve(solver)
+
+#     opt.x = Solvers.get_x(solver)
+#     opt.y = Solvers.get_y(solver)
+#     opt.s = Solvers.get_s(solver)
+#     opt.z = Solvers.get_z(solver)
+
+#     # transform solution for MOI conventions
+#     opt.zeros_primal = copy(model.b)
+#     mul!(opt.zeros_primal, model.A, opt.x, -1, true)
+#     for (cone, idxs) in zip(opt.moi_cones, opt.moi_cone_idxs)
+#         if needs_untransform(cone)
+#             @assert length(idxs) == MOI.dimension(cone)
+#             @views untransform_affine(cone, opt.s[idxs])
+#             @views untransform_affine(cone, opt.z[idxs])
+#         end
+#     end
+#     return
