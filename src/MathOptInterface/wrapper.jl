@@ -93,43 +93,6 @@ MOI.supports_constraint(
     ::Type{<:Union{MOI.Zeros, SupportedCone{T}}},
     ) where {T <: Real} = true
 
-function con_IJV(
-    IM::Vector{Int},
-    JM::Vector{Int},
-    VM::Vector{T},
-    ::Vector{Int},
-    ::Vector{T},
-    func::VV,
-    start::Int,
-    dim::Int,
-    idx_map::MOI.IndexMap,
-    ) where {T <: Real}
-    append!(IM, start .+ (1:dim))
-    append!(JM, idx_map[vi].value for vi in func.variables)
-    append!(VM, -one(T) for _ in 1:dim)
-    return
-end
-
-function con_IJV(
-    IM::Vector{Int},
-    JM::Vector{Int},
-    VM::Vector{T},
-    Iv::Vector{Int},
-    Vv::Vector{T},
-    func::VAF{T},
-    start::Int,
-    dim::Int,
-    idx_map::MOI.IndexMap,
-    ) where {T <: Real}
-    append!(IM, start + vt.output_index for vt in func.terms)
-    append!(JM, idx_map[vt.scalar_term.variable].value for vt in func.terms)
-    append!(VM, -vt.scalar_term.coefficient for vt in func.terms)
-    append!(Iv, start .+ (1:dim))
-    append!(Vv, func.constants)
-    return
-end
-
-# build representation as min c'x s.t. A*x = b, h - G*x in K
 function MOI.copy_to(
     opt::Optimizer{T},
     src::MOI.ModelLike,
@@ -188,21 +151,20 @@ function MOI.copy_to(
     i = 1 # MOI constraint index
     p = 0 # rows of A (equality constraint matrix)
     (IA, JA, VA) = (Int[], Int[], T[])
-    (Ib, Vb) = (Int[], T[])
+    model_b = T[]
     zeros_idxs = Vector{UnitRange{Int}}()
 
     for F in (VV, VAF{T}), ci in get_src_cons(F, MOI.Zeros)
         idx_map[ci] = MOI.ConstraintIndex{F, MOI.Zeros}(i)
         fi = get_con_fun(ci)
         dim = MOI.output_dimension(fi)
-        con_IJV(IA, JA, VA, Ib, Vb, fi, p, dim, idx_map)
+        _con_IJV(IA, JA, VA, model_b, fi, p, dim, idx_map)
         push!(zeros_idxs, p .+ (1:dim))
         p += dim
         i += 1
     end
 
     model_A = dropzeros!(sparse(IA, JA, VA, p, n))
-    model_b = Vector(sparsevec(Ib, Vb, p))
     opt.zeros_idxs = zeros_idxs
 
     # conic constraints
@@ -210,7 +172,7 @@ function MOI.copy_to(
     i = 1 # MOI constraint index
     q = 0 # rows of G (cone constraint matrix)
     (IG, JG, VG) = (Int[], Int[], T[])
-    (Ih, Vh) = (Int[], T[])
+    model_h = T[]
     moi_cone_idxs = Vector{UnitRange{Int}}()
     cones = Cones.Cone{T}[]
 
@@ -219,7 +181,7 @@ function MOI.copy_to(
         idx_map[ci] = MOI.ConstraintIndex{F, MOI.Nonnegatives}(i)
         fi = get_con_fun(ci)
         dim = MOI.output_dimension(fi)
-        con_IJV(IG, JG, VG, Ih, Vh, fi, q, dim, idx_map)
+        _con_IJV(IG, JG, VG, model_h, fi, q, dim, idx_map)
         push!(moi_cones, get_con_set(ci))
         push!(moi_cone_idxs, q .+ (1:dim))
         q += dim
@@ -253,11 +215,12 @@ function MOI.copy_to(
             si = get_con_set(ci)
             dim = MOI.output_dimension(fi)
 
-            perm_idxs = q .+ permute_affine(si, 1:dim)
+            perm_idxs = permute_affine(si, 1:dim)
             if F == VV
                 JGi = (idx_map[vj].value for vj in fi.variables)
-                IGi = perm_idxs
+                IGi = q .+ perm_idxs
                 VGi = rescale_affine(si, fill(-one(T), dim))
+                append!(model_h, zero(T) for _ in 1:dim)
             else
                 JGi = (idx_map[vt.scalar_term.variable].value
                     for vt in fi.terms)
@@ -265,8 +228,9 @@ function MOI.copy_to(
                 VGi = rescale_affine(si, [-vt.scalar_term.coefficient
                     for vt in fi.terms], IGi)
                 IGi .+= q
-                append!(Ih, perm_idxs)
-                append!(Vh, rescale_affine(si, fi.constants))
+                hi = zeros(T, dim)
+                hi[perm_idxs] = rescale_affine(si, fi.constants)
+                append!(model_h, hi)
             end
             append!(IG, IGi)
             append!(JG, JGi)
@@ -282,7 +246,6 @@ function MOI.copy_to(
     end
 
     model_G = dropzeros!(sparse(IG, JG, VG, q, n))
-    model_h = Vector(sparsevec(Ih, Vh, q))
     opt.moi_cone_idxs = moi_cone_idxs
     opt.moi_cones = moi_cones
 
@@ -410,4 +373,41 @@ function _transform_sz(sz::Vector{T}, cone::SupportedCone{T}) where {T}
         untransform_affine(cone, sz)
     end
     return sz
+end
+
+
+
+# TODO don't use sparsevec for b and h - append on a vector each time
+function _con_IJV(
+    IM::Vector{Int},
+    JM::Vector{Int},
+    VM::Vector{T},
+    vect::Vector{T},
+    func::VV,
+    start::Int,
+    dim::Int,
+    idx_map::MOI.IndexMap,
+    ) where {T <: Real}
+    append!(IM, start .+ (1:dim))
+    append!(JM, idx_map[vi].value for vi in func.variables)
+    append!(VM, -one(T) for _ in 1:dim)
+    append!(vect, zero(T) for _ in 1:dim)
+    return
+end
+
+function _con_IJV(
+    IM::Vector{Int},
+    JM::Vector{Int},
+    VM::Vector{T},
+    vect::Vector{T},
+    func::VAF{T},
+    start::Int,
+    dim::Int,
+    idx_map::MOI.IndexMap,
+    ) where {T <: Real}
+    append!(IM, start + vt.output_index for vt in func.terms)
+    append!(JM, idx_map[vt.scalar_term.variable].value for vt in func.terms)
+    append!(VM, -vt.scalar_term.coefficient for vt in func.terms)
+    append!(vect, func.constants)
+    return
 end
