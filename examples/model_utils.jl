@@ -84,7 +84,6 @@ function process_result(
         :time_rescale => solver.time_rescale,
         :time_initx => solver.time_initx,
         :time_inity => solver.time_inity,
-        :time_unproc => solver.time_unproc,
         :time_loadsys => solver.time_loadsys,
         :time_upsys => solver.time_upsys,
         :time_upfact => solver.time_upfact,

@@ -279,8 +279,7 @@ end
 
 function make_subtime_tables(all_df)
     divfunc(x, y) = (x ./ y)
-    init_cols = [:time_rescale, :time_initx, :time_inity, :time_unproc,
-        :time_loadsys]
+    init_cols = [:time_rescale, :time_initx, :time_inity, :time_loadsys]
     transform!(all_df,
         [:time_upsys, :iters] => divfunc => :time_upsys_piter,
         [:time_uprhs, :iters] => divfunc => :time_uprhs_piter,

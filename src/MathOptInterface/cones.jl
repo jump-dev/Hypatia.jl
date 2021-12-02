@@ -693,9 +693,8 @@ const HypatiaCones{T <: Real} = Union{
     WSOSInterpEpiNormEuclCone{T},
     }
 
-const SupportedCones{T <: Real} = Union{
+const SupportedCone{T <: Real} = Union{
     HypatiaCones{T},
-    MOI.Zeros,
     MOI.Nonnegatives,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.NormInfinityCone,
