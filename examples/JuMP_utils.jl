@@ -177,11 +177,18 @@ function solve_check(
     s = Float64[]
     z = Float64[]
     for (cone, cr) in zip(model.ext[:moi_cones], model.ext[:cone_refs])
-        s_k = Hypatia.rescale_affine(cone, JuMP.value.(cr))
-        z_k = Hypatia.rescale_affine(cone, JuMP.dual.(cr))
-        idxs = Hypatia.permute_affine(cone, 1:length(s_k))
-        append!(s, s_k[idxs])
-        append!(z, z_k[idxs])
+        s_k = JuMP.value.(cr)
+        z_k = JuMP.dual.(cr)
+        if Hypatia.needs_rescale(cone)
+            Hypatia.rescale_affine(cone, s_k)
+            Hypatia.rescale_affine(cone, z_k)
+        end
+        if Hypatia.needs_permute(cone)
+            Hypatia.permute_affine(cone, s_k)
+            Hypatia.permute_affine(cone, z_k)
+        end
+        append!(s, s_k)
+        append!(z, z_k)
     end
 
     hyp_model = model.ext[:hyp_model]

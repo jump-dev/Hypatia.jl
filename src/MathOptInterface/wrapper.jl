@@ -2,13 +2,6 @@
 MathOptInterface wrapper of Hypatia solver
 =#
 
-const VI = MOI.VariableIndex
-const SAF = MOI.ScalarAffineFunction
-const VV = MOI.VectorOfVariables
-const VAF = MOI.VectorAffineFunction
-
-export Optimizer
-
 """
 $(TYPEDEF)
 
@@ -148,55 +141,42 @@ function MOI.copy_to(
     get_con_set(con_idx) = MOI.get(src, MOI.ConstraintSet(), con_idx)
 
     # equality constraints
-    i = 1 # MOI constraint index
-    p = 0 # rows of A (equality constraint matrix)
     (IA, JA, VA) = (Int[], Int[], T[])
     model_b = T[]
-    zeros_idxs = Vector{UnitRange{Int}}()
-
+    opt.zeros_idxs = zeros_idxs = Vector{UnitRange{Int}}()
     for F in (VV, VAF{T}), ci in get_src_cons(F, MOI.Zeros)
-        idx_map[ci] = MOI.ConstraintIndex{F, MOI.Zeros}(i)
         fi = get_con_fun(ci)
-        dim = MOI.output_dimension(fi)
-        _con_IJV(IA, JA, VA, model_b, fi, p, dim, idx_map)
-        push!(zeros_idxs, p .+ (1:dim))
-        p += dim
-        i += 1
+        si = get_con_set(ci)
+        _con_IJV(IA, JA, VA, model_b, zeros_idxs, fi, si, idx_map)
+        idx_map[ci] = MOI.ConstraintIndex{F, MOI.Zeros}(length(zeros_idxs))
     end
-
-    model_A = dropzeros!(sparse(IA, JA, VA, p, n))
-    opt.zeros_idxs = zeros_idxs
+    model_A = dropzeros!(sparse(IA, JA, VA, length(model_b), n))
 
     # conic constraints
-    moi_cones = MOI.AbstractVectorSet[]
-    i = 1 # MOI constraint index
-    q = 0 # rows of G (cone constraint matrix)
     (IG, JG, VG) = (Int[], Int[], T[])
     model_h = T[]
+    moi_cones = MOI.AbstractVectorSet[]
     moi_cone_idxs = Vector{UnitRange{Int}}()
     cones = Cones.Cone{T}[]
 
     # build up one nonnegative cone
     for F in (VV, VAF{T}), ci in get_src_cons(F, MOI.Nonnegatives)
-        idx_map[ci] = MOI.ConstraintIndex{F, MOI.Nonnegatives}(i)
         fi = get_con_fun(ci)
-        dim = MOI.output_dimension(fi)
-        _con_IJV(IG, JG, VG, model_h, fi, q, dim, idx_map)
-        push!(moi_cones, get_con_set(ci))
-        push!(moi_cone_idxs, q .+ (1:dim))
-        q += dim
-        i += 1
+        si = get_con_set(ci)
+        _con_IJV(IG, JG, VG, model_h, moi_cone_idxs, fi, si, idx_map)
+        push!(moi_cones, si)
+        idx_map[ci] = MOI.ConstraintIndex{F, MOI.Nonnegatives}(length(moi_cones))
     end
-    if q > 0
-        push!(cones, cone_from_moi(T, MOI.Nonnegatives(q)))
+    if !isempty(moi_cones)
+        push!(cones, cone_from_moi(T, MOI.Nonnegatives(length(model_h))))
     end
 
     # other conic constraints
     for (F, S) in MOI.get(src, MOI.ListOfConstraintTypesPresent())
         if !MOI.supports_constraint(opt, F, S)
-            throw(MOI.UnsupportedConstraint{F,S}())
+            throw(MOI.UnsupportedConstraint{F, S}())
         end
-        for attr in MOI.get(src, MOI.ListOfConstraintAttributesSet{F,S}())
+        for attr in MOI.get(src, MOI.ListOfConstraintAttributesSet{F, S}())
             if attr == MOI.ConstraintName() ||
                attr == MOI.ConstraintPrimalStart() ||
                attr == MOI.ConstraintDualStart()
@@ -207,45 +187,18 @@ function MOI.copy_to(
         if S == MOI.Zeros || S == MOI.Nonnegatives
             continue # already copied these constraints
         end
-        @assert S <: SupportedCone{T}
 
         for ci in get_src_cons(F, S)
-            idx_map[ci] = MOI.ConstraintIndex{F, S}(i)
             fi = get_con_fun(ci)
             si = get_con_set(ci)
-            dim = MOI.output_dimension(fi)
-
-            perm_idxs = permute_affine(si, 1:dim)
-            if F == VV
-                JGi = (idx_map[vj].value for vj in fi.variables)
-                IGi = q .+ perm_idxs
-                VGi = rescale_affine(si, fill(-one(T), dim))
-                append!(model_h, zero(T) for _ in 1:dim)
-            else
-                JGi = (idx_map[vt.scalar_term.variable].value
-                    for vt in fi.terms)
-                IGi = permute_affine(si, [vt.output_index for vt in fi.terms])
-                VGi = rescale_affine(si, [-vt.scalar_term.coefficient
-                    for vt in fi.terms], IGi)
-                IGi .+= q
-                hi = zeros(T, dim)
-                hi[perm_idxs] = rescale_affine(si, fi.constants)
-                append!(model_h, hi)
-            end
-            append!(IG, IGi)
-            append!(JG, JGi)
-            append!(VG, VGi)
-
+            _con_IJV(IG, JG, VG, model_h, moi_cone_idxs, fi, si, idx_map)
             push!(cones, cone_from_moi(T, si))
             push!(moi_cones, si)
-            push!(moi_cone_idxs, q .+ (1:dim))
-
-            q += dim
-            i += 1
+            idx_map[ci] = MOI.ConstraintIndex{F, S}(length(moi_cones))
         end
     end
 
-    model_G = dropzeros!(sparse(IG, JG, VG, q, n))
+    model_G = dropzeros!(sparse(IG, JG, VG, length(model_h), n))
     opt.moi_cone_idxs = moi_cone_idxs
     opt.moi_cones = moi_cones
 
@@ -353,7 +306,7 @@ function MOI.get(
     MOI.check_result_index_bounds(opt, attr)
     i = ci.value
     z_i = opt.solver.result.z[opt.moi_cone_idxs[i]]
-    return _transform_sz(z_i, opt.moi_cones[i])
+    return untransform_affine(opt.moi_cones[i], z_i)
 end
 
 function MOI.get(
@@ -364,34 +317,36 @@ function MOI.get(
     MOI.check_result_index_bounds(opt, attr)
     i = ci.value
     s_i = opt.solver.result.s[opt.moi_cone_idxs[i]]
-    return _transform_sz(s_i, opt.moi_cones[i])
+    return untransform_affine(opt.moi_cones[i], s_i)
 end
 
-function _transform_sz(sz::Vector{T}, cone::SupportedCone{T}) where {T}
-    if needs_untransform(cone)
-        @assert length(sz) == MOI.dimension(cone)
-        untransform_affine(cone, sz)
-    end
-    return sz
-end
-
-
-
-# TODO don't use sparsevec for b and h - append on a vector each time
 function _con_IJV(
     IM::Vector{Int},
     JM::Vector{Int},
     VM::Vector{T},
     vect::Vector{T},
+    idxs_vect::Vector{UnitRange{Int}},
     func::VV,
-    start::Int,
-    dim::Int,
+    set::MOI.AbstractVectorSet,
     idx_map::MOI.IndexMap,
     ) where {T <: Real}
-    append!(IM, start .+ (1:dim))
+    dim = MOI.output_dimension(func)
+    start = length(vect)
+    idxs = start .+ (1:dim)
+    push!(idxs_vect, idxs)
+    append!(vect, zero(T) for _ in 1:dim)
+    if needs_permute(set)
+        perm_idxs = permute_affine(set, 1:dim)
+        perm_idxs .+= start
+        append!(IM, perm_idxs)
+    else
+        append!(IM, idxs)
+    end
     append!(JM, idx_map[vi].value for vi in func.variables)
     append!(VM, -one(T) for _ in 1:dim)
-    append!(vect, zero(T) for _ in 1:dim)
+    if needs_rescale(set)
+        @views rescale_affine(set, VM[(end - dim + 1):end])
+    end
     return
 end
 
@@ -400,14 +355,31 @@ function _con_IJV(
     JM::Vector{Int},
     VM::Vector{T},
     vect::Vector{T},
+    idxs_vect::Vector{UnitRange{Int}},
     func::VAF{T},
-    start::Int,
-    dim::Int,
+    set::MOI.AbstractVectorSet,
     idx_map::MOI.IndexMap,
     ) where {T <: Real}
-    append!(IM, start + vt.output_index for vt in func.terms)
+    dim = MOI.output_dimension(func)
+    start = length(vect)
+    idxs = start .+ (1:dim)
+    push!(idxs_vect, idxs)
+    if needs_permute(set)
+        @assert !needs_rescale(set)
+        append!(vect, permute_affine(set, func.constants))
+        perm_idxs = permute_affine(set, func)
+        perm_idxs .+= start
+        append!(IM, perm_idxs)
+    else
+        append!(vect, func.constants)
+        append!(IM, start + vt.output_index for vt in func.terms)
+    end
     append!(JM, idx_map[vt.scalar_term.variable].value for vt in func.terms)
     append!(VM, -vt.scalar_term.coefficient for vt in func.terms)
-    append!(vect, func.constants)
+    if needs_rescale(set)
+        @views vm = VM[(end - length(func.terms) + 1):end]
+        rescale_affine(set, func, vm)
+        @views rescale_affine(set, vect[idxs])
+    end
     return
 end
