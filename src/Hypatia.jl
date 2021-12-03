@@ -31,6 +31,10 @@ include("Solvers/Solvers.jl")
 using SparseArrays
 import MathOptInterface
 const MOI = MathOptInterface
+const VI = MOI.VariableIndex
+const SAF = MOI.ScalarAffineFunction
+const VV = MOI.VectorOfVariables
+const VAF = MOI.VectorAffineFunction
 include("MathOptInterface/cones.jl")
 include("MathOptInterface/wrapper.jl")
 

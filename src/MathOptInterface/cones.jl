@@ -59,15 +59,13 @@ cone_from_moi(::Type{T}, cone::MOI.RelativeEntropyCone) where {T <: Real} =
     Cones.EpiRelEntropy{T}(MOI.dimension(cone))
 
 # transformations fallbacks
+untransform_affine(::MOI.AbstractVectorSet, vals::AbstractVector) = vals
 needs_untransform(::MOI.AbstractVectorSet) = false
-untransform_affine(::MOI.AbstractVectorSet, vals::AbstractVector) = nothing
-permute_affine(::MOI.AbstractVectorSet, idxs::AbstractVector) = idxs
-rescale_affine(::MOI.AbstractVectorSet, vals::AbstractVector) = vals
-rescale_affine(::MOI.AbstractVectorSet, vals::AbstractVector, ::AbstractVector) =
-    vals
+needs_rescale(::MOI.AbstractVectorSet) = false
+needs_permute(::MOI.AbstractVectorSet) = false
 
-# transformations (transposition of matrix) for MOI rectangular matrix cones with matrix of more rows than columns
-
+# transformations (transposition of matrix) for MOI rectangular matrix
+# cones with matrix of more rows than columns
 const SpecNucCone = Union{
     MOI.NormSpectralCone,
     MOI.NormNuclearCone,
@@ -76,21 +74,24 @@ const SpecNucCone = Union{
 needs_untransform(cone::SpecNucCone) = (cone.row_dim > cone.column_dim)
 
 function untransform_affine(cone::SpecNucCone, vals::AbstractVector)
-    vals[2:end] = reshape(vals[2:end], cone.column_dim, cone.row_dim)'
+    if needs_untransform(cone)
+        @views vals[2:end] = reshape(vals[2:end], cone.column_dim, cone.row_dim)'
+    end
     return vals
 end
 
-function permute_affine(cone::SpecNucCone, idxs::AbstractVector)
-    @assert cone.row_dim >= 1
-    @assert cone.column_dim >= 1
-    if cone.row_dim <= cone.column_dim
-        return idxs
-    end
+needs_permute(cone::SpecNucCone) = needs_untransform(cone)
 
-    # transpose the matrix part
-    idxs_new = zero(idxs)
-    for k in eachindex(idxs)
-        i = idxs[k]
+function permute_affine(cone::SpecNucCone, vals::AbstractVector{T}) where {T}
+    @views vals[2:end] = reshape(vals[2:end], cone.row_dim, cone.column_dim)'
+    return vals
+end
+
+function permute_affine(cone::SpecNucCone, func::VAF{T}) where {T}
+    terms = func.terms
+    idxs_new = zeros(Int, length(terms))
+    for k in eachindex(idxs_new)
+        i = terms[k].output_index
         @assert i >= 1
         if i <= 2
             idxs_new[k] = i
@@ -98,12 +99,13 @@ function permute_affine(cone::SpecNucCone, idxs::AbstractVector)
         end
         (col_old, row_old) = divrem(i - 2, cone.row_dim)
         k_idx = row_old * cone.column_dim + col_old + 2
-        idxs_new[k] = idxs[k_idx]
+        idxs_new[k] = terms[k_idx].output_index
     end
     return idxs_new
 end
 
-# transformations (svec rescaling) for MOI symmetric matrix cones not in svec (scaled lower triangle) form
+# transformations (svec rescaling) for MOI symmetric matrix cones not
+# in svec (scaled lower triangle) form
 const SvecCone = Union{
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.LogDetConeTriangle,
@@ -116,28 +118,30 @@ svec_offset(::MOI.LogDetConeTriangle) = 3
 
 needs_untransform(::SvecCone) = true
 
-function untransform_affine(cone::SvecCone, vals::AbstractVector)
+function untransform_affine(cone::SvecCone, vals::AbstractVector{T}) where {T}
     @views svec_vals = vals[svec_offset(cone):end]
-    T = eltype(vals)
     Cones.scale_svec!(svec_vals, inv(sqrt(T(2))))
     return vals
 end
 
-function rescale_affine(cone::SvecCone, vals::AbstractVector)
-    vals = collect(vals)
+needs_rescale(::SvecCone) = true
+
+function rescale_affine(cone::SvecCone, vals::AbstractVector{T}) where {T}
     @views svec_vals = vals[svec_offset(cone):end]
-    T = eltype(vals)
     Cones.scale_svec!(svec_vals, sqrt(T(2)))
     return vals
 end
 
-function rescale_affine(cone::SvecCone, vals::AbstractVector, idxs::AbstractVector)
+function rescale_affine(
+    cone::SvecCone,
+    func::VAF{T},
+    vals::AbstractVector{T},
+    ) where {T}
     scal_start = svec_offset(cone) - 1
-    rt2 = sqrt(eltype(vals)(2))
+    rt2 = sqrt(T(2))
     for i in eachindex(vals)
-        shifted_idx = idxs[i] - scal_start
-        if shifted_idx > 0 && !MOI.Utilities.is_diagonal_vectorized_index(
-            shifted_idx)
+        k = func.terms[i].output_index - scal_start
+        if k > 0 && !MOI.Utilities.is_diagonal_vectorized_index(k)
             vals[i] *= rt2
         end
     end
