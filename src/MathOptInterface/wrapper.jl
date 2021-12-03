@@ -110,7 +110,7 @@ function MOI.copy_to(
     # objective
     opt.obj_sense = MOI.MIN_SENSE
     model_c = zeros(T, n)
-    obj_offset = 0.0
+    obj_offset = zero(T)
     for attr in MOI.get(src, MOI.ListOfModelAttributesSet())
         if attr == MOI.Name()
             continue
