@@ -10,25 +10,26 @@ include(joinpath(@__DIR__, "moicones.jl"))
 
 @testset "MathOptInterface wrapper tests" begin
 
-# @testset "MOI cone tests" begin
-#     println("starting MOI wrapper cone tests")
-#     real_types = [
-#         Float64,
-#         # Float32,
-#         BigFloat,
-#         ]
-#     for T in real_types
-#         @testset "$T" begin
-#             println(T, " ...")
-#             test_moi_cones(T)
-#         end
-#     end
-# end
+@testset "MOI cone tests" begin
+    println("starting MOI wrapper cone tests")
+    real_types = [
+        Float64,
+        # Float32,
+        BigFloat,
+        ]
+    for T in real_types
+        @testset "$T" begin
+            println(T, " ...")
+            test_moi_cones(T)
+        end
+    end
+end
 
 # real types, tolerances, and tests to include for MOI.Test tests
 test_T = [
     (Float64, 2 * sqrt(sqrt(eps())), 4, String[]),
-    (BigFloat, 2 * eps(BigFloat)^0.2, 1, String["test_conic"]), # TODO add test_linear
+    # TODO add test_linear after MOI 0.10.7 is tagged:
+    (BigFloat, 2 * eps(BigFloat)^0.2, 1, String["test_conic"]),
 ]
 
 @testset "MOI.Test tests: $T" for (T, tol_test, tol_relax, includes) in test_T
