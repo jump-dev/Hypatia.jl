@@ -7,9 +7,9 @@ using Printf
 using Hypatia
 
 test_files = [
-    # "polyutils",
-    # "cone",
-    # "native",
+    "polyutils",
+    "cone",
+    "native",
     "moi",
     # "examples", # CI runs examples separately
     # require optional dependencies:
