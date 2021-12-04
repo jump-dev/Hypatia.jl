@@ -149,11 +149,11 @@ function solve_check(
     JuMP.optimize!(model) # TODO make sure it doesn't copy again
     flush(stdout); flush(stderr)
 
-    opt = JuMP.backend(model).optimizer.model.optimizer
-    if opt isa Hypatia.Optimizer
+    if JuMP.solver_name(model) == "Hypatia"
+        solver = JuMP.backend(model).optimizer.model.optimizer.solver
         test && test_extra(model.ext[:inst], model)
         flush(stdout); flush(stderr)
-        (solve_stats, _) = process_result(opt.solver.orig_model, opt.solver)
+        (solve_stats, _) = process_result(solver.orig_model, solver)
         return solve_stats
     elseif test
         @info("cannot run example tests if solver is not Hypatia")
@@ -163,7 +163,7 @@ function solve_check(
     iters = MOI.get(model, MOI.BarrierIterations())
     primal_obj = JuMP.objective_value(model)
     dual_obj = JuMP.dual_objective_value(model)
-    moi_status = MOI.get(model, MOI.TerminationStatus())
+    moi_status = JuMP.termination_status(model)
     if haskey(moi_hyp_status_map, moi_status)
         hyp_status = moi_hyp_status_map[moi_status]
     else
