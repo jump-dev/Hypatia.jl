@@ -49,6 +49,7 @@ include("point.jl")
     IterationLimit
     TimeLimit
     NumericalFailure
+    UnknownStatus
 end
 
 # statuses for which near-convergence should be checked

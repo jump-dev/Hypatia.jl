@@ -218,16 +218,24 @@ function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
         return MOI.OPTIMIZE_NOT_CALLED
     elseif status == Solvers.Optimal
         return MOI.OPTIMAL
+    elseif status == Solvers.NearOptimal
+        return MOI.ALMOST_OPTIMAL
     elseif status == Solvers.PrimalInfeasible || status == Solvers.PrimalInconsistent
         return MOI.INFEASIBLE
+    elseif status == Solvers.NearPrimalInfeasible
+        return MOI.ALMOST_INFEASIBLE
     elseif status == Solvers.DualInfeasible || status == Solvers.DualInconsistent
         return MOI.DUAL_INFEASIBLE
+    elseif status == Solvers.NearDualInfeasible
+        return MOI.ALMOST_DUAL_INFEASIBLE
     elseif status == Solvers.SlowProgress
         return MOI.SLOW_PROGRESS
     elseif status == Solvers.IterationLimit
         return MOI.ITERATION_LIMIT
     elseif status == Solvers.TimeLimit
         return MOI.TIME_LIMIT
+    elseif status == Solvers.NumericalFailure
+        return MOI.NUMERICAL_ERROR
     else
         @warn("Hypatia status $(opt.solver.status) not handled")
         return MOI.OTHER_ERROR
@@ -241,10 +249,14 @@ function MOI.get(opt::Optimizer, attr::MOI.PrimalStatus)
     status = opt.solver.status
     if status == Solvers.Optimal
         return MOI.FEASIBLE_POINT
+    elseif status == Solvers.NearOptimal
+        return MOI.NEARLY_FEASIBLE_POINT
     elseif status == Solvers.PrimalInfeasible
         return MOI.INFEASIBLE_POINT
     elseif status == Solvers.DualInfeasible
         return MOI.INFEASIBILITY_CERTIFICATE
+    elseif status == Solvers.NearDualInfeasible
+        return MOI.NEARLY_INFEASIBILITY_CERTIFICATE
     elseif status == Solvers.IllPosed
         return MOI.OTHER_RESULT_STATUS
     else
@@ -259,8 +271,12 @@ function MOI.get(opt::Optimizer, attr::MOI.DualStatus)
     status = opt.solver.status
     if status == Solvers.Optimal
         return MOI.FEASIBLE_POINT
+    elseif status == Solvers.NearOptimal
+        return MOI.NEARLY_FEASIBLE_POINT
     elseif status == Solvers.PrimalInfeasible
         return MOI.INFEASIBILITY_CERTIFICATE
+    elseif status == Solvers.NearPrimalInfeasible
+        return MOI.NEARLY_INFEASIBILITY_CERTIFICATE
     elseif status == Solvers.DualInfeasible
         return MOI.INFEASIBLE_POINT
     elseif status == Solvers.IllPosed

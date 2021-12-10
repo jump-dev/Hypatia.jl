@@ -118,6 +118,7 @@ status_map = Dict(
     "SetupModelKilledTime" => "m",
     "SetupModelKilledMemory" => "m",
     "Optimal" => "co",
+    "NearOptimal" => "ne",
     "TimeLimit" => "tl",
     "IterationLimit" => "il",
     "SolveCheckKilledTime" => "tl",
