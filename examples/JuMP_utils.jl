@@ -206,10 +206,14 @@ end
 # get Hypatia status from MOI status
 moi_hyp_status_map = Dict(
     MOI.OPTIMAL => Solvers.Optimal,
+    MOI.ALMOST_OPTIMAL => Solvers.NearOptimal,
     MOI.INFEASIBLE => Solvers.PrimalInfeasible,
+    MOI.ALMOST_INFEASIBLE => Solvers.NearPrimalInfeasible,
     MOI.DUAL_INFEASIBLE => Solvers.DualInfeasible,
+    MOI.ALMOST_DUAL_INFEASIBLE => Solvers.NearDualInfeasible,
     MOI.SLOW_PROGRESS => Solvers.SlowProgress,
     MOI.ITERATION_LIMIT => Solvers.IterationLimit,
     MOI.TIME_LIMIT => Solvers.TimeLimit,
+    MOI.NUMERICAL_ERROR => Solvers.NumericalFailure,
     MOI.OTHER_ERROR => Solvers.UnknownStatus,
     )
