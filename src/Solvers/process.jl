@@ -385,8 +385,8 @@ end
 function postprocess(solver::Solver{T}) where {T <: Real}
     point = solver.point
     result = solver.result
-    if in(solver.status, (PrimalInfeasible, DualInfeasible))
-        tau = true
+    if solver.status in infeas_statuses
+        tau = one(T)
     else
         tau = point.tau[]
         if tau <= 0
@@ -407,7 +407,7 @@ function postprocess(solver::Solver{T}) where {T <: Real}
             # x = Q * [(R' \ b0), x]
             xa = zeros(T, solver.orig_model.n - length(solver.reduce_Rpib0))
             @. @views xa[solver.x_keep_idxs] = point.x / tau
-            if in(solver.status, (PrimalInfeasible, DualInfeasible))
+            if solver.status in infeas_statuses
                 Rpib0 = zeros(T, length(solver.reduce_Rpib0))
             else
                 Rpib0 = solver.reduce_Rpib0
@@ -433,7 +433,7 @@ function postprocess(solver::Solver{T}) where {T <: Real}
             # unreduce solver's solution
             # y = R \ (-cQ1' - GQ1' * z)
             ya = solver.reduce_GQ1' * result.z
-            if !in(solver.status, (PrimalInfeasible, DualInfeasible))
+            if !(solver.status in infeas_statuses)
                 ya .+= solver.reduce_cQ1
             end
             @views ldiv!(solver.reduce_Ap_R,
