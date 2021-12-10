@@ -52,6 +52,8 @@ include("point.jl")
     UnknownStatus
 end
 
+const infeas_statuses = (PrimalInfeasible, DualInfeasible, NearPrimalInfeasible, NearDualInfeasible)
+
 # statuses for which near-convergence should be checked
 const check_near_statuses = (SlowProgress, IterationLimit, TimeLimit, NumericalFailure)
 
