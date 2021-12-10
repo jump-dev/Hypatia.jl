@@ -35,18 +35,24 @@ include("point.jl")
     NotLoaded
     Loaded
     SolveCalled
+    PrimalInconsistent
+    DualInconsistent
     Optimal
     PrimalInfeasible
     DualInfeasible
     IllPosed
-    PrimalInconsistent
-    DualInconsistent
+    NearOptimal
+    NearPrimalInfeasible
+    NearDualInfeasible
+    NearIllPosed
     SlowProgress
     IterationLimit
     TimeLimit
     NumericalFailure
-    UnknownStatus
 end
+
+# statuses for which near-convergence should be checked
+const check_near_statuses = (SlowProgress, IterationLimit, TimeLimit, NumericalFailure)
 
 convert(::Type{String}, status::Status) = string(status)
 
@@ -70,6 +76,7 @@ mutable struct Solver{T <: Real}
     tol_infeas::T
     tol_illposed::T
     tol_slow::T
+    near_factor::T
     preprocess::Bool
     reduce::Bool
     rescale::Bool
@@ -171,6 +178,7 @@ mutable struct Solver{T <: Real}
         default_tol_power::RealOrNothing = nothing,
         default_tol_relax::RealOrNothing = nothing,
         tol_slow::Real = 1e-3,
+        near_factor::Real = 1000,
         preprocess::Bool = true,
         reduce::Bool = true,
         rescale::Bool = true,
@@ -187,6 +195,7 @@ mutable struct Solver{T <: Real}
             @assert preprocess # cannot use reduction without preprocessing # TODO only need primal eq preprocessing
         end
         # @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
+        @assert near_factor >= 1 # factor to relax tolerances by if fail to converge should be at least 1
 
         if isnothing(default_tol_power)
             default_tol_power = (T <: LinearAlgebra.BlasReal ? 0.5 : 0.4)
@@ -227,6 +236,7 @@ mutable struct Solver{T <: Real}
         solver.tol_infeas = tol_infeas
         solver.tol_illposed = tol_illposed
         solver.tol_slow = tol_slow
+        solver.near_factor = near_factor
         solver.preprocess = preprocess
         solver.reduce = reduce
         solver.rescale = rescale
@@ -248,9 +258,15 @@ function solve(solver::Solver{T}) where {T <: Real}
 
     if solver.status == SolveCalled
         setup_stepping(solver)
+
         while true
             step_and_check(solver) && break
         end
+
+        if solver.status in check_near_statuses
+            check_converged(solver, true)
+        end
+
         postprocess(solver)
     end
 
@@ -380,7 +396,7 @@ function step_and_check(solver::Solver{T}) where {T <: Real}
         flush(stdout)
     end
 
-    check_convergence(solver) && return true
+    check_converged(solver) && return true
 
     if solver.num_iters == solver.iter_limit
         solver.verbose && println("iteration limit reached; terminating")
@@ -498,45 +514,57 @@ function calc_convergence_params(solver::Solver{T}) where {T <: Real}
     return improv
 end
 
-function check_convergence(solver::Solver{T}) where {T <: Real}
-    # check convergence criteria
-    # TODO nearly primal or dual infeasible or nearly optimal cases?
+# check convergence criteria, with relaxed tolerances if check_near
+function check_converged(
+    solver::Solver{T},
+    check_near::Bool = false,
+    ) where {T <: Real}
+    near_factor = (check_near ? solver.near_factor : one(T))
+
     tau = solver.point.tau[]
     primal_obj_t = solver.primal_obj_t
     dual_obj_t = solver.dual_obj_t
 
-    is_feas = (max(solver.x_feas, solver.y_feas, solver.z_feas) <= solver.tol_feas)
-    is_abs_opt = (solver.gap <= solver.tol_abs_opt)
-    is_rel_opt = (min(solver.gap / tau, abs(primal_obj_t - dual_obj_t)) <=
-        solver.tol_rel_opt * max(tau, min(abs(primal_obj_t), abs(dual_obj_t))))
-    if is_feas && (is_abs_opt || is_rel_opt)
-        solver.verbose && println("optimal solution found; terminating")
-        solver.status = Optimal
-        return true
+    worst_feas = max(solver.x_feas, solver.y_feas, solver.z_feas)
+    is_feas = (worst_feas <= near_factor * solver.tol_feas)
+    if is_feas
+        is_abs_opt = (solver.gap <= near_factor * solver.tol_abs_opt)
+        worst_gap = min(solver.gap / tau, abs(primal_obj_t - dual_obj_t))
+        max_tau_obj = max(tau, min(abs(primal_obj_t), abs(dual_obj_t)))
+        is_rel_opt = (worst_gap <= near_factor * solver.tol_rel_opt * max_tau_obj)
+        if is_abs_opt || is_rel_opt
+            solver.verbose && println("optimal solution found; terminating")
+            solver.status = (check_near ? NearOptimal : Optimal)
+            return true
+        end
     end
 
-    if dual_obj_t > eps(T) && solver.x_norm_res_t <= solver.tol_infeas * dual_obj_t
-        solver.verbose && println("primal infeasibility detected; terminating")
-        solver.status = PrimalInfeasible
-        solver.primal_obj = primal_obj_t
-        solver.dual_obj = dual_obj_t
-        return true
+    if dual_obj_t > eps(T)
+        if solver.x_norm_res_t <= near_factor * solver.tol_infeas * dual_obj_t
+            solver.verbose && println("primal infeasibility detected; terminating")
+            solver.status = (check_near ? NearPrimalInfeasible : PrimalInfeasible)
+            solver.primal_obj = primal_obj_t
+            solver.dual_obj = dual_obj_t
+            return true
+        end
     end
 
-    if primal_obj_t < -eps(T) && max(solver.y_norm_res_t, solver.z_norm_res_t) <=
-        solver.tol_infeas * -primal_obj_t
-        solver.verbose && println("dual infeasibility detected; terminating")
-        solver.status = DualInfeasible
-        solver.primal_obj = primal_obj_t
-        solver.dual_obj = dual_obj_t
-        return true
+    if primal_obj_t < -eps(T)
+        yz_res = max(solver.y_norm_res_t, solver.z_norm_res_t)
+        if yz_res <= near_factor * solver.tol_infeas * -primal_obj_t
+            solver.verbose && println("dual infeasibility detected; terminating")
+            solver.status = (check_near ? NearDualInfeasible : DualInfeasible)
+            solver.primal_obj = primal_obj_t
+            solver.dual_obj = dual_obj_t
+            return true
+        end
     end
 
     # TODO experiment with ill-posedness check
-    if solver.mu <= solver.tol_illposed && tau <=
-        solver.tol_illposed * min(one(T), solver.point.kap[])
+    max_illp = max(solver.mu, tau / min(one(T), solver.point.kap[]))
+    if max_illp <= near_factor * solver.tol_illposed
         solver.verbose && println("ill-posedness detected; terminating")
-        solver.status = IllPosed
+        solver.status = (check_near ? NearIllPosed : IllPosed)
         return true
     end
 
