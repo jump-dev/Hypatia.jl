@@ -37,14 +37,17 @@ function build_solve_check(
     G,
     h::Vector{T},
     cones::Vector{Cone{T}},
-    tol::Real,
-    ;
+    tol::Real;
     obj_offset::T = zero(T),
     solver::Solvers.Solver{T} = Solvers.Solver{T}(),
+    already_loaded::Bool = false,
     ) where {T <: Real}
-    model = Hypatia.Models.Model{T}(c, A, b, G, h, cones, obj_offset = obj_offset)
-
-    Solvers.load(solver, model)
+    if already_loaded
+        model = Solvers.get_model(solver)
+    else
+        model = Hypatia.Models.Model{T}(c, A, b, G, h, cones, obj_offset = obj_offset)
+        Solvers.load(solver, model)
+    end
     Solvers.solve(solver)
 
     status = Solvers.get_status(solver)
@@ -2753,4 +2756,69 @@ function indirect5(T; options...)
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.PrimalInfeasible
+end
+
+
+
+
+function modify1(T; options...)
+    tol = test_tol(T)
+    c = T[1, 0]
+    A = T[1 1]
+    b = [-T(2)]
+    G = SparseMatrixCSC(-one(T) * I, 2, 2)
+    h = zeros(T, 2)
+    cones = Cone{T}[Cones.Nonnegative{T}(2)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.PrimalInfeasible
+    solver = r.solver
+
+# TODO somehow test that it didn't redo factorization etc
+# eg by checking that those subtimings are zero
+# but first get it working with symindef without any factorizations
+
+    b = [-T(1)]
+    Solvers.modify_b(solver, b)
+    @test Solvers.get_status(solver) == Solvers.Modified
+    r = build_solve_check(c, A, b, G, h, cones, tol;
+        solver = solver, already_loaded = true, options...)
+    @test r.status == Solvers.PrimalInfeasible
+
+    c = T[2, 1]
+    b = [T(2)]
+    Solvers.modify_c(solver, c)
+    Solvers.modify_b(solver, b)
+    @test Solvers.get_status(solver) == Solvers.Modified
+    r = build_solve_check(c, A, b, G, h, cones, tol;
+        solver = solver, already_loaded = true, options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ 2 atol=tol rtol=tol
+    @test r.x ≈ [0, 2] atol=tol rtol=tol
+    @test iszero(solver.time_rescale)
+    @test iszero(solver.time_loadsys)
+
+    c = T[3, 1]
+    h = T[1, -2]
+    Solvers.modify_c(solver, c)
+    Solvers.modify_h(solver, h)
+    @test Solvers.get_status(solver) == Solvers.Modified
+    r = build_solve_check(c, A, b, G, h, cones, tol;
+        solver = solver, already_loaded = true, options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ 0 atol=tol rtol=tol
+    @test r.x ≈ [-1, 3] atol=tol rtol=tol
+end
+
+function modify2(T; options...)
+    tol = test_tol(T)
+    c = T[-1, 0]
+    A = zeros(T, 0, 2)
+    b = T[]
+    G = T[-1 0; 0 0; 0 -1]
+    h = T[0, 1, 0]
+    cones = Cone{T}[Cones.EpiPerSquare{T}(3)]
+error("")
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.DualInfeasible
 end

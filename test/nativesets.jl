@@ -177,3 +177,8 @@ inst_indirect = [
     "indirect4",
     "indirect5",
     ]
+
+inst_modify = [
+    "modify1",
+    # "modify2",
+    ]

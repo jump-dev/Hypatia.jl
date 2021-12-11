@@ -186,24 +186,29 @@ function setup_point_sub(
     model::Models.Model{T},
     ) where {T <: Real}
     (n, p, q) = (model.n, model.p, model.q)
-    dim_sub = n + p + q
-    z_start = model.n + model.p
-
     sol_sub = syssolver.sol_sub = Point{T}()
     rhs_sub = syssolver.rhs_sub = Point{T}()
     rhs_const = syssolver.rhs_const = Point{T}()
     sol_const = syssolver.sol_const = Point{T}()
     for point_sub in (sol_sub, rhs_sub, rhs_const, sol_const)
-        point_sub.vec = zeros(T, dim_sub)
+        point_sub.vec = zeros(T, n + p + q)
         @views point_sub.x = point_sub.vec[1:n]
         @views point_sub.y = point_sub.vec[n .+ (1:p)]
         @views point_sub.z = point_sub.vec[n + p .+ (1:q)]
         point_sub.z_views = [view(point_sub.z, idxs) for idxs in model.cone_idxs]
     end
+    set_point_sub_rhs(syssolver, model)
+    return
+end
+
+function set_point_sub_rhs(
+    syssolver::Union{QRCholSystemSolver{T}, SymIndefSystemSolver{T}},
+    model::Models.Model{T},
+    ) where {T <: Real}
+    rhs_const = syssolver.rhs_const
     @. rhs_const.x = -model.c
     @. rhs_const.y = model.b
     @. rhs_const.z = model.h
-
     return
 end
 
