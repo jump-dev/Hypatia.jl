@@ -2758,9 +2758,6 @@ function indirect5(T; options...)
     @test r.status == Solvers.PrimalInfeasible
 end
 
-
-
-
 function modify1(T; options...)
     tol = test_tol(T)
     c = T[1, 0]
@@ -2774,16 +2771,14 @@ function modify1(T; options...)
     @test r.status == Solvers.PrimalInfeasible
     solver = r.solver
 
-# TODO somehow test that it didn't redo factorization etc
-# eg by checking that those subtimings are zero
-# but first get it working with symindef without any factorizations
-
     b = [-T(1)]
     Solvers.modify_b(solver, b)
     @test Solvers.get_status(solver) == Solvers.Modified
     r = build_solve_check(c, A, b, G, h, cones, tol;
         solver = solver, already_loaded = true, options...)
     @test r.status == Solvers.PrimalInfeasible
+    @test iszero(solver.time_rescale)
+    @test iszero(solver.time_loadsys)
 
     c = T[2, 1]
     b = [T(2)]
@@ -2808,17 +2803,20 @@ function modify1(T; options...)
     @test r.status == Solvers.Optimal
     @test r.primal_obj ≈ 0 atol=tol rtol=tol
     @test r.x ≈ [-1, 3] atol=tol rtol=tol
+    @test iszero(solver.time_rescale)
+    @test iszero(solver.time_loadsys)
 end
 
-function modify2(T; options...)
-    tol = test_tol(T)
-    c = T[-1, 0]
-    A = zeros(T, 0, 2)
-    b = T[]
-    G = T[-1 0; 0 0; 0 -1]
-    h = T[0, 1, 0]
-    cones = Cone{T}[Cones.EpiPerSquare{T}(3)]
-error("")
-    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
-    @test r.status == Solvers.DualInfeasible
-end
+# function modify2(T; options...)
+#     tol = test_tol(T)
+#     c = T[-1, -1, 0]
+#     A = zeros(T, 0, 3)
+#     b = T[]
+#     G = repeat(SparseMatrixCSC(-one(T) * I, 3, 3), 2, 1)
+#     h = zeros(T, 6)
+#     cones = Cone{T}[Cones.EpiNormInf{T, T}(3),
+#         Cones.EpiNormInf{T, T}(3, use_dual = true)]
+# error()
+#     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+#     @test r.status == Solvers.DualInfeasible
+# end
