@@ -198,7 +198,7 @@ mutable struct Solver{T <: Real}
         if reduce
             @assert preprocess # cannot use reduction without preprocessing # TODO only need primal eq preprocessing
         end
-        # @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
+        @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
         @assert near_factor >= 1 # factor to relax tolerances by if fail to converge should be at least 1
 
         if isnothing(default_tol_power)
@@ -292,17 +292,13 @@ end
 
 
 function solve(solver::Solver{T}) where {T <: Real}
-    @show solver.status
-    if solver.status == Loaded
-        setup_solver(solver)
+    init_status = solver.status
+    setup_solver(solver)
+    if init_status == Loaded
         setup_loaded(solver)
-    elseif solver.status == Modified
-        # TODO easier to update these system solvers (just need an update to setup_point_sub):
-        @assert solver.syssolver isa Union{QRCholSystemSolver{T}, SymIndefSystemSolver{T}}
-        setup_solver(solver)
+    elseif init_status == Modified
         setup_modified(solver)
     else
-        # return solver # TODO old
         error("solve was called but solver was not just loaded or modified")
     end
 
@@ -354,13 +350,13 @@ function setup_loaded(solver::Solver{T}) where {T <: Real}
         return
     end
 
+    load(solver.stepper, solver)
+    solver.time_loadsys = @elapsed load(solver.syssolver, solver)
+
     solver.x_residual = zero(model.c)
     solver.y_residual = zero(model.b)
     solver.z_residual = zero(model.h)
     solver.tau_residual = 0
-
-    load(solver.stepper, solver)
-    solver.time_loadsys = @elapsed load(solver.syssolver, solver)
     return
 end
 
@@ -368,10 +364,19 @@ function setup_modified(solver::Solver{T}) where {T <: Real}
     orig_model = solver.orig_model
     model = solver.model
 
-    # TODO needs fixing for rescale/preproc/reduce
-    @. model.c = orig_model.c
-    @. model.b = orig_model.b
-    @. model.h = orig_model.h
+    copyto!(model.c, orig_model.c)
+    copyto!(model.b, orig_model.b)
+    copyto!(model.h, orig_model.h)
+    if solver.used_rescaling
+        # rescale using scalings computed during first load
+        model.c ./= solver.c_scale
+        model.b ./= solver.b_scale
+        model.h ./= solver.h_scale
+    end
+    # TODO needs fixing for preproc/reduce
+
+
+
 
     # TODO don't redo factorize stuff etc in here:
     setup_point(solver)
@@ -379,6 +384,8 @@ function setup_modified(solver::Solver{T}) where {T <: Real}
         return
     end
 
+    # TODO easier to update these system solvers (just need an update to setup_point_sub):
+    @assert solver.syssolver isa Union{QRCholSystemSolver{T}, SymIndefSystemSolver{T}}
     # TODO cleaner interface: call a update_syssolver function that calls this:
     # (and errors if syssolver does not support update)
     set_point_sub_rhs(solver.syssolver, solver.model)
@@ -393,11 +400,11 @@ function setup_point(solver::Solver{T}) where {T <: Real}
 
     if solver.reduce
         # TODO don't find point / unnecessary stuff before reduce
-        solver.time_inity = @elapsed init_y = find_initial_y(solver, init_z, true)
+        solver.time_inity = @elapsed init_y = find_initial_y(solver, init_z)
         solver.time_initx = @elapsed init_x = find_initial_x(solver, init_s)
     else
         solver.time_initx = @elapsed init_x = find_initial_x(solver, init_s)
-        solver.time_inity = @elapsed init_y = find_initial_y(solver, init_z, false)
+        solver.time_inity = @elapsed init_y = find_initial_y(solver, init_z)
     end
     if solver.status != SolveCalled # TODO due to inconsistent statuses
         return

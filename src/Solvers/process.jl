@@ -14,7 +14,9 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
     solver.rescale || return false
     model = solver.model
     (c, A, b, G, h) = (model.c, model.A, model.b, model.G, model.h)
-    (isa(A, MatrixyAG) && isa(G, MatrixyAG)) || return false
+    if !isa(A, MatrixyAG) || !isa(G, MatrixyAG)
+        return false
+    end
 
     minval = sqrt(eps(T))
     maxabsmin(v::AbstractVecOrMat) = mapreduce(abs, max, v; init = minval)
@@ -182,38 +184,32 @@ end
 function find_initial_y(
     solver::Solver{T},
     init_z::Vector{T},
-    reduce::Bool,
     ) where {T <: Real}
     if solver.status != SolveCalled
         return zeros(T, 0)
     end
     model = solver.model
     p = model.p
-    if iszero(p) # y is empty (no primal variables)
+
+    if iszero(p)
+        # y is empty (no primal variables)
         solver.y_keep_idxs = Int[]
         solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
         solver.Ap_Q = I
         return zeros(T, 0)
     end
-    n = model.n
-    q = model.q
-    A = model.A
+
     solver.y_keep_idxs = 1:p
+    rhs_y = mul!(copy(model.c), model.G', init_z, -1, -1)
 
-    if !reduce || !isa(A, MatrixyAG)
-        # rhs = -c - G' * point.z
-        rhs = copy(model.c)
-        mul!(rhs, model.G', init_z, -1, -1)
-
-        # indirect method
-        if solver.init_use_indirect
-            # TODO pick lsqr or lsmr
-            init_y = IterativeSolvers.lsqr(A', rhs)
-            return init_y
-        end
+    if solver.init_use_indirect
+        # use indirect method
+        # TODO pick lsqr or lsmr
+        return IterativeSolvers.lsqr(model.A', rhs_y)
     end
 
     # factorize A'
+    A = model.A
     if issparse(A)
         if !(T <: Float64)
             @warn("using dense factorization of A' in preprocessing and initial " *
@@ -226,28 +222,39 @@ function find_initial_y(
     else
         Ap_fact = qr!(Matrix(A'), ColumnNorm())
     end
-    Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
 
-    if !reduce && !solver.preprocess
-        if Ap_rank < p
-            @warn("some primal equalities appear to be dependent " *
-            "(possibly inconsistent); try using preprocess = true")
-        end
-        init_y = Ap_fact \ rhs
-        return init_y
+    if solver.preprocess
+        return process_primal_eq(solver, Ap_fact, rhs_y)
     end
 
-    # preprocess dual equalities
+    Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
+    if Ap_rank < p
+        @warn("some primal equalities appear to be dependent " *
+        "(possibly inconsistent); try using preprocess = true")
+    end
+
+    return Ap_fact \ rhs_y
+end
+
+# preprocess primal equalities
+function process_primal_eq(
+    solver::Solver{T},
+    Ap_fact::Factorization{T},
+    rhs_y::Vector{T}
+    ) where {T <: Real}
+    Ap_Q = Ap_fact.Q
+    Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
     Ap_R = UpperTriangular(Ap_fact.R[1:Ap_rank, 1:Ap_rank])
     col_piv = (Ap_fact isa QRPivoted{T, Matrix{T}}) ? Ap_fact.p : Ap_fact.pcol
-    y_keep_idxs = col_piv[1:Ap_rank]
-    Ap_Q = Ap_fact.Q
 
+    model = solver.model
+    y_keep_idxs = col_piv[1:Ap_rank]
     b_sub = model.b[y_keep_idxs]
-    if Ap_rank < p
+
+    if Ap_rank < model.p
         # some dependent primal equalities, so check if they are consistent
         # x_sub = Ap_Q * vcat((Ap_R' \ b_sub), zeros(n - Ap_rank))
-        x_sub = zeros(T, n)
+        x_sub = zeros(T, model.n)
         x_sub1 = view(x_sub, 1:Ap_rank)
         copyto!(x_sub1, b_sub)
         ldiv!(Ap_R', x_sub1)
@@ -256,7 +263,7 @@ function find_initial_y(
         if !(Ap_fact isa QRPivoted{T, Matrix{T}})
             x_sub = x_sub[Ap_fact.rpivinv]
         end
-        residual = norm(A * x_sub - model.b, Inf)
+        residual = norm(model.A * x_sub - model.b, Inf)
         if residual > solver.init_tol_qr
             if solver.verbose
                 println("some primal equality constraints are inconsistent " *
@@ -266,94 +273,27 @@ function find_initial_y(
             return zeros(T, 0)
         end
         if solver.verbose
+            p = model.p
             println("$(p - Ap_rank) of $p primal equality constraints " *
                 "are dependent")
         end
     end
 
-    if reduce && isa(model.G, MatrixyAG)
-        # remove all primal equalities by making A and b empty with
-        # n = n0 - p0 and p = 0
-        # TODO improve efficiency
-        # TODO avoid calculating GQ1 explicitly if possible
-        # recover original-space solution using:
-        # x0 = Q * [(R' \ b0), x]
-        # y0 = R \ (-cQ1' - GQ1' * z0)
-        if !(Ap_fact isa QRPivoted{T, Matrix{T}})
-            row_piv = Ap_fact.prow
-            model.c = model.c[row_piv]
-            model.G = model.G[:, row_piv]
-            solver.reduce_row_piv_inv = Ap_fact.rpivinv
-        else
-            solver.reduce_row_piv_inv = Int[]
-        end
 
-        Q1_idxs = 1:Ap_rank
-        Q2_idxs = (Ap_rank + 1):n
-
-        # [cQ1 cQ2] = c0' * Q
-        cQ = model.c' * Ap_Q
-        cQ1 = solver.reduce_cQ1 = cQ[Q1_idxs]
-        cQ2 = cQ[Q2_idxs]
-        # c = cQ2
-        model.c = cQ2
-        model.n = length(model.c)
-        # offset = offset0 + cQ1 * (R' \ b0)
-        Rpib0 = solver.reduce_Rpib0 = ldiv!(Ap_R', b_sub)
-        # solver.Rpib0 = Rpib0 # TODO
-        model.obj_offset += dot(cQ1, Rpib0)
-
-        # [GQ1 GQ2] = G0 * Q
-        # very inefficient method used for sparse G * QRSparseQ
-        # see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
-        if model.G isa UniformScaling
-            side = size(Ap_Q, 1)
-            G_mul = Matrix{T}(model.G, side, side)
-        elseif !isa(model.G, Matrix)
-            G_mul = Matrix{T}(model.G)
-        else
-            G_mul = model.G
-        end
-        GQ = G_mul * Ap_Q
-        GQ1 = solver.reduce_GQ1 = GQ[:, Q1_idxs]
-        GQ2 = GQ[:, Q2_idxs]
-        # h = h0 - GQ1 * (R' \ b0)
-        mul!(model.h, GQ1, Rpib0, -1, true)
-
-        # G = GQ2
-        model.G = GQ2
-
-        # A and b empty
-        model.p = 0
-        model.A = zeros(T, 0, model.n)
-        model.b = zeros(T, 0)
-        solver.reduce_Ap_R = Ap_R
-        solver.reduce_Ap_Q = Ap_Q
-
-        solver.reduce_y_keep_idxs = y_keep_idxs
-        solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
-        solver.Ap_Q = I
-
-        return zeros(T, 0)
+# TODO refac some of reduce_primal_eq and below
+    if solver.reduce && isa(model.G, MatrixyAG)
+        return reduce_primal_eq(solver, Ap_fact, Ap_rank, Ap_R, y_keep_idxs, b_sub)
     end
-
-    # init_y = Ap_R \ ((Ap_fact.Q' * (-c - G' * point.z))[1:Ap_rank])
-    temp = copy(model.c)
-    mul!(temp, model.G', init_z, true, true)
-    lmul!(Ap_fact.Q', temp)
-    init_y = temp[1:Ap_rank]
-    init_y .*= -1
-    ldiv!(Ap_R, init_y)
 
     # modify solver.model to remove/reorder some dual variables y
     if !(Ap_fact isa QRPivoted{T, Matrix{T}})
         row_piv = Ap_fact.prow
-        model.A = A[y_keep_idxs, row_piv]
+        model.A = model.A[y_keep_idxs, row_piv]
         model.c = model.c[row_piv]
         model.G = model.G[:, row_piv]
         solver.x_keep_idxs = solver.x_keep_idxs[row_piv]
     else
-        model.A = A[y_keep_idxs, :]
+        model.A = model.A[y_keep_idxs, :]
     end
     model.b = b_sub
     model.p = Ap_rank
@@ -361,7 +301,88 @@ function find_initial_y(
     solver.Ap_R = Ap_R
     solver.Ap_Q = Ap_Q
 
+
+
+    # init_y = Ap_R \ ((Ap_Q' * (-c - G' * z))[1:Ap_rank])
+    lmul!(Ap_Q', rhs_y)
+    init_y = rhs_y[1:Ap_rank]
+    ldiv!(Ap_R, init_y)
     return init_y
+end
+
+# remove all primal equalities i.e. let n = n0 - p0 and p = 0
+# TODO improve efficiency
+# TODO avoid calculating GQ1 explicitly if possible
+# recover original-space solution using:
+# x0 = Q * [(R' \ b0), x]
+# y0 = R \ (-cQ1' - GQ1' * z0)
+function reduce_primal_eq(
+    solver::Solver{T},
+    Ap_fact::Factorization{T},
+    Ap_rank::Int,
+    Ap_R,
+    y_keep_idxs,
+    b_sub,
+    ) where {T <: Real}
+    model = solver.model
+
+    if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+        row_piv = Ap_fact.prow
+        model.c = model.c[row_piv]
+        model.G = model.G[:, row_piv]
+        solver.reduce_row_piv_inv = Ap_fact.rpivinv
+    else
+        solver.reduce_row_piv_inv = Int[]
+    end
+
+    Q1_idxs = 1:Ap_rank
+    Q2_idxs = (Ap_rank + 1):model.n
+
+    # [cQ1 cQ2] = c0' * Q
+    Ap_Q = Ap_fact.Q
+    cQ = model.c' * Ap_Q
+    cQ1 = solver.reduce_cQ1 = cQ[Q1_idxs]
+    cQ2 = cQ[Q2_idxs]
+    # c = cQ2
+    model.c = cQ2
+    model.n = length(cQ2)
+    # offset = offset0 + cQ1 * (R' \ b0)
+    Rpib0 = solver.reduce_Rpib0 = ldiv!(Ap_R', b_sub)
+    # solver.Rpib0 = Rpib0 # TODO
+    model.obj_offset += dot(cQ1, Rpib0)
+
+    # [GQ1 GQ2] = G0 * Q
+    # very inefficient method used for sparse G * QRSparseQ
+    # see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
+    if model.G isa UniformScaling
+        side = size(Ap_Q, 1)
+        G_mul = Matrix{T}(model.G, side, side)
+    elseif !isa(model.G, Matrix)
+        G_mul = Matrix{T}(model.G)
+    else
+        G_mul = model.G
+    end
+    GQ = G_mul * Ap_Q
+    GQ1 = solver.reduce_GQ1 = GQ[:, Q1_idxs]
+    GQ2 = GQ[:, Q2_idxs]
+    # h = h0 - GQ1 * (R' \ b0)
+    mul!(model.h, GQ1, Rpib0, -1, true)
+
+    # G = GQ2
+    model.G = GQ2
+
+    # A and b empty
+    model.p = 0
+    model.A = zeros(T, 0, model.n)
+    model.b = zeros(T, 0)
+    solver.reduce_Ap_R = Ap_R
+    solver.reduce_Ap_Q = Ap_Q
+
+    solver.reduce_y_keep_idxs = y_keep_idxs
+    solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
+    solver.Ap_Q = I
+
+    return zeros(T, 0)
 end
 
 # (pivoted) QR factorizations are usually rank-revealing but may be unreliable
@@ -385,65 +406,46 @@ end
 function postprocess(solver::Solver{T}) where {T <: Real}
     point = solver.point
     result = solver.result
-    if solver.status in infeas_statuses
-        tau = one(T)
-    else
-        tau = point.tau[]
-        if tau <= 0
-            result.vec .= NaN
-            return
-        end
+    tau = point.tau[]
+    if tau <= 0 || any(isnan, point.vec)
+        result.vec .= NaN
+        return
     end
 
-    # finalize s,z
-    @. result.s = point.s / tau
-    @. result.z = point.z / tau
+    copyto!(result.s, point.s)
+    copyto!(result.z, point.z)
+    x = copy(point.x)
+    y = copy(point.y)
+    if !in(solver.status, infeas_statuses)
+        # rescale non-infeasible certificates by 1/tau
+        result.s ./= tau
+        result.z ./= tau
+        x ./= tau
+        y ./= tau
+    end
 
     # finalize x
-    if solver.preprocess && !iszero(solver.orig_model.n) && !any(isnan, point.x)
+    if solver.preprocess && !iszero(solver.orig_model.n)
         # unpreprocess solver's solution
         if solver.reduce && !iszero(solver.orig_model.p)
-            # unreduce solver's solution
-            # x = Q * [(R' \ b0), x]
-            xa = zeros(T, solver.orig_model.n - length(solver.reduce_Rpib0))
-            @. @views xa[solver.x_keep_idxs] = point.x / tau
-            if solver.status in infeas_statuses
-                Rpib0 = zeros(T, length(solver.reduce_Rpib0))
-            else
-                Rpib0 = solver.reduce_Rpib0
-            end
-            xb = vcat(Rpib0, xa)
-            lmul!(solver.reduce_Ap_Q, xb)
-            if isempty(solver.reduce_row_piv_inv)
-                result.x .= xb
-            else
-                @. @views result.x = xb[solver.reduce_row_piv_inv]
-            end
+            unreduce_x(solver, x)
         else
-            @. @views result.x[solver.x_keep_idxs] = point.x / tau
+            @views copyto!(result.x[solver.x_keep_idxs], x)
         end
     else
-        @. result.x = point.x / tau
+        copyto!(result.x, x)
     end
 
     # finalize y
-    if solver.preprocess && !iszero(solver.orig_model.p) && !any(isnan, point.y)
+    if solver.preprocess && !iszero(solver.orig_model.p)
         # unpreprocess solver's solution
         if solver.reduce
-            # unreduce solver's solution
-            # y = R \ (-cQ1' - GQ1' * z)
-            ya = solver.reduce_GQ1' * result.z
-            if !(solver.status in infeas_statuses)
-                ya .+= solver.reduce_cQ1
-            end
-            @views ldiv!(solver.reduce_Ap_R,
-                ya[1:length(solver.reduce_y_keep_idxs)])
-            @. @views result.y[solver.reduce_y_keep_idxs] = -ya
+            unreduce_y(solver, y)
         else
-            @. @views result.y[solver.y_keep_idxs] = point.y / tau
+            @views copyto!(result.y[solver.y_keep_idxs], y)
         end
     else
-        @. result.y = point.y / tau
+        copyto!(result.y, y)
     end
 
     if solver.used_rescaling
@@ -454,5 +456,44 @@ function postprocess(solver::Solver{T}) where {T <: Real}
         result.x ./= solver.c_scale
     end
 
+    return
+end
+
+function unreduce_x(
+    solver::Solver{T},
+    x::Vector{T},
+    ) where {T <: Real}
+    # x = Q * [(R' \ b0), x]
+    Rpib0 = if solver.status in infeas_statuses
+        zero(solver.reduce_Rpib0)
+    else
+        solver.reduce_Rpib0
+    end
+    xa = zeros(T, solver.orig_model.n - length(Rpib0))
+    @views copyto!(xa[solver.x_keep_idxs], x)
+    xb = vcat(Rpib0, xa)
+    lmul!(solver.reduce_Ap_Q, xb)
+    result_x = solver.result.x
+    if isempty(solver.reduce_row_piv_inv)
+        copyto!(result_x, xb)
+    else
+        @views copyto!(result_x, xb[solver.reduce_row_piv_inv])
+    end
+    return
+end
+
+function unreduce_y(
+    solver::Solver{T},
+    y::Vector{T},
+    ) where {T <: Real}
+    # y = R \ (-cQ1' - GQ1' * z)
+    ya = solver.reduce_GQ1' * solver.result.z
+    if !in(solver.status, infeas_statuses)
+        ya .+= solver.reduce_cQ1
+    end
+    @views ya_sub = ya[1:length(solver.reduce_y_keep_idxs)]
+    ldiv!(solver.reduce_Ap_R, ya_sub)
+    @views y_sub = solver.result.y[solver.reduce_y_keep_idxs]
+    @. y_sub = -ya
     return
 end
