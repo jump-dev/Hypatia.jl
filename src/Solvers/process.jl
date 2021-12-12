@@ -135,9 +135,9 @@ function find_initial_x(
     end
 
     # preprocess dual equalities
+    AG_R = UpperTriangular(AG_fact.R[1:AG_rank, 1:AG_rank])
     col_piv = (AG_fact isa QRPivoted{T, Matrix{T}}) ? AG_fact.p : AG_fact.pcol
     x_keep_idxs = col_piv[1:AG_rank]
-    AG_R = UpperTriangular(AG_fact.R[1:AG_rank, 1:AG_rank])
 
     c_sub = model.c[x_keep_idxs]
     # yz_sub = AG_fact.Q * vcat((AG_R' \ c_sub), zeros(p + q - AG_rank))
@@ -164,12 +164,139 @@ function find_initial_x(
         println("$(n - AG_rank) of $n dual equality constraints are dependent")
     end
 
-    # modify solver.model to remove/reorder some primal variables x
+    # modify model to remove/reorder some primal variables x
     model.c = c_sub
     model.A = A[:, x_keep_idxs]
     model.G = G[:, x_keep_idxs]
     model.n = AG_rank
     solver.x_keep_idxs = x_keep_idxs
+
+    # init_x = AG_R \ ((AG_fact.Q' * vcat(b, h - point.s))[1:AG_rank])
+    temp = vcat(model.b, model.h - init_s)
+    lmul!(AG_fact.Q', temp)
+    init_x = temp[1:model.n]
+    ldiv!(AG_R, init_x)
+
+    return init_x
+end
+
+
+function handle_dual_eq(solver::Solver{T}) where {T <: Real}
+    model = solver.model
+    n = model.n
+
+    if iszero(n) # x is empty (no primal variables)
+        solver.x_keep_idxs = Int[]
+        return zeros(T, 0)
+    end
+    solver.x_keep_idxs = 1:n
+
+    A = model.A
+    G = model.G
+    if solver.init_use_indirect || !isa(A, MatrixyAG) || !isa(G, MatrixyAG)
+        return
+    end
+
+    # direct method
+    AG = if iszero(model.p)
+        # A is empty
+        if issparse(G)
+            G
+        elseif G isa Matrix{T}
+            copy(G)
+        else
+            Matrix(G)
+        end
+    else
+        vcat(A, G)
+    end
+    AG_fact = solver.AG_fact = if issparse(AG)
+        if !(T <: Float64)
+            @warn("using dense factorization of [A; G] in preprocessing and " *
+                "initial point finding because sparse factorization for number " *
+                "type $T is not supported by SuiteSparse packages", maxlog = 1)
+            qr!(Matrix(AG), ColumnNorm())
+        else
+            qr(AG, tol = solver.init_tol_qr)
+        end
+    else
+        qr!(AG, ColumnNorm())
+    end
+    AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
+
+    if !solver.preprocess || (AG_rank == n)
+        if AG_rank < n
+            @warn("some dual equalities appear to be dependent " *
+            "(possibly inconsistent); try using preprocess = true")
+        end
+        return
+    end
+
+    # preprocess
+    AG_R = solver.AG_R = UpperTriangular(AG_fact.R[1:AG_rank, 1:AG_rank])
+    col_piv = (AG_fact isa QRPivoted{T, Matrix{T}}) ? AG_fact.p : AG_fact.pcol
+    x_keep_idxs = col_piv[1:AG_rank]
+
+    # yz_sub = AG_fact.Q * vcat((AG_R' \ c_sub), zeros(p + q - AG_rank))
+    yz_sub = zeros(T, p + q)
+    yz_sub1 = view(yz_sub, 1:AG_rank)
+    @views copyto!(yz_sub1, model.c[x_keep_idxs])
+    ldiv!(AG_R', yz_sub1)
+    lmul!(AG_fact.Q, yz_sub)
+    if !(AG_fact isa QRPivoted{T, Matrix{T}})
+        yz_sub = yz_sub[AG_fact.rpivinv]
+    end
+    residual = A' * yz_sub[1:p] + G' * yz_sub[(p + 1):end] - model.c
+
+    @views res_norm = norm(residual, Inf)
+    if res_norm > solver.init_tol_qr
+        if solver.verbose
+            println("some dual equality constraints are inconsistent " *
+            "(residual norm $res_norm, tolerance $(solver.init_tol_qr))")
+        end
+        solver.status = DualInconsistent
+        return zeros(T, 0)
+    end
+    if solver.verbose
+        println("$(n - AG_rank) of $n dual equality constraints are dependent")
+    end
+
+    # modify model to remove/reorder some primal variables x
+    model.A = A[:, x_keep_idxs]
+    model.G = G[:, x_keep_idxs]
+    model.n = AG_rank
+    solver.x_keep_idxs = x_keep_idxs
+    return
+end
+
+# update data for b, c, h from dual equality preprocessing/reduction
+# and return initial x as least squares solution to Ax = b, Gx = h - s
+function update_dual_eq(
+    solver::Solver{T},
+    init_s::Vector{T},
+    ) where {T <: Real}
+    model = solver.model
+
+    if solver.init_use_indirect
+        # use indirect method TODO pick lsqr or lsmr
+        rhs_x = vcat(model.b, model.h - init_s)
+        if iszero(model.p)
+            AG = model.G
+        else
+            linmap(M::UniformScaling) = LinearMaps.LinearMap(M, model.n)
+            linmap(M) = LinearMaps.LinearMap(M)
+            AG = vcat(linmap(model.A), linmap(model.G))
+        end
+        return IterativeSolvers.lsqr(AG, rhs_x)
+    end
+
+    AG_fact = solver.AG_fact
+    if !solver.preprocess || (AG_rank == model.n)
+        rhs_x = vcat(model.b, model.h - init_s)
+        return AG_fact \ rhs_x
+    end
+
+    model.c = model.c[solver.x_keep_idxs]
 
     # init_x = AG_R \ ((AG_fact.Q' * vcat(b, h - point.s))[1:AG_rank])
     temp = vcat(model.b, model.h - init_s)
@@ -256,7 +383,7 @@ function handle_primal_eq(solver::Solver{T}) where {T <: Real}
 
     if !(solver.reduce && isa(model.G, MatrixyAG))
         # not reducing
-        # modify solver.model to remove/reorder some dual variables y
+        # modify model to remove/reorder some dual variables y
         if Ap_fact isa QRPivoted{T, Matrix{T}}
             model.A = model.A[y_keep_idxs, :]
         else
@@ -321,8 +448,7 @@ function update_primal_eq(
     solver::Solver{T},
     init_z::Vector{T},
     ) where {T <: Real}
-    orig_model = solver.orig_model
-    iszero(orig_model.p) && return zeros(T, 0)
+    iszero(solver.orig_model.p) && return zeros(T, 0)
     model = solver.model
 
     if solver.init_use_indirect
@@ -365,7 +491,7 @@ function update_primal_eq(
     Rpib0 = solver.reduce_Rpib0 = model.b[solver.reduce_y_keep_idxs]
     ldiv!(solver.reduce_Ap_R', Rpib0)
     # offset = offset0 + cQ1 * (R' \ b0)
-    model.obj_offset += dot(cQ1, Rpib0)
+    model.obj_offset = solver.orig_model.obj_offset + dot(cQ1, Rpib0)
 
     model.b = zeros(T, 0)
 
@@ -484,7 +610,7 @@ end
 #         return reduce_primal_eq(solver, Ap_fact, Ap_rank, Ap_R, y_keep_idxs, b_sub)
 #     end
 
-#     # modify solver.model to remove/reorder some dual variables y
+#     # modify model to remove/reorder some dual variables y
 #     if !(Ap_fact isa QRPivoted{T, Matrix{T}})
 #         row_piv = Ap_fact.prow
 #         model.A = model.A[y_keep_idxs, row_piv]

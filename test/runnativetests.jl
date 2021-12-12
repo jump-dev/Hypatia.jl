@@ -46,18 +46,18 @@ end
 
 @testset "native tests" begin
 
-@testset "default options tests" begin
-    println("starting default options tests")
-    inst_defaults = vcat(
-        inst_preproc,
-        inst_infeas,
-        inst_cones_few,
-        # # inst_cones_many,
-        )
-    for inst_name in inst_defaults
-        test_instance_solver(inst_name, Float64, default_options)
-    end
-end
+# @testset "default options tests" begin
+#     println("starting default options tests")
+#     inst_defaults = vcat(
+#         inst_preproc,
+#         # inst_infeas,
+#         # inst_cones_few,
+#         # # inst_cones_many,
+#         )
+#     for inst_name in inst_defaults
+#         test_instance_solver(inst_name, Float64, default_options)
+#     end
+# end
 
 @testset "no preprocess tests" begin
     println("\nstarting no preprocess tests")
@@ -70,17 +70,17 @@ end
     end
 end
 
-@testset "indirect solvers tests" begin
-    println("\nstarting indirect solvers tests")
-    for inst_name in inst_indirect, T in diff_reals
-        options = (; default_options..., init_use_indirect = true,
-            preprocess = false, reduce = false,
-            syssolver = Solvers.SymIndefIndirectSystemSolver{T}(),
-            tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4,
-            tol_infeas = 1e-6)
-        test_instance_solver(inst_name, T, options)
-    end
-end
+# @testset "indirect solvers tests" begin
+#     println("\nstarting indirect solvers tests")
+#     for inst_name in inst_indirect, T in diff_reals
+#         options = (; default_options..., init_use_indirect = true,
+#             preprocess = false, reduce = false,
+#             syssolver = Solvers.SymIndefIndirectSystemSolver{T}(),
+#             tol_feas = 1e-4, tol_rel_opt = 1e-4, tol_abs_opt = 1e-4,
+#             tol_infeas = 1e-6)
+#         test_instance_solver(inst_name, T, options)
+#     end
+# end
 
 # @testset "system solvers tests" begin
 #     println("\nstarting system solvers tests")

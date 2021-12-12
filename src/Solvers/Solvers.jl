@@ -115,6 +115,8 @@ mutable struct Solver{T <: Real}
     Ap_rank::Int
     Ap_R::UpperTriangular{T, <:AbstractMatrix{T}}
     Ap_Q::Union{UniformScaling, AbstractMatrix{T}}
+    AG_fact::Factorization{T}
+    AG_R::UpperTriangular{T, <:AbstractMatrix{T}}
     reduce_cQ1
     reduce_Rpib0
     reduce_GQ1
@@ -408,10 +410,15 @@ function setup_point(solver::Solver{T}) where {T <: Real}
         solver.status == PrimalInconsistent && return
         init_y = update_primal_eq(solver, init_z)
 
-        # solver.time_initx = @elapsed
-        init_x = find_initial_x(solver, init_s)
+        solver.time_initx = @elapsed handle_dual_eq(solver)
+        solver.status == DualInconsistent && return
+        init_x = update_dual_eq(solver, init_s)
+        # init_x = find_initial_x(solver, init_s)
     else
-        solver.time_initx = @elapsed init_x = find_initial_x(solver, init_s)
+        # solver.time_initx = @elapsed init_x = find_initial_x(solver, init_s)
+        solver.time_initx = @elapsed handle_dual_eq(solver)
+        solver.status == DualInconsistent && return
+        init_x = update_dual_eq(solver, init_s)
 
         solver.time_inity = @elapsed handle_primal_eq(solver)
         solver.status == PrimalInconsistent && return
