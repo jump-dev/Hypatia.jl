@@ -212,6 +212,52 @@ end
 
 MOI.optimize!(opt::Optimizer) = Solvers.solve(opt.solver)
 
+function MOI.modify(
+    opt::Optimizer{T},
+    ::MOI.ObjectiveFunction{SAF{T}},
+    chg::MOI.ScalarConstantChange{T},
+    ) where {T}
+    obj_offset = chg.new_constant
+    if opt.obj_sense == MOI.MAX_SENSE
+        obj_offset = -obj_offset
+    end
+    Solvers.modify_obj_offset(opt.solver, obj_offset)
+    return
+end
+
+function MOI.modify(
+    opt::Optimizer{T},
+    ::MOI.ObjectiveFunction{SAF{T}},
+    chg::MOI.ScalarCoefficientChange{T},
+    ) where {T}
+    new_c = chg.new_coefficient
+    if opt.obj_sense == MOI.MAX_SENSE
+        new_c = -new_c
+    end
+    Solvers.modify_c(opt.solver, [chg.variable.value], [new_c])
+    return
+end
+
+function MOI.modify(
+    opt::Optimizer{T},
+    ci::MOI.ConstraintIndex{VAF{T}, MOI.Zeros},
+    chg::MOI.VectorConstantChange{T},
+    ) where {T}
+    idxs = opt.zeros_idxs[ci.value]
+    Solvers.modify_b(opt.solver, idxs, chg.new_constant)
+    return
+end
+
+function MOI.modify(
+    opt::Optimizer{T},
+    ci::MOI.ConstraintIndex{VAF{T}, <:SupportedCone{T}},
+    chg::MOI.VectorConstantChange{T},
+    ) where {T}
+    idxs = opt.moi_cone_idxs[ci.value]
+    Solvers.modify_h(opt.solver, idxs, chg.new_constant)
+    return
+end
+
 function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
     status = opt.solver.status
     if status in (Solvers.NotLoaded, Solvers.Loaded)

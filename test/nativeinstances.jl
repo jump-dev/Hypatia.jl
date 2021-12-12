@@ -2782,13 +2782,15 @@ function modify1(T; options...)
 
     c = T[2, 1]
     b = [T(2)]
+    obj_offset = T(1)
     Solvers.modify_c(solver, c)
     Solvers.modify_b(solver, b)
+    Solvers.modify_obj_offset(solver, obj_offset)
     @test Solvers.get_status(solver) == Solvers.Modified
-    r = build_solve_check(c, A, b, G, h, cones, tol;
+    r = build_solve_check(c, A, b, G, h, cones, tol; obj_offset = obj_offset,
         solver = solver, already_loaded = true, options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 2 atol=tol rtol=tol
+    @test r.primal_obj ≈ 3 atol=tol rtol=tol
     @test r.x ≈ [0, 2] atol=tol rtol=tol
     @test iszero(solver.time_rescale)
     @test iszero(solver.time_loadsys)
@@ -2797,6 +2799,7 @@ function modify1(T; options...)
     h = T[1, -2]
     Solvers.modify_c(solver, c)
     Solvers.modify_h(solver, h)
+    Solvers.modify_obj_offset(solver, T(0))
     @test Solvers.get_status(solver) == Solvers.Modified
     r = build_solve_check(c, A, b, G, h, cones, tol;
         solver = solver, already_loaded = true, options...)
