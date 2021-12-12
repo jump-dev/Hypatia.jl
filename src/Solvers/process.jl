@@ -111,17 +111,17 @@ function find_initial_x(
     else
         AG = vcat(A, G)
     end
-    if issparse(AG)
+    AG_fact = if issparse(AG)
         if !(T <: Float64)
             @warn("using dense factorization of [A; G] in preprocessing and " *
                 "initial point finding because sparse factorization for number " *
-                "type $T is not supported by SuiteSparse packages")
-            AG_fact = qr!(Matrix(AG), ColumnNorm())
+                "type $T is not supported by SuiteSparse packages", maxlog = 1)
+            qr!(Matrix(AG), ColumnNorm())
         else
-            AG_fact = qr(AG, tol = solver.init_tol_qr)
+            qr(AG, tol = solver.init_tol_qr)
         end
     else
-        AG_fact = qr!(AG, ColumnNorm())
+        qr!(AG, ColumnNorm())
     end
     AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
 
@@ -149,12 +149,13 @@ function find_initial_x(
     if !(AG_fact isa QRPivoted{T, Matrix{T}})
         yz_sub = yz_sub[AG_fact.rpivinv]
     end
-    @views residual = norm(A' * yz_sub[1:p] + G' *
-        yz_sub[(p + 1):end] - model.c, Inf)
-    if residual > solver.init_tol_qr
+    residual = A' * yz_sub[1:p] + G' * yz_sub[(p + 1):end] - model.c
+
+    @views res_norm = norm(residual, Inf)
+    if res_norm > solver.init_tol_qr
         if solver.verbose
             println("some dual equality constraints are inconsistent " *
-            "(residual $residual, tolerance $(solver.init_tol_qr))")
+            "(residual norm $res_norm, tolerance $(solver.init_tol_qr))")
         end
         solver.status = DualInconsistent
         return zeros(T, 0)
@@ -179,15 +180,8 @@ function find_initial_x(
     return init_x
 end
 
-# optionally preprocess primal equalities and solve for y as least squares
-# solution to A'y = -c - G'z
-function find_initial_y(
-    solver::Solver{T},
-    init_z::Vector{T},
-    ) where {T <: Real}
-    if solver.status != SolveCalled
-        return zeros(T, 0)
-    end
+
+function handle_primal_eq(solver::Solver{T}) where {T <: Real}
     model = solver.model
     p = model.p
 
@@ -198,72 +192,53 @@ function find_initial_y(
         solver.Ap_Q = I
         return zeros(T, 0)
     end
-
     solver.y_keep_idxs = 1:p
-    rhs_y = mul!(copy(model.c), model.G', init_z, -1, -1)
 
-    if solver.init_use_indirect
-        # use indirect method
-        # TODO pick lsqr or lsmr
-        return IterativeSolvers.lsqr(model.A', rhs_y)
-    end
+    solver.init_use_indirect && return
 
     # factorize A'
     A = model.A
-    if issparse(A)
+    Ap_fact = solver.Ap_fact = if issparse(A)
         if !(T <: Float64)
             @warn("using dense factorization of A' in preprocessing and initial " *
                 "point finding because sparse factorization for number type $T " *
-                "is not supported by SuiteSparse packages")
-            Ap_fact = qr!(Matrix(A'), ColumnNorm())
+                "is not supported by SuiteSparse packages", maxlog = 1)
+            qr!(Matrix(A'), ColumnNorm())
         else
-            Ap_fact = qr(sparse(A'), tol = solver.init_tol_qr)
+            qr(sparse(A'), tol = solver.init_tol_qr)
         end
     else
-        Ap_fact = qr!(Matrix(A'), ColumnNorm())
+        qr!(Matrix(A'), ColumnNorm())
+    end
+    Ap_rank = solver.Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
+
+    if !solver.preprocess
+        if Ap_rank < p
+            @warn("some primal equalities appear to be dependent " *
+            "(possibly inconsistent); try using preprocess = true")
+        end
+        return
     end
 
-    if solver.preprocess
-        return process_primal_eq(solver, Ap_fact, rhs_y)
-    end
-
-    Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
-    if Ap_rank < p
-        @warn("some primal equalities appear to be dependent " *
-        "(possibly inconsistent); try using preprocess = true")
-    end
-
-    return Ap_fact \ rhs_y
-end
-
-# preprocess primal equalities
-function process_primal_eq(
-    solver::Solver{T},
-    Ap_fact::Factorization{T},
-    rhs_y::Vector{T}
-    ) where {T <: Real}
+    # preprocess
     Ap_Q = Ap_fact.Q
-    Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
     Ap_R = UpperTriangular(Ap_fact.R[1:Ap_rank, 1:Ap_rank])
     col_piv = (Ap_fact isa QRPivoted{T, Matrix{T}}) ? Ap_fact.p : Ap_fact.pcol
-
-    model = solver.model
     y_keep_idxs = col_piv[1:Ap_rank]
-    b_sub = model.b[y_keep_idxs]
 
-    if Ap_rank < model.p
+    if Ap_rank < p
         # some dependent primal equalities, so check if they are consistent
         # x_sub = Ap_Q * vcat((Ap_R' \ b_sub), zeros(n - Ap_rank))
         x_sub = zeros(T, model.n)
-        x_sub1 = view(x_sub, 1:Ap_rank)
-        copyto!(x_sub1, b_sub)
+        @views x_sub1 = x_sub[1:Ap_rank]
+        @views copyto!(x_sub1, model.b[y_keep_idxs])
         ldiv!(Ap_R', x_sub1)
         lmul!(Ap_Q, x_sub)
-
         if !(Ap_fact isa QRPivoted{T, Matrix{T}})
             x_sub = x_sub[Ap_fact.rpivinv]
         end
         residual = norm(model.A * x_sub - model.b, Inf)
+
         if residual > solver.init_tol_qr
             if solver.verbose
                 println("some primal equality constraints are inconsistent " *
@@ -279,94 +254,51 @@ function process_primal_eq(
         end
     end
 
+    if !(solver.reduce && isa(model.G, MatrixyAG))
+        # not reducing
+        # modify solver.model to remove/reorder some dual variables y
+        if Ap_fact isa QRPivoted{T, Matrix{T}}
+            model.A = model.A[y_keep_idxs, :]
+        else
+            row_piv = Ap_fact.prow
+            model.A = model.A[y_keep_idxs, row_piv]
+            model.G = model.G[:, row_piv]
+            solver.x_keep_idxs = solver.x_keep_idxs[row_piv]
+        end
 
-# TODO refac some of reduce_primal_eq and below
-    if solver.reduce && isa(model.G, MatrixyAG)
-        return reduce_primal_eq(solver, Ap_fact, Ap_rank, Ap_R, y_keep_idxs, b_sub)
+        model.p = Ap_rank
+        solver.y_keep_idxs = y_keep_idxs
+        solver.Ap_R = Ap_R
+        solver.Ap_Q = Ap_Q
+        return
     end
 
-    # modify solver.model to remove/reorder some dual variables y
-    if !(Ap_fact isa QRPivoted{T, Matrix{T}})
-        row_piv = Ap_fact.prow
-        model.A = model.A[y_keep_idxs, row_piv]
-        model.c = model.c[row_piv]
-        model.G = model.G[:, row_piv]
-        solver.x_keep_idxs = solver.x_keep_idxs[row_piv]
+    # reduce
+    if Ap_fact isa QRPivoted{T, Matrix{T}}
+        solver.reduce_row_piv_inv = Int[]
     else
-        model.A = model.A[y_keep_idxs, :]
-    end
-    model.b = b_sub
-    model.p = Ap_rank
-    solver.y_keep_idxs = y_keep_idxs
-    solver.Ap_R = Ap_R
-    solver.Ap_Q = Ap_Q
-
-
-
-    # init_y = Ap_R \ ((Ap_Q' * (-c - G' * z))[1:Ap_rank])
-    lmul!(Ap_Q', rhs_y)
-    init_y = rhs_y[1:Ap_rank]
-    ldiv!(Ap_R, init_y)
-    return init_y
-end
-
-# remove all primal equalities i.e. let n = n0 - p0 and p = 0
-# TODO improve efficiency
-# TODO avoid calculating GQ1 explicitly if possible
-# recover original-space solution using:
-# x0 = Q * [(R' \ b0), x]
-# y0 = R \ (-cQ1' - GQ1' * z0)
-function reduce_primal_eq(
-    solver::Solver{T},
-    Ap_fact::Factorization{T},
-    Ap_rank::Int,
-    Ap_R,
-    y_keep_idxs,
-    b_sub,
-    ) where {T <: Real}
-    model = solver.model
-
-    if !(Ap_fact isa QRPivoted{T, Matrix{T}})
         row_piv = Ap_fact.prow
-        model.c = model.c[row_piv]
         model.G = model.G[:, row_piv]
         solver.reduce_row_piv_inv = Ap_fact.rpivinv
-    else
-        solver.reduce_row_piv_inv = Int[]
     end
 
-    Q1_idxs = 1:Ap_rank
-    Q2_idxs = (Ap_rank + 1):model.n
-
-    # [cQ1 cQ2] = c0' * Q
+    model.n -= Ap_rank
     Ap_Q = Ap_fact.Q
-    cQ = model.c' * Ap_Q
-    cQ1 = solver.reduce_cQ1 = cQ[Q1_idxs]
-    cQ2 = cQ[Q2_idxs]
-    # c = cQ2
-    model.c = cQ2
-    model.n = length(cQ2)
-    # offset = offset0 + cQ1 * (R' \ b0)
-    Rpib0 = solver.reduce_Rpib0 = ldiv!(Ap_R', b_sub)
-    # solver.Rpib0 = Rpib0 # TODO
-    model.obj_offset += dot(cQ1, Rpib0)
 
     # [GQ1 GQ2] = G0 * Q
     # very inefficient method used for sparse G * QRSparseQ
     # see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
-    if model.G isa UniformScaling
+    G_mul = if model.G isa UniformScaling
         side = size(Ap_Q, 1)
-        G_mul = Matrix{T}(model.G, side, side)
+        Matrix{T}(model.G, side, side)
     elseif !isa(model.G, Matrix)
-        G_mul = Matrix{T}(model.G)
+        Matrix{T}(model.G)
     else
-        G_mul = model.G
+        model.G
     end
     GQ = G_mul * Ap_Q
-    GQ1 = solver.reduce_GQ1 = GQ[:, Q1_idxs]
-    GQ2 = GQ[:, Q2_idxs]
-    # h = h0 - GQ1 * (R' \ b0)
-    mul!(model.h, GQ1, Rpib0, -1, true)
+    solver.reduce_GQ1 = GQ[:, 1:Ap_rank]
+    GQ2 = GQ[:, (Ap_rank + 1):end]
 
     # G = GQ2
     model.G = GQ2
@@ -374,16 +306,283 @@ function reduce_primal_eq(
     # A and b empty
     model.p = 0
     model.A = zeros(T, 0, model.n)
-    model.b = zeros(T, 0)
     solver.reduce_Ap_R = Ap_R
     solver.reduce_Ap_Q = Ap_Q
 
     solver.reduce_y_keep_idxs = y_keep_idxs
     solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
     solver.Ap_Q = I
+    return
+end
+
+# update data for b, c, h from primal equality preprocessing/reduction
+# and return initial y as least squares solution to A'y = -c - G'z
+function update_primal_eq(
+    solver::Solver{T},
+    init_z::Vector{T},
+    ) where {T <: Real}
+    orig_model = solver.orig_model
+    iszero(orig_model.p) && return zeros(T, 0)
+    model = solver.model
+
+    if solver.init_use_indirect
+        # use indirect method TODO pick lsqr or lsmr
+        rhs_y = mul!(copy(model.c), model.G', init_z, -1, -1)
+        return IterativeSolvers.lsqr(model.A', rhs_y)
+    end
+
+    Ap_fact = solver.Ap_fact
+    if !solver.preprocess
+        rhs_y = mul!(copy(model.c), model.G', init_z, -1, -1)
+        return Ap_fact \ rhs_y
+    end
+
+    # preprocess
+    Ap_rank = solver.Ap_rank
+
+    if !(solver.reduce && isa(model.G, MatrixyAG))
+        # not reducing
+        model.b = model.b[solver.y_keep_idxs]
+        if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+            model.c = model.c[Ap_fact.prow]
+        end
+
+        # init_y = Ap_R \ ((Ap_Q' * (-c - G' * z))[1:Ap_rank])
+        rhs_y = mul!(copy(model.c), model.G', init_z, -1, -1)
+        lmul!(solver.Ap_Q', rhs_y)
+        init_y = rhs_y[1:Ap_rank]
+        ldiv!(solver.Ap_R, init_y)
+        return init_y
+    end
+
+    # reduce
+    # [cQ1 cQ2] = c0' * Q
+    # c = cQ2
+    cQ = model.c' * solver.reduce_Ap_Q
+    cQ1 = solver.reduce_cQ1 = cQ[1:Ap_rank]
+    model.c = cQ[(Ap_rank + 1):end]
+
+    Rpib0 = solver.reduce_Rpib0 = model.b[solver.reduce_y_keep_idxs]
+    ldiv!(solver.reduce_Ap_R', Rpib0)
+    # offset = offset0 + cQ1 * (R' \ b0)
+    model.obj_offset += dot(cQ1, Rpib0)
+
+    model.b = zeros(T, 0)
+
+    GQ1 = solver.reduce_GQ1
+    # h = h0 - GQ1 * (R' \ b0)
+    mul!(model.h, GQ1, Rpib0, -1, true)
 
     return zeros(T, 0)
 end
+
+
+
+# # optionally preprocess primal equalities and solve for y as least squares
+# # solution to A'y = -c - G'z
+# function find_initial_y(
+#     solver::Solver{T},
+#     init_z::Vector{T},
+#     ) where {T <: Real}
+#     if solver.status != SolveCalled
+#         return zeros(T, 0)
+#     end
+
+#     model = solver.model
+#     p = model.p
+#     if iszero(p)
+#         # y is empty (no primal variables)
+#         solver.y_keep_idxs = Int[]
+#         solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
+#         solver.Ap_Q = I
+#         return zeros(T, 0)
+#     end
+#     solver.y_keep_idxs = 1:p
+
+#     rhs_y = mul!(copy(model.c), model.G', init_z, -1, -1)
+
+#     if solver.init_use_indirect
+#         # use indirect method
+#         # TODO pick lsqr or lsmr
+#         return IterativeSolvers.lsqr(model.A', rhs_y)
+#     end
+
+#     # factorize A'
+#     A = model.A
+#     Ap_fact = if issparse(A)
+#         if !(T <: Float64)
+#             @warn("using dense factorization of A' in preprocessing and initial " *
+#                 "point finding because sparse factorization for number type $T " *
+#                 "is not supported by SuiteSparse packages", maxlog = 1)
+#             qr!(Matrix(A'), ColumnNorm())
+#         else
+#             qr(sparse(A'), tol = solver.init_tol_qr)
+#         end
+#     else
+#         qr!(Matrix(A'), ColumnNorm())
+#     end
+
+#     if solver.preprocess
+#         return process_primal_eq(solver, Ap_fact, rhs_y)
+#     end
+
+#     Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
+#     if Ap_rank < p
+#         @warn("some primal equalities appear to be dependent " *
+#         "(possibly inconsistent); try using preprocess = true")
+#     end
+
+#     return Ap_fact \ rhs_y
+# end
+
+# preprocess primal equalities
+# function process_primal_eq(
+#     solver::Solver{T},
+#     Ap_fact::Factorization{T},
+#     rhs_y::Vector{T}
+#     ) where {T <: Real}
+#     Ap_Q = Ap_fact.Q
+#     Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
+#     Ap_R = UpperTriangular(Ap_fact.R[1:Ap_rank, 1:Ap_rank])
+#     col_piv = (Ap_fact isa QRPivoted{T, Matrix{T}}) ? Ap_fact.p : Ap_fact.pcol
+
+#     model = solver.model
+#     y_keep_idxs = col_piv[1:Ap_rank]
+#     b_sub = model.b[y_keep_idxs]
+
+#     if Ap_rank < model.p
+#         # some dependent primal equalities, so check if they are consistent
+#         # x_sub = Ap_Q * vcat((Ap_R' \ b_sub), zeros(n - Ap_rank))
+#         x_sub = zeros(T, model.n)
+#         x_sub1 = view(x_sub, 1:Ap_rank)
+#         copyto!(x_sub1, b_sub)
+#         ldiv!(Ap_R', x_sub1)
+#         lmul!(Ap_Q, x_sub)
+
+#         if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+#             x_sub = x_sub[Ap_fact.rpivinv]
+#         end
+#         residual = norm(model.A * x_sub - model.b, Inf)
+#         if residual > solver.init_tol_qr
+#             if solver.verbose
+#                 println("some primal equality constraints are inconsistent " *
+#                 "(residual $residual, tolerance $(solver.init_tol_qr))")
+#             end
+#             solver.status = PrimalInconsistent
+#             return zeros(T, 0)
+#         end
+#         if solver.verbose
+#             p = model.p
+#             println("$(p - Ap_rank) of $p primal equality constraints " *
+#                 "are dependent")
+#         end
+#     end
+
+
+# # TODO refac some of reduce_primal_eq and below
+#     if solver.reduce && isa(model.G, MatrixyAG)
+#         return reduce_primal_eq(solver, Ap_fact, Ap_rank, Ap_R, y_keep_idxs, b_sub)
+#     end
+
+#     # modify solver.model to remove/reorder some dual variables y
+#     if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+#         row_piv = Ap_fact.prow
+#         model.A = model.A[y_keep_idxs, row_piv]
+#         model.c = model.c[row_piv]
+#         model.G = model.G[:, row_piv]
+#         solver.x_keep_idxs = solver.x_keep_idxs[row_piv]
+#     else
+#         model.A = model.A[y_keep_idxs, :]
+#     end
+#     model.b = b_sub
+#     model.p = Ap_rank
+#     solver.y_keep_idxs = y_keep_idxs
+#     solver.Ap_R = Ap_R
+#     solver.Ap_Q = Ap_Q
+
+
+
+#     # init_y = Ap_R \ ((Ap_Q' * (-c - G' * z))[1:Ap_rank])
+#     lmul!(Ap_Q', rhs_y)
+#     init_y = rhs_y[1:Ap_rank]
+#     ldiv!(Ap_R, init_y)
+#     return init_y
+# end
+
+# remove all primal equalities i.e. let n = n0 - p0 and p = 0
+# TODO improve efficiency
+# TODO avoid calculating GQ1 explicitly if possible
+# recover original-space solution using:
+# x0 = Q * [(R' \ b0), x]
+# y0 = R \ (-cQ1' - GQ1' * z0)
+# function reduce_primal_eq(
+#     solver::Solver{T},
+#     Ap_fact::Factorization{T},
+#     Ap_rank::Int,
+#     Ap_R,
+#     y_keep_idxs,
+#     b_sub,
+#     ) where {T <: Real}
+#     model = solver.model
+
+#     if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+#         row_piv = Ap_fact.prow
+#         model.c = model.c[row_piv]
+#         model.G = model.G[:, row_piv]
+#         solver.reduce_row_piv_inv = Ap_fact.rpivinv
+#     else
+#         solver.reduce_row_piv_inv = Int[]
+#     end
+
+#     Q1_idxs = 1:Ap_rank
+#     Q2_idxs = (Ap_rank + 1):model.n
+
+#     # [cQ1 cQ2] = c0' * Q
+#     Ap_Q = Ap_fact.Q
+#     cQ = model.c' * Ap_Q
+#     cQ1 = solver.reduce_cQ1 = cQ[Q1_idxs]
+#     cQ2 = cQ[Q2_idxs]
+#     # c = cQ2
+#     model.c = cQ2
+#     model.n = length(cQ2)
+#     # offset = offset0 + cQ1 * (R' \ b0)
+#     Rpib0 = solver.reduce_Rpib0 = ldiv!(Ap_R', b_sub)
+#     # solver.Rpib0 = Rpib0 # TODO
+#     model.obj_offset += dot(cQ1, Rpib0)
+
+#     # [GQ1 GQ2] = G0 * Q
+#     # very inefficient method used for sparse G * QRSparseQ
+#     # see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
+#     if model.G isa UniformScaling
+#         side = size(Ap_Q, 1)
+#         G_mul = Matrix{T}(model.G, side, side)
+#     elseif !isa(model.G, Matrix)
+#         G_mul = Matrix{T}(model.G)
+#     else
+#         G_mul = model.G
+#     end
+#     GQ = G_mul * Ap_Q
+#     GQ1 = solver.reduce_GQ1 = GQ[:, Q1_idxs]
+#     GQ2 = GQ[:, Q2_idxs]
+#     # h = h0 - GQ1 * (R' \ b0)
+#     mul!(model.h, GQ1, Rpib0, -1, true)
+
+#     # G = GQ2
+#     model.G = GQ2
+
+#     # A and b empty
+#     model.p = 0
+#     model.A = zeros(T, 0, model.n)
+#     model.b = zeros(T, 0)
+#     solver.reduce_Ap_R = Ap_R
+#     solver.reduce_Ap_Q = Ap_Q
+
+#     solver.reduce_y_keep_idxs = y_keep_idxs
+#     solver.Ap_R = UpperTriangular(zeros(T, 0, 0))
+#     solver.Ap_Q = I
+
+#     return zeros(T, 0)
+# end
 
 # (pivoted) QR factorizations are usually rank-revealing but may be unreliable
 # see http://www.math.sjsu.edu/~foster/rankrevealingcode.html

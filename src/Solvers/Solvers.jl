@@ -111,6 +111,8 @@ mutable struct Solver{T <: Real}
     model::Models.Model{T}
     x_keep_idxs::AbstractVector{Int}
     y_keep_idxs::AbstractVector{Int}
+    Ap_fact::Factorization{T}
+    Ap_rank::Int
     Ap_R::UpperTriangular{T, <:AbstractMatrix{T}}
     Ap_Q::Union{UniformScaling, AbstractMatrix{T}}
     reduce_cQ1
@@ -293,13 +295,16 @@ end
 
 function solve(solver::Solver{T}) where {T <: Real}
     init_status = solver.status
+    if !in(init_status, (Loaded, Modified))
+        @warn("solve called when solver status is $init_status")
+        return
+    end
+
     setup_solver(solver)
-    if init_status == Loaded
-        setup_loaded(solver)
-    elseif init_status == Modified
+    if init_status == Modified
         setup_modified(solver)
     else
-        error("solve was called but solver was not just loaded or modified")
+        setup_loaded(solver)
     end
 
     if !in(solver.status, (PrimalInconsistent, DualInconsistent))
@@ -325,7 +330,7 @@ function solve(solver::Solver{T}) where {T <: Real}
 
     free_memory(solver.syssolver)
     flush(stdout)
-    return solver
+    return
 end
 
 
@@ -399,13 +404,21 @@ function setup_point(solver::Solver{T}) where {T <: Real}
 
 
     if solver.reduce
-        # TODO don't find point / unnecessary stuff before reduce
-        solver.time_inity = @elapsed init_y = find_initial_y(solver, init_z)
-        solver.time_initx = @elapsed init_x = find_initial_x(solver, init_s)
+        solver.time_inity = @elapsed handle_primal_eq(solver)
+        solver.status == PrimalInconsistent && return
+        init_y = update_primal_eq(solver, init_z)
+
+        # solver.time_initx = @elapsed
+        init_x = find_initial_x(solver, init_s)
     else
         solver.time_initx = @elapsed init_x = find_initial_x(solver, init_s)
-        solver.time_inity = @elapsed init_y = find_initial_y(solver, init_z)
+
+        solver.time_inity = @elapsed handle_primal_eq(solver)
+        solver.status == PrimalInconsistent && return
+        init_y = update_primal_eq(solver, init_z)
     end
+
+    # TODO delete
     if solver.status != SolveCalled # TODO due to inconsistent statuses
         return
     end
