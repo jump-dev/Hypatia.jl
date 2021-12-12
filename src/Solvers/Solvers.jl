@@ -116,6 +116,7 @@ mutable struct Solver{T <: Real}
     Ap_R::UpperTriangular{T, <:AbstractMatrix{T}}
     Ap_Q::Union{UniformScaling, AbstractMatrix{T}}
     AG_fact::Factorization{T}
+    AG_rank::Int
     AG_R::UpperTriangular{T, <:AbstractMatrix{T}}
     reduce_cQ1
     reduce_Rpib0
@@ -292,9 +293,6 @@ function modify_h(solver::Solver{T}, h_new::Vector{T}) where {T <: Real}
     return solver
 end
 
-
-
-
 function solve(solver::Solver{T}) where {T <: Real}
     init_status = solver.status
     if !in(init_status, (Loaded, Modified))
@@ -310,6 +308,7 @@ function solve(solver::Solver{T}) where {T <: Real}
     end
 
     if !in(solver.status, (PrimalInconsistent, DualInconsistent))
+        initialize_point(solver)
         setup_stepping(solver)
         solver.verbose && print_header(solver.stepper, solver)
 
@@ -335,9 +334,6 @@ function solve(solver::Solver{T}) where {T <: Real}
     return
 end
 
-
-
-
 function setup_loaded(solver::Solver{T}) where {T <: Real}
     orig_model = solver.orig_model
     if solver.use_dense_model
@@ -348,6 +344,8 @@ function setup_loaded(solver::Solver{T}) where {T <: Real}
     # copy original model to solver.model, which may be modified
     model = solver.model = Models.Model{T}(
         orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h,
+        # orig_model.c, orig_model.A, orig_model.b, orig_model.G, copy(orig_model.h),
+        # orig_model.c, copy(orig_model.A), orig_model.b, copy(orig_model.G), orig_model.h,
         orig_model.cones, obj_offset = orig_model.obj_offset)
 
     solver.time_rescale = @elapsed solver.used_rescaling = rescale_data(solver)
@@ -371,25 +369,17 @@ function setup_modified(solver::Solver{T}) where {T <: Real}
     orig_model = solver.orig_model
     model = solver.model
 
-    copyto!(model.c, orig_model.c)
-    copyto!(model.b, orig_model.b)
-    copyto!(model.h, orig_model.h)
+    model.c = copy(orig_model.c)
+    model.b = copy(orig_model.b)
+    model.h = copy(orig_model.h)
     if solver.used_rescaling
         # rescale using scalings computed during first load
         model.c ./= solver.c_scale
         model.b ./= solver.b_scale
         model.h ./= solver.h_scale
     end
-    # TODO needs fixing for preproc/reduce
 
-
-
-
-    # TODO don't redo factorize stuff etc in here:
-    setup_point(solver)
-    if solver.status != SolveCalled
-        return
-    end
+    update_initial_point(solver)
 
     # TODO easier to update these system solvers (just need an update to setup_point_sub):
     @assert solver.syssolver isa Union{QRCholSystemSolver{T}, SymIndefSystemSolver{T}}
@@ -399,11 +389,9 @@ function setup_modified(solver::Solver{T}) where {T <: Real}
     return
 end
 
+# preprocess and find initial point
 function setup_point(solver::Solver{T}) where {T <: Real}
-    # preprocess and find initial point
     (init_z, init_s) = initialize_cone_point(solver.orig_model)
-
-
 
     if solver.reduce
         solver.time_inity = @elapsed handle_primal_eq(solver)
@@ -423,12 +411,31 @@ function setup_point(solver::Solver{T}) where {T <: Real}
         init_y = update_primal_eq(solver, init_z)
     end
 
-    model = solver.model
-    point = solver.point = Point(model)
+    point = solver.point = Point(solver.model)
     point.x .= init_x
     point.y .= init_y
     point.z .= init_z
     point.s .= init_s
+    return
+end
+
+function update_initial_point(solver::Solver{T}) where {T <: Real}
+    (init_z, init_s) = initialize_cone_point(solver.orig_model)
+    point = solver.point
+    if solver.reduce
+        point.y .= update_primal_eq(solver, init_z)
+        point.x .= update_dual_eq(solver, init_s)
+    else
+        point.x .= update_dual_eq(solver, init_s)
+        point.y .= update_primal_eq(solver, init_z)
+    end
+    point.z .= init_z
+    point.s .= init_s
+    return
+end
+
+function initialize_point(solver::Solver{T}) where {T <: Real}
+    point = solver.point
     point.tau[] = one(T)
     point.kap[] = one(T)
 
@@ -437,15 +444,12 @@ function setup_point(solver::Solver{T}) where {T <: Real}
         @warn("initial mu is $(solver.mu) but should be 1 (this could " *
             "indicate a problem with cone barrier oracles)")
     end
+
+    model = solver.model
     Cones.load_point.(model.cones, point.primal_views)
     Cones.load_dual_point.(model.cones, point.dual_views)
     return
 end
-
-
-
-
-
 
 function setup_stepping(solver::Solver{T}) where {T <: Real}
     model = solver.model
