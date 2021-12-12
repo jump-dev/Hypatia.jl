@@ -180,5 +180,5 @@ inst_indirect = [
 
 inst_modify = [
     "modify1",
-    # "modify2",
+    "modify2",
     ]

@@ -184,8 +184,8 @@ function solve_check(
             Hypatia.rescale_affine(cone, z_k)
         end
         if Hypatia.needs_permute(cone)
-            Hypatia.permute_affine(cone, s_k)
-            Hypatia.permute_affine(cone, z_k)
+            s_k = Hypatia.permute_affine(cone, s_k)
+            z_k = Hypatia.permute_affine(cone, z_k)
         end
         append!(s, s_k)
         append!(z, z_k)

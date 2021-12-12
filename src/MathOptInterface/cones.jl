@@ -83,8 +83,8 @@ end
 needs_permute(cone::SpecNucCone) = needs_untransform(cone)
 
 function permute_affine(cone::SpecNucCone, vals::AbstractVector{T}) where {T}
-    @views vals[2:end] = reshape(vals[2:end], cone.row_dim, cone.column_dim)'
-    return vals
+    w_vals = reshape(vals[2:end], cone.row_dim, cone.column_dim)'
+    return vcat(vals[1], vec(w_vals))
 end
 
 function permute_affine(cone::SpecNucCone, func::VAF{T}) where {T}
