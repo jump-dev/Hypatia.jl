@@ -2797,29 +2797,43 @@ function modify1(T; options...)
 
     c = T[3, 1]
     h = T[1, -2]
+    obj_offset = T(-1)
     Solvers.modify_c(solver, c)
     Solvers.modify_h(solver, h)
-    Solvers.modify_obj_offset(solver, T(0))
+    Solvers.modify_obj_offset(solver, obj_offset)
     @test Solvers.get_status(solver) == Solvers.Modified
-    r = build_solve_check(c, A, b, G, h, cones, tol;
+    r = build_solve_check(c, A, b, G, h, cones, tol; obj_offset = obj_offset,
         solver = solver, already_loaded = true, options...)
     @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ 0 atol=tol rtol=tol
+    @test r.primal_obj ≈ -1 atol=tol rtol=tol
     @test r.x ≈ [-1, 3] atol=tol rtol=tol
     @test iszero(solver.time_rescale)
     @test iszero(solver.time_loadsys)
 end
 
-# function modify2(T; options...)
-#     tol = test_tol(T)
-#     c = T[-1, -1, 0]
-#     A = zeros(T, 0, 3)
-#     b = T[]
-#     G = repeat(SparseMatrixCSC(-one(T) * I, 3, 3), 2, 1)
-#     h = zeros(T, 6)
-#     cones = Cone{T}[Cones.EpiNormInf{T, T}(3),
-#         Cones.EpiNormInf{T, T}(3, use_dual = true)]
-# error()
-#     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
-#     @test r.status == Solvers.DualInfeasible
-# end
+function modify2(T; options...)
+    tol = test_tol(T)
+    c = T[-1, -1, 0]
+    A = zeros(T, 0, 3)
+    b = T[]
+    G = repeat(SparseMatrixCSC(-one(T) * I, 3, 3), 2, 1)
+    h = zeros(T, 6)
+    cones = Cone{T}[Cones.EpiNormInf{T, T}(3),
+        Cones.EpiNormInf{T, T}(3, use_dual = true)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.DualInfeasible
+    solver = r.solver
+
+    c = zeros(T, 3)
+    Solvers.modify_c(solver, c)
+    @test Solvers.get_status(solver) == Solvers.Modified
+    r = build_solve_check(c, A, b, G, h, cones, tol;
+        solver = solver, already_loaded = true, options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ 0 atol=tol rtol=tol
+    @test r.dual_obj ≈ 0 atol=tol rtol=tol
+    @test norm(r.z) ≈ 0 atol=tol rtol=tol
+    @test iszero(solver.time_rescale)
+    @test iszero(solver.time_loadsys)
+end
