@@ -151,7 +151,11 @@ function load(
 
     # very inefficient method used for sparse G * QRSparseQ
     # see https://github.com/JuliaLang/julia/issues/31124#issuecomment-501540818
-    GQ = model.G * solver.Ap_Q
+    GQ = if solver.Ap_Q == I
+        model.G
+    else
+        model.G * solver.Ap_Q
+    end
 
     syssolver.GQ2 = GQ[:, (p + 1):end]
     syssolver.HGQ2 = zeros(T, q, nmp)
