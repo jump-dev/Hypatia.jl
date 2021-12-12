@@ -76,7 +76,9 @@ function handle_dual_eq(solver::Solver{T}) where {T <: Real}
     # direct method
     AG = if iszero(model.p)
         # A is empty
-        if issparse(G)
+        if G isa UniformScaling
+            sparse(G, n, n)
+        elseif issparse(G)
             G
         elseif G isa Matrix{T}
             copy(G)
@@ -98,7 +100,7 @@ function handle_dual_eq(solver::Solver{T}) where {T <: Real}
     else
         qr!(AG, ColumnNorm())
     end
-    AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
+    AG_rank = solver.AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
 
     if !solver.preprocess || (AG_rank == n)
         if AG_rank < n
@@ -161,10 +163,11 @@ function update_dual_eq(
     model.c = model.c[solver.x_keep_idxs]
     iszero(model.n) && return zeros(T, 0)
 
+    rhs_x = vcat(model.b, model.h - init_s)
+
     if solver.init_use_indirect ||
         !isa(model.A, MatrixyAG) || !isa(model.G, MatrixyAG)
         # use indirect method TODO pick lsqr or lsmr
-        rhs_x = vcat(model.b, model.h - init_s)
         if iszero(model.p)
             AG = model.G
         else
@@ -175,10 +178,8 @@ function update_dual_eq(
         return IterativeSolvers.lsqr(AG, rhs_x)
     end
 
-    rhs_x = vcat(model.b, model.h - init_s)
     AG_fact = solver.AG_fact
-
-    if !solver.preprocess || (model.n == size(AG_fact, 2))
+    if !solver.preprocess || (solver.AG_rank == size(AG_fact, 2))
         return AG_fact \ rhs_x
     end
 
@@ -307,10 +308,8 @@ function handle_primal_eq(solver::Solver{T}) where {T <: Real}
     end
     GQ = G_mul * Ap_Q
     solver.reduce_GQ1 = GQ[:, 1:Ap_rank]
-    GQ2 = GQ[:, (Ap_rank + 1):end]
-
     # G = GQ2
-    model.G = GQ2
+    model.G = GQ[:, (Ap_rank + 1):end]
 
     # A and b empty
     model.p = 0
@@ -379,7 +378,7 @@ function update_primal_eq(
 
     GQ1 = solver.reduce_GQ1
     # h = h0 - GQ1 * (R' \ b0)
-    mul!(model.h, GQ1, Rpib0, -1, true)
+    model.h = mul!(copy(model.h), GQ1, Rpib0, -1, true)
 
     return zeros(T, 0)
 end
