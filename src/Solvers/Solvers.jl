@@ -413,9 +413,7 @@ function setup_point(solver::Solver{T}) where {T <: Real}
         solver.time_initx = @elapsed handle_dual_eq(solver)
         solver.status == DualInconsistent && return
         init_x = update_dual_eq(solver, init_s)
-        # init_x = find_initial_x(solver, init_s)
     else
-        # solver.time_initx = @elapsed init_x = find_initial_x(solver, init_s)
         solver.time_initx = @elapsed handle_dual_eq(solver)
         solver.status == DualInconsistent && return
         init_x = update_dual_eq(solver, init_s)
@@ -424,14 +422,6 @@ function setup_point(solver::Solver{T}) where {T <: Real}
         solver.status == PrimalInconsistent && return
         init_y = update_primal_eq(solver, init_z)
     end
-
-    # TODO delete
-    if solver.status != SolveCalled # TODO due to inconsistent statuses
-        return
-    end
-
-
-
 
     model = solver.model
     point = solver.point = Point(model)
