@@ -372,7 +372,7 @@ function update_primal_eq(
     Rpib0 = solver.reduce_Rpib0 = model.b[solver.reduce_y_keep_idxs]
     ldiv!(solver.reduce_Ap_R', Rpib0)
     # offset = offset0 + cQ1 * (R' \ b0)
-    model.obj_offset = solver.orig_model.obj_offset + dot(cQ1, Rpib0)
+    model.obj_offset += dot(cQ1, Rpib0)
 
     model.b = zeros(T, 0)
 

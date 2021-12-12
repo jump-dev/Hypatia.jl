@@ -29,7 +29,7 @@ end
 test_T = [
     (Float64, 2 * sqrt(sqrt(eps())), 4, String[]),
     # TODO add test_linear after MOI 0.10.7 is tagged:
-    (BigFloat, 2 * eps(BigFloat)^0.2, 1, String["test_conic"]),
+    (BigFloat, 2 * eps(BigFloat)^0.2, 1, String["test_conic", "test_modification"]),
 ]
 
 @testset "MOI.Test tests: $T" for (T, tol_test, tol_relax, includes) in test_T

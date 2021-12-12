@@ -263,34 +263,67 @@ end
 function load(solver::Solver{T}, model::Models.Model{T}) where {T <: Real}
     solver.orig_model = model
     solver.status = Loaded
-    return solver
+    return
 end
 
+function modify_obj_offset(solver::Solver{T}, offset_new::T) where {T <: Real}
+    solver.orig_model.obj_offset = offset_new
+    solver.status = Modified
+    return
+end
 
-
-
-# TODO in the MOI wrapper the b, c, h changes can be cached and called at the
-# start of optimize if there is a modify flag. this matters most for h because
-# it will be updated constraint by constraint
-function modify_c(solver::Solver{T}, c_new::Vector{T}) where {T <: Real}
+function modify_c(solver::Solver{T}, c_new::AbstractVector{T}) where {T <: Real}
     @assert length(c_new) == solver.orig_model.n
     solver.orig_model.c = c_new
     solver.status = Modified
-    return solver
+    return
 end
 
-function modify_b(solver::Solver{T}, b_new::Vector{T}) where {T <: Real}
+function modify_c(
+    solver::Solver{T},
+    idxs::AbstractVector{Int},
+    c_new::Vector{T},
+    ) where {T <: Real}
+    @assert length(c_new) == length(idxs) <= solver.orig_model.n
+    solver.orig_model.c[idxs] .= c_new
+    solver.status = Modified
+    return
+end
+
+function modify_b(solver::Solver{T}, b_new::AbstractVector{T}) where {T <: Real}
     @assert length(b_new) == solver.orig_model.p
     solver.orig_model.b = b_new
     solver.status = Modified
-    return solver
+    return
 end
 
-function modify_h(solver::Solver{T}, h_new::Vector{T}) where {T <: Real}
+function modify_b(
+    solver::Solver{T},
+    idxs::AbstractVector{Int},
+    b_new::Vector{T},
+    ) where {T <: Real}
+    @assert length(b_new) == length(idxs) <= solver.orig_model.p
+    solver.orig_model.b[idxs] .= b_new
+    solver.status = Modified
+    return
+end
+
+function modify_h(solver::Solver{T}, h_new::AbstractVector{T}) where {T <: Real}
     @assert length(h_new) == solver.orig_model.q
     solver.orig_model.h = h_new
     solver.status = Modified
-    return solver
+    return
+end
+
+function modify_h(
+    solver::Solver{T},
+    idxs::AbstractVector{Int},
+    h_new::Vector{T},
+    ) where {T <: Real}
+    @assert length(h_new) == length(idxs) <= solver.orig_model.q
+    solver.orig_model.h[idxs] .= h_new
+    solver.status = Modified
+    return
 end
 
 function solve(solver::Solver{T}) where {T <: Real}
@@ -344,8 +377,6 @@ function setup_loaded(solver::Solver{T}) where {T <: Real}
     # copy original model to solver.model, which may be modified
     model = solver.model = Models.Model{T}(
         orig_model.c, orig_model.A, orig_model.b, orig_model.G, orig_model.h,
-        # orig_model.c, orig_model.A, orig_model.b, orig_model.G, copy(orig_model.h),
-        # orig_model.c, copy(orig_model.A), orig_model.b, copy(orig_model.G), orig_model.h,
         orig_model.cones, obj_offset = orig_model.obj_offset)
 
     solver.time_rescale = @elapsed solver.used_rescaling = rescale_data(solver)
@@ -369,6 +400,7 @@ function setup_modified(solver::Solver{T}) where {T <: Real}
     orig_model = solver.orig_model
     model = solver.model
 
+    model.obj_offset = orig_model.obj_offset
     model.c = copy(orig_model.c)
     model.b = copy(orig_model.b)
     model.h = copy(orig_model.h)
@@ -383,8 +415,6 @@ function setup_modified(solver::Solver{T}) where {T <: Real}
 
     # TODO easier to update these system solvers (just need an update to setup_point_sub):
     @assert solver.syssolver isa Union{QRCholSystemSolver{T}, SymIndefSystemSolver{T}}
-    # TODO cleaner interface: call a update_syssolver function that calls this:
-    # (and errors if syssolver does not support update)
     set_point_sub_rhs(solver.syssolver, solver.model)
     return
 end
