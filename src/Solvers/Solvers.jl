@@ -229,7 +229,7 @@ mutable struct Solver{T <: Real}
             tol_infeas = default_tol_tight
         end
         if isnothing(tol_illposed)
-            tol_illposed = default_tol_tight / 100
+            tol_illposed = default_tol_tight
         end
         @assert min(tol_rel_opt, tol_abs_opt, tol_feas,
             tol_infeas, tol_illposed, tol_slow) >= 0
@@ -702,8 +702,7 @@ function check_converged(
     end
 
     # TODO experiment with ill-posedness check
-    max_illp = max(solver.mu, tau / min(one(T), solver.point.kap[]))
-    if max_illp <= near_factor * solver.tol_illposed
+    if max(tau, solver.point.kap[]) <= near_factor * solver.tol_illposed
         solver.verbose && println("ill-posedness detected; terminating")
         solver.status = (check_near ? NearIllPosed : IllPosed)
         return true
