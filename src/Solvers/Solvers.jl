@@ -86,6 +86,7 @@ mutable struct Solver{T <: Real}
     rescale::Bool
     init_use_indirect::Bool
     init_tol_qr::T
+    tol_inconsistent::T
     stepper::Stepper{T}
     syssolver::SystemSolver{T}
     use_dense_model::Bool # make the model use dense A and G data instead of sparse
@@ -193,6 +194,7 @@ mutable struct Solver{T <: Real}
         rescale::Bool = true,
         init_use_indirect::Bool = false,
         init_tol_qr::Real = 1000 * eps(T),
+        tol_inconsistent::Real = init_tol_qr,
         stepper::Stepper{T} = CombinedStepper{T}(),
         syssolver::SystemSolver{T} = QRCholDenseSystemSolver{T}(),
         use_dense_model::Bool = (syssolver isa QRCholDenseSystemSolver{T}),
@@ -251,6 +253,7 @@ mutable struct Solver{T <: Real}
         solver.rescale = rescale
         solver.init_use_indirect = init_use_indirect
         solver.init_tol_qr = init_tol_qr
+        solver.tol_inconsistent = tol_inconsistent
         solver.stepper = stepper
         solver.syssolver = syssolver
         solver.status = NotLoaded

@@ -132,10 +132,10 @@ function handle_dual_eq(solver::Solver{T}) where {T <: Real}
     @views mul!(residual, A', yz_sub[1:p], true, true)
     res_norm = norm(residual, Inf)
 
-    if res_norm > solver.init_tol_qr
+    if res_norm > solver.tol_inconsistent
         if solver.verbose
             println("some dual equality constraints are inconsistent " *
-            "(residual norm $res_norm, tolerance $(solver.init_tol_qr))")
+            "(residual norm $res_norm, tolerance $(solver.tol_inconsistent))")
         end
         solver.status = DualInconsistent
         return zeros(T, 0)
@@ -249,10 +249,10 @@ function handle_primal_eq(solver::Solver{T}) where {T <: Real}
         end
         residual = norm(model.A * x_sub - model.b, Inf)
 
-        if residual > solver.init_tol_qr
+        if residual > solver.tol_inconsistent
             if solver.verbose
                 println("some primal equality constraints are inconsistent " *
-                "(residual $residual, tolerance $(solver.init_tol_qr))")
+                "(residual $residual, tolerance $(solver.tol_inconsistent))")
             end
             solver.status = PrimalInconsistent
             return zeros(T, 0)
