@@ -292,6 +292,8 @@ function MOI.get(opt::Optimizer, ::MOI.TerminationStatus)
         return MOI.TIME_LIMIT
     elseif status == Solvers.NumericalFailure
         return MOI.NUMERICAL_ERROR
+    elseif status in (Solvers.IllPosed, Solvers.NearIllPosed)
+        return MOI.OTHER_LIMIT
     else
         @warn("Hypatia status $(opt.solver.status) not handled")
         return MOI.OTHER_ERROR
@@ -313,7 +315,7 @@ function MOI.get(opt::Optimizer, attr::MOI.PrimalStatus)
         return MOI.INFEASIBILITY_CERTIFICATE
     elseif status == Solvers.NearDualInfeasible
         return MOI.NEARLY_INFEASIBILITY_CERTIFICATE
-    elseif status == Solvers.IllPosed
+    elseif status in (Solvers.IllPosed, Solvers.NearIllPosed)
         return MOI.OTHER_RESULT_STATUS
     else
         return MOI.UNKNOWN_RESULT_STATUS
@@ -335,7 +337,7 @@ function MOI.get(opt::Optimizer, attr::MOI.DualStatus)
         return MOI.NEARLY_INFEASIBILITY_CERTIFICATE
     elseif status == Solvers.DualInfeasible
         return MOI.INFEASIBLE_POINT
-    elseif status == Solvers.IllPosed
+    elseif status in (Solvers.IllPosed, Solvers.NearIllPosed)
         return MOI.OTHER_RESULT_STATUS
     else
         return MOI.UNKNOWN_RESULT_STATUS
