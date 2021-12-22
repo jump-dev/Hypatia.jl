@@ -339,20 +339,20 @@ See [`Cones.EpiNormSpectral`](@ref).
 $(TYPEDFIELDS)
 """
 struct EpiNormSpectralCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
-    n::Int
-    m::Int
+    d1::Int
+    d2::Int
     use_dual::Bool
 end
 export EpiNormSpectralCone
 
-EpiNormSpectralCone{T, R}(n::Int, m::Int) where {T <: Real, R <: RealOrComplex{T}} =
-    EpiNormSpectralCone{T, R}(n, m, false)
+EpiNormSpectralCone{T, R}(d1::Int, d2::Int) where {T <: Real, R <: RealOrComplex{T}} =
+    EpiNormSpectralCone{T, R}(d1, d2, false)
 
 MOI.dimension(cone::EpiNormSpectralCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
-    1 + Cones.vec_length(R, cone.n * cone.m)
+    1 + Cones.vec_length(R, cone.d1 * cone.d2)
 
 cone_from_moi(::Type{T}, cone::EpiNormSpectralCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
-    Cones.EpiNormSpectral{T, R}(cone.n, cone.m, use_dual = cone.use_dual)
+    Cones.EpiNormSpectral{T, R}(cone.d1, cone.d2, use_dual = cone.use_dual)
 
 """
 $(TYPEDEF)
@@ -362,20 +362,20 @@ See [`Cones.MatrixEpiPerSquare`](@ref).
 $(TYPEDFIELDS)
 """
 struct MatrixEpiPerSquareCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
-    n::Int
-    m::Int
+    d1::Int
+    d2::Int
     use_dual::Bool
 end
 export MatrixEpiPerSquareCone
 
-MatrixEpiPerSquareCone{T, R}(n::Int, m::Int) where {T <: Real, R <: RealOrComplex{T}} =
-    MatrixEpiPerSquareCone{T, R}(n, m, false)
+MatrixEpiPerSquareCone{T, R}(d1::Int, d2::Int) where {T <: Real, R <: RealOrComplex{T}} =
+    MatrixEpiPerSquareCone{T, R}(d1, d2, false)
 
 MOI.dimension(cone::MatrixEpiPerSquareCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
-    Cones.svec_length(R, cone.n) + 1 + Cones.vec_length(R, cone.n * cone.m)
+    Cones.svec_length(R, cone.d1) + 1 + Cones.vec_length(R, cone.d1 * cone.d2)
 
 cone_from_moi(::Type{T}, cone::MatrixEpiPerSquareCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
-    Cones.MatrixEpiPerSquare{T, R}(cone.n, cone.m, use_dual = cone.use_dual)
+    Cones.MatrixEpiPerSquare{T, R}(cone.d1, cone.d2, use_dual = cone.use_dual)
 
 """
 $(TYPEDEF)
