@@ -1,8 +1,3 @@
-#=
-TODO in complex case, can maybe compute Lambda fast in feas check by taking sqrt of
-point and doing outer product
-=#
-
 """
 $(TYPEDEF)
 
@@ -101,6 +96,7 @@ function update_feas(cone::WSOSInterpNonnegative)
             LLk = cone.tempLL[k]
 
             # Λ = Pk' * Diagonal(point) * Pk
+            # TODO for complex case, can do sqrt and outer product
             @. LUk = Pk' * cone.point' # currently faster than mul!(LUk, Pk', D)
             mul!(LLk, LUk, Pk)
 
@@ -114,6 +110,11 @@ function update_feas(cone::WSOSInterpNonnegative)
 
     cone.feas_updated = true
     return cone.is_feas
+end
+
+function is_dual_feas(cone::WSOSInterpNonnegative{T}) where {T}
+    # condition is necessary but not sufficient for dual feasibility
+    return all(>(eps(T)), cone.dual_point)
 end
 
 function update_grad(cone::WSOSInterpNonnegative)
