@@ -2,7 +2,7 @@
 $(TYPEDEF)
 
 Interpolant-basis weighted sum-of-squares polynomial cone of dimension `U`, for
-real or real-valued complex polynomials , parametrized by vector of matrices
+real or real-valued complex polynomials, parametrized by vector of matrices
 `Ps` derived from interpolant basis and polynomial domain constraints.
 
     $(FUNCTIONNAME){T, R}(U::Int, Ps::Vector{Matrix{R}}, use_dual::Bool = false)
