@@ -181,12 +181,12 @@ function update_inv_hess(cone::GeneralizedPower{T}) where {T <: Real}
     @. uiα = α / u
     k2 = -dot(uiα, guiα)
     k1 = (1 + w2 / z) / 2 - k2 * gww
-    k3 = zw * (-k2 * (gww + 2) / k1 + 1) / (z + w2)
-    k4 = -gww / k1
+    k3 = (gww - 4 * w2 / zw) / k1
+    k4 = zw * (-k2 * (gww + 2) / k1 + 1) / (z + w2)
     zw2 = zw / 2
 
     @inbounds for j in u_idxs
-        guiαj = -guiα[j] * k4
+        guiαj = -guiα[j] * k3
         for i in 1:j
             H[i, j] = guiα[i] * guiαj
         end
@@ -199,7 +199,7 @@ function update_inv_hess(cone::GeneralizedPower{T}) where {T <: Real}
             H[i, j] = -guiα[i] * wj / k1
         end
         for i in first(w_idxs):j
-            H[i, j] = -cone.point[i] * wj * k3
+            H[i, j] = -cone.point[i] * wj * k4
         end
         H[j, j] += zw2
     end
@@ -274,6 +274,7 @@ function inv_hess_prod!(
     k2 = -dot(uiα, guiα)
     k1 = (1 + w2 / z) / 2 - k2 * gww
     k3 = zw * (-k2 * (gww + 2) + k1) / (z + w2)
+    k4 = gww - 4 * w2 / zw
 
     @inbounds for j in 1:size(arr, 2)
         @views begin
@@ -285,7 +286,92 @@ function inv_hess_prod!(
         dot_wr = dot(r, w)
         dot_pu = dot(guiα, p)
         @. prod_w = zw * r / 2 - w * (k3 * dot_wr + dot_pu) / k1
-        @. prod_u = p * u / -gu - guiα * (-gww * dot_pu + dot_wr) / k1
+        @. prod_u = p * u / -gu - guiα * (k4 * dot_pu + dot_wr) / k1
+
+        A = zw^2 * dot(-w, r) / (z + w2) / 2
+        B = 2 * w2 * z / (z + w2)
+        # c = 1 .- α - u .* -gu
+        c = α * (-gww - 2)
+        # @show c ./ (α * (-gww - 2))
+        y = -sum(α ./ u ./ gu / zw .* (-2 * c * A - p .* u * zw)) / (1 + sum(α ./ u ./ gu / zw .* (4α*z .+ 2c * (z - B))))
+        y = (2 * -k2 / zw * (-gww - 2) * A + dot_pu) / (1 + -k2 / zw * (4 * z .+ 2 * (-gww - 2) * (z - B))) # <-------- last line in latex
+
+        try_prod_w = zw * r / 2 - w * 2 / zw * ((z - B) * y - A)
+        try_prod_w = zw * r / 2 - w * 2 / zw * ((z - B) * (2 * -k2 / zw * (-gww - 2) * A + dot_pu) / (1 + -k2 / zw * (4 * z .+ 2 * (-gww - 2) * (z - B))) - A) # sub in y
+        try_prod_w = zw * r / 2 - w * 2 / zw * ((2 * -k2 / zw * (-gww - 2) * A + dot_pu) / (1 / (z - B) + -k2 / zw * (4 * z / (z - B) .+ 2 * (-gww - 2))) - A) # bring in z - B
+        try_prod_w = zw * r / 2 - w * 2 / zw * ((2 * -k2 / zw * (-gww - 2) * A + dot_pu) / ((z + w2) / z / zw + -k2 / zw * (4 * (z + w2) / zw .+ 2 * (-gww - 2))) - A) # sub in z - B
+        try_prod_w = zw * r / 2 - w * 2 * ((2 * -k2 / zw * (-gww - 2) * A + dot_pu) / ((z + w2) / z + -k2 * (4 * (z + w2) / zw .+ 2 * (-gww - 2))) - A / zw) # cancel zw
+
+        @assert k1 ≈ ((z + w2) / z + -k2 * (4 * (z + w2) / zw .+ 2 * (-gww - 2))) / 2
+        @assert k1 ≈ (z + w2) / z / 2 + -k2 * (2 * (z + w2) / zw - gww - 2)
+        @assert (z + w2) / zw ≈ (zw + 2w2) / zw ≈ 1 + 2w2 / zw ≈ 1 + gww # definitional! from grad of the barrier function
+        @assert k1 ≈ (z + w2) / z / 2 + -k2 * gww
+
+        try_prod_w = zw * r / 2 - w * 2 * ((2 * -k2 / zw * (-gww - 2) * A + dot_pu) / 2k1 - A / zw) # sub in k1
+        try_prod_w = zw * r / 2 - w * 2 * (((2 * -k2 * (-gww - 2) - 2k1) * A / zw + dot_pu) / 2k1) # group A
+        try_prod_w = zw * r / 2 - w * 2 * ((2 * k2 * (-gww - 2) + 2k1) * zw * dot_wr / (z + w2) / 2 + dot_pu) / 2k1 # sub A
+        try_prod_w = zw * r / 2 - w * ((2 * k2 * (-gww - 2) + 2k1) * zw * dot_wr / (z + w2) / 2 + dot_pu) / k1 # cancel 2
+        @assert k3 ≈ (2 * k2 * (-gww - 2) + 2k1) * zw / (z + w2) / 2
+        @assert k3 ≈ (-k2 * (gww + 2) + k1) * zw / (z + w2)
+
+
+        @assert k3 ≈ (-k2 * (gww + 2) + k1) / (1 + gww)
+        @assert k3 ≈ -k2 * (gww + 2) / (1 + gww) + k1 / (1 + gww)
+        @assert k3 ≈ -k2 - k2 / (1 + gww)  + k1 / (1 + gww)
+        @assert k3 ≈ -k2  + ((1 + w2 / z) / 2 - k2 * (gww + 1)) / (1 + gww)
+        @assert k3 ≈ -k2  + (1 + w2 / z) / 2 / (1 + gww) - k2 # meh
+        @assert k4 ≈ -gww
+
+        try_prod_u = -(4α * z * y + 2α * (-gww - 2) * (z * y - dot(prod_w, -w)) - p .* u * zw)./ (-gu * zw) # this is old prod = ... from ungeneralized n section, but after subbing trick
+        try_prod_u = -(2α * -gww * z * y + 2α * (-gww - 2) * (-dot(prod_w, -w)) - p .* u * zw)./ (-gu * zw) # group y
+
+        y = (2 * -k2 * (-gww - 2) * zw * -dot_wr / (z + w2) / 2 + dot_pu) / (1 + -k2 / zw * (4 * z .+ 2 * (-gww - 2) * (z - B))) # sub for A
+        y = (2 * -k2 * (-gww - 2) * zw * -dot_wr / (z + w2) / 2 + dot_pu) / (1 + -k2 / zw * (4 * z .+ 2 * (-gww - 2) * z * zw / (z + w2))) # sub for z - B
+        y = (-k2 * (-gww - 2) * zw * -dot_wr / (z + w2) + dot_pu) / (1 + -k2 / zw * z * (4 .+ 2 * (-gww - 2) * zw / (z + w2))) # move z, cancel 2
+        k5 = -k2 * (-gww - 2) * zw / (z + w2)
+        y = (k5 * -dot_wr + dot_pu) / (1 + (-k2 * 2 .+ k5) * z / zw * 2)
+        y = k5 / (1 + (-k2 * 2 .+ k5) * z / zw * 2) * -dot_wr + dot_pu / (1 + (-k2 * 2 .+ k5) * z / zw * 2) # next plan, simplify y. there should be a way
+        @assert 1 + (-k2 * 2 .+ k5) * z / zw * 2 ≈
+            1 + (-k2 * 2 .+ -k2 * (-gww - 2) * zw / (z + w2)) * 2z / zw ≈
+            1 + (-k2 * 2 .+ -k2 * (-gww - 2) / (1 + gww)) * 2z / zw ≈
+            1 + ((-k2 * (2 + 2gww) .+ -k2 * (-gww - 2)) / (1 + gww)) * 2z / zw
+            1 + (-k2 * gww) / (1 + gww) * 2z / zw
+        y = (-k2 * (-gww - 2) * -dot_wr / (1 + gww) + dot_pu) / (1 + (-k2 * gww) / (1 + gww) * 2z / zw)
+        C = -k2 * (-gww - 2) / (1 + gww)
+        D = 1 + (-k2 * gww) / (1 + gww) * 2z / zw
+        y = -C / D * dot_wr + dot_pu / D
+
+
+
+        try_prod_u = -(2α * -gww * z * y + 2α * (-gww - 2) * (-dot(zw * r / 2 - w * 2 / zw * ((z - B) * y - A), -w)) - p .* u * zw)./ (-gu * zw) # sub for first prod_w
+        try_prod_u = -(2α * -gww * z * y + 2α * (-gww - 2) * (-dot(zw * r / 2 - w * (k3 * dot_wr + dot_pu) / k1, -w)) - p .* u * zw)./ (-gu * zw) # sub most simplified prod_w
+        try_prod_u = -(2α * -gww * z * y + 2α * (-gww - 2) * (dot_wr * zw / 2 - (k3 * dot_wr + dot_pu) / k1 * w2) - p .* u * zw)./ (-gu * zw) # expand out dot
+        try_prod_u = -(2α * -gww * z * y + 2α * (-gww - 2) * (dot_wr * (zw / 2 - k3 / k1 * w2) - dot_pu / k1 * w2) - p .* u * zw)./ (-gu * zw) # group dot_wr
+        try_prod_u = p .* u ./ -gu - (2α * -gww * z * y + 2α * (-gww - 2) * (dot_wr * (zw / 2 - k3 / k1 * w2) - dot_pu / k1 * w2))./ (-gu * zw) # move pu/gu
+        try_prod_u = p .* u ./ -gu - (2α * -gww * z * (-C / D * dot_wr + dot_pu / D) + 2α * (-gww - 2) * (dot_wr * (zw / 2 - k3 / k1 * w2) - dot_pu / k1 * w2))./ (-gu * zw) # sub last y
+        try_prod_u = p .* u ./ -gu -
+            dot_wr * (2α * -gww * z * -C / D + 2α * (-gww - 2) * (zw / 2 - k3 / k1 * w2)) ./ (-gu * zw) -
+            dot_pu * (2α * -gww * z / D + 2α * (-gww - 2) / -k1 * w2) ./ (-gu * zw)
+
+        @assert (2α * -gww * z * -C / D + 2α * (-gww - 2) * (zw / 2 - k3 / k1 * w2)) ./ (-gu * zw) ≈
+            2α ./ -gu * (-gww * z * -C / D + (-gww - 2) * (zw / 2 - zw * (-k2 * (gww + 2) + k1) / (z + w2) / k1 * w2)) ./ zw ≈
+            2α ./ -gu * (-gww * z * -C / D / zw + (-gww - 2) * (1 / 2 - (-k2 * (gww + 2) + k1) / (z + w2) / k1 * w2)) ≈
+            2α ./ -gu * (-gww * z * -C / (zw + (-k2 * gww) / (1 + gww) * 2z) + (-gww - 2) * (1 / 2 - (-k2 * (gww + 2) + k1) / (z + w2) / k1 * w2)) ≈
+            2α ./ -gu * (-gww * z * k2 * (-gww - 2) / (1 + gww) / (zw + (-k2 * gww) / (1 + gww) * 2z) + (-gww - 2) * (1 / 2 - (-k2 * (gww + 2) + k1) / (z + w2) / k1 * w2)) ≈
+            2α ./ -gu * (-gww * z * k2 * (-gww - 2) / (zw * (1 + gww) + (-k2 * gww) * 2z) + (-gww - 2) * (1 / 2 - (-k2 * (gww + 2) + k1) / (z + w2) / k1 * w2))
+
+        @assert (2α * -gww * z / D + 2α * (-gww - 2) / -k1 * w2) ./ (-gu * zw) ≈
+            2α ./ -gu * (-gww * z + (-gww - 2) / -k1 * w2 * (1 + (-k2 * gww) / (1 + gww) * 2z / zw)) / zw / D ≈
+            2α ./ -gu * (-gww * z * -((1 + w2 / z) / 2 - k2 * gww) + (-gww - 2) * w2 + (-gww - 2) * w2 * (-k2 * gww) / (1 + gww) * 2z / zw) / zw / D / -k1
+
+
+        @show try_prod_u ./ prod_u
+
+        # @show try_prod_w ./ prod_w
+
+
+
+
     end
 
     return prod
