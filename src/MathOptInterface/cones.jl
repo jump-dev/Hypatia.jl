@@ -592,6 +592,32 @@ cone_from_moi(::Type{T}, cone::WSOSInterpNonnegativeCone{T, R}) where {T <: Real
 """
 $(TYPEDEF)
 
+See [`Cones.WSOSInterpNonnegative2`](@ref).
+
+$(TYPEDFIELDS)
+"""
+struct WSOSInterpNonnegativeCone2{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
+    U::Int
+    initial_point
+    P::Matrix{R}
+    Ls
+    gs
+    use_dual::Bool
+end
+export WSOSInterpNonnegativeCone2
+
+WSOSInterpNonnegativeCone2{T, R}(U::Int, initial_point, P::Matrix{R}, Ls, gs) where
+    {T <: Real, R <: RealOrComplex{T}} =
+    WSOSInterpNonnegativeCone2{T, R}(U, initial_point, P, Ls, gs, false)
+
+MOI.dimension(cone::WSOSInterpNonnegativeCone2) = cone.U
+
+cone_from_moi(::Type{T}, cone::WSOSInterpNonnegativeCone2{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
+    Cones.WSOSInterpNonnegative2{T, R}(cone.U, cone.initial_point, cone.P, cone.Ls, cone.gs, use_dual = cone.use_dual)
+
+"""
+$(TYPEDEF)
+
 See [`Cones.WSOSInterpPosSemidefTri`](@ref).
 
 $(TYPEDFIELDS)
@@ -692,6 +718,8 @@ const HypatiaCones{T <: Real} = Union{
     EpiTrRelEntropyTriCone{T},
     WSOSInterpNonnegativeCone{T, T},
     WSOSInterpNonnegativeCone{T, Complex{T}},
+    WSOSInterpNonnegativeCone2{T, T},
+    WSOSInterpNonnegativeCone2{T, Complex{T}},
     WSOSInterpPosSemidefTriCone{T},
     WSOSInterpEpiNormOneCone{T},
     WSOSInterpEpiNormEuclCone{T},

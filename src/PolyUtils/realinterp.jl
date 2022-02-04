@@ -395,3 +395,20 @@ function make_product_vandermonde(
 
     return V
 end
+
+# takes in points in the domain of positivity and figures out an interior point for the cone parametrized by interpolation points corresponding to F
+function initial_wsos_point(F, points, lb::Vector{T}, ub::Vector{T}, order, shift) where {T}
+    # shift and scale points into [-1, 1]^n, needed if didn't use sampling for F, points, this part is confusing
+    points_shift = copy(points)
+    if shift
+        for i in 1:size(points, 1)
+            points_shift[i, :] = (points[i, :] .- (lb .+ ub) ./ 2) ./ (ub .- lb) .* 2
+        end
+    end
+    X = hcat(points_shift) # for 1 by 1 matrix edge-case
+    V = make_chebyshev_vandermonde(X, 2order)
+    # evaluation of the lagrange polynomials at the points
+    point_evals = F \ V'
+    # a feasible moment sequence is obtained from putting weight 1 on every evaluation of each interpoloation point
+    return vec(sum(point_evals, dims = 2))
+end
