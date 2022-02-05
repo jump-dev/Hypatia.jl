@@ -184,7 +184,7 @@ function hess_prod_slow!(
             arrg = g .* arr[:, j] # TODO in place
             partial_lambda!(LUk, arrg, LLk, ΛFLPk)
             for i in 1:cone.dim
-                prod[i, j] += real(dot(ΛFLPk[:, i], LUk[:, i])) * g[i] * g[j]
+                prod[i, j] += real(dot(ΛFLPk[:, i], LUk[:, i])) * g[i]
             end
         end
     end
@@ -200,7 +200,7 @@ function dder3(cone::WSOSInterpNonnegative2, dir::AbstractVector)
         dirg = g .* dir # TODO in place
         LUk = partial_lambda!(cone.tempLU[k], dirg, cone.tempLL2[k], cone.ΛFLP[k])
         @views for j in 1:cone.dim
-            dder3[j] += sum(abs2, LUk[:, j] * g[j])
+            dder3[j] += sum(abs2, LUk[:, j]) * g[j]
         end
     end
     return dder3

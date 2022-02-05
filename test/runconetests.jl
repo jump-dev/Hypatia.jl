@@ -42,7 +42,7 @@ function cone_types(T::Type{<:Real})
         # Cones.WSOSInterpNonnegative{T, T},
         # Cones.WSOSInterpNonnegative{T, Complex{T}},
         Cones.WSOSInterpNonnegative2{T, T},
-        Cones.WSOSInterpNonnegative2{T, Complex{T}},
+        # Cones.WSOSInterpNonnegative2{T, Complex{T}}, # TODO test
         # Cones.WSOSInterpPosSemidefTri{T},
         # Cones.WSOSInterpEpiNormEucl{T},
         # Cones.WSOSInterpEpiNormOne{T},

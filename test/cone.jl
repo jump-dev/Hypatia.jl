@@ -819,11 +819,21 @@ function test_oracles(C::Type{Cones.WSOSInterpNonnegative2{T, R}}) where {T, R}
     end
 end
 
-# function test_barrier(C::Type{Cones.WSOSInterpNonnegative2{T, R}}) where {T, R}
-#     (d, Ps) = rand_interp(2, 1, R)
-#     barrier(s) = -sum(logdet_pd(Hermitian(P' * Diagonal(s) * P)) for P in Ps)
-#     test_barrier(C(d, Ps), barrier)
-# end
+function test_barrier(C::Type{Cones.WSOSInterpNonnegative2{T, R}}) where {T, R}
+    # (d, Ps) = rand_interp(2, 1, R)
+    (num_vars, halfdeg) = (2, 1)
+    dom = PolyUtils.BoxDomain{T}(-ones(T, num_vars), ones(T, num_vars))
+    sample = false
+    (U, pts, Ps, V) = PolyUtils.interpolate(dom, halfdeg, sample = sample, calc_V = true) # use a unit box domain
+    F = qr!(Array(V'), Val(true))
+    Ls = [size(P, 2) for P in Ps]
+    gs = vcat([ones(U)], [(1 .- pts[:, i]) .* (1 .+ pts[:, i]) for i in 1:num_vars])
+    # U points enough for strict interior. seems like not enough for perturbed point to be feasible too, so get 2U
+    init_support_points = PolyUtils.sample(dom, 2 * U)
+    initial_point = PolyUtils.initial_wsos_point(F, init_support_points, -ones(T, num_vars), ones(T, num_vars), halfdeg, !sample)
+    barrier(s) = -sum(logdet_pd(Hermitian((Ps[1][:, 1:L])' * Diagonal(s .* g) * Ps[1][:, 1:L])) for (L, g) in zip(Ls, gs))
+    test_barrier(C(U, initial_point, Ps[1], Ls, gs), barrier)
+end
 #
 # show_time_alloc(C::Type{Cones.WSOSInterpNonnegative2{T, R}}) where {T, R} =
 #     show_time_alloc(C(rand_interp(3, 1, R)...))
