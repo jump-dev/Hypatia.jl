@@ -205,15 +205,3 @@ function dder3(cone::WSOSInterpNonnegative2, dir::AbstractVector)
     end
     return dder3
 end
-
-function partial_lambda!(
-    LUk::Matrix,
-    dir::AbstractVector,
-    LLk::Matrix,
-    ΛFLPk::Matrix,
-    )
-    mul!(LUk, ΛFLPk, Diagonal(dir))
-    mul!(LLk, LUk, ΛFLPk')
-    mul!(LUk, Hermitian(LLk), ΛFLPk)
-    return LUk
-end
