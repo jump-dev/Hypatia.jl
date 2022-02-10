@@ -38,6 +38,15 @@ stepper_options = [
     "toa" => porc(use_adjustment = true, use_curve_search = false),
     "curve" => porc(use_adjustment = true, use_curve_search = true),
     "comb" => comb(shift_sched = 0),
+    "prox_val2" => porc(use_adjustment = false, use_curve_search = false,
+        prox_bound = 0.5),
+    "prox_val3" => porc(use_adjustment = false, use_curve_search = false,
+        prox_bound = 0.99),
+    "prox_val4" => porc(use_adjustment = false, use_curve_search = false,
+        prox_bound = 0.9999),
+    "comb_val2" => comb(shift_sched = 0, prox_bound = 0.5),
+    "comb_val3" => comb(shift_sched = 0, prox_bound = 0.99),
+    "comb_val4" => comb(shift_sched = 0, prox_bound = 0.9999),
     ]
 
 # instance sets and real types to run and corresponding time limits (seconds)
