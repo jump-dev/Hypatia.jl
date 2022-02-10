@@ -18,6 +18,7 @@ cone_from_moi(::Type{T}, cone::MOI.NormInfinityCone) where {T <: Real} =
     Cones.EpiNormInf{T, T}(MOI.dimension(cone))
 
 cone_from_moi(::Type{T}, cone::MOI.NormOneCone) where {T <: Real} =
+    # Cones.EpiNormOne{T}(MOI.dimension(cone))
     Cones.EpiNormInf{T, T}(MOI.dimension(cone), use_dual = true)
 
 cone_from_moi(::Type{T}, cone::MOI.SecondOrderCone) where {T <: Real} =
@@ -275,6 +276,27 @@ MOI.dimension(cone::EpiNormInfCone) = cone.dim
 
 cone_from_moi(::Type{T}, cone::EpiNormInfCone{T, R}) where {T <: Real, R <: RealOrComplex{T}} =
     Cones.EpiNormInf{T, R}(cone.dim, use_dual = cone.use_dual)
+
+"""
+$(TYPEDEF)
+
+See [`Cones.EpiNormOne`](@ref).
+
+$(TYPEDFIELDS)
+"""
+struct EpiNormOneCone{T <: Real} <: MOI.AbstractVectorSet
+    dim::Int
+    use_dual::Bool
+end
+export EpiNormOneCone
+
+EpiNormOneCone{T}(dim::Int) where {T <: Real} =
+    EpiNormOneCone{T}(dim, false)
+
+MOI.dimension(cone::EpiNormOneCone) = cone.dim
+
+cone_from_moi(::Type{T}, cone::EpiNormOneCone{T}) where {T <: Real} =
+    Cones.EpiNormOne{T}(cone.dim, use_dual = cone.use_dual)
 
 """
 $(TYPEDEF)
@@ -671,6 +693,7 @@ const HypatiaCones{T <: Real} = Union{
     LinMatrixIneqCone{T},
     EpiNormInfCone{T, T},
     EpiNormInfCone{T, Complex{T}},
+    EpiNormOneCone{T},
     EpiNormEuclCone{T},
     EpiPerSquareCone{T},
     EpiNormSpectralTriCone{T, T},
