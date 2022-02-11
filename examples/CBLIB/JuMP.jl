@@ -2,7 +2,7 @@
 run a CBLIB instance
 cblib_dir (defined in JuMP_test.jl) is the directory of CBLIB files
 =#
-
+cblib_dir = joinpath(ENV["HOME"], "cblib/cblib.zib.de/download/all")
 struct CBLIBJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     name::String # filename of CBLIB instance
 end

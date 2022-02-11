@@ -39,4 +39,8 @@ insts["fast"] = [
     ((:cancer, 4, false, true, true),),
     ((:cancer, 4, true, false, true),),
     ]
+insts["various"] = [
+    ((50, 1, 4, false, false, true),),
+    ((50, 1, 10, false, false, true),),
+    ]
 return (DensityEstNative, insts)

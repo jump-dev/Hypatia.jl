@@ -75,7 +75,7 @@ inst_sets = [
     #= natural formulations paper =#
     # ("nat", hyp_solver),
     # ("ext", hyp_solver),
-    # ("ext", mosek_solver),
+    ("ext", mosek_solver),
     # ("extEP", hyp_solver), # ExpPSD extender
     # ("extSEP", hyp_solver), # SOCExpPSD extender
     # ("extEP", mosek_solver), # ExpPSD extender
@@ -101,6 +101,7 @@ inst_sets = [
 
 # models to run
 JuMP_examples = [
+    "CBLIB",
     #= natural formulations paper =#
     # "densityest",
     # "doptimaldesign",
