@@ -16,6 +16,14 @@ enhancements = [
     "TOA",
     "curve",
     "comb",
+    "prox_val2",
+    "prox_val3",
+    "prox_val4",
+    "prox_val5",
+    "comb_val2",
+    "comb_val3",
+    "comb_val4",
+    "comb_val5",
     ]
 
 compare_pairs = [
