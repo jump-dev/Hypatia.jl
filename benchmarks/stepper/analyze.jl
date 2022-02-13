@@ -16,6 +16,14 @@ enhancements = [
     "TOA",
     "curve",
     "comb",
+    # "prox_val2",
+    # "prox_val3",
+    # "prox_val4",
+    # "prox_val5",
+    # "comb_val2",
+    # "comb_val3",
+    # "comb_val4",
+    # "comb_val5",
     ]
 
 compare_pairs = [
@@ -46,7 +54,7 @@ function extra_stats(all_df)
     for enh in ("basic", "comb")
         enh_conv = filter(t -> ((t.enhancement == enh) && t.conv), all_df)
         enh_data = select(enh_conv,
-            :npq, :iters, :solve_time,
+            :npq, :nu, :iters, :solve_time,
             :iters => ByRow(log10) => :log_iters,
             :solve_time => ByRow(log10) => :log_solve_time,
             [:time_uprhs, :solve_time] => ((x, y) -> x ./ y) => :prop_rhs,
