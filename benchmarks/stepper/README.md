@@ -30,10 +30,10 @@ pkg> add DynamicPolynomials ForwardDiff JuMP PolyJuMP Random SemialgebraicSets
 pkg> add SpecialFunctions SumOfSquares Test Printf BenchmarkProfiles
 ```
 Exit Julia.
-Set the desired version of Hypatia (e.g. v0.5.2) with:
+Set the desired version of Hypatia (e.g. v0.5.2-patch) with:
 ```shell
 cd ~/.julia/dev/Hypatia
-git checkout v0.5.2
+git checkout v0.5.2-patch
 ```
 Update packages by starting Julia again and typing `]`, then:
 ```julia
