@@ -162,7 +162,8 @@ function solve_check(
     solve_time = JuMP.solve_time(model)
     iters = MOI.get(model, MOI.BarrierIterations())
     primal_obj = JuMP.objective_value(model)
-    dual_obj = JuMP.dual_objective_value(model)
+    # dual_obj = JuMP.dual_objective_value(model)
+    dual_obj = NaN
     moi_status = JuMP.termination_status(model)
     if haskey(moi_hyp_status_map, moi_status)
         hyp_status = moi_hyp_status_map[moi_status]

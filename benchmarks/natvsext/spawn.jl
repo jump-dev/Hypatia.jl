@@ -88,6 +88,7 @@ function spawn_instance(
         LinearAlgebra.BLAS.set_num_threads(num_threads)
         @eval using MosekTools
         @eval using ECOS
+        @eval using Gurobi
         include(joinpath(@__DIR__, "../../examples/Examples.jl"))
         @eval using Main.Examples
         flush(stdout); flush(stderr)

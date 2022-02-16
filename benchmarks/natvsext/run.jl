@@ -10,6 +10,7 @@ import CSV
 import Hypatia
 using MosekTools
 using ECOS
+using Gurobi
 
 include(joinpath(@__DIR__, "../../examples/Examples.jl"))
 using Main.Examples
@@ -25,8 +26,8 @@ results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
 # setup_model_anyway = true
 setup_model_anyway = false
 
-# verbose = true # make solvers print output
-verbose = false
+verbose = true # make solvers print output
+# verbose = false
 
 iter_limit = 250
 num_threads = 16 # number of threads for BLAS and Julia processes running instances
@@ -45,11 +46,9 @@ hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     tol_rel_opt = tol_loose,
     tol_feas = tol_loose,
     tol_infeas = tol_tight,
-    init_use_indirect = true, # skips dual equalities preprocessing
-    use_dense_model = true,
     ))
 
-mosek_solver = ("Mosek", Mosek.Optimizer, (
+mosek_solver_conic = ("Mosek_conic", Mosek.Optimizer, (
     QUIET = !verbose,
     MSK_IPAR_INTPNT_MAX_ITERATIONS = iter_limit,
     MSK_IPAR_NUM_THREADS = num_threads,
@@ -60,6 +59,43 @@ mosek_solver = ("Mosek", Mosek.Optimizer, (
     MSK_DPAR_INTPNT_CO_TOL_PFEAS = tol_loose,
     MSK_DPAR_INTPNT_CO_TOL_DFEAS = tol_loose,
     MSK_DPAR_INTPNT_CO_TOL_INFEAS = tol_tight,
+    ))
+
+mosek_solver_intpnt = ("Mosek_intpnt", Mosek.Optimizer, (
+    QUIET = !verbose,
+    MSK_IPAR_NUM_THREADS = num_threads,
+    MSK_IPAR_OPTIMIZER = Mosek.MSK_OPTIMIZER_INTPNT,
+    MSK_IPAR_INTPNT_BASIS = Mosek.MSK_BI_NEVER, # no basis identification for LP
+    MSK_DPAR_OPTIMIZER_MAX_TIME = optimizer_time_limit,
+    ))
+
+mosek_solver_simplex = ("Mosek_simplex", Mosek.Optimizer, (
+    QUIET = !verbose,
+    MSK_IPAR_NUM_THREADS = num_threads,
+    MSK_IPAR_OPTIMIZER = Mosek.MSK_OPTIMIZER_FREE_SIMPLEX,
+    MSK_DPAR_OPTIMIZER_MAX_TIME = optimizer_time_limit,
+    ))
+
+gurobi_solver_barrier = ("Gurobi_barrier", Gurobi.Optimizer, (
+    OutputFlag = 1,
+    TimeLimit = optimizer_time_limit,
+    Threads = num_threads,
+    Method = 2,
+    Crossover = 0, # no basis identification for LP
+    ))
+
+gurobi_solver_primalsimplex = ("Gurobi_primalsimplex", Gurobi.Optimizer, (
+    OutputFlag = 1,
+    TimeLimit = optimizer_time_limit,
+    Threads = num_threads,
+    Method = 0,
+    ))
+
+gurobi_solver_dualsimplex = ("Gurobi_dualsimplex", Gurobi.Optimizer, (
+    OutputFlag = 1,
+    TimeLimit = optimizer_time_limit,
+    Threads = num_threads,
+    Method = 1,
     ))
 
 ecos_solver = ("ECOS", ECOS.Optimizer, (
@@ -73,9 +109,15 @@ ecos_solver = ("ECOS", ECOS.Optimizer, (
 # instance sets and solvers to run
 inst_sets = [
     #= natural formulations paper =#
-    # ("nat", hyp_solver),
-    # ("ext", hyp_solver),
-    # ("ext", mosek_solver),
+    ("nat", hyp_solver),
+    ("ext", hyp_solver),
+    ("ext", ecos_solver),
+    ("ext", mosek_solver_conic),
+    ("ext", mosek_solver_intpnt),
+    ("ext", mosek_solver_simplex),
+    ("ext", gurobi_solver_barrier),
+    ("ext", gurobi_solver_primalsimplex),
+    ("ext", gurobi_solver_dualsimplex),
     # ("extEP", hyp_solver), # ExpPSD extender
     # ("extSEP", hyp_solver), # SOCExpPSD extender
     # ("extEP", mosek_solver), # ExpPSD extender
@@ -107,7 +149,7 @@ JuMP_examples = [
     # "matrixcompletion",
     # "matrixregression",
     # "polymin",
-    # "portfolio",
+    "portfolio",
     # "shapeconregr",
     #= WSOS cones paper =#
     # "polynorm",
