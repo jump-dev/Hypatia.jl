@@ -38,27 +38,12 @@ check_time_limit = 1.2 * optimizer_time_limit
 tol_loose = 1e-7
 tol_tight = 1e-3 * tol_loose
 
-hyp_solver = ("Hypatia", Hypatia.Optimizer, (
-    verbose = verbose,
-    iter_limit = iter_limit,
-    time_limit = optimizer_time_limit,
-    tol_abs_opt = tol_tight,
-    tol_rel_opt = tol_loose,
-    tol_feas = tol_loose,
-    tol_infeas = tol_tight,
-    ))
-
-mosek_solver_conic = ("Mosek_conic", Mosek.Optimizer, (
-    QUIET = !verbose,
-    MSK_IPAR_INTPNT_MAX_ITERATIONS = iter_limit,
-    MSK_IPAR_NUM_THREADS = num_threads,
-    MSK_IPAR_OPTIMIZER = Mosek.MSK_OPTIMIZER_CONIC,
-    MSK_IPAR_INTPNT_BASIS = Mosek.MSK_BI_NEVER, # no basis identification for LP
-    MSK_DPAR_OPTIMIZER_MAX_TIME = optimizer_time_limit,
-    MSK_DPAR_INTPNT_CO_TOL_REL_GAP = tol_loose,
-    MSK_DPAR_INTPNT_CO_TOL_PFEAS = tol_loose,
-    MSK_DPAR_INTPNT_CO_TOL_DFEAS = tol_loose,
-    MSK_DPAR_INTPNT_CO_TOL_INFEAS = tol_tight,
+ecos_solver = ("ECOS", ECOS.Optimizer, (
+    verbose = 2 * verbose,
+    maxit = iter_limit, # no time limit option available
+    abstol = tol_tight,
+    reltol = tol_loose,
+    feastol = tol_loose,
     ))
 
 mosek_solver_intpnt = ("Mosek_intpnt", Mosek.Optimizer, (
@@ -98,66 +83,21 @@ gurobi_solver_dualsimplex = ("Gurobi_dualsimplex", Gurobi.Optimizer, (
     Method = 1,
     ))
 
-ecos_solver = ("ECOS", ECOS.Optimizer, (
-    verbose = 2 * verbose,
-    maxit = iter_limit, # no time limit option available
-    abstol = tol_tight,
-    reltol = tol_loose,
-    feastol = tol_loose,
-    ))
-
 # instance sets and solvers to run
 inst_sets = [
     #= natural formulations paper =#
-    ("nat", hyp_solver),
-    ("ext", hyp_solver),
     ("ext", ecos_solver),
-    ("ext", mosek_solver_conic),
     ("ext", mosek_solver_intpnt),
     ("ext", mosek_solver_simplex),
     ("ext", gurobi_solver_barrier),
     ("ext", gurobi_solver_primalsimplex),
     ("ext", gurobi_solver_dualsimplex),
-    # ("extEP", hyp_solver), # ExpPSD extender
-    # ("extSEP", hyp_solver), # SOCExpPSD extender
-    # ("extEP", mosek_solver), # ExpPSD extender
-    # ("extSEP", mosek_solver), # SOCExpPSD extender
-    #= WSOS cones paper =#
-    # ("nat", hyp_solver),
-    # ("ext", hyp_solver),
-    # ("extmat", hyp_solver),
-    #= spectral function cones paper =#
-    # ("nat", hyp_solver),
-    # ("ext", hyp_solver),
-    # ("extmat", hyp_solver),
-    #= spectral function cones paper =#
-    # ("nat", hyp_solver),
-    # ("natlog", hyp_solver),
-    # ("ext", hyp_solver),
-    # ("ext", mosek_solver),
-    # for nonparametricdistr (allows ECOS)
-    # ("vecext", hyp_solver),
-    # ("vecext", mosek_solver),
-    # ("vecext", ecos_solver),
     ]
 
 # models to run
 JuMP_examples = [
     #= natural formulations paper =#
-    # "densityest",
-    # "doptimaldesign",
-    # "matrixcompletion",
-    # "matrixregression",
-    # "polymin",
     "portfolio",
-    # "shapeconregr",
-    #= WSOS cones paper =#
-    # "polynorm",
-    #= spectral function cones paper =#
-    # "centralpolymat",
-    # "classicalquantum",
-    # "experimentdesign",
-    # "nonparametricdistr",
     ]
 
 interrupt()
