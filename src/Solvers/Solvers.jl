@@ -78,6 +78,7 @@ mutable struct Solver{T <: Real}
     tol_abs_opt::T
     tol_feas::T
     tol_infeas::T
+    tol_tau_infeas::T
     tol_illposed::T
     tol_slow::T
     near_factor::T
@@ -184,6 +185,7 @@ mutable struct Solver{T <: Real}
         tol_abs_opt::RealOrNothing = nothing,
         tol_feas::RealOrNothing = nothing,
         tol_infeas::RealOrNothing = nothing,
+        tol_tau_infeas::RealOrNothing = nothing,
         tol_illposed::RealOrNothing = nothing,
         default_tol_power::RealOrNothing = nothing,
         default_tol_relax::RealOrNothing = nothing,
@@ -230,6 +232,9 @@ mutable struct Solver{T <: Real}
         if isnothing(tol_infeas)
             tol_infeas = default_tol_tight
         end
+        if isnothing(tol_tau_infeas)
+            tol_tau_infeas = T(1e-2)
+        end
         if isnothing(tol_illposed)
             tol_illposed = default_tol_tight
         end
@@ -245,6 +250,7 @@ mutable struct Solver{T <: Real}
         solver.tol_abs_opt = tol_abs_opt
         solver.tol_feas = tol_feas
         solver.tol_infeas = tol_infeas
+        solver.tol_tau_infeas = tol_tau_infeas
         solver.tol_illposed = tol_illposed
         solver.tol_slow = tol_slow
         solver.near_factor = near_factor
@@ -664,11 +670,11 @@ function check_converged(
     check_near::Bool = false,
     ) where {T <: Real}
     near_factor = (check_near ? solver.near_factor : one(T))
-
     tau = solver.point.tau[]
     primal_obj_t = solver.primal_obj_t
     dual_obj_t = solver.dual_obj_t
 
+    # check optimality
     worst_feas = max(solver.x_feas, solver.y_feas, solver.z_feas)
     is_feas = (worst_feas <= near_factor * solver.tol_feas)
     if is_feas
@@ -683,19 +689,20 @@ function check_converged(
         end
     end
 
-    if dual_obj_t > eps(T)
-        if solver.x_norm_res_t <= near_factor * solver.tol_infeas * dual_obj_t
+    # check primal or dual infeasibility
+    if tau <= near_factor * solver.tol_tau_infeas
+        tol = near_factor * solver.tol_infeas
+
+        if (dual_obj_t > eps(T)) && (solver.x_norm_res_t <= tol * dual_obj_t)
             solver.verbose && println("primal infeasibility detected; terminating")
             solver.status = (check_near ? NearPrimalInfeasible : PrimalInfeasible)
             solver.primal_obj = primal_obj_t
             solver.dual_obj = dual_obj_t
             return true
         end
-    end
 
-    if primal_obj_t < -eps(T)
         yz_res = max(solver.y_norm_res_t, solver.z_norm_res_t)
-        if yz_res <= near_factor * solver.tol_infeas * -primal_obj_t
+        if (primal_obj_t < -eps(T)) && (yz_res <= tol * -primal_obj_t)
             solver.verbose && println("dual infeasibility detected; terminating")
             solver.status = (check_near ? NearDualInfeasible : DualInfeasible)
             solver.primal_obj = primal_obj_t
@@ -704,7 +711,7 @@ function check_converged(
         end
     end
 
-    # TODO experiment with ill-posedness check
+    # check ill-posedness
     if max(tau, solver.point.kap[]) <= near_factor * solver.tol_illposed
         solver.verbose && println("ill-posedness detected; terminating")
         solver.status = (check_near ? NearIllPosed : IllPosed)

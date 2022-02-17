@@ -10,7 +10,7 @@ min 1/(2n) * ||Y - X * A||_fro^2 + lam_fro * ||A||_fro + lam_nuc * ||A||_nuc +
 - ||.||_nuc is the nuclear norm
 - ||.||_las is the L1 norm
 - ||.||_glr is the row group lasso penalty (L1 norm of row groups)
-- ||.||_glc  is the column group lasso penalty (L1 norm of column groups)
+- ||.||_glc is the column group lasso penalty (L1 norm of column groups)
 
 TODO
 - generalize for sparse Y,X but make sure qr factorization does not permute
