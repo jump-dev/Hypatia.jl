@@ -16,14 +16,19 @@ enhancements = [
     "TOA",
     "curve",
     "comb",
-    # "prox_val2",
-    # "prox_val3",
-    # "prox_val4",
-    # "prox_val5",
-    # "comb_val2",
-    # "comb_val3",
-    # "comb_val4",
-    # "comb_val5",
+    ]
+
+validations = [
+    "prox_val2",
+    "prox_val3",
+    "prox_val4",
+    "prox",
+    "prox_val5",
+    "comb_val2",
+    "comb_val3",
+    "comb_val4",
+    "comb",
+    "comb_val5",
     ]
 
 compare_pairs = [
@@ -130,6 +135,9 @@ function post_process()
     end
     extra_stats(all_df)
 
+    all_df_val = preprocess_df(validation = true)
+    make_agg_tables(all_df_val, validation = true)
+
     return
 end
 
@@ -164,7 +172,7 @@ function get_enhancement(x)
     return sol_opt[1]
 end
 
-function preprocess_df()
+function preprocess_df(; validation = false)
     all_df = CSV.read(bench_file, DataFrame)
 
     # only keep wanted instance set
@@ -172,6 +180,8 @@ function preprocess_df()
 
     # get enhancement name from solver options
     transform!(all_df, :solver_options => ByRow(get_enhancement) => :enhancement)
+    comps = (validation ? validations : enhancements)
+    filter!(t -> (t.enhancement in lowercase.(comps)), all_df)
 
     # check if any instances could be duplicates:
     possible_dupes = nonunique(all_df, [:enhancement, :example, :inst_data,
@@ -215,7 +225,7 @@ function preprocess_df()
     return all_df
 end
 
-function make_agg_tables(all_df)
+function make_agg_tables(all_df; validation = false)
     # calculate caps for replacing time/iters of unconverged instances
     # use double the largest value for the same instance across all steppers
     # assumes instances are in the same order for all steppers
@@ -257,9 +267,11 @@ function make_agg_tables(all_df)
         :status => length => :total,
         )
 
+    comps = (validation ? validations : enhancements)
     sort!(df_agg, order(:enhancement, by = (x ->
-        findfirst(isequal(x), lowercase.(enhancements)))))
-    CSV.write(joinpath(stats_dir, "agg.csv"), df_agg)
+        findfirst(isequal(x), lowercase.(comps)))))
+    suff = (validation ? "val" : "enh")
+    CSV.write(joinpath(stats_dir, "agg_" * suff * ".csv"), df_agg)
 
     # prepare latex table
 
@@ -267,14 +279,18 @@ function make_agg_tables(all_df)
     transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] =>
         ByRow((x...) -> sum(x)) => :converged)
 
-    cols = [:converged, :iters_geomean_everyconv, :iters_geomean_thisconv,
-        :iters_geomean_all, :time_geomean_everyconv, :time_geomean_thisconv,
-        :time_geomean_all]
+    if validation
+        cols = [:converged, :iters_geomean_thisconv, :time_geomean_thisconv]
+    else
+        cols = [:converged, :iters_geomean_everyconv, :iters_geomean_thisconv,
+            :iters_geomean_all, :time_geomean_everyconv, :time_geomean_thisconv,
+            :time_geomean_all]
+    end
     sep = " & "
-    tex = open(joinpath(tex_dir, "agg.tex"), "w")
+    tex = open(joinpath(tex_dir, "agg_" * suff * ".tex"), "w")
 
-    for i in 1:length(enhancements)
-        row_str = enhancements[i]
+    for i in 1:length(comps)
+        row_str = comps[i]
         for c in cols
             subdf = df_agg[!, c]
             x = (startswith(string(c), "time") ? subdf[i] * 1000 : subdf[i])
