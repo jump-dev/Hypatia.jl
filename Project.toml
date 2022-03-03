@@ -22,7 +22,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 [compat]
 Combinatorics = "1"
 DocStringExtensions = "0.8"
-GenericLinearAlgebra = "0.2"
+GenericLinearAlgebra = "0.2, 0.3"
 IterativeSolvers = "0.8, 0.9"
 LinearMaps = "2.7, 3"
 MathOptInterface = "0.10.6"
