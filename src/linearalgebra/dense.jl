@@ -4,10 +4,8 @@ helpers for dense factorizations and linear solves
 
 import LinearAlgebra.BlasReal
 import LinearAlgebra.BlasFloat
-import LinearAlgebra.BlasInt
-import LinearAlgebra.BLAS.@blasfunc
-import LinearAlgebra.LAPACK.liblapack
-import LinearAlgebra.copytri!
+import LinearAlgebra.BLAS
+import LinearAlgebra.LAPACK
 
 # helpers for in-place matrix inverses (updates upper triangle only in some cases)
 
