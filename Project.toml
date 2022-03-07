@@ -1,7 +1,7 @@
 name = "Hypatia"
 uuid = "b99e6be6-89ff-11e8-14f8-45c827f4f8f2"
 repo = "https://github.com/chriscoey/Hypatia.jl.git"
-version = "0.6.3"
+version = "0.7.0"
 
 [deps]
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
@@ -20,7 +20,15 @@ SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
+Combinatorics = "1"
+DocStringExtensions = "0.8"
+GenericLinearAlgebra = "0.3"
+IterativeSolvers = "0.9"
+LinearMaps = "3"
 MathOptInterface = "1"
+PolynomialRoots = "1"
+Requires = "1"
+SpecialFunctions = "2"
 julia = "1.6"
 
 [extras]
