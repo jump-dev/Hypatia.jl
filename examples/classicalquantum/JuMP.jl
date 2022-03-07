@@ -23,7 +23,7 @@ function build(inst::ClassicalQuantum{T}) where {T <: Float64}
         return Hermitian(P)
     end
     Ps = [hermtr1() for _ in 1:d]
-    Hs = [dot(P, log(P)) for P in Ps]
+    Hs = [real(dot(P, log(P))) for P in Ps]
 
     model = JuMP.Model()
     JuMP.@variable(model, ρ[1:d] >= 0)
