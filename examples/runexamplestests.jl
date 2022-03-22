@@ -9,12 +9,12 @@ import Hypatia
 import Hypatia.Solvers
 
 # script verbosity
-script_verbose = false
+script_verbose = true
 
 # default options to solvers
 default_options = (
-    verbose = false,
-    # verbose = true,
+    # verbose = false,
+    verbose = true,
     default_tol_relax = 10,
     # stepper = Solvers.CombinedStepper{Float64}(),
     # stepper = Solvers.PredOrCentStepper{Float64}(),
@@ -23,14 +23,19 @@ default_options = (
 
 # instance sets and real types to run and corresponding time limits (seconds)
 inst_sets = [
-    ("minimal", Float64, 60),
+    # ("minimal", Float64, 60),
     # ("minimal", Float32, 60),
     # ("minimal", BigFloat, 60),
     # ("fast", Float64, 60),
     # ("various", Float64, 120),
+    ("various", Float64, 3600),
     ]
 
 perf = Examples.setup_benchmark_dataframe()
+
+open("invhess.csv", "w") do io
+    println(io, "r,s,t1,v1,t2,v2,fact")
+end
 
 @testset "examples tests" begin
 test_insts = Examples.get_test_instances()
