@@ -168,7 +168,7 @@ function test_extra(inst::MatrixRegressionJuMP{T}, model::JuMP.Model) where T
 
         # print output line for table
         open("invhess.csv", "a") do io
-            println(io, "$r_dim,$s_dim,$(stats1.time),$LHviol1")
+            println(io, "$r_dim,$s_dim,$(stats1.time),$LHviol1,,,")
         end
         println("\n")
 
