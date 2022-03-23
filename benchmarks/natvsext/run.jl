@@ -73,7 +73,7 @@ ecos_solver = ("ECOS", ECOS.Optimizer, (
 # instance sets and solvers to run
 inst_sets = [
     #= natural formulations paper =#
-    # ("nat", hyp_solver),
+    ("nat", hyp_solver),
     # ("ext", hyp_solver),
     # ("ext", mosek_solver),
     # ("extEP", hyp_solver), # ExpPSD extender
@@ -104,8 +104,8 @@ JuMP_examples = [
     #= natural formulations paper =#
     # "densityest",
     # "doptimaldesign",
-    # "matrixcompletion",
-    # "matrixregression",
+    "matrixcompletion",
+    "matrixregression",
     # "polymin",
     # "portfolio",
     # "shapeconregr",
