@@ -207,7 +207,7 @@ mutable struct Solver{T <: Real}
         if reduce
             @assert preprocess # cannot use reduction without preprocessing # TODO only need primal eq preprocessing
         end
-        # @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
+        @assert !(init_use_indirect && preprocess) # cannot use preprocessing and indirect methods for initial point
         @assert near_factor >= 1 # factor to relax tolerances by if fail to converge should be at least 1
 
         if isnothing(default_tol_power)
