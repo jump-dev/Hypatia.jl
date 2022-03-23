@@ -13,6 +13,10 @@ struct MatrixCompletionJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     sparsity::Real # fraction of values that are known
 end
 
+function MatrixCompletionJuMP{Float64}(k::Int, d::Int)
+    return MatrixCompletionJuMP{Float64}(false, false, false, d, k * d, 0.8)
+end
+
 function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64}
     @assert 0 < inst.sparsity < 1
     nrow = inst.nrow

@@ -31,11 +31,11 @@ verbose = true # make solvers print output
 iter_limit = 250
 num_threads = 16 # number of threads for BLAS and Julia processes running instances
 free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
-optimizer_time_limit = 1800
+optimizer_time_limit = 120
 setup_time_limit = 1.2 * optimizer_time_limit
 check_time_limit = 1.2 * optimizer_time_limit
-tol_loose = 1e-7
-tol_tight = 1e-3 * tol_loose
+tol_loose = 1e-6
+tol_tight = 1e-2 * tol_loose
 
 hyp_solver = ("Hypatia", Hypatia.Optimizer, (
     verbose = verbose,
@@ -74,12 +74,12 @@ ecos_solver = ("ECOS", ECOS.Optimizer, (
 inst_sets = [
     #= natural formulations paper =#
     ("nat", hyp_solver),
-    # ("ext", hyp_solver),
-    # ("ext", mosek_solver),
-    # ("extEP", hyp_solver), # ExpPSD extender
-    # ("extSEP", hyp_solver), # SOCExpPSD extender
-    # ("extEP", mosek_solver), # ExpPSD extender
-    # ("extSEP", mosek_solver), # SOCExpPSD extender
+    ("ext", hyp_solver),
+    ("ext", mosek_solver),
+    ("extEP", hyp_solver), # ExpPSD extender
+    ("extSEP", hyp_solver), # SOCExpPSD extender
+    ("extEP", mosek_solver), # ExpPSD extender
+    ("extSEP", mosek_solver), # SOCExpPSD extender
     #= WSOS cones paper =#
     # ("nat", hyp_solver),
     # ("ext", hyp_solver),
@@ -102,13 +102,13 @@ inst_sets = [
 # models to run
 JuMP_examples = [
     #= natural formulations paper =#
-    # "densityest",
-    # "doptimaldesign",
+    "densityest",
+    "doptimaldesign",
     "matrixcompletion",
     "matrixregression",
-    # "polymin",
-    # "portfolio",
-    # "shapeconregr",
+    "polymin",
+    "portfolio",
+    "shapeconregr",
     #= WSOS cones paper =#
     # "polynorm",
     #= spectral function cones paper =#
