@@ -22,16 +22,16 @@ results_path = joinpath(mkpath(joinpath(@__DIR__, "raw")), "bench.csv")
 
 # option to keep setting up larger models, only if solver is Hypatia,
 # even if last solve was killed
-# setup_model_anyway = true
-setup_model_anyway = false
+setup_model_anyway = true
+# setup_model_anyway = false
 
-verbose = true # make solvers print output
-# verbose = false
+# verbose = true # make solvers print output
+verbose = false
 
 iter_limit = 250
 num_threads = 16 # number of threads for BLAS and Julia processes running instances
 free_memory_limit = 8 * 2^30 # keep at least X GB of RAM available
-optimizer_time_limit = 120
+optimizer_time_limit = 1800
 setup_time_limit = 1.2 * optimizer_time_limit
 check_time_limit = 1.2 * optimizer_time_limit
 tol_loose = 1e-6
@@ -101,13 +101,13 @@ inst_sets = [
 # models to run
 JuMP_examples = [
     #= natural formulations paper =#
-    "densityest",
-    "doptimaldesign",
+    # "densityest",
+    # "doptimaldesign",
     "matrixcompletion",
     "matrixregression",
-    "polymin",
-    "portfolio",
-    "shapeconregr",
+    # "polymin",
+    # "portfolio",
+    # "shapeconregr",
     #= WSOS cones paper =#
     # "polynorm",
     #= spectral function cones paper =#
