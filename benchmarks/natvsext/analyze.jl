@@ -22,63 +22,63 @@ print_table_solvers =
 
 # uncomment examples to process
 examples_params = Dict(
-    #= natural formulations paper =#
-    "densityest" => (
-        [:m, :twok], [2, 3],
-        [:SEP,], [:nu_nat, :n_nat, :n_SEP]
-        ),
-    "doptimaldesign" => (
-        [:logdet, :k], [5, 1],
-        # [:EP,], [:n_EP, :q_nat, :q_EP]
-        [:EP, :SEP],
-        Symbol[]
-        # [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
-        ),
-    "matrixcompletion" => (
-        [:m, :k], [1, 2],
-        [:EP, :SEP],
-        Symbol[]
-        # [:nu_nat, :n_nat, :p_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP,
-        # :n_SEP, :q_SEP]
-        ),
+    # #= natural formulations paper =#
+    # "densityest" => (
+    #     [:m, :twok], [2, 3],
+    #     [:SEP,], [:nu_nat, :n_nat, :n_SEP]
+    #     ),
+    # "doptimaldesign" => (
+    #     [:logdet, :k], [5, 1],
+    #     # [:EP,], [:n_EP, :q_nat, :q_EP]
+    #     [:EP, :SEP],
+    #     Symbol[]
+    #     # [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP, :n_SEP, :q_SEP]
+    #     ),
+    # "matrixcompletion" => (
+    #     [:m, :k], [1, 2],
+    #     [:EP, :SEP],
+    #     # Symbol[]
+    #     [:nu_nat, :n_nat, :q_nat, :nu_EP, :n_EP, :q_EP, :nu_SEP,
+    #     :n_SEP, :q_SEP]
+    #     ),
     "matrixregression" => (
         [:m, :k], [2, 1],
         [:SEP,], [:n_SEP, :q_nat]
         ),
-    "polymin" => (
-        [:m, :k], [1, 2],
-        [:SEP,], [:nu_nat, :n_nat, :q_SEP]
-        ),
-    "portfolio" => (
-        [:k], [1],
-        [:SEP,], Symbol[]
-        ),
-    "shapeconregr" => (
-        [:m, :twok], [1, 5],
-        [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
-        ),
-    #= WSOS cones paper =#
-    "polynorm" => (
-        [:L1, :n, :d, :m], [5, 1, 3, 4],
-        [:SEP,], Symbol[]
-        ),
-    #= spectral function cones paper =#
-    "centralpolymat" => (
-        [:func, :m, :k], [3, 1, 2],
-        [:nat, :ext], Symbol[]
-        ),
-    "classicalquantum" => (
-        [:d], [1],
-        [:nat, :ext], Symbol[]
-        ),
-    "experimentdesign" => (
-        [:func, :d], [2, 1],
-        [:nat, :natlog, :ext], Symbol[]
-        ),
-    "nonparametricdistr" => (
-        [:func, :d], [2, 1],
-        [:nat, :natlog, :vecext], Symbol[]
-        ),
+    # "polymin" => (
+    #     [:m, :k], [1, 2],
+    #     [:SEP,], [:nu_nat, :n_nat, :q_SEP]
+    #     ),
+    # "portfolio" => (
+    #     [:k], [1],
+    #     [:SEP,], Symbol[]
+    #     ),
+    # "shapeconregr" => (
+    #     [:m, :twok], [1, 5],
+    #     [:SEP,], [:nu_nat, :n_nat, :n_SEP, :q_nat]
+    #     ),
+    # #= WSOS cones paper =#
+    # "polynorm" => (
+    #     [:L1, :n, :d, :m], [5, 1, 3, 4],
+    #     [:SEP,], Symbol[]
+    #     ),
+    # #= spectral function cones paper =#
+    # "centralpolymat" => (
+    #     [:func, :m, :k], [3, 1, 2],
+    #     [:nat, :ext], Symbol[]
+    #     ),
+    # "classicalquantum" => (
+    #     [:d], [1],
+    #     [:nat, :ext], Symbol[]
+    #     ),
+    # "experimentdesign" => (
+    #     [:func, :d], [2, 1],
+    #     [:nat, :natlog, :ext], Symbol[]
+    #     ),
+    # "nonparametricdistr" => (
+    #     [:func, :d], [2, 1],
+    #     [:nat, :natlog, :vecext], Symbol[]
+    #     ),
     )
 
 @info("analyzing examples: $(keys(examples_params))")
@@ -129,10 +129,10 @@ status_map = Dict(
     "SkippedSolveCheck" => "sk",
     )
 
-residual_tol_satisfied(a, tol = 1e-5) =
+residual_tol_satisfied(a, tol = 1e-4) =
     (all(isfinite, a) && (maximum(abs, a) < tol))
 
-relative_tol_satisfied(a::T, b::T, tol::T = 1e-4) where {T <: Real} =
+relative_tol_satisfied(a::T, b::T, tol::T = 1e-3) where {T <: Real} =
     (abs(a - b) / (1 + max(abs(a), abs(b))) < tol)
 
 get_name(x::Any) = string(x)
@@ -194,12 +194,12 @@ function make_wide_csv(ex_df, ex_name, ex_params)
 
     unstacked_dims = [
         unstack(ex_df, inst_keys, :inst_ext, v, renamecols = x ->
-        Symbol(v, :_, x), allowduplicates=true)
+        Symbol(v, :_, x), allowduplicates=false)
         for v in [:nu, :n, :p, :q]
         ]
     unstacked_res = [
         unstack(ex_df, inst_keys, :inst_solver, v, renamecols = x ->
-        Symbol(v, :_, x), allowduplicates=true)
+        Symbol(v, :_, x), allowduplicates=false)
         for v in [:status, :converged, :iters, :solve_time]
         ]
     ex_df_wide = outerjoin(unstacked_dims..., unstacked_res..., on = inst_keys)
