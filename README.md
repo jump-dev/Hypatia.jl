@@ -27,8 +27,8 @@ and corresponding [raw results CSV files](https://github.com/chriscoey/Hypatia.j
 To use Hypatia, install [Julia](https://julialang.org/downloads/), then at the Julia REPL, type:
 ```julia
 using Hypatia
-using Pkg;
-Pkg.add("Hypatia");
+using Pkg
+Pkg.add("Hypatia")
 ```
 Hypatia is an experimental solver and a work in progress, and may not run with older releases of Julia.
 Default options/parameters are not well-tuned, so we encourage you to experiment with these.

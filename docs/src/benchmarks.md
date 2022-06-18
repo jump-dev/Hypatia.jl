@@ -6,6 +6,7 @@ The two types of benchmarks we run are:
 
   - natural versus extended formulations, for a selection of examples; see [natvsext](https://github.com/chriscoey/Hypatia.jl/tree/master/benchmarks/natvsext),
   - selected algorithmic options for the stepping procedures; see [stepper](https://github.com/chriscoey/Hypatia.jl/tree/master/benchmarks/stepper).
-    We also provide scripts to analyze the raw results output from the run scripts.
-    See the READMEs for simple instructions for running these scripts on your machines.
-    Each run script typically takes several days to complete if running all examples, and the analysis scripts only take seconds.
+  
+We also provide scripts to analyze the raw results output from the run scripts.
+See the READMEs for simple instructions for running these scripts on your machines.
+Each run script typically takes several days to complete if running all examples, and the analysis scripts only take seconds.

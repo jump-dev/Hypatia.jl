@@ -11,12 +11,9 @@ For more information about Hypatia's algorithms and cones, please see our [worki
 To use Hypatia, install [Julia](https://julialang.org/downloads/), then at the Julia REPL, type:
 
 ```julia
-julia> using Pkg;
-       Pkg.add("Hypatia");
-
-
-julia> using Hypatia
-
+using Pkg
+Pkg.add("Hypatia")
+using Hypatia
 ```
 
 Hypatia is an experimental solver and a work in progress, and may not run with older releases of Julia.

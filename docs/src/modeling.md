@@ -44,8 +44,9 @@ Hypatia's [`Models`](@ref) module specifies a [`Model`](@ref) type corresponding
   - ``\mathcal{K}`` is a vector of Hypatia cones,
   - ``c \in \mathbb{R}^n``, ``b \in \mathbb{R}^p``, ``h \in \mathbb{R}^q`` are vectors,
   - ``A \in \mathbb{R}^{p \times n}`` and ``G \in \mathbb{R}^{q \times n}`` are linear operators.
-    An objective offset can be specified using the keyword arg `obj_offset` (the default is 0).
-    See [Models module](@ref).
+
+An objective offset can be specified using the keyword arg `obj_offset` (the default is 0).
+See [Models module](@ref).
 
 ## Polynomial utilities
 
