@@ -9,12 +9,7 @@ Base.eval(Distributed, :(function redirect_worker_output(ident, stream)
     end
 end))
 
-function spawn_step(
-    fun::Function,
-    fun_name::Symbol,
-    time_limit::Real,
-    worker::Int,
-    )
+function spawn_step(fun::Function, fun_name::Symbol, time_limit::Real, worker::Int)
     @assert nprocs() == 2
     status = :Success
     time_start = time()
@@ -64,7 +59,8 @@ function spawn_step(
         output = NamedTuple()
     end
     finalize(fut)
-    flush(stdout); flush(stderr)
+    flush(stdout)
+    flush(stderr)
 
     return (status, output)
 end
@@ -78,9 +74,9 @@ function spawn_instance(
     solver::Tuple,
     solve::Bool,
     num_threads::Int,
-    )
-    worker = addprocs(1, enable_threaded_blas = true,
-        exeflags = `--threads $num_threads`)[1]
+)
+    worker =
+        addprocs(1, enable_threaded_blas = true, exeflags = `--threads $num_threads`)[1]
     @assert nprocs() == 2
     println("loading files")
     @fetchfrom worker begin
@@ -90,16 +86,25 @@ function spawn_instance(
         @eval using ECOS
         include(joinpath(@__DIR__, "../../examples/Examples.jl"))
         @eval using Main.Examples
-        flush(stdout); flush(stderr)
+        flush(stdout)
+        flush(stderr)
         return
     end
     println("running compile instance")
     original_stdout = stdout
     (out_rd, out_wr) = redirect_stdout() # don't print output
     @fetchfrom worker begin
-        Examples.run_instance(ex_type, compile_inst, extender, NamedTuple(), solver[2],
-            default_options = solver[3], test = false)
-        flush(stdout); flush(stderr)
+        Examples.run_instance(
+            ex_type,
+            compile_inst,
+            extender,
+            NamedTuple(),
+            solver[2],
+            default_options = solver[3],
+            test = false,
+        )
+        flush(stdout)
+        flush(stderr)
         return
     end
     redirect_stdout(original_stdout)
@@ -158,7 +163,6 @@ function spawn_instance(
     @assert nprocs() == 1
 
     script_status = string(script_status)
-    run_perf = (; model_stats..., solve_stats..., setup_time,
-        check_time, script_status)
+    run_perf = (; model_stats..., solve_stats..., setup_time, check_time, script_status)
     return (setup_killed, solver_hit_limit, run_perf)
 end

@@ -33,9 +33,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     inv_mat::Matrix{R}
     fact_mat::Cholesky{R}
 
-    function PosSemidefTri{T, R}(
-        dim::Int,
-        ) where {T <: Real, R <: RealOrComplex{T}}
+    function PosSemidefTri{T, R}(dim::Int) where {T <: Real, R <: RealOrComplex{T}}
         @assert dim >= 1
         cone = new{T, R}()
         cone.dim = dim
@@ -48,14 +46,18 @@ end
 
 use_dual_barrier(::PosSemidefTri) = false
 
-reset_data(cone::PosSemidefTri) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = false)
+function reset_data(cone::PosSemidefTri)
+    return (
+        cone.feas_updated =
+            cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false
+    )
+end
 
 use_sqrt_hess_oracles(::Int, cone::PosSemidefTri) = true
 
 function setup_extra_data!(
     cone::PosSemidefTri{T, R},
-    ) where {T <: Real, R <: RealOrComplex{T}}
+) where {T <: Real, R <: RealOrComplex{T}}
     cone.mat = zeros(R, cone.side, cone.side)
     cone.mat2 = zero(cone.mat)
     cone.mat3 = zero(cone.mat)
@@ -70,7 +72,7 @@ function set_initial_point!(arr::AbstractVector, cone::PosSemidefTri)
     incr = (cone.is_complex ? 2 : 1)
     arr .= 0
     k = 1
-    @inbounds for i in 1:cone.side
+    @inbounds for i in 1:(cone.side)
         arr[k] = 1
         k += incr * i + 1
     end
@@ -123,11 +125,7 @@ function update_inv_hess(cone::PosSemidefTri)
     return cone.inv_hess
 end
 
-function hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::PosSemidefTri,
-    )
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
 
     @inbounds for i in 1:size(arr, 2)
@@ -141,11 +139,7 @@ function hess_prod!(
     return prod
 end
 
-function inv_hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::PosSemidefTri,
-    )
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
 
     @inbounds for i in 1:size(arr, 2)
@@ -158,11 +152,7 @@ function inv_hess_prod!(
     return prod
 end
 
-function sqrt_hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::PosSemidefTri,
-    )
+function sqrt_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemidefTri)
     @assert is_feas(cone)
 
     @inbounds for i in 1:size(arr, 2)
@@ -180,7 +170,7 @@ function inv_sqrt_hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::PosSemidefTri,
-    )
+)
     @assert is_feas(cone)
 
     @inbounds for i in 1:size(arr, 2)

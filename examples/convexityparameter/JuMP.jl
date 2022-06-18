@@ -28,7 +28,7 @@ function build(inst::ConvexityParameterJuMP{T}) where {T <: Float64}
     JuMP.@variable(model, mu)
     JuMP.@objective(model, Max, mu)
 
-    convpoly = poly - 0.5 * mu * sum(x.^2)
+    convpoly = poly - 0.5 * mu * sum(x .^ 2)
     H = DP.differentiate(convpoly, x, 2)
 
     if inst.use_matrixwsos
@@ -40,27 +40,29 @@ function build(inst::ConvexityParameterJuMP{T}) where {T <: Float64}
         JuMP.@constraint(model, H_interp in mat_wsos_cone)
     else
         PolyJuMP.setpolymodule!(model, SumOfSquares)
-        JuMP.@constraint(model, H in JuMP.PSDCone(), domain =
-            get_domain_inequalities(dom, x))
+        JuMP.@constraint(
+            model,
+            H in JuMP.PSDCone(),
+            domain = get_domain_inequalities(dom, x)
+        )
     end
 
     return model
 end
 
-function test_extra(inst::ConvexityParameterJuMP{T}, model::JuMP.Model) where T
+function test_extra(inst::ConvexityParameterJuMP{T}, model::JuMP.Model) where {T}
     stat = JuMP.termination_status(model)
     @test stat == MOI.OPTIMAL
     if (stat == MOI.OPTIMAL) && !isnan(inst.true_mu)
         # check objective value is correct
         tol = eps(T)^0.25
-        @test JuMP.objective_value(model) ≈ inst.true_mu atol=tol rtol=tol
+        @test JuMP.objective_value(model) ≈ inst.true_mu atol = tol rtol = tol
     end
     return
 end
 
 # construct domain inequalities for SumOfSquares models from Hypatia domains
-bss() = SAS.BasicSemialgebraicSet{Float64,
-    DynamicPolynomials.Polynomial{true, Float64}}()
+bss() = SAS.BasicSemialgebraicSet{Float64, DynamicPolynomials.Polynomial{true, Float64}}()
 
 function get_domain_inequalities(dom::PolyUtils.BoxDomain, x)
     box = bss()
@@ -79,4 +81,4 @@ convexityparameter_data = Dict(
     :dom2 => PolyUtils.BoxDomain{Float64}([-1.0], [1.0]),
     :dom3 => PolyUtils.FreeDomain{Float64}(3),
     :dom4 => PolyUtils.BoxDomain{Float64}([-1.0, 0.0], [1.0, 2.0]),
-    )
+)

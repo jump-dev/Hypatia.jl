@@ -7,7 +7,7 @@ insts["minimal"] = [
     ((:lotkavolterra, 3, true, true),),
     ((:motzkin_ellipsoid, 3, false, true),),
     ((:schwefel_ball, 2, false, false),),
-    ]
+]
 insts["fast"] = [
     ((1, 3, true, true),),
     ((1, 30, true, true),),
@@ -48,7 +48,7 @@ insts["fast"] = [
     ((:lotkavolterra, 3, false, false),),
     ((:motzkin, 3, false, false),),
     ((:motzkin_ball, 3, false, false),),
-    ]
+]
 insts["various"] = [
     ((4, 5, true, true),),
     ((3, 5, true, false),),
@@ -65,5 +65,5 @@ insts["various"] = [
     ((:robinson, 8, true, true),),
     ((:rosenbrock, 5, true, true),),
     ((:schwefel, 2, true, true),),
-    ]
+]
 return (PolyMinJuMP, insts)

@@ -75,8 +75,7 @@ function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64}
             JuMP.@constraint(model, vcat(t, Xvec) in K)
         end
     else
-        K = (nuclear_obj ? MOI.NormNuclearCone : MOI.NormSpectralCone)(
-            nrow, ncol)
+        K = (nuclear_obj ? MOI.NormNuclearCone : MOI.NormSpectralCone)(nrow, ncol)
         JuMP.@constraint(model, vcat(t, vec(X)) in K)
     end
 
@@ -87,7 +86,7 @@ function build(inst::MatrixCompletionJuMP{T}) where {T <: Float64}
     return model
 end
 
-function test_extra(inst::MatrixCompletionJuMP{T}, model::JuMP.Model) where T
+function test_extra(inst::MatrixCompletionJuMP{T}, model::JuMP.Model) where {T}
     stat = JuMP.termination_status(model)
     @test stat == MOI.OPTIMAL
     (stat == MOI.OPTIMAL) || return
@@ -100,6 +99,6 @@ function test_extra(inst::MatrixCompletionJuMP{T}, model::JuMP.Model) where T
     X_opt = JuMP.value.(model.ext[:X_var])
     s = (inst.symmetric ? abs.(eigvals(Symmetric(X_opt, :U))) : svdvals(X_opt))
     snorm = (inst.nuclear_obj ? sum(s) : maximum(s))
-    @test JuMP.objective_value(model) ≈ snorm atol=tol rtol=tol
+    @test JuMP.objective_value(model) ≈ snorm atol = tol rtol = tol
     return
 end

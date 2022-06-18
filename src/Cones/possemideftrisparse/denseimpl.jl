@@ -6,19 +6,15 @@ cone [`PosSemidefTriSparse`](@ref).
 """
 struct PSDSparseDense <: PSDSparseImpl end
 
-mutable struct PSDSparseDenseCache{T <: Real, R <: RealOrComplex{T}} <:
-    PSDSparseCache{T, R}
+mutable struct PSDSparseDenseCache{T <: Real, R <: RealOrComplex{T}} <: PSDSparseCache{T, R}
     mat::Matrix{R}
     mat2::Matrix{R}
     inv_mat::Matrix{R}
-    fact_mat
-    PSDSparseDenseCache{T, R}() where {T <: Real, R <: RealOrComplex{T}} =
-        new{T, R}()
+    fact_mat::Any
+    PSDSparseDenseCache{T, R}() where {T <: Real, R <: RealOrComplex{T}} = new{T, R}()
 end
 
-function setup_extra_data!(
-    cone::PosSemidefTriSparse{PSDSparseDense, T, R},
-    ) where {T, R}
+function setup_extra_data!(cone::PosSemidefTriSparse{PSDSparseDense, T, R}) where {T, R}
     cone.cache = cache = PSDSparseDenseCache{T, R}()
     cache.mat = zeros(R, cone.side, cone.side)
     cache.mat2 = zero(cache.mat)
@@ -53,9 +49,7 @@ function update_grad(cone::PosSemidefTriSparse{PSDSparseDense})
     return cone.grad
 end
 
-function update_hess(
-    cone::PosSemidefTriSparse{PSDSparseDense, T, T},
-    ) where {T <: Real}
+function update_hess(cone::PosSemidefTriSparse{PSDSparseDense, T, T}) where {T <: Real}
     @assert cone.grad_updated
     isdefined(cone, :hess) || alloc_hess!(cone)
     rt2 = cone.rt2
@@ -84,7 +78,7 @@ end
 
 function update_hess(
     cone::PosSemidefTriSparse{PSDSparseDense, T, Complex{T}},
-    ) where {T <: Real}
+) where {T <: Real}
     @assert cone.grad_updated
     isdefined(cone, :hess) || alloc_hess!(cone)
     rt2 = cone.rt2
@@ -143,7 +137,7 @@ function hess_prod_slow!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::PosSemidefTriSparse{PSDSparseDense},
-    )
+)
     cone.use_hess_prod_slow_updated || update_use_hess_prod_slow(cone)
     @assert cone.hess_updated
     cone.use_hess_prod_slow || return hess_prod!(prod, arr, cone)
@@ -161,10 +155,7 @@ function hess_prod_slow!(
     return prod
 end
 
-function dder3(
-    cone::PosSemidefTriSparse{PSDSparseDense},
-    dir::AbstractVector,
-    )
+function dder3(cone::PosSemidefTriSparse{PSDSparseDense}, dir::AbstractVector)
     @assert is_feas(cone)
     cache = cone.cache
 
@@ -181,7 +172,7 @@ function outer_prod_vec_sparse!(
     vec::AbstractVector{T},
     mat::AbstractMatrix{T},
     cone::PosSemidefTriSparse{PSDSparseDense, T, T},
-    ) where {T <: Real}
+) where {T <: Real}
     @assert length(vec) == length(cone.row_idxs)
     @inbounds for (idx, (i, j)) in enumerate(zip(cone.row_idxs, cone.col_idxs))
         @views x = dot(mat[:, i], mat[:, j])
@@ -197,7 +188,7 @@ function outer_prod_vec_sparse!(
     vec::AbstractVector{T},
     mat::AbstractMatrix{Complex{T}},
     cone::PosSemidefTriSparse{PSDSparseDense, T, Complex{T}},
-    ) where {T <: Real}
+) where {T <: Real}
     idx = 1
     @inbounds for (i, j) in zip(cone.row_idxs, cone.col_idxs)
         @views x = dot(mat[:, i], mat[:, j])
@@ -219,7 +210,7 @@ function svec_to_smat_sparse!(
     mat::AbstractMatrix{T},
     vec::AbstractVector{T},
     cone::PosSemidefTriSparse{PSDSparseDense, T, T},
-    ) where {T <: Real}
+) where {T <: Real}
     @assert length(vec) == length(cone.row_idxs)
     fill!(mat, 0)
     @inbounds for (idx, (i, j)) in enumerate(zip(cone.row_idxs, cone.col_idxs))
@@ -236,7 +227,7 @@ function svec_to_smat_sparse!(
     mat::AbstractMatrix{Complex{T}},
     vec::AbstractVector{T},
     cone::PosSemidefTriSparse{PSDSparseDense, T, Complex{T}},
-    ) where {T <: Real}
+) where {T <: Real}
     fill!(mat, 0)
     idx = 1
     @inbounds for (i, j) in zip(cone.row_idxs, cone.col_idxs)
@@ -256,7 +247,7 @@ function smat_to_svec_sparse!(
     vec::AbstractVector{T},
     mat::AbstractMatrix{T},
     cone::PosSemidefTriSparse{PSDSparseDense, T, T},
-    ) where {T <: Real}
+) where {T <: Real}
     @assert length(vec) == length(cone.row_idxs)
     fill!(vec, 0)
     @inbounds for (idx, (i, j)) in enumerate(zip(cone.row_idxs, cone.col_idxs))
@@ -273,7 +264,7 @@ function smat_to_svec_sparse!(
     vec::AbstractVector{T},
     mat::AbstractMatrix{Complex{T}},
     cone::PosSemidefTriSparse{PSDSparseDense, T, Complex{T}},
-    ) where {T <: Real}
+) where {T <: Real}
     fill!(vec, 0)
     idx = 1
     @inbounds for (i, j) in zip(cone.row_idxs, cone.col_idxs)

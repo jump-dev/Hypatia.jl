@@ -17,7 +17,7 @@ else
         "classical_20_0", # soc, orthant
         "achtziger_stolpe06-6.1flowc", # rsoc, orthant
         "LogExpCR-n100-m400", # exp, orthant
-        ]
+    ]
 end
 
 relaxed_tols = (default_tol_relax = 1000,)

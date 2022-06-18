@@ -33,7 +33,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_fact_mat::Symmetric{T, Matrix{T}}
     hess_fact::Factorization{T}
 
-    W_svd
+    W_svd::Any
     s::Vector{T}
     U::Matrix{R}
     Vt::Matrix{R}
@@ -61,7 +61,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         d1::Int,
         d2::Int;
         use_dual::Bool = false,
-        ) where {T <: Real, R <: RealOrComplex{T}}
+    ) where {T <: Real, R <: RealOrComplex{T}}
         @assert 1 <= d1 <= d2
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
@@ -73,13 +73,20 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiNormSpectral) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated =
-    cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
+function reset_data(cone::EpiNormSpectral)
+    return (
+        cone.feas_updated =
+            cone.grad_updated =
+                cone.hess_updated =
+                    cone.inv_hess_updated =
+                        cone.hess_aux_updated =
+                            cone.inv_hess_aux_updated = cone.hess_fact_updated = false
+    )
+end
 
 function setup_extra_data!(
     cone::EpiNormSpectral{T, R},
-    ) where {T <: Real, R <: RealOrComplex{T}}
+) where {T <: Real, R <: RealOrComplex{T}}
     (d1, d2) = (cone.d1, cone.d2)
     cone.mu = zeros(T, d1)
     cone.zeta = zeros(T, d1)
@@ -104,7 +111,7 @@ get_nu(cone::EpiNormSpectral) = 1 + cone.d1
 function set_initial_point!(
     arr::AbstractVector{T},
     cone::EpiNormSpectral{T},
-    ) where {T <: Real}
+) where {T <: Real}
     arr .= 0
     arr[1] = sqrt(T(get_nu(cone)))
     return arr
@@ -138,7 +145,7 @@ function update_feas(cone::EpiNormSpectral{T}) where {T <: Real}
     if u - ub < eps(T)
         # use fast Cholesky-based feasibility check, rescale W*W' by inv(u)
         Z = mul!(cone.U1, W, W', -inv(u), false)
-        @inbounds for i in 1:cone.d1
+        @inbounds for i in 1:(cone.d1)
             Z[i, i] += u
         end
         isposdef(cholesky!(Hermitian(Z, :U), check = false)) || return false
@@ -167,7 +174,7 @@ function is_dual_feas(cone::EpiNormSpectral{T}) where {T <: Real}
     return (sqrt(u) - sum(sqrt(abs(λ_i)) for λ_i in λ) > eps(T))
 end
 
-function update_grad(cone::EpiNormSpectral{T}) where T
+function update_grad(cone::EpiNormSpectral{T}) where {T}
     @assert cone.is_feas
     u = cone.point[1]
     U = cone.U = cone.W_svd.U
@@ -207,7 +214,7 @@ function update_hess_aux(cone::EpiNormSpectral)
     @. s2 = inv(s1)
     mul!(cone.Urzi, cone.U, Diagonal(s2))
 
-    cone.hess_aux_updated = true
+    return cone.hess_aux_updated = true
 end
 
 function update_hess(cone::EpiNormSpectral{T, R}) where {T, R}
@@ -267,7 +274,7 @@ function hess_prod!(
     prod::AbstractVecOrMat{T},
     arr::AbstractVecOrMat{T},
     cone::EpiNormSpectral{T},
-    ) where T
+) where {T}
     cone.hess_aux_updated || update_hess_aux(cone)
     d1 = cone.d1
     u = cone.point[1]
@@ -290,8 +297,7 @@ function hess_prod!(
         @. S1 = T(0.5) * (sim + sim')
         @. S1diag -= p / zeta
 
-        prod[1, j] = -sum((pui + real(S1[i, i])) / zeta[i] for i in 1:d1) -
-            cone.cu * pui
+        prod[1, j] = -sum((pui + real(S1[i, i])) / zeta[i] for i in 1:d1) - cone.cu * pui
 
         mul!(w2, Hermitian(S1, :U), mrziVt, true, inv(u))
         mul!(w1, Urzi, w2)
@@ -301,7 +307,7 @@ function hess_prod!(
     return prod
 end
 
-function update_inv_hess_aux(cone::EpiNormSpectral{T}) where T
+function update_inv_hess_aux(cone::EpiNormSpectral{T}) where {T}
     @assert !cone.inv_hess_aux_updated
     @assert cone.grad_updated
     u = cone.point[1]
@@ -317,7 +323,7 @@ function update_inv_hess_aux(cone::EpiNormSpectral{T}) where T
 
     # umzdd = 0.5 * (u .+ mu * s')
     # simdot = zeta ./ (u .- mu * s')
-    @inbounds for j in 1:cone.d1
+    @inbounds for j in 1:(cone.d1)
         mu_j = cone.mu[j]
         z_j = zeta[j]
         for i in 1:(j - 1)
@@ -331,7 +337,7 @@ function update_inv_hess_aux(cone::EpiNormSpectral{T}) where T
         simdot[j, j] = T(0.5)
     end
 
-    cone.inv_hess_aux_updated = true
+    return cone.inv_hess_aux_updated = true
 end
 
 function update_inv_hess(cone::EpiNormSpectral)
@@ -399,7 +405,7 @@ function inv_hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::EpiNormSpectral,
-    )
+)
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     d1 = cone.d1
     u = cone.point[1]
@@ -435,7 +441,7 @@ function inv_hess_prod!(
     return prod
 end
 
-function dder3(cone::EpiNormSpectral{T}, dir::AbstractVector{T}) where T
+function dder3(cone::EpiNormSpectral{T}, dir::AbstractVector{T}) where {T}
     cone.hess_aux_updated || update_hess_aux(cone)
     u = cone.point[1]
     zeta = cone.zeta
@@ -463,8 +469,9 @@ function dder3(cone::EpiNormSpectral{T}, dir::AbstractVector{T}) where T
     @. S2diag += T(0.5) * p / zeta * pui
     mul!(S2, Hermitian(S1, :U), S1, -1, true)
 
-    @inbounds dder3[1] = -sum((real(S1[i, i]) * pui + real(S2[i, i])) / zeta[i]
-        for i in 1:cone.d1) - cone.cu * abs2(pui)
+    @inbounds dder3[1] =
+        -sum((real(S1[i, i]) * pui + real(S2[i, i])) / zeta[i] for i in 1:(cone.d1)) -
+        cone.cu * abs2(pui)
 
     mul!(w1, Hermitian(S2, :U), mrziVt)
     mul!(w1, Hermitian(S1, :U), simU, inv(u), true)

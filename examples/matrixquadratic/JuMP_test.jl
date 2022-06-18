@@ -1,9 +1,6 @@
 
 insts = OrderedDict()
-insts["minimal"] = [
-    ((2, 2, true),),
-    ((2, 2, false),),
-    ]
+insts["minimal"] = [((2, 2, true),), ((2, 2, false),)]
 insts["fast"] = [
     ((2, 3, true),),
     ((2, 3, false),),
@@ -13,7 +10,7 @@ insts["fast"] = [
     ((10, 20, false),),
     ((20, 40, true),),
     ((20, 40, false),),
-    ]
+]
 insts["various"] = [
     ((15, 20, true),),
     ((15, 20, false),),
@@ -23,5 +20,5 @@ insts["various"] = [
     ((60, 80, false),),
     ((30, 160, true),),
     ((30, 160, false),),
-    ]
+]
 return (MatrixQuadraticJuMP, insts)

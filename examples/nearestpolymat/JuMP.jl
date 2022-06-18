@@ -21,8 +21,8 @@ function build(inst::NearestPolyMatJuMP{T}) where {T <: Float64}
     svec_dim = Cones.svec_length(R)
 
     domain = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n))
-    (U, points, Ps, V, w) = PolyUtils.interpolate(domain, halfdeg,
-        calc_V = true, get_quadr = true)
+    (U, points, Ps, V, w) =
+        PolyUtils.interpolate(domain, halfdeg, calc_V = true, get_quadr = true)
 
     model = JuMP.Model()
     JuMP.@variable(model, q_poly[1:(U * svec_dim)])
@@ -32,8 +32,8 @@ function build(inst::NearestPolyMatJuMP{T}) where {T <: Float64}
     idx = 1
     for j in 1:R
         for i in 1:(j - 1)
-            full_coeffs[i, j] = full_coeffs[j, i] =
-                V * rand(-9:9, U) - q_poly[Cones.block_idxs(U, idx)]
+            full_coeffs[i, j] =
+                full_coeffs[j, i] = V * rand(-9:9, U) - q_poly[Cones.block_idxs(U, idx)]
             idx += 1
         end
         full_coeffs[j, j] = V * rand(-9:9, U) - q_poly[Cones.block_idxs(U, idx)]
@@ -42,8 +42,12 @@ function build(inst::NearestPolyMatJuMP{T}) where {T <: Float64}
 
     if inst.use_matrixwsos
         wsosmatT = Hypatia.WSOSInterpPosSemidefTriCone{T}
-        JuMP.@constraint(model, vcat([full_coeffs[i, j] * (i == j ? 1 : sqrt(2))
-            for j in 1:R for i in 1:j]...) in wsosmatT(R, U, Ps))
+        JuMP.@constraint(
+            model,
+            vcat(
+                [full_coeffs[i, j] * (i == j ? 1 : sqrt(2)) for j in 1:R for i in 1:j]...,
+            ) in wsosmatT(R, U, Ps)
+        )
     elseif inst.use_wsos
         ypts = zeros(svec_dim, R)
         idx = 1
@@ -67,15 +71,25 @@ function build(inst::NearestPolyMatJuMP{T}) where {T <: Float64}
     else
         JuMP.@variable(model, psd_var[1:(L * R), 1:(L * R)], PSD)
         for x2 in 1:R, x1 in 1:x2
-            coeffs_lhs = JuMP.@expression(model, [u in 1:U],
-                sum(Ps[1][u, k] * Ps[1][u, l] * psd_var[(x1 - 1) * L + k,
-                (x2 - 1) * L + l] for k in 1:L for l in 1:L))
+            coeffs_lhs = JuMP.@expression(
+                model,
+                [u in 1:U],
+                sum(
+                    Ps[1][u, k] * Ps[1][u, l] * psd_var[(x1 - 1) * L + k, (x2 - 1) * L + l] for k in 1:L for
+                    l in 1:L
+                )
+            )
             JuMP.@constraint(model, coeffs_lhs .== full_coeffs[x1, x2])
         end
     end
-    JuMP.@objective(model, Max, sum(dot(w, q_poly[
-        Cones.block_idxs(U, Cones.svec_idx(i, j))]) * (i == j ? 1 : 2)
-        for i in 1:R for j in 1:i))
+    JuMP.@objective(
+        model,
+        Max,
+        sum(
+            dot(w, q_poly[Cones.block_idxs(U, Cones.svec_idx(i, j))]) * (i == j ? 1 : 2) for
+            i in 1:R for j in 1:i
+        )
+    )
 
     return model
 end

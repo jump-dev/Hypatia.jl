@@ -38,11 +38,13 @@ struct SignomialMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     obj_ub::Real
 end
 
-SignomialMinJuMP{Float64}(sig_name::Symbol) =
-    SignomialMinJuMP{Float64}(signomialmin_data[sig_name]...)
+function SignomialMinJuMP{Float64}(sig_name::Symbol)
+    return SignomialMinJuMP{Float64}(signomialmin_data[sig_name]...)
+end
 
-SignomialMinJuMP{Float64}(m::Int, n::Int) =
-    SignomialMinJuMP{Float64}(signomialmin_random(m, n)...)
+function SignomialMinJuMP{Float64}(m::Int, n::Int)
+    return SignomialMinJuMP{Float64}(signomialmin_random(m, n)...)
+end
 
 function build(inst::SignomialMinJuMP{T}) where {T <: Float64}
     (fc, fA, gc, gA) = (inst.fc, inst.fA, inst.gc, inst.gA)
@@ -109,15 +111,22 @@ function build(inst::SignomialMinJuMP{T}) where {T <: Float64}
     JuMP.@variable(model, C[1:m, 1:m])
     JuMP.@variable(model, V[1:m, 1:(m - 1)])
     JuMP.@constraint(model, [k in 1:m], d[k] == sum(C[:, k]))
-    JuMP.@constraint(model, [k in 1:m, i in 1:n],
-        dot(A[notk[k], i] .- A[k, i], V[k, :]) == 0)
-    JuMP.@constraint(model, [k in 1:m], vcat(C[k, k] +
-        sum(V[k, :]), C[k, notk[k]], V[k, :]) in MOI.RelativeEntropyCone(2m - 1))
+    JuMP.@constraint(
+        model,
+        [k in 1:m, i in 1:n],
+        dot(A[notk[k], i] .- A[k, i], V[k, :]) == 0
+    )
+    JuMP.@constraint(
+        model,
+        [k in 1:m],
+        vcat(C[k, k] + sum(V[k, :]), C[k, notk[k]], V[k, :]) in
+        MOI.RelativeEntropyCone(2m - 1)
+    )
 
     return model
 end
 
-function test_extra(inst::SignomialMinJuMP{T}, model::JuMP.Model) where T
+function test_extra(inst::SignomialMinJuMP{T}, model::JuMP.Model) where {T}
     stat = JuMP.termination_status(model)
     @test stat == MOI.OPTIMAL
     if (stat == MOI.OPTIMAL) && !isnan(inst.obj_ub)

@@ -1,10 +1,7 @@
-
 Copyright (c) 2020
 Chris Coey, Lea Kapelevich, and contributors
 
-Hypatia.jl is licensed under the **[MIT License]**.
-
-[MIT License]: https://opensource.org/licenses/MIT
+Hypatia.jl is licensed under the **[MIT License](https://opensource.org/licenses/MIT)**.
 
     MIT License
 
@@ -30,11 +27,9 @@ Hypatia.jl is licensed under the **[MIT License]**.
 
 Some code for polynomial interpolations (in the PolyUtils module) and several
 sum-of-squares examples (in the examples folder) is adapted from the
-**[Alfonso]** and **[Chebfun]** packages in MATLAB (licenses below).
+**[Alfonso](https://github.com/dpapp-github/alfonso)** and **[Chebfun](https://github.com/chebfun/chebfun)** packages in MATLAB (licenses below).
 
-**[Alfonso]**:
-
-[Alfonso]: https://github.com/dpapp-github/alfonso
+**[Alfonso](https://github.com/dpapp-github/alfonso)**:
 
     Copyright (C) 2018, David Papp and Sercan Yildiz.
     All rights reserved.
@@ -61,9 +56,7 @@ sum-of-squares examples (in the examples folder) is adapted from the
     ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
     POSSIBILITY OF SUCH DAMAGE.
 
-**[Chebfun]**:
-
-[Chebfun]: https://github.com/chebfun/chebfun
+**[Chebfun](https://github.com/chebfun/chebfun)**:
 
     Copyright (c) 2017, The Chancellor, Masters and Scholars of the University
     of Oxford, and the Chebfun Developers. All rights reserved.

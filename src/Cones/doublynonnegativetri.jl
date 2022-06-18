@@ -33,29 +33,30 @@ mutable struct DoublyNonnegativeTri{T <: Real} <: Cone{T}
     mat2::Matrix{T} # TODO rename to imply mutates fact_mat
     mat3::Matrix{T}
     mat4::Matrix{T} # TODO could remove if we factorize mat instead of mat2, currently mat is not used in any other oracles
-    offdiag_idxs
+    offdiag_idxs::Any
     inv_mat::Matrix{T}
     inv_vec::Vector{T}
-    fact_mat
+    fact_mat::Any
 
-    function DoublyNonnegativeTri{T}(
-        dim::Int;
-        use_dual::Bool = false,
-        ) where {T <: Real}
+    function DoublyNonnegativeTri{T}(dim::Int; use_dual::Bool = false) where {T <: Real}
         @assert dim >= 1
         cone = new{T}()
         cone.use_dual_barrier = use_dual
         cone.dim = dim
         cone.rt2 = sqrt(T(2))
         cone.side = side = svec_side(dim)
-        cone.offdiag_idxs =
-            vcat([svec_length(i - 1) .+ (1:(i - 1)) for i in 2:side]...)
+        cone.offdiag_idxs = vcat([svec_length(i - 1) .+ (1:(i - 1)) for i in 2:side]...)
         return cone
     end
 end
 
-reset_data(cone::DoublyNonnegativeTri) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false)
+function reset_data(cone::DoublyNonnegativeTri)
+    return (
+        cone.feas_updated =
+            cone.grad_updated =
+                cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated = false
+    )
+end
 
 function setup_extra_data!(cone::DoublyNonnegativeTri{T}) where {T <: Real}
     cone.mat = zeros(T, cone.side, cone.side)
@@ -69,10 +70,7 @@ end
 
 get_nu(cone::DoublyNonnegativeTri) = cone.dim
 
-function set_initial_point!(
-    arr::AbstractVector{T},
-    cone::DoublyNonnegativeTri{T},
-    ) where T
+function set_initial_point!(arr::AbstractVector{T}, cone::DoublyNonnegativeTri{T}) where {T}
     side = cone.side
 
     # for small side dimension, use closed-form solutions
@@ -84,7 +82,7 @@ function set_initial_point!(
         n = T(side)
         d = T(cone.dim)
         # root of this polynomial gives off-diagonal
-        p1 = [-n - 1, 0, n ^ 2 + n + 7, 0, -2 * n ^ 2 - 8, 0, n ^ 2]
+        p1 = [-n - 1, 0, n^2 + n + 7, 0, -2 * n^2 - 8, 0, n^2]
         # fallback values
         (on_diag, off_diag) = (n + 1, one(T))
         found_soln = false
@@ -96,11 +94,12 @@ function set_initial_point!(
                 temp = d - (d - n) * abs2(offd_real)
                 if temp > sqrt(eps(T))
                     ond_try = sqrt(temp / n)
-                    denom = abs2(ond_try) + (n - 2) / cone.rt2 * ond_try *
-                        offd_real - (n - 1) * abs2(offd_real) / 2
+                    denom =
+                        abs2(ond_try) + (n - 2) / cone.rt2 * ond_try * offd_real -
+                        (n - 1) * abs2(offd_real) / 2
                     # check s = -g(s) conditions
-                    if ond_try * cone.rt2 + (n - 2) * offd_real ≈ ond_try *
-                        denom * cone.rt2 && denom ≈ abs2(offd_real) * (denom + 1)
+                    if ond_try * cone.rt2 + (n - 2) * offd_real ≈
+                       ond_try * denom * cone.rt2 && denom ≈ abs2(offd_real) * (denom + 1)
                         (on_diag, off_diag) = (ond_try, offd_real)
                         found_soln = true
                         break
@@ -109,14 +108,16 @@ function set_initial_point!(
             end
         end
         if !found_soln
-            @warn("initial point inaccurate for DoublyNonnegativeTri " *
-                "cone dimension $(cone.dim)")
+            @warn(
+                "initial point inaccurate for DoublyNonnegativeTri " *
+                "cone dimension $(cone.dim)"
+            )
         end
     end
 
     arr .= off_diag
     k = 1
-    @inbounds for i in 1:cone.side
+    @inbounds for i in 1:(cone.side)
         arr[k] = on_diag
         k += i + 1
     end
@@ -124,7 +125,7 @@ function set_initial_point!(
     return arr
 end
 
-function update_feas(cone::DoublyNonnegativeTri{T}) where T
+function update_feas(cone::DoublyNonnegativeTri{T}) where {T}
     @assert !cone.feas_updated
 
     if all(>(eps(T)), cone.point)
@@ -172,7 +173,7 @@ function hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::DoublyNonnegativeTri,
-    )
+)
     @assert is_feas(cone)
 
     @inbounds for i in 1:size(arr, 2)

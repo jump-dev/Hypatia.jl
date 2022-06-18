@@ -1,0 +1,16 @@
+# Configuration file for JuliaFormatter.jl
+# For more information, see: https://domluna.github.io/JuliaFormatter.jl/stable/config/
+
+verbose = true
+# format_markdown = true
+always_for_in = true
+whitespace_typedefs = true
+whitespace_ops_in_indices = true
+remove_extra_newlines = true
+pipe_to_function_call = true
+short_to_long_function_def = true
+always_use_return = true
+whitespace_in_kwargs = true
+format_docstrings = true
+conditional_to_if = true
+normalize_line_endings = "unix"

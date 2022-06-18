@@ -15,7 +15,7 @@ function interpolate(
     get_quadr::Bool = false,
     sample = nothing,
     sample_factor::Int = 0,
-    ) where {T <: Real}
+) where {T <: Real}
     @assert d >= 1
     n = dimension(dom)
     U = binomial(n + 2d, n)
@@ -54,7 +54,7 @@ function interp_sample(
     d::Int,
     get_quadr::Bool,
     sample_factor::Int,
-    ) where {T <: Real}
+) where {T <: Real}
     U = get_U(dimension(dom), d)
 
     cand_pts = sample(dom, U * sample_factor)
@@ -75,7 +75,7 @@ function interp_box(
     d::Int,
     calc_V::Bool,
     get_quadr::Bool,
-    ) where {T <: Real}
+) where {T <: Real}
     (U, pts, P0, P0sub, V, w) = interp_box(T, n, d, calc_V, get_quadr)
     return (U = U, pts = pts, Ps = Matrix{T}[P0,], V = V, w = w)
 end
@@ -86,15 +86,21 @@ function interp_box(
     d::Int,
     calc_V::Bool,
     get_quadr::Bool,
-    ) where {T <: Real}
+) where {T <: Real}
     (U, pts, P0, P0sub, V, w) = interp_box(T, n, d, calc_V, get_quadr)
 
     # TODO refactor/cleanup below
     # scale and shift points, get WSOS matrices
-    pscale = [T(0.5) * (dom.u[mod(j - 1, dimension(dom)) + 1] -
-        dom.l[mod(j - 1, dimension(dom)) + 1]) for j in 1:n]
-    pshift = [T(0.5) * (dom.u[mod(j - 1, dimension(dom)) + 1] +
-        dom.l[mod(j - 1, dimension(dom)) + 1]) for j in 1:n]
+    pscale = [
+        T(0.5) *
+        (dom.u[mod(j - 1, dimension(dom)) + 1] - dom.l[mod(j - 1, dimension(dom)) + 1])
+        for j in 1:n
+    ]
+    pshift = [
+        T(0.5) *
+        (dom.u[mod(j - 1, dimension(dom)) + 1] + dom.l[mod(j - 1, dimension(dom)) + 1])
+        for j in 1:n
+    ]
     @views Wtsfun = (j -> sqrt.(1 .- abs2.(pts[:, j])) * pscale[j])
     PWts = Matrix{T}[Wtsfun(j) .* P0sub for j in 1:dimension(dom)]
     trpts = pts .* pscale' .+ pshift'
@@ -102,13 +108,7 @@ function interp_box(
     return (U = U, pts = trpts, Ps = Matrix{T}[P0, PWts...], V = V, w = w)
 end
 
-function interp_box(
-    T::Type{<:Real},
-    n::Int,
-    d::Int,
-    calc_V::Bool,
-    get_quadr::Bool,
-    )
+function interp_box(T::Type{<:Real}, n::Int, d::Int, calc_V::Bool, get_quadr::Bool)
     if n == 1
         return cheb2_data(T, d, calc_V, get_quadr)
     elseif n == 2
@@ -126,7 +126,7 @@ function calc_univariate_chebyshev(
     d::Int;
     calc_gradient::Bool = false,
     calc_hessian::Bool = false,
-    ) where {T <: Real}
+) where {T <: Real}
     @assert d > 0
     u = zeros(T, length(pts_i), d + 1)
     @. @views u[:, 1] = 1
@@ -145,8 +145,7 @@ function calc_univariate_chebyshev(
     @. @views ug[:, 1] = 0
     @. @views ug[:, 2] = 1
     for t in 3:(d + 1)
-        @. @views ug[:, t] = 2 * (u[:, t - 1] + pts_i *
-            ug[:, t - 1]) - ug[:, t - 2]
+        @. @views ug[:, t] = 2 * (u[:, t - 1] + pts_i * ug[:, t - 1]) - ug[:, t - 2]
     end
 
     if !calc_hessian
@@ -158,19 +157,13 @@ function calc_univariate_chebyshev(
     uh = zero(u)
     @. @views uh[:, 1:2] = 0
     for t in 3:(d + 1)
-        @. @views uh[:, t] = 2 * (2 * ug[:, t - 1] + pts_i *
-            uh[:, t - 1]) - uh[:, t - 2]
+        @. @views uh[:, t] = 2 * (2 * ug[:, t - 1] + pts_i * uh[:, t - 1]) - uh[:, t - 2]
     end
 
     return (u, ug, uh)
 end
 
-function cheb2_data(
-    T::Type{<:Real},
-    d::Int,
-    calc_V::Bool,
-    get_quadr::Bool,
-    )
+function cheb2_data(T::Type{<:Real}, d::Int, calc_V::Bool, get_quadr::Bool)
     @assert d > 0
     U = get_U(1, d)
     L = get_L(1, d)
@@ -194,8 +187,12 @@ function cheb2_data(
         @views append!(wa, wa[div(U, 2):-1:2])
         tempconst = pi / T(length(wa)) * 2 * im
         # inverse FFT
-        w = [abs(sum(wa[j] * exp(tempconst * (i - 1) * j) for
-            j in eachindex(wa)) / length(wa)) for i in eachindex(wa)]
+        w = [
+            abs(
+                sum(wa[j] * exp(tempconst * (i - 1) * j) for j in eachindex(wa)) /
+                length(wa),
+            ) for i in eachindex(wa)
+        ]
         w[1] /= 2
         push!(w, w[1])
     else
@@ -205,12 +202,7 @@ function cheb2_data(
     return (U, pts, P0, P0sub, V, w)
 end
 
-function padua_data(
-    T::Type{<:Real},
-    d::Int,
-    calc_V::Bool,
-    get_quadr::Bool,
-    )
+function padua_data(T::Type{<:Real}, d::Int, calc_V::Bool, get_quadr::Bool)
     @assert d > 0
     U = get_U(2, d)
     L = get_L(2, d)
@@ -220,7 +212,7 @@ function padua_data(
     chebb = cheb2_pts(T, 2d + 2)
     pts = zeros(T, U, 2)
     j = 1
-    for a in 0:2d, b in 0:(2d + 1)
+    for a in 0:(2d), b in 0:(2d + 1)
         if iseven(a + b)
             pts[j, 1] = -cheba[a + 1]
             pts[(U + 1 - j), 2] = -chebb[2d + 2 - b]
@@ -241,16 +233,16 @@ function padua_data(
     # cubature weights at Padua points
     # even-degree Chebyshev polynomials on the subgrids
     if get_quadr
-        te1 = [cospi(T(i * j) / T(2d)) for i in 0:2:2d, j in 0:2:2d]
-        to1 = [cospi(T(i * j) / T(2d)) for i in 0:2:2d, j in 1:2:2d]
-        te2 = [cospi(T(i * j) / T(2d + 1)) for i in 0:2:2d, j in 0:2:(2d + 1)]
-        to2 = [cospi(T(i * j) / T(2d + 1)) for i in 0:2:2d, j in 1:2:(2d + 1)]
+        te1 = [cospi(T(i * j) / T(2d)) for i in 0:2:(2d), j in 0:2:(2d)]
+        to1 = [cospi(T(i * j) / T(2d)) for i in 0:2:(2d), j in 1:2:(2d)]
+        te2 = [cospi(T(i * j) / T(2d + 1)) for i in 0:2:(2d), j in 0:2:(2d + 1)]
+        to2 = [cospi(T(i * j) / T(2d + 1)) for i in 0:2:(2d), j in 1:2:(2d + 1)]
         @views te1[2:(d + 1), :] .*= sqrt(T(2))
         @views to1[2:(d + 1), :] .*= sqrt(T(2))
         @views te2[2:(d + 1), :] .*= sqrt(T(2))
         @views to2[2:(d + 1), :] .*= sqrt(T(2))
         # even, even moments matrix
-        mom = T(2) * sqrt(T(2)) ./ [T(1 - i^2) for i in 0:2:2d]
+        mom = T(2) * sqrt(T(2)) ./ [T(1 - i^2) for i in 0:2:(2d)]
         mom[1] = 2
         Mmom = zeros(T, d + 1, d + 1)
         f = inv(T(d * (2d + 1)))
@@ -275,12 +267,7 @@ end
 
 prod_consec(n::Int, d::Int, j::Int = 0) = prod(big(2d + 1 + j):big(2d + n))
 
-function approxfekete_data(
-    T::Type{<:Real},
-    n::Int,
-    d::Int,
-    get_quadr::Bool,
-    )
+function approxfekete_data(T::Type{<:Real}, n::Int, d::Int, get_quadr::Bool)
     @assert d > 0
     @assert n > 1
 
@@ -318,7 +305,7 @@ function make_wsos_arrays(
     cand_pts::Matrix{T},
     d::Int,
     get_quadr::Bool,
-    ) where {T <: Real}
+) where {T <: Real}
     n = size(cand_pts, 2)
     (V, keep_pts, w) = choose_interp_pts(cand_pts, d, get_quadr)
     pts = cand_pts[keep_pts, :]
@@ -328,15 +315,12 @@ function make_wsos_arrays(
     return (pts, P0, P0sub, V, w)
 end
 
-n_deg_exponents(n::Int, deg::Int) = [xp for t in 0:deg for
-    xp in Combinatorics.multiexponents(n, t)]
+function n_deg_exponents(n::Int, deg::Int)
+    return [xp for t in 0:deg for xp in Combinatorics.multiexponents(n, t)]
+end
 
 # indices of points to keep and quadrature weights at those points
-function choose_interp_pts(
-    cand_pts::Matrix{T},
-    d::Int,
-    get_quadr::Bool,
-    ) where {T <: Real}
+function choose_interp_pts(cand_pts::Matrix{T}, d::Int, get_quadr::Bool) where {T <: Real}
     n = size(cand_pts, 2)
     U = get_U(n, d)
 
@@ -378,10 +362,7 @@ function make_chebyshev_vandermonde(pts::Matrix{T}, deg::Int) where {T <: Real}
     return make_product_vandermonde(univ_chebs, expos)
 end
 
-function make_product_vandermonde(
-    u::Vector{Matrix{T}},
-    expos::Vector,
-    ) where {T <: Real}
+function make_product_vandermonde(u::Vector{Matrix{T}}, expos::Vector) where {T <: Real}
     npts = size(u[1], 1)
     n = length(u)
     V = zeros(T, npts, length(expos))

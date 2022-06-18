@@ -172,29 +172,33 @@ function test_moi_cones(T::Type{<:Real})
 
             Random.seed!(1)
             side = 5
-            (row_idxs, col_idxs, _) = SparseArrays.findnz(
-                tril!(SparseArrays.sprand(Bool, side, side, 0.3)) + I)
+            (row_idxs, col_idxs, _) =
+                SparseArrays.findnz(tril!(SparseArrays.sprand(Bool, side, side, 0.3)) + I)
 
             moi_cone = Hypatia.PosSemidefTriSparseCone{psdsparseimpl, T, T}(
-                side, row_idxs, col_idxs)
+                side,
+                row_idxs,
+                col_idxs,
+            )
             hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
             @test hyp_cone isa Cones.PosSemidefTriSparse{psdsparseimpl, T, T}
-            @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) ==
-                length(row_idxs)
+            @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == length(row_idxs)
 
             moi_cone = Hypatia.PosSemidefTriSparseCone{psdsparseimpl, T, Complex{T}}(
-                side, row_idxs, col_idxs)
+                side,
+                row_idxs,
+                col_idxs,
+            )
             hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-            @test hyp_cone isa
-                Cones.PosSemidefTriSparse{psdsparseimpl, T, Complex{T}}
-            @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) ==
-                2 * length(row_idxs) - side
+            @test hyp_cone isa Cones.PosSemidefTriSparse{psdsparseimpl, T, Complex{T}}
+            @test MOI.dimension(moi_cone) ==
+                  Cones.dimension(hyp_cone) ==
+                  2 * length(row_idxs) - side
         end
     end
 
     @testset "LinMatrixIneq" begin
-        As = [Symmetric(Matrix(one(T) * I, 2, 2)),
-            Hermitian(Complex{T}[1 0; 0 -1])]
+        As = [Symmetric(Matrix(one(T) * I, 2, 2)), Hermitian(Complex{T}[1 0; 0 -1])]
         moi_cone = Hypatia.LinMatrixIneqCone{T}(As)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
         @test hyp_cone isa Cones.LinMatrixIneq{T}
@@ -324,11 +328,7 @@ function test_moi_cones(T::Type{<:Real})
 
     @testset "EpiPerSepSpectral" begin
         h_fun = Cones.NegEntropySSF()
-        QTs = [
-            Cones.VectorCSqr{T},
-            Cones.MatrixCSqr{T, T},
-            Cones.MatrixCSqr{T, Complex{T}},
-            ]
+        QTs = [Cones.VectorCSqr{T}, Cones.MatrixCSqr{T, T}, Cones.MatrixCSqr{T, Complex{T}}]
         for QT in QTs
             moi_cone = Hypatia.EpiPerSepSpectralCone{T}(h_fun, QT, 3)
             hyp_cone = Hypatia.cone_from_moi(T, moi_cone)

@@ -11,7 +11,7 @@ insts["minimal"] = [
     ((2, true, false, true, false),),
     ((2, false, false, false, false),),
     ((2, true, false, false, false),),
-    ]
+]
 insts["fast"] = [
     ((5, false, true, true, true),),
     ((5, false, false, true, false),),
@@ -31,7 +31,7 @@ insts["fast"] = [
     ((20, true, false, false, false),),
     ((100, false, true, false, false),),
     ((100, false, false, false, false),),
-    ]
+]
 insts["various"] = [
     ((50, false, true, true, true),),
     ((50, false, false, true, true),),
@@ -61,5 +61,5 @@ insts["various"] = [
     ((400, false, false, true, true),),
     ((400, true, true, true, true),),
     ((400, true, false, true, false),),
-    ]
+]
 return (NearestPSDJuMP, insts)

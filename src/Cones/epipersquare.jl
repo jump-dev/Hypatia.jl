@@ -41,9 +41,16 @@ end
 
 use_dual_barrier(::EpiPerSquare) = false
 
-reset_data(cone::EpiPerSquare) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = cone.sqrt_hess_prod_updated =
-    cone.inv_sqrt_hess_prod_updated = false)
+function reset_data(cone::EpiPerSquare)
+    return (
+        cone.feas_updated =
+            cone.grad_updated =
+                cone.hess_updated =
+                    cone.inv_hess_updated =
+                        cone.sqrt_hess_prod_updated =
+                            cone.inv_sqrt_hess_prod_updated = false
+    )
+end
 
 use_sqrt_hess_oracles(::Int, cone::EpiPerSquare) = true
 
@@ -56,7 +63,7 @@ function set_initial_point!(arr::AbstractVector, cone::EpiPerSquare)
 end
 
 # TODO refac with dual feas check
-function update_feas(cone::EpiPerSquare{T}) where T
+function update_feas(cone::EpiPerSquare{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
     v = cone.point[2]
@@ -73,7 +80,7 @@ function update_feas(cone::EpiPerSquare{T}) where T
     return cone.is_feas
 end
 
-function is_dual_feas(cone::EpiPerSquare{T}) where T
+function is_dual_feas(cone::EpiPerSquare{T}) where {T}
     u = cone.dual_point[1]
     v = cone.dual_point[2]
 
@@ -104,7 +111,7 @@ function update_hess(cone::EpiPerSquare)
 
     mul!(H, cone.grad, cone.grad')
     inv_dist = inv(cone.dist)
-    @inbounds for j in 3:cone.dim
+    @inbounds for j in 3:(cone.dim)
         H[j, j] += inv_dist
     end
     H[1, 2] -= inv_dist
@@ -119,7 +126,7 @@ function update_inv_hess(cone::EpiPerSquare)
     Hi = cone.inv_hess.data
 
     mul!(Hi, cone.point, cone.point')
-    @inbounds for j in 3:cone.dim
+    @inbounds for j in 3:(cone.dim)
         Hi[j, j] += cone.dist
     end
     Hi[1, 2] -= cone.dist
@@ -128,11 +135,7 @@ function update_inv_hess(cone::EpiPerSquare)
     return cone.inv_hess
 end
 
-function hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::EpiPerSquare,
-    )
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
     u = cone.point[1]
     v = cone.point[2]
     w = @view cone.point[3:end]
@@ -151,11 +154,7 @@ function hess_prod!(
     return prod
 end
 
-function inv_hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::EpiPerSquare,
-    )
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiPerSquare)
     @assert cone.is_feas
 
     @inbounds @views for j in 1:size(prod, 2)
@@ -169,7 +168,7 @@ function inv_hess_prod!(
     return prod
 end
 
-function update_sqrt_hess_prod(cone::EpiPerSquare{T}) where T
+function update_sqrt_hess_prod(cone::EpiPerSquare{T}) where {T}
     @assert cone.is_feas
     @assert !cone.sqrt_hess_prod_updated
     if !isdefined(cone, :sqrt_hess_vec)
@@ -187,7 +186,7 @@ function update_sqrt_hess_prod(cone::EpiPerSquare{T}) where T
     return
 end
 
-function update_inv_sqrt_hess_prod(cone::EpiPerSquare{T}) where T
+function update_inv_sqrt_hess_prod(cone::EpiPerSquare{T}) where {T}
     @assert cone.is_feas
     @assert !cone.inv_sqrt_hess_prod_updated
     if !isdefined(cone, :inv_sqrt_hess_vec)
@@ -208,7 +207,7 @@ function sqrt_hess_prod!(
     prod::AbstractVecOrMat{T},
     arr::AbstractVecOrMat{T},
     cone::EpiPerSquare{T},
-    ) where {T <: Real}
+) where {T <: Real}
     if !cone.sqrt_hess_prod_updated
         update_sqrt_hess_prod(cone)
     end
@@ -230,7 +229,7 @@ function inv_sqrt_hess_prod!(
     prod::AbstractVecOrMat{T},
     arr::AbstractVecOrMat{T},
     cone::EpiPerSquare{T},
-    ) where {T <: Real}
+) where {T <: Real}
     if !cone.inv_sqrt_hess_prod_updated
         update_inv_sqrt_hess_prod(cone)
     end

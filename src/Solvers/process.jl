@@ -25,13 +25,15 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
     maxabsminrow(v::UniformScaling, ::Int) = max(abs(v.λ), minval)
     maxabsminrow(v::AbstractMatrix, i::Int) = maxabsmin(view(v, i, :))
     maxabsminrows(v::UniformScaling, ::UnitRange{Int}) = max(abs(v.λ), minval)
-    maxabsminrows(v::AbstractMatrix, rows::UnitRange{Int}) =
-        maxabsmin(view(v, rows, :))
+    maxabsminrows(v::AbstractMatrix, rows::UnitRange{Int}) = maxabsmin(view(v, rows, :))
 
-    @inbounds solver.c_scale = c_scale = T[sqrt(max(abs(c[j]),
-        maxabsmincol(A, j), maxabsmincol(G, j))) for j in eachindex(c)]
-    @inbounds solver.b_scale = b_scale = T[sqrt(max(abs(b[i]),
-        maxabsminrow(A, i))) for i in eachindex(b)]
+    @inbounds solver.c_scale =
+        c_scale = T[
+            sqrt(max(abs(c[j]), maxabsmincol(A, j), maxabsmincol(G, j))) for
+            j in eachindex(c)
+        ]
+    @inbounds solver.b_scale =
+        b_scale = T[sqrt(max(abs(b[i]), maxabsminrow(A, i))) for i in eachindex(b)]
 
     h_scale = solver.h_scale = ones(T, model.q)
     for (k, cone) in enumerate(model.cones)
@@ -42,8 +44,8 @@ function rescale_data(solver::Solver{T}) where {T <: Real}
             end
         else
             # TODO store single scale value only?
-            @inbounds @views h_scale[idxs] .= sqrt(
-                max(maxabsmin(h[idxs]), maxabsminrows(G, idxs)))
+            @inbounds @views h_scale[idxs] .=
+                sqrt(max(maxabsmin(h[idxs]), maxabsminrows(G, idxs)))
         end
     end
 
@@ -88,24 +90,30 @@ function handle_dual_eq(solver::Solver{T}) where {T <: Real}
     else
         vcat(A, G)
     end
-    AG_fact = solver.AG_fact = if issparse(AG)
-        if !(T <: Float64)
-            @warn("using dense factorization of [A; G] in preprocessing and " *
-                "initial point finding because sparse factorization for number " *
-                "type $T is not supported by SuiteSparse packages", maxlog = 1)
-            qr!(Matrix(AG), ColumnNorm())
+    AG_fact =
+        solver.AG_fact = if issparse(AG)
+            if !(T <: Float64)
+                @warn(
+                    "using dense factorization of [A; G] in preprocessing and " *
+                    "initial point finding because sparse factorization for number " *
+                    "type $T is not supported by SuiteSparse packages",
+                    maxlog = 1
+                )
+                qr!(Matrix(AG), ColumnNorm())
+            else
+                qr(AG, tol = solver.init_tol_qr)
+            end
         else
-            qr(AG, tol = solver.init_tol_qr)
+            qr!(AG, ColumnNorm())
         end
-    else
-        qr!(AG, ColumnNorm())
-    end
     AG_rank = solver.AG_rank = get_rank_est(AG_fact, solver.init_tol_qr)
 
     if !solver.preprocess || (AG_rank == n)
         if AG_rank < n
-            @warn("some dual equalities appear to be dependent " *
-            "(possibly inconsistent); try using preprocess = true")
+            @warn(
+                "some dual equalities appear to be dependent " *
+                "(possibly inconsistent); try using preprocess = true"
+            )
         end
         return
     end
@@ -134,8 +142,10 @@ function handle_dual_eq(solver::Solver{T}) where {T <: Real}
 
     if res_norm > solver.tol_inconsistent
         if solver.verbose
-            println("some dual equality constraints are inconsistent " *
-            "(residual norm $res_norm, tolerance $(solver.tol_inconsistent))")
+            println(
+                "some dual equality constraints are inconsistent " *
+                "(residual norm $res_norm, tolerance $(solver.tol_inconsistent))",
+            )
         end
         solver.status = DualInconsistent
         return zeros(T, 0)
@@ -154,10 +164,7 @@ end
 
 # update data for b, c, h from dual equality preprocessing/reduction
 # and return initial x as least squares solution to Ax = b, Gx = h - s
-function update_dual_eq(
-    solver::Solver{T},
-    init_s::Vector{T},
-    ) where {T <: Real}
+function update_dual_eq(solver::Solver{T}, init_s::Vector{T}) where {T <: Real}
     model = solver.model
 
     model.c = model.c[solver.x_keep_idxs]
@@ -165,8 +172,7 @@ function update_dual_eq(
 
     rhs_x = vcat(model.b, model.h - init_s)
 
-    if solver.init_use_indirect ||
-        !isa(model.A, MatrixyAG) || !isa(model.G, MatrixyAG)
+    if solver.init_use_indirect || !isa(model.A, MatrixyAG) || !isa(model.G, MatrixyAG)
         # use indirect method TODO pick lsqr or lsmr
         if iszero(model.p)
             AG = model.G
@@ -185,7 +191,7 @@ function update_dual_eq(
 
     # init_x = AG_R \ ((AG_fact.Q' * vcat(b, h - point.s))[1:AG_rank])
     lmul!(AG_fact.Q', rhs_x)
-    init_x = rhs_x[1:model.n]
+    init_x = rhs_x[1:(model.n)]
     ldiv!(solver.AG_R, init_x)
 
     return init_x
@@ -208,24 +214,30 @@ function handle_primal_eq(solver::Solver{T}) where {T <: Real}
 
     # factorize A'
     A = model.A
-    Ap_fact = solver.Ap_fact = if issparse(A)
-        if !(T <: Float64)
-            @warn("using dense factorization of A' in preprocessing and initial " *
-                "point finding because sparse factorization for number type $T " *
-                "is not supported by SuiteSparse packages", maxlog = 1)
-            qr!(Matrix(A'), ColumnNorm())
+    Ap_fact =
+        solver.Ap_fact = if issparse(A)
+            if !(T <: Float64)
+                @warn(
+                    "using dense factorization of A' in preprocessing and initial " *
+                    "point finding because sparse factorization for number type $T " *
+                    "is not supported by SuiteSparse packages",
+                    maxlog = 1
+                )
+                qr!(Matrix(A'), ColumnNorm())
+            else
+                qr(sparse(A'), tol = solver.init_tol_qr)
+            end
         else
-            qr(sparse(A'), tol = solver.init_tol_qr)
+            qr!(Matrix(A'), ColumnNorm())
         end
-    else
-        qr!(Matrix(A'), ColumnNorm())
-    end
     Ap_rank = solver.Ap_rank = get_rank_est(Ap_fact, solver.init_tol_qr)
 
     if !solver.preprocess
         if Ap_rank < p
-            @warn("some primal equalities appear to be dependent " *
-            "(possibly inconsistent); try using preprocess = true")
+            @warn(
+                "some primal equalities appear to be dependent " *
+                "(possibly inconsistent); try using preprocess = true"
+            )
         end
         return
     end
@@ -251,16 +263,17 @@ function handle_primal_eq(solver::Solver{T}) where {T <: Real}
 
         if residual > solver.tol_inconsistent
             if solver.verbose
-                println("some primal equality constraints are inconsistent " *
-                "(residual $residual, tolerance $(solver.tol_inconsistent))")
+                println(
+                    "some primal equality constraints are inconsistent " *
+                    "(residual $residual, tolerance $(solver.tol_inconsistent))",
+                )
             end
             solver.status = PrimalInconsistent
             return zeros(T, 0)
         end
         if solver.verbose
             p = model.p
-            println("$(p - Ap_rank) of $p primal equality constraints " *
-                "are dependent")
+            println("$(p - Ap_rank) of $p primal equality constraints " * "are dependent")
         end
     end
 
@@ -325,10 +338,7 @@ end
 
 # update data for b, c, h from primal equality preprocessing/reduction
 # and return initial y as least squares solution to A'y = -c - G'z
-function update_primal_eq(
-    solver::Solver{T},
-    init_z::Vector{T},
-    ) where {T <: Real}
+function update_primal_eq(solver::Solver{T}, init_z::Vector{T}) where {T <: Real}
     iszero(solver.orig_model.p) && return zeros(T, 0)
     model = solver.model
 
@@ -386,8 +396,7 @@ end
 # (pivoted) QR factorizations are usually rank-revealing but may be unreliable
 # see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
 # TODO could replace this with rank(qr_fact) when available for both dense and sparse
-get_rank_est(qr_fact::SuiteSparse.SPQR.QRSparse, init_tol_qr::Real) =
-    rank(qr_fact)
+get_rank_est(qr_fact::SuiteSparse.SPQR.QRSparse, init_tol_qr::Real) = rank(qr_fact)
 
 function get_rank_est(qr_fact::QRPivoted, init_tol_qr::Real)
     factors = qr_fact.factors
@@ -457,10 +466,7 @@ function postprocess(solver::Solver{T}) where {T <: Real}
     return
 end
 
-function unreduce_x(
-    solver::Solver{T},
-    x::Vector{T},
-    ) where {T <: Real}
+function unreduce_x(solver::Solver{T}, x::Vector{T}) where {T <: Real}
     # x = Q * [(R' \ b0), x]
     Rpib0 = if solver.status in infeas_statuses
         zero(solver.reduce_Rpib0)
@@ -480,10 +486,7 @@ function unreduce_x(
     return
 end
 
-function unreduce_y(
-    solver::Solver{T},
-    y::Vector{T},
-    ) where {T <: Real}
+function unreduce_y(solver::Solver{T}, y::Vector{T}) where {T <: Real}
     # y = R \ (-cQ1' - GQ1' * z)
     ya = solver.reduce_GQ1' * solver.result.z
     if !in(solver.status, infeas_statuses)

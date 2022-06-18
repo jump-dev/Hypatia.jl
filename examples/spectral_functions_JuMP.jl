@@ -23,15 +23,23 @@ struct VecNegEntropy <: VecSpecExt end
 struct VecNegEntropyEF <: VecSpecExt end
 struct VecNegSqrt <: VecSpecExt end
 struct VecNegSqrtEF <: VecSpecExt end
-struct VecNegPower01 <: VecSpecExt p::Real end
-struct VecNegPower01EF <: VecSpecExt p::Real end
-struct VecPower12 <: VecSpecExt p::Real end
-struct VecPower12EF <: VecSpecExt p::Real end
+struct VecNegPower01 <: VecSpecExt
+    p::Real
+end
+struct VecNegPower01EF <: VecSpecExt
+    p::Real
+end
+struct VecPower12 <: VecSpecExt
+    p::Real
+end
+struct VecPower12EF <: VecSpecExt
+    p::Real
+end
 
-const VecSepSpecPrim = Union{VecLogCone, VecNegLog, VecNegEntropy, VecNegSqrt,
-    VecNegPower01, VecPower12}
-const VecSepSpecPrimEF = Union{VecNegLogEF, VecNegEntropyEF, VecNegSqrtEF,
-    VecNegPower01EF, VecPower12EF}
+const VecSepSpecPrim =
+    Union{VecLogCone, VecNegLog, VecNegEntropy, VecNegSqrt, VecNegPower01, VecPower12}
+const VecSepSpecPrimEF =
+    Union{VecNegLogEF, VecNegEntropyEF, VecNegSqrtEF, VecNegPower01EF, VecPower12EF}
 const VecSepSpecPrimAll = Union{VecSepSpecPrim, VecSepSpecPrimEF}
 
 # vector separable spectral dual formulations
@@ -39,15 +47,23 @@ struct VecNegEntropyConj <: VecSpecExt end
 struct VecNegEntropyConjEF <: VecSpecExt end
 struct VecNegSqrtConj <: VecSpecExt end
 struct VecNegSqrtConjEF <: VecSpecExt end
-struct VecNegPower01Conj <: VecSpecExt p::Real end
-struct VecNegPower01ConjEF <: VecSpecExt p::Real end
-struct VecPower12Conj <: VecSpecExt p::Real end
-struct VecPower12ConjEF <: VecSpecExt p::Real end
+struct VecNegPower01Conj <: VecSpecExt
+    p::Real
+end
+struct VecNegPower01ConjEF <: VecSpecExt
+    p::Real
+end
+struct VecPower12Conj <: VecSpecExt
+    p::Real
+end
+struct VecPower12ConjEF <: VecSpecExt
+    p::Real
+end
 
-const VecSepSpecDual = Union{VecNegEntropyConj, VecNegSqrtConj,
-    VecNegPower01Conj, VecPower12Conj}
-const VecSepSpecDualEF = Union{VecNegEntropyConjEF, VecNegSqrtConjEF,
-    VecNegPower01ConjEF, VecPower12ConjEF}
+const VecSepSpecDual =
+    Union{VecNegEntropyConj, VecNegSqrtConj, VecNegPower01Conj, VecPower12Conj}
+const VecSepSpecDualEF =
+    Union{VecNegEntropyConjEF, VecNegSqrtConjEF, VecNegPower01ConjEF, VecPower12ConjEF}
 const VecSepSpecDualAll = Union{VecSepSpecDual, VecSepSpecDualEF}
 
 const VecSepSpec = Union{VecSepSpecPrim, VecSepSpecDual}
@@ -72,16 +88,29 @@ struct MatNegEntropy <: MatSpecExt end
 struct MatNegEntropyEigOrd <: MatSpecExt end
 struct MatNegSqrt <: MatSpecExt end
 struct MatNegSqrtEigOrd <: MatSpecExt end
-struct MatNegPower01 <: MatSpecExt p::Real end
-struct MatNegPower01EigOrd <: MatSpecExt p::Real end
-struct MatPower12 <: MatSpecExt p::Real end
-struct MatPower12EigOrd <: MatSpecExt p::Real end
+struct MatNegPower01 <: MatSpecExt
+    p::Real
+end
+struct MatNegPower01EigOrd <: MatSpecExt
+    p::Real
+end
+struct MatPower12 <: MatSpecExt
+    p::Real
+end
+struct MatPower12EigOrd <: MatSpecExt
+    p::Real
+end
 
-const MatSepSpecPrim = Union{MatLogdetCone, MatNegLog, MatNegEntropy,
-    MatNegSqrt, MatNegPower01, MatPower12}
-const MatSepSpecPrimEF = Union{MatNegLogEigOrd, MatNegLogDirect,
-    MatNegEntropyEigOrd, MatNegSqrtEigOrd, MatNegPower01EigOrd,
-    MatPower12EigOrd}
+const MatSepSpecPrim =
+    Union{MatLogdetCone, MatNegLog, MatNegEntropy, MatNegSqrt, MatNegPower01, MatPower12}
+const MatSepSpecPrimEF = Union{
+    MatNegLogEigOrd,
+    MatNegLogDirect,
+    MatNegEntropyEigOrd,
+    MatNegSqrtEigOrd,
+    MatNegPower01EigOrd,
+    MatPower12EigOrd,
+}
 const MatSepSpecPrimAll = Union{MatSepSpecPrim, MatSepSpecPrimEF}
 
 # matrix separable spectral dual formulations
@@ -90,22 +119,42 @@ struct MatNegEntropyConjEigOrd <: MatSpecExt end
 struct MatNegSqrtConj <: MatSpecExt end
 struct MatNegSqrtConjEigOrd <: MatSpecExt end
 struct MatNegSqrtConjDirect <: MatSpecExt end
-struct MatNegPower01Conj <: MatSpecExt p::Real end
-struct MatNegPower01ConjEigOrd <: MatSpecExt p::Real end
-struct MatPower12Conj <: MatSpecExt p::Real end
-struct MatPower12ConjEigOrd <: MatSpecExt p::Real end
+struct MatNegPower01Conj <: MatSpecExt
+    p::Real
+end
+struct MatNegPower01ConjEigOrd <: MatSpecExt
+    p::Real
+end
+struct MatPower12Conj <: MatSpecExt
+    p::Real
+end
+struct MatPower12ConjEigOrd <: MatSpecExt
+    p::Real
+end
 
-const MatSepSpecDual = Union{MatNegEntropyConj, MatNegSqrtConj,
-    MatNegPower01Conj, MatPower12Conj}
-const MatSepSpecDualEF = Union{MatNegEntropyConjEigOrd, MatNegSqrtConjEigOrd,
-    MatNegSqrtConjDirect, MatNegPower01ConjEigOrd, MatPower12ConjEigOrd}
+const MatSepSpecDual =
+    Union{MatNegEntropyConj, MatNegSqrtConj, MatNegPower01Conj, MatPower12Conj}
+const MatSepSpecDualEF = Union{
+    MatNegEntropyConjEigOrd,
+    MatNegSqrtConjEigOrd,
+    MatNegSqrtConjDirect,
+    MatNegPower01ConjEigOrd,
+    MatPower12ConjEigOrd,
+}
 const MatSepSpecDualAll = Union{MatSepSpecDual, MatSepSpecDualEF}
 
 const MatSepSpec = Union{MatSepSpecPrim, MatSepSpecDual}
-const MatSepSpecEigOrd = Union{MatNegLogEigOrd, MatNegEntropyEigOrd,
-    MatNegSqrtEigOrd, MatNegPower01EigOrd, MatPower12EigOrd,
-    MatNegEntropyConjEigOrd, MatNegSqrtConjEigOrd, MatNegPower01ConjEigOrd,
-    MatPower12ConjEigOrd}
+const MatSepSpecEigOrd = Union{
+    MatNegLogEigOrd,
+    MatNegEntropyEigOrd,
+    MatNegSqrtEigOrd,
+    MatNegPower01EigOrd,
+    MatPower12EigOrd,
+    MatNegEntropyConjEigOrd,
+    MatNegSqrtConjEigOrd,
+    MatNegPower01ConjEigOrd,
+    MatPower12ConjEigOrd,
+}
 
 const NegRtdetAll = Union{VecNegRtdetAll, MatNegRtdetAll}
 const SepSpecPrimAll = Union{VecSepSpecPrimAll, MatSepSpecPrimAll}
@@ -125,24 +174,76 @@ get_vec_ef(::MatNegSqrtConjEigOrd) = VecNegSqrtConjEF()
 get_vec_ef(ext::MatNegPower01ConjEigOrd) = VecNegPower01ConjEF(ext.p)
 get_vec_ef(ext::MatPower12ConjEigOrd) = VecPower12ConjEF(ext.p)
 
-get_ssf(::Union{VecLogCone, VecNegLog, VecNegLogEF, MatLogdetCone, MatNegLog,
-    MatNegLogEigOrd, MatNegLogDirect}) =
-    Cones.NegLogSSF()
-get_ssf(::Union{VecNegEntropy, VecNegEntropyEF, VecNegEntropyConj,
-    VecNegEntropyConjEF, MatNegEntropy, MatNegEntropyEigOrd, MatNegEntropyConj,
-    MatNegEntropyConjEigOrd}) =
-    Cones.NegEntropySSF()
-get_ssf(::Union{VecNegSqrt, VecNegSqrtEF, VecNegSqrtConj, VecNegSqrtConjEF,
-    MatNegSqrt, MatNegSqrtEigOrd, MatNegSqrtConj, MatNegSqrtConjEigOrd,
-    MatNegSqrtConjDirect}) =
-    Cones.NegSqrtSSF()
-get_ssf(ext::Union{VecNegPower01, VecNegPower01EF, VecNegPower01Conj,
-    VecNegPower01ConjEF, MatNegPower01, MatNegPower01EigOrd, MatNegPower01Conj,
-    MatNegPower01ConjEigOrd}) =
-    Cones.NegPower01SSF(ext.p)
-get_ssf(ext::Union{VecPower12, VecPower12EF, VecPower12Conj, VecPower12ConjEF,
-    MatPower12, MatPower12EigOrd, MatPower12Conj, MatPower12ConjEigOrd}) =
-    Cones.Power12SSF(ext.p)
+function get_ssf(
+    ::Union{
+        VecLogCone,
+        VecNegLog,
+        VecNegLogEF,
+        MatLogdetCone,
+        MatNegLog,
+        MatNegLogEigOrd,
+        MatNegLogDirect,
+    },
+)
+    return Cones.NegLogSSF()
+end
+function get_ssf(
+    ::Union{
+        VecNegEntropy,
+        VecNegEntropyEF,
+        VecNegEntropyConj,
+        VecNegEntropyConjEF,
+        MatNegEntropy,
+        MatNegEntropyEigOrd,
+        MatNegEntropyConj,
+        MatNegEntropyConjEigOrd,
+    },
+)
+    return Cones.NegEntropySSF()
+end
+function get_ssf(
+    ::Union{
+        VecNegSqrt,
+        VecNegSqrtEF,
+        VecNegSqrtConj,
+        VecNegSqrtConjEF,
+        MatNegSqrt,
+        MatNegSqrtEigOrd,
+        MatNegSqrtConj,
+        MatNegSqrtConjEigOrd,
+        MatNegSqrtConjDirect,
+    },
+)
+    return Cones.NegSqrtSSF()
+end
+function get_ssf(
+    ext::Union{
+        VecNegPower01,
+        VecNegPower01EF,
+        VecNegPower01Conj,
+        VecNegPower01ConjEF,
+        MatNegPower01,
+        MatNegPower01EigOrd,
+        MatNegPower01Conj,
+        MatNegPower01ConjEigOrd,
+    },
+)
+    return Cones.NegPower01SSF(ext.p)
+end
+function get_ssf(
+    ext::Union{
+        VecPower12,
+        VecPower12EF,
+        VecPower12Conj,
+        VecPower12ConjEF,
+        MatPower12,
+        MatPower12EigOrd,
+        MatPower12Conj,
+        MatPower12ConjEigOrd,
+    },
+)
+    return Cones.Power12SSF(ext.p)
+end
 
 nat_name(::NegRtdetAll) = "NegRtdet"
 get_name_ssf(ext::SepSpecAll) = string(nameof(typeof(get_ssf(ext))))
@@ -156,8 +257,9 @@ get_val(x::Vector, ::NegRtdetAll) = -exp(sum(log, x) / length(x))
 get_val(x::Vector, ext::SepSpecPrimAll) = Cones.h_val(x, get_ssf(ext))
 get_val(x::Vector, ext::SepSpecDualAll) = Cones.h_conj(x, get_ssf(ext))
 
-pos_only(x::Vector{T}, minval::T = eps(T)) where {T <: Real} =
-    [(x_i < minval ? minval : x_i) for x_i in x]
+function pos_only(x::Vector{T}, minval::T = eps(T)) where {T <: Real}
+    return [(x_i < minval ? minval : x_i) for x_i in x]
+end
 
 #=
 homogenizes separable spectral vector/matrix constraints
@@ -167,7 +269,7 @@ function add_homog_spectral(
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
-    )
+)
     # epigraph and perspective variables are swapped if dual cone is used
     aff_new = vcat(swap_if_dual(aff[1], 1.0, ext)..., aff[2:end])
     add_spectral(ext, d, aff_new, model)
@@ -183,7 +285,7 @@ function add_homog_spectral(
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
-    )
+)
     @assert 1 + d == length(aff)
     aff_new = vcat(-aff[1], aff[2:end])
     JuMP.@constraint(model, aff_new in Hypatia.HypoGeoMeanCone{Float64}(1 + d))
@@ -201,7 +303,7 @@ function add_homog_spectral(
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
-    )
+)
     @assert 1 + d == length(aff)
 
     y = JuMP.@variable(model)
@@ -230,7 +332,7 @@ function add_homog_spectral(
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
-    )
+)
     @assert d > 2 # EF does not work for d = 2
     @assert 1 + d == length(aff)
     w = aff[2:end]
@@ -253,32 +355,25 @@ end
 #=
 VecLogCone
 =#
-function add_spectral(
-    ::VecLogCone,
-    d::Int,
-    aff::Vector{JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function add_spectral(::VecLogCone, d::Int, aff::Vector{JuMP.AffExpr}, model::JuMP.Model)
     @assert 2 + d == length(aff)
     aff_new = vcat(-aff[1], aff[2], aff[3:end])
-    JuMP.@constraint(model, aff_new in
-        Hypatia.HypoPerLogCone{Float64}(length(aff)))
+    JuMP.@constraint(model, aff_new in Hypatia.HypoPerLogCone{Float64}(length(aff)))
     return
 end
 
 #=
 VecSepSpec
 =#
-function add_spectral(
-    ext::VecSepSpec,
-    d::Int,
-    aff::Vector{JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function add_spectral(ext::VecSepSpec, d::Int, aff::Vector{JuMP.AffExpr}, model::JuMP.Model)
     @assert 2 + d == length(aff)
     is_dual = (ext isa VecSepSpecDualAll)
-    cone = Hypatia.EpiPerSepSpectralCone{Float64}(get_ssf(ext),
-        Cones.VectorCSqr{Float64}, d, is_dual)
+    cone = Hypatia.EpiPerSepSpectralCone{Float64}(
+        get_ssf(ext),
+        Cones.VectorCSqr{Float64},
+        d,
+        is_dual,
+    )
     JuMP.@constraint(model, aff in cone)
     return
 end
@@ -291,7 +386,7 @@ function add_spectral(
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
-    )
+)
     @assert 2 + d == length(aff)
     # epigraph and perspective variables are swapped if dual cone is used
     (epi, per) = swap_if_dual(aff[1], aff[2], ext)
@@ -319,11 +414,10 @@ function add_homog_spectral(
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
-    )
+)
     aff_new = vcat(-aff[1], aff[2:end])
     R = get_R(d, length(aff) - 1)
-    JuMP.@constraint(model, aff_new in
-        Hypatia.HypoRootdetTriCone{Float64, R}(length(aff)))
+    JuMP.@constraint(model, aff_new in Hypatia.HypoRootdetTriCone{Float64, R}(length(aff)))
     return
 end
 
@@ -338,7 +432,7 @@ function add_homog_spectral(
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
-    )
+)
     R = get_R(d, length(aff) - 1)
     δ = extend_det(R, d, aff[2:end], model)
     add_homog_spectral(get_vec_ef(ext), d, vcat(aff[1], δ), model)
@@ -348,32 +442,28 @@ end
 #=
 MatLogdetCone
 =#
-function add_spectral(
-    ::MatLogdetCone,
-    d::Int,
-    aff::Vector{JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function add_spectral(::MatLogdetCone, d::Int, aff::Vector{JuMP.AffExpr}, model::JuMP.Model)
     aff_new = vcat(-aff[1], aff[2], aff[3:end])
     R = get_R(d, length(aff) - 2)
-    JuMP.@constraint(model, aff_new in
-        Hypatia.HypoPerLogdetTriCone{Float64, R}(length(aff)))
+    JuMP.@constraint(
+        model,
+        aff_new in Hypatia.HypoPerLogdetTriCone{Float64, R}(length(aff))
+    )
     return
 end
 
 #=
 MatSepSpec
 =#
-function add_spectral(
-    ext::MatSepSpec,
-    d::Int,
-    aff::Vector{JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function add_spectral(ext::MatSepSpec, d::Int, aff::Vector{JuMP.AffExpr}, model::JuMP.Model)
     R = get_R(d, length(aff) - 2)
     is_dual = (ext isa MatSepSpecDualAll)
-    cone = Hypatia.EpiPerSepSpectralCone{Float64}(get_ssf(ext),
-        Cones.MatrixCSqr{Float64, R}, d, is_dual)
+    cone = Hypatia.EpiPerSepSpectralCone{Float64}(
+        get_ssf(ext),
+        Cones.MatrixCSqr{Float64, R},
+        d,
+        is_dual,
+    )
     JuMP.@constraint(model, aff in cone)
     return
 end
@@ -387,7 +477,7 @@ function add_spectral(
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
-    )
+)
     λ = JuMP.@variable(model, [1:d])
     JuMP.@constraint(model, [i in 1:(d - 1)], λ[i] >= λ[i + 1])
 
@@ -442,7 +532,7 @@ function add_spectral(
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
-    )
+)
     R = get_R(d, length(aff) - 2)
     δ = extend_det(R, d, aff[3:end], model)
     vec_aff = vcat(aff[1], aff[2], δ)
@@ -461,7 +551,7 @@ function add_spectral(
     d::Int,
     aff::Vector{JuMP.AffExpr},
     model::JuMP.Model,
-    )
+)
     w = aff[3:end]
     R = get_R(d, length(w))
 
@@ -544,12 +634,7 @@ function make_skewsymm(d::Int, U::Symmetric)
 end
 
 # construct the real matrix part of the det EF, return δ like eigenvalues
-function extend_det(
-    R::Type{Float64},
-    d::Int,
-    w::Vector{JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function extend_det(R::Type{Float64}, d::Int, w::Vector{JuMP.AffExpr}, model::JuMP.Model)
     u = JuMP.@variable(model, [1:length(w)])
     U = get_smat(d, 1.0 * u)
     δ = diag(U)
@@ -562,12 +647,7 @@ function extend_det(
 end
 
 # construct the complex matrix part of the det EF, return δ like eigenvalues
-function extend_det(
-    R::Type{ComplexF64},
-    d::Int,
-    w::Vector{JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function extend_det(R::Type{ComplexF64}, d::Int, w::Vector{JuMP.AffExpr}, model::JuMP.Model)
     (Wr, Wi) = get_smat_complex(d, w)
 
     Ur = UpperTriangular(JuMP.@variable(model, [1:d, 1:d], Symmetric))
@@ -591,11 +671,7 @@ NegLogSSF:
 ↔ (-x, y, z) ∈ MOI.ExponentialCone
 conjugate does not provide additional modeling power
 =#
-function extend_atom(
-    ::VecNegLogEF,
-    aff::NTuple{3, JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function extend_atom(::VecNegLogEF, aff::NTuple{3, JuMP.AffExpr}, model::JuMP.Model)
     aff_new = vcat(-aff[1], aff[2], aff[3])
     JuMP.@constraint(model, aff_new in MOI.ExponentialCone())
     return
@@ -610,21 +686,13 @@ or for the conjugate: (z can be negative)
 (x > 0, y > 0, z) : x > y * exp(-z / y - 1) = y * exp((-z - y) / y)
 ↔ (-z - y, y, x) ∈ MOI.ExponentialCone
 =#
-function extend_atom(
-    ::VecNegEntropyEF,
-    aff::NTuple{3, JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function extend_atom(::VecNegEntropyEF, aff::NTuple{3, JuMP.AffExpr}, model::JuMP.Model)
     aff_new = vcat(-aff[1], aff[3], aff[2])
     JuMP.@constraint(model, aff_new in MOI.ExponentialCone())
     return
 end
 
-function extend_atom(
-    ::VecNegEntropyConjEF,
-    aff::NTuple{3, JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function extend_atom(::VecNegEntropyConjEF, aff::NTuple{3, JuMP.AffExpr}, model::JuMP.Model)
     aff_new = vcat(-aff[3] - aff[2], aff[2], aff[1])
     JuMP.@constraint(model, aff_new in MOI.ExponentialCone())
     return
@@ -640,11 +708,7 @@ or for the conjugate:
 ↔ 2 * x * z > y^2 / 2
 ↔ (x, z, y / sqrt(2)) ∈ JuMP.RotatedSecondOrderCone
 =#
-function extend_atom(
-    ::VecNegSqrtEF,
-    aff::NTuple{3, JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function extend_atom(::VecNegSqrtEF, aff::NTuple{3, JuMP.AffExpr}, model::JuMP.Model)
     θ = JuMP.@variable(model)
     JuMP.@constraint(model, θ >= 0)
     aff_new = vcat(aff[2], aff[3], sqrt(2) * (aff[1] - θ))
@@ -652,11 +716,7 @@ function extend_atom(
     return
 end
 
-function extend_atom(
-    ::VecNegSqrtConjEF,
-    aff::NTuple{3, JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function extend_atom(::VecNegSqrtConjEF, aff::NTuple{3, JuMP.AffExpr}, model::JuMP.Model)
     aff_new = vcat(aff[1], aff[3], aff[2] / sqrt(2))
     JuMP.@constraint(model, aff_new in JuMP.RotatedSecondOrderCone())
     return
@@ -677,11 +737,7 @@ let c = (1 - p) * p^-q > 0
 where b = c^(1/(1-q)) = p^p * (1 - p)^(1-p) > 0
 ↔ (z, x, b * y) ∈ MOI.PowerCone(p), y ∈ ℝ₊
 =#
-function extend_atom(
-    ext::VecNegPower01EF,
-    aff::NTuple{3, JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function extend_atom(ext::VecNegPower01EF, aff::NTuple{3, JuMP.AffExpr}, model::JuMP.Model)
     p = ext.p
     @assert 0 < p < 1
     θ = JuMP.@variable(model)
@@ -695,7 +751,7 @@ function extend_atom(
     ext::VecNegPower01ConjEF,
     aff::NTuple{3, JuMP.AffExpr},
     model::JuMP.Model,
-    )
+)
     p = ext.p
     @assert 0 < p < 1
     q = p / (p - 1)
@@ -720,11 +776,7 @@ let z₋ = {0 if z ≥ 0, or -z if z < 0}, q = p / (p - 1) > 2
 where c = (p - 1)^(1/q) / p > 0
 ↔ (x, y, c * (z - θ)) ∈ MOI.PowerCone(1/q), θ ∈ ℝ₊
 =#
-function extend_atom(
-    ext::VecPower12EF,
-    aff::NTuple{3, JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function extend_atom(ext::VecPower12EF, aff::NTuple{3, JuMP.AffExpr}, model::JuMP.Model)
     p = ext.p
     @assert 1 < p <= 2
     JuMP.@constraint(model, aff[3] >= 0)
@@ -732,11 +784,7 @@ function extend_atom(
     return
 end
 
-function extend_atom(
-    ext::VecPower12ConjEF,
-    aff::NTuple{3, JuMP.AffExpr},
-    model::JuMP.Model,
-    )
+function extend_atom(ext::VecPower12ConjEF, aff::NTuple{3, JuMP.AffExpr}, model::JuMP.Model)
     p = ext.p
     @assert 1 < p <= 2
     q = p / (p - 1)

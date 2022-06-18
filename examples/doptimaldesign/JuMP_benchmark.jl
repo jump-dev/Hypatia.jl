@@ -1,8 +1,10 @@
 
-doptimaldesign_insts(use_logdet::Bool) = [
-    [(q, 2q, 2q, 5, use_logdet, !use_logdet, false)
-    for q in vcat(3, 50:50:200, 300:100:1000)] # includes compile run
-    ]
+function doptimaldesign_insts(use_logdet::Bool)
+    return [[
+        (q, 2q, 2q, 5, use_logdet, !use_logdet, false) for
+        q in vcat(3, 50:50:200, 300:100:1000)
+    ]]
+end
 
 insts = OrderedDict()
 rootdet_insts = doptimaldesign_insts(false)

@@ -20,7 +20,13 @@ function get_naics5811_data()
 
     # four covariates: non production employees, production worker hours, production workers, total capital stock
     # use the log transform of covariates
-    X = log.(convert(Matrix{Float64}, df_aggr[!, [:prode_sum, :prodh_sum, :prodw_sum, :cap_sum]])) # n = 4
+    X =
+        log.(
+            convert(
+                Matrix{Float64},
+                df_aggr[!, [:prode_sum, :prodh_sum, :prodw_sum, :cap_sum]],
+            )
+        ) # n = 4
     # value of shipment
     y = convert(Vector{Float64}, df_aggr[!, :vship_sum])
     # mean center
@@ -34,5 +40,5 @@ function get_naics5811_data()
 end
 
 open(joinpath(@__DIR__, "naics5811.txt"), "w") do io
-    DelimitedFiles.writedlm(io, get_naics5811_data())
+    return DelimitedFiles.writedlm(io, get_naics5811_data())
 end

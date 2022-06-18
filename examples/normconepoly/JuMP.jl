@@ -12,8 +12,7 @@ end
 
 function build(inst::NormConePoly{T}) where {T <: Float64}
     halfdeg = div(inst.deg + 1, 2)
-    (U, pts, Ps) = PolyUtils.interpolate(
-        PolyUtils.FreeDomain{T}(1), halfdeg)
+    (U, pts, Ps) = PolyUtils.interpolate(PolyUtils.FreeDomain{T}(1), halfdeg)
     vals = normconepoly_data[inst.polys_name].(pts)
     l = length(vals[1])
     if inst.use_L2
@@ -28,7 +27,7 @@ function build(inst::NormConePoly{T}) where {T <: Float64}
     return model
 end
 
-function test_extra(inst::NormConePoly{T}, model::JuMP.Model) where T
+function test_extra(inst::NormConePoly{T}, model::JuMP.Model) where {T}
     stat = JuMP.termination_status(model)
     @test stat == (inst.is_feas ? MOI.OPTIMAL : MOI.INFEASIBLE)
 end
@@ -43,4 +42,4 @@ normconepoly_data = Dict(
     :polys7 => (x -> [x^2, x]),
     :polys8 => (x -> [x + 2, x]),
     :polys9 => (x -> [x - 1, x, x]),
-    )
+)

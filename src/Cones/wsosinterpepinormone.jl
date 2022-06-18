@@ -75,7 +75,7 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
         U::Int,
         Ps::Vector{Matrix{T}};
         use_dual::Bool = false,
-        ) where {T <: Real}
+    ) where {T <: Real}
         @assert R >= 2
         for Pk in Ps
             @assert size(Pk, 1) == U
@@ -104,7 +104,7 @@ function setup_extra_data!(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     cone.hess_diag_blocks = [zeros(T, U, U) for _ in 1:R]
     # TODO preallocate better
     cone.hess_diag_facts = Any[cholesky(hcat([one(T)])) for _ in 1:(R - 1)]
-    cone.hess_diags = [zeros(T, U, U) for _ in 1:R - 1]
+    cone.hess_diags = [zeros(T, U, U) for _ in 1:(R - 1)]
     cone.ΛLi_Λ = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
     cone.Λ11 = [zeros(T, L, L) for L in Ls]
     cone.tempΛ11 = [zeros(T, L, L) for L in Ls]
@@ -134,12 +134,19 @@ function setup_extra_data!(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     return cone
 end
 
-reset_data(cone::WSOSInterpEpiNormOne) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = cone.hess_fact_updated =
-    cone.hess_prod_updated = cone.inv_hess_prod_updated = false)
+function reset_data(cone::WSOSInterpEpiNormOne)
+    return (
+        cone.feas_updated =
+            cone.grad_updated =
+                cone.hess_updated =
+                    cone.inv_hess_updated =
+                        cone.hess_fact_updated =
+                            cone.hess_prod_updated = cone.inv_hess_prod_updated = false
+    )
+end
 
 function set_initial_point!(arr::AbstractVector, cone::WSOSInterpEpiNormOne)
-    @views arr[1:cone.U] .= 1
+    @views arr[1:(cone.U)] .= 1
     @views arr[(cone.U + 1):end] .= 0
     return arr
 end
@@ -205,7 +212,7 @@ end
 
 function is_dual_feas(cone::WSOSInterpEpiNormOne{T}) where {T}
     # condition is necessary but not sufficient for dual feasibility
-    @views p1 = cone.dual_point[1:cone.U]
+    @views p1 = cone.dual_point[1:(cone.U)]
     return all(>(eps(T)), p1)
 end
 
@@ -319,7 +326,7 @@ function hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::WSOSInterpEpiNormOne,
-    )
+)
     if !cone.hess_prod_updated
         update_hess_prod(cone)
     end
@@ -341,7 +348,7 @@ function hess_prod!(
     return prod
 end
 
-function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where T
+function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where {T}
     if !cone.hess_prod_updated
         update_hess_prod(cone)
     end
@@ -357,8 +364,11 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where T
 
     @inbounds for r in 2:R
         r1 = r - 1
-        diag_facts[r1] = posdef_fact_copy!(Symmetric(cone.hess_diags[r1], :U),
-            Symmetric(diag_blocks[r], :U), false)
+        diag_facts[r1] = posdef_fact_copy!(
+            Symmetric(cone.hess_diags[r1], :U),
+            Symmetric(diag_blocks[r], :U),
+            false,
+        )
 
         z = cone.hess_edge_blocks[r1]
         LinearAlgebra.copytri!(z, 'U')
@@ -367,8 +377,8 @@ function update_inv_hess_prod(cone::WSOSInterpEpiNormOne{T}) where T
         mul!(schur, z', Dizi, -1, true)
     end
 
-    cone.hess_schur_fact = posdef_fact_copy!(Symmetric(schur_backup, :U),
-        Symmetric(schur, :U), false)
+    cone.hess_schur_fact =
+        posdef_fact_copy!(Symmetric(schur_backup, :U), Symmetric(schur, :U), false)
 
     cone.inv_hess_prod_updated = true
     return
@@ -378,7 +388,7 @@ function inv_hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::WSOSInterpEpiNormOne,
-    )
+)
     if !cone.inv_hess_prod_updated
         update_inv_hess_prod(cone)
     end
@@ -470,8 +480,13 @@ function dder3(cone::WSOSInterpEpiNormOne, dir::AbstractVector)
 
             mul!(LLk, ΛLiP_dir22, ΛLiPs12[s]')
             mul!(dder3_half[s][(L + 1):(2 * L), 1:U], LLk, ΛLiPs11[s], true, true)
-            mul!(dder3_half[s][(L + 1):(2 * L), (U + 1):(2 * U)], LLk, ΛLiPs12[s],
-                true, true)
+            mul!(
+                dder3_half[s][(L + 1):(2 * L), (U + 1):(2 * U)],
+                LLk,
+                ΛLiPs12[s],
+                true,
+                true,
+            )
 
             mul!(LLk, ΛLiP_dir11[s], Λ11LiP')
             mul!(dder3_half[s][1:L, 1:U], LLk, Λ11LiP, true, true)

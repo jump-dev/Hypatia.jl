@@ -19,13 +19,13 @@ makedocs(
             "api/models.md",
             "api/solvers.md",
             "api/polyutils.md",
-            ],
         ],
+    ],
     # linkcheck = true, # test URLs
-    )
+)
 
 deploydocs(
     repo = "github.com/chriscoey/Hypatia.jl.git",
     target = "build",
     push_preview = true,
-    )
+)

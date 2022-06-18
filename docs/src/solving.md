@@ -13,6 +13,7 @@ CurrentModule = Hypatia.Solvers
 Hypatia's [`Solvers`](@ref) module provides a [`Solver`](@ref) type with low-level functions for solving models and querying solve information and conic certificates; see [Solvers module](@ref).
 
 Below is a simple example of a spectral norm optimization problem:
+
 ```julia
 using LinearAlgebra
 import Hypatia
@@ -27,14 +28,18 @@ A = hcat(zeros(T, dim, 1), Matrix{T}(I, dim, dim))
 b = rand(T, dim)
 G = -one(T) * I
 h = vcat(zero(T), rand(T, dim))
-cones = [Cones.EpiNormSpectral{T, T}(Xn, Xm),]
+cones = [Cones.EpiNormSpectral{T, T}(Xn, Xm)]
 model = Hypatia.Models.Model{T}(c, A, b, G, h, cones);
 ```
+
 Now we call optimize and query the solution:
+
 ```julia
 julia> solver = Solvers.Solver{T}(verbose = true);
 
+
 julia> Solvers.load(solver, model);
+
 
 julia> Solvers.solve(solver);
 
@@ -97,7 +102,9 @@ Q = V * diagm(x) * V'
 aff = vcat(hypo, [Q[i, j] for i in 1:2 for j in 1:i]...)
 @constraint(model, aff in MOI.RootDetConeTriangle(2))
 ```
+
 The model is now:
+
 ```julia
 julia> model
 A JuMP Model
@@ -112,9 +119,12 @@ CachingOptimizer state: EMPTY_OPTIMIZER
 Solver name: Hypatia
 Names registered in the model: hypo, x
 ```
+
 Now we call optimize and query the solution:
+
 ```julia
 julia> optimize!(model)
+
 
 julia> termination_status(model)
 OPTIMAL::TerminationStatusCode = 1

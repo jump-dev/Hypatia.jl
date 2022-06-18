@@ -75,21 +75,22 @@ function MOI.get(opt::Optimizer, param::MOI.RawOptimizerAttribute)
     return getproperty(opt.solver, Symbol(param.name))
 end
 
-MOI.supports(
+function MOI.supports(
     ::Optimizer{T},
     ::Union{MOI.ObjectiveSense, MOI.ObjectiveFunction{<:Union{VI, SAF{T}}}},
-    ) where {T <: Real} = true
+) where {T <: Real}
+    return true
+end
 
-MOI.supports_constraint(
+function MOI.supports_constraint(
     ::Optimizer{T},
     ::Type{<:Union{VV, VAF{T}}},
     ::Type{<:Union{MOI.Zeros, SupportedCone{T}}},
-    ) where {T <: Real} = true
+) where {T <: Real}
+    return true
+end
 
-function MOI.copy_to(
-    opt::Optimizer{T},
-    src::MOI.ModelLike,
-    ) where {T <: Real}
+function MOI.copy_to(opt::Optimizer{T}, src::MOI.ModelLike) where {T <: Real}
     idx_map = MOI.Utilities.IndexMap()
 
     # variables
@@ -203,8 +204,15 @@ function MOI.copy_to(
     opt.moi_cones = moi_cones
 
     # finalize model and load into solver
-    model = Models.Model{T}(model_c, model_A, model_b, model_G, model_h,
-        cones; obj_offset = obj_offset)
+    model = Models.Model{T}(
+        model_c,
+        model_A,
+        model_b,
+        model_G,
+        model_h,
+        cones;
+        obj_offset = obj_offset,
+    )
     Solvers.load(opt.solver, model)
 
     return idx_map
@@ -216,7 +224,7 @@ function MOI.modify(
     opt::Optimizer{T},
     ::MOI.ObjectiveFunction{SAF{T}},
     chg::MOI.ScalarConstantChange{T},
-    ) where {T}
+) where {T}
     obj_offset = chg.new_constant
     if opt.obj_sense == MOI.MAX_SENSE
         obj_offset = -obj_offset
@@ -229,7 +237,7 @@ function MOI.modify(
     opt::Optimizer{T},
     ::MOI.ObjectiveFunction{SAF{T}},
     chg::MOI.ScalarCoefficientChange{T},
-    ) where {T}
+) where {T}
     new_c = chg.new_coefficient
     if opt.obj_sense == MOI.MAX_SENSE
         new_c = -new_c
@@ -242,7 +250,7 @@ function MOI.modify(
     opt::Optimizer{T},
     ci::MOI.ConstraintIndex{VAF{T}, MOI.Zeros},
     chg::MOI.VectorConstantChange{T},
-    ) where {T}
+) where {T}
     idxs = opt.zeros_idxs[ci.value]
     Solvers.modify_b(opt.solver, idxs, chg.new_constant)
     return
@@ -252,7 +260,7 @@ function MOI.modify(
     opt::Optimizer{T},
     ci::MOI.ConstraintIndex{VAF{T}, <:SupportedCone{T}},
     chg::MOI.VectorConstantChange{T},
-    ) where {T}
+) where {T}
     i = ci.value
     idxs = opt.moi_cone_idxs[i]
     set = opt.moi_cones[i]
@@ -367,7 +375,7 @@ function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintDual,
     ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, MOI.Zeros},
-    ) where {T}
+) where {T}
     MOI.check_result_index_bounds(opt, attr)
     return opt.solver.result.y[opt.zeros_idxs[ci.value]]
 end
@@ -376,7 +384,7 @@ function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintDual,
     ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCone{T}},
-    ) where {T}
+) where {T}
     MOI.check_result_index_bounds(opt, attr)
     i = ci.value
     z_i = opt.solver.result.z[opt.moi_cone_idxs[i]]
@@ -387,7 +395,7 @@ function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintPrimal,
     ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCone{T}},
-    ) where {T}
+) where {T}
     MOI.check_result_index_bounds(opt, attr)
     i = ci.value
     s_i = opt.solver.result.s[opt.moi_cone_idxs[i]]
@@ -403,7 +411,7 @@ function _con_IJV(
     func::VV,
     set::MOI.AbstractVectorSet,
     idx_map::MOI.IndexMap,
-    ) where {T <: Real}
+) where {T <: Real}
     dim = MOI.output_dimension(func)
     start = length(vect)
     idxs = start .+ (1:dim)
@@ -433,7 +441,7 @@ function _con_IJV(
     func::VAF{T},
     set::MOI.AbstractVectorSet,
     idx_map::MOI.IndexMap,
-    ) where {T <: Real}
+) where {T <: Real}
     dim = MOI.output_dimension(func)
     start = length(vect)
     idxs = start .+ (1:dim)

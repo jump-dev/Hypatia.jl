@@ -1,10 +1,7 @@
 
 insts = OrderedDict()
-insts["minimal"] = [
-    ((3, true, false),),
-    ((3, false, true),),
-    ((3, false, true), :SOCExpPSD),
-    ]
+insts["minimal"] =
+    [((3, true, false),), ((3, false, true),), ((3, false, true), :SOCExpPSD)]
 insts["fast"] = [
     ((10, true, false),),
     ((10, false, true),),
@@ -17,7 +14,7 @@ insts["fast"] = [
     ((400, true, false),),
     ((400, false, true),),
     ((400, false, true), :SOCExpPSD),
-    ]
+]
 insts["various"] = [
     ((50, false, true), :SOCExpPSD),
     ((1000, true, false),),
@@ -28,5 +25,5 @@ insts["various"] = [
     ((4000, false, true),),
     ((8000, true, false),),
     ((8000, false, true),),
-    ]
+]
 return (PortfolioJuMP, insts)

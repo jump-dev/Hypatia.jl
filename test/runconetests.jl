@@ -44,13 +44,16 @@ function cone_types(T::Type{<:Real})
         Cones.WSOSInterpPosSemidefTri{T},
         Cones.WSOSInterpEpiNormEucl{T},
         Cones.WSOSInterpEpiNormOne{T},
-        ]
+    ]
 
     if T <: LinearAlgebra.BlasReal
-        append!(cones_T, [
-            Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, T},
-            Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, Complex{T}},
-            ])
+        append!(
+            cones_T,
+            [
+                Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, T},
+                Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, Complex{T}},
+            ],
+        )
     end
 
     return cones_T
@@ -60,54 +63,52 @@ sep_spectral_funs = [
     Cones.NegLogSSF(),
     Cones.NegEntropySSF(),
     Cones.NegSqrtSSF(),
-    Cones.NegPower01SSF(3//10),
+    Cones.NegPower01SSF(3 // 10),
     Cones.Power12SSF(1.5),
-    ]
+]
 
 @testset "cone tests" begin
+    println("starting oracle tests")
+    @testset "oracle tests" begin
+        real_types = [
+            Float64,
+            # Float32,
+            # BigFloat,
+        ]
+        @testset "$cone" for T in real_types, cone in cone_types(T)
+            println("$cone")
+            test_time = @elapsed test_oracles(cone)
+            @printf("%8.2e seconds\n", test_time)
+        end
+    end
 
-println("starting oracle tests")
-@testset "oracle tests" begin
-real_types = [
-    Float64,
-    # Float32,
-    # BigFloat,
-    ]
-@testset "$cone" for T in real_types, cone in cone_types(T)
-    println("$cone")
-    test_time = @elapsed test_oracles(cone)
-    @printf("%8.2e seconds\n", test_time)
-end
-end
+    # println("\nstarting barrier tests")
+    # @testset "barrier tests" begin
+    # real_types = [
+    #     Float64,
+    #     # Float32,
+    #     # BigFloat,
+    #     ]
+    # @testset "$cone" for T in real_types, cone in cone_types(T)
+    #     println("$cone")
+    #     test_time = @elapsed test_barrier(cone)
+    #     @printf("%8.2e seconds\n", test_time)
+    # end
+    # end
+    #
+    # println("\nstarting time/allocation measurements")
+    # @testset "allocation tests" begin
+    # real_types = [
+    #     Float64,
+    #     # Float32,
+    #     # BigFloat,
+    #     ]
+    # @testset "$cone" for T in real_types, cone in cone_types(T)
+    #     println("\n$cone")
+    #     test_time = @elapsed show_time_alloc(cone)
+    #     @printf("%8.2e seconds\n", test_time)
+    # end
+    # println()
+    # end
 
-# println("\nstarting barrier tests")
-# @testset "barrier tests" begin
-# real_types = [
-#     Float64,
-#     # Float32,
-#     # BigFloat,
-#     ]
-# @testset "$cone" for T in real_types, cone in cone_types(T)
-#     println("$cone")
-#     test_time = @elapsed test_barrier(cone)
-#     @printf("%8.2e seconds\n", test_time)
-# end
-# end
-#
-# println("\nstarting time/allocation measurements")
-# @testset "allocation tests" begin
-# real_types = [
-#     Float64,
-#     # Float32,
-#     # BigFloat,
-#     ]
-# @testset "$cone" for T in real_types, cone in cone_types(T)
-#     println("\n$cone")
-#     test_time = @elapsed show_time_alloc(cone)
-#     @printf("%8.2e seconds\n", test_time)
-# end
-# println()
-# end
-
-end
-;
+end;

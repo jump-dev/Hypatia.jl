@@ -32,8 +32,12 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
 
     # vectorized information matrix
     rt2 = sqrt(T(2))
-    Q_vec = [JuMP.@expression(model, (i == j ? one(T) : rt2) *
-        sum(V[i, k] * x[k] * V[j, k] for k in 1:k)) for i in 1:d for j in 1:i]
+    Q_vec = [
+        JuMP.@expression(
+            model,
+            (i == j ? one(T) : rt2) * sum(V[i, k] * x[k] * V[j, k] for k in 1:k)
+        ) for i in 1:d for j in 1:i
+    ]
 
     # convex objective
     JuMP.@variable(model, epi)
@@ -47,7 +51,7 @@ function build(inst::ExperimentDesignJuMP{T}) where {T <: Float64}
     return model
 end
 
-function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where T
+function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where {T}
     stat = JuMP.termination_status(model)
     @test stat == MOI.OPTIMAL
     (stat == MOI.OPTIMAL) || return
@@ -59,6 +63,6 @@ function test_extra(inst::ExperimentDesignJuMP{T}, model::JuMP.Model) where T
     λ = eigvals(Symmetric(V * Diagonal(x_opt) * V', :U))
     @test minimum(λ) >= -tol
     obj_result = get_val(pos_only(λ), inst.ext)
-    @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
+    @test JuMP.objective_value(model) ≈ obj_result atol = tol rtol = tol
     return
 end

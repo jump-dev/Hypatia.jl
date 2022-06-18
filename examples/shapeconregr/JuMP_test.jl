@@ -9,7 +9,7 @@ insts["minimal"] = [
     ((1, 5, :func6, 2, 4, false, false, true, true, false),),
     ((1, 5, :func7, 2, 4, false, true, true, true, false), :SOCExpPSD),
     ((1, 5, :func1, 2, 4, false, true, false, false, true), :SOCExpPSD),
-    ]
+]
 insts["fast"] = [
     ((:naics5811, 4, true, false, true, true, false),),
     ((:naics5811, 4, true, true, true, true, false),),
@@ -42,7 +42,7 @@ insts["fast"] = [
     ((4, 150, :func7, 0, 4, true, true, true, true, true),),
     ((4, 150, :func7, 0, 4, false, false, true, true, true),),
     ((3, 150, :func8, 0, 6, true, false, true, true, true),),
-    ]
+]
 insts["various"] = [
     ((8, 100, :func4, 5, 3, true, true, true, true, false),),
     ((8, 100, :func4, 5, 3, true, false, true, true, false),),
@@ -55,5 +55,5 @@ insts["various"] = [
     ((:naics5811, 3, false, true, true, true, false),),
     ((:naics5811, 3, false, true, true, true, false), :SOCExpPSD),
     ((:naics5811, 3, false, false, true, true, false),),
-    ]
+]
 return (ShapeConRegrJuMP, insts)

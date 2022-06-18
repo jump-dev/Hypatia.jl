@@ -54,12 +54,15 @@ end
 
 dimension(dom::FreeDomain) = dom.n
 
-sample(dom::FreeDomain{T}, npts::Int) where {T <: Real} =
-    sample(BoxDomain{T}(-ones(T, dom.n), ones(T, dom.n)), npts)::Matrix{T}
+function sample(dom::FreeDomain{T}, npts::Int) where {T <: Real}
+    return sample(BoxDomain{T}(-ones(T, dom.n), ones(T, dom.n)), npts)::Matrix{T}
+end
 
 degree(::FreeDomain) = 0
 
-weights(::FreeDomain{T}, ::AbstractMatrix{T}) where {T <: Real} = Vector{T}[]::Vector{Vector{T}}
+function weights(::FreeDomain{T}, ::AbstractMatrix{T}) where {T <: Real}
+    return Vector{T}[]::Vector{Vector{T}}
+end
 
 """
 $(TYPEDEF)
@@ -94,12 +97,10 @@ end
 degree(::BoxDomain) = 2
 
 function weights(dom::BoxDomain{T}, pts::AbstractMatrix{T}) where {T <: Real}
-    @views g = [(pts[:, i] .- dom.l[i]) .* (dom.u[i] .- pts[:, i]) for
-        i in 1:size(pts, 2)]
+    @views g = [(pts[:, i] .- dom.l[i]) .* (dom.u[i] .- pts[:, i]) for i in 1:size(pts, 2)]
     @assert all(all(gi .>= 0) for gi in g)
     return g::Vector{Vector{T}}
 end
-
 
 # for hyperball and hyperellipse
 function ball_sample(dom::Domain{T}, npts::Int) where {T <: Real}
@@ -108,7 +109,7 @@ function ball_sample(dom::Domain{T}, npts::Int) where {T <: Real}
     norms = sum(abs2, pts, dims = 2)
     pts ./= sqrt.(norms) # scale
     norms ./= 2
-    gammainv = [gamma_inc(ai, dim / 2)[2] ^ inv(dim) for ai in norms]
+    gammainv = [gamma_inc(ai, dim / 2)[2]^inv(dim) for ai in norms]
     pts .*= gammainv
     return pts::Matrix{T}
 end
@@ -158,10 +159,7 @@ mutable struct EllipsoidDomain{T <: Real} <: Domain{T}
     c::Vector{T}
     Q::AbstractMatrix{T}
     QU::UpperTriangular{T}
-    function EllipsoidDomain{T}(
-        c::Vector{T},
-        Q::AbstractMatrix{T},
-        ) where {T <: Real}
+    function EllipsoidDomain{T}(c::Vector{T}, Q::AbstractMatrix{T}) where {T <: Real}
         @assert length(c) == size(Q, 1)
         @assert issymmetric(Q)
         F = cholesky(Q, check = false)
@@ -185,10 +183,7 @@ end
 
 degree(::EllipsoidDomain) = 2
 
-function weights(
-    dom::EllipsoidDomain{T},
-    pts::AbstractMatrix{T},
-    ) where {T <: Real}
+function weights(dom::EllipsoidDomain{T}, pts::AbstractMatrix{T}) where {T <: Real}
     g = [1 - sum(abs2, dom.QU * (pts[j, :] - dom.c)) for j in 1:size(pts, 1)]
     @assert all(g .>= 0)
     return [g]::Vector{Vector{T}}
