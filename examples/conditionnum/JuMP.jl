@@ -34,8 +34,9 @@ function build(inst::ConditionNumJuMP{T}) where {T <: Float64}
     Mi = [rand_pd() for i in 1:len_y]
     M0 = rand_pd()
     # make some F_i matrices pos def
-    Fi = [(rand() > 0.5 || i <= 2) ? rand_pd() :
-        Symmetric(randn(side, side)) for i in 1:len_y]
+    Fi = [
+        (rand() > 0.5 || i <= 2) ? rand_pd() : Symmetric(randn(side, side)) for i in 1:len_y
+    ]
     F0 = rand_pd() + I
 
     model = JuMP.Model()
@@ -56,8 +57,10 @@ function build(inst::ConditionNumJuMP{T}) where {T <: Float64}
     else
         S1 = Symmetric(nu * F0 + sum(y[i] * Fi[i] for i in eachindex(y)))
         S2 = Symmetric(nu * M0 + sum(y[i] * Mi[i] for i in eachindex(y)) - I)
-        S3 = Symmetric(gamma * Matrix(I, side, side) - nu * M0 -
-            sum(y[i] * Mi[i] for i in eachindex(y)))
+        S3 = Symmetric(
+            gamma * Matrix(I, side, side) - nu * M0 -
+            sum(y[i] * Mi[i] for i in eachindex(y)),
+        )
 
         JuMP.@constraints(model, begin
             S1 in JuMP.PSDCone()

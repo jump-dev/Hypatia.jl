@@ -12,17 +12,11 @@ struct PolyMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_wsos::Bool # use wsosinterpnonnegative cone, else PSD formulation
 end
 
-function PolyMinJuMP{Float64}(
-    poly_name::Symbol,
-    halfdeg::Int,
-    args...)
+function PolyMinJuMP{Float64}(poly_name::Symbol, halfdeg::Int, args...)
     return PolyMinJuMP{Float64}(get_interp_data(Float64, poly_name, halfdeg)..., args...)
 end
 
-function PolyMinJuMP{Float64}(
-    n::Int,
-    halfdeg::Int,
-    args...)
+function PolyMinJuMP{Float64}(n::Int, halfdeg::Int, args...)
     return PolyMinJuMP{Float64}(random_interp_data(Float64, n, halfdeg)..., args...)
 end
 
@@ -58,17 +52,31 @@ function build(inst::PolyMinJuMP{T}) where {T <: Float64}
                 end
                 push!(psd_vars, psd_r)
             end
-            coeffs_lhs = JuMP.@expression(model, [u in 1:U], sum(sum(Pr[u, k] * Pr[u, l] * psd_r[k, l] * (k == l ? 1 : 2) for k in 1:size(Pr, 2) for l in 1:k) for (Pr, psd_r) in zip(Ps, psd_vars)))
+            coeffs_lhs = JuMP.@expression(
+                model,
+                [u in 1:U],
+                sum(
+                    sum(
+                        Pr[u, k] * Pr[u, l] * psd_r[k, l] * (k == l ? 1 : 2) for
+                        k in 1:size(Pr, 2) for l in 1:k
+                    ) for (Pr, psd_r) in zip(Ps, psd_vars)
+                )
+            )
             JuMP.@constraint(model, coeffs_lhs .== interp_vals .- a)
         else
             for Pr in Ps
                 Lr = size(Pr, 2)
-                psd_r = [JuMP.@expression(model, sum(Pr[u, i] * Pr[u, j] * μ[u] for u in 1:U)) for i in 1:Lr for j in 1:i]
+                psd_r = [
+                    JuMP.@expression(model, sum(Pr[u, i] * Pr[u, j] * μ[u] for u in 1:U)) for i in 1:Lr for j in 1:i
+                ]
                 if Lr == 1
                     # Mosek cannot handle 1x1 PSD constraints
                     JuMP.@constraint(model, psd_r[1] >= 0)
                 else
-                    JuMP.@constraint(model, psd_r in MOI.PositiveSemidefiniteConeTriangle(Lr))
+                    JuMP.@constraint(
+                        model,
+                        psd_r in MOI.PositiveSemidefiniteConeTriangle(Lr)
+                    )
                 end
             end
         end
@@ -77,12 +85,12 @@ function build(inst::PolyMinJuMP{T}) where {T <: Float64}
     return model
 end
 
-function test_extra(inst::PolyMinJuMP{T}, model::JuMP.Model) where T
+function test_extra(inst::PolyMinJuMP{T}, model::JuMP.Model) where {T}
     stat = JuMP.termination_status(model)
     @test stat == MOI.OPTIMAL
     if (stat == MOI.OPTIMAL) && !isnan(inst.true_min)
         # check objective value is correct
         tol = eps(T)^0.1
-        @test JuMP.objective_value(model) ≈ inst.true_min atol=tol rtol=tol
+        @test JuMP.objective_value(model) ≈ inst.true_min atol = tol rtol = tol
     end
 end

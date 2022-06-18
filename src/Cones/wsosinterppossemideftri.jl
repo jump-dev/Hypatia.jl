@@ -44,7 +44,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     ΛFLP::Vector{Matrix{T}}
     tempLU::Vector{Matrix{T}}
     PΛiP::Matrix{T}
-    PΛiP_blocks_U
+    PΛiP_blocks_U::Any
     Ps_times::Vector{Float64}
     Ps_order::Vector{Int}
 
@@ -53,7 +53,7 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
         U::Int,
         Ps::Vector{Matrix{T}};
         use_dual::Bool = false,
-        ) where {T <: Real}
+    ) where {T <: Real}
         for Pk in Ps
             @assert size(Pk, 1) == U
         end
@@ -68,10 +68,17 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     end
 end
 
-reset_data(cone::WSOSInterpPosSemidefTri) = (cone.feas_updated =
-    cone.grad_updated = cone.hess_updated = cone.inv_hess_updated =
-    cone.hess_fact_updated = cone.use_hess_prod_slow =
-    cone.use_hess_prod_slow_updated = false)
+function reset_data(cone::WSOSInterpPosSemidefTri)
+    return (
+        cone.feas_updated =
+            cone.grad_updated =
+                cone.hess_updated =
+                    cone.inv_hess_updated =
+                        cone.hess_fact_updated =
+                            cone.use_hess_prod_slow =
+                                cone.use_hess_prod_slow_updated = false
+    )
+end
 
 function setup_extra_data!(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     U = cone.U
@@ -89,8 +96,8 @@ function setup_extra_data!(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.ΛFL = Vector{Any}(undef, K)
     cone.ΛFLP = [zeros(T, R * L, R * U) for L in Ls]
     cone.PΛiP = zeros(T, R * U, R * U)
-    cone.PΛiP_blocks_U = [view(cone.PΛiP, block_idxs(U, r), block_idxs(U, s))
-        for r in 1:R, s in 1:R]
+    cone.PΛiP_blocks_U =
+        [view(cone.PΛiP, block_idxs(U, r), block_idxs(U, s)) for r in 1:R, s in 1:R]
     cone.Ps_times = zeros(K)
     cone.Ps_order = collect(1:K)
     return cone
@@ -99,7 +106,7 @@ end
 function set_initial_point!(arr::AbstractVector, cone::WSOSInterpPosSemidefTri)
     arr .= 0
     block = 1
-    @inbounds for i in 1:cone.R
+    @inbounds for i in 1:(cone.R)
         @views arr[block_idxs(cone.U, block)] .= 1
         block += i + 1
     end
@@ -120,7 +127,7 @@ function update_feas(cone::WSOSInterpPosSemidefTri)
             L = size(Pk, 2)
             Λ = cone.tempLRLR[k]
 
-            @views for p in 1:cone.R, q in 1:p
+            @views for p in 1:(cone.R), q in 1:p
                 @. cone.tempU = cone.point[block_idxs(cone.U, svec_idx(p, q))]
                 if p != q
                     cone.tempU .*= cone.rt2i
@@ -144,7 +151,7 @@ end
 function is_dual_feas(cone::WSOSInterpPosSemidefTri{T}) where {T}
     # condition is necessary but not sufficient for dual feasibility
     block = 1
-    @inbounds for i in 1:cone.R
+    @inbounds for i in 1:(cone.R)
         @views diag_i = cone.dual_point[block_idxs(cone.U, block)]
         all(>(eps(T)), diag_i) || return false
         block += i + 1
@@ -170,8 +177,11 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
             block_L_p_idxs = block_idxs(L, p)
             @views ΛFLP_pp = ΛFLP[block_L_p_idxs, block_U_p_idxs]
             # ΛFLP_pp = ΛFL_pp \ P'
-            @views ldiv!(ΛFLP_pp, LowerTriangular(
-                ΛFL[block_L_p_idxs, block_L_p_idxs]), cone.Ps[k]')
+            @views ldiv!(
+                ΛFLP_pp,
+                LowerTriangular(ΛFL[block_L_p_idxs, block_L_p_idxs]),
+                cone.Ps[k]',
+            )
             # to get off-diagonals in ΛFLP, subtract known blocks aggregated in ΛFLP_qp
             for q in (p + 1):R
                 block_L_q_idxs = block_idxs(L, q)
@@ -179,11 +189,15 @@ function update_grad(cone::WSOSInterpPosSemidefTri)
                 ΛFLP_qp .= 0
                 for p2 in p:(q - 1)
                     block_L_p2_idxs = block_idxs(L, p2)
-                    @views mul!(ΛFLP_qp, ΛFL[block_L_q_idxs, block_L_p2_idxs],
-                        ΛFLP[block_L_p2_idxs, block_U_p_idxs], -1, 1)
+                    @views mul!(
+                        ΛFLP_qp,
+                        ΛFL[block_L_q_idxs, block_L_p2_idxs],
+                        ΛFLP[block_L_p2_idxs, block_U_p_idxs],
+                        -1,
+                        1,
+                    )
                 end
-                @views ldiv!(LowerTriangular(ΛFL[block_L_q_idxs,
-                    block_L_q_idxs]), ΛFLP_qp)
+                @views ldiv!(LowerTriangular(ΛFL[block_L_q_idxs, block_L_q_idxs]), ΛFLP_qp)
             end
         end
 
@@ -213,8 +227,11 @@ function update_hess(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
             # since ΛFLP is block lower triangular rows only from max(p,q)
             # start making a nonzero contribution to the product
             row_range = ((q - 1) * L + 1):(L * R)
-            @views mul!(PΛiP_blocks[p, q], ΛFLP[row_range, block_idxs(U, p)]',
-                ΛFLP[row_range, block_idxs(U, q)])
+            @views mul!(
+                PΛiP_blocks[p, q],
+                ΛFLP[row_range, block_idxs(U, p)]',
+                ΛFLP[row_range, block_idxs(U, q)],
+            )
         end
         LinearAlgebra.copytri!(cone.PΛiP, 'U')
 
@@ -247,7 +264,7 @@ function hess_prod_slow!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::WSOSInterpPosSemidefTri,
-    )
+)
     cone.use_hess_prod_slow_updated || update_use_hess_prod_slow(cone)
     @assert cone.hess_updated
     cone.use_hess_prod_slow || return hess_prod!(prod, arr, cone)
@@ -265,12 +282,12 @@ function block_diag_prod!(
     mat1::Matrix{T},
     mat2::Matrix{T},
     cone::WSOSInterpPosSemidefTri{T},
-    ) where T
+) where {T}
     U = cone.U
     @inbounds for u in 1:U
         idx = u
         j_idx = u
-        for j in 1:cone.R
+        for j in 1:(cone.R)
             i_idx = u
             for i in 1:(j - 1)
                 @views vect[idx] += dot(mat1[:, i_idx], mat2[:, j_idx]) * cone.rt2
@@ -290,7 +307,7 @@ function partial_prod!(
     arr::AbstractVecOrMat,
     use_symm_prod::Bool,
     cone::WSOSInterpPosSemidefTri,
-    )
+)
     @assert cone.grad_updated
     prod .= 0
     U = cone.U

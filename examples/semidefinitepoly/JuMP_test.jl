@@ -6,7 +6,7 @@ insts["minimal"] = [
     ((:matpoly5, true, true),),
     ((:matpoly5, true, false),),
     ((:matpoly5, false, false), :SOCExpPSD),
-    ]
+]
 insts["fast"] = [
     ((:matpoly1, true, true),),
     ((:matpoly1, true, false),),
@@ -26,6 +26,6 @@ insts["fast"] = [
     ((:matpoly7, true, true), nothing, relaxed_tols),
     ((:matpoly7, true, false),),
     ((:matpoly7, false, false), :SOCExpPSD),
-    ]
+]
 insts["various"] = insts["fast"]
 return (SemidefinitePolyJuMP, insts)

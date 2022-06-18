@@ -10,7 +10,7 @@ insts["minimal"] = [
     ((false, :motzkin, 3, true, true),),
     ((false, :motzkin_ball, 3, false, false),),
     ((false, :motzkin_ellipsoid, 3, false, true),),
-    ]
+]
 insts["fast"] = [
     ((false, 1, 30, true, true),),
     ((false, 1, 30, false, true),),
@@ -62,5 +62,5 @@ insts["fast"] = [
     ((false, :lotkavolterra, 3, false, false),),
     ((false, :motzkin, 3, false, false),),
     ((false, :motzkin_ball, 3, false, false),),
-    ]
+]
 return (PolyMinNative, insts)

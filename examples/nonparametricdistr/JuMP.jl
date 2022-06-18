@@ -44,7 +44,7 @@ function build(inst::NonparametricDistrJuMP{T}) where {T <: Float64}
     return model
 end
 
-function test_extra(inst::NonparametricDistrJuMP{T}, model::JuMP.Model) where T
+function test_extra(inst::NonparametricDistrJuMP{T}, model::JuMP.Model) where {T}
     stat = JuMP.termination_status(model)
     @test stat == MOI.OPTIMAL
     (stat == MOI.OPTIMAL) || return
@@ -52,10 +52,10 @@ function test_extra(inst::NonparametricDistrJuMP{T}, model::JuMP.Model) where T
     # check objective and constraints
     tol = eps(T)^0.2
     p_opt = JuMP.value.(model.ext[:p_var])
-    @test sum(p_opt) ≈ inst.d atol=tol rtol=tol
+    @test sum(p_opt) ≈ inst.d atol = tol rtol = tol
     @test minimum(p_opt) >= -tol
     p_opt = pos_only(p_opt)
     obj_result = get_val(p_opt, inst.ext)
-    @test JuMP.objective_value(model) ≈ obj_result atol=tol rtol=tol
+    @test JuMP.objective_value(model) ≈ obj_result atol = tol rtol = tol
     return
 end

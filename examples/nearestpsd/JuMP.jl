@@ -45,19 +45,22 @@ function build(inst::NearestPSDJuMP{T}) where {T <: Float64}
 
     if inst.use_sparsepsd || !inst.use_completable
         JuMP.@variable(model, X[1:length(row_idxs)])
-        JuMP.@objective(model, Max, 2 * dot(A_vals, X) -
-            sum(A_vals[k] * X[k] for k in diag_idxs)) # tr(A, X)
+        JuMP.@objective(
+            model,
+            Max,
+            2 * dot(A_vals, X) - sum(A_vals[k] * X[k] for k in diag_idxs)
+        ) # tr(A, X)
         JuMP.@constraint(model, sum(X[diag_idxs]) == 1) # tr(X) == 1
 
         if inst.use_sparsepsd
             rt2 = sqrt(2)
-            X_scal = [X[k] * (row_idxs[k] == col_idxs[k] ? 1.0 : rt2)
-                for k in eachindex(X)]
-            impl = (inst.use_cholmod_impl ? Cones.PSDSparseCholmod :
-                Cones.PSDSparseDense)
+            X_scal = [X[k] * (row_idxs[k] == col_idxs[k] ? 1.0 : rt2) for k in eachindex(X)]
+            impl = (inst.use_cholmod_impl ? Cones.PSDSparseCholmod : Cones.PSDSparseDense)
             cone = Hypatia.PosSemidefTriSparseCone{impl, T, T}
-            JuMP.@constraint(model, X_scal in cone(side, row_idxs,
-                col_idxs, inst.use_completable))
+            JuMP.@constraint(
+                model,
+                X_scal in cone(side, row_idxs, col_idxs, inst.use_completable)
+            )
         else
             X_sparse = sparse(row_idxs, col_idxs, X)
             JuMP.@constraint(model, Symmetric(Matrix(X_sparse), :L) in JuMP.PSDCone())
@@ -66,8 +69,12 @@ function build(inst::NearestPSDJuMP{T}) where {T <: Float64}
         @assert inst.use_completable
         JuMP.@variable(model, X[1:side, 1:side], PSD)
         # tr(A, X):
-        JuMP.@objective(model, Max, 2 * sum(X[row_idxs[k], col_idxs[k]] * A_vals[k]
-            for k in eachindex(row_idxs)) - dot(A_vals[diag_idxs], diag(X)))
+        JuMP.@objective(
+            model,
+            Max,
+            2 * sum(X[row_idxs[k], col_idxs[k]] * A_vals[k] for k in eachindex(row_idxs)) -
+            dot(A_vals[diag_idxs], diag(X))
+        )
         JuMP.@constraint(model, tr(X) == 1) # tr(X) == 1
     end
 

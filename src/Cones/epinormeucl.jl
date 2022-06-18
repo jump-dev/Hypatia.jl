@@ -34,24 +34,25 @@ end
 
 use_dual_barrier(::EpiNormEucl) = false
 
-reset_data(cone::EpiNormEucl) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = false)
+function reset_data(cone::EpiNormEucl)
+    return (
+        cone.feas_updated =
+            cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false
+    )
+end
 
 use_sqrt_hess_oracles(::Int, cone::EpiNormEucl) = true
 
 get_nu(cone::EpiNormEucl) = 2
 
-function set_initial_point!(
-    arr::AbstractVector,
-    cone::EpiNormEucl{T},
-    ) where {T <: Real}
+function set_initial_point!(arr::AbstractVector, cone::EpiNormEucl{T}) where {T <: Real}
     arr .= 0
     arr[1] = sqrt(T(get_nu(cone)))
     return arr
 end
 
 # TODO refac with dual feas check
-function update_feas(cone::EpiNormEucl{T}) where T
+function update_feas(cone::EpiNormEucl{T}) where {T}
     @assert !cone.feas_updated
     u = cone.point[1]
 
@@ -67,11 +68,11 @@ function update_feas(cone::EpiNormEucl{T}) where T
     return cone.is_feas
 end
 
-function is_dual_feas(cone::EpiNormEucl{T}) where T
+function is_dual_feas(cone::EpiNormEucl{T}) where {T}
     u = cone.dual_point[1]
 
     if u > eps(T)
-        w = view(cone.dual_point, 2:cone.dim)
+        w = view(cone.dual_point, 2:(cone.dim))
         @views dual_dist = abs2(u) - sum(abs2, cone.dual_point[2:end])
         return (dual_dist > 2 * eps(T))
     end
@@ -118,11 +119,7 @@ function update_inv_hess(cone::EpiNormEucl)
     return cone.inv_hess
 end
 
-function hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::EpiNormEucl,
-    )
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas
     u = cone.point[1]
     w = @view cone.point[2:end]
@@ -139,11 +136,7 @@ function hess_prod!(
     return prod
 end
 
-function inv_hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::EpiNormEucl,
-    )
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiNormEucl)
     @assert cone.is_feas
 
     @inbounds for j in 1:size(prod, 2)
@@ -160,7 +153,7 @@ function sqrt_hess_prod!(
     prod::AbstractVecOrMat{T},
     arr::AbstractVecOrMat{T},
     cone::EpiNormEucl{T},
-    ) where {T <: Real}
+) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
     w = @view cone.point[2:end]
@@ -185,7 +178,7 @@ function inv_sqrt_hess_prod!(
     prod::AbstractVecOrMat{T},
     arr::AbstractVecOrMat{T},
     cone::EpiNormEucl{T},
-    ) where {T <: Real}
+) where {T <: Real}
     @assert cone.is_feas
     u = cone.point[1]
     w = @view cone.point[2:end]

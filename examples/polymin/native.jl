@@ -26,17 +26,14 @@ function PolyMinNative{T}(
     is_complex::Bool,
     poly_name::Symbol,
     halfdeg::Int,
-    args...) where {T <: Real}
+    args...,
+) where {T <: Real}
     R = (is_complex ? Complex{T} : T)
     interp = get_interp_data(R, poly_name, halfdeg)
     return PolyMinNative{T}(is_complex, interp..., args...)
 end
 
-function PolyMinNative{T}(
-    is_complex::Bool,
-    n::Int,
-    halfdeg::Int,
-    args...) where {T <: Real}
+function PolyMinNative{T}(is_complex::Bool, n::Int, halfdeg::Int, args...) where {T <: Real}
     interp = random_interp_data(T, n, halfdeg)
     return PolyMinNative{T}(is_complex, interp..., args...)
 end
@@ -60,7 +57,10 @@ function build_real(inst::PolyMinNative{T}) where {T <: Real}
 
     cones = Cones.Cone{T}[]
     if inst.use_wsos
-        push!(cones, Cones.WSOSInterpNonnegative{T, T}(U, inst.Ps, use_dual = !inst.use_primal))
+        push!(
+            cones,
+            Cones.WSOSInterpNonnegative{T, T}(U, inst.Ps, use_dual = !inst.use_primal),
+        )
     end
 
     if inst.use_primal
@@ -127,18 +127,22 @@ function build_complex(inst::PolyMinNative{T}) where {T <: Real}
         h = zeros(T, U)
     end
 
-    cones = Cones.Cone{T}[Cones.WSOSInterpNonnegative{T, Complex{T}}(U, inst.Ps, use_dual = !inst.use_primal)]
+    cones = Cones.Cone{T}[Cones.WSOSInterpNonnegative{T, Complex{T}}(
+        U,
+        inst.Ps,
+        use_dual = !inst.use_primal,
+    )]
 
     model = Models.Model{T}(c, A, b, G, h, cones)
     return model
 end
 
-function test_extra(inst::PolyMinNative{T}, solve_stats::NamedTuple, ::NamedTuple) where T
+function test_extra(inst::PolyMinNative{T}, solve_stats::NamedTuple, ::NamedTuple) where {T}
     @test solve_stats.status == Solvers.Optimal
     if solve_stats.status == Solvers.Optimal && !isnan(inst.true_min)
         # check objective value is correct
         tol = eps(T)^0.1
         true_min = (inst.use_primal ? -1 : 1) * inst.true_min
-        @test solve_stats.primal_obj ≈ true_min atol=tol rtol=tol
+        @test solve_stats.primal_obj ≈ true_min atol = tol rtol = tol
     end
 end

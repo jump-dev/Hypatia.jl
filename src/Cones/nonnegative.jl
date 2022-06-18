@@ -32,8 +32,12 @@ end
 
 use_dual_barrier(::Nonnegative) = false
 
-reset_data(cone::Nonnegative) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = false)
+function reset_data(cone::Nonnegative)
+    return (
+        cone.feas_updated =
+            cone.grad_updated = cone.hess_updated = cone.inv_hess_updated = false
+    )
+end
 
 use_sqrt_hess_oracles(::Int, cone::Nonnegative) = true
 
@@ -41,14 +45,14 @@ get_nu(cone::Nonnegative) = cone.dim
 
 set_initial_point!(arr::AbstractVector, cone::Nonnegative) = (arr .= 1)
 
-function update_feas(cone::Nonnegative{T}) where T
+function update_feas(cone::Nonnegative{T}) where {T}
     @assert !cone.feas_updated
     cone.is_feas = all(>(eps(T)), cone.point)
     cone.feas_updated = true
     return cone.is_feas
 end
 
-is_dual_feas(cone::Nonnegative{T}) where T = all(>(eps(T)), cone.dual_point)
+is_dual_feas(cone::Nonnegative{T}) where {T} = all(>(eps(T)), cone.dual_point)
 
 function update_grad(cone::Nonnegative)
     @assert cone.is_feas
@@ -57,7 +61,7 @@ function update_grad(cone::Nonnegative)
     return cone.grad
 end
 
-function update_hess(cone::Nonnegative{T}) where T
+function update_hess(cone::Nonnegative{T}) where {T}
     cone.grad_updated || update_grad(cone)
     if !isdefined(cone, :hess)
         cone.hess = Diagonal(zeros(T, cone.dim))
@@ -68,7 +72,7 @@ function update_hess(cone::Nonnegative{T}) where T
     return cone.hess
 end
 
-function update_inv_hess(cone::Nonnegative{T}) where T
+function update_inv_hess(cone::Nonnegative{T}) where {T}
     @assert cone.is_feas
     if !isdefined(cone, :inv_hess)
         cone.inv_hess = Diagonal(zeros(T, cone.dim))
@@ -79,31 +83,19 @@ function update_inv_hess(cone::Nonnegative{T}) where T
     return cone.inv_hess
 end
 
-function hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::Nonnegative,
-    )
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
     @assert cone.is_feas
     @. prod = arr / cone.point / cone.point
     return prod
 end
 
-function inv_hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::Nonnegative,
-    )
+function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
     @assert cone.is_feas
     @. prod = arr * cone.point * cone.point
     return prod
 end
 
-function sqrt_hess_prod!(
-    prod::AbstractVecOrMat,
-    arr::AbstractVecOrMat,
-    cone::Nonnegative,
-    )
+function sqrt_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Nonnegative)
     @assert cone.is_feas
     @. prod = arr / cone.point
     return prod
@@ -113,7 +105,7 @@ function inv_sqrt_hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::Nonnegative,
-    )
+)
     @assert cone.is_feas
     @. prod = arr * cone.point
     return prod
@@ -134,12 +126,9 @@ inv_hess_nz_idxs_col(cone::Nonnegative, j::Int) = [j]
 inv_hess_nz_idxs_col_tril(cone::Nonnegative, j::Int) = [j]
 
 # nonnegative is not primitive, so sum and max proximity measures differ
-function get_proxsqr(
-    cone::Nonnegative{T},
-    irtmu::T,
-    use_max_prox::Bool,
-    ) where {T <: Real}
+function get_proxsqr(cone::Nonnegative{T}, irtmu::T, use_max_prox::Bool) where {T <: Real}
     aggfun = (use_max_prox ? maximum : sum)
-    return aggfun(abs2(si * zi * irtmu - 1) for (si, zi) in
-        zip(cone.point, cone.dual_point))
+    return aggfun(
+        abs2(si * zi * irtmu - 1) for (si, zi) in zip(cone.point, cone.dual_point)
+    )
 end

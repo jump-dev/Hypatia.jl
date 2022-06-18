@@ -54,7 +54,7 @@ mutable struct EpiNormSpectralTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     function EpiNormSpectralTri{T, R}(
         dim::Int;
         use_dual::Bool = false,
-        ) where {T <: Real, R <: RealOrComplex{T}}
+    ) where {T <: Real, R <: RealOrComplex{T}}
         @assert dim >= 2
         cone = new{T, R}()
         cone.use_dual_barrier = use_dual
@@ -66,13 +66,20 @@ mutable struct EpiNormSpectralTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     end
 end
 
-reset_data(cone::EpiNormSpectralTri) = (cone.feas_updated = cone.grad_updated =
-    cone.hess_updated = cone.inv_hess_updated = cone.hess_aux_updated =
-    cone.inv_hess_aux_updated = cone.hess_fact_updated = false)
+function reset_data(cone::EpiNormSpectralTri)
+    return (
+        cone.feas_updated =
+            cone.grad_updated =
+                cone.hess_updated =
+                    cone.inv_hess_updated =
+                        cone.hess_aux_updated =
+                            cone.inv_hess_aux_updated = cone.hess_fact_updated = false
+    )
+end
 
 function setup_extra_data!(
     cone::EpiNormSpectralTri{T, R},
-    ) where {T <: Real, R <: RealOrComplex{T}}
+) where {T <: Real, R <: RealOrComplex{T}}
     d = cone.d
     cone.V = zeros(R, d, d)
     cone.zeta = zeros(T, d)
@@ -95,7 +102,7 @@ get_nu(cone::EpiNormSpectralTri) = 1 + cone.d
 function set_initial_point!(
     arr::AbstractVector{T},
     cone::EpiNormSpectralTri{T},
-    ) where {T <: Real}
+) where {T <: Real}
     arr .= 0
     arr[1] = sqrt(T(get_nu(cone)))
     return arr
@@ -126,7 +133,7 @@ function update_feas(cone::EpiNormSpectralTri{T}) where {T <: Real}
     if u - ub < eps(T)
         # use fast Cholesky-based feasibility check, rescale W*W' by inv(u)
         Z = mul!(cone.w1, W, W', -inv(u), false)
-        @inbounds for i in 1:cone.d
+        @inbounds for i in 1:(cone.d)
             Z[i, i] += u
         end
         isposdef(cholesky!(Hermitian(Z, :U), check = false)) || return false
@@ -154,7 +161,7 @@ function is_dual_feas(cone::EpiNormSpectralTri{T}) where {T <: Real}
     return (u - sum(abs, eigvals!(Hermitian(W, :U))) > eps(T))
 end
 
-function update_grad(cone::EpiNormSpectralTri{T}) where T
+function update_grad(cone::EpiNormSpectralTri{T}) where {T}
     @assert cone.is_feas
     u = cone.point[1]
     V = cone.V
@@ -181,7 +188,7 @@ function update_grad(cone::EpiNormSpectralTri{T}) where T
     return cone.grad
 end
 
-function update_hess_aux(cone::EpiNormSpectralTri{T}) where T
+function update_hess_aux(cone::EpiNormSpectralTri{T}) where {T}
     @assert !cone.hess_aux_updated
     @assert cone.grad_updated
     s1 = cone.s1
@@ -193,10 +200,10 @@ function update_hess_aux(cone::EpiNormSpectralTri{T}) where T
     @. s2 = inv(s1)
     @. cone.Vrzi = s2 * cone.V'
 
-    cone.hess_aux_updated = true
+    return cone.hess_aux_updated = true
 end
 
-function update_hess(cone::EpiNormSpectralTri{T}) where T
+function update_hess(cone::EpiNormSpectralTri{T}) where {T}
     cone.hess_aux_updated || update_hess_aux(cone)
     isdefined(cone, :hess) || alloc_hess!(cone)
     d = cone.d
@@ -219,13 +226,12 @@ function update_hess(cone::EpiNormSpectralTri{T}) where T
 
     # w, w
     # TODO or write faster symmetric spectral kron
-    @inbounds for j in 1:cone.d
+    @inbounds for j in 1:(cone.d)
         z_j = zeta[j]
         zi_j = inv(z_j)
         mzi_j = mu[j] / z_j
         for i in 1:(j - 1)
-            umzzzi[i, j] = umzzzi[j, i] = T(0.5) *
-                (zi_j + mzi_j * mu[i]) / zeta[i]
+            umzzzi[i, j] = umzzzi[j, i] = T(0.5) * (zi_j + mzi_j * mu[i]) / zeta[i]
         end
         umzzzi[j, j] = (zi_j - ui) / z_j
     end
@@ -243,7 +249,7 @@ function hess_prod!(
     prod::AbstractVecOrMat{T},
     arr::AbstractVecOrMat{T},
     cone::EpiNormSpectralTri{T},
-    ) where T
+) where {T}
     cone.hess_aux_updated || update_hess_aux(cone)
     d = cone.d
     u = cone.point[1]
@@ -265,8 +271,7 @@ function hess_prod!(
         @. S1 = T(0.5) * (sim + sim')
         @. S1diag -= p / zeta
 
-        prod[1, j] = -sum((pui + real(S1[i, i])) / zeta[i] for i in 1:d) -
-            cone.cu * pui
+        prod[1, j] = -sum((pui + real(S1[i, i])) / zeta[i] for i in 1:d) - cone.cu * pui
 
         mul!(w2, Hermitian(S1, :U), Vmrzi, true, inv(u))
         mul!(w1, Vrzi', w2)
@@ -276,7 +281,7 @@ function hess_prod!(
     return prod
 end
 
-function update_inv_hess_aux(cone::EpiNormSpectralTri{T}) where T
+function update_inv_hess_aux(cone::EpiNormSpectralTri{T}) where {T}
     @assert !cone.inv_hess_aux_updated
     @assert cone.grad_updated
     u = cone.point[1]
@@ -288,7 +293,7 @@ function update_inv_hess_aux(cone::EpiNormSpectralTri{T}) where T
 
     @. cone.sumzi = s / (u - zeta)
 
-    @inbounds for j in 1:cone.d
+    @inbounds for j in 1:(cone.d)
         mu_j = cone.mu[j]
         z_j = zeta[j]
         for i in 1:(j - 1)
@@ -297,7 +302,7 @@ function update_inv_hess_aux(cone::EpiNormSpectralTri{T}) where T
         zumziz[j, j] = z_j / (u - z_j) * z_j
     end
 
-    cone.inv_hess_aux_updated = true
+    return cone.inv_hess_aux_updated = true
 end
 
 function update_inv_hess(cone::EpiNormSpectralTri)
@@ -335,7 +340,7 @@ function inv_hess_prod!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::EpiNormSpectralTri,
-    )
+)
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     d = cone.d
     u = cone.point[1]
@@ -365,7 +370,7 @@ function inv_hess_prod!(
     return prod
 end
 
-function dder3(cone::EpiNormSpectralTri{T}, dir::AbstractVector{T}) where T
+function dder3(cone::EpiNormSpectralTri{T}, dir::AbstractVector{T}) where {T}
     cone.hess_aux_updated || update_hess_aux(cone)
     u = cone.point[1]
     zeta = cone.zeta
@@ -392,8 +397,9 @@ function dder3(cone::EpiNormSpectralTri{T}, dir::AbstractVector{T}) where T
     @. S2diag += T(0.5) * p / zeta * pui
     mul!(S2, Hermitian(S1, :U), S1, -1, true)
 
-    @inbounds dder3[1] = -sum((real(S1[i, i]) * pui + real(S2[i, i])) / zeta[i]
-        for i in 1:cone.d) - cone.cu * abs2(pui)
+    @inbounds dder3[1] =
+        -sum((real(S1[i, i]) * pui + real(S2[i, i])) / zeta[i] for i in 1:(cone.d)) -
+        cone.cu * abs2(pui)
 
     mul!(w1, Hermitian(S2, :U), Vmrzi)
     mul!(w1, Hermitian(S1, :U), simU, inv(u), true)

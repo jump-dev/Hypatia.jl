@@ -16,20 +16,15 @@ The negative logarithm function ``x \\to - \\log(x)``.
 """
 struct NegLogSSF <: SepSpectralFun end
 
-h_val(xs::Vector{T}, ::NegLogSSF) where {T <: Real} =
-    -sum(log, xs)
+h_val(xs::Vector{T}, ::NegLogSSF) where {T <: Real} = -sum(log, xs)
 
 h_conj_dom_pos(::NegLogSSF) = true
 
-h_conj(xs::Vector{T}, ::NegLogSSF) where {T <: Real} =
-    -length(xs) - sum(log, xs)
+h_conj(xs::Vector{T}, ::NegLogSSF) where {T <: Real} = -length(xs) - sum(log, xs)
 
-h_der1(ds::Vector{T}, xs::Vector{T}, ::NegLogSSF) where {T <: Real} =
-    (@. ds = -inv(xs))
-h_der2(ds::Vector{T}, xs::Vector{T}, ::NegLogSSF) where {T <: Real} =
-    (@. ds = xs^-2)
-h_der3(ds::Vector{T}, xs::Vector{T}, ::NegLogSSF) where {T <: Real} =
-    (@. ds = -2 * xs^-3)
+h_der1(ds::Vector{T}, xs::Vector{T}, ::NegLogSSF) where {T <: Real} = (@. ds = -inv(xs))
+h_der2(ds::Vector{T}, xs::Vector{T}, ::NegLogSSF) where {T <: Real} = (@. ds = xs^-2)
+h_der3(ds::Vector{T}, xs::Vector{T}, ::NegLogSSF) where {T <: Real} = (@. ds = -2 * xs^-3)
 
 function get_initial_point(d::Int, ::NegLogSSF)
     # TODO initial central point
@@ -43,20 +38,17 @@ The negative entropy function ``x \\to x \\log(x)``.
 """
 struct NegEntropySSF <: SepSpectralFun end
 
-h_val(xs::Vector{T}, ::NegEntropySSF) where {T <: Real} =
-    sum(x * log(x) for x in xs)
+h_val(xs::Vector{T}, ::NegEntropySSF) where {T <: Real} = sum(x * log(x) for x in xs)
 
 h_conj_dom_pos(::NegEntropySSF) = false
 
-h_conj(xs::Vector{T}, ::NegEntropySSF) where {T <: Real} =
-    sum(exp(-x - 1) for x in xs)
+h_conj(xs::Vector{T}, ::NegEntropySSF) where {T <: Real} = sum(exp(-x - 1) for x in xs)
 
-h_der1(ds::Vector{T}, xs::Vector{T}, ::NegEntropySSF) where {T <: Real} =
-    (@. ds = 1 + log(xs))
-h_der2(ds::Vector{T}, xs::Vector{T}, ::NegEntropySSF) where {T <: Real} =
-    (@. ds = inv(xs))
-h_der3(ds::Vector{T}, xs::Vector{T}, ::NegEntropySSF) where {T <: Real} =
-    (@. ds = -xs^-2)
+function h_der1(ds::Vector{T}, xs::Vector{T}, ::NegEntropySSF) where {T <: Real}
+    return (@. ds = 1 + log(xs))
+end
+h_der2(ds::Vector{T}, xs::Vector{T}, ::NegEntropySSF) where {T <: Real} = (@. ds = inv(xs))
+h_der3(ds::Vector{T}, xs::Vector{T}, ::NegEntropySSF) where {T <: Real} = (@. ds = -xs^-2)
 
 function get_initial_point(d::Int, ::NegEntropySSF)
     # TODO initial central point
@@ -71,20 +63,21 @@ case of the negative power: `NegPower01SSF(0.5)`.
 """
 struct NegSqrtSSF <: SepSpectralFun end
 
-h_val(xs::Vector{T}, ::NegSqrtSSF) where {T <: Real} =
-    -sum(sqrt, xs)
+h_val(xs::Vector{T}, ::NegSqrtSSF) where {T <: Real} = -sum(sqrt, xs)
 
 h_conj_dom_pos(::NegSqrtSSF) = true
 
-h_conj(xs::Vector{T}, ::NegSqrtSSF) where {T <: Real} =
-    T(0.25) * sum(inv, xs)
+h_conj(xs::Vector{T}, ::NegSqrtSSF) where {T <: Real} = T(0.25) * sum(inv, xs)
 
-h_der1(ds::Vector{T}, xs::Vector{T}, ::NegSqrtSSF) where {T <: Real} =
-    (@. ds = T(-0.5) * inv(sqrt(xs)))
-h_der2(ds::Vector{T}, xs::Vector{T}, ::NegSqrtSSF) where {T <: Real} =
-    (@. ds = T(0.25) * xs ^ T(-1.5))
-h_der3(ds::Vector{T}, xs::Vector{T}, ::NegSqrtSSF) where {T <: Real} =
-    (@. ds = T(-3 / 8) * xs ^ T(-2.5))
+function h_der1(ds::Vector{T}, xs::Vector{T}, ::NegSqrtSSF) where {T <: Real}
+    return (@. ds = T(-0.5) * inv(sqrt(xs)))
+end
+function h_der2(ds::Vector{T}, xs::Vector{T}, ::NegSqrtSSF) where {T <: Real}
+    return (@. ds = T(0.25) * xs^T(-1.5))
+end
+function h_der3(ds::Vector{T}, xs::Vector{T}, ::NegSqrtSSF) where {T <: Real}
+    return (@. ds = T(-3 / 8) * xs^T(-2.5))
+end
 
 function get_initial_point(d::Int, ::NegSqrtSSF)
     # TODO initial central point
@@ -101,8 +94,7 @@ struct NegPower01SSF <: SepSpectralFun
     NegPower01SSF(p::Real) = (@assert 0 < p < 1; new(p))
 end
 
-h_val(xs::Vector{T}, h::NegPower01SSF) where {T <: Real} =
-    -sum(x^T(h.p) for x in xs)
+h_val(xs::Vector{T}, h::NegPower01SSF) where {T <: Real} = -sum(x^T(h.p) for x in xs)
 
 h_conj_dom_pos(::NegPower01SSF) = true
 
@@ -150,8 +142,7 @@ struct Power12SSF <: SepSpectralFun
     Power12SSF(p::Real) = (@assert 1 < p <= 2; new(p))
 end
 
-h_val(xs::Vector{T}, h::Power12SSF) where {T <: Real} =
-    sum(x^T(h.p) for x in xs)
+h_val(xs::Vector{T}, h::Power12SSF) where {T <: Real} = sum(x^T(h.p) for x in xs)
 
 h_conj_dom_pos(::Power12SSF) = false
 

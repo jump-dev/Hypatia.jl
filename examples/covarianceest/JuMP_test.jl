@@ -35,7 +35,7 @@ insts["minimal"] = [
     # tr power12
     ((3, false, MatPower12(1.3)),),
     ((3, false, MatPower12EigOrd(1.3)),),
-    ]
+]
 insts["fast"] = [
     ((30, true, MatNegRtdet()),),
     ((15, false, MatNegRtdetEFExp()),),
@@ -54,7 +54,7 @@ insts["fast"] = [
     ((8, true, MatNegEntropyEigOrd()),),
     ((30, false, MatPower12(1.5)),),
     ((7, false, MatPower12EigOrd(1.5)),),
-    ]
+]
 insts["various"] = [
     ((100, false, MatNegRtdet()),),
     ((60, true, MatNegRtdet()),),
@@ -75,5 +75,5 @@ insts["various"] = [
     ((14, false, MatNegEntropyEigOrd()),),
     ((30, false, MatPower12(1.5)),),
     ((6, true, MatPower12EigOrd(1.5)),),
-    ]
+]
 return (CovarianceEstJuMP, insts)

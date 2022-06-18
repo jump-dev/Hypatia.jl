@@ -10,10 +10,7 @@ import LinearAlgebra.LAPACK
 # helpers for in-place matrix inverses (updates upper triangle only in some cases)
 
 # Cholesky, BlasFloat
-function inv_fact!(
-    mat::Matrix{R},
-    fact::Cholesky{R, Matrix{R}},
-    ) where {R <: BlasFloat}
+function inv_fact!(mat::Matrix{R}, fact::Cholesky{R, Matrix{R}}) where {R <: BlasFloat}
     copyto!(mat, fact.factors)
     LAPACK.potri!(fact.uplo, mat)
     return mat
@@ -23,7 +20,7 @@ end
 function inv_fact!(
     mat::Matrix{R},
     fact::Cholesky{R, Matrix{R}},
-    ) where {R <: RealOrComplex{<:Real}}
+) where {R <: RealOrComplex{<:Real}}
     # this is how Julia computes the inverse, but it could be implemented better
     copyto!(mat, I)
     ldiv!(fact, mat)
@@ -31,31 +28,21 @@ function inv_fact!(
 end
 
 # BunchKaufman, BlasReal
-function inv_fact!(
-    mat::Matrix{T},
-    fact::BunchKaufman{T, Matrix{T}},
-    ) where {T <: BlasReal}
+function inv_fact!(mat::Matrix{T}, fact::BunchKaufman{T, Matrix{T}}) where {T <: BlasReal}
     @assert fact.rook
     copyto!(mat, fact.LD)
-    LAPACK.sytri_rook!(fact.uplo, mat, fact.ipiv),
-    return mat
+    LAPACK.sytri_rook!(fact.uplo, mat, fact.ipiv), return mat
 end
 
 # LU, BlasReal
-function inv_fact!(
-    mat::Matrix{T},
-    fact::LU{T, Matrix{T}},
-    ) where {T <: BlasReal}
+function inv_fact!(mat::Matrix{T}, fact::LU{T, Matrix{T}}) where {T <: BlasReal}
     copyto!(mat, fact.factors)
     LAPACK.getri!(mat, fact.ipiv)
     return mat
 end
 
 # LU, generic
-function inv_fact!(
-    mat::Matrix{T},
-    fact::LU{T, Matrix{T}},
-    ) where {T <: Real}
+function inv_fact!(mat::Matrix{T}, fact::LU{T, Matrix{T}}) where {T <: Real}
     # this is how Julia computes the inverse, but it could be implemented better
     copyto!(mat, I)
     ldiv!(fact, mat)
@@ -75,30 +62,32 @@ end
 # helpers for symmetric outer product (upper triangle only)
 # B = alpha * A' * A + beta * B
 
-outer_prod!(
+function outer_prod!(
     A::Matrix{T},
     B::Matrix{T},
     alpha::Real,
     beta::Real,
-    ) where {T <: LinearAlgebra.BlasReal} =
-    BLAS.syrk!('U', 'T', alpha, A, beta, B)
+) where {T <: LinearAlgebra.BlasReal}
+    return BLAS.syrk!('U', 'T', alpha, A, beta, B)
+end
 
-outer_prod!(
+function outer_prod!(
     A::AbstractMatrix{Complex{T}},
     B::AbstractMatrix{Complex{T}},
     alpha::Real,
     beta::Real,
-    ) where {T <: LinearAlgebra.BlasReal} =
-    BLAS.herk!('U', 'C', alpha, A, beta, B)
+) where {T <: LinearAlgebra.BlasReal}
+    return BLAS.herk!('U', 'C', alpha, A, beta, B)
+end
 
-outer_prod!(
+function outer_prod!(
     A::AbstractMatrix{R},
     B::AbstractMatrix{R},
     alpha::Real,
     beta::Real,
-    ) where {R <: RealOrComplex} =
-    mul!(B, A', A, alpha, beta)
-
+) where {R <: RealOrComplex}
+    return mul!(B, A', A, alpha, beta)
+end
 
 # ensure diagonal terms in square matrix are not too small
 function increase_diag!(A::Matrix{T}) where {T <: Real}
@@ -117,7 +106,7 @@ function spectral_outer!(
     vecs::Union{Matrix{T}, Adjoint{T, Matrix{T}}},
     diag::AbstractVector{T},
     temp::Matrix{T},
-    ) where {T <: Real}
+) where {T <: Real}
     mul!(temp, vecs, Diagonal(diag))
     mul!(mat, temp, vecs')
     return mat
@@ -128,7 +117,7 @@ function spectral_outer!(
     vecs::Union{Matrix{T}, Adjoint{T, Matrix{T}}},
     symm::Symmetric{T},
     temp::Matrix{T},
-    ) where {T <: Real}
+) where {T <: Real}
     mul!(temp, vecs, symm)
     mul!(mat, temp, vecs')
     return mat
@@ -138,10 +127,7 @@ end
 nonsymmetric square: LU
 =#
 
-function nonsymm_fact_copy!(
-    mat2::Matrix{T},
-    mat::Matrix{T},
-    ) where {T <: Real}
+function nonsymm_fact_copy!(mat2::Matrix{T}, mat::Matrix{T}) where {T <: Real}
     copyto!(mat2, mat)
     fact = lu!(mat2, check = false)
 
@@ -159,16 +145,16 @@ symmetric indefinite: BunchKaufman (rook pivoting) and LU for generic fallback
 NOTE if better fallback becomes available (eg dense LDL), use that
 =#
 
-symm_fact!(A::Symmetric{T, Matrix{T}}) where {T <: BlasReal} =
-    bunchkaufman!(A, true, check = false)
+function symm_fact!(A::Symmetric{T, Matrix{T}}) where {T <: BlasReal}
+    return bunchkaufman!(A, true, check = false)
+end
 
-symm_fact!(A::Symmetric{T, Matrix{T}}) where {T <: Real} =
-    lu!(A, check = false)
+symm_fact!(A::Symmetric{T, Matrix{T}}) where {T <: Real} = lu!(A, check = false)
 
 function symm_fact_copy!(
     mat2::Symmetric{T, Matrix{T}},
     mat::Symmetric{T, Matrix{T}},
-    ) where {T <: Real}
+) where {T <: Real}
     copyto!(mat2, mat)
     fact = symm_fact!(mat2)
 
@@ -186,14 +172,13 @@ symmetric positive definite: unpivoted Cholesky
 NOTE pivoted seems slower than BunchKaufman
 =#
 
-posdef_fact!(A::Symmetric{T, Matrix{T}}) where {T <: Real} =
-    cholesky!(A, check = false)
+posdef_fact!(A::Symmetric{T, Matrix{T}}) where {T <: Real} = cholesky!(A, check = false)
 
 function posdef_fact_copy!(
     mat2::Symmetric{T, Matrix{T}},
     mat::Symmetric{T, Matrix{T}},
     try_shift::Bool = true,
-    ) where {T <: Real}
+) where {T <: Real}
     copyto!(mat2, mat)
     fact = posdef_fact!(mat2)
 

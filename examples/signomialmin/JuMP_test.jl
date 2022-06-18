@@ -1,10 +1,7 @@
 
 relaxed_tols = (default_tol_relax = 100,)
 insts = OrderedDict()
-insts["minimal"] = [
-    ((2, 2),),
-    ((2, 2), :SOCExpPSD),
-    ]
+insts["minimal"] = [((2, 2),), ((2, 2), :SOCExpPSD)]
 insts["fast"] = [
     ((:motzkin2,),),
     ((:motzkin2,), :SOCExpPSD),
@@ -22,7 +19,7 @@ insts["fast"] = [
     ((6, 6),),
     ((20, 3),),
     ((20, 3), :SOCExpPSD),
-    ]
+]
 insts["various"] = [
     ((:motzkin2,),),
     ((:motzkin3,),),
@@ -37,5 +34,5 @@ insts["various"] = [
     ((6, 3), :SOCExpPSD),
     ((20, 3), nothing, relaxed_tols),
     ((20, 3), :SOCExpPSD, relaxed_tols),
-    ]
+]
 return (SignomialMinJuMP, insts)

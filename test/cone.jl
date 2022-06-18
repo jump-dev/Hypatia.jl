@@ -16,8 +16,9 @@ import Hypatia.RealOrComplex
 
 Random.randn(::Type{BigFloat}, dims::Integer...) = BigFloat.(randn(dims...))
 
-Random.randn(::Type{Complex{BigFloat}}, dims::Integer...) =
-    Complex{BigFloat}.(randn(ComplexF64, dims...))
+function Random.randn(::Type{Complex{BigFloat}}, dims::Integer...)
+    return Complex{BigFloat}.(randn(ComplexF64, dims...))
+end
 
 # sanity check oracles
 function test_oracles(
@@ -27,7 +28,7 @@ function test_oracles(
     tol::Real = 1e3 * eps(T),
     init_only::Bool = false,
     init_tol::Real = tol,
-    ) where {T <: Real}
+) where {T <: Real}
     Random.seed!(1)
     dim = Cones.dimension(cone)
     Cones.setup_data!(cone)
@@ -48,19 +49,19 @@ function test_oracles(
 
     # test centrality of initial point
     if isfinite(init_tol)
-        @test point ≈ dual_point atol=init_tol rtol=init_tol
+        @test point ≈ dual_point atol = init_tol rtol = init_tol
     end
     init_only && return
 
     # test at initial point
     prod_vec = zero(point)
     hess = Cones.hess(cone)
-    @test hess * point ≈ dual_point atol=tol rtol=tol
-    @test Cones.hess_prod!(prod_vec, point, cone) ≈ dual_point atol=tol rtol=tol
+    @test hess * point ≈ dual_point atol = tol rtol = tol
+    @test Cones.hess_prod!(prod_vec, point, cone) ≈ dual_point atol = tol rtol = tol
     inv_hess = Cones.inv_hess(cone)
-    @test inv_hess * dual_point ≈ point atol=tol rtol=tol
-    @test Cones.inv_hess_prod!(prod_vec, dual_point, cone) ≈ point atol=tol rtol=tol
-    @test hess * inv_hess ≈ I atol=tol rtol=tol
+    @test inv_hess * dual_point ≈ point atol = tol rtol = tol
+    @test Cones.inv_hess_prod!(prod_vec, dual_point, cone) ≈ point atol = tol rtol = tol
+    @test hess * inv_hess ≈ I atol = tol rtol = tol
 
     # perturb and scale the initial point
     perturb_scale!(point, noise, scale)
@@ -75,46 +76,46 @@ function test_oracles(
     # test gradient and Hessian oracles
     nu = Cones.get_nu(cone)
     grad = Cones.grad(cone)
-    @test dot(point, grad) ≈ -nu atol=tol rtol=tol
+    @test dot(point, grad) ≈ -nu atol = tol rtol = tol
 
     hess = Matrix(Cones.hess(cone))
     inv_hess = Matrix(Cones.inv_hess(cone))
-    @test hess * inv_hess ≈ I atol=tol rtol=tol
+    @test hess * inv_hess ≈ I atol = tol rtol = tol
 
-    @test hess * point ≈ -grad atol=tol rtol=tol
-    @test Cones.hess_prod!(prod_vec, point, cone) ≈ -grad atol=tol rtol=tol
-    @test Cones.inv_hess_prod!(prod_vec, grad, cone) ≈ -point atol=tol rtol=tol
+    @test hess * point ≈ -grad atol = tol rtol = tol
+    @test Cones.hess_prod!(prod_vec, point, cone) ≈ -grad atol = tol rtol = tol
+    @test Cones.inv_hess_prod!(prod_vec, grad, cone) ≈ -point atol = tol rtol = tol
 
     prod_mat = zeros(T, dim, dim)
-    @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
-    @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol=tol rtol=tol
+    @test Cones.hess_prod!(prod_mat, inv_hess, cone) ≈ I atol = tol rtol = tol
+    @test Cones.inv_hess_prod!(prod_mat, hess, cone) ≈ I atol = tol rtol = tol
 
     psi = dual_point + grad
     proxsqr = dot(psi, Cones.inv_hess_prod!(prod_vec, psi, cone))
-    @test Cones.get_proxsqr(cone, one(T), false) ≈ proxsqr atol=tol rtol=tol
+    @test Cones.get_proxsqr(cone, one(T), false) ≈ proxsqr atol = tol rtol = tol
 
     if hasproperty(cone, :use_hess_prod_slow)
         Cones.update_use_hess_prod_slow(cone)
         @test cone.use_hess_prod_slow_updated
         @test !cone.use_hess_prod_slow
         cone.use_hess_prod_slow = true
-        @test Cones.hess_prod_slow!(prod_mat, inv_hess, cone) ≈ I atol=tol rtol=tol
+        @test Cones.hess_prod_slow!(prod_mat, inv_hess, cone) ≈ I atol = tol rtol = tol
     end
 
     if Cones.use_sqrt_hess_oracles(dim + 1, cone)
         prod_mat2 = Matrix(Cones.sqrt_hess_prod!(prod_mat, inv_hess, cone)')
-        @test Cones.sqrt_hess_prod!(prod_mat, prod_mat2, cone) ≈ I atol=tol rtol=tol
+        @test Cones.sqrt_hess_prod!(prod_mat, prod_mat2, cone) ≈ I atol = tol rtol = tol
         Cones.inv_sqrt_hess_prod!(prod_mat2, Matrix(one(T) * I, dim, dim), cone)
-        @test prod_mat2' * prod_mat2 ≈ inv_hess atol=tol rtol=tol
+        @test prod_mat2' * prod_mat2 ≈ inv_hess atol = tol rtol = tol
     end
 
     # test third order deriv oracle
     if Cones.use_dder3(cone)
-        @test -Cones.dder3(cone, point) ≈ grad atol=tol rtol=tol
+        @test -Cones.dder3(cone, point) ≈ grad atol = tol rtol = tol
 
         dir = perturb_scale!(zeros(T, dim), noise, one(T))
         dder3 = Cones.dder3(cone, dir)
-        @test dot(dder3, point) ≈ dot(dir, hess * dir) atol=tol rtol=tol
+        @test dot(dder3, point) ≈ dot(dir, hess * dir) atol = tol rtol = tol
     end
 
     return
@@ -128,7 +129,7 @@ function test_barrier(
     scale::T = T(1e-1),
     tol::Real = 1e4 * eps(T),
     TFD::Type{<:Real} = T,
-    ) where {T <: Real}
+) where {T <: Real}
     Random.seed!(1)
     dim = Cones.dimension(cone)
     Cones.setup_data!(cone)
@@ -144,27 +145,34 @@ function test_barrier(
     TFD_point = TFD.(point)
 
     fd_grad = ForwardDiff.gradient(barrier, TFD_point)
-    @test Cones.grad(cone) ≈ fd_grad atol=tol rtol=tol
+    @test Cones.grad(cone) ≈ fd_grad atol = tol rtol = tol
 
     dir = 10 * randn(T, dim)
     TFD_dir = TFD.(dir)
 
     barrier_dir(s, t) = barrier(s + t * TFD_dir)
 
-    fd_hess_dir = ForwardDiff.gradient(s -> ForwardDiff.derivative(t ->
-        barrier_dir(s, t), 0), TFD_point)
+    fd_hess_dir = ForwardDiff.gradient(
+        s -> ForwardDiff.derivative(t -> barrier_dir(s, t), 0),
+        TFD_point,
+    )
 
-    @test Cones.hess(cone) * dir ≈ fd_hess_dir atol=tol rtol=tol
-    @test Cones.inv_hess(cone) * fd_hess_dir ≈ dir atol=tol rtol=tol
+    @test Cones.hess(cone) * dir ≈ fd_hess_dir atol = tol rtol = tol
+    @test Cones.inv_hess(cone) * fd_hess_dir ≈ dir atol = tol rtol = tol
     prod_vec = zero(dir)
-    @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol=tol rtol=tol
-    @test Cones.inv_hess_prod!(prod_vec, fd_hess_dir, cone) ≈ dir atol=tol rtol=tol
+    @test Cones.hess_prod!(prod_vec, dir, cone) ≈ fd_hess_dir atol = tol rtol = tol
+    @test Cones.inv_hess_prod!(prod_vec, fd_hess_dir, cone) ≈ dir atol = tol rtol = tol
 
     if Cones.use_dder3(cone)
-        fd_third_dir = ForwardDiff.gradient(s2 -> ForwardDiff.derivative(s ->
-            ForwardDiff.derivative(t -> barrier_dir(s2, t), s), 0), TFD_point)
+        fd_third_dir = ForwardDiff.gradient(
+            s2 -> ForwardDiff.derivative(
+                s -> ForwardDiff.derivative(t -> barrier_dir(s2, t), s),
+                0,
+            ),
+            TFD_point,
+        )
 
-        @test -2 * Cones.dder3(cone, dir) ≈ fd_third_dir atol=tol rtol=tol
+        @test -2 * Cones.dder3(cone, dir) ≈ fd_third_dir atol = tol rtol = tol
     end
 
     return
@@ -175,7 +183,7 @@ function show_time_alloc(
     cone::Cones.Cone{T};
     noise::T = T(1e-4),
     scale::T = T(1e-1),
-    ) where {T <: Real}
+) where {T <: Real}
     Random.seed!(1)
     dim = Cones.dimension(cone)
     println("dimension: ", dim)
@@ -244,11 +252,7 @@ function show_time_alloc(
     return
 end
 
-function perturb_scale!(
-    point::Vector{T},
-    noise::T,
-    scale::T,
-    ) where {T <: Real}
+function perturb_scale!(point::Vector{T}, noise::T, scale::T) where {T <: Real}
     if !iszero(noise)
         @. point += 2 * noise * rand(T) - noise
     end
@@ -290,7 +294,9 @@ end
 
 function rand_herms(ds::Int, Rd::Vector, T::Type{<:Real})
     Ps = Vector{LinearAlgebra.HermOrSym{R, Matrix{R}} where {R <: RealOrComplex{T}}}(
-        undef, length(Rd))
+        undef,
+        length(Rd),
+    )
     A_1_half = randn(Rd[1], ds, ds)
     Ps[1] = Hermitian(A_1_half * A_1_half' + I, :U)
     for i in 2:length(Rd)
@@ -319,12 +325,10 @@ function rand_interp(num_vars::Int, halfdeg::Int, R::Type{<:Complex{<:Real}})
     Random.seed!(1)
     gs = [z -> 1 - sum(abs2, z)]
     g_halfdegs = [1]
-    (points, Ps) = PolyUtils.interpolate(
-        R, halfdeg, num_vars, gs, g_halfdegs)
+    (points, Ps) = PolyUtils.interpolate(R, halfdeg, num_vars, gs, g_halfdegs)
     d = length(points)
     return (d, Ps)
 end
-
 
 # cones
 
@@ -337,11 +341,10 @@ end
 
 function test_barrier(C::Type{<:Cones.Nonnegative})
     barrier = (s -> -sum(log, s))
-    test_barrier(C(3), barrier)
+    return test_barrier(C(3), barrier)
 end
 
 show_time_alloc(C::Type{<:Cones.Nonnegative}) = show_time_alloc(C(9))
-
 
 # PosSemidefTri
 function test_oracles(C::Type{Cones.PosSemidefTri{T, R}}) where {T, R}
@@ -353,36 +356,34 @@ end
 function test_barrier(C::Type{Cones.PosSemidefTri{T, R}}) where {T, R}
     dW = 3
     barrier(s) = -logdet_pd(Hermitian(new_herm(s, dW, R), :U))
-    test_barrier(C(Cones.svec_length(R, dW)), barrier)
+    return test_barrier(C(Cones.svec_length(R, dW)), barrier)
 end
 
-show_time_alloc(C::Type{Cones.PosSemidefTri{T, R}}) where {T, R} =
-    show_time_alloc(C(Cones.svec_length(R, 4)))
-
+function show_time_alloc(C::Type{Cones.PosSemidefTri{T, R}}) where {T, R}
+    return show_time_alloc(C(Cones.svec_length(R, 4)))
+end
 
 # DoublyNonnegativeTri
-function test_oracles(C::Type{Cones.DoublyNonnegativeTri{T}}) where T
+function test_oracles(C::Type{Cones.DoublyNonnegativeTri{T}}) where {T}
     for dW in [1, 2, 5]
         test_oracles(C(Cones.svec_length(dW)), init_tol = sqrt(eps(T)))
     end
     for dW in [10, 20]
-        test_oracles(C(Cones.svec_length(dW)), init_tol = sqrt(eps(T)),
-        init_only = true)
+        test_oracles(C(Cones.svec_length(dW)), init_tol = sqrt(eps(T)), init_only = true)
     end
 end
 
-function test_barrier(C::Type{Cones.DoublyNonnegativeTri{T}}) where T
+function test_barrier(C::Type{Cones.DoublyNonnegativeTri{T}}) where {T}
     dW = 3
     function barrier(s)
         W = new_herm(s, dW, T)
         offdiags = vcat([Cones.svec_length(i - 1) .+ (1:(i - 1)) for i in 2:dW]...)
         return -logdet_pd(Hermitian(W, :U)) - sum(log, s[offdiags])
     end
-    test_barrier(C(Cones.svec_length(dW)), barrier)
+    return test_barrier(C(Cones.svec_length(dW)), barrier)
 end
 
 show_time_alloc(C::Type{<:Cones.DoublyNonnegativeTri}) = show_time_alloc(C(10))
-
 
 # PosSemidefTriSparse
 function test_oracles(C::Type{<:Cones.PosSemidefTriSparse})
@@ -391,7 +392,9 @@ function test_oracles(C::Type{<:Cones.PosSemidefTriSparse})
     end
 end
 
-function test_barrier(C::Type{<:Cones.PosSemidefTriSparse{<:Cones.PSDSparseImpl, T, T}}) where T
+function test_barrier(
+    C::Type{<:Cones.PosSemidefTriSparse{<:Cones.PSDSparseImpl, T, T}},
+) where {T}
     dW = 20
     (row_idxs, col_idxs) = rand_sppsd_pattern(dW)
     invrt2 = inv(sqrt(T(2)))
@@ -401,10 +404,12 @@ function test_barrier(C::Type{<:Cones.PosSemidefTriSparse{<:Cones.PSDSparseImpl,
         W = Matrix(sparse(row_idxs, col_idxs, scal_s, dW, dW))
         return -logdet_pd(Hermitian(W, :L))
     end
-    test_barrier(C(dW, row_idxs, col_idxs), barrier)
+    return test_barrier(C(dW, row_idxs, col_idxs), barrier)
 end
 
-function test_barrier(C::Type{<:Cones.PosSemidefTriSparse{<:Cones.PSDSparseImpl, T, Complex{T}}}) where T
+function test_barrier(
+    C::Type{<:Cones.PosSemidefTriSparse{<:Cones.PSDSparseImpl, T, Complex{T}}},
+) where {T}
     dW = 20
     (row_idxs, col_idxs) = rand_sppsd_pattern(dW)
     invrt2 = inv(sqrt(T(2)))
@@ -423,15 +428,15 @@ function test_barrier(C::Type{<:Cones.PosSemidefTriSparse{<:Cones.PSDSparseImpl,
         W = Matrix(sparse(row_idxs, col_idxs, scal_s, dW, dW))
         return -logdet_pd(Hermitian(W, :L))
     end
-    test_barrier(C(dW, row_idxs, col_idxs), barrier)
+    return test_barrier(C(dW, row_idxs, col_idxs), barrier)
 end
 
-show_time_alloc(C::Type{<:Cones.PosSemidefTriSparse}) =
-    show_time_alloc(C(15, rand_sppsd_pattern(15)...))
-
+function show_time_alloc(C::Type{<:Cones.PosSemidefTriSparse})
+    return show_time_alloc(C(15, rand_sppsd_pattern(15)...))
+end
 
 # LinMatrixIneq
-function test_oracles(C::Type{Cones.LinMatrixIneq{T}}) where T
+function test_oracles(C::Type{Cones.LinMatrixIneq{T}}) where {T}
     Random.seed!(1)
     Rd_list = [[T, T], [T, Complex{T}], [Complex{T}, T, T]]
     for ds in [2, 3, 4], Rd in Rd_list
@@ -439,16 +444,16 @@ function test_oracles(C::Type{Cones.LinMatrixIneq{T}}) where T
     end
 end
 
-function test_barrier(C::Type{Cones.LinMatrixIneq{T}}) where T
+function test_barrier(C::Type{Cones.LinMatrixIneq{T}}) where {T}
     Random.seed!(1)
     Ps = rand_herms(2, [T, Complex{T}], T)
     barrier(s) = -logdet_pd(Hermitian(sum(s[i] * Ps[i] for i in eachindex(s)), :U))
-    test_barrier(C(Ps), barrier)
+    return test_barrier(C(Ps), barrier)
 end
 
-show_time_alloc(C::Type{Cones.LinMatrixIneq{T}}) where T =
-    show_time_alloc(C(rand_herms(3, [T, Complex{T}, T, Complex{T}], T)))
-
+function show_time_alloc(C::Type{Cones.LinMatrixIneq{T}}) where {T}
+    return show_time_alloc(C(rand_herms(3, [T, Complex{T}, T, Complex{T}], T)))
+end
 
 # EpiNormInf
 function test_oracles(C::Type{Cones.EpiNormInf{T, R}}) where {T, R}
@@ -464,11 +469,10 @@ function test_barrier(C::Type{Cones.EpiNormInf{T, R}}) where {T, R}
         w = new_vec(s[2:end], dw, R)
         return -sum(log(abs2(u) - abs2(wi)) for wi in w) + (dw - 1) * log(u)
     end
-    test_barrier(C(1 + Cones.vec_length(R, dw)), barrier)
+    return test_barrier(C(1 + Cones.vec_length(R, dw)), barrier)
 end
 
 show_time_alloc(C::Type{<:Cones.EpiNormInf}) = show_time_alloc(C(9))
-
 
 # EpiNormEucl
 function test_oracles(C::Type{<:Cones.EpiNormEucl})
@@ -482,11 +486,10 @@ function test_barrier(C::Type{<:Cones.EpiNormEucl})
         (u, w) = (s[1], s[2:end])
         return -log(abs2(u) - sum(abs2, w))
     end
-    test_barrier(C(3), barrier)
+    return test_barrier(C(3), barrier)
 end
 
 show_time_alloc(C::Type{<:Cones.EpiNormEucl}) = show_time_alloc(C(9))
-
 
 # EpiPerSquare
 function test_oracles(C::Type{<:Cones.EpiPerSquare})
@@ -500,32 +503,31 @@ function test_barrier(C::Type{<:Cones.EpiPerSquare})
         (u, v, w) = (s[1], s[2], s[3:end])
         return -log(2 * u * v - sum(abs2, w))
     end
-    test_barrier(C(4), barrier)
+    return test_barrier(C(4), barrier)
 end
 
 show_time_alloc(C::Type{<:Cones.EpiPerSquare}) = show_time_alloc(C(9))
 
-
 # EpiNormSpectralTri
 function test_oracles(C::Type{Cones.EpiNormSpectralTri{T, R}}) where {T, R}
-   for d in [1, 2, 3, 5]
-       test_oracles(C(1 + Cones.svec_length(R, d)))
-   end
+    for d in [1, 2, 3, 5]
+        test_oracles(C(1 + Cones.svec_length(R, d)))
+    end
 end
 
 function test_barrier(C::Type{Cones.EpiNormSpectralTri{T, R}}) where {T, R}
-   d = 3
-   function barrier(s)
-       u = s[1]
-       W = Hermitian(new_herm(s[2:end], d, R), :U)
-       return -logdet_pd(Hermitian(abs2(u) * I - W * W')) + (d - 1) * log(u)
-   end
-   test_barrier(C(1 + Cones.svec_length(R, d)), barrier)
+    d = 3
+    function barrier(s)
+        u = s[1]
+        W = Hermitian(new_herm(s[2:end], d, R), :U)
+        return -logdet_pd(Hermitian(abs2(u) * I - W * W')) + (d - 1) * log(u)
+    end
+    return test_barrier(C(1 + Cones.svec_length(R, d)), barrier)
 end
 
-show_time_alloc(C::Type{Cones.EpiNormSpectralTri{T, R}}) where {T, R} =
-   show_time_alloc(C(1 + Cones.svec_length(R, 4)))
-
+function show_time_alloc(C::Type{Cones.EpiNormSpectralTri{T, R}}) where {T, R}
+    return show_time_alloc(C(1 + Cones.svec_length(R, 4)))
+end
 
 # EpiNormSpectral
 function test_oracles(C::Type{<:Cones.EpiNormSpectral})
@@ -541,11 +543,10 @@ function test_barrier(C::Type{Cones.EpiNormSpectral{T, R}}) where {T, R}
         W = reshape(new_vec(s[2:end], dr * ds, R), dr, ds)
         return -logdet_pd(Hermitian(abs2(u) * I - W * W')) + (dr - 1) * log(u)
     end
-    test_barrier(C(dr, ds), barrier)
+    return test_barrier(C(dr, ds), barrier)
 end
 
 show_time_alloc(C::Type{<:Cones.EpiNormSpectral}) = show_time_alloc(C(2, 3))
-
 
 # MatrixEpiPerSquare
 function test_oracles(C::Type{<:Cones.MatrixEpiPerSquare})
@@ -563,36 +564,35 @@ function test_barrier(C::Type{Cones.MatrixEpiPerSquare{T, R}}) where {T, R}
         W = reshape(new_vec(s[(du + 2):end], dr * ds, R), dr, ds)
         return -logdet_pd(Hermitian(2 * v * U - W * W', :U)) + (dr - 1) * log(v)
     end
-    test_barrier(C(dr, ds), barrier)
+    return test_barrier(C(dr, ds), barrier)
 end
 
 show_time_alloc(C::Type{<:Cones.MatrixEpiPerSquare}) = show_time_alloc(C(2, 2))
 
-
 # GeneralizedPower
-function test_oracles(C::Type{Cones.GeneralizedPower{T}}) where T
+function test_oracles(C::Type{Cones.GeneralizedPower{T}}) where {T}
     for (du, dw) in [(2, 1), (3, 2), (4, 1), (2, 4)]
         test_oracles(C(rand_powers(T, du), dw))
     end
 end
 
-function test_barrier(C::Type{Cones.GeneralizedPower{T}}) where T
+function test_barrier(C::Type{Cones.GeneralizedPower{T}}) where {T}
     (du, dw) = (2, 2)
     α = rand_powers(T, du)
     function barrier(s)
         (u, w) = (s[1:du], s[(du + 1):end])
-        return -log(exp(2 * sum(α[i] * log(u[i]) for i in eachindex(u))) -
-            sum(abs2, w)) - sum((1 - α[i]) * log(u[i]) for i in eachindex(u))
+        return -log(exp(2 * sum(α[i] * log(u[i]) for i in eachindex(u))) - sum(abs2, w)) -
+               sum((1 - α[i]) * log(u[i]) for i in eachindex(u))
     end
-    test_barrier(C(α, dw), barrier)
+    return test_barrier(C(α, dw), barrier)
 end
 
-show_time_alloc(C::Type{Cones.GeneralizedPower{T}}) where T =
-    show_time_alloc(C(rand_powers(T, 4), 5))
-
+function show_time_alloc(C::Type{Cones.GeneralizedPower{T}}) where {T}
+    return show_time_alloc(C(rand_powers(T, 4), 5))
+end
 
 # HypoPowerMean
-function test_oracles(C::Type{Cones.HypoPowerMean{T}}) where T
+function test_oracles(C::Type{Cones.HypoPowerMean{T}}) where {T}
     for dw in [1, 2, 5]
         test_oracles(C(rand_powers(T, dw)), init_tol = 1e-2)
     end
@@ -601,19 +601,18 @@ function test_oracles(C::Type{Cones.HypoPowerMean{T}}) where T
     end
 end
 
-function test_barrier(C::Type{Cones.HypoPowerMean{T}}) where T
+function test_barrier(C::Type{Cones.HypoPowerMean{T}}) where {T}
     α = rand_powers(T, 3)
     function barrier(s)
         (u, w) = (s[1], s[2:end])
-        return -log(exp(sum(α[i] * log(w[i]) for i in eachindex(w))) - u) -
-            sum(log, w)
+        return -log(exp(sum(α[i] * log(w[i]) for i in eachindex(w))) - u) - sum(log, w)
     end
-    test_barrier(C(α), barrier)
+    return test_barrier(C(α), barrier)
 end
 
-show_time_alloc(C::Type{Cones.HypoPowerMean{T}}) where T =
-    show_time_alloc(C(rand_powers(T, 8)))
-
+function show_time_alloc(C::Type{Cones.HypoPowerMean{T}}) where {T}
+    return show_time_alloc(C(rand_powers(T, 8)))
+end
 
 # HypoGeoMean
 function test_oracles(C::Type{<:Cones.HypoGeoMean})
@@ -628,11 +627,10 @@ function test_barrier(C::Type{<:Cones.HypoGeoMean})
         sumlogw = sum(log, w)
         return -log(exp(sumlogw / length(w)) - u) - sumlogw
     end
-    test_barrier(C(3), barrier)
+    return test_barrier(C(3), barrier)
 end
 
 show_time_alloc(C::Type{<:Cones.HypoGeoMean}) = show_time_alloc(C(9))
-
 
 # HypoRootdetTri
 function test_oracles(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R}
@@ -648,12 +646,12 @@ function test_barrier(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R}
         logdet_W = logdet_pd(new_herm(w, dW, R))
         return -log(exp(logdet_W / dW) - u) - logdet_W
     end
-    test_barrier(C(1 + Cones.svec_length(R, dW)), barrier)
+    return test_barrier(C(1 + Cones.svec_length(R, dW)), barrier)
 end
 
-show_time_alloc(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R} =
-    show_time_alloc(C(1 + Cones.svec_length(R, 3)))
-
+function show_time_alloc(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R}
+    return show_time_alloc(C(1 + Cones.svec_length(R, 3)))
+end
 
 # HypoPerLog
 function test_oracles(C::Type{<:Cones.HypoPerLog})
@@ -670,11 +668,10 @@ function test_barrier(C::Type{<:Cones.HypoPerLog})
         (u, v, w) = (s[1], s[2], s[3:end])
         return -log(v * sum(log(wi / v) for wi in w) - u) - log(v) - sum(log, w)
     end
-    test_barrier(C(4), barrier)
+    return test_barrier(C(4), barrier)
 end
 
 show_time_alloc(C::Type{<:Cones.HypoPerLog}) = show_time_alloc(C(10))
-
 
 # HypoPerLogdetTri
 function test_oracles(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R}
@@ -693,12 +690,12 @@ function test_barrier(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R}
         W = new_herm(w, dW, R)
         return -log(v * logdet_pd(W / v) - u) - log(v) - logdet_pd(W)
     end
-    test_barrier(C(2 + Cones.svec_length(R, dW)), barrier)
+    return test_barrier(C(2 + Cones.svec_length(R, dW)), barrier)
 end
 
-show_time_alloc(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R} =
-    show_time_alloc(C(2 + Cones.svec_length(R, 3)))
-
+function show_time_alloc(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R}
+    return show_time_alloc(C(2 + Cones.svec_length(R, 3)))
+end
 
 # EpiPerSepSpectral
 function test_oracles(C::Type{<:Cones.EpiPerSepSpectral})
@@ -717,7 +714,9 @@ function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}})
     end
 end
 
-function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}}}) where {T, R}
+function test_barrier(
+    C::Type{<:Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}}},
+) where {T, R}
     dW = 3
     for h_fun in sep_spectral_funs
         function barrier(s)
@@ -729,12 +728,13 @@ function test_barrier(C::Type{<:Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, R}}}
     end
 end
 
-show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}}) =
-    show_time_alloc(C(first(sep_spectral_funs), 9))
+function show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.VectorCSqr}})
+    return show_time_alloc(C(first(sep_spectral_funs), 9))
+end
 
-show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr}}) =
-    show_time_alloc(C(first(sep_spectral_funs), 4))
-
+function show_time_alloc(C::Type{<:Cones.EpiPerSepSpectral{<:Cones.MatrixCSqr}})
+    return show_time_alloc(C(first(sep_spectral_funs), 4))
+end
 
 # EpiRelEntropy
 function test_oracles(C::Type{<:Cones.EpiRelEntropy})
@@ -750,14 +750,13 @@ function test_barrier(C::Type{<:Cones.EpiRelEntropy})
     dw = 2
     function barrier(s)
         (u, v, w) = (s[1], s[2:(1 + dw)], s[(2 + dw):end])
-        return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) -
-            sum(log, v) - sum(log, w)
+        return -log(u - sum(wi * log(wi / vi) for (vi, wi) in zip(v, w))) - sum(log, v) -
+               sum(log, w)
     end
-    test_barrier(C(5), barrier)
+    return test_barrier(C(5), barrier)
 end
 
 show_time_alloc(C::Type{<:Cones.EpiRelEntropy}) = show_time_alloc(C(9))
-
 
 # EpiTrRelEntropyTri
 function test_oracles(C::Type{<:Cones.EpiTrRelEntropyTri})
@@ -765,12 +764,11 @@ function test_oracles(C::Type{<:Cones.EpiTrRelEntropyTri})
         test_oracles(C(1 + 2 * Cones.svec_length(dW)), init_tol = 1e-4)
     end
     for dW in [6, 10]
-        test_oracles(C(1 + 2 * Cones.svec_length(dW)), init_tol = 1e-1,
-            init_only = true)
+        test_oracles(C(1 + 2 * Cones.svec_length(dW)), init_tol = 1e-1, init_only = true)
     end
 end
 
-function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T}}) where T
+function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T}}) where {T}
     dW = 3
     dw = Cones.svec_length(dW)
     function barrier(s)
@@ -779,11 +777,10 @@ function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T}}) where T
         W = new_herm(w, dW, T)
         return -log(u - dot(W, log(W) - log(V))) - logdet_pd(V) - logdet_pd(W)
     end
-    test_barrier(C(1 + 2 * dw), barrier, TFD = BigFloat)
+    return test_barrier(C(1 + 2 * dw), barrier, TFD = BigFloat)
 end
 
 show_time_alloc(C::Type{<:Cones.EpiTrRelEntropyTri}) = show_time_alloc(C(13))
-
 
 # WSOSInterpNonnegative
 function test_oracles(C::Type{Cones.WSOSInterpNonnegative{T, R}}) where {T, R}
@@ -796,22 +793,22 @@ end
 function test_barrier(C::Type{Cones.WSOSInterpNonnegative{T, R}}) where {T, R}
     (d, Ps) = rand_interp(2, 1, R)
     barrier(s) = -sum(logdet_pd(Hermitian(P' * Diagonal(s) * P)) for P in Ps)
-    test_barrier(C(d, Ps), barrier)
+    return test_barrier(C(d, Ps), barrier)
 end
 
-show_time_alloc(C::Type{Cones.WSOSInterpNonnegative{T, R}}) where {T, R} =
-    show_time_alloc(C(rand_interp(3, 1, R)...))
-
+function show_time_alloc(C::Type{Cones.WSOSInterpNonnegative{T, R}}) where {T, R}
+    return show_time_alloc(C(rand_interp(3, 1, R)...))
+end
 
 # WSOSInterpPosSemidefTri
-function test_oracles(C::Type{Cones.WSOSInterpPosSemidefTri{T}}) where T
+function test_oracles(C::Type{Cones.WSOSInterpPosSemidefTri{T}}) where {T}
     for (num_vars, halfdeg, ds) in [(1, 1, 1), (1, 1, 4), (2, 2, 1), (3, 1, 2)]
         (d, Ps) = rand_interp(num_vars, halfdeg, T)
         test_oracles(C(ds, d, Ps), init_tol = Inf)
     end
 end
 
-function test_barrier(C::Type{Cones.WSOSInterpPosSemidefTri{T}}) where T
+function test_barrier(C::Type{Cones.WSOSInterpPosSemidefTri{T}}) where {T}
     (d, Ps) = rand_interp(1, 1, T)
     ds = 3
     invrt2 = inv(sqrt(T(2)))
@@ -831,22 +828,22 @@ function test_barrier(C::Type{Cones.WSOSInterpPosSemidefTri{T}}) where T
         end
         return sum(ldΛP, Ps)
     end
-    test_barrier(C(ds, d, Ps), barrier)
+    return test_barrier(C(ds, d, Ps), barrier)
 end
 
-show_time_alloc(C::Type{Cones.WSOSInterpPosSemidefTri{T}}) where T =
-    show_time_alloc(C(2, rand_interp(2, 1, T)...))
-
+function show_time_alloc(C::Type{Cones.WSOSInterpPosSemidefTri{T}}) where {T}
+    return show_time_alloc(C(2, rand_interp(2, 1, T)...))
+end
 
 # WSOSInterpEpiNormEucl
-function test_oracles(C::Type{Cones.WSOSInterpEpiNormEucl{T}}) where T
+function test_oracles(C::Type{Cones.WSOSInterpEpiNormEucl{T}}) where {T}
     for (num_vars, halfdeg, ds) in [(1, 1, 1), (1, 2, 3), (2, 2, 2), (3, 1, 1)]
         (d, Ps) = rand_interp(num_vars, halfdeg, T)
         test_oracles(C(1 + ds, d, Ps), init_tol = Inf)
     end
 end
 
-function test_barrier(C::Type{Cones.WSOSInterpEpiNormEucl{T}}) where T
+function test_barrier(C::Type{Cones.WSOSInterpEpiNormEucl{T}}) where {T}
     (d, Ps) = rand_interp(1, 1, T)
     ds = 2
     invrt2 = inv(sqrt(T(2)))
@@ -863,22 +860,22 @@ function test_barrier(C::Type{Cones.WSOSInterpEpiNormEucl{T}}) where T
         end
         return sum(ldΛP, Ps)
     end
-    test_barrier(C(1 + ds, d, Ps), barrier)
+    return test_barrier(C(1 + ds, d, Ps), barrier)
 end
 
-show_time_alloc(C::Type{Cones.WSOSInterpEpiNormEucl{T}}) where T =
-    show_time_alloc(C(3, rand_interp(2, 1, T)...))
-
+function show_time_alloc(C::Type{Cones.WSOSInterpEpiNormEucl{T}}) where {T}
+    return show_time_alloc(C(3, rand_interp(2, 1, T)...))
+end
 
 # WSOSInterpEpiNormOne
-function test_oracles(C::Type{Cones.WSOSInterpEpiNormOne{T}}) where T
+function test_oracles(C::Type{Cones.WSOSInterpEpiNormOne{T}}) where {T}
     for (num_vars, halfdeg, ds) in [(1, 1, 1), (1, 2, 3), (2, 2, 2), (3, 1, 1)]
         (d, Ps) = rand_interp(num_vars, halfdeg, T)
         test_oracles(C(1 + ds, d, Ps), init_tol = Inf)
     end
 end
 
-function test_barrier(C::Type{Cones.WSOSInterpEpiNormOne{T}}) where T
+function test_barrier(C::Type{Cones.WSOSInterpEpiNormOne{T}}) where {T}
     (d, Ps) = rand_interp(1, 1, T)
     ds = 2
     invrt2 = inv(sqrt(T(2)))
@@ -893,8 +890,9 @@ function test_barrier(C::Type{Cones.WSOSInterpEpiNormOne{T}}) where T
         end
         return sum(ldΛP, Ps)
     end
-    test_barrier(C(1 + ds, d, Ps), barrier)
+    return test_barrier(C(1 + ds, d, Ps), barrier)
 end
 
-show_time_alloc(C::Type{Cones.WSOSInterpEpiNormOne{T}}) where T =
-    show_time_alloc(C(3, rand_interp(2, 1, T)...))
+function show_time_alloc(C::Type{Cones.WSOSInterpEpiNormOne{T}}) where {T}
+    return show_time_alloc(C(3, rand_interp(2, 1, T)...))
+end

@@ -32,10 +32,14 @@ function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64}
     r = [1.0, 0.6, 0.4, 0.2] # growth rate of species
 
     DP.@polyvar x_h[1:n]
-    x_mon = DP.monomials(x_h, 0:inst.deg)
+    x_mon = DP.monomials(x_h, 0:(inst.deg))
     x_o = x_h * Q .+ q
-    A = [1.0 0.3 0.4 0.2; -0.2 1.0 0.4 -0.1;
-        -0.1 -0.2 1.0 0.3; -0.1 -0.2 -0.3 1.0]
+    A = [
+        1.0 0.3 0.4 0.2
+        -0.2 1.0 0.4 -0.1
+        -0.1 -0.2 1.0 0.3
+        -0.1 -0.2 -0.3 1.0
+    ]
     M = (sum(abs, l_u) + sum(l_u)) / 2.0 + l_x
     M *= 0.01 # upper bound on the total cost
     f = r .* x_o .* (1.0 .- A * x_o)
@@ -56,23 +60,35 @@ function build(inst::LotkaVolterraJuMP{T}) where {T <: Float64}
         end
     end
 
-    integrate_ball(p, n) = sum(DP.coefficient(t) * integrate_ball_monomial(t, n)
-        for t in DP.terms(p))
+    function integrate_ball(p, n)
+        return sum(DP.coefficient(t) * integrate_ball_monomial(t, n) for t in DP.terms(p))
+    end
 
     model = SumOfSquares.SOSModel()
     JuMP.@variable(model, rho, PolyJuMP.Poly(x_mon))
     JuMP.@variable(model, rho_T, PolyJuMP.Poly(x_mon))
     JuMP.@variable(model, sigma[1:m], PolyJuMP.Poly(x_mon))
 
-    JuMP.@objective(model, Min, integrate_ball(l_x * rho, n) +
+    JuMP.@objective(
+        model,
+        Min,
+        integrate_ball(l_x * rho, n) +
         sum(integrate_ball(sigma[i] * l_u[i], n) for i in 1:m) +
-        M * integrate_ball(rho_T, n))
+        M * integrate_ball(rho_T, n)
+    )
 
     JuMP.@constraint(model, rho <= 0, domain = delta_X)
-    JuMP.@constraint(model, rho_T + brho * rho +
+    JuMP.@constraint(
+        model,
+        rho_T +
+        brho * rho +
         sum(DP.differentiate(rho * f[i], x_h[i]) / Q for i in 1:n) +
-        sum(sum(DP.differentiate(sigma[j] * f_u[i, j], x_h[i]) / Q
-            for i in 1:n) for j in 1:m) >= 1, domain = X)
+        sum(
+            sum(DP.differentiate(sigma[j] * f_u[i, j], x_h[i]) / Q for i in 1:n) for
+            j in 1:m
+        ) >= 1,
+        domain = X
+    )
     JuMP.@constraint(model, [i in 1:m], u_bar * rho >= sigma[i], domain = X)
     JuMP.@constraint(model, rho_T >= 0, domain = X)
     JuMP.@constraint(model, [i in 1:m], sigma[i] >= 0, domain = X)

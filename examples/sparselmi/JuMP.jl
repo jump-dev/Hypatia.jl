@@ -53,22 +53,23 @@ function build(inst::SparseLMIJuMP{T}) where {T <: Float64}
 
     if inst.use_psd || inst.use_sparsepsd
         for k in 1:num_lmis
-            Sk = Symmetric(Qs[k] + y * matI +
-                sum(x[i] * Ps[k, i] for i in 1:num_Ps))
+            Sk = Symmetric(Qs[k] + y * matI + sum(x[i] * Ps[k, i] for i in 1:num_Ps))
             if inst.use_psd
                 JuMP.@constraint(model, Sk in JuMP.PSDCone())
             else
-                impl = (inst.use_cholmod_impl ? Cones.PSDSparseCholmod :
-                    Cones.PSDSparseDense)
+                impl =
+                    (inst.use_cholmod_impl ? Cones.PSDSparseCholmod : Cones.PSDSparseDense)
                 cone = Hypatia.PosSemidefTriSparseCone{impl, T, T}
                 (row_idxs, col_idxs, vals) = findnz(sparse(LowerTriangular(Sk)))
-                JuMP.@constraint(model, vals in cone(
-                    side_Ps, row_idxs, col_idxs, false))
+                JuMP.@constraint(model, vals in cone(side_Ps, row_idxs, col_idxs, false))
             end
         end
     elseif inst.use_linmatrixineq
-        JuMP.@constraint(model, [k in 1:num_lmis], vcat(y, x, 1) in
-            Hypatia.LinMatrixIneqCone{T}([matI, Ps[k, :]..., Qs[k]]))
+        JuMP.@constraint(
+            model,
+            [k in 1:num_lmis],
+            vcat(y, x, 1) in Hypatia.LinMatrixIneqCone{T}([matI, Ps[k, :]..., Qs[k]])
+        )
     else
         error()
     end

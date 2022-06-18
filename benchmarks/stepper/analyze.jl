@@ -24,7 +24,7 @@ enhancements = [
     # "comb_val3",
     # "comb_val4",
     # "comb_val5",
-    ]
+]
 
 compare_pairs = [
     ["basic", "prox"],
@@ -32,7 +32,7 @@ compare_pairs = [
     ["toa", "curve"],
     ["curve", "comb"],
     ["basic", "comb"],
-    ]
+]
 
 # geomean shifts
 time_shift = 1e-3
@@ -53,35 +53,48 @@ function extra_stats(all_df)
     # basic or comb converged
     for enh in ("basic", "comb")
         enh_conv = filter(t -> ((t.enhancement == enh) && t.conv), all_df)
-        enh_data = select(enh_conv,
-            :npq, :nu, :iters, :solve_time,
+        enh_data = select(
+            enh_conv,
+            :npq,
+            :nu,
+            :iters,
+            :solve_time,
             :iters => ByRow(log10) => :log_iters,
             :solve_time => ByRow(log10) => :log_solve_time,
             [:time_uprhs, :solve_time] => ((x, y) -> x ./ y) => :prop_rhs,
-            )
+        )
         CSV.write(joinpath(csv_dir, enh * "conv.csv"), enh_data)
     end
 
     # basic/comb both converged
     two_solver = filter(t -> (t.enhancement in ("basic", "comb")), all_df)
-    two_solver = combine(groupby(two_solver, :inst_key), names(all_df),
-        :conv => all => :two_conv)
+    two_solver =
+        combine(groupby(two_solver, :inst_key), names(all_df), :conv => all => :two_conv)
     two_solver_conv = filter(t -> t.two_conv, two_solver)
     rel_impr = (x -> (x[1] - x[2]) / x[1])
-    two_solver_conv = combine(groupby(two_solver_conv, :inst_key),
-        [:enhancement, :solve_time], :solve_time => rel_impr => :time_impr,
-        [:enhancement, :iters], :iters => rel_impr => :iters_impr,
-        )
+    two_solver_conv = combine(
+        groupby(two_solver_conv, :inst_key),
+        [:enhancement, :solve_time],
+        :solve_time => rel_impr => :time_impr,
+        [:enhancement, :iters],
+        :iters => rel_impr => :iters_impr,
+    )
     filter!(t -> (t.enhancement == "comb"), two_solver_conv)
-    CSV.write(joinpath(csv_dir, "basiccombconv.csv"),
-        select(two_solver_conv, :solve_time, :time_impr, :iters, :iters_impr))
+    CSV.write(
+        joinpath(csv_dir, "basiccombconv.csv"),
+        select(two_solver_conv, :solve_time, :time_impr, :iters, :iters_impr),
+    )
 
     # logged stats for instances
     basic_df = filter(t -> (t.enhancement == "basic"), all_df)
-    CSV.write(joinpath(csv_dir, "inst_stats.csv"), select(basic_df,
-        :num_cones => ByRow(log10) => :log_numcones,
-        :npq => ByRow(log10) => :log_npq,
-        ),)
+    CSV.write(
+        joinpath(csv_dir, "inst_stats.csv"),
+        select(
+            basic_df,
+            :num_cones => ByRow(log10) => :log_numcones,
+            :npq => ByRow(log10) => :log_npq,
+        ),
+    )
 
     # update examplestats.csv with unique cones and instance count for each example
     exstats = open(joinpath(stats_dir, "examplestats.csv"), "w")
@@ -107,8 +120,7 @@ function extra_stats(all_df)
     end
 
     # count number of instances in "every"
-    count_every = nrow(unique(select(filter(t -> t.every_conv, all_df),
-        :inst_key)))
+    count_every = nrow(unique(select(filter(t -> t.every_conv, all_df), :inst_key)))
     @info("$count_every instances are in the every set")
 
     return
@@ -145,7 +157,7 @@ function shifted_geomean(
     shift::Real = 0,
     cap::AbstractVector = fill(Inf, length(conv)),
     use_cap::Bool = false,
-    )
+)
     if use_cap
         @assert length(cap) == length(metric)
         x = copy(metric)
@@ -174,34 +186,56 @@ function preprocess_df()
     transform!(all_df, :solver_options => ByRow(get_enhancement) => :enhancement)
 
     # check if any instances could be duplicates:
-    possible_dupes = nonunique(all_df, [:enhancement, :example, :inst_data,
-        :n, :p, :q, :nu, :cone_types, :num_cones, :max_q])
+    possible_dupes = nonunique(
+        all_df,
+        [
+            :enhancement,
+            :example,
+            :inst_data,
+            :n,
+            :p,
+            :q,
+            :nu,
+            :cone_types,
+            :num_cones,
+            :max_q,
+        ],
+    )
     if any(possible_dupes)
-        df_dupes = unique!(all_df[possible_dupes, [:example, :model_type,
-            :inst_set, :inst_num, :inst_data, :extender]])
+        df_dupes = unique!(
+            all_df[
+                possible_dupes,
+                [:example, :model_type, :inst_set, :inst_num, :inst_data, :extender],
+            ],
+        )
         println()
-        @warn("possible instance/option duplicates detected; inspect instance set " *
-            "for duplicates of each of the below (unique) rows:")
+        @warn(
+            "possible instance/option duplicates detected; inspect instance set " *
+            "for duplicates of each of the below (unique) rows:"
+        )
         println("\n", df_dupes, "\n")
     end
 
     # get converged instances, identify by instance key
     ok_status = ["Optimal", "PrimalInfeasible", "DualInfeasible"]
     str_missing(s) = (ismissing(s) ? "" : string(s))
-    transform!(all_df,
+    transform!(
+        all_df,
         :status => ByRow(x -> (!ismissing(x) && x in ok_status)) => :conv,
         # identify instances by example + model_type + inst_data + extender
         [:example, :model_type, :inst_data, :extender] =>
-        ((s1, s2, s3, s4) -> s1 .* s2 .* s3 .* str_missing.(s4)) => :inst_key,
-        )
+            ((s1, s2, s3, s4) -> s1 .* s2 .* s3 .* str_missing.(s4)) => :inst_key,
+    )
 
     # assumes that nothing returned incorrect status, which is checked manually
-    all_df = combine(groupby(all_df, :inst_key), names(all_df),
-        :conv => all => :every_conv)
+    all_df = combine(groupby(all_df, :inst_key), names(all_df), :conv => all => :every_conv)
 
     # remove instances where none of the steppers converged (removes noise)
-    none_df = combine(groupby(all_df, :inst_key), :inst_key,
-        :conv => (x -> !any(x)) => :none_conv)
+    none_df = combine(
+        groupby(all_df, :inst_key),
+        :inst_key,
+        :conv => (x -> !any(x)) => :none_conv,
+    )
     filter!(t -> t.none_conv, none_df)
     if !isempty(none_df)
         @info "removing $(nrow(none_df)) instances where no stepper converged"
@@ -219,31 +253,49 @@ function make_agg_tables(all_df)
     # calculate caps for replacing time/iters of unconverged instances
     # use double the largest value for the same instance across all steppers
     # assumes instances are in the same order for all steppers
-    max_df = combine(groupby(all_df, :inst_key),
+    max_df = combine(
+        groupby(all_df, :inst_key),
         [:solve_time, :conv] => get_cap => :max_time,
         [:iters, :conv] => get_cap => :max_iters,
-        )
+    )
     cap(x::Symbol) = max_df[!, x]
 
     # collect aggregated summary statistics
-    df_agg = combine(groupby(all_df, :enhancement),
+    df_agg = combine(
+        groupby(all_df, :enhancement),
         # geometric mean over instances where every stepper converged
-        [:solve_time, :every_conv] => ((x, y) ->
-            shifted_geomean(x, y, shift = time_shift)) => :time_geomean_everyconv,
-        [:iters, :every_conv] => ((x, y) ->
-            shifted_geomean(x, y, shift = 1)) => :iters_geomean_everyconv,
+        [:solve_time, :every_conv] =>
+            ((x, y) -> shifted_geomean(x, y, shift = time_shift)) =>
+                :time_geomean_everyconv,
+        [:iters, :every_conv] =>
+            ((x, y) -> shifted_geomean(x, y, shift = 1)) => :iters_geomean_everyconv,
         # geometric mean over instances where this stepper converged
-        [:solve_time, :conv] => ((x, y) ->
-            shifted_geomean(x, y, shift = time_shift)) => :time_geomean_thisconv,
-        [:iters, :conv] => ((x, y) ->
-            shifted_geomean(x, y, shift = 1)) => :iters_geomean_thisconv,
+        [:solve_time, :conv] =>
+            ((x, y) -> shifted_geomean(x, y, shift = time_shift)) =>
+                :time_geomean_thisconv,
+        [:iters, :conv] =>
+            ((x, y) -> shifted_geomean(x, y, shift = 1)) => :iters_geomean_thisconv,
         # geometric mean over all instances, use caps on unconverged isntances
-        [:solve_time, :conv] => ((x, y) ->
-            shifted_geomean(x, y, cap = cap(:max_time), use_cap = true,
-            shift = time_shift)) => :time_geomean_all,
-        [:iters, :conv] => ((x, y) ->
-            shifted_geomean(x, y, shift = 1, cap = cap(:max_iters),
-            use_cap = true)) => :iters_geomean_all,
+        [:solve_time, :conv] =>
+            (
+                (x, y) -> shifted_geomean(
+                    x,
+                    y,
+                    cap = cap(:max_time),
+                    use_cap = true,
+                    shift = time_shift,
+                )
+            ) => :time_geomean_all,
+        [:iters, :conv] =>
+            (
+                (x, y) -> shifted_geomean(
+                    x,
+                    y,
+                    shift = 1,
+                    cap = cap(:max_iters),
+                    use_cap = true,
+                )
+            ) => :iters_geomean_all,
         :status => (x -> count(isequal("Optimal"), x)) => :optimal,
         :status => (x -> count(isequal("NearOptimal"), x)) => :nearoptimal,
         :status => (x -> count(isequal("PrimalInfeasible"), x)) => :priminfeas,
@@ -255,21 +307,31 @@ function make_agg_tables(all_df)
         :status => (x -> count(isequal("TimeLimit"), x)) => :timelimit,
         :status => (x -> count(isequal("IterationLimit"), x)) => :iterationlimit,
         :status => length => :total,
-        )
+    )
 
-    sort!(df_agg, order(:enhancement, by = (x ->
-        findfirst(isequal(x), lowercase.(enhancements)))))
+    sort!(
+        df_agg,
+        order(:enhancement, by = (x -> findfirst(isequal(x), lowercase.(enhancements)))),
+    )
     CSV.write(joinpath(stats_dir, "agg.csv"), df_agg)
 
     # prepare latex table
 
     # combine feasible and infeasible statuses
-    transform!(df_agg, [:optimal, :priminfeas, :dualinfeas] =>
-        ByRow((x...) -> sum(x)) => :converged)
+    transform!(
+        df_agg,
+        [:optimal, :priminfeas, :dualinfeas] => ByRow((x...) -> sum(x)) => :converged,
+    )
 
-    cols = [:converged, :iters_geomean_everyconv, :iters_geomean_thisconv,
-        :iters_geomean_all, :time_geomean_everyconv, :time_geomean_thisconv,
-        :time_geomean_all]
+    cols = [
+        :converged,
+        :iters_geomean_everyconv,
+        :iters_geomean_thisconv,
+        :iters_geomean_all,
+        :time_geomean_everyconv,
+        :time_geomean_thisconv,
+        :time_geomean_all,
+    ]
     sep = " & "
     tex = open(joinpath(tex_dir, "agg.tex"), "w")
 
@@ -291,22 +353,33 @@ end
 function make_subtime_tables(all_df)
     divfunc(x, y) = (x ./ y)
     init_cols = [:time_rescale, :time_initx, :time_inity, :time_loadsys]
-    transform!(all_df,
+    transform!(
+        all_df,
         [:time_upsys, :iters] => divfunc => :time_upsys_piter,
         [:time_uprhs, :iters] => divfunc => :time_uprhs_piter,
         [:time_getdir, :iters] => divfunc => :time_getdir_piter,
         [:time_search, :iters] => divfunc => :time_search_piter,
         init_cols => ((x...) -> sum(x)) => :time_init,
-        )
+    )
 
-    metrics = [:init, :lhs, :rhs, :direc, :search, :lhs_piter,
-        :rhs_piter, :direc_piter, :search_piter]
+    metrics = [
+        :init,
+        :lhs,
+        :rhs,
+        :direc,
+        :search,
+        :lhs_piter,
+        :rhs_piter,
+        :direc_piter,
+        :search_piter,
+    ]
     sets = [:_thisconv, :_everyconv, :_all]
 
     # calculate caps for replacing time/iters of unconverged instances
     # use double the largest value for the same instance across all steppers
     # assumes instances are in the same order for all steppers
-    max_df = combine(groupby(all_df, :inst_key),
+    max_df = combine(
+        groupby(all_df, :inst_key),
         [:time_init, :conv] => get_cap => :max_init,
         [:time_upsys, :conv] => get_cap => :max_upsys,
         [:time_uprhs, :conv] => get_cap => :max_uprhs,
@@ -316,48 +389,112 @@ function make_subtime_tables(all_df)
         [:time_uprhs_piter, :conv] => get_cap => :max_uprhs_iter,
         [:time_getdir_piter, :conv] => get_cap => :max_getdir_iter,
         [:time_search_piter, :conv] => get_cap => :max_search_iter,
-        )
+    )
     cap(x::Symbol) = max_df[!, x]
 
     function get_subtime_df(set, convcol, use_cap)
-        subtime_df = combine(groupby(all_df, :enhancement),
-            [:time_init, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = total_shift, cap = cap(:max_init),
-                use_cap = use_cap)) => Symbol(:init, set),
-            [:time_upsys, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = total_shift, cap = cap(:max_upsys),
-                use_cap = use_cap)) => Symbol(:lhs, set),
-            [:time_uprhs, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = total_shift, cap = cap(:max_uprhs),
-                use_cap = use_cap)) => Symbol(:rhs, set),
-            [:time_getdir, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = total_shift, cap = cap(:max_getdir),
-                use_cap = use_cap)) => Symbol(:direc, set),
-            [:time_search, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = total_shift, cap = cap(:max_search),
-                use_cap = use_cap)) => Symbol(:search, set),
-            [:time_upsys_piter, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = piter_shift,
-                cap = cap(:max_upsys_iter), use_cap = use_cap)) =>
-                Symbol(:lhs_piter, set),
-            [:time_uprhs_piter, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = piter_shift,
-                cap = cap(:max_uprhs_iter), use_cap = use_cap)) =>
-                Symbol(:rhs_piter, set),
-            [:time_getdir_piter, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = piter_shift,
-                cap = cap(:max_getdir_iter), use_cap = use_cap)) =>
-                Symbol(:direc_piter, set),
-            [:time_search_piter, convcol] => ((x, y) ->
-                shifted_geomean(x, y, shift = piter_shift,
-                cap = cap(:max_search_iter), use_cap = use_cap)) =>
-                Symbol(:search_piter, set),
-            )
+        subtime_df = combine(
+            groupby(all_df, :enhancement),
+            [:time_init, convcol] =>
+                (
+                    (x, y) -> shifted_geomean(
+                        x,
+                        y,
+                        shift = total_shift,
+                        cap = cap(:max_init),
+                        use_cap = use_cap,
+                    )
+                ) => Symbol(:init, set),
+            [:time_upsys, convcol] =>
+                (
+                    (x, y) -> shifted_geomean(
+                        x,
+                        y,
+                        shift = total_shift,
+                        cap = cap(:max_upsys),
+                        use_cap = use_cap,
+                    )
+                ) => Symbol(:lhs, set),
+            [:time_uprhs, convcol] =>
+                (
+                    (x, y) -> shifted_geomean(
+                        x,
+                        y,
+                        shift = total_shift,
+                        cap = cap(:max_uprhs),
+                        use_cap = use_cap,
+                    )
+                ) => Symbol(:rhs, set),
+            [:time_getdir, convcol] =>
+                (
+                    (x, y) -> shifted_geomean(
+                        x,
+                        y,
+                        shift = total_shift,
+                        cap = cap(:max_getdir),
+                        use_cap = use_cap,
+                    )
+                ) => Symbol(:direc, set),
+            [:time_search, convcol] =>
+                (
+                    (x, y) -> shifted_geomean(
+                        x,
+                        y,
+                        shift = total_shift,
+                        cap = cap(:max_search),
+                        use_cap = use_cap,
+                    )
+                ) => Symbol(:search, set),
+            [:time_upsys_piter, convcol] =>
+                (
+                    (x, y) -> shifted_geomean(
+                        x,
+                        y,
+                        shift = piter_shift,
+                        cap = cap(:max_upsys_iter),
+                        use_cap = use_cap,
+                    )
+                ) => Symbol(:lhs_piter, set),
+            [:time_uprhs_piter, convcol] =>
+                (
+                    (x, y) -> shifted_geomean(
+                        x,
+                        y,
+                        shift = piter_shift,
+                        cap = cap(:max_uprhs_iter),
+                        use_cap = use_cap,
+                    )
+                ) => Symbol(:rhs_piter, set),
+            [:time_getdir_piter, convcol] =>
+                (
+                    (x, y) -> shifted_geomean(
+                        x,
+                        y,
+                        shift = piter_shift,
+                        cap = cap(:max_getdir_iter),
+                        use_cap = use_cap,
+                    )
+                ) => Symbol(:direc_piter, set),
+            [:time_search_piter, convcol] =>
+                (
+                    (x, y) -> shifted_geomean(
+                        x,
+                        y,
+                        shift = piter_shift,
+                        cap = cap(:max_search_iter),
+                        use_cap = use_cap,
+                    )
+                ) => Symbol(:search_piter, set),
+        )
 
-        sort!(subtime_df, order(:enhancement,
-            by = (x -> findfirst(isequal(x), lowercase.(enhancements)))))
-        CSV.write(joinpath(stats_dir, "subtime" * string(set) * ".csv"),
-            subtime_df)
+        sort!(
+            subtime_df,
+            order(
+                :enhancement,
+                by = (x -> findfirst(isequal(x), lowercase.(enhancements))),
+            ),
+        )
+        CSV.write(joinpath(stats_dir, "subtime" * string(set) * ".csv"), subtime_df)
 
         return subtime_df
     end
@@ -398,26 +535,33 @@ function make_perf_profiles(all_df, comp, metric)
     pp = filter(t -> t.enhancement in comp, all_df)
 
     # BenchmarkProfiles.jl expects NaNs for failures
-    select!(pp,
+    select!(
+        pp,
         :inst_key,
         :enhancement,
         [metric, :conv] => ByRow((x, y) -> (y ? x : NaN)) => metric,
-        )
+    )
     wide_df = unstack(pp, :enhancement, metric)
 
     (x_plot, y_plot, max_ratio) = BenchmarkProfiles.performance_profile_data(
-        Matrix{Float64}(wide_df[!, string.(comp)]), logscale = true)
+        Matrix{Float64}(wide_df[!, string.(comp)]),
+        logscale = true,
+    )
 
     # make steps like :steppost in Plots
     for s in 1:2
         x = vcat(0, repeat(x_plot[s], inner = 2))
         y = vcat(0, 0, repeat(y_plot[s][1:(end - 1)], inner = 2), y_plot[s][end])
-        CSV.write(joinpath(csv_dir, comp[s] * "_vs_" * comp[2 - s + 1] * "_" *
-            string(metric) * ".csv"), DataFrame(x = x, y = y))
+        CSV.write(
+            joinpath(
+                csv_dir,
+                comp[s] * "_vs_" * comp[2 - s + 1] * "_" * string(metric) * ".csv",
+            ),
+            DataFrame(x = x, y = y),
+        )
     end
 
     return
 end
 
-post_process()
-;
+post_process();

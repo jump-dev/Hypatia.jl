@@ -27,8 +27,10 @@ function build(inst::RelEntrEntanglementJuMP{T}) where {T <: Float64}
 
     JuMP.@variable(model, y)
     JuMP.@objective(model, Min, y / log(T(2)))
-    JuMP.@constraint(model, vcat(y, tau_vec, rho_vec) in
-        Hypatia.EpiTrRelEntropyTriCone{T}(1 + 2 * vec_dim))
+    JuMP.@constraint(
+        model,
+        vcat(y, tau_vec, rho_vec) in Hypatia.EpiTrRelEntropyTriCone{T}(1 + 2 * vec_dim)
+    )
     pt = partial_transpose(Symmetric(Tau), 2, [na, nb])
     JuMP.@constraint(model, Symmetric(pt) in JuMP.PSDCone())
 
@@ -36,16 +38,12 @@ function build(inst::RelEntrEntanglementJuMP{T}) where {T <: Float64}
 end
 
 # partial transpose of Q over system i given subsystem dimensions subs
-function partial_transpose(
-    Q::Symmetric,
-    i::Int,
-    subs::Vector{Int},
-    )
+function partial_transpose(Q::Symmetric, i::Int, subs::Vector{Int})
     @assert 1 <= i <= length(subs)
     @assert size(Q, 1) == prod(subs)
     n = length(subs)
     s = n + 1 - i
-    p = collect(1:2n)
+    p = collect(1:(2n))
     p[s] = n + s
     p[n + s] = s
     rev = reverse(subs)

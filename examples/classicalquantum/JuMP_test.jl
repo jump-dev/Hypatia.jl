@@ -1,11 +1,7 @@
 
 insts = OrderedDict()
-insts["minimal"] = [
-    ((3, false, false),),
-    ((3, false, true),),
-    ((3, true, false),),
-    ((3, true, true),),
-    ]
+insts["minimal"] =
+    [((3, false, false),), ((3, false, true),), ((3, true, false),), ((3, true, true),)]
 insts["fast"] = [
     ((20, false, false),),
     ((20, true, false),),
@@ -15,7 +11,7 @@ insts["fast"] = [
     ((50, true, false),),
     ((12, false, true),),
     ((8, true, true),),
-    ]
+]
 insts["various"] = [
     ((100, false, false),),
     ((100, true, false),),
@@ -27,5 +23,5 @@ insts["various"] = [
     ((300, false, false),),
     ((250, true, false),),
     ((17, false, true), nothing, (default_tol_relax = 1000,)),
-    ]
+]
 return (ClassicalQuantum, insts)

@@ -21,34 +21,33 @@ supported.
 struct PSDSparseCholmod <: PSDSparseImpl end
 
 mutable struct PSDSparseCholmodCache{T <: BlasReal, R <: RealOrComplex{T}} <:
-    PSDSparseCache{T, R}
-    sparse_point
-    sparse_point_map
-    symb_mat
-    supers
-    super_map
-    parents
-    ancestors
-    num_cols
-    num_rows
-    J_rows
-    L_idxs
-    F_blocks
-    L_blocks
-    S_blocks
-    L_pr_blocks
-    S_pr_blocks
-    L_pr_pr_blocks
-    map_blocks
-    temp_blocks
-    rel_idxs
-    PSDSparseCholmodCache{T, R}() where {T <: BlasReal, R <: RealOrComplex{T}} =
-        new{T, R}()
+               PSDSparseCache{T, R}
+    sparse_point::Any
+    sparse_point_map::Any
+    symb_mat::Any
+    supers::Any
+    super_map::Any
+    parents::Any
+    ancestors::Any
+    num_cols::Any
+    num_rows::Any
+    J_rows::Any
+    L_idxs::Any
+    F_blocks::Any
+    L_blocks::Any
+    S_blocks::Any
+    L_pr_blocks::Any
+    S_pr_blocks::Any
+    L_pr_pr_blocks::Any
+    map_blocks::Any
+    temp_blocks::Any
+    rel_idxs::Any
+    PSDSparseCholmodCache{T, R}() where {T <: BlasReal, R <: RealOrComplex{T}} = new{T, R}()
 end
 
 function setup_extra_data!(
     cone::PosSemidefTriSparse{PSDSparseCholmod, T, R},
-    ) where {T <: BlasReal, R <: RealOrComplex{T}}
+) where {T <: BlasReal, R <: RealOrComplex{T}}
     cone.cache = cache = PSDSparseCholmodCache{T, R}()
 
     # setup symbolic factorization
@@ -56,15 +55,17 @@ function setup_extra_data!(
     dim_R = length(cone.row_idxs)
 
     fake_point = [R(l) for l in 1:dim_R]
-    sparse_point = cache.sparse_point = CHOLMOD.Sparse(Hermitian(
-        sparse(cone.row_idxs, cone.col_idxs, fake_point, side, side), :L))
+    sparse_point =
+        cache.sparse_point = CHOLMOD.Sparse(
+            Hermitian(sparse(cone.row_idxs, cone.col_idxs, fake_point, side, side), :L),
+        )
     sparse_point_map = cache.sparse_point_map = zeros(Int, dim_R)
     sx_ptr = Ptr{R}(unsafe_load(sparse_point.ptr).x)
     for l in 1:dim_R
         sparse_point_map[Int(unsafe_load(sx_ptr, l))] = l
     end
     CHOLMOD.@cholmod_param supernodal = 2 begin
-        cache.symb_mat = CHOLMOD.symbolic(sparse_point, postorder=true)
+        cache.symb_mat = CHOLMOD.symbolic(sparse_point, postorder = true)
     end
     symb_mat = cache.symb_mat
 
@@ -152,8 +153,7 @@ function setup_extra_data!(
             rel_idx = rel_idxs[k]
             k_par = parents[k]
             I_k = J_k[(num_col + 1):end]
-            for (idx_i, i) in enumerate(I_k), (idx_j, j) in
-                enumerate(J_rows[k_par])
+            for (idx_i, i) in enumerate(I_k), (idx_j, j) in enumerate(J_rows[k_par])
                 if i == j
                     push!(rel_idx, (idx_i, idx_j))
                 end
@@ -162,8 +162,7 @@ function setup_extra_data!(
     end
 
     iperm = invperm(symb_mat.p)
-    map_blocks = cache.map_blocks = Vector{Tuple{Int, Int, Int, Bool, Bool}}(
-        undef, dim_R)
+    map_blocks = cache.map_blocks = Vector{Tuple{Int, Int, Int, Bool, Bool}}(undef, dim_R)
     for i in 1:dim_R
         row = iperm[cone.row_idxs[i]]
         col = iperm[cone.col_idxs[i]]
@@ -185,7 +184,7 @@ end
 
 function update_feas(
     cone::PosSemidefTriSparse{PSDSparseCholmod, T, R},
-    ) where {T <: BlasReal, R <: RealOrComplex{T}}
+) where {T <: BlasReal, R <: RealOrComplex{T}}
     @assert !cone.feas_updated
     point = cone.point
     cache = cone.cache
@@ -217,8 +216,8 @@ function update_feas(
 
     # update numeric factorization
     CHOLMOD.@cholmod_param supernodal = 2 begin
-        cone.is_feas = isposdef(CHOLMOD.cholesky!(cache.symb_mat, sparse_point;
-            check = false))
+        cone.is_feas =
+            isposdef(CHOLMOD.cholesky!(cache.symb_mat, sparse_point; check = false))
     end
 
     cone.feas_updated = true
@@ -227,7 +226,7 @@ end
 
 function update_grad(
     cone::PosSemidefTriSparse{PSDSparseCholmod, T, R},
-    ) where {T <: BlasReal, R <: RealOrComplex{T}}
+) where {T <: BlasReal, R <: RealOrComplex{T}}
     @assert cone.is_feas
     cache = cone.cache
     num_cols = cache.num_cols
@@ -296,7 +295,7 @@ function update_hess(cone::PosSemidefTriSparse{PSDSparseCholmod})
 
     H_idx_j = 1
     @inbounds for (j, (super_j, row_idx_j, col_idx_j, scal_j, swapped_j)) in
-        enumerate(cache.map_blocks)
+                  enumerate(cache.map_blocks)
         for H_block in temp_blocks
             H_block .= 0
         end
@@ -309,8 +308,7 @@ function update_hess(cone::PosSemidefTriSparse{PSDSparseCholmod})
             out_blocks = _hess_step3(cone)
             H_idx_i = 1
             for i in 1:j
-                (super_i, row_idx_i, col_idx_i, scal_i, swapped_i) =
-                    cache.map_blocks[i]
+                (super_i, row_idx_i, col_idx_i, scal_i, swapped_i) = cache.map_blocks[i]
                 HijR = out_blocks[super_i][row_idx_i, col_idx_i]
                 if scal_i
                     HijR *= rt2
@@ -330,15 +328,13 @@ function update_hess(cone::PosSemidefTriSparse{PSDSparseCholmod})
                 for H_block in temp_blocks
                     H_block .= 0
                 end
-                temp_blocks[super_j][row_idx_j, col_idx_j] =
-                    (scal_j ? invrt2 : 1) * im
+                temp_blocks[super_j][row_idx_j, col_idx_j] = (scal_j ? invrt2 : 1) * im
                 _hess_step1(cone, cache.ancestors[super_j])
                 _hess_step2(cone, cache.ancestors[super_j], false)
                 out_blocks = _hess_step3(cone)
                 H_idx_i = 1
                 for i in 1:j
-                    (super_i, row_idx_i, col_idx_i, scal_i, swapped_i) =
-                        cache.map_blocks[i]
+                    (super_i, row_idx_i, col_idx_i, scal_i, swapped_i) = cache.map_blocks[i]
                     HijR = out_blocks[super_i][row_idx_i, col_idx_i]
                     if scal_i
                         HijR *= rt2
@@ -348,8 +344,8 @@ function update_hess(cone::PosSemidefTriSparse{PSDSparseCholmod})
                     H_idx_i += 1
                     if row_idx_i != col_idx_i
                         # complex part i
-                        H[H_idx_i, H_idx_j] = xor(swapped_i, swapped_j) ?
-                            -imag(HijR) : imag(HijR)
+                        H[H_idx_i, H_idx_j] =
+                            xor(swapped_i, swapped_j) ? -imag(HijR) : imag(HijR)
                         H_idx_i += 1
                     end
                 end
@@ -362,8 +358,7 @@ function update_hess(cone::PosSemidefTriSparse{PSDSparseCholmod})
             out_blocks = _hess_step3(cone)
 
             for i in 1:j
-                (super_i, row_idx_i, col_idx_i, scal_i, swapped_i) =
-                    cache.map_blocks[i]
+                (super_i, row_idx_i, col_idx_i, scal_i, swapped_i) = cache.map_blocks[i]
                 H[i, j] = out_blocks[super_i][row_idx_i, col_idx_i]
                 if scal_i
                     H[i, j] *= rt2
@@ -380,7 +375,7 @@ function hess_prod_slow!(
     prod::AbstractVecOrMat,
     arr::AbstractVecOrMat,
     cone::PosSemidefTriSparse,
-    )
+)
     cone.use_hess_prod_slow_updated || update_use_hess_prod_slow(cone)
     @assert cone.hess_updated
     cone.use_hess_prod_slow || return hess_prod!(prod, arr, cone)
@@ -402,7 +397,7 @@ end
 function _hess_step1(
     cone::PosSemidefTriSparse{PSDSparseCholmod},
     supernode_list::AbstractVector{Int},
-    )
+)
     @assert cone.grad_updated
     cache = cone.cache
     temp_blocks = cache.temp_blocks
@@ -448,7 +443,7 @@ function _hess_step2(
     cone::PosSemidefTriSparse{PSDSparseCholmod},
     supernode_list::AbstractVector{Int},
     save_L_pr::Bool,
-    )
+)
     cache = cone.cache
     temp_blocks = cache.temp_blocks
 
@@ -485,9 +480,7 @@ function _hess_step2(
     return temp_blocks
 end
 
-function _hess_step3(
-    cone::PosSemidefTriSparse{PSDSparseCholmod},
-    )
+function _hess_step3(cone::PosSemidefTriSparse{PSDSparseCholmod})
     cache = cone.cache
     temp_blocks = cache.temp_blocks
 
@@ -520,10 +513,7 @@ function _hess_step3(
     return temp_blocks
 end
 
-function outer_L_prod(
-    cone::PosSemidefTriSparse{PSDSparseCholmod},
-    k::Int,
-    )
+function outer_L_prod(cone::PosSemidefTriSparse{PSDSparseCholmod}, k::Int)
     cache = cone.cache
 
     num_col = cache.num_cols[k]
@@ -542,10 +532,7 @@ function outer_L_prod(
     return F_block
 end
 
-function dder3(
-    cone::PosSemidefTriSparse{PSDSparseCholmod},
-    dir::AbstractVector,
-    )
+function dder3(cone::PosSemidefTriSparse{PSDSparseCholmod}, dir::AbstractVector)
     @assert cone.grad_updated
     cache = cone.cache
     temp_blocks = cache.temp_blocks
@@ -618,12 +605,13 @@ function svec_to_smat_sparse!(
     blocks::Vector{Matrix{T}},
     vec::AbstractVector{T},
     cone::PosSemidefTriSparse{PSDSparseCholmod, T, T},
-    ) where {T <: BlasReal}
+) where {T <: BlasReal}
     @assert length(vec) == length(cone.row_idxs)
     for b in blocks
         b .= 0
     end
-    @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.cache.map_blocks)
+    @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in
+                  enumerate(cone.cache.map_blocks)
         vec_i = vec[i]
         if scal
             vec_i /= cone.rt2
@@ -637,9 +625,10 @@ function smat_to_svec_sparse!(
     vec::AbstractVector{T},
     blocks::Vector{Matrix{T}},
     cone::PosSemidefTriSparse{PSDSparseCholmod, T, T},
-    ) where {T <: BlasReal}
+) where {T <: BlasReal}
     @assert length(vec) == length(cone.row_idxs)
-    @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.cache.map_blocks)
+    @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in
+                  enumerate(cone.cache.map_blocks)
         vec_i = blocks[super][row_idx, col_idx]
         if scal
             vec_i *= cone.rt2
@@ -653,14 +642,16 @@ function svec_to_smat_sparse!(
     blocks::Vector{Matrix{Complex{T}}},
     vec::AbstractVector{T},
     cone::PosSemidefTriSparse{PSDSparseCholmod, T, Complex{T}},
-    ) where {T <: BlasReal}
+) where {T <: BlasReal}
     for b in blocks
         b .= 0
     end
     idx = 1
-    @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.cache.map_blocks)
+    @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in
+                  enumerate(cone.cache.map_blocks)
         if scal
-            blocks[super][row_idx, col_idx] = Complex(vec[idx], (swapped ? -vec[idx + 1] : vec[idx + 1])) / cone.rt2
+            blocks[super][row_idx, col_idx] =
+                Complex(vec[idx], (swapped ? -vec[idx + 1] : vec[idx + 1])) / cone.rt2
             idx += 2
         else
             blocks[super][row_idx, col_idx] = vec[idx]
@@ -675,9 +666,10 @@ function smat_to_svec_sparse!(
     vec::AbstractVector{T},
     blocks::Vector{Matrix{Complex{T}}},
     cone::PosSemidefTriSparse{PSDSparseCholmod, T, Complex{T}},
-    ) where {T <: BlasReal}
+) where {T <: BlasReal}
     idx = 1
-    @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in enumerate(cone.cache.map_blocks)
+    @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in
+                  enumerate(cone.cache.map_blocks)
         vec_R = blocks[super][row_idx, col_idx]
         if scal
             vec_R *= cone.rt2

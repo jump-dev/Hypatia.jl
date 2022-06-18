@@ -38,7 +38,7 @@ function MatrixRegressionNative{T}(
     A_max_rank::Int = div(m, 2) + 1,
     A_sparsity::Real = max(0.2, inv(sqrt(m * p))),
     Y_noise::Real = 0.01,
-    ) where {T <: Real}
+) where {T <: Real}
     @assert p >= m
     @assert 1 <= A_max_rank <= m
     @assert 0 < A_sparsity <= 1
@@ -55,8 +55,7 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
     (Y, X) = (inst.Y, inst.X)
     is_complex = inst.is_complex
     R = eltype(Y)
-    @assert min(inst.lam_fro, inst.lam_nuc, inst.lam_las,
-        inst.lam_glr, inst.lam_glc) >= 0
+    @assert min(inst.lam_fro, inst.lam_nuc, inst.lam_las, inst.lam_glr, inst.lam_glc) >= 0
     (data_n, data_m) = size(Y)
     data_p = size(X, 2)
     @assert size(X, 1) == data_n
@@ -144,9 +143,8 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
     lams = [
         (inst.lam_fro, Cones.EpiNormEucl{T}(reg_cone_dim)),
         (inst.lam_las, Cones.EpiNormInf{T, R}(reg_cone_dim, use_dual = true)),
-        (inst.lam_nuc, Cones.EpiNormSpectral{T, R}(
-            data_m, data_p, use_dual = true)),
-        ]
+        (inst.lam_nuc, Cones.EpiNormSpectral{T, R}(data_m, data_p, use_dual = true)),
+    ]
 
     for (lam, cone) in lams
         if iszero(lam)
@@ -175,11 +173,10 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
             iden_mat = Matrix(-one(T) * I, R_dim * data_pm, R_dim * data_pm)
         end
         model_G = T[
-            model_G  zeros(T, model_q, 1);
-            zeros(T, 1, model_n)  -one(T);
-            zeros(T, R_dim * data_pm, 1)  iden_mat  zeros(T, R_dim * data_pm,
-                model_n - R_dim * data_pm);
-            ]
+            model_G zeros(T, model_q, 1)
+            zeros(T, 1, model_n) -one(T)
+            zeros(T, R_dim * data_pm, 1) iden_mat zeros(T, R_dim * data_pm, model_n - R_dim * data_pm)
+        ]
         append!(model_h, zeros(reg_cone_dim))
 
         model_n += 1
@@ -215,15 +212,17 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
 
         append!(model_h, zeros(q_glr))
         model_G = T[
-            model_G  zeros(model_q, data_p);
-            G_glr;
-            ]
+            model_G zeros(model_q, data_p)
+            G_glr
+        ]
 
         model_n += data_p
         model_q += q_glr
 
-        append!(cones, Cones.Cone{T}[Cones.EpiNormEucl{T}(
-            1 + R_dim * data_m) for k in 1:data_p])
+        append!(
+            cones,
+            Cones.Cone{T}[Cones.EpiNormEucl{T}(1 + R_dim * data_m) for k in 1:data_p],
+        )
     end
 
     # column group lasso regularizer (one lambda for all columns)
@@ -253,19 +252,21 @@ function build(inst::MatrixRegressionNative{T}) where {T <: Real}
 
         append!(model_h, zeros(q_glc))
         model_G = T[
-            model_G  zeros(model_q, data_m);
-            G_glc;
-            ]
+            model_G zeros(model_q, data_m)
+            G_glc
+        ]
 
         model_n += data_m
         model_q += q_glc
 
-        append!(cones, Cones.Cone{T}[Cones.EpiNormEucl{T}(1 + R_dim * data_p)
-            for k in 1:data_m])
+        append!(
+            cones,
+            Cones.Cone{T}[Cones.EpiNormEucl{T}(1 + R_dim * data_p) for k in 1:data_m],
+        )
     end
 
-    model = Models.Model{T}(model_c, zeros(T, 0, model_n), zeros(T, 0),
-        model_G, model_h, cones)
+    model =
+        Models.Model{T}(model_c, zeros(T, 0, model_n), zeros(T, 0), model_G, model_h, cones)
     return model
 end
 
@@ -273,7 +274,7 @@ function test_extra(
     inst::MatrixRegressionNative{T},
     solve_stats::NamedTuple,
     solution::NamedTuple,
-    ) where T
+) where {T}
     @test solve_stats.status == Solvers.Optimal
     (solve_stats.status == Solvers.Optimal) || return
 
@@ -283,13 +284,14 @@ function test_extra(
     A_len = length(A_opt) * (inst.is_complex ? 2 : 1)
     @views Cones.vec_copyto!(A_opt, solution.x[1 .+ (1:A_len)])
     loss = (sum(abs2, X * A_opt) / 2 - real(dot(X' * Y, A_opt))) / size(Y, 1)
-    obj_result = loss +
+    obj_result =
+        loss +
         inst.lam_fro * norm(A_opt, 2) +
         inst.lam_nuc * sum(svd(A_opt).S) +
         inst.lam_las * norm(A_opt, 1) +
         inst.lam_glr * sum(norm, eachrow(A_opt)) +
         inst.lam_glc * sum(norm, eachcol(A_opt))
     tol = eps(T)^0.25
-    @test solve_stats.primal_obj ≈ obj_result atol=tol rtol=tol
+    @test solve_stats.primal_obj ≈ obj_result atol = tol rtol = tol
     return
 end

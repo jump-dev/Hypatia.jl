@@ -2,12 +2,7 @@
 sets of native test instances
 =#
 
-inst_preproc = [
-    "dimension1",
-    "consistent1",
-    "inconsistent1",
-    "inconsistent2",
-    ]
+inst_preproc = ["dimension1", "consistent1", "inconsistent1", "inconsistent2"]
 
 inst_infeas = [
     "primalinfeas1",
@@ -16,14 +11,9 @@ inst_infeas = [
     "dualinfeas1",
     "dualinfeas2",
     "dualinfeas3",
-    ]
+]
 
-inst_minimal = [
-    "primalinfeas3",
-    "dualinfeas3",
-    "epinorminf4",
-    "hyporootdettri4",
-    ]
+inst_minimal = ["primalinfeas3", "dualinfeas3", "epinorminf4", "hyporootdettri4"]
 
 inst_cones_few = [
     "nonnegative1",
@@ -55,7 +45,7 @@ inst_cones_few = [
     "wsosinterppossemideftri1",
     "wsosinterpepinormone1",
     "wsosinterpepinormeucl2",
-    ]
+]
 
 # superset of inst_cones_few
 inst_cones_many = [
@@ -168,17 +158,8 @@ inst_cones_many = [
     "wsosinterpepinormeucl1",
     "wsosinterpepinormeucl2",
     "wsosinterpepinormeucl3",
-    ]
+]
 
-inst_indirect = [
-    "indirect1",
-    "indirect2",
-    "indirect3",
-    "indirect4",
-    "indirect5",
-    ]
+inst_indirect = ["indirect1", "indirect2", "indirect3", "indirect4", "indirect5"]
 
-inst_modify = [
-    "modify1",
-    "modify2",
-    ]
+inst_modify = ["modify1", "modify2"]

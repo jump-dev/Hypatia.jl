@@ -28,10 +28,7 @@ include("JuMP_utils.jl")
 include("spectral_functions_JuMP.jl")
 include("benchmark_utils.jl")
 
-const model_types = [
-    "native",
-    "JuMP",
-    ]
+const model_types = ["native", "JuMP"]
 
 # list of names of native examples to run
 const native_examples = [
@@ -45,7 +42,7 @@ const native_examples = [
     "polymin",
     "portfolio",
     "sparsepca",
-    ]
+]
 
 # list of names of JuMP examples to run
 const JuMP_examples = [
@@ -84,16 +81,17 @@ const JuMP_examples = [
     "signomialmin",
     "sparselmi",
     "stabilitynumber",
-    ]
+]
 
-load_example(mod::String, ex::String) =
-    include(joinpath(@__DIR__, ex, mod * ".jl"))
+load_example(mod::String, ex::String) = include(joinpath(@__DIR__, ex, mod * ".jl"))
 
-get_test_instances(mod::String, ex::String) =
-    include(joinpath(@__DIR__, ex, mod * "_test.jl"))
+function get_test_instances(mod::String, ex::String)
+    return include(joinpath(@__DIR__, ex, mod * "_test.jl"))
+end
 
-get_benchmark_instances(mod::String, ex::String) =
-    include(joinpath(@__DIR__, ex, mod * "_benchmark.jl"))
+function get_benchmark_instances(mod::String, ex::String)
+    return include(joinpath(@__DIR__, ex, mod * "_benchmark.jl"))
+end
 
 model_type_examples(mod::String) = eval(Symbol(mod, "_examples"))
 

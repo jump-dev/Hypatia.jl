@@ -4,10 +4,7 @@ homogeneous self dual embedding
 =#
 
 # update the RHS for prediction direction
-function update_rhs_pred(
-    solver::Solver{T},
-    rhs::Point{T},
-    ) where {T <: Real}
+function update_rhs_pred(solver::Solver{T}, rhs::Point{T}) where {T <: Real}
     rhs.x .= solver.x_residual
     rhs.y .= solver.y_residual
     rhs.z .= solver.z_residual
@@ -27,7 +24,7 @@ function update_rhs_predadj(
     solver::Solver{T},
     rhs::Point{T},
     dir::Point{T},
-    ) where {T <: Real}
+) where {T <: Real}
     rhs.vec .= 0
 
     rteps = sqrt(eps(T))
@@ -59,10 +56,7 @@ function update_rhs_predadj(
 end
 
 # update the RHS for centering direction
-function update_rhs_cent(
-    solver::Solver{T},
-    rhs::Point{T},
-    ) where {T <: Real}
+function update_rhs_cent(solver::Solver{T}, rhs::Point{T}) where {T <: Real}
     rhs.x .= 0
     rhs.y .= 0
     rhs.z .= 0
@@ -86,7 +80,7 @@ function update_rhs_centadj(
     solver::Solver{T},
     rhs::Point{T},
     dir::Point{T},
-    ) where {T <: Real}
+) where {T <: Real}
     rhs.vec .= 0
 
     rteps = sqrt(eps(T))
