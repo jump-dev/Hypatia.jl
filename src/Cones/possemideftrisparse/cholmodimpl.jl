@@ -1,4 +1,11 @@
 #=
+Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
+
+This Julia package Hypatia.jl is released under the MIT license; see LICENSE
+file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+=#
+
+#=
 NOTE currently we do not restrict the sparsity pattern to be chordal here (at the
 cost of not being able to obtain "closed form" hess sqrt and inv hess oracles)
 

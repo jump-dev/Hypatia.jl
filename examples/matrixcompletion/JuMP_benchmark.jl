@@ -1,3 +1,9 @@
+#=
+Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
+
+This Julia package Hypatia.jl is released under the MIT license; see LICENSE
+file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+=#
 
 matrixcompletion_insts = [
     [(false, false, false, d, k * d, 0.8) for d in vcat(2, 5:5:max_d)] # includes compile run

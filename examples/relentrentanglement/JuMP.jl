@@ -1,4 +1,11 @@
 #=
+Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
+
+This Julia package Hypatia.jl is released under the MIT license; see LICENSE
+file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+=#
+
+#=
 lower bound on relative entropy of entanglement (PPT relaxation)
 adapted from
 https://github.com/hfawzi/cvxquad/blob/master/examples/rel_entr_entanglement.m

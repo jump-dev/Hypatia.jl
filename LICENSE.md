@@ -1,11 +1,11 @@
-Copyright (c) 2020
+Copyright (c) 2018-2022
 Chris Coey, Lea Kapelevich, and contributors
 
 Hypatia.jl is licensed under the **[MIT License](https://opensource.org/licenses/MIT)**.
 
     MIT License
 
-    Copyright (c) 2020, Chris Coey, Lea Kapelevich, and contributors
+    Copyright (c) 2018-2022, Chris Coey, Lea Kapelevich, and contributors
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal

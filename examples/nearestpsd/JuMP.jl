@@ -1,4 +1,11 @@
 #=
+Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
+
+This Julia package Hypatia.jl is released under the MIT license; see LICENSE
+file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+=#
+
+#=
 let E be a symmetric matrix sparsity pattern:
 (1) find sparse PSD matrix with given sparsity pattern, "nearest" to A
     max_X tr(A, X) :
