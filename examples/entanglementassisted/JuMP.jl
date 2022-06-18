@@ -1,4 +1,11 @@
 #=
+Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
+
+This Julia package Hypatia.jl is released under the MIT license; see LICENSE
+file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+=#
+
+#=
 see:
 https://github.com/hfawzi/cvxquad/blob/master/examples/entanglement_assisted_capacity.m
 listing 2 in "Efficient optimization of the quantum relative entropy"

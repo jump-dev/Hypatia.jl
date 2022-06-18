@@ -1,4 +1,11 @@
 #=
+Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
+
+This Julia package Hypatia.jl is released under the MIT license; see LICENSE
+file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+=#
+
+#=
 find parameter of convexity mu for a given polynomial p(x)
 ie the largest mu such that p(x) - mu/2*||x||^2 is convex on given domain
 see https://en.wikipedia.org/wiki/Convex_function#Strongly_convex_functions

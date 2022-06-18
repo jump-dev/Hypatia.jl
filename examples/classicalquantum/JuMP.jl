@@ -1,4 +1,11 @@
 #=
+Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
+
+This Julia package Hypatia.jl is released under the MIT license; see LICENSE
+file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+=#
+
+#=
 compute the capacity of a classical-quantum channel
 adapted from https://github.com/hfawzi/cvxquad/blob/master/examples/cq_channel_capacity.m
 and listing 1 in "Efficient optimization of the quantum relative entropy" by H. Fawzi and O. Fawzi

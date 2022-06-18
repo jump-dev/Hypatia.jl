@@ -1,4 +1,11 @@
 #=
+Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
+
+This Julia package Hypatia.jl is released under the MIT license; see LICENSE
+file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+=#
+
+#=
 minimize the condition number of positive definite matrix
 M(x) = M_0 + sum_i x_i*M_i
 subject to F(x) = F_0 + sum_i x_i*F_i in S_+

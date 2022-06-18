@@ -1,4 +1,11 @@
 #=
+Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
+
+This Julia package Hypatia.jl is released under the MIT license; see LICENSE
+file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+=#
+
+#=
 run tests using Pardiso sparse linear system solver caches
 requires that Pardiso.jl be installed and built successfully; Requires.jl handles this optional dependency
 =#

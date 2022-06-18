@@ -1,4 +1,11 @@
 #=
+Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
+
+This Julia package Hypatia.jl is released under the MIT license; see LICENSE
+file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+=#
+
+#=
 given data (xᵢ, yᵢ), find a polynomial p to solve
 minimize    ∑ᵢℓ(p(xᵢ), yᵢ)
 subject to  ρⱼ × dᵏp/dtⱼᵏ ≥ 0 ∀ t ∈ D
