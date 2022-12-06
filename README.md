@@ -80,26 +80,29 @@ This work has been partially funded by the National Science Foundation under gra
 
 ### Citing Hypatia
 
-If you find Hypatia solver useful, please cite our [solver paper](https://arxiv.org/abs/2005.01136):
+If you find Hypatia solver useful, please cite our [solver paper](https://pubsonline.informs.org/doi/abs/10.1287/ijoc.2022.1202):
 ```bibtex
-@misc{coey2021solving,
-    title={Solving natural conic formulations with Hypatia.jl}, 
+@article{coey2022solving,
+    title={Solving natural conic formulations with {H}ypatia.jl},
     author={Chris Coey and Lea Kapelevich and Juan Pablo Vielma},
-    year={2021},
-    eprint={2005.01136},
-    archivePrefix={arXiv},
-    primaryClass={math.OC}
+    year={2022},
+    journal={INFORMS Journal on Computing},
+    publisher={INFORMS},
+    volume={34},
+    number={5},
+    pages={2686--2699},
+    doi={https://doi.org/10.1287/ijoc.2022.1202}
 }
 ```
 
-If you find aspects of Hypatia's IPM implementation useful, please cite our [algorithm paper](https://arxiv.org/abs/2107.04262):
+If you find aspects of Hypatia's IPM implementation useful, please cite our [algorithm paper](https://link.springer.com/article/10.1007/s12532-022-00226-0):
 ```bibtex
-@misc{coey2021performance,
-    title={Performance enhancements for a generic conic interior point algorithm}, 
+@article{coey2022performance,
+    title={Performance enhancements for a generic conic interior point algorithm},
     author={Chris Coey and Lea Kapelevich and Juan Pablo Vielma},
-    year={2021},
-    eprint={2107.04262},
-    archivePrefix={arXiv},
-    primaryClass={math.OC}
+    year={2022},
+    journal={Mathematical Programming Computation},
+    publisher={Springer},
+    doi={https://doi.org/10.1007/s12532-022-00226-0}
 }
 ```
