@@ -138,7 +138,7 @@ function update_grad(cone::WSOSInterpNonnegative)
     cone.grad .= 0
     @inbounds for k in eachindex(cone.Ps)
         ΛFLPk = cone.ΛFLP[k] # computed here
-        ldiv!(ΛFLPk, cone.ΛF[k].L, cone.Ps[k]')
+        ldiv!(ΛFLPk, cone.ΛF[k].L, transpose(cone.Ps[k]))
         @views for j in 1:(cone.dim)
             cone.grad[j] -= sum(abs2, ΛFLPk[:, j])
         end
