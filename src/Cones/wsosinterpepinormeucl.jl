@@ -116,6 +116,7 @@ function setup_extra_data!(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.Λfact = Vector{Any}(undef, K)
     cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
     cone.Ps_times = zeros(K)
+    cone.Ps_order = Vector{Int}(undef, K)
     return cone
 end
 

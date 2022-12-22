@@ -106,6 +106,7 @@ function setup_extra_data!(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.PΛiP_blocks_U =
         [view(cone.PΛiP, block_idxs(U, r), block_idxs(U, s)) for r in 1:R, s in 1:R]
     cone.Ps_times = zeros(K)
+    cone.Ps_order = Vector{Int}(undef, K)
     return cone
 end
 

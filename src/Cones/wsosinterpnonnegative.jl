@@ -90,6 +90,7 @@ function setup_extra_data!(
     K = length(Ls)
     cone.ΛF = Vector{Any}(undef, K)
     cone.Ps_times = zeros(K)
+    cone.Ps_order = Vector{Int}(undef, K)
     return cone
 end
 
