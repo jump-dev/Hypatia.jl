@@ -106,7 +106,6 @@ function setup_extra_data!(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.PΛiP_blocks_U =
         [view(cone.PΛiP, block_idxs(U, r), block_idxs(U, s)) for r in 1:R, s in 1:R]
     cone.Ps_times = zeros(K)
-    cone.Ps_order = collect(1:K)
     return cone
 end
 
@@ -124,7 +123,7 @@ function update_feas(cone::WSOSInterpPosSemidefTri)
     @assert !cone.feas_updated
 
     # order the Ps by how long it takes to check feasibility, to improve efficiency
-    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # stochastic
+    sortperm!(cone.Ps_order, cone.Ps_times) # stochastic
 
     cone.is_feas = true
     for k in cone.Ps_order

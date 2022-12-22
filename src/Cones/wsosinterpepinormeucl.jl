@@ -116,7 +116,6 @@ function setup_extra_data!(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     cone.Λfact = Vector{Any}(undef, K)
     cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
     cone.Ps_times = zeros(K)
-    cone.Ps_order = collect(1:K)
     return cone
 end
 
@@ -134,7 +133,7 @@ function update_feas(cone::WSOSInterpEpiNormEucl)
     point_views = cone.point_views
 
     # order the Ps by how long it takes to check feasibility, to improve efficiency
-    sortperm!(cone.Ps_order, cone.Ps_times, initialized = true) # stochastic
+    sortperm!(cone.Ps_order, cone.Ps_times) # stochastic
 
     cone.is_feas = true
     for k in cone.Ps_order
