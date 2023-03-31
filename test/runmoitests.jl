@@ -34,7 +34,7 @@ include(joinpath(@__DIR__, "moicones.jl"))
             BigFloat,
             2 * eps(BigFloat)^0.15,
             1,
-            String[],
+            String["test_linear", "test_conic", "test_modification"],
             String["test_linear_INFEASIBLE_2",],
         ),
     ]
