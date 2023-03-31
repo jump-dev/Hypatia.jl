@@ -27,6 +27,13 @@ function cone_from_moi(
     return Cones.PosSemidefTri{T, T}(MOI.dimension(cone))
 end
 
+function cone_from_moi(
+    ::Type{T},
+    cone::MOI.HermitianPositiveSemidefiniteConeTriangle,
+) where {T <: Real}
+    return Cones.PosSemidefTri{T, Complex{T}}(MOI.dimension(cone))
+end
+
 function cone_from_moi(::Type{T}, cone::MOI.NormInfinityCone) where {T <: Real}
     return Cones.EpiNormInf{T, T}(MOI.dimension(cone))
 end
@@ -88,89 +95,6 @@ end
 
 function cone_from_moi(::Type{T}, cone::MOI.RelativeEntropyCone) where {T <: Real}
     return Cones.EpiRelEntropy{T}(MOI.dimension(cone))
-end
-
-# transformations fallbacks
-untransform_affine(::MOI.AbstractVectorSet, vals::AbstractVector) = vals
-needs_untransform(::MOI.AbstractVectorSet) = false
-needs_rescale(::MOI.AbstractVectorSet) = false
-needs_permute(::MOI.AbstractVectorSet) = false
-
-# transformations (transposition of matrix) for MOI rectangular matrix
-# cones with matrix of more rows than columns
-const SpecNucCone = Union{MOI.NormSpectralCone, MOI.NormNuclearCone}
-
-needs_untransform(cone::SpecNucCone) = (cone.row_dim > cone.column_dim)
-
-function untransform_affine(cone::SpecNucCone, vals::AbstractVector)
-    if needs_untransform(cone)
-        @views vals[2:end] = reshape(vals[2:end], cone.column_dim, cone.row_dim)'
-    end
-    return vals
-end
-
-needs_permute(cone::SpecNucCone) = needs_untransform(cone)
-
-function permute_affine(cone::SpecNucCone, vals::AbstractVector{T}) where {T}
-    w_vals = reshape(vals[2:end], cone.row_dim, cone.column_dim)'
-    return vcat(vals[1], vec(w_vals))
-end
-
-function permute_affine(cone::SpecNucCone, func::VAF{T}) where {T}
-    terms = func.terms
-    idxs_new = zeros(Int, length(terms))
-    for k in eachindex(idxs_new)
-        i = terms[k].output_index
-        @assert i >= 1
-        if i <= 2
-            idxs_new[k] = i
-            continue
-        end
-        (col_old, row_old) = divrem(i - 2, cone.row_dim)
-        k_idx = row_old * cone.column_dim + col_old + 2
-        idxs_new[k] = terms[k_idx].output_index
-    end
-    return idxs_new
-end
-
-# transformations (svec rescaling) for MOI symmetric matrix cones not
-# in svec (scaled lower triangle) form
-const SvecCone = Union{
-    MOI.PositiveSemidefiniteConeTriangle,
-    MOI.LogDetConeTriangle,
-    MOI.RootDetConeTriangle,
-}
-
-svec_offset(::MOI.PositiveSemidefiniteConeTriangle) = 1
-svec_offset(::MOI.RootDetConeTriangle) = 2
-svec_offset(::MOI.LogDetConeTriangle) = 3
-
-needs_untransform(::SvecCone) = true
-
-function untransform_affine(cone::SvecCone, vals::AbstractVector{T}) where {T}
-    @views svec_vals = vals[svec_offset(cone):end]
-    Cones.scale_svec!(svec_vals, inv(sqrt(T(2))))
-    return vals
-end
-
-needs_rescale(::SvecCone) = true
-
-function rescale_affine(cone::SvecCone, vals::AbstractVector{T}) where {T}
-    @views svec_vals = vals[svec_offset(cone):end]
-    Cones.scale_svec!(svec_vals, sqrt(T(2)))
-    return vals
-end
-
-function rescale_affine(cone::SvecCone, func::VAF{T}, vals::AbstractVector{T}) where {T}
-    scal_start = svec_offset(cone) - 1
-    rt2 = sqrt(T(2))
-    for i in eachindex(vals)
-        k = func.terms[i].output_index - scal_start
-        if k > 0 && !MOI.Utilities.is_diagonal_vectorized_index(k)
-            vals[i] *= rt2
-        end
-    end
-    return vals
 end
 
 # Hypatia predefined cones
@@ -842,6 +766,7 @@ const SupportedCone{T <: Real} = Union{
     HypatiaCones{T},
     MOI.Nonnegatives,
     MOI.PositiveSemidefiniteConeTriangle,
+    MOI.HermitianPositiveSemidefiniteConeTriangle,
     MOI.NormInfinityCone,
     MOI.NormOneCone,
     MOI.SecondOrderCone,

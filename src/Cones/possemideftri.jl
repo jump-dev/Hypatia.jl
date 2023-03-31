@@ -9,7 +9,7 @@ file in the root directory or at https://github.com/chriscoey/Hypatia.jl
 $(TYPEDEF)
 
 Real symmetric or complex Hermitian positive semidefinite cone of dimension
-`dim` in svec format.
+`dim` in svec (scaled upper triangle) format.
 
     $(FUNCTIONNAME){T, R}(dim::Int)
 """

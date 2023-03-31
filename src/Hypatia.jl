@@ -45,6 +45,7 @@ const SAF = MOI.ScalarAffineFunction
 const VV = MOI.VectorOfVariables
 const VAF = MOI.VectorAffineFunction
 include("MathOptInterface/cones.jl")
+include("MathOptInterface/transform.jl")
 include("MathOptInterface/wrapper.jl")
 
 end

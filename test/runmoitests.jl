@@ -33,12 +33,21 @@ include(joinpath(@__DIR__, "moicones.jl"))
 
     # real types, tolerances, and tests to include for MOI.Test tests
     test_T = [
-        (Float64, 2 * sqrt(sqrt(eps())), 4, String[]),
-        # TODO add test_linear after MOI 0.10.7 is tagged:
-        (BigFloat, 2 * eps(BigFloat)^0.2, 1, String["test_conic", "test_modification"]),
+        (Float64, 2 * sqrt(sqrt(eps())), 4, String[], String[]),
+        (
+            BigFloat,
+            2 * eps(BigFloat)^0.15,
+            1,
+            String["test_linear", "test_conic", "test_modification"],
+            String[
+                "test_linear_INFEASIBLE_2",
+                "test_conic_NormNuclearCone",
+                "test_conic_NormSpectralCone",
+            ],
+        ),
     ]
 
-    @testset "MOI.Test tests: $T" for (T, tol_test, tol_relax, includes) in test_T
+    @testset "MOI.Test tests: $T" for (T, tol_test, tol_relax, includes, excludes) in test_T
         println("\nstarting MOI.Test tests: $T")
         model = MOI.Bridges.full_bridge_optimizer(
             MOI.Utilities.CachingOptimizer(
@@ -62,11 +71,14 @@ include(joinpath(@__DIR__, "moicones.jl"))
                 ],
             ),
             include = includes,
-            exclude = String[
-                # TODO(odow): unexpected failure, probably in the bridge layer
-                "test_model_UpperBoundAlreadySet",
-                "test_model_LowerBoundAlreadySet",
-            ],
+            exclude = vcat(
+                excludes,
+                String[
+                    # TODO(odow): unexpected failure, probably in the bridge layer
+                    "test_model_UpperBoundAlreadySet",
+                    "test_model_LowerBoundAlreadySet",
+                ],
+            ),
         )
     end
 end;

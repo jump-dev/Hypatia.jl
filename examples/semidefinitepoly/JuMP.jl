@@ -49,11 +49,11 @@ function build(inst::SemidefinitePolyJuMP{T}) where {T <: Float64}
 
         rt2 = sqrt(T(2))
         H_svec = [H[i, j](pts[u, :]) for i in 1:side for j in 1:i for u in 1:U]
-        Cones.scale_svec!(H_svec, rt2, incr = U)
+        Cones.scale_svec_incr!(H_svec, rt2, U)
         if inst.use_dual
             JuMP.@variable(model, z[i in 1:side, 1:i, 1:U])
             z_svec = [1.0 * z[i, j, u] for i in 1:side for j in 1:i for u in 1:U]
-            Cones.scale_svec!(z_svec, rt2, incr = U)
+            Cones.scale_svec_incr!(z_svec, rt2, U)
             JuMP.@constraint(model, z_svec in mat_wsos_cone)
             JuMP.@objective(model, Min, dot(z_svec, H_svec))
         else
