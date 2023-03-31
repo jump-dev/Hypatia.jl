@@ -29,6 +29,14 @@ function test_moi_cones(T::Type{<:Real})
         @test !Cones.use_dual_barrier(hyp_cone)
     end
 
+    @testset "HermitianPositiveSemidefiniteConeTriangle" begin
+        moi_cone = MOI.HermitianPositiveSemidefiniteConeTriangle(3)
+        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa Cones.PosSemidefTri{T, Complex{T}}
+        @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 9
+        @test !Cones.use_dual_barrier(hyp_cone)
+    end
+
     @testset "NormInfinityCone" begin
         moi_cone = MOI.NormInfinityCone(3)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)

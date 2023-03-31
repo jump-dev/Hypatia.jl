@@ -21,6 +21,7 @@ svec_side
 svec_idx
 block_idxs
 scale_svec!
+scale_svec_incr!
 smat_to_svec!
 svec_to_smat!
 ```

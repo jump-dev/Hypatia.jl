@@ -10,24 +10,33 @@ see description in examples/polymin/native.jl
 =#
 
 include(joinpath(@__DIR__, "data_real.jl"))
+include(joinpath(@__DIR__, "data_complex.jl"))
 
 struct PolyMinJuMP{T <: Real} <: ExampleInstanceJuMP{T}
-    interp_vals::Vector{T}
-    Ps::Vector{Matrix{T}}
+    is_complex::Bool
+    interp_vals::Vector
+    Ps::Vector{<:Matrix}
     true_min::Real
     use_primal::Bool # solve primal, else solve dual
     use_wsos::Bool # use wsosinterpnonnegative cone, else PSD formulation
 end
 
-function PolyMinJuMP{Float64}(poly_name::Symbol, halfdeg::Int, args...)
-    return PolyMinJuMP{Float64}(get_interp_data(Float64, poly_name, halfdeg)..., args...)
+function PolyMinJuMP{Float64}(is_complex::Bool, poly_name::Symbol, halfdeg::Int, args...)
+    R = (is_complex ? Complex{Float64} : Float64)
+    interp = get_interp_data(R, poly_name, halfdeg)
+    return PolyMinJuMP{Float64}(is_complex, interp..., args...)
 end
 
-function PolyMinJuMP{Float64}(n::Int, halfdeg::Int, args...)
-    return PolyMinJuMP{Float64}(random_interp_data(Float64, n, halfdeg)..., args...)
+function PolyMinJuMP{Float64}(is_complex::Bool, n::Int, halfdeg::Int, args...)
+    interp = random_interp_data(Float64, n, halfdeg)
+    return PolyMinJuMP{Float64}(is_complex, interp..., args...)
 end
 
 function build(inst::PolyMinJuMP{T}) where {T <: Float64}
+    if !inst.use_wsos && inst.use_primal && inst.is_complex
+        error("complex primal PSD formulation is not implemented yet")
+    end
+
     (interp_vals, Ps, use_primal) = (inst.interp_vals, inst.Ps, inst.use_primal)
     U = length(interp_vals)
 
@@ -42,7 +51,8 @@ function build(inst::PolyMinJuMP{T}) where {T <: Float64}
     end
 
     if inst.use_wsos
-        cone = Hypatia.WSOSInterpNonnegativeCone{Float64, Float64}(U, Ps, !use_primal)
+        R = (inst.is_complex ? Complex{Float64} : Float64)
+        cone = Hypatia.WSOSInterpNonnegativeCone{Float64, R}(U, Ps, !use_primal)
         aff_expr = (use_primal ? interp_vals .- a : μ)
         JuMP.@constraint(model, aff_expr in cone)
     else
@@ -71,19 +81,17 @@ function build(inst::PolyMinJuMP{T}) where {T <: Float64}
             )
             JuMP.@constraint(model, coeffs_lhs .== interp_vals .- a)
         else
+            psd_set = (inst.is_complex ? JuMP.HermitianPSDCone() : JuMP.PSDCone())
             for Pr in Ps
                 Lr = size(Pr, 2)
                 psd_r = [
-                    JuMP.@expression(model, sum(Pr[u, i] * Pr[u, j] * μ[u] for u in 1:U)) for i in 1:Lr for j in 1:i
+                    JuMP.@expression(model, sum(Pr[u, i]' * Pr[u, j] * μ[u] for u in 1:U)) for i in 1:Lr, j in 1:Lr
                 ]
                 if Lr == 1
                     # Mosek cannot handle 1x1 PSD constraints
-                    JuMP.@constraint(model, psd_r[1] >= 0)
+                    JuMP.@constraint(model, real(psd_r[1, 1]) >= 0)
                 else
-                    JuMP.@constraint(
-                        model,
-                        psd_r in MOI.PositiveSemidefiniteConeTriangle(Lr)
-                    )
+                    JuMP.@constraint(model, Hermitian(psd_r) in psd_set)
                 end
             end
         end

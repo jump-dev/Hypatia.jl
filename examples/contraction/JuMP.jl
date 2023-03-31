@@ -68,8 +68,8 @@ function build(inst::ContractionJuMP{T}) where {T <: Float64}
 
         wsosmatT = Hypatia.WSOSInterpPosSemidefTriCone{T}
         rt2 = sqrt(2)
-        M_scal = Cones.scale_svec!(M_gap, rt2, incr = U_M)
-        R_scal = Cones.scale_svec!(R_gap, rt2, incr = U_R)
+        M_scal = Cones.scale_svec_incr!(M_gap, rt2, U_M)
+        R_scal = Cones.scale_svec_incr!(R_gap, rt2, U_R)
         JuMP.@constraint(model, M_scal in wsosmatT(n, U_M, Ps_M))
         JuMP.@constraint(model, R_scal in wsosmatT(n, U_R, Ps_R))
     else

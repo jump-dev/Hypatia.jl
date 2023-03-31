@@ -135,16 +135,36 @@ block_idxs(incr::Int, block::Int) = (incr * (block - 1) .+ (1:incr))
 $(SIGNATURES)
 
 Rescale the elements corresponding to off-diagonals in `arr::AbstractVecOrMat`,
-with scaling `scal::Real` and default block increment `incr::Int = 1`.
+with scaling `scal::Real`, for real symmetric matrices.
 """
-function scale_svec!(arr::AbstractVecOrMat, scal::Real; incr::Int = 1)
+function scale_svec!(arr::AbstractVecOrMat, scal::Real)
+    k = 1
+    n = size(arr, 1)
+    for i in 1:svec_side(n)
+        for j in 1:(i - 1)
+            @inbounds @views @. arr[k, :] *= scal
+            k += 1
+        end
+        k += 1
+    end
+    @assert k == 1 + n
+    return arr
+end
+
+"""
+$(SIGNATURES)
+
+Rescale the elements corresponding to off-diagonals in `arr::AbstractVecOrMat`,
+with scaling `scal::Real` and block increment `incr::Int`, for real symmetric
+matrices.
+"""
+function scale_svec_incr!(arr::AbstractVecOrMat, scal::Real, incr::Int)
     @assert incr > 0
     n = size(arr, 1)
     (d, r) = divrem(n, incr)
     @assert iszero(r)
-    side = svec_side(d)
     k = 1
-    for i in 1:side
+    for i in 1:svec_side(d)
         for j in 1:(i - 1)
             @inbounds @views @. arr[k:(k + incr - 1), :] *= scal
             k += incr

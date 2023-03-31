@@ -2603,7 +2603,7 @@ function wsosinterppossemideftri2(T; options...)
     b = T[]
     G = vcat(ones(T, U, 1), zeros(T, U, 1), ones(T, U, 1))
     h = T[H[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
-    Cones.scale_svec!(h, sqrt(T(2)), incr = U)
+    Cones.scale_svec_incr!(h, sqrt(T(2)), U)
     cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
@@ -2627,7 +2627,7 @@ function wsosinterppossemideftri3(T; options...)
     b = T[]
     h = T[M[i, j](pts[u, :]...) for i in 1:2 for j in 1:i for u in 1:U]
     G = zeros(T, length(h), 0)
-    Cones.scale_svec!(h, sqrt(T(2)), incr = U)
+    Cones.scale_svec_incr!(h, sqrt(T(2)), U)
     cones = Cone{T}[Cones.WSOSInterpPosSemidefTri{T}(2, U, Ps)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)

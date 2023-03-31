@@ -47,7 +47,7 @@ examples_params = Dict(
         # :n_SEP, :q_SEP]
     ),
     "matrixregression" => ([:m, :k], [2, 1], [:SEP], [:n_SEP, :q_nat]),
-    "polymin" => ([:m, :k], [1, 2], [:SEP], [:nu_nat, :n_nat, :q_SEP]),
+    "polymin" => ([:m, :k], [2, 3], [:SEP], [:nu_nat, :n_nat, :q_SEP]),
     "portfolio" => ([:k], [1], [:SEP], Symbol[]),
     "shapeconregr" => ([:m, :twok], [1, 5], [:SEP], [:nu_nat, :n_nat, :n_SEP, :q_nat]),
     #= WSOS cones paper =#

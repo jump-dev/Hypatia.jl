@@ -43,7 +43,7 @@ function build(inst::ConvexityParameterJuMP{T}) where {T <: Float64}
         (U, pts, Ps) = PolyUtils.interpolate(dom, d)
         mat_wsos_cone = Hypatia.WSOSInterpPosSemidefTriCone{T}(n, U, Ps)
         H_interp = [H[i, j](x => pts[u, :]) for i in 1:n for j in 1:i for u in 1:U]
-        Cones.scale_svec!(H_interp, sqrt(T(2)), incr = U)
+        Cones.scale_svec_incr!(H_interp, sqrt(T(2)), U)
         JuMP.@constraint(model, H_interp in mat_wsos_cone)
     else
         PolyJuMP.setpolymodule!(model, SumOfSquares)

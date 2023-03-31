@@ -46,27 +46,22 @@ function PolyMinNative{T}(is_complex::Bool, n::Int, halfdeg::Int, args...) where
 end
 
 function build(inst::PolyMinNative{T}) where {T <: Real}
-    if inst.is_complex
-        if !inst.use_wsos
-            error("PSD formulation is not implemented yet")
+    if !inst.use_wsos
+        if inst.is_complex
+            error("complex PSD formulation is not implemented yet")
         end
-        return build_complex(inst)
-    else
-        if inst.use_primal && !inst.use_wsos
-            error("primal psd formulation is not implemented yet")
+        if inst.use_primal
+            error("primal PSD formulation is not implemented yet")
         end
-        return build_real(inst)
     end
-end
 
-function build_real(inst::PolyMinNative{T}) where {T <: Real}
     U = length(inst.interp_vals)
-
     cones = Cones.Cone{T}[]
     if inst.use_wsos
+        R = (inst.is_complex ? Complex{T} : T)
         push!(
             cones,
-            Cones.WSOSInterpNonnegative{T, T}(U, inst.Ps, use_dual = !inst.use_primal),
+            Cones.WSOSInterpNonnegative{T, R}(U, inst.Ps, use_dual = !inst.use_primal),
         )
     end
 
@@ -112,33 +107,6 @@ function build_real(inst::PolyMinNative{T}) where {T <: Real}
             h = zeros(T, size(G, 1))
         end
     end
-
-    model = Models.Model{T}(c, A, b, G, h, cones)
-    return model
-end
-
-function build_complex(inst::PolyMinNative{T}) where {T <: Real}
-    U = length(inst.interp_vals)
-
-    if inst.use_primal
-        c = T[-1]
-        A = zeros(T, 0, 1)
-        b = T[]
-        G = ones(T, U, 1)
-        h = inst.interp_vals
-    else
-        c = inst.interp_vals
-        A = ones(T, 1, U)
-        b = T[1]
-        G = -one(T) * I
-        h = zeros(T, U)
-    end
-
-    cones = Cones.Cone{T}[Cones.WSOSInterpNonnegative{T, Complex{T}}(
-        U,
-        inst.Ps,
-        use_dual = !inst.use_primal,
-    )]
 
     model = Models.Model{T}(c, A, b, G, h, cones)
     return model
