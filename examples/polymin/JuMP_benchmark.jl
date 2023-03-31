@@ -61,7 +61,7 @@ polymin_n_ds = [
     ],
 ]
 function polymin_insts(use_nat::Bool)
-    return [[(n, d, false, use_nat) for (n, d) in nds] for nds in polymin_n_ds]
+    return [[(false, n, d, false, use_nat) for (n, d) in nds] for nds in polymin_n_ds]
 end
 
 insts = OrderedDict()
