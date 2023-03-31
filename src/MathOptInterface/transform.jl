@@ -139,20 +139,22 @@ function rescale_affine(
     return vals
 end
 
-# function rescale_affine(
-#     cone::MOI.HermitianPositiveSemidefiniteConeTriangle,
-#     func::VAF{T},
-#     vals::AbstractVector{T},
-# ) where {T}
-#     rt2 = sqrt(T(2))
-#     for i in eachindex(vals)
-#         k = func.terms[i].output_index
-#         if k > 0 && isqrt(k)^2 != k
-#             vals[i] *= rt2
-#         end
-#     end
-#     return vals
-# end
+function rescale_affine(
+    cone::MOI.HermitianPositiveSemidefiniteConeTriangle,
+    func::VAF{T},
+    vals::AbstractVector{T},
+) where {T}
+    rt2 = sqrt(T(2))
+    re_len = Cones.svec_length(isqrt(MOI.dimension(cone)))
+    for i in eachindex(vals)
+        k = func.terms[i].output_index
+        k > 0 || continue
+        if (k > re_len) || !MOI.Utilities.is_diagonal_vectorized_index(k)
+            vals[i] *= rt2
+        end
+    end
+    return vals
+end
 
 needs_permute(cone::MOI.HermitianPositiveSemidefiniteConeTriangle) = true
 
@@ -184,32 +186,32 @@ end
 function vec_to_symm_idxs(k::Int)
     i = div(1 + isqrt(8 * k - 7), 2)
     j = k - div((i - 1) * i, 2)
-    @assert i <= j
+    if i > j
+        return (j, i)
+    end
     return (i, j)
 end
 
-# function permute_affine(
-#     cone::MOI.HermitianPositiveSemidefiniteConeTriangle,
-#     func::VAF{T},
-# ) where {T}
-#     side = isqrt(MOI.dimension(cone))
-#     re_len = Cones.svec_length(side)
-#     terms = func.terms
-#     idxs_new = zeros(Int, length(terms))
-#     for k in eachindex(idxs_new)
-#         i = terms[k].output_index
-#         @assert i >= 1
-#         l = terms[k_idx].output_index
-#         if l > re_len
-#             # imag
-#             pos = l - re_len
-#             (i1, j1) = vec_to_symm_idxs(pos)
-#             idxs_new[k] = j1^2 + 2 * i1
-#         else
-#             # real
-#             (i1, j1) = vec_to_symm_idxs(l)
-#             idxs_new[k] = (j1 - 1)^2 + 2 * i1 - 1
-#         end
-#     end
-#     return idxs_new
-# end
+function permute_affine(
+    cone::MOI.HermitianPositiveSemidefiniteConeTriangle,
+    func::VAF{T},
+) where {T}
+    side = isqrt(MOI.dimension(cone))
+    re_len = Cones.svec_length(side)
+    terms = func.terms
+    idxs_new = zeros(Int, length(terms))
+    for k in eachindex(idxs_new)
+        l = terms[k].output_index
+        if l > re_len
+            # imag
+            (i, j) = vec_to_symm_idxs(l - re_len)
+            idxs_new[k] = j^2 + 2 * i
+        else
+            # real
+            @assert l >= 1
+            (i, j) = vec_to_symm_idxs(l)
+            idxs_new[k] = (j - 1)^2 + 2 * i - 1
+        end
+    end
+    return idxs_new
+end

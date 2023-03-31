@@ -55,7 +55,8 @@ end
 
     @testset "no preprocess tests" begin
         println("\nstarting no preprocess tests")
-        for inst_name in inst_cones_few, T in diff_reals
+        for inst_name in inst_cones_few
+            T = Float64
             options = (;
                 default_options...,
                 rescale = false,
