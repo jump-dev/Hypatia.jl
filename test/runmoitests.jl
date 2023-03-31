@@ -18,11 +18,7 @@ include(joinpath(@__DIR__, "moicones.jl"))
 @testset "MathOptInterface wrapper tests" begin
     @testset "MOI cone tests" begin
         println("starting MOI wrapper cone tests")
-        real_types = [
-            Float64,
-            # Float32,
-            BigFloat,
-        ]
+        real_types = [Float64, BigFloat]
         for T in real_types
             @testset "$T" begin
                 println(T, " ...")
@@ -38,12 +34,8 @@ include(joinpath(@__DIR__, "moicones.jl"))
             BigFloat,
             2 * eps(BigFloat)^0.15,
             1,
-            String["test_linear", "test_conic", "test_modification"],
-            String[
-                "test_linear_INFEASIBLE_2",
-                "test_conic_NormNuclearCone",
-                "test_conic_NormSpectralCone",
-            ],
+            String[],
+            String["test_linear_INFEASIBLE_2",],
         ),
     ]
 
