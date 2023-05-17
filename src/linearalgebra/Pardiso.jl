@@ -48,7 +48,7 @@ mutable struct PardisoSymCache{Float64} <: SparseSymCache{Float64}
     end
 end
 
-PardisoSparseCache = Union{PardisoSymCache{Float64}, PardisoNonSymCache{Float64}}
+const PardisoSparseCache = Union{PardisoSymCache{Float64}, PardisoNonSymCache{Float64}}
 int_type(::PardisoSparseCache) = Int32
 
 function update_fact(cache::PardisoSparseCache{Float64}, A::SparseMatrixCSC{Float64, Int32})
