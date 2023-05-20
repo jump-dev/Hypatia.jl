@@ -24,10 +24,10 @@ nonnegative1(Float64, solver = solver)
 ```
 =#
 
-mutable struct PardisoNonSymCache{Float64} <: SparseNonSymCache{Float64}
+mutable struct PardisoNonSymCache <: SparseNonSymCache{Float64}
     analyzed::Bool
     pardiso::Pardiso.MKLPardisoSolver
-    function PardisoNonSymCache{Float64}()
+    function PardisoNonSymCache()
         cache = new{Float64}()
         cache.analyzed = false
         cache.pardiso = Pardiso.MKLPardisoSolver()
@@ -36,10 +36,10 @@ mutable struct PardisoNonSymCache{Float64} <: SparseNonSymCache{Float64}
     end
 end
 
-mutable struct PardisoSymCache{Float64} <: SparseSymCache{Float64}
+mutable struct PardisoSymCache <: SparseSymCache{Float64}
     analyzed::Bool
     pardiso::Pardiso.MKLPardisoSolver
-    function PardisoSymCache{Float64}()
+    function PardisoSymCache()
         cache = new{Float64}()
         cache.analyzed = false
         cache.pardiso = Pardiso.MKLPardisoSolver()
@@ -48,10 +48,11 @@ mutable struct PardisoSymCache{Float64} <: SparseSymCache{Float64}
     end
 end
 
-PardisoSparseCache = Union{PardisoSymCache{Float64}, PardisoNonSymCache{Float64}}
+const PardisoSparseCache = Union{PardisoSymCache, PardisoNonSymCache}
+
 int_type(::PardisoSparseCache) = Int32
 
-function update_fact(cache::PardisoSparseCache{Float64}, A::SparseMatrixCSC{Float64, Int32})
+function update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int32})
     pardiso = cache.pardiso
 
     if !cache.analyzed
@@ -70,7 +71,7 @@ function update_fact(cache::PardisoSparseCache{Float64}, A::SparseMatrixCSC{Floa
 end
 
 function inv_prod(
-    cache::PardisoSparseCache{Float64},
+    cache::PardisoSparseCache,
     x::Vector{Float64},
     A::SparseMatrixCSC{Float64, Int32},
     b::Vector{Float64},
@@ -83,7 +84,7 @@ function inv_prod(
     return x
 end
 
-function free_memory(cache::PardisoSparseCache{Float64})
+function free_memory(cache::PardisoSparseCache)
     Pardiso.set_phase!(cache.pardiso, Pardiso.RELEASE_ALL)
     Pardiso.pardiso(cache.pardiso)
     return
