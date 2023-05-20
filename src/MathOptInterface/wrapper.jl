@@ -452,21 +452,21 @@ function _con_IJV(
     start = length(vect)
     idxs = start .+ (1:dim)
     push!(idxs_vect, idxs)
-    if needs_permute(set)
-        append!(vect, permute_affine(set, func.constants))
-        perm_idxs = permute_affine(set, func)
-        perm_idxs .+= start
-        append!(IM, perm_idxs)
-    else
-        append!(vect, func.constants)
-        append!(IM, start + vt.output_index for vt in func.terms)
-    end
     append!(JM, idx_map[vt.scalar_term.variable].value for vt in func.terms)
     append!(VM, -vt.scalar_term.coefficient for vt in func.terms)
+    append!(vect, func.constants)
     if needs_rescale(set)
         @views vm = VM[(end - length(func.terms) + 1):end]
         rescale_affine(set, func, vm)
         @views rescale_affine(set, vect[idxs])
+    end
+    if needs_permute(set)
+        @views vect[idxs] = permute_affine(set, vect[idxs])
+        perm_idxs = permute_affine(set, func)
+        perm_idxs .+= start
+        append!(IM, perm_idxs)
+    else
+        append!(IM, start + vt.output_index for vt in func.terms)
     end
     return
 end
