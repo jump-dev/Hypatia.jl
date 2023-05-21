@@ -211,8 +211,8 @@ function solve_check(model::JuMP.Model; test::Bool = true)
             Hypatia.rescale_affine(cone, z_k)
         end
         if Hypatia.needs_permute(cone)
-            s_k = Hypatia.permute_affine(cone, s_k)
-            z_k = Hypatia.permute_affine(cone, z_k)
+            s_k = s_k[Hypatia.permute_idxs(cone)]
+            z_k = z_k[Hypatia.permute_idxs(cone)]
         end
         append!(s, s_k)
         append!(z, z_k)
