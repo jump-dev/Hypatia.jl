@@ -424,7 +424,6 @@ function _con_IJV(
     push!(idxs_vect, idxs)
     append!(vect, zero(T) for _ in 1:dim)
     if needs_permute(set)
-        perm_idxs = permute_idxs(set)
         append!(IM, invperm(permute_idxs(set)) .+ start)
     else
         append!(IM, idxs)
@@ -462,9 +461,9 @@ function _con_IJV(
     if needs_permute(set)
         perm_idxs = permute_idxs(set)
         @views vect[idxs] = vect[perm_idxs .+ start]
-        iperm_idxs = invperm(perm_idxs)
-        func_idxs = [iperm_idxs[t.output_index] for t in func.terms]
-        append!(IM, func_idxs .+ start)
+        func_idxs = permute_affine(set, func)
+        func_idxs .+= start
+        append!(IM, func_idxs)
     else
         append!(IM, start + vt.output_index for vt in func.terms)
     end
