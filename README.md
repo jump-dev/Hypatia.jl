@@ -101,9 +101,11 @@ If you find aspects of Hypatia's IPM implementation useful, please cite our [alg
 @article{coey2022performance,
     title={Performance enhancements for a generic conic interior point algorithm},
     author={Chris Coey and Lea Kapelevich and Juan Pablo Vielma},
-    year={2022},
+    year={2023},
     journal={Mathematical Programming Computation},
     publisher={Springer},
+    volume={15},
+    pages={53--101},
     doi={https://doi.org/10.1007/s12532-022-00226-0}
 }
 ```

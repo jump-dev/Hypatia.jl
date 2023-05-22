@@ -276,7 +276,7 @@ function MOI.modify(
         rescale_affine(set, new_h)
     end
     if needs_permute(set)
-        new_h = permute_affine(set, new_h)
+        new_h = h[permute_idxs(set)]
     end
     Solvers.modify_h(opt.solver, idxs, new_h)
     return
@@ -424,9 +424,7 @@ function _con_IJV(
     push!(idxs_vect, idxs)
     append!(vect, zero(T) for _ in 1:dim)
     if needs_permute(set)
-        perm_idxs = permute_affine(set, 1:dim)
-        perm_idxs .+= start
-        append!(IM, perm_idxs)
+        append!(IM, invperm(permute_idxs(set)) .+ start)
     else
         append!(IM, idxs)
     end
@@ -452,21 +450,22 @@ function _con_IJV(
     start = length(vect)
     idxs = start .+ (1:dim)
     push!(idxs_vect, idxs)
-    if needs_permute(set)
-        append!(vect, permute_affine(set, func.constants))
-        perm_idxs = permute_affine(set, func)
-        perm_idxs .+= start
-        append!(IM, perm_idxs)
-    else
-        append!(vect, func.constants)
-        append!(IM, start + vt.output_index for vt in func.terms)
-    end
     append!(JM, idx_map[vt.scalar_term.variable].value for vt in func.terms)
     append!(VM, -vt.scalar_term.coefficient for vt in func.terms)
+    append!(vect, func.constants)
     if needs_rescale(set)
         @views vm = VM[(end - length(func.terms) + 1):end]
         rescale_affine(set, func, vm)
         @views rescale_affine(set, vect[idxs])
+    end
+    if needs_permute(set)
+        perm_idxs = permute_idxs(set)
+        @views vect[idxs] = vect[perm_idxs .+ start]
+        func_idxs = permute_affine(set, func)
+        func_idxs .+= start
+        append!(IM, func_idxs)
+    else
+        append!(IM, start + vt.output_index for vt in func.terms)
     end
     return
 end
