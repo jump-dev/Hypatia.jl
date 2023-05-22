@@ -27,8 +27,8 @@ end
 needs_permute(cone::SpecNucCone) = needs_untransform(cone)
 
 function permute_idxs(cone::SpecNucCone)
-    dim = MOI.dimension(cone)
-    return vcat(1, reshape(2:dim, cone.row_dim, cone.column_dim)'...)
+    W_idxs = reshape(2:MOI.dimension(cone), cone.row_dim, cone.column_dim)'
+    return vcat(1, vec(W_idxs))
 end
 
 function permute_affine(cone::SpecNucCone, func::VAF{T}) where {T}
@@ -163,21 +163,21 @@ function permute_idxs(cone::MOI.HermitianPositiveSemidefiniteConeTriangle)
     k_re = 1
     k_im = Cones.svec_length(side) + 1
     l = 1
-    new_vals = zeros(Int, MOI.dimension(cone))
+    idxs = zeros(Int, MOI.dimension(cone))
     for i in 1:side
         for j in 1:(i - 1)
-            new_vals[l] = k_re
-            new_vals[l + 1] = k_im
+            idxs[l] = k_re
+            idxs[l + 1] = k_im
             k_re += 1
             k_im += 1
             l += 2
         end
-        new_vals[l] = k_re
+        idxs[l] = k_re
         k_re += 1
         l += 1
     end
     @assert l == 1 + MOI.dimension(cone)
-    return new_vals
+    return idxs
 end
 
 function vec_to_symm_idxs(k::Int)
