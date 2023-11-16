@@ -15,7 +15,7 @@ import SumOfSquares
 import PolyJuMP
 
 struct SemidefinitePolyJuMP{T <: Real} <: ExampleInstanceJuMP{T}
-    x::Vector{<:DP.PolyVar}
+    x::Vector{<:DP.Variable}
     H::Matrix{<:DP.Polynomial}
     is_feas::Bool # whether model should be primal-dual feasible; only for testing
     use_wsosmatrix::Bool # use wsosinterppossemideftri cone, else PSD formulation
@@ -23,7 +23,7 @@ struct SemidefinitePolyJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 function SemidefinitePolyJuMP{Float64}(
-    x::Vector{DP.PolyVar{true}},
+    x::Vector{DP.Variable{true}},
     poly::DP.Polynomial,
     args...,
 )

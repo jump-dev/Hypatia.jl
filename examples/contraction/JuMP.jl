@@ -105,7 +105,7 @@ function get_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
 end
 
 # returns the multivariate Chebyshev polynomials in x up to degree deg
-function get_chebyshev_polys(x::Vector{DP.PolyVar{true}}, deg::Int)
+function get_chebyshev_polys(x::Vector{DP.Variable{true}}, deg::Int)
     if deg > 8
         @warn("get_chebyshev_polys is not numerically stable for large degree")
     end
@@ -124,7 +124,7 @@ function get_chebyshev_polys(x::Vector{DP.PolyVar{true}}, deg::Int)
     return V
 end
 
-function get_chebyshev_univ(monovec::Vector{DP.PolyVar{true}}, deg::Int)
+function get_chebyshev_univ(monovec::Vector{DP.Variable{true}}, deg::Int)
     if deg > 8
         @warn("get_chebyshev_univ is not numerically stable for large degree")
     end
