@@ -74,7 +74,7 @@ bss() = SAS.BasicSemialgebraicSet{Float64, DynamicPolynomials.Polynomial{true, F
 function get_domain_inequalities(dom::PolyUtils.BoxDomain, x)
     box = bss()
     for (xi, ui, li) in zip(x, dom.u, dom.l)
-        SAS.addinequality!(box, (-xi + ui) * (xi - li))
+        SAS.add_inequality!(box, (-xi + ui) * (xi - li))
     end
     return box
 end
