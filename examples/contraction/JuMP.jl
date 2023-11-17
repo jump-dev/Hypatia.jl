@@ -44,7 +44,7 @@ function build(inst::ContractionJuMP{T}) where {T <: Float64}
     JuMP.@variable(
         model,
         polys[1:3],
-        PolyJuMP.Poly(PolyJuMP.MultivariateBases.FixedPolynomialBasis(lagrange_polys))
+        PolyJuMP.Poly(PolyJuMP.MB.FixedPolynomialBasis(lagrange_polys))
     )
 
     M = [polys[1] polys[2]; polys[2] polys[3]]
