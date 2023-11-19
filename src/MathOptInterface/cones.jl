@@ -586,20 +586,20 @@ See [`Cones.EpiTrRelEntropyTri`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct EpiTrRelEntropyTriCone{T <: Real} <: MOI.AbstractVectorSet
+struct EpiTrRelEntropyTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     dim::Int
     use_dual::Bool
 end
 export EpiTrRelEntropyTriCone
 
-function EpiTrRelEntropyTriCone{T}(dim::Int) where {T <: Real}
-    return EpiTrRelEntropyTriCone{T}(dim, false)
+function EpiTrRelEntropyTriCone{T, R}(dim::Int) where {T <: Real, R <: RealOrComplex{T}}
+    return EpiTrRelEntropyTriCone{T, R}(dim, false)
 end
 
-MOI.dimension(cone::EpiTrRelEntropyTriCone where {T <: Real}) = cone.dim
+MOI.dimension(cone::EpiTrRelEntropyTriCone) = cone.dim
 
-function cone_from_moi(::Type{T}, cone::EpiTrRelEntropyTriCone{T}) where {T <: Real}
-    return Cones.EpiTrRelEntropyTri{T}(cone.dim, use_dual = cone.use_dual)
+function cone_from_moi(::Type{T}, cone::EpiTrRelEntropyTriCone{T, R}) where {T <: Real, R <: RealOrComplex{T}}
+    return Cones.EpiTrRelEntropyTri{T, R}(cone.dim, use_dual = cone.use_dual)
 end
 
 """
@@ -754,7 +754,8 @@ const HypatiaCones{T <: Real} = Union{
     HypoPerLogdetTriCone{T, Complex{T}},
     EpiPerSepSpectralCone{T},
     EpiRelEntropyCone{T},
-    EpiTrRelEntropyTriCone{T},
+    EpiTrRelEntropyTriCone{T, T},
+    EpiTrRelEntropyTriCone{T, Complex{T}},
     WSOSInterpNonnegativeCone{T, T},
     WSOSInterpNonnegativeCone{T, Complex{T}},
     WSOSInterpPosSemidefTriCone{T},

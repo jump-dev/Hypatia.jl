@@ -393,8 +393,8 @@ function eig_dot_kron!(
 
         mul!(temp2, V_j, V_j')
         temp2 .*= inner
-        mul!(temp1, Hermitian(temp2, :U), V)
-        mul!(temp2, V', temp1)
+        mul!(temp1, Hermitian(temp2, :U), vecs')
+        mul!(temp2, vecs, temp1)
         @views smat_to_svec!(skr[:, col_idx], temp2, rt2)
         col_idx += 1
     end

@@ -2402,7 +2402,7 @@ function epitrrelentropytri1(T; options...)
     )
     G = zeros(T, dim, 1)
     G[1, 1] = -1
-    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(dim)]
+    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T, T}(dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
@@ -2422,7 +2422,7 @@ function epitrrelentropytri2(T; options...)
     h = vcat(T(5), zeros(T, 2 * svec_dim))
     g_svec = Cones.scale_svec!(-ones(T, svec_dim), sqrt(T(2)))
     G = vcat(zeros(T, 2 * svec_dim)', Diagonal(vcat(g_svec, g_svec)))
-    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(dim)]
+    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T, T}(dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
@@ -2444,7 +2444,7 @@ function epitrrelentropytri3(T; options...)
     b = [zero(T)]
     h = zeros(T, dim)
     G = Diagonal(-one(T) * I, dim)
-    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(dim)]
+    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T, T}(dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
@@ -2464,7 +2464,7 @@ function epitrrelentropytri4(T; options...)
     b = [zero(T)]
     h = zeros(T, dim)
     G = Diagonal(-one(T) * I, dim)
-    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(dim)]
+    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T, T}(dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal

@@ -766,23 +766,23 @@ end
 show_time_alloc(C::Type{<:Cones.EpiRelEntropy}) = show_time_alloc(C(9))
 
 # EpiTrRelEntropyTri
-function test_oracles(C::Type{<:Cones.EpiTrRelEntropyTri})
+function test_oracles(C::Type{<:Cones.EpiTrRelEntropyTri{T, R}}) where {T, R}
     for dW in [1, 2, 4]
-        test_oracles(C(1 + 2 * Cones.svec_length(dW)), init_tol = 1e-4)
+        test_oracles(C(1 + 2 * Cones.svec_length(R, dW)), init_tol = 1e-4)
     end
     for dW in [6, 10]
-        test_oracles(C(1 + 2 * Cones.svec_length(dW)), init_tol = 1e-1, init_only = true)
+        test_oracles(C(1 + 2 * Cones.svec_length(R, dW)), init_tol = 1e-1, init_only = true)
     end
 end
 
-function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T}}) where {T}
+function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T, R}}) where {T, R}
     dW = 3
-    dw = Cones.svec_length(dW)
+    dw = Cones.svec_length(R, dW)
     function barrier(s)
         (u, v, w) = (s[1], s[1 .+ (1:dw)], s[(2 + dw):end])
-        V = new_herm(v, dW, T)
-        W = new_herm(w, dW, T)
-        return -log(u - dot(W, log(W) - log(V))) - logdet_pd(V) - logdet_pd(W)
+        V = new_herm(v, dW, R)
+        W = new_herm(w, dW, R)
+        return real(-log(u - dot(W, log(W) - log(V)))) - logdet_pd(V) - logdet_pd(W)
     end
     return test_barrier(C(1 + 2 * dw), barrier, TFD = BigFloat)
 end
