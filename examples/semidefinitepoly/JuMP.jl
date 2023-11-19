@@ -23,7 +23,7 @@ struct SemidefinitePolyJuMP{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 function SemidefinitePolyJuMP{Float64}(
-    x::Vector{DP.Variable{true}},
+    x::Vector{<:DP.Variable},
     poly::DP.Polynomial,
     args...,
 )

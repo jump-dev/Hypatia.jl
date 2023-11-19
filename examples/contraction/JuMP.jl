@@ -105,13 +105,13 @@ function get_lagrange_polys(pts::Matrix{T}, deg::Int) where {T <: Real}
 end
 
 # returns the multivariate Chebyshev polynomials in x up to degree deg
-function get_chebyshev_polys(x::Vector{DP.Variable{true}}, deg::Int)
+function get_chebyshev_polys(x::Vector{<:DP.Variable}, deg::Int)
     if deg > 8
         @warn("get_chebyshev_polys is not numerically stable for large degree")
     end
     n = length(x)
     u = get_chebyshev_univ(x, deg)
-    V = Vector{DP.Polynomial{true, Int}}(undef, PolyUtils.get_L(n, deg))
+    V = Vector(undef, PolyUtils.get_L(n, deg))
     V[1] = DP.Monomial(1)
     col = 1
     for t in 1:deg, xp in Combinatorics.multiexponents(n, t)
@@ -124,14 +124,14 @@ function get_chebyshev_polys(x::Vector{DP.Variable{true}}, deg::Int)
     return V
 end
 
-function get_chebyshev_univ(monovec::Vector{DP.Variable{true}}, deg::Int)
+function get_chebyshev_univ(monovec::Vector{<:DP.Variable}, deg::Int)
     if deg > 8
         @warn("get_chebyshev_univ is not numerically stable for large degree")
     end
     n = length(monovec)
     u = Vector{Vector}(undef, n)
     for j in 1:n
-        uj = u[j] = Vector{DP.Polynomial{true, Int}}(undef, deg + 1)
+        uj = u[j] = Vector(undef, deg + 1)
         uj[1] = DP.Monomial(1)
         uj[2] = monovec[j]
         for t in 3:(deg + 1)
