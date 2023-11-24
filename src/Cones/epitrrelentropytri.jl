@@ -441,9 +441,7 @@ function Δ3!(Δ3::Array{T, 3}, Δ2::Matrix{T}, λ::Vector{T}) where {T <: Real}
     return Δ3
 end
 
-# similar to eig_dot_kron, but a different slice of Δ3 is used to apply
-# to each column of the input
-# TODO get down to d^4 ops
+# TODO consider refactor with eig_dot_kron!
 function d2zdV2!(
     d2zdV2::Matrix{T},
     vecs::Matrix{R},
@@ -456,45 +454,40 @@ function d2zdV2!(
     rt2::T,
 ) where {T <: Real, R <: RealOrComplex{T}}
     d = size(vecs, 1)
-    Eijtilde = zero(mat)
-    # TODO alloc, ten3d would be better as vec of matrices
-    inners = [inner .* Δ3[:, :, k] for k = 1:d]
     V = copyto!(mat, vecs')
     V_views = [view(V, :, i) for i in 1:d]
     rt2i = inv(rt2)
     scals = (R <: Complex{T} ? [rt2i, rt2i * im] : [rt2i])
-
-    col_idx = 1
-    for j in 1:d
-        for i in 1:(j - 1)
-            for scal in scals
-                mul!(Eijtilde, V_views[j], V_views[i]', scal, false)
-                # TODO alloc/rearrange
-                Eijtilde = Eijtilde + Eijtilde'
-                for k = 1:d
-                    @views @. mat2 = inner * Δ3[:, :, k]
-                    @views mul!(mat3[:, k], mat2, Eijtilde[:, k])
-                end
-                # mat2 = vecs * (mat3 + mat3) * vecs'
-                mat2 = mat3 + mat3'
-                mul!(mat3, Hermitian(mat2, :U), vecs')
-                mul!(mat2, vecs, mat3)
-                @views smat_to_svec!(d2zdV2[:, col_idx], mat2, rt2)
-                col_idx += 1
-            end # scal
-        end # i
-
-        mul!(Eijtilde, V_views[j], V_views[j]')
-        for k = 1:d
-            @views @. mat2 = inner * Δ3[:, :, k]
-            @views mul!(mat3[:, k], mat2, Eijtilde[:, k])
-        end
-        mat2 = vecs * (mat3 + mat3') * vecs'
-        @views smat_to_svec!(d2zdV2[:, col_idx], mat2, rt2)
-        col_idx += 1
-
+    @inbounds for k = 1:d
+        @. @views ten3d[:, :, k] = inner * Δ3[:, :, k]
     end
 
+    col_idx = 1
+    @inbounds for j in 1:d
+        for i in 1:(j - 1), scal in scals
+            mul!(mat3, V_views[j], V_views[i]', scal, false)
+            @. mat2 = mat3 + mat3'
+            for k = 1:d
+                @views mul!(mat3[:, k], ten3d[:, :, k], mat2[:, k])
+            end
+            # mat2 = vecs * (mat3 + mat3) * vecs'
+            @. mat2 = mat3 + mat3'
+            mul!(mat3, Hermitian(mat2, :U), vecs')
+            mul!(mat2, vecs, mat3)
+            @views smat_to_svec!(d2zdV2[:, col_idx], mat2, rt2)
+            col_idx += 1
+        end
+
+        mul!(mat2, V_views[j], V_views[j]')
+        for k = 1:d
+            @views mul!(mat3[:, k], ten3d[:, :, k], mat2[:, k])
+        end
+        @. mat2 = mat3 + mat3'
+        mul!(mat3, Hermitian(mat2, :U), vecs')
+        mul!(mat2, vecs, mat3)
+        @views smat_to_svec!(d2zdV2[:, col_idx], mat2, rt2)
+        col_idx += 1
+    end
     return d2zdV2
 end
 
