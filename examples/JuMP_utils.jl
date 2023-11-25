@@ -118,7 +118,7 @@ function setup_model(
     if !isnothing(extender)
         # for PolyJuMP/SumOfSquares models
         for B in model.bridge_types
-            MOI.Bridges.add_bridge(opt, B{Float64})
+            MOI.Bridges.add_bridge(opt, B)
         end
     end
 

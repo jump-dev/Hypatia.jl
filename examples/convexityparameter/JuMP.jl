@@ -69,12 +69,12 @@ function test_extra(inst::ConvexityParameterJuMP{T}, model::JuMP.Model) where {T
 end
 
 # construct domain inequalities for SumOfSquares models from Hypatia domains
-bss() = SAS.BasicSemialgebraicSet{Float64, DynamicPolynomials.Polynomial{true, Float64}}()
+bss() = SAS.FullSpace()
 
 function get_domain_inequalities(dom::PolyUtils.BoxDomain, x)
     box = bss()
     for (xi, ui, li) in zip(x, dom.u, dom.l)
-        SAS.addinequality!(box, (-xi + ui) * (xi - li))
+        SAS.add_inequality!(box, (-xi + ui) * (xi - li))
     end
     return box
 end
