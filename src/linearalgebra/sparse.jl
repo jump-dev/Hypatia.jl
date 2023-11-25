@@ -11,7 +11,7 @@ helpers for sparse factorizations and linear solves
 
 import SparseArrays.SparseMatrixCSC
 import SuiteSparse
-const SuiteSparseInt = SuiteSparse.CHOLMOD.SuiteSparse_long
+const SuiteSparseInt = typeof(Sys.WORD_SIZE)
 
 #=
 nonsymmetric
