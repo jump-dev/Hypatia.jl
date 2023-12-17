@@ -363,7 +363,7 @@ function dder3(cone::EpiTrRelEntropyTri{T, R}, dir::AbstractVector{T}) where {T 
     svec_to_smat!(V_part_1, V_part_1a, rt2)
     rdiv!(V_dir_sim, Diagonal(sqrt.(V_λ)))
     ldiv!(Diagonal(V_λ), V_dir_sim)
-    V_part_2 = (d3WlogVdV + d3WlogVdV') / T(2)
+    V_part_2 = d3WlogVdV
     @. V_part_2 += diff_dot_V_VW + diff_dot_V_VW'
     mul!(V_part_2, V_dir_sim, V_dir_sim', true, zi)
     mul!(mat, Hermitian(V_part_2, :U), V_vecs')
@@ -472,8 +472,8 @@ function d2zdV2!(
             end
             # mat2 = vecs * (mat3 + mat3) * vecs'
             @. mat2 = mat3 + mat3'
-            mul!(mat3, Hermitian(mat2, :U), vecs')
-            mul!(mat2, vecs, mat3)
+            mul!(mat3, Hermitian(mat2, :U), V)
+            mul!(mat2, V', mat3)
             @views smat_to_svec!(d2zdV2[:, col_idx], mat2, rt2)
             col_idx += 1
         end
@@ -483,8 +483,8 @@ function d2zdV2!(
             @views mul!(mat3[:, k], ten3d[:, :, k], mat2[:, k])
         end
         @. mat2 = mat3 + mat3'
-        mul!(mat3, Hermitian(mat2, :U), vecs')
-        mul!(mat2, vecs, mat3)
+        mul!(mat3, Hermitian(mat2, :U), V)
+        mul!(mat2, V', mat3)
         @views smat_to_svec!(d2zdV2[:, col_idx], mat2, rt2)
         col_idx += 1
     end

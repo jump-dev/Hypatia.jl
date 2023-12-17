@@ -787,7 +787,9 @@ function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T, R}}) where {T, R}
     return test_barrier(C(1 + 2 * dw), barrier, TFD = BigFloat)
 end
 
-show_time_alloc(C::Type{<:Cones.EpiTrRelEntropyTri}) = show_time_alloc(C(13))
+function show_time_alloc(C::Type{Cones.EpiTrRelEntropyTri{T, R}}) where {T, R}
+    return show_time_alloc(C(Cones.svec_length(R, 4) * 2 + 1))
+end
 
 # WSOSInterpNonnegative
 function test_oracles(C::Type{Cones.WSOSInterpNonnegative{T, R}}) where {T, R}
