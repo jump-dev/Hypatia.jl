@@ -14,17 +14,17 @@ struct NearestCorrelationJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     side::Int
 end
 
-function build(inst::NearestCorrelationJuMP{T}) where {T <: Float64}
+function build(inst::NearestCorrelationJuMP{T}) where {T <: Real}
     side = inst.side
     M = randn(T, side, side)
     M = M * M'
     vec_dim = Cones.svec_length(side)
-    m_vec = zeros(T, vec_dim)
+    m_vec = Vector{T}(undef, vec_dim)
     Cones.smat_to_svec!(m_vec, M, sqrt(T(2)))
 
-    model = JuMP.Model()
+    model = JuMP.GenericModel{T}()
     JuMP.@variable(model, x_vec[1:vec_dim])
-    X = zeros(JuMP.AffExpr, side, side)
+    X = Matrix{JuMP.GenericAffExpr{T, JuMP.GenericVariableRef{T}}}(undef, side, side)
     Cones.svec_to_smat!(X, one(T) * x_vec, sqrt(T(2)))
     JuMP.@constraint(model, diag(X) .== 1)
 
@@ -32,7 +32,7 @@ function build(inst::NearestCorrelationJuMP{T}) where {T <: Float64}
     JuMP.@objective(model, Min, y)
     JuMP.@constraint(
         model,
-        vcat(y, x_vec, m_vec) in Hypatia.EpiTrRelEntropyTriCone{T}(1 + 2 * vec_dim)
+        vcat(y, x_vec, m_vec) in Hypatia.EpiTrRelEntropyTriCone{T, T}(1 + 2 * vec_dim)
     )
 
     return model

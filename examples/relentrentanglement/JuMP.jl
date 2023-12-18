@@ -16,36 +16,42 @@ struct RelEntrEntanglementJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     nb::Int
 end
 
-function build(inst::RelEntrEntanglementJuMP{T}) where {T <: Float64}
+function build(inst::RelEntrEntanglementJuMP{T}) where {T <: Real}
     (na, nb) = (inst.na, inst.nb)
     side = na * nb
-    Rho = randn(T, side, side)
+    Rho = randn(Complex{T}, side, side)
     Rho = Rho * Rho'
-    Rho = Symmetric(Rho / tr(Rho))
-    vec_dim = Cones.svec_length(side)
-    rho_vec = zeros(T, vec_dim)
+    Rho = Hermitian(Rho / tr(Rho))
+    vec_dim = Cones.svec_length(Complex, side)
+    rho_vec = Vector{T}(undef, vec_dim)
     Cones.smat_to_svec!(rho_vec, Rho, sqrt(T(2)))
 
-    model = JuMP.Model()
+    model = JuMP.GenericModel{T}()
     JuMP.@variable(model, tau_vec[1:vec_dim])
-    Tau = zeros(JuMP.AffExpr, side, side)
-    Cones.svec_to_smat!(Tau, one(T) * tau_vec, sqrt(T(2)))
+    Tau = Matrix{JuMP.GenericAffExpr{Complex{T}, JuMP.GenericVariableRef{T}}}(
+        undef,
+        side,
+        side,
+    )
+    Cones._svec_to_smat_complex!(Tau, one(T) * tau_vec, sqrt(T(2)))
     JuMP.@constraint(model, tr(Tau) == 1)
 
     JuMP.@variable(model, y)
     JuMP.@objective(model, Min, y / log(T(2)))
     JuMP.@constraint(
         model,
-        vcat(y, tau_vec, rho_vec) in Hypatia.EpiTrRelEntropyTriCone{T}(1 + 2 * vec_dim)
+        vcat(y, tau_vec, rho_vec) in
+        Hypatia.EpiTrRelEntropyTriCone{T, Complex{T}}(1 + 2 * vec_dim)
     )
-    pt = partial_transpose(Symmetric(Tau), 2, [na, nb])
-    JuMP.@constraint(model, Symmetric(pt) in JuMP.PSDCone())
+    pt = partial_transpose(Hermitian(Tau), 2, [na, nb])
+    JuMP.@constraint(model, Hermitian(pt) in JuMP.HermitianPSDCone())
+    JuMP.@constraint(model, Hermitian(Tau) in JuMP.HermitianPSDCone())
 
     return model
 end
 
 # partial transpose of Q over system i given subsystem dimensions subs
-function partial_transpose(Q::Symmetric, i::Int, subs::Vector{Int})
+function partial_transpose(Q::AbstractMatrix, i::Int, subs::Vector{Int})
     @assert 1 <= i <= length(subs)
     @assert size(Q, 1) == prod(subs)
     n = length(subs)

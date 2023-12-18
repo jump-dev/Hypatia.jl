@@ -19,8 +19,8 @@ struct EntanglementAssisted{T <: Real} <: ExampleInstanceJuMP{T}
     ne::Int
 end
 
-function build(inst::EntanglementAssisted{T}) where {T <: Float64}
-    gamma = 0.2
+function build(inst::EntanglementAssisted{T}) where {T <: Real}
+    gamma = T(1 // 5)
     ampl_damp = [
         1 0
         0 sqrt(gamma)
@@ -33,46 +33,56 @@ function build(inst::EntanglementAssisted{T}) where {T <: Float64}
     ne = inst.ne
     @assert nb * ne == ampl_dim
     rt2 = sqrt(T(2))
-    sa = Cones.svec_length(ampl_dim)
-    sb = Cones.svec_length(nb)
+    sbe = Cones.svec_length(Complex, ampl_dim)
+    sb = Cones.svec_length(Complex, nb)
 
-    model = JuMP.Model()
+    model = JuMP.GenericModel{T}()
     JuMP.@variables(model, begin
-        ρ[1:na, 1:na], PSD
-        cond_epi
-        qe_epi
+        ρA[1:na, 1:na] in JuMP.HermitianPSDCone()
+        conditional
+        von_neumann
     end)
 
-    Q1 = Symmetric(ampl_damp * ρ * ampl_damp')
-    Q2 = zeros(JuMP.AffExpr, nb * ne, nb * ne)
-    kron!(Q2, I(nb), partial_trace(Q1, 1, [nb, ne]))
-    Q3 = partial_trace(Q1, 2, [nb, ne])
-    Q1_vec = Cones.smat_to_svec!(zeros(JuMP.AffExpr, sa), Q1, rt2)
-    Q2_vec = Cones.smat_to_svec!(zeros(JuMP.AffExpr, sa), Q2, rt2)
-    Q3_vec = Cones.smat_to_svec!(zeros(JuMP.AffExpr, sb), Q3, rt2)
-    RE_cone = Hypatia.EpiTrRelEntropyTriCone{T}(1 + 2 * sa)
-    E_cone =
-        Hypatia.EpiPerSepSpectralCone{T}(Cones.NegEntropySSF(), Cones.MatrixCSqr{T, T}, nb)
+    ρBE = Hermitian(ampl_damp * ρA * ampl_damp')
+    IρE = Matrix{JuMP.GenericAffExpr{Complex{T}, JuMP.GenericVariableRef{T}}}(
+        undef,
+        nb * ne,
+        nb * ne,
+    )
+    kron!(IρE, I(nb), partial_trace(ρBE, 1, [nb, ne]))
+    ρB = partial_trace(ρBE, 2, [nb, ne])
+
+    ρBE_vec = Vector{JuMP.GenericAffExpr{T, JuMP.GenericVariableRef{T}}}(undef, sbe)
+    IρE_vec = Vector{JuMP.GenericAffExpr{T, JuMP.GenericVariableRef{T}}}(undef, sbe)
+    ρB_vec = Vector{JuMP.GenericAffExpr{T, JuMP.GenericVariableRef{T}}}(undef, sb)
+    I_vec = Vector{T}(undef, sb)
+
+    Cones._smat_to_svec_complex!(ρBE_vec, ρBE, rt2)
+    Cones._smat_to_svec_complex!(IρE_vec, IρE, rt2)
+    Cones._smat_to_svec_complex!(ρB_vec, ρB, rt2)
+    Cones.smat_to_svec!(I_vec, Matrix{Complex{T}}(I(nb)), rt2)
+    RE_cone_be = Hypatia.EpiTrRelEntropyTriCone{T, Complex{T}}(1 + 2 * sbe)
+    RE_cone_b = Hypatia.EpiTrRelEntropyTriCone{T, Complex{T}}(1 + 2 * sb)
 
     JuMP.@constraints(model, begin
-        tr(ρ) == 1
-        vcat(cond_epi, Q1_vec, Q2_vec) in RE_cone
-        vcat(qe_epi, 1, Q3_vec) in E_cone
+        tr(ρA) == 1
+        vcat(conditional, IρE_vec, ρBE_vec) in RE_cone_be
+        vcat(von_neumann, I_vec, ρB_vec) in RE_cone_b
     end)
 
-    JuMP.@objective(model, Max, (cond_epi + qe_epi) / -log(T(2)))
+    JuMP.@objective(model, Max, (conditional + von_neumann) / -log(T(2)))
 
     return model
 end
 
 # partial trace of Q over system i given subsystem dimensions subs
-function partial_trace(Q::Symmetric, i::Int, subs::Vector{Int})
+function partial_trace(Q::AbstractMatrix, i::Int, subs::Vector{Int})
     @assert 1 <= i <= length(subs)
     @assert size(Q, 1) == prod(subs)
     return sum(partial_trace_j(j, Q, i, subs) for j in 1:subs[i])
 end
 
-function partial_trace_j(j::Int, Q::Symmetric, i::Int, subs::Vector{Int})
+function partial_trace_j(j::Int, Q::AbstractMatrix, i::Int, subs::Vector{Int})
     X1 = sparse(I, 1, 1)
     X2 = copy(X1)
     for (k, dim) in enumerate(subs)
