@@ -360,10 +360,15 @@ function test_moi_cones(T::Type{<:Real})
     end
 
     @testset "EpiTrRelEntropyTriCone" begin
-        moi_cone = Hypatia.EpiTrRelEntropyTriCone{T}(3)
+        moi_cone = Hypatia.EpiTrRelEntropyTriCone{T, T}(7)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa Cones.EpiTrRelEntropyTri{T}
-        @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
+        @test hyp_cone isa Cones.EpiTrRelEntropyTri{T, T}
+        @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 7
+
+        moi_cone = Hypatia.EpiTrRelEntropyTriCone{T, Complex{T}}(9)
+        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa Cones.EpiTrRelEntropyTri{T, Complex{T}}
+        @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 9
     end
 
     @testset "WSOSInterpNonnegative" begin
