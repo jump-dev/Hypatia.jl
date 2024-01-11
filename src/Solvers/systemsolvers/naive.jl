@@ -216,7 +216,9 @@ function load(syssolver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where {T 
         dz(1, q),
         1,
     )
-    @assert lhs isa Matrix{T}
+    if !(lhs isa Matrix{T})
+        lhs = Matrix{T}(lhs)
+    end
     syssolver.lhs = lhs
     syssolver.lhs_fact = zero(lhs)
 

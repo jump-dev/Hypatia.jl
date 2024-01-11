@@ -302,7 +302,9 @@ function load(syssolver::NaiveElimDenseSystemSolver{T}, solver::Solver{T}) where
         -model.h',
         1,
     )
-    @assert lhs_sub isa Matrix{T}
+    if !(lhs_sub isa Matrix{T})
+        lhs_sub = Matrix{T}(lhs_sub)
+    end
     syssolver.lhs_sub = lhs_sub
     syssolver.lhs_sub_fact = zero(lhs_sub)
 
