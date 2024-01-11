@@ -499,6 +499,9 @@ function unreduce_y(solver::Solver{T}, y::Vector{T}) where {T <: Real}
     if !in(solver.status, infeas_statuses)
         ya .+= solver.reduce_cQ1
     end
+    if length(solver.reduce_y_keep_idxs) == 0
+        return
+    end
     @views ya_sub = ya[1:length(solver.reduce_y_keep_idxs)]
     ldiv!(solver.reduce_Ap_R, ya_sub)
     @views y_sub = solver.result.y[solver.reduce_y_keep_idxs]
