@@ -45,7 +45,6 @@ function build(inst::RelEntrEntanglementJuMP{T}) where {T <: Real}
     )
     pt = partial_transpose(Hermitian(Tau), 2, [na, nb])
     JuMP.@constraint(model, Hermitian(pt) in JuMP.HermitianPSDCone())
-    JuMP.@constraint(model, Hermitian(Tau) in JuMP.HermitianPSDCone())
 
     return model
 end

@@ -20,7 +20,7 @@ struct EntanglementAssisted{T <: Real} <: ExampleInstanceJuMP{T}
 end
 
 function build(inst::EntanglementAssisted{T}) where {T <: Real}
-    gamma = T(1 // 5)
+    gamma = T(1) / 5
     ampl_damp = [
         1 0
         0 sqrt(gamma)
@@ -38,7 +38,7 @@ function build(inst::EntanglementAssisted{T}) where {T <: Real}
 
     model = JuMP.GenericModel{T}()
     JuMP.@variables(model, begin
-        ρA[1:na, 1:na] in JuMP.HermitianPSDCone()
+        ρA[1:na, 1:na], Hermitian
         conditional
         von_neumann
     end)
@@ -55,19 +55,20 @@ function build(inst::EntanglementAssisted{T}) where {T <: Real}
     ρBE_vec = Vector{JuMP.GenericAffExpr{T, JuMP.GenericVariableRef{T}}}(undef, sbe)
     IρE_vec = Vector{JuMP.GenericAffExpr{T, JuMP.GenericVariableRef{T}}}(undef, sbe)
     ρB_vec = Vector{JuMP.GenericAffExpr{T, JuMP.GenericVariableRef{T}}}(undef, sb)
-    I_vec = Vector{T}(undef, sb)
 
     Cones._smat_to_svec_complex!(ρBE_vec, ρBE, rt2)
     Cones._smat_to_svec_complex!(IρE_vec, IρE, rt2)
     Cones._smat_to_svec_complex!(ρB_vec, ρB, rt2)
-    Cones.smat_to_svec!(I_vec, Matrix{Complex{T}}(I(nb)), rt2)
-    RE_cone_be = Hypatia.EpiTrRelEntropyTriCone{T, Complex{T}}(1 + 2 * sbe)
-    RE_cone_b = Hypatia.EpiTrRelEntropyTriCone{T, Complex{T}}(1 + 2 * sb)
-
+    RE_cone = Hypatia.EpiTrRelEntropyTriCone{T, Complex{T}}(1 + 2 * sbe)
+    E_cone = Hypatia.EpiPerSepSpectralCone{T}(
+        Cones.NegEntropySSF(),
+        Cones.MatrixCSqr{T, Complex{T}},
+        nb,
+    )
     JuMP.@constraints(model, begin
         tr(ρA) == 1
-        vcat(conditional, IρE_vec, ρBE_vec) in RE_cone_be
-        vcat(von_neumann, I_vec, ρB_vec) in RE_cone_b
+        vcat(conditional, IρE_vec, ρBE_vec) in RE_cone
+        vcat(von_neumann, 1, ρB_vec) in E_cone
     end)
 
     JuMP.@objective(model, Max, (conditional + von_neumann) / -log(T(2)))
