@@ -1,10 +1,10 @@
 # Hypatia
 
 Hypatia is a highly-customizable interior point solver for generic conic optimization problems, written in [Julia](https://julialang.org/).
-It is licensed under the MIT License; see [LICENSE](https://github.com/chriscoey/Hypatia.jl/blob/master/LICENSE.md).
+It is licensed under the MIT License; see [LICENSE](https://github.com/jump-dev/Hypatia.jl/blob/master/LICENSE.md).
 
-See the [README](https://github.com/chriscoey/Hypatia.jl/blob/master/README.md) for a quick-start introduction.
-For more information about Hypatia's algorithms and cones, please see our [working paper](https://arxiv.org/abs/2005.01136) and [cones reference](https://github.com/chriscoey/Hypatia.jl/wiki/files/coneref.pdf).
+See the [README](https://github.com/jump-dev/Hypatia.jl/blob/master/README.md) for a quick-start introduction.
+For more information about Hypatia's algorithms and cones, please see our [working paper](https://arxiv.org/abs/2005.01136) and [cones reference](https://github.com/jump-dev/Hypatia.jl/wiki/files/coneref.pdf).
 
 ## Installation
 
