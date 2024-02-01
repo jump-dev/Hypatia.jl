@@ -381,7 +381,6 @@ function eig_dot_kron!(
 ) where {T <: Real, R <: RealOrComplex{T}}
     @assert issymmetric(inner) # must be symmetric (wrapper is less efficient)
     rt2i = inv(rt2)
-    d = size(inner, 1)
     copyto!(V, vecs') # allows fast column slices
     V_views = [view(V, :, i) for i in 1:size(inner, 1)]
     scals = (R <: Complex{T} ? [rt2i, rt2i * im] : [rt2i]) # real and imag parts
