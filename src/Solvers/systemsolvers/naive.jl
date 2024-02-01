@@ -2,7 +2,7 @@
 Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
 
 This Julia package Hypatia.jl is released under the MIT license; see LICENSE
-file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 =#
 
 #=
@@ -216,7 +216,9 @@ function load(syssolver::NaiveDenseSystemSolver{T}, solver::Solver{T}) where {T 
         dz(1, q),
         1,
     )
-    @assert lhs isa Matrix{T}
+    if !(lhs isa Matrix{T})
+        lhs = Matrix{T}(lhs)
+    end
     syssolver.lhs = lhs
     syssolver.lhs_fact = zero(lhs)
 

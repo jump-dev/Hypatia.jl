@@ -2,7 +2,7 @@
 Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
 
 This Julia package Hypatia.jl is released under the MIT license; see LICENSE
-file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 =#
 
 """
@@ -124,7 +124,8 @@ mutable struct Solver{T <: Real}
     Ap_fact::Factorization{T}
     Ap_rank::Int
     Ap_R::UpperTriangular{T, <:AbstractMatrix{T}}
-    Ap_Q::Union{UniformScaling, AbstractMatrix{T}}
+    # Ap_Q::Union{UniformScaling, AbstractMatrix{T}}
+    Ap_Q::Any  # Any is needed for Julia 1.10 and later
     AG_fact::Factorization{T}
     AG_rank::Int
     AG_R::UpperTriangular{T, <:AbstractMatrix{T}}

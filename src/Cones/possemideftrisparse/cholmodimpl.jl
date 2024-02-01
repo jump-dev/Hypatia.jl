@@ -2,7 +2,7 @@
 Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
 
 This Julia package Hypatia.jl is released under the MIT license; see LICENSE
-file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 =#
 
 #=
@@ -52,6 +52,8 @@ mutable struct PSDSparseCholmodCache{T <: BlasReal, R <: RealOrComplex{T}} <:
     PSDSparseCholmodCache{T, R}() where {T <: BlasReal, R <: RealOrComplex{T}} = new{T, R}()
 end
 
+_unsafe_load(::Type{T}, ptr::Ptr, i) where {T} = unsafe_load(convert(Ptr{T}, ptr), i)
+
 function setup_extra_data!(
     cone::PosSemidefTriSparse{PSDSparseCholmod, T, R},
 ) where {T <: BlasReal, R <: RealOrComplex{T}}
@@ -79,14 +81,13 @@ function setup_extra_data!(
     f = unsafe_load(pointer(symb_mat))
     @assert f.n == cone.side
     @assert f.is_super != 0
-
     num_super = Int(f.nsuper)
-    supers = cache.supers = [unsafe_load(f.super, i) + 1 for i in 1:num_super]
+    supers = cache.supers = [_unsafe_load(Int, f.super, i) + 1 for i in 1:num_super]
     push!(supers, side + 1)
-    fs = [unsafe_load(f.s, i) + 1 for i in 1:Int(f.ssize)]
-    fpi = [unsafe_load(f.pi, i) + 1 for i in 1:num_super]
+    fs = [_unsafe_load(Int, f.s, i) + 1 for i in 1:Int(f.ssize)]
+    fpi = [_unsafe_load(Int, f.pi, i) + 1 for i in 1:num_super]
     push!(fpi, length(fs) + 1)
-    fpx = [unsafe_load(f.px, i) + 1 for i in 1:num_super]
+    fpx = [_unsafe_load(Int, f.px, i) + 1 for i in 1:num_super]
 
     # construct super_map
     # super_map[k] = s if column k is in supernode s

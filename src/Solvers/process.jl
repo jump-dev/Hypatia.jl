@@ -2,7 +2,7 @@
 Copyright (c) 2018-2022 Chris Coey, Lea Kapelevich, and contributors
 
 This Julia package Hypatia.jl is released under the MIT license; see LICENSE
-file in the root directory or at https://github.com/chriscoey/Hypatia.jl
+file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 =#
 
 #=
@@ -498,6 +498,9 @@ function unreduce_y(solver::Solver{T}, y::Vector{T}) where {T <: Real}
     ya = solver.reduce_GQ1' * solver.result.z
     if !in(solver.status, infeas_statuses)
         ya .+= solver.reduce_cQ1
+    end
+    if length(solver.reduce_y_keep_idxs) == 0
+        return
     end
     @views ya_sub = ya[1:length(solver.reduce_y_keep_idxs)]
     ldiv!(solver.reduce_Ap_R, ya_sub)
