@@ -69,7 +69,10 @@ mutable struct EpiTrRelEntropyTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     mat3::Matrix{R}
     ten3d::Array{R, 3}
 
-    function EpiTrRelEntropyTri{T, R}(dim::Int; use_dual::Bool = false) where {T <: Real, R <: RealOrComplex{T}}
+    function EpiTrRelEntropyTri{T, R}(
+        dim::Int;
+        use_dual::Bool = false,
+    ) where {T <: Real, R <: RealOrComplex{T}}
         @assert dim > 2
         @assert isodd(dim)
         cone = new{T, R}()
@@ -92,7 +95,9 @@ function reset_data(cone::EpiTrRelEntropyTri)
     )
 end
 
-function setup_extra_data!(cone::EpiTrRelEntropyTri{T, R}) where {T <: Real, R <: RealOrComplex{T}}
+function setup_extra_data!(
+    cone::EpiTrRelEntropyTri{T, R},
+) where {T <: Real, R <: RealOrComplex{T}}
     vw_dim = cone.vw_dim
     d = cone.d
     cone.rt2 = sqrt(T(2))
@@ -143,7 +148,9 @@ function set_initial_point!(
     return arr
 end
 
-function update_feas(cone::EpiTrRelEntropyTri{T, R}) where {T <: Real, R <: RealOrComplex{T}}
+function update_feas(
+    cone::EpiTrRelEntropyTri{T, R},
+) where {T <: Real, R <: RealOrComplex{T}}
     @assert !cone.feas_updated
     point = cone.point
 
@@ -177,7 +184,9 @@ function update_feas(cone::EpiTrRelEntropyTri{T, R}) where {T <: Real, R <: Real
     return cone.is_feas
 end
 
-function update_grad(cone::EpiTrRelEntropyTri{T, R}) where {T <: Real, R <: RealOrComplex{T}}
+function update_grad(
+    cone::EpiTrRelEntropyTri{T, R},
+) where {T <: Real, R <: RealOrComplex{T}}
     @assert cone.is_feas
     rt2 = cone.rt2
     zi = inv(cone.z)
@@ -219,7 +228,9 @@ function update_grad(cone::EpiTrRelEntropyTri{T, R}) where {T <: Real, R <: Real
     return cone.grad
 end
 
-function update_hess(cone::EpiTrRelEntropyTri{T, R}) where {T <: Real, R <: RealOrComplex{T}}
+function update_hess(
+    cone::EpiTrRelEntropyTri{T, R},
+) where {T <: Real, R <: RealOrComplex{T}}
     @assert cone.grad_updated
     isdefined(cone, :hess) || alloc_hess!(cone)
     rt2 = cone.rt2
@@ -284,7 +295,10 @@ function update_dder3_aux(cone::EpiTrRelEntropyTri)
     return
 end
 
-function dder3(cone::EpiTrRelEntropyTri{T, R}, dir::AbstractVector{T}) where {T <: Real, R <: RealOrComplex{T}}
+function dder3(
+    cone::EpiTrRelEntropyTri{T, R},
+    dir::AbstractVector{T},
+) where {T <: Real, R <: RealOrComplex{T}}
     cone.dder3_aux_updated || update_dder3_aux(cone)
     rt2 = cone.rt2
     V_idxs = cone.V_idxs
@@ -458,7 +472,7 @@ function d2zdV2!(
     V_views = [view(V, :, i) for i in 1:d]
     rt2i = inv(rt2)
     scals = (R <: Complex{T} ? [rt2i, rt2i * im] : [rt2i])
-    @inbounds for k = 1:d
+    @inbounds for k in 1:d
         @. @views ten3d[:, :, k] = inner * Δ3[:, :, k]
     end
 
@@ -467,7 +481,7 @@ function d2zdV2!(
         for i in 1:(j - 1), scal in scals
             mul!(mat3, V_views[j], V_views[i]', scal, false)
             @. mat2 = mat3 + mat3'
-            for k = 1:d
+            for k in 1:d
                 @views mul!(mat3[:, k], ten3d[:, :, k], mat2[:, k])
             end
             # mat2 = vecs * (mat3 + mat3) * vecs'
@@ -479,7 +493,7 @@ function d2zdV2!(
         end
 
         mul!(mat2, V_views[j], V_views[j]')
-        for k = 1:d
+        for k in 1:d
             @views mul!(mat3[:, k], ten3d[:, :, k], mat2[:, k])
         end
         @. mat2 = mat3 + mat3'

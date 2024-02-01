@@ -598,7 +598,10 @@ end
 
 MOI.dimension(cone::EpiTrRelEntropyTriCone) = cone.dim
 
-function cone_from_moi(::Type{T}, cone::EpiTrRelEntropyTriCone{T, R}) where {T <: Real, R <: RealOrComplex{T}}
+function cone_from_moi(
+    ::Type{T},
+    cone::EpiTrRelEntropyTriCone{T, R},
+) where {T <: Real, R <: RealOrComplex{T}}
     return Cones.EpiTrRelEntropyTri{T, R}(cone.dim, use_dual = cone.use_dual)
 end
 

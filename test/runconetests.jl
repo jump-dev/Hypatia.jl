@@ -55,13 +55,10 @@ function cone_types(T::Type{<:Real})
     ]
 
     if T <: LinearAlgebra.BlasReal
-        append!(
-            cones_T,
-            [
-                # Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, T},
-                # Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, Complex{T}},
-            ],
-        )
+        append!(cones_T, [
+        # Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, T},
+        # Cones.PosSemidefTriSparse{Cones.PSDSparseCholmod, T, Complex{T}},
+        ])
     end
 
     return cones_T
