@@ -118,5 +118,4 @@ sep_spectral_funs = [
     # end
     # println()
     # end
-
 end;
