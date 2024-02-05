@@ -5,8 +5,6 @@ This Julia package Hypatia.jl is released under the MIT license; see LICENSE
 file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 =#
 
-# TODO hess_prod
-
 """
 $(TYPEDEF)
 
@@ -29,6 +27,7 @@ mutable struct EpiTrRelEntropyTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     feas_updated::Bool
     grad_updated::Bool
     hess_updated::Bool
+    hess_aux_updated::Bool
     inv_hess_updated::Bool
     hess_fact_updated::Bool
     dder3_aux_updated::Bool
@@ -64,9 +63,11 @@ mutable struct EpiTrRelEntropyTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     d2zdV2::Matrix{T}
     d2zdW2::Matrix{T}
     d2zdVW::Matrix{T}
+    tempvec::Vector{T}
     mat::Matrix{R}
     mat2::Matrix{R}
     mat3::Matrix{R}
+    mat4::Matrix{R}
     ten3d::Array{R, 3}
 
     function EpiTrRelEntropyTri{T, R}(
@@ -90,8 +91,9 @@ function reset_data(cone::EpiTrRelEntropyTri)
         cone.feas_updated =
             cone.grad_updated =
                 cone.hess_updated =
-                    cone.inv_hess_updated =
-                        cone.hess_fact_updated = cone.dder3_aux_updated = false
+                    cone.hess_aux_updated =
+                        cone.inv_hess_updated =
+                            cone.hess_fact_updated = cone.dder3_aux_updated = false
     )
 end
 
@@ -122,9 +124,11 @@ function setup_extra_data!(
     cone.d2zdV2 = zeros(T, vw_dim, vw_dim)
     cone.d2zdW2 = zeros(T, vw_dim, vw_dim)
     cone.d2zdVW = zeros(T, vw_dim, vw_dim)
+    cone.tempvec = zeros(T, vw_dim)
     cone.mat = zeros(R, d, d)
     cone.mat2 = zeros(R, d, d)
     cone.mat3 = zeros(R, d, d)
+    cone.mat4 = zeros(R, d, d)
     cone.ten3d = zeros(R, d, d, d)
     return
 end
@@ -219,29 +223,38 @@ function update_grad(
     spectral_outer!(W_sim, V_vecs', Hermitian(cone.W, :U), mat)
     @. mat = W_sim * Δ2_V
     spectral_outer!(mat2, V_vecs, Hermitian(mat, :U), mat3)
+    @. mat2 *= zi
     @views smat_to_svec!(cone.dzdV, mat2, rt2)
 
-    axpby!(-1, Vi, -zi, mat2)
+    axpby!(-1, Vi, -1, mat2)
     @views smat_to_svec!(g[cone.V_idxs], mat2, rt2)
 
     cone.grad_updated = true
     return cone.grad
 end
 
-function update_hess(
-    cone::EpiTrRelEntropyTri{T, R},
-) where {T <: Real, R <: RealOrComplex{T}}
+function update_hess_aux(cone::EpiTrRelEntropyTri)
     @assert cone.grad_updated
+    Δ2!(cone.Δ2_W, cone.W_fact.values, cone.W_λ_log)
+    Δ3!(cone.Δ3_V, cone.Δ2_V, cone.V_fact.values)
+
+    cone.hess_aux_updated = true
+    return cone.hess_aux_updated
+end
+
+function update_hess(cone::EpiTrRelEntropyTri)
+    cone.hess_aux_updated || update_hess_aux(cone)
     isdefined(cone, :hess) || alloc_hess!(cone)
     rt2 = cone.rt2
     V_idxs = cone.V_idxs
     W_idxs = cone.W_idxs
     zi = inv(cone.z)
-    (V_λ, V_vecs) = cone.V_fact
-    (W_λ, W_vecs) = cone.W_fact
+    V_vecs = cone.V_fact.vectors
+    W_vecs = cone.W_fact.vectors
     Δ2_V = cone.Δ2_V
     Δ2_W = cone.Δ2_W
     Δ3_V = cone.Δ3_V
+    dzdV = cone.dzdV
     dzdW = cone.dzdW
     d2zdV2 = cone.d2zdV2
     d2zdW2 = cone.d2zdW2
@@ -252,31 +265,26 @@ function update_hess(
     H = cone.hess.data
 
     # u
-    @views dzdVzi = H[V_idxs, 1]
-    @. dzdVzi = zi * cone.dzdV
-
     H[1, 1] = abs2(zi)
-    @. H[1, V_idxs] = zi * dzdVzi
+    @. H[1, V_idxs] = zi * dzdV
     @. H[1, W_idxs] = zi * dzdW
 
     # vv
-    Δ3!(Δ3_V, Δ2_V, V_λ)
     d2zdV2!(d2zdV2, V_vecs, cone.W_sim, Δ3_V, cone.ten3d, mat, mat2, mat3, rt2)
 
     @. d2zdV2 *= -1
     @views Hvv = H[V_idxs, V_idxs]
     symm_kron!(Hvv, cone.Vi, rt2)
-    mul!(Hvv, dzdVzi, dzdVzi', true, true)
+    mul!(Hvv, dzdV, dzdV', true, true)
     @. Hvv += zi * d2zdV2
 
     # vw
     eig_dot_kron!(d2zdVW, Δ2_V, V_vecs, mat, mat2, mat3, rt2)
     @views Hvw = H[V_idxs, W_idxs]
     @. Hvw = -zi * d2zdVW
-    mul!(Hvw, dzdVzi, dzdW', true, true)
+    mul!(Hvw, dzdV, dzdW', true, true)
 
     # ww
-    Δ2!(Δ2_W, W_λ, cone.W_λ_log)
     eig_dot_kron!(d2zdW2, Δ2_W, W_vecs, mat, mat2, mat3, rt2)
     @views Hww = H[W_idxs, W_idxs]
     symm_kron!(Hww, cone.Wi, rt2)
@@ -285,6 +293,69 @@ function update_hess(
 
     cone.hess_updated = true
     return cone.hess
+end
+
+function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiTrRelEntropyTri)
+    cone.hess_aux_updated || update_hess_aux(cone)
+    rt2 = cone.rt2
+    V_idxs = cone.V_idxs
+    W_idxs = cone.W_idxs
+    dzdW = cone.dzdW
+    dzdV = cone.dzdV
+    z = cone.z
+    tempvec = cone.tempvec
+    temp = cone.mat
+    temp2 = cone.mat2
+    Varr_simV = cone.mat3
+    arr_W_mat = cone.mat4
+    (V_λ, V_vecs) = cone.V_fact
+    (W_λ, W_vecs) = cone.W_fact
+    Δ3 = cone.Δ3_V
+
+    for i in 1:size(arr, 2)
+        @views V_arr = arr[V_idxs, i]
+        @views W_arr = arr[W_idxs, i]
+
+        const1 = arr[1, i] / z + dot(dzdV, V_arr) + dot(dzdW, W_arr)
+        prod[1, i] = const1 / z
+
+        @views @. prod[W_idxs, i] = dzdW * const1
+        # Hwv * a_v
+        arr_V_mat = svec_to_smat!(temp, V_arr, rt2)
+        spectral_outer!(Varr_simV, V_vecs', Hermitian(arr_V_mat, :U), temp2)
+        @. temp = Varr_simV * cone.Δ2_V
+        spectral_outer!(temp, V_vecs, Hermitian(temp, :U), temp2)
+        @. temp /= -z
+        @views prod[W_idxs, i] .+= smat_to_svec!(tempvec, temp, rt2)
+        # Hww * a_w
+        svec_to_smat!(arr_W_mat, W_arr, rt2)
+        Warr_simW = spectral_outer!(temp2, W_vecs', Hermitian(arr_W_mat, :U), temp)
+        @. temp = Warr_simW * cone.Δ2_W / z
+        @. Warr_simW /= W_λ'
+        ldiv!(Diagonal(W_λ), Warr_simW)
+        @. temp += Warr_simW
+        spectral_outer!(temp, W_vecs, Hermitian(temp, :U), temp2)
+        @views prod[W_idxs, i] .+= smat_to_svec!(tempvec, temp, rt2)
+
+        @views @. prod[V_idxs, i] = dzdV * const1
+        # Hvv * a_v
+        for k in 1:(cone.d)
+            @views @. temp = cone.W_sim * Δ3[:, :, k]
+            @views mul!(temp2[:, k], temp, Varr_simV[:, k])
+        end
+        @. temp = temp2 + temp2'
+        # destroys arr_W_mat
+        Warr_simV = spectral_outer!(arr_W_mat, V_vecs', Hermitian(arr_W_mat, :U), temp2)
+        @. temp += Warr_simV * cone.Δ2_V
+        @. temp /= -z
+        @. Varr_simV /= V_λ'
+        ldiv!(Diagonal(V_λ), Varr_simV)
+        @. temp += Varr_simV
+        spectral_outer!(temp, V_vecs, Hermitian(temp, :U), temp2)
+        @views prod[V_idxs, i] .+= smat_to_svec!(tempvec, temp, rt2)
+    end
+
+    return prod
 end
 
 function update_dder3_aux(cone::EpiTrRelEntropyTri)
@@ -324,7 +395,7 @@ function dder3(
     d2zdVW = Symmetric(cone.d2zdVW, :U)
     VWwd = d2zdVW * w_dir
 
-    const0 = zi * (u_dir + dot(v_dir, dzdV)) + dot(w_dir, dzdW)
+    const0 = zi * u_dir + dot(v_dir, dzdV) + dot(w_dir, dzdW)
     const1 =
         abs2(const0) + zi * (-dot(v_dir, VWwd) + (dot(v_dir, Vvd) + dot(w_dir, Wwd)) / 2)
 
@@ -332,7 +403,7 @@ function dder3(
     W_part_1a = Wwd - d2zdVW * v_dir
 
     # u
-    ziconst1 = dder3[1] = zi * const1
+    dder3[1] = zi * const1
 
     # v, w
     # TODO prealloc
@@ -384,7 +455,7 @@ function dder3(
     mul!(V_part_1, V_vecs, mat, true, zi)
     @views dder3_V = dder3[V_idxs]
     smat_to_svec!(dder3_V, V_part_1, rt2)
-    @. dder3_V += ziconst1 * dzdV
+    @. dder3_V += const1 * dzdV
 
     # w
     svec_to_smat!(W_part_1, W_part_1a, rt2)
@@ -504,30 +575,6 @@ function d2zdV2!(
     end
     return d2zdV2
 end
-
-# NOTE helper for hess_prod, totally untested, can have typos
-# function d2zdV2_prod!(
-#     prod::AbstractVecOrMat{T},
-#     arr::AbstractVecOrMat{T},
-#     vecs::Matrix{R},
-#     inner::Matrix{R},
-#     Δ3::Array{T, 3},
-#     mat::Matrix{R},
-#     rt2::T,
-# ) where {T <: Real, R <: RealOrComplex{T}}
-#     d = size(vecs, 1)
-#     arr_mat = svec_to_smat!(mat, arr, rt2)
-#     arr_mat_tilde = vecs' * arr_mat * vecs
-#     temp = zero(mat)
-#     for k = 1:d
-#         @views temp[:, k] .= (inner .* Δ3[:, :, k]) * arr_mat_tilde[:, k]
-#     end
-#     temp = temp + temp'
-#     temp = vecs * temp * vecs'
-#     smat_to_svec!(prod, temp, rt2)
-#
-#     return prod
-# end
 
 function VdWs_element(
     i::Int,
