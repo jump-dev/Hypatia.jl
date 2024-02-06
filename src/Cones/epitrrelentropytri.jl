@@ -237,7 +237,6 @@ function update_hess_aux(cone::EpiTrRelEntropyTri)
     @assert cone.grad_updated
     Δ2!(cone.Δ2_W, cone.W_fact.values, cone.W_λ_log)
     Δ3!(cone.Δ3_V, cone.Δ2_V, cone.V_fact.values)
-
     cone.hess_aux_updated = true
     return cone.hess_aux_updated
 end
@@ -360,7 +359,7 @@ end
 
 function update_dder3_aux(cone::EpiTrRelEntropyTri)
     @assert !cone.dder3_aux_updated
-    @assert cone.hess_updated
+    cone.hess_aux_updated || update_hess_aux(cone)
     Δ3!(cone.Δ3_W, cone.Δ2_W, cone.W_fact.values)
     cone.dder3_aux_updated = true
     return
