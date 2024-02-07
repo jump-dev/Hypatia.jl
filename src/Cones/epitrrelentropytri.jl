@@ -68,7 +68,7 @@ mutable struct EpiTrRelEntropyTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     mat2::Matrix{R}
     mat3::Matrix{R}
     mat4::Matrix{R}
-    ten3d::Array{R, 3}
+    Wsim_Δ3::Array{R, 3}
 
     function EpiTrRelEntropyTri{T, R}(
         dim::Int;
@@ -129,7 +129,7 @@ function setup_extra_data!(
     cone.mat2 = zeros(R, d, d)
     cone.mat3 = zeros(R, d, d)
     cone.mat4 = zeros(R, d, d)
-    cone.ten3d = zeros(R, d, d, d)
+    cone.Wsim_Δ3 = zeros(R, d, d, d)
     return
 end
 
@@ -162,6 +162,7 @@ function update_feas(
     for (X, idxs) in zip((cone.V, cone.W), (cone.V_idxs, cone.W_idxs))
         @views svec_to_smat!(X, point[idxs], cone.rt2)
     end
+
     VH = Hermitian(cone.V, :U)
     WH = Hermitian(cone.W, :U)
     if isposdef(VH) && isposdef(WH)
@@ -237,6 +238,10 @@ function update_hess_aux(cone::EpiTrRelEntropyTri)
     @assert cone.grad_updated
     Δ2!(cone.Δ2_W, cone.W_fact.values, cone.W_λ_log)
     Δ3!(cone.Δ3_V, cone.Δ2_V, cone.V_fact.values)
+    @inbounds for k in 1:(cone.d)
+        @. @views cone.Wsim_Δ3[:, :, k] = cone.W_sim * cone.Δ3_V[:, :, k]
+    end
+
     cone.hess_aux_updated = true
     return cone.hess_aux_updated
 end
@@ -252,7 +257,6 @@ function update_hess(cone::EpiTrRelEntropyTri)
     W_vecs = cone.W_fact.vectors
     Δ2_V = cone.Δ2_V
     Δ2_W = cone.Δ2_W
-    Δ3_V = cone.Δ3_V
     dzdV = cone.dzdV
     dzdW = cone.dzdW
     d2zdV2 = cone.d2zdV2
@@ -269,7 +273,7 @@ function update_hess(cone::EpiTrRelEntropyTri)
     @. H[1, W_idxs] = zi * dzdW
 
     # vv
-    d2zdV2!(d2zdV2, V_vecs, cone.W_sim, Δ3_V, cone.ten3d, mat, mat2, mat3, rt2)
+    d2zdV2!(d2zdV2, V_vecs, cone.Wsim_Δ3, mat, mat2, mat3, rt2)
 
     @. d2zdV2 *= -1
     @views Hvv = H[V_idxs, V_idxs]
@@ -309,9 +313,8 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiTrRe
     arr_W_mat = cone.mat4
     (V_λ, V_vecs) = cone.V_fact
     (W_λ, W_vecs) = cone.W_fact
-    Δ3 = cone.Δ3_V
 
-    for i in 1:size(arr, 2)
+    @inbounds for i in 1:size(arr, 2)
         @views V_arr = arr[V_idxs, i]
         @views W_arr = arr[W_idxs, i]
 
@@ -339,8 +342,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiTrRe
         @views @. prod[V_idxs, i] = dzdV * const1
         # Hvv * a_v
         for k in 1:(cone.d)
-            @views @. temp = cone.W_sim * Δ3[:, :, k]
-            @views mul!(temp2[:, k], temp, Varr_simV[:, k])
+            @views mul!(temp2[:, k], cone.Wsim_Δ3[:, :, k], Varr_simV[:, k])
         end
         @. temp = temp2 + temp2'
         # destroys arr_W_mat
@@ -388,22 +390,6 @@ function dder3(
     @views v_dir = dir[V_idxs]
     @views w_dir = dir[W_idxs]
 
-    # TODO in-place
-    Vvd = Symmetric(cone.d2zdV2, :U) * v_dir
-    Wwd = Symmetric(cone.d2zdW2, :U) * w_dir
-    d2zdVW = Symmetric(cone.d2zdVW, :U)
-    VWwd = d2zdVW * w_dir
-
-    const0 = zi * u_dir + dot(v_dir, dzdV) + dot(w_dir, dzdW)
-    const1 =
-        abs2(const0) + zi * (-dot(v_dir, VWwd) + (dot(v_dir, Vvd) + dot(w_dir, Wwd)) / 2)
-
-    V_part_1a = const0 * (Vvd - VWwd)
-    W_part_1a = Wwd - d2zdVW * v_dir
-
-    # u
-    dder3[1] = zi * const1
-
     # v, w
     # TODO prealloc
     V_dir = Hermitian(zero(mat), :U)
@@ -423,6 +409,35 @@ function dder3(
     spectral_outer!(V_dir_sim, V_vecs', V_dir, mat)
     spectral_outer!(W_dir_sim, W_vecs', W_dir, mat)
     spectral_outer!(VW_dir_sim, V_vecs', W_dir, mat)
+
+    for k in 1:(cone.d)
+        @views mul!(mat2[:, k], cone.Wsim_Δ3[:, :, k], V_dir_sim[:, k])
+    end
+    @. mat = mat2 + mat2'
+    spectral_outer!(mat, V_vecs, Hermitian(mat, :U), mat2)
+    Vvd = smat_to_svec!(zero(w_dir), mat, rt2)
+
+    @. mat = W_dir_sim * cone.Δ2_W
+    spectral_outer!(mat, W_vecs, Hermitian(mat, :U), mat2)
+    Wwd = smat_to_svec!(zero(w_dir), mat, rt2)
+
+    @. mat = VW_dir_sim * cone.Δ2_V
+    spectral_outer!(mat, V_vecs, Hermitian(mat, :U), mat2)
+    VWwd = smat_to_svec!(zero(w_dir), mat, rt2)
+
+    @. mat = V_dir_sim * cone.Δ2_V
+    spectral_outer!(mat, V_vecs, Hermitian(mat, :U), mat2)
+    VWvd = smat_to_svec!(zero(w_dir), mat, rt2)
+
+    const0 = zi * u_dir + dot(v_dir, dzdV) + dot(w_dir, dzdW)
+    const1 =
+        abs2(const0) + zi * (-dot(v_dir, VWwd) + (-dot(v_dir, Vvd) + dot(w_dir, Wwd)) / 2)
+
+    V_part_1a = -const0 * (Vvd + VWwd)
+    W_part_1a = Wwd - VWvd
+
+    # u
+    dder3[1] = zi * const1
 
     @inbounds @views for j in 1:(cone.d)
         Vds_j = V_dir_sim[:, j]
@@ -445,7 +460,7 @@ function dder3(
     # v
     d3WlogVdV!(d3WlogVdV, Δ3_V, V_λ, V_dir_sim, cone.W_sim, mat)
     svec_to_smat!(V_part_1, V_part_1a, rt2)
-    @. V_dir_sim /= sqrt(V_λ)'
+    rdiv!(V_dir_sim, Diagonal(sqrt.(V_λ)))
     ldiv!(Diagonal(V_λ), V_dir_sim)
     V_part_2 = d3WlogVdV
     @. V_part_2 += diff_dot_V_VW + diff_dot_V_VW'
@@ -460,7 +475,7 @@ function dder3(
     svec_to_smat!(W_part_1, W_part_1a, rt2)
     spectral_outer!(mat2, V_vecs, Hermitian(diff_dot_V_VV, :U), mat)
     axpby!(true, mat2, const0, W_part_1)
-    @. W_dir_sim /= sqrt(W_λ)'
+    rdiv!(W_dir_sim, Diagonal(sqrt.(W_λ)))
     ldiv!(Diagonal(W_λ), W_dir_sim)
     W_part_2 = diff_dot_W_WW
     mul!(W_part_2, W_dir_sim, W_dir_sim', true, -zi)
@@ -529,9 +544,7 @@ end
 function d2zdV2!(
     d2zdV2::Matrix{T},
     vecs::Matrix{R},
-    inner::Matrix{R},
-    Δ3::Array{T, 3},
-    ten3d::Array{R, 3}, # temp
+    Wsim_Δ3::Array{R, 3},
     mat::Matrix{R}, # temp
     mat2::Matrix{R}, # temp
     mat3::Matrix{R}, # temp
@@ -542,9 +555,6 @@ function d2zdV2!(
     V_views = [view(V, :, i) for i in 1:d]
     rt2i = inv(rt2)
     scals = (R <: Complex{T} ? [rt2i, rt2i * im] : [rt2i])
-    @inbounds for k in 1:d
-        @. @views ten3d[:, :, k] = inner * Δ3[:, :, k]
-    end
 
     col_idx = 1
     @inbounds for j in 1:d
@@ -552,7 +562,7 @@ function d2zdV2!(
             mul!(mat3, V_views[j], V_views[i]', scal, false)
             @. mat2 = mat3 + mat3'
             for k in 1:d
-                @views mul!(mat3[:, k], ten3d[:, :, k], mat2[:, k])
+                @views mul!(mat3[:, k], Wsim_Δ3[:, :, k], mat2[:, k])
             end
             # mat2 = vecs * (mat3 + mat3) * vecs'
             @. mat2 = mat3 + mat3'
@@ -564,7 +574,7 @@ function d2zdV2!(
 
         mul!(mat2, V_views[j], V_views[j]')
         for k in 1:d
-            @views mul!(mat3[:, k], ten3d[:, :, k], mat2[:, k])
+            @views mul!(mat3[:, k], Wsim_Δ3[:, :, k], mat2[:, k])
         end
         @. mat2 = mat3 + mat3'
         mul!(mat3, Hermitian(mat2, :U), V)
@@ -597,7 +607,7 @@ function d3WlogVdV!(
     λ::Vector{T},
     Vds::Matrix{R},
     Ws::Matrix{R},
-    Δ4_ij::Matrix{R}, # temp TODO could have been a Matrix{T}
+    Δ4_ij::Matrix{R},
 ) where {T <: Real, R <: RealOrComplex{T}}
     d = length(λ)
 
