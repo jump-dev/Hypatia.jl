@@ -460,7 +460,7 @@ function dder3(
     # v
     d3WlogVdV!(d3WlogVdV, Δ3_V, V_λ, V_dir_sim, cone.W_sim, mat)
     svec_to_smat!(V_part_1, V_part_1a, rt2)
-    rdiv!(V_dir_sim, Diagonal(sqrt.(V_λ)))
+    @. V_dir_sim /= sqrt(V_λ)'
     ldiv!(Diagonal(V_λ), V_dir_sim)
     V_part_2 = d3WlogVdV
     @. V_part_2 += diff_dot_V_VW + diff_dot_V_VW'
@@ -475,7 +475,7 @@ function dder3(
     svec_to_smat!(W_part_1, W_part_1a, rt2)
     spectral_outer!(mat2, V_vecs, Hermitian(diff_dot_V_VV, :U), mat)
     axpby!(true, mat2, const0, W_part_1)
-    rdiv!(W_dir_sim, Diagonal(sqrt.(W_λ)))
+    @. W_dir_sim /= sqrt(W_λ)'
     ldiv!(Diagonal(W_λ), W_dir_sim)
     W_part_2 = diff_dot_W_WW
     mul!(W_part_2, W_dir_sim, W_dir_sim', true, -zi)
