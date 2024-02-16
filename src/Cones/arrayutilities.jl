@@ -202,11 +202,13 @@ $(SIGNATURES)
 Copy a complex Hermitian matrix upper triangle to a svec-scaled real vector
 in-place.
 """
-function smat_to_svec!(
+smat_to_svec!(
     vec::AbstractVector{T},
     mat::AbstractMatrix{Complex{T}},
     rt2::Real,
-) where {T}
+) where {T} = _smat_to_svec_complex!(vec, mat, rt2)
+
+function _smat_to_svec_complex!(vec, mat, rt2)
     k = 1
     m = size(mat, 1)
     @assert m == size(mat, 2)
@@ -258,6 +260,10 @@ function svec_to_smat!(
     vec::AbstractVector{T},
     rt2::Real,
 ) where {T}
+    return _svec_to_smat_complex!(mat, vec, rt2)
+end
+
+function _svec_to_smat_complex!(mat, vec, rt2)
     k = 1
     m = size(mat, 1)
     @assert m == size(mat, 2)
@@ -266,7 +272,7 @@ function svec_to_smat!(
             mat[i, j] = vec[k]
             k += 1
         else
-            mat[i, j] = Complex(vec[k], -vec[k + 1]) / rt2
+            mat[i, j] = (vec[k] - im * vec[k + 1]) / rt2
             k += 2
         end
     end
@@ -375,7 +381,6 @@ function eig_dot_kron!(
 ) where {T <: Real, R <: RealOrComplex{T}}
     @assert issymmetric(inner) # must be symmetric (wrapper is less efficient)
     rt2i = inv(rt2)
-    d = size(inner, 1)
     copyto!(V, vecs') # allows fast column slices
     V_views = [view(V, :, i) for i in 1:size(inner, 1)]
     scals = (R <: Complex{T} ? [rt2i, rt2i * im] : [rt2i]) # real and imag parts

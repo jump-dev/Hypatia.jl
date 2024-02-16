@@ -492,7 +492,6 @@ function dder3(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}, dir::AbstractVector{T})
     w_λi = cache.w_λi
     σ = cache.σ
     ∇h = cache.∇h
-    ∇2h = cache.∇2h
     Δ2h = cache.Δ2h
     r_X = cache.w1
     ξ_X = cache.w2

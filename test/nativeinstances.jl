@@ -562,7 +562,7 @@ function doublynonnegativetri1(T; options...)
     A = T[1 0 0; 0 0 1]
     b = ones(T, 2)
     G = SparseMatrixCSC(-one(T) * I, q, n)
-    for use_dual in [false, true]
+    for use_dual in (false, true)
         use_dual = false
         h = (use_dual ? T[1, 0, 1] : zeros(T, q))
         cones = Cone{T}[Cones.DoublyNonnegativeTri{T}(q, use_dual = use_dual)]
@@ -2194,7 +2194,7 @@ function epipersepspectral_matrix1(T; options...)
     tol = test_tol(T)
     Random.seed!(1)
     rt2 = sqrt(T(2))
-    for d in [1, 3], is_complex in [false, true]
+    for d in [1, 3], is_complex in (false, true)
         R = (is_complex ? Complex{T} : T)
         dim = 2 + Cones.svec_length(R, d)
         W = rand(R, d, d)
@@ -2223,7 +2223,7 @@ function epipersepspectral_matrix2(T; options...)
     tol = test_tol(T)
     Random.seed!(1)
     rt2 = sqrt(T(2))
-    for d in [1, 3], is_complex in [false, true]
+    for d in [1, 3], is_complex in (false, true)
         R = (is_complex ? Complex{T} : T)
         dim = 2 + Cones.svec_length(R, d)
         c = T[1]
@@ -2257,8 +2257,7 @@ end
 
 function epipersepspectral_matrix3(T; options...)
     tol = test_tol(T)
-    rt2 = sqrt(T(2))
-    for d in [2, 4], is_complex in [false, true]
+    for d in [2, 4], is_complex in (false, true)
         R = (is_complex ? Complex{T} : T)
         dim = 2 + Cones.svec_length(R, d)
         c = zeros(T, dim)
@@ -2386,56 +2385,60 @@ function epitrrelentropytri1(T; options...)
     Random.seed!(1)
     rt2 = sqrt(T(2))
     side = 4
-    svec_dim = Cones.svec_length(side)
-    dim = 2 * svec_dim + 1
-    c = T[1]
-    A = zeros(T, 0, 1)
-    b = T[]
-    W = rand(T, side, side)
-    W = W * W'
-    V = rand(T, side, side)
-    V = V * V'
-    h = vcat(
-        zero(T),
-        Cones.smat_to_svec!(zeros(T, svec_dim), V, rt2),
-        Cones.smat_to_svec!(zeros(T, svec_dim), W, rt2),
-    )
-    G = zeros(T, dim, 1)
-    G[1, 1] = -1
-    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(dim)]
+    for is_complex in (false, true)
+        R = (is_complex ? Complex{T} : T)
+        svec_dim = Cones.svec_length(R, side)
+        dim = 2 * svec_dim + 1
+        c = T[1]
+        A = zeros(T, 0, 1)
+        b = T[]
+        W = randn(R, side, side)
+        W = W * W'
+        V = randn(R, side, side)
+        V = V * V'
+        h = vcat(
+            zero(T),
+            Cones.smat_to_svec!(zeros(T, svec_dim), V, rt2),
+            Cones.smat_to_svec!(zeros(T, svec_dim), W, rt2),
+        )
+        G = zeros(T, dim, 1)
+        G[1, 1] = -1
+        cones = Cone{T}[Cones.EpiTrRelEntropyTri{T, R}(dim)]
 
-    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
-    @test r.status == Solvers.Optimal
-    @test r.primal_obj ≈ dot(W, log(W) - log(V)) atol = tol rtol = tol
+        r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+        @test r.status == Solvers.Optimal
+        @test r.primal_obj ≈ dot(W, log(W) - log(V)) atol = tol rtol = tol
+    end
 end
 
 function epitrrelentropytri2(T; options...)
     tol = test_tol(T)
     rt2 = sqrt(T(2))
     side = 3
-    svec_dim = Cones.svec_length(side)
-    dim = 2 * svec_dim + 1
-    c = vcat(zeros(T, svec_dim), -ones(T, svec_dim))
-    A = Matrix{T}(I, svec_dim, 2 * svec_dim)
-    b = zeros(T, svec_dim)
-    b[[sum(1:i) for i in 1:side]] .= 1
-    h = vcat(T(5), zeros(T, 2 * svec_dim))
-    g_svec = Cones.scale_svec!(-ones(T, svec_dim), sqrt(T(2)))
-    G = vcat(zeros(T, 2 * svec_dim)', Diagonal(vcat(g_svec, g_svec)))
-    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(dim)]
+    for is_complex in (false, true)
+        R = (is_complex ? Complex{T} : T)
+        svec_dim = Cones.svec_length(R, side)
+        dim = 2 * svec_dim + 1
+        c = vcat(zeros(T, svec_dim), -ones(T, svec_dim))
+        A = Matrix{T}(I, svec_dim, 2 * svec_dim)
+        b = zeros(T, svec_dim)
+        Cones.smat_to_svec!(b, Matrix{R}(I, side, side), rt2)
+        h = vcat(T(5), zeros(T, 2 * svec_dim))
+        G = vcat(zeros(T, 2 * svec_dim)', Diagonal(-ones(T, 2 * svec_dim)))
+        cones = Cone{T}[Cones.EpiTrRelEntropyTri{T, R}(dim)]
 
-    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
-    @test r.status == Solvers.Optimal
-    W = Hermitian(
-        Cones.svec_to_smat!(zeros(T, side, side), r.s[(svec_dim + 2):end], rt2),
-        :U,
-    )
-    @test dot(W, log(W)) ≈ T(5) atol = tol rtol = tol
+        r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+        @test r.status == Solvers.Optimal
+        W = Hermitian(
+            Cones.svec_to_smat!(zeros(R, side, side), r.s[(svec_dim + 2):end], rt2),
+            :U,
+        )
+        @test dot(W, log(W)) ≈ T(5) atol = tol rtol = tol
+    end
 end
 
 function epitrrelentropytri3(T; options...)
     tol = test_tol(T)
-    rt2 = sqrt(T(2))
     side = 3
     svec_dim = Cones.svec_length(side)
     dim = 2 * svec_dim + 1
@@ -2444,7 +2447,7 @@ function epitrrelentropytri3(T; options...)
     b = [zero(T)]
     h = zeros(T, dim)
     G = Diagonal(-one(T) * I, dim)
-    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(dim)]
+    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T, T}(dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal
@@ -2455,8 +2458,7 @@ end
 
 function epitrrelentropytri4(T; options...)
     tol = test_tol(T)
-    rt2 = sqrt(T(2))
-    side = 3
+    side = 4
     svec_dim = Cones.svec_length(side)
     dim = 2 * svec_dim + 1
     c = vcat(zero(T), ones(T, svec_dim), zeros(T, svec_dim))
@@ -2464,7 +2466,7 @@ function epitrrelentropytri4(T; options...)
     b = [zero(T)]
     h = zeros(T, dim)
     G = Diagonal(-one(T) * I, dim)
-    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T}(dim)]
+    cones = Cone{T}[Cones.EpiTrRelEntropyTri{T, T}(dim)]
 
     r = build_solve_check(c, A, b, G, h, cones, tol; options...)
     @test r.status == Solvers.Optimal

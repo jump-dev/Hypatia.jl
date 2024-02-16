@@ -397,10 +397,14 @@ function get_central_ray_epirelentropy(w_dim::Int)
         u = 1.2023 / rtw_dim - 0.015
         v = 0.432 / rtw_dim + 1.0125
         w = -0.3057 / rtw_dim + 0.972
-    else
+    elseif w_dim <= 300
         u = 1.1513 / rtw_dim - 0.0069
         v = 0.4873 / rtw_dim + 1.0008
         w = -0.4247 / rtw_dim + 0.9961
+    else # use asymptotic expansion for the highest dimensions
+        u = 1 / rtw_dim + 0.75 / w_dim
+        v = 1 + 0.5 / rtw_dim
+        w = 1 - 0.5 / rtw_dim + 0.25 / w_dim
     end
     return [u, v, w]
 end

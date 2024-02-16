@@ -45,7 +45,8 @@ function cone_types(T::Type{<:Real})
         Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, T}, T},
         Cones.EpiPerSepSpectral{Cones.MatrixCSqr{T, Complex{T}}, T},
         Cones.EpiRelEntropy{T},
-        Cones.EpiTrRelEntropyTri{T},
+        Cones.EpiTrRelEntropyTri{T, T},
+        Cones.EpiTrRelEntropyTri{T, Complex{T}},
         Cones.WSOSInterpNonnegative{T, T},
         Cones.WSOSInterpNonnegative{T, Complex{T}},
         Cones.WSOSInterpPosSemidefTri{T},
@@ -117,5 +118,4 @@ sep_spectral_funs = [
     # end
     # println()
     # end
-
 end;
