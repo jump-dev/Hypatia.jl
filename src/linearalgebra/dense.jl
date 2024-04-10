@@ -133,7 +133,7 @@ end
 function spectral_outer!(
     mat::AbstractMatrix{T},
     vecs::Matrix{T},
-    symm::Union{Symmetric{T}, Hermitian{T}},
+    symm::Symmetric{T},
     temp::Matrix{T},
 ) where {T <: Real}
     mul!(temp, vecs, symm)
@@ -144,7 +144,7 @@ end
 function spectral_outer!(
     mat::AbstractMatrix{T},
     vecs::Adjoint{T, Matrix{T}},
-    symm::Union{Symmetric{T}, Hermitian{T}},
+    symm::Symmetric{T},
     temp::Matrix{T},
 ) where {T <: Real}
     mul!(temp, symm, vecs')
