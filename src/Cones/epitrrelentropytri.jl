@@ -550,7 +550,7 @@ function d2zdV2!(
     rt2::T,
 ) where {T <: Real, R <: RealOrComplex{T}}
     d = size(vecs, 1)
-    V = copyto!(mat,vecs')
+    V = copyto!(mat, vecs')
     V_views = [view(V, :, i) for i in 1:d]
     rt2i = inv(rt2)
     scals = (R <: Complex{T} ? [rt2i, rt2i * im] : [rt2i])
