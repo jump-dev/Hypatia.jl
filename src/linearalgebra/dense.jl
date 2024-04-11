@@ -168,7 +168,7 @@ function spectral_outer!(
     vecs::Adjoint{R, Matrix{R}},
     symm::Hermitian{R},
     temp::Matrix{R},
-) where {T <: Real, R <: RealOrComplex{T}}
+) where {R <: RealOrComplex}
     mul!(temp, symm, vecs')
     mul!(mat, vecs, temp)
     return mat
