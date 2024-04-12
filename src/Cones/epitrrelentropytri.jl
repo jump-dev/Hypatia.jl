@@ -166,7 +166,6 @@ function update_feas(
     VH = Hermitian(cone.V, :U)
     WH = Hermitian(cone.W, :U)
     if isposdef(VH) && isposdef(WH)
-        # TODO use LAPACK syev! instead of syevr! for efficiency
         V_fact = cone.V_fact = eigen(VH)
         W_fact = cone.W_fact = eigen(WH)
         if isposdef(V_fact) && isposdef(W_fact)
@@ -345,7 +344,7 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::EpiTrRe
             @views mul!(temp2[:, k], cone.Wsim_Δ3[:, :, k], Varr_simV[:, k])
         end
         @. temp = temp2 + temp2'
-        # destroys arr_W_mat
+        # overwrites arr_W_mat
         Warr_simV = spectral_outer!(arr_W_mat, V_vecs', Hermitian(arr_W_mat, :U), temp2)
         @. temp += Warr_simV * cone.Δ2_V
         @. temp /= -z
@@ -465,8 +464,8 @@ function dder3(
     V_part_2 = d3WlogVdV
     @. V_part_2 += diff_dot_V_VW + diff_dot_V_VW'
     mul!(V_part_2, V_dir_sim, V_dir_sim', true, zi)
-    mul!(mat, Hermitian(V_part_2, :U), V_vecs')
-    mul!(V_part_1, V_vecs, mat, true, zi)
+    mul!(mat, V_vecs, Hermitian(V_part_2, :U))
+    mul!(V_part_1, mat, V_vecs', true, zi)
     @views dder3_V = dder3[V_idxs]
     smat_to_svec!(dder3_V, V_part_1, rt2)
     @. dder3_V += const1 * dzdV
@@ -479,8 +478,8 @@ function dder3(
     ldiv!(Diagonal(W_λ), W_dir_sim)
     W_part_2 = diff_dot_W_WW
     mul!(W_part_2, W_dir_sim, W_dir_sim', true, -zi)
-    mul!(mat, Hermitian(W_part_2, :U), W_vecs')
-    mul!(W_part_1, W_vecs, mat, true, zi)
+    mul!(mat, W_vecs, Hermitian(W_part_2, :U))
+    mul!(W_part_1, mat, W_vecs', true, zi)
     @views dder3_W = dder3[W_idxs]
     smat_to_svec!(dder3_W, W_part_1, rt2)
     @. dder3_W += const1 * dzdW
@@ -566,8 +565,7 @@ function d2zdV2!(
             end
             # mat2 = vecs * (mat3 + mat3) * vecs'
             @. mat2 = mat3 + mat3'
-            mul!(mat3, Hermitian(mat2, :U), V)
-            mul!(mat2, V', mat3)
+            spectral_outer!(mat2, V', Hermitian(mat2, :U), mat3)
             @views smat_to_svec!(d2zdV2[:, col_idx], mat2, rt2)
             col_idx += 1
         end
@@ -577,8 +575,7 @@ function d2zdV2!(
             @views mul!(mat3[:, k], Wsim_Δ3[:, :, k], mat2[:, k])
         end
         @. mat2 = mat3 + mat3'
-        mul!(mat3, Hermitian(mat2, :U), V)
-        mul!(mat2, V', mat3)
+        spectral_outer!(mat2, V', Hermitian(mat2, :U), mat3)
         @views smat_to_svec!(d2zdV2[:, col_idx], mat2, rt2)
         col_idx += 1
     end
