@@ -413,7 +413,6 @@ function dder3(
     diff_dot_V_VV = cone.diff_dot_V_VV
     diff_dot_V_VW = cone.diff_dot_V_VW
     diff_dot_W_WW = cone.diff_dot_W_WW
-
     Vvd = cone.Vvd
     Wwd = cone.Wwd
     VWwd = cone.VWwd
