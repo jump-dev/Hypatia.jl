@@ -385,10 +385,10 @@ function eig_dot_kron!(
     scals = (R <: Complex{T} ? [rt2i, rt2i * im] : [rt2i]) # real and imag parts
 
     col_idx = 1
-    @inbounds for j in 1:size(inner,1)
-        @views V_j = V[:,j]
+    @inbounds for j in 1:size(inner, 1)
+        @views V_j = V[:, j]
         for i in 1:(j - 1), scal in scals
-            @views V_i = V[:,i]
+            @views V_i = V[:, i]
             mul!(temp1, V_j, V_i', scal, false)
             @. temp2 = inner * (temp1 + temp1')
             mul!(temp1, Hermitian(temp2, :U), V)

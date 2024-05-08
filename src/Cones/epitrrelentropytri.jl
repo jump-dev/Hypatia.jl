@@ -578,31 +578,32 @@ function d2zdV2!(
 ) where {T <: Real, R <: RealOrComplex{T}}
     d = size(vecs, 1)
     V = copyto!(mat, vecs')
-    V_views = [view(V, :, i) for i in 1:d]
     rt2i = inv(rt2)
     scals = (R <: Complex{T} ? [rt2i, rt2i * im] : [rt2i])
 
     col_idx = 1
     @inbounds for j in 1:d
+        @views V_j = V[:, j]
         for i in 1:(j - 1), scal in scals
-            mul!(mat3, V_views[j], V_views[i]', scal, false)
+            @views V_i = V[:, i]
+            mul!(mat3, V_j, V_i', scal, false)
             @. mat2 = mat3 + mat3'
             for k in 1:d
                 @views mul!(mat3[:, k], Wsim_Δ3[:, :, k], mat2[:, k])
             end
             # mat2 = vecs * (mat3 + mat3) * vecs'
             @. mat2 = mat3 + mat3'
-            spectral_outer!(mat2, V', Hermitian(mat2, :U), mat3)
+            spectral_outer!(mat2, vecs, Hermitian(mat2, :U), mat3)
             @views smat_to_svec!(d2zdV2[:, col_idx], mat2, rt2)
             col_idx += 1
         end
 
-        mul!(mat2, V_views[j], V_views[j]')
+        mul!(mat2, V_j, V_j')
         for k in 1:d
             @views mul!(mat3[:, k], Wsim_Δ3[:, :, k], mat2[:, k])
         end
         @. mat2 = mat3 + mat3'
-        spectral_outer!(mat2, V', Hermitian(mat2, :U), mat3)
+        spectral_outer!(mat2, vecs, Hermitian(mat2, :U), mat3)
         @views smat_to_svec!(d2zdV2[:, col_idx], mat2, rt2)
         col_idx += 1
     end
