@@ -58,7 +58,7 @@ function vec_copyto!(
     @assert length(rvec) == 2 * length(cvec)
     k = 1
     @inbounds for i in eachindex(cvec)
-        cvec[i] = Complex(rvec[k], rvec[k + 1])
+        cvec[i] = complex(rvec[k], rvec[k + 1])
         k += 2
     end
     return cvec
@@ -272,7 +272,7 @@ function _svec_to_smat_complex!(mat, vec, rt2)
             mat[i, j] = vec[k]
             k += 1
         else
-            mat[i, j] = (vec[k] - im * vec[k + 1]) / rt2
+            mat[i, j] = complex(vec[k], -vec[k + 1]) / rt2
             k += 2
         end
     end
