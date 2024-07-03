@@ -28,7 +28,7 @@ mutable struct PardisoNonSymCache <: SparseNonSymCache{Float64}
     analyzed::Bool
     pardiso::Pardiso.MKLPardisoSolver
     function PardisoNonSymCache()
-        cache = new{Float64}()
+        cache = new()
         cache.analyzed = false
         cache.pardiso = Pardiso.MKLPardisoSolver()
         Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_NONSYM)
@@ -40,7 +40,7 @@ mutable struct PardisoSymCache <: SparseSymCache{Float64}
     analyzed::Bool
     pardiso::Pardiso.MKLPardisoSolver
     function PardisoSymCache()
-        cache = new{Float64}()
+        cache = new()
         cache.analyzed = false
         cache.pardiso = Pardiso.MKLPardisoSolver()
         Pardiso.set_matrixtype!(cache.pardiso, Pardiso.REAL_SYM_INDEF)
