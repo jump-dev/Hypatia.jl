@@ -10,8 +10,7 @@ run MOI tests
 =#
 
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
+import MathOptInterface as MOI
 import Hypatia
 include(joinpath(@__DIR__, "moicones.jl"))
 
