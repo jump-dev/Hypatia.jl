@@ -1,6 +1,6 @@
 <img src="https://github.com/jump-dev/Hypatia.jl/wiki/hypatia_logo.png" alt="Hypatia logo" width="358"/>
 
-[![Build Status](https://github.com/jump-dev/Hypatia.jl/workflows/CI/badge.svg)](https://github.com/jump-dev/Hypatia.jl/actions?query=workflow%3ACI+branch%3Amaster)
+[![Build Status](https://github.com/jump-dev/Hypatia.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/jump-dev/Hypatia.jl/actions?query=workflow%3ACI+branch%3Amaster)
 [![codecov](https://codecov.io/gh/jump-dev/Hypatia.jl/branch/master/graph/badge.svg?token=x7G2wQeKJF)](https://codecov.io/gh/jump-dev/Hypatia.jl)
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://jump.dev/Hypatia.jl/stable)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://jump.dev/Hypatia.jl/dev)
