@@ -202,11 +202,13 @@ $(SIGNATURES)
 Copy a complex Hermitian matrix upper triangle to a svec-scaled real vector
 in-place.
 """
-smat_to_svec!(
+function smat_to_svec!(
     vec::AbstractVector{T},
     mat::AbstractMatrix{Complex{T}},
     rt2::Real,
-) where {T} = _smat_to_svec_complex!(vec, mat, rt2)
+) where {T}
+    return _smat_to_svec_complex!(vec, mat, rt2)
+end
 
 function _smat_to_svec_complex!(vec, mat, rt2)
     k = 1
