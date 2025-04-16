@@ -635,6 +635,24 @@ function cone_from_moi(
     return Cones.WSOSInterpNonnegative{T, R}(cone.U, cone.Ps, use_dual = cone.use_dual)
 end
 
+function _transformation_to(lag::MultivariateBases.LagrangeBasis, gram, weight)
+    return StarAlgebras.coeffs(weight, lag) .* MultivariateBases.transformation_to(gram, lag)
+end
+
+function cone_from_moi(
+    ::Type{T},
+    cone::SumOfSquares.WeightedSOSCone{MOI.PositiveSemidefiniteConeTriangle,<:MultivariateBases.LagrangeBasis},
+) where {T<:Real}
+    return cone_from_moi(
+        T,
+        WSOSInterpNonnegativeCone{T,T}(
+            length(cone.basis),
+            _transformation_to.(Ref(cone.basis), cone.gram_bases, cone.weights),
+        ),
+    )
+end
+
+
 """
 $(TYPEDEF)
 
@@ -785,6 +803,7 @@ const SupportedCone{T <: Real} = Union{
     MOI.DualExponentialCone,
     MOI.LogDetConeTriangle,
     MOI.RelativeEntropyCone,
+    SumOfSquares.WeightedSOSCone{MOI.PositiveSemidefiniteConeTriangle,<:MultivariateBases.LagrangeBasis},
 }
 
 Base.copy(cone::HypatiaCones) = cone # maybe should deep copy the cone struct, but this is expensive
