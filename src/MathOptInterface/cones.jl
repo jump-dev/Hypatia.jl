@@ -9,6 +9,11 @@ file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 definitions of conic sets not already defined by MathOptInterface
 and functions for converting between Hypatia and MOI cone definitions
 =#
+using Hypatia.Cones: Cone
+
+function cone_from_moi(::Type{T}, cone::Cone{T}) where {T <: Real}
+    return cone
+end
 
 function cone_from_moi(::Type{<:Real}, cone::MOI.AbstractVectorSet)
     return error("MOI set $cone is not recognized")

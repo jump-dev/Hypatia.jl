@@ -10,6 +10,7 @@ Proper cone definitions, oracles, and utilities.
 """
 module Cones
 
+import MathOptInterface as MOI
 using DocStringExtensions
 using LinearAlgebra
 import LinearAlgebra.copytri!
@@ -31,7 +32,7 @@ $(TYPEDEF)
 
 A proper cone.
 """
-abstract type Cone{T <: Real} end
+abstract type Cone{T <: Real} <: MOI.AbstractVectorSet end
 
 """
 $(SIGNATURES)
@@ -302,6 +303,9 @@ function get_proxsqr(
 
     return abs(prox_sqr)
 end
+
+Base.copy(cone::Cone) = cone # maybe should deep copy the cone struct, but this is expensive
+MOI.dimension(cone::Cone) = dimension(cone)
 
 include("nonnegative.jl")
 include("possemideftri.jl")
