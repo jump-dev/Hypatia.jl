@@ -304,6 +304,9 @@ function get_proxsqr(
     return abs(prox_sqr)
 end
 
+Base.copy(cone::Cone) = cone # maybe should deep copy the cone struct, but this is expensive
+MOI.dimension(cone::Cone) = dimension(cone)
+
 include("nonnegative.jl")
 include("possemideftri.jl")
 include("doublynonnegativetri.jl")
