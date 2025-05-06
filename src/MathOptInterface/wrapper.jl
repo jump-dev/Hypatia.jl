@@ -8,7 +8,7 @@ file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 #=
 MathOptInterface wrapper of Hypatia solver
 =#
-
+using Hypatia.Cones: Cone
 """
 $(TYPEDEF)
 
@@ -92,7 +92,7 @@ end
 function MOI.supports_constraint(
     ::Optimizer{T},
     ::Type{<:Union{VV, VAF{T}}},
-    ::Type{<:Union{MOI.Zeros, SupportedCone{T}}},
+    ::Type{<:Union{MOI.Zeros, Cone{T}}},
 ) where {T <: Real}
     return true
 end
@@ -265,7 +265,7 @@ end
 
 function MOI.modify(
     opt::Optimizer{T},
-    ci::MOI.ConstraintIndex{VAF{T}, <:SupportedCone{T}},
+    ci::MOI.ConstraintIndex{VAF{T}, <:Cone{T}},
     chg::MOI.VectorConstantChange{T},
 ) where {T}
     i = ci.value
@@ -389,7 +389,7 @@ end
 function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintDual,
-    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCone{T}},
+    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:Cone{T}},
 ) where {T}
     MOI.check_result_index_bounds(opt, attr)
     i = ci.value
@@ -400,7 +400,7 @@ end
 function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintPrimal,
-    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCone{T}},
+    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:Cone{T}},
 ) where {T}
     MOI.check_result_index_bounds(opt, attr)
     i = ci.value
