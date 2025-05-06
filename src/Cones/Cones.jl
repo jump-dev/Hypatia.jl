@@ -10,6 +10,7 @@ Proper cone definitions, oracles, and utilities.
 """
 module Cones
 
+import MathOptInterface as MOI
 using DocStringExtensions
 using LinearAlgebra
 import LinearAlgebra.copytri!
@@ -31,7 +32,7 @@ $(TYPEDEF)
 
 A proper cone.
 """
-abstract type Cone{T <: Real} end
+abstract type Cone{T <: Real} <: MOI.AbstractVectorSet end
 
 """
 $(SIGNATURES)
