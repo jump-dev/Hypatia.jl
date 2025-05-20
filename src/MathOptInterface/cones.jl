@@ -642,7 +642,7 @@ const RankOnePSD{T<:Real} = LRO.SetDotProducts{
         LRO.Factorization{
             T,
             <:AbstractVector{T},
-            FillArrays.Ones{T,0,Tuple{}},
+            LRO.Test.One{T},
         }
     },
 }
