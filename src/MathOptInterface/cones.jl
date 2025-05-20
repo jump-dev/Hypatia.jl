@@ -635,13 +635,14 @@ function cone_from_moi(
     return Cones.WSOSInterpNonnegative{T, R}(cone.U, cone.Ps, use_dual = cone.use_dual)
 end
 
-const RankOnePSD{T<:Real} = MOI.SetDotProducts{
+const RankOnePSD{T<:Real} = LRO.SetDotProducts{
     MOI.PositiveSemidefiniteConeTriangle,
-    MOI.TriangleVectorization{
+    LRO.TriangleVectorization{
         T,
-        MOI.PositiveSemidefiniteFactorization{
+        LRO.Factorization{
             T,
             <:AbstractVector{T},
+            FillArrays.Ones{T,0,Tuple{}},
         }
     },
 }
