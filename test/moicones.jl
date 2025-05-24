@@ -377,20 +377,41 @@ function test_moi_cones(T::Type{<:Real})
 
     @testset "WSOSInterpNonnegative" begin
         Ps = [rand(T, 3, 2), rand(T, 3, 1)]
-        for moi_cone in [
-            Hypatia.WSOSInterpNonnegativeCone{T, T}(3, Ps),
-            LRO.SetDotProducts{LRO.WITHOUT_SET}(
+        moi_cone = Hypatia.WSOSInterpNonnegativeCone{T, T}(3, Ps)
+        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa Cones.WSOSInterpNonnegative{T, T}
+        @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
+        @test hyp_cone.Ps == Ps
+
+        @testset "LowRankOpt" begin
+            P = Ps[1]
+            moi_cone = LRO.SetDotProducts{LRO.WITHOUT_SET}(
                 MOI.PositiveSemidefiniteConeTriangle(2),
-                [
-                    LRO.positive_semidefinite_factorization(Ps[1]),
-                    LRO.positive_semidefinite_factorization(Ps[2]),
-                ]
-            ),
-        ]
+                LRO.TriangleVectorization.([
+                    LRO.positive_semidefinite_factorization(P[1,:]),
+                    LRO.positive_semidefinite_factorization(P[2,:]),
+                    LRO.positive_semidefinite_factorization(P[3,:]),
+                ]),
+            )
             hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
             @test hyp_cone isa Cones.WSOSInterpNonnegative{T, T}
             @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
-            @test hyp_cone.Ps == Ps
+            @test only(hyp_cone.Ps) == P
+            @test hyp_cone.use_dual_barrier
+
+            moi_cone = LRO.LinearCombinationInSet{LRO.WITHOUT_SET}(
+                MOI.PositiveSemidefiniteConeTriangle(2),
+                LRO.TriangleVectorization.([
+                    LRO.positive_semidefinite_factorization(P[1,:]),
+                    LRO.positive_semidefinite_factorization(P[2,:]),
+                    LRO.positive_semidefinite_factorization(P[3,:]),
+                ]),
+            )
+            hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+            @test hyp_cone isa Cones.WSOSInterpNonnegative{T, T}
+            @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
+            @test only(hyp_cone.Ps) == P
+            @test !hyp_cone.use_dual_barrier
         end
 
         Ps = [rand(Complex{T}, 4, 3), rand(Complex{T}, 4, 2)]
