@@ -27,6 +27,10 @@ function test_moi_cones(T::Type{<:Real})
         @test hyp_cone isa Cones.PosSemidefTri{T, T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 6
         @test !Cones.use_dual_barrier(hyp_cone)
+
+        @testset "Copy" begin
+            @test copy(hyp_cone) == hyp_cone
+        end
     end
 
     @testset "HermitianPositiveSemidefiniteConeTriangle" begin
