@@ -635,25 +635,22 @@ function cone_from_moi(
     return Cones.WSOSInterpNonnegative{T, R}(cone.U, cone.Ps, use_dual = cone.use_dual)
 end
 
-const _PrimalRankOnePSD{T<:Real,F<:AbstractVector{T}} = LRO.SetDotProducts{
+const _PrimalRankOnePSD{T <: Real, F <: AbstractVector{T}} = LRO.SetDotProducts{
     LRO.WITHOUT_SET,
     MOI.PositiveSemidefiniteConeTriangle,
-    LRO.TriangleVectorization{
-        T,
-        LRO.Factorization{T,F,LRO.One{T}},
-    },
+    LRO.TriangleVectorization{T, LRO.Factorization{T, F, LRO.One{T}}},
 }
 
-const _DualRankOnePSD{T<:Real,F<:AbstractVector{T}} = LRO.LinearCombinationInSet{
+const _DualRankOnePSD{T <: Real, F <: AbstractVector{T}} = LRO.LinearCombinationInSet{
     LRO.WITHOUT_SET,
     MOI.PositiveSemidefiniteConeTriangle,
-    LRO.TriangleVectorization{
-        T,
-        LRO.Factorization{T,F,LRO.One{T}},
-    },
+    LRO.TriangleVectorization{T, LRO.Factorization{T, F, LRO.One{T}}},
 }
 
-function cone_from_moi(::Type{T}, cone::Union{_PrimalRankOnePSD,_DualRankOnePSD}) where {T <: Real}
+function cone_from_moi(
+    ::Type{T},
+    cone::Union{_PrimalRankOnePSD, _DualRankOnePSD},
+) where {T <: Real}
     return cone_from_moi(
         T,
         WSOSInterpNonnegativeCone{T, T}(

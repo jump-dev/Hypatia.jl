@@ -30,18 +30,11 @@ include(joinpath(@__DIR__, "moicones.jl"))
     @testset "Supports $T" for T in [Float64, BigFloat]
         model = Hypatia.Optimizer{T}()
         for S in [
-            Hypatia._PrimalRankOnePSD{T,Vector{T}}
-            Hypatia._DualRankOnePSD{T,Vector{T}}
+            Hypatia._PrimalRankOnePSD{T, Vector{T}}
+            Hypatia._DualRankOnePSD{T, Vector{T}}
         ]
-            @test MOI.supports_add_constrained_variables(
-                model,
-                S,
-            )
-            @test MOI.supports_constraint(
-                model,
-                MOI.VectorAffineFunction{T},
-                S,
-            )
+            @test MOI.supports_add_constrained_variables(model, S)
+            @test MOI.supports_constraint(model, MOI.VectorAffineFunction{T}, S)
         end
     end
 
