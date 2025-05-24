@@ -388,9 +388,9 @@ function test_moi_cones(T::Type{<:Real})
             moi_cone = LRO.SetDotProducts{LRO.WITHOUT_SET}(
                 MOI.PositiveSemidefiniteConeTriangle(2),
                 LRO.TriangleVectorization.([
-                    LRO.positive_semidefinite_factorization(P[1,:]),
-                    LRO.positive_semidefinite_factorization(P[2,:]),
-                    LRO.positive_semidefinite_factorization(P[3,:]),
+                    LRO.positive_semidefinite_factorization(P[1, :]),
+                    LRO.positive_semidefinite_factorization(P[2, :]),
+                    LRO.positive_semidefinite_factorization(P[3, :]),
                 ]),
             )
             hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
@@ -402,9 +402,9 @@ function test_moi_cones(T::Type{<:Real})
             moi_cone = LRO.LinearCombinationInSet{LRO.WITHOUT_SET}(
                 MOI.PositiveSemidefiniteConeTriangle(2),
                 LRO.TriangleVectorization.([
-                    LRO.positive_semidefinite_factorization(P[1,:]),
-                    LRO.positive_semidefinite_factorization(P[2,:]),
-                    LRO.positive_semidefinite_factorization(P[3,:]),
+                    LRO.positive_semidefinite_factorization(P[1, :]),
+                    LRO.positive_semidefinite_factorization(P[2, :]),
+                    LRO.positive_semidefinite_factorization(P[3, :]),
                 ]),
             )
             hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
