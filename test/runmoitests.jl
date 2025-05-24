@@ -10,8 +10,8 @@ run MOI tests
 =#
 
 using Test
-import MathOptInterface
-const MOI = MathOptInterface
+import MathOptInterface as MOI
+import LowRankOpt as LRO
 import Hypatia
 include(joinpath(@__DIR__, "moicones.jl"))
 
@@ -24,6 +24,17 @@ include(joinpath(@__DIR__, "moicones.jl"))
                 println(T, " ...")
                 test_moi_cones(T)
             end
+        end
+    end
+
+    @testset "Supports $T" for T in [Float64, BigFloat]
+        model = Hypatia.Optimizer{T}()
+        for S in [
+            Hypatia._PrimalRankOnePSD{T, Vector{T}}
+            Hypatia._DualRankOnePSD{T, Vector{T}}
+        ]
+            @test MOI.supports_add_constrained_variables(model, S)
+            @test MOI.supports_constraint(model, MOI.VectorAffineFunction{T}, S)
         end
     end
 
@@ -49,19 +60,20 @@ include(joinpath(@__DIR__, "moicones.jl"))
             T,
         )
         MOI.set(model, MOI.Silent(), true)
+        config = MOI.Test.Config(
+            T,
+            atol = tol_test,
+            rtol = tol_test,
+            exclude = Any[
+                MOI.ConstraintBasisStatus,
+                MOI.VariableBasisStatus,
+                MOI.ObjectiveBound,
+                MOI.SolverVersion,
+            ],
+        )
         MOI.Test.runtests(
             model,
-            MOI.Test.Config(
-                T,
-                atol = tol_test,
-                rtol = tol_test,
-                exclude = Any[
-                    MOI.ConstraintBasisStatus,
-                    MOI.VariableBasisStatus,
-                    MOI.ObjectiveBound,
-                    MOI.SolverVersion,
-                ],
-            ),
+            config,
             include = includes,
             exclude = vcat(
                 excludes,
@@ -72,5 +84,6 @@ include(joinpath(@__DIR__, "moicones.jl"))
                 ],
             ),
         )
+        MOI.Test.runtests(model, config, test_module = LRO.Test)
     end
 end;
