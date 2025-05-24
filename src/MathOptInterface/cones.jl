@@ -635,20 +635,31 @@ function cone_from_moi(
     return Cones.WSOSInterpNonnegative{T, R}(cone.U, cone.Ps, use_dual = cone.use_dual)
 end
 
-const RankOnePSD{T <: Real} = LRO.SetDotProducts{
+const _PrimalRankOnePSD{T<:Real,F<:AbstractVector{T}} = LRO.SetDotProducts{
+    LRO.WITHOUT_SET,
     MOI.PositiveSemidefiniteConeTriangle,
     LRO.TriangleVectorization{
         T,
-        LRO.Factorization{T, <:AbstractVector{T}, LRO.Test.One{T}},
+        LRO.Factorization{T,F,LRO.One{T}},
     },
 }
 
-function cone_from_moi(::Type{T}, cone::RankOnePSD) where {T <: Real}
+const _DualRankOnePSD{T<:Real,F<:AbstractVector{T}} = LRO.LinearCombinationInSet{
+    LRO.WITHOUT_SET,
+    MOI.PositiveSemidefiniteConeTriangle,
+    LRO.TriangleVectorization{
+        T,
+        LRO.Factorization{T,F,LRO.One{T}},
+    },
+}
+
+function cone_from_moi(::Type{T}, cone::Union{_PrimalRankOnePSD,_DualRankOnePSD}) where {T <: Real}
     return cone_from_moi(
         T,
         WSOSInterpNonnegativeCone{T, T}(
             length(cone.vectors),
-            [operate(vcat, [v.matrix.factor' for v in cone.vectors])],
+            [reduce(vcat, [v.matrix.factor' for v in cone.vectors])],
+            cone isa _DualRankOnePSD,
         ),
     )
 end
@@ -803,7 +814,8 @@ const SupportedCone{T <: Real} = Union{
     MOI.DualExponentialCone,
     MOI.LogDetConeTriangle,
     MOI.RelativeEntropyCone,
-    RankOnePSD,
+    _PrimalRankOnePSD{T},
+    _DualRankOnePSD{T},
 }
 
 Base.copy(cone::HypatiaCones) = cone # maybe should deep copy the cone struct, but this is expensive
