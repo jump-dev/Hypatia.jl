@@ -88,7 +88,7 @@ function rescale_affine(cone::SvecCone, func::VAF{T}, vals::AbstractVector{T}) w
     return vals
 end
 
-# transformation (svec rescaling and real/imag parts reordering) for MOI Hermitian PSD cone not in svec (scaled lower triangle) form
+# transformation (svec rescaling and real/imag parts reordering) for MOI Hermitian PSD cone not in svec (scaled upper triangle) form
 needs_untransform(::MOI.HermitianPositiveSemidefiniteConeTriangle) = true
 
 function untransform_affine(
