@@ -185,7 +185,7 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Real
     m = size(mat, 1)
     @assert m == size(mat, 2)
     @inbounds for j in 1:m
-        for i in 1:j-1
+        for i in 1:(j - 1)
             vec[k] = mat[i, j] * rt2
             k += 1
         end
@@ -215,7 +215,7 @@ function _smat_to_svec_complex!(vec, mat, rt2)
     m = size(mat, 1)
     @assert m == size(mat, 2)
     @inbounds for j in 1:m
-        for i in 1:j-1
+        for i in 1:(j - 1)
             vec[k] = real(mat[i, j]) * rt2
             k += 1
             vec[k] = imag(mat[i, j]) * rt2
@@ -239,7 +239,7 @@ function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Real
     @assert m == size(mat, 2)
     invrt2 = inv(rt2)
     @inbounds for j in 1:m
-        for i in 1:j-1
+        for i in 1:(j - 1)
             mat[i, j] = vec[k] * invrt2
             k += 1
         end
@@ -270,7 +270,7 @@ function _svec_to_smat_complex!(mat, vec, rt2)
     @assert m == size(mat, 2)
     invrt2 = inv(rt2)
     @inbounds for j in 1:m
-        for i in 1:j-1
+        for i in 1:(j - 1)
             mat[i, j] = complex(vec[k], vec[k + 1]) * invrt2
             k += 2
         end
