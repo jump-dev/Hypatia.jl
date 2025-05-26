@@ -184,12 +184,12 @@ function smat_to_svec!(vec::AbstractVector{T}, mat::AbstractMatrix{T}, rt2::Real
     k = 1
     m = size(mat, 1)
     @assert m == size(mat, 2)
-    for j in 1:m, i in 1:j
-        @inbounds if i == j
-            vec[k] = mat[i, j]
-        else
+    @inbounds for j in 1:m
+        for i in 1:(j - 1)
             vec[k] = mat[i, j] * rt2
+            k += 1
         end
+        vec[k] = mat[j, j]
         k += 1
     end
     @assert k == length(vec) + 1
@@ -214,17 +214,15 @@ function _smat_to_svec_complex!(vec, mat, rt2)
     k = 1
     m = size(mat, 1)
     @assert m == size(mat, 2)
-    for j in 1:m, i in 1:j
-        @inbounds if i == j
-            vec[k] = real(mat[i, j])
+    @inbounds for j in 1:m
+        for i in 1:(j - 1)
+            vec[k] = real(mat[i, j]) * rt2
             k += 1
-        else
-            ck = mat[i, j] * rt2
-            vec[k] = real(ck)
-            k += 1
-            vec[k] = -imag(ck)
+            vec[k] = -imag(mat[i, j]) * rt2
             k += 1
         end
+        vec[k] = real(mat[j, j])
+        k += 1
     end
     @assert k == length(vec) + 1
     return vec
@@ -239,12 +237,13 @@ function svec_to_smat!(mat::AbstractMatrix{T}, vec::AbstractVector{T}, rt2::Real
     k = 1
     m = size(mat, 1)
     @assert m == size(mat, 2)
-    for j in 1:m, i in 1:j
-        @inbounds if i == j
-            mat[i, j] = vec[k]
-        else
-            mat[i, j] = vec[k] / rt2
+    invrt2 = inv(rt2)
+    @inbounds for j in 1:m
+        for i in 1:(j - 1)
+            mat[i, j] = vec[k] * invrt2
+            k += 1
         end
+        mat[j, j] = vec[k]
         k += 1
     end
     @assert k == length(vec) + 1
@@ -269,14 +268,14 @@ function _svec_to_smat_complex!(mat, vec, rt2)
     k = 1
     m = size(mat, 1)
     @assert m == size(mat, 2)
-    @inbounds for j in 1:m, i in 1:j
-        if i == j
-            mat[i, j] = vec[k]
-            k += 1
-        else
-            mat[i, j] = complex(vec[k], -vec[k + 1]) / rt2
+    invrt2 = inv(rt2)
+    @inbounds for j in 1:m
+        for i in 1:(j - 1)
+            mat[i, j] = complex(vec[k], -vec[k + 1]) * invrt2
             k += 2
         end
+        mat[j, j] = vec[k]
+        k += 1
     end
     @assert k == length(vec) + 1
     return mat
