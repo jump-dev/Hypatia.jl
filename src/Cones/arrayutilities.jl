@@ -218,7 +218,7 @@ function _smat_to_svec_complex!(vec, mat, rt2)
         for i in 1:(j - 1)
             vec[k] = real(mat[i, j]) * rt2
             k += 1
-            vec[k] = -imag(mat[i, j]) * rt2
+            vec[k] = imag(mat[i, j]) * rt2
             k += 1
         end
         vec[k] = real(mat[j, j])
@@ -271,7 +271,7 @@ function _svec_to_smat_complex!(mat, vec, rt2)
     invrt2 = inv(rt2)
     @inbounds for j in 1:m
         for i in 1:(j - 1)
-            mat[i, j] = complex(vec[k], -vec[k + 1]) * invrt2
+            mat[i, j] = complex(vec[k], vec[k + 1]) * invrt2
             k += 2
         end
         mat[j, j] = vec[k]
@@ -339,12 +339,12 @@ function symm_kron!(
                 for i in 1:(j - 1)
                     a = mat[i, k] * mat[l, j]
                     b = mat[j, k] * mat[l, i]
-                    spectral_kron_element!(skr, row_idx, col_idx, a, b)
+                    spectral_kron_element!(skr, row_idx, col_idx, conj(a), conj(b))
                     row_idx += 2
                 end
                 c = rt2 * mat[j, k] * mat[l, j]
                 skr[row_idx, col_idx] = real(c)
-                skr[row_idx, col_idx + 1] = imag(c)
+                skr[row_idx, col_idx + 1] = -imag(c)
                 row_idx += 1
                 (row_idx > col_idx) && break
             end
@@ -356,7 +356,7 @@ function symm_kron!(
             for i in 1:(j - 1)
                 c = rt2 * mat[i, l] * mat[l, j]
                 skr[row_idx, col_idx] = real(c)
-                skr[row_idx + 1, col_idx] = -imag(c)
+                skr[row_idx + 1, col_idx] = imag(c)
                 row_idx += 2
             end
             skr[row_idx, col_idx] = abs2(mat[j, l])
@@ -383,7 +383,7 @@ function eig_dot_kron!(
     @assert issymmetric(inner) # must be symmetric (wrapper is less efficient)
     rt2i = inv(rt2)
     copyto!(V, vecs') # allows fast column slices
-    scals = (R <: Complex{T} ? [rt2i, rt2i * im] : [rt2i]) # real and imag parts
+    scals = (R <: Complex{T} ? [rt2i, -rt2i * im] : [rt2i]) # real and imag parts
 
     col_idx = 1
     @inbounds for j in 1:size(inner, 1)
