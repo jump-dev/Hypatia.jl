@@ -579,7 +579,7 @@ function d2zdV2!(
     d = size(vecs, 1)
     V = copyto!(mat, vecs')
     rt2i = inv(rt2)
-    scals = (R <: Complex{T} ? [rt2i, -rt2i * im] : [rt2i])
+    scals = (R <: Complex{T} ? [rt2i, rt2i * im] : [rt2i])
 
     col_idx = 1
     @inbounds for j in 1:d

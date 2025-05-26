@@ -261,8 +261,8 @@ function update_hess(cone::MatrixEpiPerSquare)
                 H[row_idx, col_idx] = real(term1) + real(term2)
                 H[row_idx, col_idx + 1] = imag(term1) + imag(term2)
                 if i != j
-                    H[row_idx + 1, col_idx] = imag(term1) - imag(term2)
-                    H[row_idx + 1, col_idx + 1] = real(term2) - real(term1)
+                    H[row_idx + 1, col_idx] = imag(term2) - imag(term1)
+                    H[row_idx + 1, col_idx + 1] = real(term1) - real(term2)
                 end
             else
                 term = Zi[i, k] * ZiW[j, l] + Zi[k, j] * ZiW[i, l]
