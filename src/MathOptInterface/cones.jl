@@ -107,7 +107,7 @@ See [`Cones.Nonnegative`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct NonnegativeCone{T <: Real} <: MOI.AbstractVectorSet
+struct NonnegativeCone{T <: Real} <: MOICones.MOICone
     dim::Int
 end
 export NonnegativeCone
@@ -125,7 +125,7 @@ See [`Cones.PosSemidefTri`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct PosSemidefTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
+struct PosSemidefTriCone{T <: Real, R <: RealOrComplex{T}} <: MOICones.MOICone
     dim::Int
 end
 export PosSemidefTriCone
@@ -146,7 +146,7 @@ See [`Cones.DoublyNonnegativeTri`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct DoublyNonnegativeTriCone{T <: Real} <: MOI.AbstractVectorSet
+struct DoublyNonnegativeTriCone{T <: Real} <: MOICones.MOICone
     dim::Int
     use_dual::Bool
 end
@@ -173,7 +173,7 @@ struct PosSemidefTriSparseCone{
     I <: Cones.PSDSparseImpl,
     T <: Real,
     R <: RealOrComplex{T},
-} <: MOI.AbstractVectorSet
+} <: MOICones.MOICone
     side::Int
     row_idxs::Vector{Int}
     col_idxs::Vector{Int}
@@ -220,7 +220,7 @@ See [`Cones.LinMatrixIneq`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct LinMatrixIneqCone{T <: Real} <: MOI.AbstractVectorSet
+struct LinMatrixIneqCone{T <: Real} <: MOICones.MOICone
     As::Vector
     use_dual::Bool
 end
@@ -241,7 +241,7 @@ See [`Cones.EpiNormInf`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct EpiNormInfCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
+struct EpiNormInfCone{T <: Real, R <: RealOrComplex{T}} <: MOICones.MOICone
     dim::Int
     use_dual::Bool
 end
@@ -267,7 +267,7 @@ See [`Cones.EpiNormEucl`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct EpiNormEuclCone{T <: Real} <: MOI.AbstractVectorSet
+struct EpiNormEuclCone{T <: Real} <: MOICones.MOICone
     dim::Int
 end
 export EpiNormEuclCone
@@ -285,7 +285,7 @@ See [`Cones.EpiPerSquare`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct EpiPerSquareCone{T <: Real} <: MOI.AbstractVectorSet
+struct EpiPerSquareCone{T <: Real} <: MOICones.MOICone
     dim::Int
 end
 export EpiPerSquareCone
@@ -303,7 +303,7 @@ See [`Cones.EpiNormSpectralTri`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct EpiNormSpectralTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
+struct EpiNormSpectralTriCone{T <: Real, R <: RealOrComplex{T}} <: MOICones.MOICone
     dim::Int
     use_dual::Bool
 end
@@ -329,7 +329,7 @@ See [`Cones.EpiNormSpectral`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct EpiNormSpectralCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
+struct EpiNormSpectralCone{T <: Real, R <: RealOrComplex{T}} <: MOICones.MOICone
     d1::Int
     d2::Int
     use_dual::Bool
@@ -363,7 +363,7 @@ See [`Cones.MatrixEpiPerSquare`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct MatrixEpiPerSquareCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
+struct MatrixEpiPerSquareCone{T <: Real, R <: RealOrComplex{T}} <: MOICones.MOICone
     d1::Int
     d2::Int
     use_dual::Bool
@@ -397,7 +397,7 @@ See [`Cones.GeneralizedPower`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct GeneralizedPowerCone{T <: Real} <: MOI.AbstractVectorSet
+struct GeneralizedPowerCone{T <: Real} <: MOICones.MOICone
     α::Vector{T}
     n::Int
     use_dual::Bool
@@ -421,7 +421,7 @@ See [`Cones.HypoPowerMean`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct HypoPowerMeanCone{T <: Real} <: MOI.AbstractVectorSet
+struct HypoPowerMeanCone{T <: Real} <: MOICones.MOICone
     α::Vector{T}
     use_dual::Bool
 end
@@ -442,7 +442,7 @@ See [`Cones.HypoGeoMean`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct HypoGeoMeanCone{T <: Real} <: MOI.AbstractVectorSet
+struct HypoGeoMeanCone{T <: Real} <: MOICones.MOICone
     dim::Int
     use_dual::Bool
 end
@@ -463,7 +463,7 @@ See [`Cones.HypoRootdetTri`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct HypoRootdetTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
+struct HypoRootdetTriCone{T <: Real, R <: RealOrComplex{T}} <: MOICones.MOICone
     dim::Int
     use_dual::Bool
 end
@@ -489,7 +489,7 @@ See [`Cones.HypoPerLog`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct HypoPerLogCone{T <: Real} <: MOI.AbstractVectorSet
+struct HypoPerLogCone{T <: Real} <: MOICones.MOICone
     dim::Int
     use_dual::Bool
 end
@@ -510,7 +510,7 @@ See [`Cones.HypoPerLogdetTri`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct HypoPerLogdetTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
+struct HypoPerLogdetTriCone{T <: Real, R <: RealOrComplex{T}} <: MOICones.MOICone
     dim::Int
     use_dual::Bool
 end
@@ -536,7 +536,7 @@ See [`Cones.EpiPerSepSpectral`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct EpiPerSepSpectralCone{T <: Real} <: MOI.AbstractVectorSet
+struct EpiPerSepSpectralCone{T <: Real} <: MOICones.MOICone
     h::Cones.SepSpectralFun
     Q::Type{<:Cones.ConeOfSquares{T}}
     d::Int
@@ -565,7 +565,7 @@ See [`Cones.EpiRelEntropy`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct EpiRelEntropyCone{T <: Real} <: MOI.AbstractVectorSet
+struct EpiRelEntropyCone{T <: Real} <: MOICones.MOICone
     dim::Int
     use_dual::Bool
 end
@@ -586,7 +586,7 @@ See [`Cones.EpiTrRelEntropyTri`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct EpiTrRelEntropyTriCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
+struct EpiTrRelEntropyTriCone{T <: Real, R <: RealOrComplex{T}} <: MOICones.MOICone
     dim::Int
     use_dual::Bool
 end
@@ -612,7 +612,7 @@ See [`Cones.WSOSInterpNonnegative`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct WSOSInterpNonnegativeCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
+struct WSOSInterpNonnegativeCone{T <: Real, R <: RealOrComplex{T}} <: MOICones.MOICone
     U::Int
     Ps::Vector{Matrix{R}}
     use_dual::Bool
@@ -642,7 +642,7 @@ See [`Cones.WSOSInterpPosSemidefTri`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct WSOSInterpPosSemidefTriCone{T <: Real} <: MOI.AbstractVectorSet
+struct WSOSInterpPosSemidefTriCone{T <: Real} <: MOICones.MOICone
     R::Int
     U::Int
     Ps::Vector{Matrix{T}}
@@ -676,7 +676,7 @@ See [`Cones.WSOSInterpEpiNormOne`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct WSOSInterpEpiNormOneCone{T <: Real} <: MOI.AbstractVectorSet
+struct WSOSInterpEpiNormOneCone{T <: Real} <: MOICones.MOICone
     R::Int
     U::Int
     Ps::Vector{Matrix{T}}
@@ -705,7 +705,7 @@ See [`Cones.WSOSInterpEpiNormEucl`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct WSOSInterpEpiNormEuclCone{T <: Real} <: MOI.AbstractVectorSet
+struct WSOSInterpEpiNormEuclCone{T <: Real} <: MOICones.MOICone
     R::Int
     U::Int
     Ps::Vector{Matrix{T}}
@@ -729,45 +729,8 @@ end
 
 # all cones
 
-const HypatiaCones{T <: Real} = Union{
-    NonnegativeCone{T},
-    PosSemidefTriCone{T, T},
-    PosSemidefTriCone{T, Complex{T}},
-    DoublyNonnegativeTriCone{T},
-    PosSemidefTriSparseCone{<:Cones.PSDSparseImpl, T, T},
-    PosSemidefTriSparseCone{<:Cones.PSDSparseImpl, T, Complex{T}},
-    LinMatrixIneqCone{T},
-    EpiNormInfCone{T, T},
-    EpiNormInfCone{T, Complex{T}},
-    EpiNormEuclCone{T},
-    EpiPerSquareCone{T},
-    EpiNormSpectralTriCone{T, T},
-    EpiNormSpectralTriCone{T, Complex{T}},
-    EpiNormSpectralCone{T, T},
-    EpiNormSpectralCone{T, Complex{T}},
-    MatrixEpiPerSquareCone{T, T},
-    MatrixEpiPerSquareCone{T, Complex{T}},
-    GeneralizedPowerCone{T},
-    HypoPowerMeanCone{T},
-    HypoGeoMeanCone{T},
-    HypoRootdetTriCone{T, T},
-    HypoRootdetTriCone{T, Complex{T}},
-    HypoPerLogCone{T},
-    HypoPerLogdetTriCone{T, T},
-    HypoPerLogdetTriCone{T, Complex{T}},
-    EpiPerSepSpectralCone{T},
-    EpiRelEntropyCone{T},
-    EpiTrRelEntropyTriCone{T, T},
-    EpiTrRelEntropyTriCone{T, Complex{T}},
-    WSOSInterpNonnegativeCone{T, T},
-    WSOSInterpNonnegativeCone{T, Complex{T}},
-    WSOSInterpPosSemidefTriCone{T},
-    WSOSInterpEpiNormOneCone{T},
-    WSOSInterpEpiNormEuclCone{T},
-}
-
 const SupportedCone{T <: Real} = Union{
-    HypatiaCones{T},
+    MOICones.MOICone,
     MOI.Nonnegatives,
     MOI.PositiveSemidefiniteConeTriangle,
     MOI.HermitianPositiveSemidefiniteConeTriangle,
@@ -787,4 +750,4 @@ const SupportedCone{T <: Real} = Union{
     MOI.RelativeEntropyCone,
 }
 
-Base.copy(cone::HypatiaCones) = cone # maybe should deep copy the cone struct, but this is expensive
+Base.copy(cone::MOICones.MOICone) = cone # maybe should deep copy the cone struct, but this is expensive
