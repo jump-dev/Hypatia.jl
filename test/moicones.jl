@@ -160,6 +160,10 @@ function test_moi_cones(T::Type{<:Real})
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
         @test hyp_cone isa Cones.Nonnegative{T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
+
+        @testset "Copy" begin
+            @test copy(moi_cone) == moi_cone
+        end
     end
 
     @testset "PosSemidefTri" begin
