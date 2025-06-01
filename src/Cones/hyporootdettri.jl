@@ -42,7 +42,7 @@ mutable struct HypoRootdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     ζ::T
     η::T
     mat::Matrix{R}
-    fact_W::Cholesky{R}
+    fact_W::Cholesky{R, Matrix{R}}
     Wi::Matrix{R}
     Wi_vec::Vector{T}
     tempw::Vector{T}

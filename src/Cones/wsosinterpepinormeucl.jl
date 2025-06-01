@@ -40,7 +40,7 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     hess_fact::Factorization{T}
 
     mat::Vector{Matrix{T}}
-    matfact::Vector
+    matfact::Vector{Cholesky{T, Matrix{T}}}
     ΛLi_Λ::Vector{Vector{Matrix{T}}}
     Λ11::Vector{Matrix{T}}
     tempLL::Vector{Matrix{T}}
@@ -55,12 +55,14 @@ mutable struct WSOSInterpEpiNormEucl{T <: Real} <: Cone{T}
     tempUU::Matrix{T}
     ΛLiPs_edge::Vector{Vector{Matrix{T}}}
     PΛiPs::Vector{Matrix{T}}
-    PΛiP_blocks_U::Vector
+    PΛiP_blocks_U::Vector{
+        Matrix{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int}, UnitRange{Int}}, false}},
+    }
     Λ11LiP::Vector{Matrix{T}} # also equal to the block on the diagonal of ΛLiP
     matLiP::Vector{Matrix{T}} # also equal to block (1, 1) of ΛLiP
     PΛ11iP::Vector{Matrix{T}}
-    Λfact::Vector
-    point_views::Vector
+    Λfact::Vector{Cholesky{T, Matrix{T}}}
+    point_views::Vector{SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int}}, true}}
     Ps_times::Vector{Float64}
     Ps_order::Vector{Int}
 
@@ -91,7 +93,7 @@ function setup_extra_data!(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
     K = length(Ps)
     Ls = [size(Pk, 2) for Pk in cone.Ps]
     cone.mat = [zeros(T, L, L) for L in Ls]
-    cone.matfact = Vector{Any}(undef, K)
+    cone.matfact = Vector{Cholesky{T, Matrix{T}}}(undef, K)
     cone.ΛLi_Λ = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
     cone.Λ11 = [zeros(T, L, L) for L in Ls]
     cone.tempLL = [zeros(T, L, L) for L in Ls]
@@ -113,7 +115,7 @@ function setup_extra_data!(cone::WSOSInterpEpiNormEucl{T}) where {T <: Real}
         [view(PΛiPk, block_idxs(U, r), block_idxs(U, s)) for r in 1:R, s in 1:R] for
         PΛiPk in cone.PΛiPs
     ]
-    cone.Λfact = Vector{Any}(undef, K)
+    cone.Λfact = Vector{Cholesky{T, Matrix{T}}}(undef, K)
     cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
     cone.Ps_times = zeros(K)
     cone.Ps_order = collect(1:K)

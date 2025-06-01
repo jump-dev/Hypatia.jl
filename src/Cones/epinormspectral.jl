@@ -40,7 +40,7 @@ mutable struct EpiNormSpectral{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     hess_fact_mat::Symmetric{T, Matrix{T}}
     hess_fact::Factorization{T}
 
-    W_svd::Any
+    W_svd::SVD{R, T, Matrix{R}, Vector{T}}
     s::Vector{T}
     U::Matrix{R}
     Vt::Matrix{R}

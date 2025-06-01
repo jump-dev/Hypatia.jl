@@ -43,8 +43,8 @@ mutable struct EpiTrRelEntropyTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     W_idxs::UnitRange{Int}
     V::Matrix{R}
     W::Matrix{R}
-    V_fact::Eigen{R}
-    W_fact::Eigen{R}
+    V_fact::Eigen{R, T, Matrix{R}, Vector{T}}
+    W_fact::Eigen{R, T, Matrix{R}, Vector{T}}
     Vi::Matrix{R}
     Wi::Matrix{R}
     W_sim::Matrix{R}

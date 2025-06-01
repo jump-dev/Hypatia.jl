@@ -17,7 +17,7 @@ mutable struct PSDSparseDenseCache{T <: Real, R <: RealOrComplex{T}} <: PSDSpars
     mat::Matrix{R}
     mat2::Matrix{R}
     inv_mat::Matrix{R}
-    fact_mat::Any
+    fact_mat::Cholesky{R, Matrix{R}}
     PSDSparseDenseCache{T, R}() where {T <: Real, R <: RealOrComplex{T}} = new{T, R}()
 end
 
