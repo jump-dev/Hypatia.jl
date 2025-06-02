@@ -29,26 +29,26 @@ struct PSDSparseCholmod <: PSDSparseImpl end
 
 mutable struct PSDSparseCholmodCache{T <: BlasReal, R <: RealOrComplex{T}} <:
                PSDSparseCache{T, R}
-    sparse_point::Any
-    sparse_point_map::Any
-    symb_mat::Any
-    supers::Any
-    super_map::Any
-    parents::Any
-    ancestors::Any
-    num_cols::Any
-    num_rows::Any
-    J_rows::Any
-    L_idxs::Any
-    F_blocks::Any
-    L_blocks::Any
-    S_blocks::Any
-    L_pr_blocks::Any
-    S_pr_blocks::Any
-    L_pr_pr_blocks::Any
-    map_blocks::Any
-    temp_blocks::Any
-    rel_idxs::Any
+    sparse_point::CHOLMOD.Sparse{R, Int}
+    sparse_point_map::Vector{Int}
+    symb_mat::CHOLMOD.Factor{R, Int}
+    supers::Vector{Int}
+    super_map::Vector{Int}
+    parents::Vector{Int}
+    ancestors::Vector{Vector{Int}}
+    num_cols::Vector{Int}
+    num_rows::Vector{Int}
+    J_rows::Vector{Vector{Int}}
+    L_idxs::Vector{UnitRange{Int}}
+    F_blocks::Vector{Matrix{R}}
+    L_blocks::Vector{Matrix{R}}
+    S_blocks::Vector{Matrix{R}}
+    L_pr_blocks::Vector{Matrix{R}}
+    S_pr_blocks::Vector{Matrix{R}}
+    L_pr_pr_blocks::Vector{Matrix{R}}
+    map_blocks::Vector{Tuple{Int, Int, Int, Bool, Bool}}
+    temp_blocks::Vector{Matrix{R}}
+    rel_idxs::Vector{Vector{Tuple{Int, Int}}}
     PSDSparseCholmodCache{T, R}() where {T <: BlasReal, R <: RealOrComplex{T}} = new{T, R}()
 end
 
@@ -128,7 +128,7 @@ function setup_extra_data!(
     num_cols = cache.num_cols = Vector{Int}(undef, num_super)
     num_rows = cache.num_rows = Vector{Int}(undef, num_super)
     L_idxs = cache.L_idxs = Vector{UnitRange{Int}}(undef, num_super)
-    J_rows = cache.J_rows = Vector{Vector}(undef, num_super)
+    J_rows = cache.J_rows = Vector{Vector{Int}}(undef, num_super)
     F_blocks = cache.F_blocks = Vector{Matrix{R}}(undef, num_super)
     L_blocks = cache.L_blocks = Vector{Matrix{R}}(undef, num_super)
     L_pr_blocks = cache.L_pr_blocks = Vector{Matrix{R}}(undef, num_super)
