@@ -56,7 +56,7 @@ mutable struct EpiPerSepSpectral{Q <: ConeOfSquares, T <: Real} <: Cone{T}
     hess_fact_mat::Symmetric{T, Matrix{T}}
     hess_fact::Factorization{T}
 
-    w_view::SubArray{T, 1}
+    w_view::SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int}}, true}
     cache::CSqrCache{T}
 
     function EpiPerSepSpectral{Q, T}(

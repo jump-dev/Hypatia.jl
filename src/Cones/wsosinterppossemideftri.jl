@@ -47,11 +47,13 @@ mutable struct WSOSInterpPosSemidefTri{T <: Real} <: Cone{T}
     tempLRLR::Vector{Symmetric{T, Matrix{T}}}
     tempLRLR2::Vector{Matrix{T}}
     tempLRUR::Vector{Matrix{T}}
-    ΛFL::Vector
+    ΛFL::Vector{Cholesky{T, Matrix{T}}}
     ΛFLP::Vector{Matrix{T}}
     tempLU::Vector{Matrix{T}}
     PΛiP::Matrix{T}
-    PΛiP_blocks_U::Any
+    PΛiP_blocks_U::Matrix{
+        SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int}, UnitRange{Int}}, false},
+    }
     Ps_times::Vector{Float64}
     Ps_order::Vector{Int}
 
@@ -100,7 +102,7 @@ function setup_extra_data!(cone::WSOSInterpPosSemidefTri{T}) where {T <: Real}
     cone.tempLRLR2 = [zeros(T, L * R, L * R) for L in Ls]
     cone.tempLRUR = [zeros(T, L * R, U * R) for L in Ls]
     cone.tempLU = [zeros(T, L, U) for L in Ls]
-    cone.ΛFL = Vector{Any}(undef, K)
+    cone.ΛFL = Vector{Cholesky{T, Matrix{T}}}(undef, K)
     cone.ΛFLP = [zeros(T, R * L, R * U) for L in Ls]
     cone.PΛiP = zeros(T, R * U, R * U)
     cone.PΛiP_blocks_U =

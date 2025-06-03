@@ -16,8 +16,8 @@ mutable struct EpiRelEntropy{T <: Real} <: Cone{T}
     use_dual_barrier::Bool
     dim::Int
     w_dim::Int
-    v_idxs::UnitRange{Int64}
-    w_idxs::UnitRange{Int64}
+    v_idxs::UnitRange{Int}
+    w_idxs::UnitRange{Int}
 
     point::Vector{T}
     dual_point::Vector{T}

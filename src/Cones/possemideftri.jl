@@ -38,7 +38,7 @@ mutable struct PosSemidefTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     mat3::Matrix{R}
     mat4::Matrix{R}
     inv_mat::Matrix{R}
-    fact_mat::Cholesky{R}
+    fact_mat::Cholesky{R, Matrix{R}}
 
     function PosSemidefTri{T, R}(dim::Int) where {T <: Real, R <: RealOrComplex{T}}
         @assert dim >= 1

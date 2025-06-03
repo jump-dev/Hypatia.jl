@@ -44,7 +44,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tempLU::Vector{Matrix{R}}
     ΛFLP::Vector{Matrix{R}}
     tempUU::Matrix{R}
-    ΛF::Vector
+    ΛF::Vector{Cholesky{R, Matrix{R}}}
     Ps_times::Vector{Float64}
     Ps_order::Vector{Int}
 
@@ -88,7 +88,7 @@ function setup_extra_data!(
     cone.ΛFLP = [zeros(R, L, dim) for L in Ls]
     cone.tempUU = zeros(R, dim, dim)
     K = length(Ls)
-    cone.ΛF = Vector{Any}(undef, K)
+    cone.ΛF = Vector{Cholesky{R, Matrix{R}}}(undef, K)
     cone.Ps_times = zeros(K)
     cone.Ps_order = collect(1:K)
     return cone

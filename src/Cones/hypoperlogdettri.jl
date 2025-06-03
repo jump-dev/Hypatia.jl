@@ -40,7 +40,7 @@ mutable struct HypoPerLogdetTri{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     ϕ::T
     ζ::T
     mat::Matrix{R}
-    fact_W::Cholesky{R}
+    fact_W::Cholesky{R, Matrix{R}}
     Wi::Matrix{R}
     Wi_vec::Vector{T}
     mat2::Matrix{R}

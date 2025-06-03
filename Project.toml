@@ -29,7 +29,7 @@ MathOptInterface = "1"
 PolynomialRoots = "1"
 Requires = "1"
 SpecialFunctions = "2"
-julia = "1.6"
+julia = "1.10"
 
 [extras]
 DynamicPolynomials = "7c1d4256-1411-5781-91ec-d7bc3513ac07"

@@ -40,10 +40,10 @@ mutable struct DoublyNonnegativeTri{T <: Real} <: Cone{T}
     mat2::Matrix{T} # TODO rename to imply mutates fact_mat
     mat3::Matrix{T}
     mat4::Matrix{T} # TODO could remove if we factorize mat instead of mat2, currently mat is not used in any other oracles
-    offdiag_idxs::Any
+    offdiag_idxs::Vector{Int}
     inv_mat::Matrix{T}
     inv_vec::Vector{T}
-    fact_mat::Any
+    fact_mat::Cholesky{T, Matrix{T}}
 
     function DoublyNonnegativeTri{T}(dim::Int; use_dual::Bool = false) where {T <: Real}
         @assert dim >= 1

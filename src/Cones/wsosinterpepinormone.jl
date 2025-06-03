@@ -42,7 +42,7 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     hess_fact::Factorization{T}
 
     mats::Vector{Vector{Matrix{T}}}
-    matfact::Vector{Vector}
+    matfact::Vector{Vector{Cholesky{T, Matrix{T}}}}
     ΛLi_Λ::Vector{Vector{Matrix{T}}}
     Λ11::Vector{Matrix{T}}
     tempΛ11::Vector{Matrix{T}}
@@ -67,13 +67,13 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     ΛLiP_dir12::Vector{Vector{Matrix{T}}}
     ΛLiP_dir21::Vector{Vector{Matrix{T}}}
     dder3_half::Vector{Vector{Matrix}}
-    Λfact::Vector
+    Λfact::Vector{Cholesky{T, Matrix{T}}}
     hess_edge_blocks::Vector{Matrix{T}}
     hess_diag_blocks::Vector{Matrix{T}}
-    hess_diag_facts::Vector
+    hess_diag_facts::Vector{Cholesky{T, Matrix{T}}}
     hess_diags::Vector{Matrix{T}}
     hess_schur_fact::Factorization{T}
-    point_views::Vector
+    point_views::Vector{SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int}}, true}}
     Ps_times::Vector{Float64}
     Ps_order::Vector{Int}
 
@@ -110,7 +110,7 @@ function setup_extra_data!(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     cone.hess_edge_blocks = [zeros(T, U, U) for _ in 1:(R - 1)]
     cone.hess_diag_blocks = [zeros(T, U, U) for _ in 1:R]
     # TODO preallocate better
-    cone.hess_diag_facts = Any[cholesky(hcat([one(T)])) for _ in 1:(R - 1)]
+    cone.hess_diag_facts = [cholesky(hcat([one(T)])) for _ in 1:(R - 1)]
     cone.hess_diags = [zeros(T, U, U) for _ in 1:(R - 1)]
     cone.ΛLi_Λ = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
     cone.Λ11 = [zeros(T, L, L) for L in Ls]
@@ -134,7 +134,7 @@ function setup_extra_data!(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     cone.ΛLiP_dir12 = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.ΛLiP_dir21 = [[zeros(T, L, U) for _ in 1:(R - 1)] for L in Ls]
     cone.dder3_half = [[zeros(T, 2 * L, 2 * U) for _ in 1:(R - 1)] for L in Ls]
-    cone.Λfact = Vector{Any}(undef, K)
+    cone.Λfact = Vector{Cholesky{T, Matrix{T}}}(undef, K)
     cone.point_views = [view(cone.point, block_idxs(U, i)) for i in 1:R]
     cone.Ps_times = zeros(K)
     cone.Ps_order = collect(1:K)

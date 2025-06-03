@@ -46,7 +46,7 @@ mutable struct MatrixEpiPerSquare{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     U::Hermitian{R, Matrix{R}}
     W::Matrix{R}
     Z::Hermitian{R, Matrix{R}}
-    fact_Z::Any
+    fact_Z::Cholesky{R, Matrix{R}}
     Zi::Hermitian{R, Matrix{R}}
     ZiW::Matrix{R}
     ZiUZi::Hermitian{R, Matrix{R}}
