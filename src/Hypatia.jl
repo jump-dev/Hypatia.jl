@@ -44,6 +44,7 @@ const VI = MOI.VariableIndex
 const SAF = MOI.ScalarAffineFunction
 const VV = MOI.VectorOfVariables
 const VAF = MOI.VectorAffineFunction
+import LowRankOpt as LRO
 include("MathOptInterface/cones.jl")
 include("MathOptInterface/transform.jl")
 include("MathOptInterface/wrapper.jl")
