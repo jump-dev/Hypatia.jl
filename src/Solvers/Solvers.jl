@@ -17,7 +17,6 @@ using SparseArrays
 import SuiteSparse
 import LinearMaps
 import IterativeSolvers
-using Test
 import Base.convert
 import Hypatia.Cones
 import Hypatia.Models
