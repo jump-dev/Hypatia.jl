@@ -84,7 +84,7 @@ function set_initial_point!(
 ) where {T <: Real, R <: RealOrComplex{T}}
     arr .= 0
     # central point data are the same as for hypoperlog
-    (arr[1], arr[2], w) = get_central_ray_hypoperlog(cone.d)
+    (arr[1], arr[2], w) = get_central_ray_hypoperlog(T(cone.d))
     incr = (cone.is_complex ? 2 : 1)
     k = 3
     @inbounds for i in 1:(cone.d)

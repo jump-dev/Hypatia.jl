@@ -392,7 +392,7 @@ function get_central_ray_epirelentropy(d::T) where {T <: AbstractFloat}
     counter = 0
     while counter < maxiter
         counter += 1
-        step = newton_ratio(w2, d)
+        step = _newton_ratio_relent(w2, d)
         w2 -= step
         if abs(step) < tol
             break
@@ -407,7 +407,7 @@ function get_central_ray_epirelentropy(d::T) where {T <: AbstractFloat}
     return u, v, w
 end
 
-function newton_ratio(w2, d)
+function _newton_ratio_relent(w2, d)
     rt = sqrt(w2 + d * w2 * (1 - w2) + d^2 * w2^2 / 4)
     v2 = 1 - d * w2 / 2 + rt
     f = 1 + (w2 - 1) / (v2 - 1) + log(w2 / v2) / 2
