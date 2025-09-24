@@ -90,8 +90,8 @@ end
 
 get_nu(cone::EpiRelEntropy) = cone.dim
 
-function set_initial_point!(arr::AbstractVector, cone::EpiRelEntropy)
-    (arr[1], v, w) = get_central_ray_epirelentropy(cone.w_dim)
+function set_initial_point!(arr::AbstractVector, cone::EpiRelEntropy{T}) where {T}
+    (arr[1], v, w) = get_central_ray_epirelentropy(T(cone.w_dim))
     @views arr[cone.v_idxs] .= v
     @views arr[cone.w_idxs] .= w
     return arr
@@ -385,39 +385,33 @@ function inv_hess_nz_idxs_col_tril(cone::EpiRelEntropy, j::Int)
     return (j == 1 ? (1:(cone.dim)) : (j <= (1 + cone.w_dim) ? [j, j + cone.w_dim] : [j]))
 end
 
-# see analysis in
-# https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
-function get_central_ray_epirelentropy(w_dim::Int)
-    if w_dim <= 10
-        return central_rays_epirelentropy[w_dim, :]
+function get_central_ray_epirelentropy(d::T) where {T <: AbstractFloat}
+    w2 = (1 - 1 / sqrt(4d) + 1 / 4d)^2
+    tol = sqrt(eps(T))
+    maxiter = 2ceil(log2(-log2(tol)))
+    counter = 0
+    while counter < maxiter
+        counter += 1
+        step = newton_ratio(w2, d)
+        w2 -= step
+        if abs(step) < tol
+            break
+        end
     end
-    # use nonlinear fit for higher dimensions
-    rtw_dim = sqrt(w_dim)
-    if w_dim <= 20
-        u = 1.2023 / rtw_dim - 0.015
-        v = 0.432 / rtw_dim + 1.0125
-        w = -0.3057 / rtw_dim + 0.972
-    elseif w_dim <= 300
-        u = 1.1513 / rtw_dim - 0.0069
-        v = 0.4873 / rtw_dim + 1.0008
-        w = -0.4247 / rtw_dim + 0.9961
-    else # use asymptotic expansion for the highest dimensions
-        u = 1 / rtw_dim + 0.75 / w_dim
-        v = 1 + 0.5 / rtw_dim
-        w = 1 - 0.5 / rtw_dim + 0.25 / w_dim
-    end
-    return [u, v, w]
+    counter == maxiter && error("Failed to compute initial point.")
+    w = √w2
+    rt = sqrt(w2 + d * w2 * (1 - w2) + d^2 * w2^2 / 4)
+    v = sqrt(1 - d * w2 / 2 + rt)
+    D = d * w * log(w / v)
+    u = D / 2 + sqrt(1 + D^2 / 4)
+    return u, v, w
 end
 
-const central_rays_epirelentropy = [
-    0.827838399 1.290927714 0.805102005
-    0.708612491 1.256859155 0.818070438
-    0.622618845 1.231401008 0.829317079
-    0.558111266 1.211710888 0.838978357
-    0.508038611 1.196018952 0.847300431
-    0.468039614 1.183194753 0.854521307
-    0.435316653 1.172492397 0.860840992
-    0.408009282 1.163403374 0.866420017
-    0.38483862 1.155570329 0.871385499
-    0.364899122 1.148735192 0.875838068
-]
+function newton_ratio(w2, d)
+    rt = sqrt(w2 + d * w2 * (1 - w2) + d^2 * w2^2 / 4)
+    v2 = 1 - d * w2 / 2 + rt
+    f = 1 + (w2 - 1) / (v2 - 1) + log(w2 / v2) / 2
+    dv2 = -d / 2 + (1 + d * (1 - 2w2) + d^2 * w2 / 2) / 2rt
+    df = 1 / (v2 - 1) - (w2 - 1) * dv2 / (v2 - 1)^2 + (1 / w2 - dv2 / v2) / 2
+    return f / df
+end

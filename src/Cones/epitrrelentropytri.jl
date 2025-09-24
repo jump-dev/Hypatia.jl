@@ -162,7 +162,7 @@ function set_initial_point!(
     incr = (cone.is_complex ? 2 : 1)
     arr .= 0
     # at the initial point V and W are diagonal, equivalent to epirelentropy
-    (arr[1], v, w) = get_central_ray_epirelentropy(cone.d)
+    (arr[1], v, w) = get_central_ray_epirelentropy(T(cone.d))
     k = 1
     for i in 1:(cone.d)
         arr[1 + k] = v
