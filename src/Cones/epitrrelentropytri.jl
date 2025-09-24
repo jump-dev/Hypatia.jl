@@ -515,7 +515,7 @@ function dder3(
 end
 
 function Δ2!(Δ2::Matrix{T}, λ::Vector{T}, log_λ::Vector{T}) where {T <: Real}
-    rteps = sqrt(eps(T))
+    rteps = cbrt(eps(T))
     d = length(λ)
 
     @inbounds for j in 1:d
@@ -540,7 +540,7 @@ end
 
 function Δ3!(Δ3::Array{T, 3}, Δ2::Matrix{T}, λ::Vector{T}) where {T <: Real}
     @assert issymmetric(Δ2) # must be symmetric (wrapper is less efficient)
-    rteps = sqrt(eps(T))
+    rteps = eps(T)^(2/9)
     d = length(λ)
 
     @inbounds for k in 1:d, j in 1:k, i in 1:j
@@ -661,7 +661,7 @@ function Δ4_ij!(
     Δ3::Array{T, 3},
     λ::Vector{T},
 ) where {T <: Real}
-    rteps = sqrt(eps(T))
+    rteps = eps(T)^(4/27)
     d = length(λ)
     λ_i = λ[i]
     λ_j = λ[j]
@@ -676,7 +676,8 @@ function Δ4_ij!(
         B_il = (abs(λ_il) < rteps)
 
         if (abs(λ_ij) < rteps) && B_ik && B_il
-            t = λ_i^-3 / 3
+            λ_mean = (λ_i + λ_j + λ_k + λ_l)/4
+            t = λ_mean^-3 / 3
         elseif B_ik && B_il
             t = (Δ3[i, i, i] - Δ3[i, i, j]) / λ_ij
         elseif B_il
