@@ -275,9 +275,9 @@ end
 
 function get_central_ray_hypopowermean(α::Vector{T}) where {T <: AbstractFloat}
     if length(α) == 1
-        s = 1/√T(2)
+        s = 1 / √T(2)
     else
-        s = (√T(5) - 1)/2
+        s = (√T(5) - 1) / 2
         tol = sqrt(eps(T))
         maxiter = 2ceil(log2(-log2(tol)))
         counter = 0
@@ -291,13 +291,13 @@ function get_central_ray_hypopowermean(α::Vector{T}) where {T <: AbstractFloat}
         end
         counter == maxiter && error("Failed to compute initial point.")
     end
-    u = -√(1-s)
-    w = sqrt.(s*α .+ 1)
+    u = -√(1 - s)
+    w = sqrt.(s * α .+ 1)
     return u, w
 end
 
 function _newton_ratio_powermean(s, α)
-    logf = 2log(s) - log(1-s) - sum(αi*log(αi*s+1) for αi in α)
-    dlogf = 2/s + 1/(1-s) - sum(αi^2/(αi*s+1) for αi in α)
+    logf = 2log(s) - log(1 - s) - sum(αi * log(αi * s + 1) for αi in α)
+    dlogf = 2 / s + 1 / (1 - s) - sum(αi^2 / (αi * s + 1) for αi in α)
     return logf / dlogf
 end
