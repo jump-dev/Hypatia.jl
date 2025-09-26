@@ -292,7 +292,7 @@ function get_central_ray_hypopowermean(α::Vector{T}) where {T <: AbstractFloat}
         counter == maxiter && error("Failed to compute initial point.")
     end
     u = -√(1 - s)
-    w = sqrt.(s * α .+ 1)
+    w = sqrt.(s .* α .+ 1)
     return u, w
 end
 
