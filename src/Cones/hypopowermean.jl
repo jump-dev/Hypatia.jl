@@ -273,27 +273,31 @@ function dder3(cone::HypoPowerMean{T}, dir::AbstractVector{T}) where {T <: Real}
     return dder3
 end
 
-# see analysis in
-# https://github.com/lkapelevich/HypatiaSupplements.jl/tree/master/centralpoints
-function get_central_ray_hypopowermean(α::Vector{T}) where {T <: Real}
-    d = length(α)
-    # predict w given α and d
-    w = zeros(T, d)
-    if d == 1
-        w .= 1.306563
-    elseif d == 2
-        @. w = 1.0049885 + 0.2986276 * α
-    elseif d <= 5
-        @. w = 1.0040142949 - 0.0004885108 * d + 0.3016645951 * α
-    elseif d <= 20
-        @. w = 1.001168 - 4.547017e-05 * d + 3.032880e-01 * α
-    elseif d <= 100
-        @. w = 1.000069 - 5.469926e-07 * d + 3.074084e-01 * α
+function get_central_ray_hypopowermean(α::Vector{T}) where {T <: AbstractFloat}
+    if length(α) == 1
+        s = 1/√T(2)
     else
-        @. w = 1 + 3.086535e-01 * α
+        s = (√T(5) - 1)/2
+        tol = sqrt(eps(T))
+        maxiter = 2ceil(log2(-log2(tol)))
+        counter = 0
+        while counter < maxiter
+            counter += 1
+            step = _newton_ratio_powermean(s, α)
+            s -= step
+            if abs(step) < tol
+                break
+            end
+        end
+        counter == maxiter && error("Failed to compute initial point.")
     end
-    # get u in closed form from w
-    p = exp(sum(α_i * log(w_i) for (α_i, w_i) in zip(α, w)))
-    u = p - p / d * sum(α_i / (abs2(w_i) - 1) for (α_i, w_i) in zip(α, w))
-    return (u, w)
+    u = -√(1-s)
+    w = sqrt.(s*α .+ 1)
+    return u, w
+end
+
+function _newton_ratio_powermean(s, α)
+    logf = 2log(s) - log(1-s) - sum(αi*log(αi*s+1) for αi in α)
+    dlogf = 2/s + 1/(1-s) - sum(αi^2/(αi*s+1) for αi in α)
+    return logf / dlogf
 end
