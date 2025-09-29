@@ -274,26 +274,22 @@ function dder3(cone::HypoPowerMean{T}, dir::AbstractVector{T}) where {T <: Real}
 end
 
 function get_central_ray_hypopowermean(α::Vector{T}) where {T <: AbstractFloat}
-    if length(α) == 1
-        s = 1 / √T(2)
-    else
-        s = (√T(5) - 1) / 2
-        tol = sqrt(eps(T))
-        maxiter = 2ceil(log2(-log2(tol)))
-        counter = 0
-        while counter < maxiter
-            counter += 1
-            step = _newton_ratio_powermean(s, α)
-            s -= step
-            if abs(step) < tol
-                break
-            end
+    s = (√T(5) - 1) / 2
+    tol = sqrt(eps(T))
+    maxiter = 2ceil(log2(-log2(tol)))
+    counter = 0
+    while counter < maxiter
+        counter += 1
+        step = _newton_ratio_powermean(s, α)
+        s -= step
+        if abs(step) < tol
+            break
         end
-        counter == maxiter && error("Failed to compute initial point.")
     end
+    counter == maxiter && error("Failed to compute initial point.")
     u = -√(1 - s)
     w = sqrt.(s .* α .+ 1)
-    return u, w
+    return (u, w)
 end
 
 function _newton_ratio_powermean(s, α)
