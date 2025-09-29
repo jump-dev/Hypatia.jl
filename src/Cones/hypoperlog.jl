@@ -291,7 +291,7 @@ function get_central_ray_hypoperlog(d::T) where {T <: AbstractFloat}
     counter == maxiter && error("Failed to compute initial point.")
     u = v * d / 2 - sqrt(2 + v^2 * (d^2 / 4 - 1))
     w = sqrt(1 - u * v)
-    return u, v, w
+    return (u, v, w)
 end
 
 function _newton_ratio_log(v, d)

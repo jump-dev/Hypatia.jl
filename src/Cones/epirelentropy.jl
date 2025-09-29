@@ -404,7 +404,7 @@ function get_central_ray_epirelentropy(d::T) where {T <: AbstractFloat}
     v = sqrt(1 - d * w2 / 2 + rt)
     D = d * w * log(w / v)
     u = D / 2 + sqrt(1 + D^2 / 4)
-    return u, v, w
+    return (u, v, w)
 end
 
 function _newton_ratio_relent(w2, d)
