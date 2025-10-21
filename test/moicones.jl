@@ -22,7 +22,7 @@ function test_moi_cones(T::Type{<:Real})
     # MOI predefined cones
 
     @testset "PositiveSemidefiniteConeTriangle" begin
-        moi_cone = MOI.PositiveSemidefiniteConeTriangle(3)
+        moi_cone = MOI.Scaled(MOI.PositiveSemidefiniteConeTriangle(3))
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
         @test hyp_cone isa Cones.PosSemidefTri{T, T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 6
@@ -114,7 +114,7 @@ function test_moi_cones(T::Type{<:Real})
     end
 
     @testset "RootDetConeTriangle" begin
-        moi_cone = MOI.RootDetConeTriangle(3)
+        moi_cone = MOI.Scaled(MOI.RootDetConeTriangle(3))
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
         @test hyp_cone isa Cones.HypoRootdetTri{T, T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 7
@@ -138,7 +138,7 @@ function test_moi_cones(T::Type{<:Real})
     end
 
     @testset "LogDetConeTriangle" begin
-        moi_cone = MOI.LogDetConeTriangle(3)
+        moi_cone = MOI.Scaled(MOI.LogDetConeTriangle(3))
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
         @test hyp_cone isa Cones.HypoPerLogdetTri{T, T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 8
