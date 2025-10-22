@@ -11,7 +11,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@latest
         with:
-          version: '1'
+          # Can be reverted to '1' once this issue is fixed:
+          # https://github.com/kalmarek/SymbolicWedderburn.jl/issues/97
+          version: '1.11'
       - name: Install dependencies
         run: julia --project=examples -e 'using Pkg; Pkg.instantiate(); Pkg.develop(PackageSpec(path=pwd()))'
       - name: Run examples
