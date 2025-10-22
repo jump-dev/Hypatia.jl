@@ -22,7 +22,7 @@ end
 
 function cone_from_moi(
     ::Type{T},
-    cone::MOI.PositiveSemidefiniteConeTriangle,
+    cone::MOI.Scaled{MOI.PositiveSemidefiniteConeTriangle},
 ) where {T <: Real}
     return Cones.PosSemidefTri{T, T}(MOI.dimension(cone))
 end
@@ -77,7 +77,10 @@ function cone_from_moi(::Type{T}, cone::MOI.GeometricMeanCone) where {T <: Real}
     return (l = MOI.dimension(cone) - 1; Cones.HypoGeoMean{T}(1 + l))
 end
 
-function cone_from_moi(::Type{T}, cone::MOI.RootDetConeTriangle) where {T <: Real}
+function cone_from_moi(
+    ::Type{T},
+    cone::MOI.Scaled{MOI.RootDetConeTriangle},
+) where {T <: Real}
     return Cones.HypoRootdetTri{T, T}(MOI.dimension(cone))
 end
 
@@ -89,7 +92,10 @@ function cone_from_moi(::Type{T}, cone::MOI.DualExponentialCone) where {T <: Rea
     return Cones.HypoPerLog{T}(3, use_dual = true)
 end
 
-function cone_from_moi(::Type{T}, cone::MOI.LogDetConeTriangle) where {T <: Real}
+function cone_from_moi(
+    ::Type{T},
+    cone::MOI.Scaled{MOI.LogDetConeTriangle},
+) where {T <: Real}
     return Cones.HypoPerLogdetTri{T, T}(MOI.dimension(cone))
 end
 
@@ -795,7 +801,7 @@ const HypatiaCones{T <: Real} = Union{
 const SupportedCone{T <: Real} = Union{
     HypatiaCones{T},
     MOI.Nonnegatives,
-    MOI.PositiveSemidefiniteConeTriangle,
+    MOI.Scaled{MOI.PositiveSemidefiniteConeTriangle},
     MOI.HermitianPositiveSemidefiniteConeTriangle,
     MOI.NormInfinityCone,
     MOI.NormOneCone,
@@ -806,10 +812,10 @@ const SupportedCone{T <: Real} = Union{
     MOI.PowerCone{T},
     MOI.DualPowerCone{T},
     MOI.GeometricMeanCone,
-    MOI.RootDetConeTriangle,
+    MOI.Scaled{MOI.RootDetConeTriangle},
     MOI.ExponentialCone,
     MOI.DualExponentialCone,
-    MOI.LogDetConeTriangle,
+    MOI.Scaled{MOI.LogDetConeTriangle},
     MOI.RelativeEntropyCone,
     _PrimalRankOnePSD{T},
     _DualRankOnePSD{T},

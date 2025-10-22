@@ -48,46 +48,6 @@ function permute_affine(cone::SpecNucCone, func::VAF{T}) where {T}
     return idxs_new
 end
 
-# transformations (svec rescaling) for MOI symmetric matrix cones not
-# in svec (scaled lower triangle) form
-const SvecCone = Union{
-    MOI.PositiveSemidefiniteConeTriangle,
-    MOI.LogDetConeTriangle,
-    MOI.RootDetConeTriangle,
-}
-
-svec_offset(::MOI.PositiveSemidefiniteConeTriangle) = 1
-svec_offset(::MOI.RootDetConeTriangle) = 2
-svec_offset(::MOI.LogDetConeTriangle) = 3
-
-needs_untransform(::SvecCone) = true
-
-function untransform_affine(cone::SvecCone, vals::AbstractVector{T}) where {T}
-    @views svec_vals = vals[svec_offset(cone):end]
-    Cones.scale_svec!(svec_vals, inv(sqrt(T(2))))
-    return vals
-end
-
-needs_rescale(::SvecCone) = true
-
-function rescale_affine(cone::SvecCone, vals::AbstractVector{T}) where {T}
-    @views svec_vals = vals[svec_offset(cone):end]
-    Cones.scale_svec!(svec_vals, sqrt(T(2)))
-    return vals
-end
-
-function rescale_affine(cone::SvecCone, func::VAF{T}, vals::AbstractVector{T}) where {T}
-    scal_start = svec_offset(cone) - 1
-    rt2 = sqrt(T(2))
-    for i in eachindex(vals)
-        k = func.terms[i].output_index - scal_start
-        if k > 0 && !MOI.Utilities.is_diagonal_vectorized_index(k)
-            vals[i] *= rt2
-        end
-    end
-    return vals
-end
-
 # transformation (svec rescaling and real/imag parts reordering) for MOI Hermitian PSD cone not in svec (scaled upper triangle) form
 needs_untransform(::MOI.HermitianPositiveSemidefiniteConeTriangle) = true
 
