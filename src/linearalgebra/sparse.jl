@@ -85,7 +85,8 @@ diag_min(::SparseSymCache{Float64}) = sqrt(eps())
 
 function update_fact(
     cache::CHOLMODSymCache{Float64},
-    A::SparseMatrixCSC{Float64, SuiteSparseInt},
+    A::SparseMatrixCSC{Float64, SuiteSparseInt};
+    npos=nothing,
 )
     A_symm = Symmetric(A, :L)
 

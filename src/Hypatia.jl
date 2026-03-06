@@ -28,6 +28,9 @@ function __init__()
     Requires.@require HSL = "34c5aeac-e683-54a6-a0e9-6e0fdc586c50" include(
         "linearalgebra/HSL.jl",
     )
+    Requires.@require CliqueTrees = "60701a23-6482-424a-84db-faee86b9b1f8" include(
+        "linearalgebra/CliqueTrees.jl",
+    )
 end
 
 # submodules
