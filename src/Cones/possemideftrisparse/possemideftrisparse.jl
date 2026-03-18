@@ -125,11 +125,6 @@ end
 include("denseimpl.jl")
 # cholmod implementation only works after this commit
 # see https://github.com/JuliaLang/julia/pull/40560
-if VERSION >= v"1.7.0-DEV.1025"
-    include("cholmodimpl.jl")
-    const PSDSparseImplList =
-        [(PSDSparseDense, Real), (PSDSparseCholmod, LinearAlgebra.BlasReal)]
-else
-    const PSDSparseCholmod = PSDSparseDense
-    const PSDSparseImplList = [(PSDSparseDense, Real)]
-end
+include("cholmodimpl.jl")
+const PSDSparseImplList =
+    [(PSDSparseDense, Real), (PSDSparseCholmod, LinearAlgebra.BlasReal)]
