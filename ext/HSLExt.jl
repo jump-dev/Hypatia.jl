@@ -10,9 +10,14 @@ utilities for HSL
 only works with Float64 and Float32
 =#
 
+module HSLExt
+
+import HSL
+import Hypatia
+import SparseArrays.SparseMatrixCSC
 import LinearAlgebra.BlasReal
 
-mutable struct HSLSymCache{T <: BlasReal} <: SparseSymCache{T}
+mutable struct HSLSymCache{T <: BlasReal} <: Hypatia.SparseSymCache{T}
     analyzed::Bool
     ma57::HSL.Ma57{T}
     function HSLSymCache{T}() where {T <: BlasReal}
@@ -22,9 +27,9 @@ mutable struct HSLSymCache{T <: BlasReal} <: SparseSymCache{T}
     end
 end
 
-int_type(::HSLSymCache) = Int
+Hypatia.int_type(::HSLSymCache) = Int
 
-function update_fact(
+function Hypatia.update_fact(
     cache::HSLSymCache{T},
     A::SparseMatrixCSC{T, Int},
 ) where {T <: BlasReal}
@@ -34,11 +39,11 @@ function update_fact(
     else
         copyto!(cache.ma57.vals, A.nzval)
     end
-    HSL.ma57_factorize(cache.ma57)
+    HSL.ma57_factorize!(cache.ma57)
     return
 end
 
-function inv_prod(
+function Hypatia.inv_prod(
     cache::HSLSymCache{T},
     x::Vector{T},
     A::SparseMatrixCSC{T, Int},
@@ -61,4 +66,6 @@ function inv_prod(
     return x
 end
 
-free_memory(cache::HSLSymCache) = nothing
+Hypatia.free_memory(cache::HSLSymCache) = nothing
+
+end #module

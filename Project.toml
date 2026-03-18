@@ -14,21 +14,29 @@ LowRankOpt = "607ca3ad-272e-43c8-bcbe-fc71b56c935c"
 MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 PolynomialRoots = "3a141323-8675-5d76-9d11-e1df1406c778"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
-Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
+
+[weakdeps]
+HSL = "34c5aeac-e683-54a6-a0e9-6e0fdc586c50"
+Pardiso = "46dd5b70-b6fb-5a00-ae2d-e8fea33afaf2"
+
+[extensions]
+HSLExt = "HSL"
+PardisoExt = "Pardiso"
 
 [compat]
 Combinatorics = "1"
 DocStringExtensions = "0.9"
 GenericLinearAlgebra = "0.3"
+HSL = "0.5"
 IterativeSolvers = "0.9"
 LinearMaps = "3"
 LowRankOpt = "0.2"
 MathOptInterface = "1.20"
+Pardiso = "1"
 PolynomialRoots = "1"
-Requires = "1"
 SpecialFunctions = "2"
 julia = "1.10"
 
@@ -39,4 +47,4 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["DynamicPolynomials", "ForwardDiff", "Random", "Test"]
+test = ["DynamicPolynomials", "ForwardDiff", "Random", "Test", "Pardiso", "HSL"]

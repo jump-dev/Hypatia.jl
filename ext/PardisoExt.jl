@@ -24,7 +24,14 @@ nonnegative1(Float64, solver = solver)
 ```
 =#
 
-mutable struct PardisoNonSymCache <: SparseNonSymCache{Float64}
+module PardisoExt
+
+import Pardiso
+import Hypatia
+import SparseArrays.SparseMatrixCSC
+
+
+mutable struct PardisoNonSymCache <: Hypatia.SparseNonSymCache{Float64}
     analyzed::Bool
     pardiso::Pardiso.MKLPardisoSolver
     function PardisoNonSymCache()
@@ -36,7 +43,7 @@ mutable struct PardisoNonSymCache <: SparseNonSymCache{Float64}
     end
 end
 
-mutable struct PardisoSymCache <: SparseSymCache{Float64}
+mutable struct PardisoSymCache <: Hypatia.SparseSymCache{Float64}
     analyzed::Bool
     pardiso::Pardiso.MKLPardisoSolver
     function PardisoSymCache()
@@ -50,9 +57,9 @@ end
 
 const PardisoSparseCache = Union{PardisoSymCache, PardisoNonSymCache}
 
-int_type(::PardisoSparseCache) = Int32
+Hypatia.int_type(::PardisoSparseCache) = Int32
 
-function update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int32})
+function Hypatia.update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int32})
     pardiso = cache.pardiso
 
     if !cache.analyzed
@@ -70,7 +77,7 @@ function update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int3
     return
 end
 
-function inv_prod(
+function Hypatia.inv_prod(
     cache::PardisoSparseCache,
     x::Vector{Float64},
     A::SparseMatrixCSC{Float64, Int32},
@@ -84,8 +91,10 @@ function inv_prod(
     return x
 end
 
-function free_memory(cache::PardisoSparseCache)
+function Hypatia.free_memory(cache::PardisoSparseCache)
     Pardiso.set_phase!(cache.pardiso, Pardiso.RELEASE_ALL)
     Pardiso.pardiso(cache.pardiso)
     return
 end
+
+end # module
