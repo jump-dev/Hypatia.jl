@@ -23,10 +23,8 @@ include(joinpath(@__DIR__, "nativesets.jl"))
 options = (verbose = true,)
 
 @testset "Pardiso cache tests" begin
-    @testset "cache setup: $cache_type" for cache_type in [
-        PardisoNonSymCache,
-        PardisoSymCache,
-    ]
+    @testset "cache setup: $cache_type" for cache_type in
+                                            [PardisoNonSymCache, PardisoSymCache]
         cache = cache_type()
         @test !cache.analyzed
         @test_throws Exception cache_type{Float32}()
