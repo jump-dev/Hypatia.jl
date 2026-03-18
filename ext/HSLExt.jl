@@ -20,6 +20,7 @@ import LinearAlgebra.BlasReal
 mutable struct HSLSymCache{T <: BlasReal} <: Hypatia.SparseSymCache{T}
     analyzed::Bool
     ma57::HSL.Ma57{T}
+    work::Vector{T}
     function HSLSymCache{T}() where {T <: BlasReal}
         cache = new{T}()
         cache.analyzed = false
@@ -35,6 +36,7 @@ function Hypatia.update_fact(
 ) where {T <: BlasReal}
     if !cache.analyzed
         cache.ma57 = HSL.Ma57(A)
+        cache.work = Vector{T}(undef, cache.ma57.n)
         cache.analyzed = true
     else
         copyto!(cache.ma57.vals, A.nzval)
@@ -50,9 +52,8 @@ function Hypatia.inv_prod(
     b::Vector{T},
 ) where {T <: BlasReal}
     # MA57 only has the option to take iterative refinement steps for a single-column RHS
-    ma57 = cache.ma57
     copyto!(x, b)
-    HSL.ma57_solve!(ma57, x)
+    HSL.ma57_solve!(cache.ma57, x, cache.work)
 
     # info we could print
     # ma57.info.backward_error1
