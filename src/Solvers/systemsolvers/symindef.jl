@@ -194,7 +194,7 @@ function update_lhs(syssolver::SymIndefSparseSystemSolver, solver::Solver)
         end
     end
 
-    solver.time_upfact += @elapsed update_fact(syssolver.fact_cache, syssolver.lhs_sub)
+    solver.time_upfact += @elapsed update_fact(syssolver.fact_cache, syssolver.lhs_sub; npos=solver.model.n)
     solve_subsystem3(syssolver, solver, syssolver.sol_const, syssolver.rhs_const)
 
     return syssolver

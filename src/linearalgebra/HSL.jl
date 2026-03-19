@@ -26,7 +26,8 @@ int_type(::HSLSymCache) = Int
 
 function update_fact(
     cache::HSLSymCache{T},
-    A::SparseMatrixCSC{T, Int},
+    A::SparseMatrixCSC{T, Int};
+    npos=nothing,
 ) where {T <: BlasReal}
     if !cache.analyzed
         cache.ma57 = HSL.Ma57(A)

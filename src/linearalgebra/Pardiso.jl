@@ -52,7 +52,7 @@ const PardisoSparseCache = Union{PardisoSymCache, PardisoNonSymCache}
 
 int_type(::PardisoSparseCache) = Int32
 
-function update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int32})
+function update_fact(cache::PardisoSparseCache, A::SparseMatrixCSC{Float64, Int32}; npos=nothing)
     pardiso = cache.pardiso
 
     if !cache.analyzed
