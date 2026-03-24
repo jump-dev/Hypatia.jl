@@ -11,11 +11,6 @@ preprocessing and initial point finding functions for interior point algorithms
 
 const MatrixyAG = Union{AbstractMatrix, UniformScaling}
 
-# delete later, affects qr. see https://github.com/JuliaLang/julia/pull/40623
-if VERSION < v"1.7.0-DEV.1188"
-    const ColumnNorm = Val{true}
-end
-
 # rescale the rows and columns of the conic data to get an equivalent conic problem
 function rescale_data(solver::Solver{T}) where {T <: Real}
     solver.rescale || return false

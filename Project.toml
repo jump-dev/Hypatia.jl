@@ -29,7 +29,7 @@ PardisoExt = "Pardiso"
 [compat]
 Combinatorics = "1"
 DocStringExtensions = "0.9"
-GenericLinearAlgebra = "0.3"
+GenericLinearAlgebra = "0.3 - 0.4"
 HSL = "0.5"
 IterativeSolvers = "0.9"
 LinearMaps = "3"

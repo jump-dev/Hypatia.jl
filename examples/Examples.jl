@@ -11,10 +11,6 @@ Hypatia examples and script utilities.
 module Examples
 
 using LinearAlgebra
-# delete later, affects qr. see https://github.com/JuliaLang/julia/pull/40623
-if VERSION < v"1.7.0-DEV.1188"
-    const ColumnNorm = Val{true}
-end
 
 using Test
 import Random
