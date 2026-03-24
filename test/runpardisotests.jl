@@ -7,12 +7,15 @@ file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 
 #=
 run tests using Pardiso sparse linear system solver caches
-requires that Pardiso.jl be installed and built successfully; Requires.jl handles this optional dependency
+requires that Pardiso.jl be installed and built successfully;
 =#
 
 using Test
 import Pardiso
 import Hypatia.Solvers
+
+const PardisoSymCache = Base.get_extension(Hypatia, :PardisoExt).PardisoSymCache
+const PardisoNonSymCache = Base.get_extension(Hypatia, :PardisoExt).PardisoNonSymCache
 
 include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
@@ -20,10 +23,8 @@ include(joinpath(@__DIR__, "nativesets.jl"))
 options = (verbose = true,)
 
 @testset "Pardiso cache tests" begin
-    @testset "cache setup: $cache_type" for cache_type in [
-        Hypatia.PardisoSymCache,
-        Hypatia.PardisoNonSymCache,
-    ]
+    @testset "cache setup: $cache_type" for cache_type in
+                                            [PardisoNonSymCache, PardisoSymCache]
         cache = cache_type()
         @test !cache.analyzed
         @test_throws Exception cache_type{Float32}()
@@ -36,7 +37,7 @@ options = (verbose = true,)
             T,
             solver = Solvers.Solver{T}(
                 syssolver = Solvers.NaiveSparseSystemSolver{T}(
-                    fact_cache = Hypatia.PardisoNonSymCache{T}(),
+                    fact_cache = PardisoNonSymCache(),
                 );
                 options...,
             ),
@@ -48,7 +49,7 @@ options = (verbose = true,)
             T,
             solver = Solvers.Solver{T}(
                 syssolver = Solvers.NaiveElimSparseSystemSolver{T}(
-                    fact_cache = Hypatia.PardisoNonSymCache{T}(),
+                    fact_cache = PardisoNonSymCache(),
                 );
                 options...,
             ),
@@ -60,7 +61,7 @@ options = (verbose = true,)
             T,
             solver = Solvers.Solver{T}(
                 syssolver = Solvers.SymIndefSparseSystemSolver{T}(
-                    fact_cache = Hypatia.PardisoSymCache{T}(),
+                    fact_cache = PardisoSymCache(),
                 );
                 options...,
             ),

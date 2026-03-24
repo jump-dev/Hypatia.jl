@@ -7,13 +7,16 @@ file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 
 #=
 run tests using HSL sparse linear system solver caches
-requires that HSL.jl be installed and built successfully; Requires.jl handles this optional dependency
+requires that HSL.jl be installed and built successfully;
 =#
 
 using Test
 import HSL
 import Hypatia
 import Hypatia.Solvers
+
+const HSLSymCache = Base.get_extension(Hypatia, :HSLExt).HSLSymCache
+
 blas_reals = [Float64, Float32]
 include(joinpath(@__DIR__, "nativeinstances.jl"))
 include(joinpath(@__DIR__, "nativesets.jl"))
@@ -21,10 +24,9 @@ include(joinpath(@__DIR__, "nativesets.jl"))
 options = (verbose = false,)
 
 @testset "HSL cache tests" begin
-    @testset "cache setup: $cache_type" for cache_type in [Hypatia.HSLSymCache] # TODO wrap and test a HSLNonSymCache
-        cache = cache_type()
-        @test !cache.analyzed
+    @testset "cache setup: $cache_type" for cache_type in [HSLSymCache] # TODO wrap and test a HSLNonSymCache
         @test cache_type{Float32}().analyzed == false
+        @test cache_type{Float64}().analyzed == false
         @test_throws Exception cache_type{BigFloat}()
     end
 
@@ -36,7 +38,7 @@ options = (verbose = false,)
             T,
             solver = Solvers.Solver{T}(
                 syssolver = Solvers.SymIndefSparseSystemSolver{T}(
-                    fact_cache = Hypatia.HSLSymCache{T}(),
+                    fact_cache = HSLSymCache{T}(),
                 );
                 options...,
             ),
