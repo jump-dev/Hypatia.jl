@@ -22,7 +22,7 @@ SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 [compat]
 Combinatorics = "1"
 DocStringExtensions = "0.9"
-GenericLinearAlgebra = "0.3"
+GenericLinearAlgebra = "0.3 - 0.4"
 IterativeSolvers = "0.9"
 LinearMaps = "3"
 LowRankOpt = "0.2"
