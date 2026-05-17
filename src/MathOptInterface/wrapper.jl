@@ -173,8 +173,7 @@ function MOI.copy_to(opt::Optimizer{T}, src::MOI.ModelLike) where {T <: Real}
         si = get_con_set(ci)
         _con_IJV(IG, JG, VG, model_h, moi_cone_idxs, fi, si, idx_map)
         push!(moi_cones, si)
-        idx_map[ci] =
-            MOI.ConstraintIndex{VAF{T}, MOI.Nonnegatives}(length(moi_cones))
+        idx_map[ci] = MOI.ConstraintIndex{VAF{T}, MOI.Nonnegatives}(length(moi_cones))
     end
     if !isempty(moi_cones)
         push!(cones, cone_from_moi(T, MOI.Nonnegatives(length(model_h))))
