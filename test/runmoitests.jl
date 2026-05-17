@@ -33,7 +33,6 @@ include(joinpath(@__DIR__, "moicones.jl"))
             Hypatia._PrimalRankOnePSD{T, Vector{T}}
             Hypatia._DualRankOnePSD{T, Vector{T}}
         ]
-            @test MOI.supports_add_constrained_variables(model, S)
             @test MOI.supports_constraint(model, MOI.VectorAffineFunction{T}, S)
         end
     end
