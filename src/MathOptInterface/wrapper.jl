@@ -91,7 +91,7 @@ end
 
 function MOI.supports_constraint(
     ::Optimizer{T},
-    ::Type{<:Union{VV, VAF{T}}},
+    ::Type{VAF{T}},
     ::Type{<:Union{MOI.Zeros, SupportedCone{T}}},
 ) where {T <: Real}
     return true
@@ -152,11 +152,11 @@ function MOI.copy_to(opt::Optimizer{T}, src::MOI.ModelLike) where {T <: Real}
     (IA, JA, VA) = (Int[], Int[], T[])
     model_b = T[]
     opt.zeros_idxs = zeros_idxs = Vector{UnitRange{Int}}()
-    for F in (VV, VAF{T}), ci in get_src_cons(F, MOI.Zeros)
+    for ci in get_src_cons(VAF{T}, MOI.Zeros)
         fi = get_con_fun(ci)
         si = get_con_set(ci)
         _con_IJV(IA, JA, VA, model_b, zeros_idxs, fi, si, idx_map)
-        idx_map[ci] = MOI.ConstraintIndex{F, MOI.Zeros}(length(zeros_idxs))
+        idx_map[ci] = MOI.ConstraintIndex{VAF{T}, MOI.Zeros}(length(zeros_idxs))
     end
     model_A = dropzeros!(sparse(IA, JA, VA, length(model_b), n))
 
@@ -168,12 +168,12 @@ function MOI.copy_to(opt::Optimizer{T}, src::MOI.ModelLike) where {T <: Real}
     cones = Cones.Cone{T}[]
 
     # build up one nonnegative cone
-    for F in (VV, VAF{T}), ci in get_src_cons(F, MOI.Nonnegatives)
+    for ci in get_src_cons(VAF{T}, MOI.Nonnegatives)
         fi = get_con_fun(ci)
         si = get_con_set(ci)
         _con_IJV(IG, JG, VG, model_h, moi_cone_idxs, fi, si, idx_map)
         push!(moi_cones, si)
-        idx_map[ci] = MOI.ConstraintIndex{F, MOI.Nonnegatives}(length(moi_cones))
+        idx_map[ci] = MOI.ConstraintIndex{VAF{T}, MOI.Nonnegatives}(length(moi_cones))
     end
     if !isempty(moi_cones)
         push!(cones, cone_from_moi(T, MOI.Nonnegatives(length(model_h))))
@@ -380,7 +380,7 @@ end
 function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintDual,
-    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, MOI.Zeros},
+    ci::MOI.ConstraintIndex{VAF{T}, MOI.Zeros},
 ) where {T}
     MOI.check_result_index_bounds(opt, attr)
     return opt.solver.result.y[opt.zeros_idxs[ci.value]]
@@ -389,7 +389,7 @@ end
 function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintDual,
-    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCone{T}},
+    ci::MOI.ConstraintIndex{VAF{T}, <:SupportedCone{T}},
 ) where {T}
     MOI.check_result_index_bounds(opt, attr)
     i = ci.value
@@ -400,40 +400,12 @@ end
 function MOI.get(
     opt::Optimizer{T},
     attr::MOI.ConstraintPrimal,
-    ci::MOI.ConstraintIndex{<:Union{VV, VAF{T}}, <:SupportedCone{T}},
+    ci::MOI.ConstraintIndex{VAF{T}, <:SupportedCone{T}},
 ) where {T}
     MOI.check_result_index_bounds(opt, attr)
     i = ci.value
     s_i = opt.solver.result.s[opt.moi_cone_idxs[i]]
     return untransform_affine(opt.moi_cones[i], s_i)
-end
-
-function _con_IJV(
-    IM::Vector{Int},
-    JM::Vector{Int},
-    VM::Vector{T},
-    vect::Vector{T},
-    idxs_vect::Vector{UnitRange{Int}},
-    func::VV,
-    set::MOI.AbstractVectorSet,
-    idx_map::MOI.IndexMap,
-) where {T <: Real}
-    dim = MOI.output_dimension(func)
-    start = length(vect)
-    idxs = start .+ (1:dim)
-    push!(idxs_vect, idxs)
-    append!(vect, zero(T) for _ in 1:dim)
-    if needs_permute(set)
-        append!(IM, invperm(permute_idxs(set)) .+ start)
-    else
-        append!(IM, idxs)
-    end
-    append!(JM, idx_map[vi].value for vi in func.variables)
-    append!(VM, -one(T) for _ in 1:dim)
-    if needs_rescale(set)
-        @views rescale_affine(set, VM[(end - dim + 1):end])
-    end
-    return
 end
 
 function _con_IJV(
