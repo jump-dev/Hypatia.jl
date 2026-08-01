@@ -6,7 +6,11 @@ file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 =#
 
 insts = OrderedDict()
-insts["minimal"] = [((:poly1, :dom1, true, -4),), ((:poly1, :dom1, false, -4), :SOCExpPSD)]
+insts["minimal"] = [
+    ((:poly1, :dom1, true, -4),),
+    ((:poly1, :dom1, false, -4), :SOCExpPSD),
+    ((:poly1, :dom1, true, -4, true),),
+]
 insts["fast"] = [
     ((:poly1, :dom2, true, -4),),
     ((:poly1, :dom1, false, -4), :SOCExpPSD),

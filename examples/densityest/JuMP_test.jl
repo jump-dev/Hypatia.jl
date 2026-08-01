@@ -13,6 +13,7 @@ insts["minimal"] = [
     ((5, 1, 2, true, false, false), :ExpPSD),
     ((5, 1, 2, true, false, false), :SOCExpPSD),
     ((:iris, 2, true, false, true),),
+    ((5, 2, 2, false, true, true, true),),
 ]
 insts["fast"] = [
     ((10, 1, 10, true, false, false), :ExpPSD),

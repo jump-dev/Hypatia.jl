@@ -23,6 +23,15 @@ struct ConvexityParameterJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     dom::Symbol
     use_matrixwsos::Bool # use wsosinterpposemideftricone, else PSD formulation
     true_mu::Real # optional true value of parameter for testing only
+    dualize::Bool
+end
+function ConvexityParameterJuMP{Float64}(
+    poly::Symbol,
+    dom::Symbol,
+    use_matrixwsos::Bool,
+    true_mu::Real,
+)
+    return ConvexityParameterJuMP{Float64}(poly, dom, use_matrixwsos, true_mu, false)
 end
 
 function build(inst::ConvexityParameterJuMP{T}) where {T <: Float64}
@@ -54,7 +63,11 @@ function build(inst::ConvexityParameterJuMP{T}) where {T <: Float64}
         )
     end
 
-    return model
+    if !inst.dualize
+        return model
+    else
+        return Dualization.dualize(model)
+    end
 end
 
 function test_extra(inst::ConvexityParameterJuMP{T}, model::JuMP.Model) where {T}

@@ -13,6 +13,8 @@ insts["minimal"] = [
     ((1, 1, 1, 2, false, true, false),),
     ((1, 1, 1, 2, false, false, true),),
     ((1, 1, 1, 2, false, false, false),),
+    ((1, 1, 1, 2, false, true, true, true),),
+    ((1, 1, 1, 2, true, true, true, true),),
 ]
 insts["fast"] = [
     ((2, 2, 2, 2, true, true, false),),

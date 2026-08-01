@@ -73,3 +73,10 @@ perf = Examples.setup_benchmark_dataframe()
     # DataFrames.show(perf, allrows = true, allcols = true)
     # println("\n")
 end;
+
+@testset "duality tests" begin
+    cones = Examples.cone_types(Float64)
+    for cone in cones
+        Examples.run_duality_test(cone)
+    end
+end;

@@ -30,6 +30,7 @@ include("native_utils.jl")
 include("JuMP_utils.jl")
 include("spectral_functions_JuMP.jl")
 include("benchmark_utils.jl")
+include("duality_test.jl")
 
 const model_types = ["native", "JuMP"]
 
