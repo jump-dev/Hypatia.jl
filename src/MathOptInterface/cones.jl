@@ -119,6 +119,8 @@ end
 export NonnegativeCone
 
 MOI.dimension(cone::NonnegativeCone) = cone.dim
+MOI.dual_set(cone::NonnegativeCone{T}) where {T} = NonnegativeCone{T}(cone.dim)
+MOI.dual_set_type(::Type{NonnegativeCone{T}}) where {T} = NonnegativeCone{T}
 
 function cone_from_moi(::Type{T}, cone::NonnegativeCone{T}) where {T <: Real}
     return Cones.Nonnegative{T}(cone.dim)
@@ -137,6 +139,8 @@ end
 export PosSemidefTriCone
 
 MOI.dimension(cone::PosSemidefTriCone) = cone.dim
+MOI.dual_set(cone::PosSemidefTriCone{T, R}) where {T, R} = PosSemidefTriCone{T, R}(cone.dim)
+MOI.dual_set_type(::Type{PosSemidefTriCone{T, R}}) where {T, R} = PosSemidefTriCone{T, R}
 
 function cone_from_moi(
     ::Type{T},
@@ -163,6 +167,12 @@ function DoublyNonnegativeTriCone{T}(dim::Int) where {T <: Real}
 end
 
 MOI.dimension(cone::DoublyNonnegativeTriCone where {T <: Real}) = cone.dim
+function MOI.dual_set(cone::DoublyNonnegativeTriCone{T}) where {T}
+    return DoublyNonnegativeTriCone{T}(cone.dim, !cone.use_dual)
+end
+function MOI.dual_set_type(::Type{DoublyNonnegativeTriCone{T}}) where {T}
+    return DoublyNonnegativeTriCone{T}
+end
 
 function cone_from_moi(::Type{T}, cone::DoublyNonnegativeTriCone{T}) where {T <: Real}
     return Cones.DoublyNonnegativeTri{T}(cone.dim, use_dual = cone.use_dual)
@@ -207,6 +217,18 @@ function MOI.dimension(
     return (2 * length(cone.row_idxs) - cone.side)
 end
 
+function MOI.dual_set(cone::PosSemidefTriSparseCone{I, T, R}) where {I, T, R}
+    return PosSemidefTriSparseCone{I, T, R}(
+        cone.side,
+        cone.row_idxs,
+        cone.col_idxs,
+        !cone.use_dual,
+    )
+end
+function MOI.dual_set_type(::Type{PosSemidefTriSparseCone{I, T, R}}) where {I, T, R}
+    return PosSemidefTriSparseCone{I, T, R}
+end
+
 function cone_from_moi(
     ::Type{T},
     cone::PosSemidefTriSparseCone{I, T, R},
@@ -235,6 +257,10 @@ export LinMatrixIneqCone
 LinMatrixIneqCone{T}(As::Vector) where {T <: Real} = LinMatrixIneqCone{T}(As, false)
 
 MOI.dimension(cone::LinMatrixIneqCone) = length(cone.As)
+function MOI.dual_set(cone::LinMatrixIneqCone{T}) where {T}
+    return LinMatrixIneqCone{T}(cone.As, !cone.use_dual)
+end
+MOI.dual_set_type(::Type{LinMatrixIneqCone{T}}) where {T} = LinMatrixIneqCone{T}
 
 function cone_from_moi(::Type{T}, cone::LinMatrixIneqCone{T}) where {T <: Real}
     return Cones.LinMatrixIneq{T}(cone.As, use_dual = cone.use_dual)
@@ -258,6 +284,10 @@ function EpiNormInfCone{T, R}(dim::Int) where {T <: Real, R <: RealOrComplex{T}}
 end
 
 MOI.dimension(cone::EpiNormInfCone) = cone.dim
+function MOI.dual_set(cone::EpiNormInfCone{T, R}) where {T, R}
+    return EpiNormInfCone{T, R}(cone.dim, !cone.use_dual)
+end
+MOI.dual_set_type(::Type{EpiNormInfCone{T, R}}) where {T, R} = EpiNormInfCone{T, R}
 
 function cone_from_moi(
     ::Type{T},
@@ -279,6 +309,8 @@ end
 export EpiNormEuclCone
 
 MOI.dimension(cone::EpiNormEuclCone) = cone.dim
+MOI.dual_set(cone::EpiNormEuclCone{T}) where {T} = EpiNormEuclCone{T}(cone.dim)
+MOI.dual_set_type(::Type{EpiNormEuclCone{T}}) where {T} = EpiNormEuclCone{T}
 
 function cone_from_moi(::Type{T}, cone::EpiNormEuclCone{T}) where {T <: Real}
     return Cones.EpiNormEucl{T}(cone.dim)
@@ -297,6 +329,8 @@ end
 export EpiPerSquareCone
 
 MOI.dimension(cone::EpiPerSquareCone) = cone.dim
+MOI.dual_set(cone::EpiPerSquareCone{T}) where {T} = EpiPerSquareCone{T}(cone.dim)
+MOI.dual_set_type(::Type{EpiPerSquareCone{T}}) where {T} = EpiPerSquareCone{T}
 
 function cone_from_moi(::Type{T}, cone::EpiPerSquareCone{T}) where {T <: Real}
     return Cones.EpiPerSquare{T}(cone.dim)
@@ -320,6 +354,12 @@ function EpiNormSpectralTriCone{T, R}(dim::Int) where {T <: Real, R <: RealOrCom
 end
 
 MOI.dimension(cone::EpiNormSpectralTriCone) = cone.dim
+function MOI.dual_set(cone::EpiNormSpectralTriCone{T, R}) where {T, R}
+    return EpiNormSpectralTriCone{T, R}(cone.dim, !cone.use_dual)
+end
+function MOI.dual_set_type(::Type{EpiNormSpectralTriCone{T, R}}) where {T, R}
+    return EpiNormSpectralTriCone{T, R}
+end
 
 function cone_from_moi(
     ::Type{T},
@@ -353,6 +393,12 @@ function MOI.dimension(
     cone::EpiNormSpectralCone{T, R},
 ) where {T <: Real, R <: RealOrComplex{T}}
     return 1 + Cones.vec_length(R, cone.d1 * cone.d2)
+end
+function MOI.dual_set(cone::EpiNormSpectralCone{T, R}) where {T, R}
+    return EpiNormSpectralCone{T, R}(cone.d1, cone.d2, !cone.use_dual)
+end
+function MOI.dual_set_type(::Type{EpiNormSpectralCone{T, R}}) where {T, R}
+    return EpiNormSpectralCone{T, R}
 end
 
 function cone_from_moi(
@@ -388,6 +434,12 @@ function MOI.dimension(
 ) where {T <: Real, R <: RealOrComplex{T}}
     return Cones.svec_length(R, cone.d1) + 1 + Cones.vec_length(R, cone.d1 * cone.d2)
 end
+function MOI.dual_set(cone::MatrixEpiPerSquareCone{T, R}) where {T, R}
+    return MatrixEpiPerSquareCone{T, R}(cone.d1, cone.d2, !cone.use_dual)
+end
+function MOI.dual_set_type(::Type{MatrixEpiPerSquareCone{T, R}}) where {T, R}
+    return MatrixEpiPerSquareCone{T, R}
+end
 
 function cone_from_moi(
     ::Type{T},
@@ -415,6 +467,10 @@ function GeneralizedPowerCone{T}(α::Vector{T}, n::Int) where {T <: Real}
 end
 
 MOI.dimension(cone::GeneralizedPowerCone) = length(cone.α) + cone.n
+function MOI.dual_set(cone::GeneralizedPowerCone{T}) where {T}
+    return GeneralizedPowerCone{T}(cone.α, cone.n, !cone.use_dual)
+end
+MOI.dual_set_type(::Type{GeneralizedPowerCone{T}}) where {T} = GeneralizedPowerCone{T}
 
 function cone_from_moi(::Type{T}, cone::GeneralizedPowerCone{T}) where {T <: Real}
     return Cones.GeneralizedPower{T}(cone.α, cone.n, use_dual = cone.use_dual)
@@ -436,6 +492,10 @@ export HypoPowerMeanCone
 HypoPowerMeanCone{T}(α::Vector{T}) where {T <: Real} = HypoPowerMeanCone{T}(α, false)
 
 MOI.dimension(cone::HypoPowerMeanCone) = 1 + length(cone.α)
+function MOI.dual_set(cone::HypoPowerMeanCone{T}) where {T}
+    return HypoPowerMeanCone{T}(cone.α, !cone.use_dual)
+end
+MOI.dual_set_type(::Type{HypoPowerMeanCone{T}}) where {T} = HypoPowerMeanCone{T}
 
 function cone_from_moi(::Type{T}, cone::HypoPowerMeanCone{T}) where {T <: Real}
     return Cones.HypoPowerMean{T}(cone.α, use_dual = cone.use_dual)
@@ -457,6 +517,10 @@ export HypoGeoMeanCone
 HypoGeoMeanCone{T}(dim::Int) where {T <: Real} = HypoGeoMeanCone{T}(dim, false)
 
 MOI.dimension(cone::HypoGeoMeanCone) = cone.dim
+function MOI.dual_set(cone::HypoGeoMeanCone{T}) where {T}
+    return HypoGeoMeanCone{T}(cone.dim, !cone.use_dual)
+end
+MOI.dual_set_type(::Type{HypoGeoMeanCone{T}}) where {T} = HypoGeoMeanCone{T}
 
 function cone_from_moi(::Type{T}, cone::HypoGeoMeanCone{T}) where {T <: Real}
     return Cones.HypoGeoMean{T}(cone.dim, use_dual = cone.use_dual)
@@ -480,6 +544,10 @@ function HypoRootdetTriCone{T, R}(dim::Int) where {T <: Real, R <: RealOrComplex
 end
 
 MOI.dimension(cone::HypoRootdetTriCone where {T <: Real}) = cone.dim
+function MOI.dual_set(cone::HypoRootdetTriCone{T, R}) where {T, R}
+    return HypoRootdetTriCone{T, R}(cone.dim, !cone.use_dual)
+end
+MOI.dual_set_type(::Type{HypoRootdetTriCone{T, R}}) where {T, R} = HypoRootdetTriCone{T, R}
 
 function cone_from_moi(
     ::Type{T},
@@ -504,6 +572,10 @@ export HypoPerLogCone
 HypoPerLogCone{T}(dim::Int) where {T <: Real} = HypoPerLogCone{T}(dim, false)
 
 MOI.dimension(cone::HypoPerLogCone) = cone.dim
+function MOI.dual_set(cone::HypoPerLogCone{T}) where {T}
+    return HypoPerLogCone{T}(cone.dim, !cone.use_dual)
+end
+MOI.dual_set_type(::Type{HypoPerLogCone{T}}) where {T} = HypoPerLogCone{T}
 
 function cone_from_moi(::Type{T}, cone::HypoPerLogCone{T}) where {T <: Real}
     return Cones.HypoPerLog{T}(cone.dim, use_dual = cone.use_dual)
@@ -527,6 +599,12 @@ function HypoPerLogdetTriCone{T, R}(dim::Int) where {T <: Real, R <: RealOrCompl
 end
 
 MOI.dimension(cone::HypoPerLogdetTriCone) = cone.dim
+function MOI.dual_set(cone::HypoPerLogdetTriCone{T, R}) where {T, R}
+    return HypoPerLogdetTriCone{T, R}(cone.dim, !cone.use_dual)
+end
+function MOI.dual_set_type(::Type{HypoPerLogdetTriCone{T, R}}) where {T, R}
+    return HypoPerLogdetTriCone{T, R}
+end
 
 function cone_from_moi(
     ::Type{T},
@@ -559,6 +637,10 @@ function EpiPerSepSpectralCone{T}(
 end
 
 MOI.dimension(cone::EpiPerSepSpectralCone) = 2 + Cones.vector_dim(cone.Q, cone.d)
+function MOI.dual_set(cone::EpiPerSepSpectralCone{T}) where {T}
+    return EpiPerSepSpectralCone{T}(cone.h, cone.Q, cone.d, !cone.use_dual)
+end
+MOI.dual_set_type(::Type{EpiPerSepSpectralCone{T}}) where {T} = EpiPerSepSpectralCone{T}
 
 function cone_from_moi(::Type{T}, cone::EpiPerSepSpectralCone{T}) where {T <: Real}
     return Cones.EpiPerSepSpectral{cone.Q, T}(cone.h, cone.d, use_dual = cone.use_dual)
@@ -580,6 +662,10 @@ export EpiRelEntropyCone
 EpiRelEntropyCone{T}(dim::Int) where {T <: Real} = EpiRelEntropyCone{T}(dim, false)
 
 MOI.dimension(cone::EpiRelEntropyCone) = cone.dim
+function MOI.dual_set(cone::EpiRelEntropyCone{T}) where {T}
+    return EpiRelEntropyCone{T}(cone.dim, !cone.use_dual)
+end
+MOI.dual_set_type(::Type{EpiRelEntropyCone{T}}) where {T} = EpiRelEntropyCone{T}
 
 function cone_from_moi(::Type{T}, cone::EpiRelEntropyCone{T}) where {T <: Real}
     return Cones.EpiRelEntropy{T}(cone.dim, use_dual = cone.use_dual)
@@ -603,6 +689,12 @@ function EpiTrRelEntropyTriCone{T, R}(dim::Int) where {T <: Real, R <: RealOrCom
 end
 
 MOI.dimension(cone::EpiTrRelEntropyTriCone) = cone.dim
+function MOI.dual_set(cone::EpiTrRelEntropyTriCone{T, R}) where {T, R}
+    return EpiTrRelEntropyTriCone{T, R}(cone.dim, !cone.use_dual)
+end
+function MOI.dual_set_type(::Type{EpiTrRelEntropyTriCone{T, R}}) where {T, R}
+    return EpiTrRelEntropyTriCone{T, R}
+end
 
 function cone_from_moi(
     ::Type{T},
@@ -633,6 +725,12 @@ function WSOSInterpNonnegativeCone{T, R}(
 end
 
 MOI.dimension(cone::WSOSInterpNonnegativeCone) = cone.U
+function MOI.dual_set(cone::WSOSInterpNonnegativeCone{T, R}) where {T, R}
+    return WSOSInterpNonnegativeCone{T, R}(cone.U, cone.Ps, !cone.use_dual)
+end
+function MOI.dual_set_type(::Type{WSOSInterpNonnegativeCone{T, R}}) where {T, R}
+    return WSOSInterpNonnegativeCone{T, R}
+end
 
 function cone_from_moi(
     ::Type{T},
@@ -691,6 +789,12 @@ function WSOSInterpPosSemidefTriCone{T}(
 end
 
 MOI.dimension(cone::WSOSInterpPosSemidefTriCone) = cone.U * Cones.svec_length(cone.R)
+function MOI.dual_set(cone::WSOSInterpPosSemidefTriCone{T}) where {T}
+    return WSOSInterpPosSemidefTriCone{T}(cone.R, cone.U, cone.Ps, !cone.use_dual)
+end
+function MOI.dual_set_type(::Type{WSOSInterpPosSemidefTriCone{T}}) where {T}
+    return WSOSInterpPosSemidefTriCone{T}
+end
 
 function cone_from_moi(::Type{T}, cone::WSOSInterpPosSemidefTriCone{T}) where {T <: Real}
     return Cones.WSOSInterpPosSemidefTri{T}(
@@ -725,6 +829,12 @@ function WSOSInterpEpiNormOneCone{T}(
 end
 
 MOI.dimension(cone::WSOSInterpEpiNormOneCone) = cone.U * cone.R
+function MOI.dual_set(cone::WSOSInterpEpiNormOneCone{T}) where {T}
+    return WSOSInterpEpiNormOneCone{T}(cone.R, cone.U, cone.Ps, !cone.use_dual)
+end
+function MOI.dual_set_type(::Type{WSOSInterpEpiNormOneCone{T}}) where {T}
+    return WSOSInterpEpiNormOneCone{T}
+end
 
 function cone_from_moi(::Type{T}, cone::WSOSInterpEpiNormOneCone{T}) where {T <: Real}
     return Cones.WSOSInterpEpiNormOne{T}(cone.R, cone.U, cone.Ps, use_dual = cone.use_dual)
@@ -754,6 +864,12 @@ function WSOSInterpEpiNormEuclCone{T}(
 end
 
 MOI.dimension(cone::WSOSInterpEpiNormEuclCone) = cone.U * cone.R
+function MOI.dual_set(cone::WSOSInterpEpiNormEuclCone{T}) where {T}
+    return WSOSInterpEpiNormEuclCone{T}(cone.R, cone.U, cone.Ps, !cone.use_dual)
+end
+function MOI.dual_set_type(::Type{WSOSInterpEpiNormEuclCone{T}}) where {T}
+    return WSOSInterpEpiNormEuclCone{T}
+end
 
 function cone_from_moi(::Type{T}, cone::WSOSInterpEpiNormEuclCone{T}) where {T <: Real}
     return Cones.WSOSInterpEpiNormEucl{T}(cone.R, cone.U, cone.Ps, use_dual = cone.use_dual)

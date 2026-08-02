@@ -18,6 +18,28 @@ struct PolyNormJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     use_l1::Bool # use epigraph of one norm, otherwise Euclidean norm
     use_norm_cone::Bool # use Euclidean / L1 norm WSOS cones
     use_wsos_scalar::Bool # use WSOS scalar cone
+    dualize::Bool
+end
+
+function PolyNormJuMP{Float64}(
+    n::Int,
+    rand_halfdeg::Int,
+    epi_halfdeg::Int,
+    num_polys::Int,
+    use_l1::Bool,
+    use_norm_cone::Bool,
+    use_wsos_scalar::Bool,
+)
+    return PolyNormJuMP{Float64}(
+        n,
+        rand_halfdeg,
+        epi_halfdeg,
+        num_polys,
+        use_l1,
+        use_norm_cone,
+        use_wsos_scalar,
+        false,
+    )
 end
 
 function build(inst::PolyNormJuMP{T}) where {T <: Float64}
@@ -104,5 +126,9 @@ function build(inst::PolyNormJuMP{T}) where {T <: Float64}
         JuMP.@constraint(model, polyvec in cone)
     end
 
-    return model
+    if !inst.dualize
+        return model
+    else
+        return Dualization.dualize(model)
+    end
 end

@@ -18,6 +18,7 @@ struct DensityEstJuMP{T <: Real} <: ExampleInstanceJuMP{T}
     geomean_obj::Bool # use geomean in objective, else sum of logs
     use_wsos::Bool # use WSOS cone formulation, else PSD formulation
     use_nlog::Bool # use n-dim HypoPerLog cone, else use 3-dim HypoPerLog cones
+    dualize::Bool
 end
 
 function DensityEstJuMP{Float64}(dataset_name::Symbol, deg::Int, args...)
@@ -28,6 +29,25 @@ function DensityEstJuMP{Float64}(dataset_name::Symbol, deg::Int, args...)
     X .-= (minX + maxX) / 2
     X ./= (maxX - minX) / 2
     return DensityEstJuMP{Float64}(dataset_name, X, deg, args...)
+end
+
+function DensityEstJuMP{Float64}(
+    dataset_name::Symbol,
+    X::Matrix{Float64},
+    deg::Int,
+    geomean_obj::Bool,
+    uses_wsos::Bool,
+    use_nlog::Bool,
+)
+    return DensityEstJuMP{Float64}(
+        dataset_name,
+        X,
+        deg,
+        geomean_obj,
+        uses_wsos,
+        use_nlog,
+        false,
+    )
 end
 
 function DensityEstJuMP{Float64}(num_obs::Int, n::Int, args...)
@@ -106,6 +126,9 @@ function build(inst::DensityEstJuMP{T}) where {T <: Float64}
         )
         JuMP.@constraint(model, coeffs_lhs .== f_pts)
     end
-
-    return model
+    if !inst.dualize
+        return model
+    else
+        return Dualization.dualize(model)
+    end
 end
