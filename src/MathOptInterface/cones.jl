@@ -74,7 +74,11 @@ function cone_from_moi(::Type{T}, cone::MOI.DualPowerCone{T}) where {T <: Real}
 end
 
 function cone_from_moi(::Type{T}, cone::MOI.GeometricMeanCone) where {T <: Real}
-    return (l = MOI.dimension(cone) - 1; Cones.HypoGeoMean{T}(1 + l))
+    return Cones.HypoGeoMean{T}(MOI.dimension(cone))
+end
+
+function cone_from_moi(::Type{T}, cone::MOI.DualGeometricMeanCone) where {T <: Real}
+    return Cones.HypoGeoMean{T}(MOI.dimension(cone), use_dual = true)
 end
 
 function cone_from_moi(
@@ -928,6 +932,7 @@ const SupportedCone{T <: Real} = Union{
     MOI.PowerCone{T},
     MOI.DualPowerCone{T},
     MOI.GeometricMeanCone,
+    MOI.DualGeometricMeanCone,
     MOI.Scaled{MOI.RootDetConeTriangle},
     MOI.ExponentialCone,
     MOI.DualExponentialCone,
