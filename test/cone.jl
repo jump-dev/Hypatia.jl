@@ -709,7 +709,8 @@ end
 # EpiPerSepSpectral
 function test_oracles(C::Type{<:Cones.EpiPerSepSpectral})
     for h_fun in sep_spectral_funs
-        @test Cones.pretty_name(h_fun) != @invoke Cones.pretty_name(h_fun::Cones.SepSpectralFun)
+        @test Cones.pretty_name(h_fun) !=
+              @invoke Cones.pretty_name(h_fun::Cones.SepSpectralFun)
         for d in [1, 2, 3, 6]
             test_oracles(C(h_fun, d), init_tol = Inf)
         end
