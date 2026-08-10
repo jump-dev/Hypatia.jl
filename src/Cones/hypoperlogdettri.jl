@@ -354,3 +354,9 @@ function dder3(cone::HypoPerLogdetTri, dir::AbstractVector)
 
     return dder3
 end
+
+function pretty_name(cone::HypoPerLogdetTri)
+    realorcomplex = cone.is_complex ? "complex " : "real "
+    dualorprimal = use_dual_barrier(cone) ? "dual " : ""
+    return realorcomplex * dualorprimal * "log-determinant"
+end

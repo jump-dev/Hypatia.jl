@@ -36,6 +36,8 @@ function test_oracles(
     init_only::Bool = false,
     init_tol::Real = tol,
 ) where {T <: Real}
+    @test Cones.pretty_name(cone) != @invoke Cones.pretty_name(cone::Cones.Cone)
+
     Random.seed!(1)
     dim = Cones.dimension(cone)
     Cones.setup_data!(cone)
