@@ -99,7 +99,6 @@ include("matrixcsqr.jl")
 
 include("sepspectralfun.jl")
 
-pretty_name(Q::Type{<:ConeOfSquares}) = string(Q)
 pretty_name(Q::Type{<:VectorCSqr}) = "vector"
 function pretty_name(Q::Type{MatrixCSqr{T, R}}) where {T, R}
     return (R <: Complex ? "complex" : "real") * " matrix"

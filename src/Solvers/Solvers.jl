@@ -803,6 +803,7 @@ _plural(n::Integer) = n == 1 ? "" : "s"
 
 # verbose helpers
 function print_header(stepper::Stepper, solver::Solver{T}) where {T}
+    println()
     println("Hypatia v" * HYPATIA_VERSION)
     println()
     model = solver.model
