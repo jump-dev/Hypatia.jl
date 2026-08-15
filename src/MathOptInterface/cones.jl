@@ -107,6 +107,10 @@ function cone_from_moi(::Type{T}, cone::MOI.RelativeEntropyCone) where {T <: Rea
     return Cones.EpiRelEntropy{T}(MOI.dimension(cone))
 end
 
+function cone_from_moi(::Type{T}, cone::MOI.DualRelativeEntropyCone) where {T <: Real}
+    return Cones.EpiRelEntropy{T}(MOI.dimension(cone), use_dual = true)
+end
+
 # Hypatia predefined cones
 # some are equivalent to above MOI predefined cones, but we define again for the sake of consistency
 
@@ -938,6 +942,7 @@ const SupportedCone{T <: Real} = Union{
     MOI.DualExponentialCone,
     MOI.Scaled{MOI.LogDetConeTriangle},
     MOI.RelativeEntropyCone,
+    MOI.DualRelativeEntropyCone,
     _PrimalRankOnePSD{T},
     _DualRankOnePSD{T},
 }
