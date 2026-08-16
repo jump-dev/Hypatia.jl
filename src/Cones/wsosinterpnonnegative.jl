@@ -209,3 +209,10 @@ function partial_lambda!(LUk::Matrix, dir::AbstractVector, LLk::Matrix, ΛFLPk::
     mul!(LUk, Hermitian(LLk), ΛFLPk)
     return LUk
 end
+
+function pretty_name(cone::WSOSInterpNonnegative{T, R}) where {T, R}
+    realorcomplex = R <: Real ? "real " : "complex "
+    primalordual = !use_dual_barrier(cone) ? "dual " : ""
+    conename = "interpolant-basis weighted sum-of-squares polynomial"
+    return realorcomplex * primalordual * conename
+end

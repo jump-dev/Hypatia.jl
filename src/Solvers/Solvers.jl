@@ -31,6 +31,7 @@ import Hypatia.nonsymm_fact_copy!
 import Hypatia.symm_fact_copy!
 import Hypatia.posdef_fact_copy!
 import Hypatia.outer_prod!
+import Hypatia.HYPATIA_VERSION
 
 const RealOrNothing = Union{Real, Nothing}
 
@@ -798,8 +799,24 @@ function free_memory(syssolver::Union{NaiveSparseSystemSolver, SymIndefSparseSys
     return free_memory(syssolver.fact_cache)
 end
 
+_plural(n::Integer) = n == 1 ? "" : "s"
+
 # verbose helpers
-function print_header(stepper::Stepper, solver::Solver)
+function print_header(stepper::Stepper, solver::Solver{T}) where {T}
+    println()
+    println("Hypatia v" * HYPATIA_VERSION)
+    println()
+    model = solver.model
+    @printf "Floating-point type: %s." string(T)
+    println()
+    @printf "Problem with %i variable%s, %i equality constraint%s and %i cone%s:" model.n _plural(
+        model.n,
+    ) model.p _plural(model.p) length(model.cones) _plural(length(model.cones))
+    println()
+    for (cone, idxs) in zip(model.cones, model.cone_idxs)
+        @printf "%i-dimensional %s cone." length(idxs) Cones.pretty_name(cone)
+        println()
+    end
     println()
     @printf("%5s %12s %12s |%9s ", "iter", "p_obj", "d_obj", "abs_gap")
     if iszero(solver.model.p)

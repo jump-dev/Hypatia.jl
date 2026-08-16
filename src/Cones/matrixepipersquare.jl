@@ -423,3 +423,9 @@ function dder3(cone::MatrixEpiPerSquare, dir::AbstractVector)
 
     return dder3
 end
+
+function pretty_name(cone::MatrixEpiPerSquare)
+    realorcomplex = cone.is_complex ? "complex " : "real "
+    dualorprimal = use_dual_barrier(cone) ? "dual " : ""
+    return realorcomplex * dualorprimal * "matrix outer product"
+end

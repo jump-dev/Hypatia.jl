@@ -139,3 +139,5 @@ function get_proxsqr(cone::Nonnegative{T}, irtmu::T, use_max_prox::Bool) where {
         abs2(si * zi * irtmu - 1) for (si, zi) in zip(cone.point, cone.dual_point)
     )
 end
+
+pretty_name(cone::Nonnegative) = "nonnegative"

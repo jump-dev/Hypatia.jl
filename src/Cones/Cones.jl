@@ -142,6 +142,9 @@ function dder3(cone::Cone, dir::AbstractVector) end
 
 # other oracles and helpers
 
+#fallback for printing cone name
+pretty_name(cone::Cones.Cone) = string(typeof(cone))
+
 use_dual_barrier(cone::Cone)::Bool = cone.use_dual_barrier
 
 function setup_data!(cone::Cone{T}) where {T <: Real}

@@ -98,3 +98,14 @@ include("vectorcsqr.jl")
 include("matrixcsqr.jl")
 
 include("sepspectralfun.jl")
+
+pretty_name(Q::Type{<:VectorCSqr}) = "vector"
+function pretty_name(Q::Type{MatrixCSqr{T, R}}) where {T, R}
+    return (R <: Complex ? "complex" : "real") * " matrix"
+end
+pretty_name(h::SepSpectralFun) = string(typeof(h))
+
+function pretty_name(cone::EpiPerSepSpectral{Q, T}) where {Q, T}
+    primalordual = use_dual_barrier(cone) ? "dual " : ""
+    return primalordual * pretty_name(Q) * " " * pretty_name(cone.h)
+end

@@ -356,3 +356,9 @@ function partial_prod!(
 
     return prod
 end
+
+function pretty_name(cone::WSOSInterpPosSemidefTri)
+    primalordual = !use_dual_barrier(cone) ? "dual " : ""
+    conename = "interpolant-basis weighted sum-of-squares polynomial positive semidefinite"
+    return primalordual * conename
+end
