@@ -13,20 +13,6 @@ module Hypatia
 using DocStringExtensions
 const RealOrComplex{T <: Real} = Union{T, Complex{T}}
 
-function _get_version()
-    project = joinpath(@__DIR__, "../Project.toml")
-    versionline = ""
-    for line in eachline(project)
-        if startswith(line, "version")
-            versionline *= line
-            break
-        end
-    end
-    return strip(split(versionline, "=")[2], (' ', '\"'))
-end
-
-const HYPATIA_VERSION = _get_version()
-
 # linear algebra helpers
 using LinearAlgebra
 using GenericLinearAlgebra

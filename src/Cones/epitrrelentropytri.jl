@@ -691,9 +691,3 @@ function Δ4_ij!(
 
     return Δ4_ij
 end
-
-function pretty_name(cone::EpiTrRelEntropyTri)
-    realorcomplex = cone.is_complex ? "complex " : "real "
-    dualorprimal = use_dual_barrier(cone) ? "dual " : ""
-    return realorcomplex * dualorprimal * "matrix relative entropy"
-end

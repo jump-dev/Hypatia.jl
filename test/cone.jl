@@ -36,8 +36,6 @@ function test_oracles(
     init_only::Bool = false,
     init_tol::Real = tol,
 ) where {T <: Real}
-    @test Cones.pretty_name(cone) != @invoke Cones.pretty_name(cone::Cones.Cone)
-
     Random.seed!(1)
     dim = Cones.dimension(cone)
     Cones.setup_data!(cone)
@@ -708,12 +706,8 @@ end
 
 # EpiPerSepSpectral
 function test_oracles(C::Type{<:Cones.EpiPerSepSpectral})
-    for h_fun in sep_spectral_funs
-        @test Cones.pretty_name(h_fun) !=
-              @invoke Cones.pretty_name(h_fun::Cones.SepSpectralFun)
-        for d in [1, 2, 3, 6]
-            test_oracles(C(h_fun, d), init_tol = Inf)
-        end
+    for d in [1, 2, 3, 6], h_fun in sep_spectral_funs
+        test_oracles(C(h_fun, d), init_tol = Inf)
     end
 end
 

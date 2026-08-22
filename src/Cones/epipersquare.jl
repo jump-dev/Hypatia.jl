@@ -278,5 +278,3 @@ function dder3(cone::EpiPerSquare, dir::AbstractVector)
 
     return dder3
 end
-
-pretty_name(cone::EpiPerSquare) = "halved squared Euclidean norm"

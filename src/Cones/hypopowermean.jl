@@ -297,5 +297,3 @@ function _newton_ratio_powermean(s, α)
     dlogf = 2 / s + 1 / (1 - s) - sum(αi^2 / (αi * s + 1) for αi in α)
     return logf / dlogf
 end
-
-pretty_name(cone::HypoPowerMean) = (use_dual_barrier(cone) ? "dual " : "") * "power mean"

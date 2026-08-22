@@ -519,9 +519,3 @@ function dder3(cone::WSOSInterpEpiNormOne, dir::AbstractVector)
 
     return dder3
 end
-
-function pretty_name(cone::WSOSInterpEpiNormOne)
-    primalordual = !use_dual_barrier(cone) ? "dual " : ""
-    conename = "interpolant-basis weighted sum-of-squares polynomial one norm"
-    return primalordual * conename
-end

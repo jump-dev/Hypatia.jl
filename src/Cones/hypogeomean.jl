@@ -263,5 +263,3 @@ function get_central_ray_hypogeomean(::Type{T}, d::Int) where {T <: Real}
     w = -u * (d + 1 + c) / T(2 * d)
     return (u, w)
 end
-
-pretty_name(cone::HypoGeoMean) = (use_dual_barrier(cone) ? "dual " : "") * "geometric mean"

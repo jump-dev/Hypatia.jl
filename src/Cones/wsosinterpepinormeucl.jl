@@ -408,9 +408,3 @@ function dder3(cone::WSOSInterpEpiNormEucl, dir::AbstractVector)
 
     return dder3
 end
-
-function pretty_name(cone::WSOSInterpEpiNormEucl)
-    primalordual = !use_dual_barrier(cone) ? "dual " : ""
-    conename = "interpolant-basis weighted sum-of-squares polynomial Euclidean norm"
-    return primalordual * conename
-end

@@ -487,9 +487,3 @@ function dder3(cone::EpiNormSpectral{T}, dir::AbstractVector{T}) where {T}
 
     return dder3
 end
-
-function pretty_name(cone::EpiNormSpectral)
-    realorcomplex = cone.is_complex ? "complex " : "real "
-    primalordual = use_dual_barrier(cone) ? "trace norm" : "spectral norm"
-    return realorcomplex * primalordual
-end

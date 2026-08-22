@@ -330,7 +330,3 @@ function dder3(cone::GeneralizedPower, dir::AbstractVector)
 
     return cone.dder3
 end
-
-function pretty_name(cone::GeneralizedPower)
-    return (use_dual_barrier(cone) ? "dual " : "") * "generalized power"
-end

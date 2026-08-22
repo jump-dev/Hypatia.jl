@@ -305,5 +305,3 @@ function _newton_ratio_log(v, d)
         u * d * (-2 + u * v - v^2 * du) / (2 - 2 * u * v)
     return f / df
 end
-
-pretty_name(cone::HypoPerLog) = (use_dual_barrier(cone) ? "dual " : "") * "sum-log"

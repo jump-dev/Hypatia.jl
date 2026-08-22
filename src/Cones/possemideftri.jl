@@ -202,7 +202,3 @@ function dder3(cone::PosSemidefTri, dir::AbstractVector)
 
     return cone.dder3
 end
-
-function pretty_name(cone::PosSemidefTri)
-    return (cone.is_complex ? "complex " : "real ") * "positive semidefinite"
-end

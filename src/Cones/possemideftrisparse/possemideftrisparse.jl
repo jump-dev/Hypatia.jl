@@ -128,9 +128,3 @@ include("denseimpl.jl")
 include("cholmodimpl.jl")
 const PSDSparseImplList =
     [(PSDSparseDense, Real), (PSDSparseCholmod, LinearAlgebra.BlasReal)]
-
-function pretty_name(cone::PosSemidefTriSparse)
-    realorcomplex = cone.is_complex ? "complex " : "real "
-    dualorprimal = use_dual_barrier(cone) ? "dual " : ""
-    return realorcomplex * dualorprimal * "sparse positive semidefinite"
-end

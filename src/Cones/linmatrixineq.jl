@@ -161,9 +161,3 @@ function dder3(cone::LinMatrixIneq, dir::AbstractVector)
 
     return dder3
 end
-
-function pretty_name(cone::LinMatrixIneq)
-    realorcomplex = isreal(cone.As) ? "real " : "complex "
-    dualorprimal = use_dual_barrier(cone) ? "dual " : ""
-    return realorcomplex * dualorprimal * "linear matrix inequality"
-end

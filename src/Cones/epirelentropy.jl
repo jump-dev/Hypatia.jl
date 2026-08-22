@@ -415,7 +415,3 @@ function _newton_ratio_relent(w2, d)
     df = 1 / (v2 - 1) - (w2 - 1) * dv2 / (v2 - 1)^2 + (1 / w2 - dv2 / v2) / 2
     return f / df
 end
-
-function pretty_name(cone::EpiRelEntropy)
-    return (use_dual_barrier(cone) ? "dual " : "") * "vector relative entropy"
-end

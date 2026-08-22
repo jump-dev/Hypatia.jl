@@ -38,8 +38,6 @@ function get_initial_point(d::Int, ::NegLogSSF)
     return (1, 1, 1)
 end
 
-pretty_name(h::NegLogSSF) = "negative logarithm"
-
 """
 $(TYPEDEF)
 
@@ -63,8 +61,6 @@ function get_initial_point(d::Int, ::NegEntropySSF)
     # TODO initial central point
     return (1, 1, 1)
 end
-
-pretty_name(h::NegEntropySSF) = "negative entropy"
 
 """
 $(TYPEDEF)
@@ -94,8 +90,6 @@ function get_initial_point(d::Int, ::NegSqrtSSF)
     # TODO initial central point
     return (0, 1, 1)
 end
-
-pretty_name(h::NegSqrtSSF) = "negative square root"
 
 """
 $(TYPEDEF)
@@ -143,8 +137,6 @@ function get_initial_point(d::Int, h::NegPower01SSF)
     # TODO initial central point
     return (0, 1, 1)
 end
-
-pretty_name(h::NegPower01SSF) = "negative power"
 
 """
 $(TYPEDEF)
@@ -199,5 +191,3 @@ function get_initial_point(d::Int, h::Power12SSF)
     # TODO initial central point
     return (2d, 1, 1)
 end
-
-pretty_name(h::Power12SSF) = "power"

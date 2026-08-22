@@ -211,7 +211,3 @@ function dder3(cone::DoublyNonnegativeTri, dir::AbstractVector)
 
     return cone.dder3
 end
-
-function pretty_name(cone::DoublyNonnegativeTri)
-    return (use_dual_barrier(cone) ? "dual " : "") * "doubly nonnegative"
-end
