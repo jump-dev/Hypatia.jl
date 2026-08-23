@@ -113,6 +113,14 @@ function test_moi_cones(T::Type{<:Real})
         @test !Cones.use_dual_barrier(hyp_cone)
     end
 
+    @testset "DualGeometricMeanCone" begin
+        moi_cone = MOI.DualGeometricMeanCone(3)
+        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa Cones.HypoGeoMean{T}
+        @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
+        @test Cones.use_dual_barrier(hyp_cone)
+    end
+
     @testset "RootDetConeTriangle" begin
         moi_cone = MOI.Scaled(MOI.RootDetConeTriangle(3))
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
@@ -151,6 +159,14 @@ function test_moi_cones(T::Type{<:Real})
         @test hyp_cone isa Cones.EpiRelEntropy{T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
         @test !Cones.use_dual_barrier(hyp_cone)
+    end
+
+    @testset "DualRelativeEntropyCone" begin
+        moi_cone = MOI.DualRelativeEntropyCone(3)
+        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa Cones.EpiRelEntropy{T}
+        @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
+        @test Cones.use_dual_barrier(hyp_cone)
     end
 
     # Hypatia predefined cones
