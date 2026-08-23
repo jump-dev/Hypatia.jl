@@ -226,3 +226,5 @@ function dder3(cone::EpiNormEucl, dir::AbstractVector)
 
     return dder3
 end
+
+pretty_name(cone::EpiNormEucl) = "Euclidean norm"

@@ -325,3 +325,9 @@ function dder3(cone::HypoRootdetTri{T}, dir::AbstractVector{T}) where {T <: Real
 
     return dder3
 end
+
+function pretty_name(cone::HypoRootdetTri)
+    realorcomplex = cone.is_complex ? "complex " : "real "
+    dualorprimal = use_dual_barrier(cone) ? "dual " : ""
+    return realorcomplex * dualorprimal * "root-determinant"
+end

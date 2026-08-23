@@ -478,3 +478,9 @@ end
 function hess_nz_idxs_col_tril(cone::EpiNormInf{<:Real, <:Complex}, j::Int)
     return (j == 1 ? (1:(cone.dim)) : (iseven(j) ? [j, j + 1] : [j]))
 end
+
+function pretty_name(cone::EpiNormInf)
+    realorcomplex = cone.is_complex ? "complex " : "real "
+    primalordual = use_dual_barrier(cone) ? "one norm" : "infinity norm"
+    return realorcomplex * primalordual
+end
