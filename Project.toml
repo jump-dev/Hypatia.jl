@@ -28,7 +28,9 @@ PardisoExt = "Pardiso"
 
 [compat]
 Combinatorics = "1"
+DynamicPolynomials = "0.6"
 DocStringExtensions = "0.9"
+ForwardDiff = "1.4.6"
 GenericLinearAlgebra = "0.3 - 0.4"
 HSL = "0.5"
 IterativeSolvers = "0.9"

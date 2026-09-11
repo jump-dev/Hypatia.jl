@@ -16,8 +16,6 @@ import LinearAlgebra.BlasReal
 using SparseArrays
 import LinearMaps
 import GenericLinearAlgebra.svdvals
-import GenericLinearAlgebra.eigvals
-import GenericLinearAlgebra.eigen
 import DynamicPolynomials
 import Hypatia
 import Hypatia.PolyUtils
