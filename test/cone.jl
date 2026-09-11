@@ -15,7 +15,6 @@ import Random.randn
 using LinearAlgebra
 using SparseArrays
 import ForwardDiff
-import GenericLinearAlgebra.eigen # needed by ForwardDiff currently for test_barrier
 import Hypatia
 import Hypatia.PolyUtils
 import Hypatia.Cones
