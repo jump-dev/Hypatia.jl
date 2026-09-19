@@ -16,7 +16,7 @@ TODO
 - maybe allow passing more options to CHOLMOD
 =#
 
-import SuiteSparse.CHOLMOD
+import SparseArrays.CHOLMOD
 
 """
 $(TYPEDEF)

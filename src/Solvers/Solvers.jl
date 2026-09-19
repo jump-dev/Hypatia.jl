@@ -14,7 +14,6 @@ using DocStringExtensions
 using Printf
 using LinearAlgebra
 using SparseArrays
-import SuiteSparse
 import LinearMaps
 import IterativeSolvers
 import Base.convert

@@ -16,7 +16,6 @@ PolynomialRoots = "3a141323-8675-5d76-9d11-e1df1406c778"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
-SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [weakdeps]
 HSL = "34c5aeac-e683-54a6-a0e9-6e0fdc586c50"
