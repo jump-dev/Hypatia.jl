@@ -9,9 +9,9 @@ file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 helpers for sparse factorizations and linear solves
 =#
 
+import SparseArrays
 import SparseArrays.SparseMatrixCSC
-import SuiteSparse
-const SuiteSparseInt = typeof(Sys.WORD_SIZE)
+const SparseArraysInt = typeof(Sys.WORD_SIZE)
 
 #=
 nonsymmetric
@@ -22,7 +22,7 @@ abstract type SparseNonSymCache{T <: Real} end
 # only works with Float64
 mutable struct UMFPACKNonSymCache{Float64} <: SparseNonSymCache{Float64}
     analyzed::Bool
-    umfpack::SuiteSparse.UMFPACK.UmfpackLU
+    umfpack::SparseArrays.UMFPACK.UmfpackLU
     function UMFPACKNonSymCache{Float64}()
         cache = new{Float64}()
         cache.analyzed = false
@@ -30,12 +30,11 @@ mutable struct UMFPACKNonSymCache{Float64} <: SparseNonSymCache{Float64}
     end
 end
 
-# restrict int type to SuiteSparse_long
-int_type(::UMFPACKNonSymCache) = SuiteSparseInt
+int_type(::UMFPACKNonSymCache) = SparseArraysInt
 
 function update_fact(
     cache::UMFPACKNonSymCache{Float64},
-    A::SparseMatrixCSC{Float64, SuiteSparseInt},
+    A::SparseMatrixCSC{Float64, SparseArraysInt},
 )
     if !cache.analyzed
         cache.umfpack = lu(A) # symbolic and numeric factorization
@@ -49,7 +48,7 @@ end
 function inv_prod(
     cache::UMFPACKNonSymCache{Float64},
     x::Vector{Float64},
-    A::SparseMatrixCSC{Float64, SuiteSparseInt},
+    A::SparseMatrixCSC{Float64, SparseArraysInt},
     b::Vector{Float64},
 )
     ldiv!(x, cache.umfpack, b) # does not repeat symbolic or numeric factorization
@@ -71,26 +70,26 @@ diag_min(::SparseSymCache{T}) where {T} = zero(T)
 # only works with Float64
 mutable struct CHOLMODSymCache{Float64} <: SparseSymCache{Float64}
     analyzed::Bool
-    cholmod::SuiteSparse.CHOLMOD.Factor
+    cholmod::SparseArrays.CHOLMOD.Factor
     function CHOLMODSymCache{Float64}()
         cache = new{Float64}()
         cache.analyzed = false
         return cache
     end
 end
-int_type(::CHOLMODSymCache) = SuiteSparseInt
+int_type(::CHOLMODSymCache) = SparseArraysInt
 
 # CHOLMOD needs nonzero diagonal
 diag_min(::SparseSymCache{Float64}) = sqrt(eps())
 
 function update_fact(
     cache::CHOLMODSymCache{Float64},
-    A::SparseMatrixCSC{Float64, SuiteSparseInt},
+    A::SparseMatrixCSC{Float64, SparseArraysInt},
 )
     A_symm = Symmetric(A, :L)
 
     if !cache.analyzed
-        cache.cholmod = SuiteSparse.CHOLMOD.ldlt(A_symm, check = false)
+        cache.cholmod = SparseArrays.CHOLMOD.ldlt(A_symm, check = false)
         cache.analyzed = true
     else
         ldlt!(cache.cholmod, A_symm, check = false)
@@ -109,7 +108,7 @@ end
 function inv_prod(
     cache::CHOLMODSymCache{Float64},
     x::Vector{Float64},
-    A::SparseMatrixCSC{Float64, SuiteSparseInt},
+    A::SparseMatrixCSC{Float64, SparseArraysInt},
     b::Vector{Float64},
 )
     x .= cache.cholmod \ b # TODO try to make this in-place

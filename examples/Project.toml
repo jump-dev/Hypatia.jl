@@ -17,7 +17,6 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SemialgebraicSets = "8e049039-38e8-557d-ae3a-bc521ccf6204"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
-SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 SumOfSquares = "4b9e565b-77fc-50a5-a571-1244f986bda1"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 

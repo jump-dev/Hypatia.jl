@@ -98,7 +98,7 @@ function handle_dual_eq(solver::Solver{T}) where {T <: Real}
                 @warn(
                     "using dense factorization of [A; G] in preprocessing and " *
                     "initial point finding because sparse factorization for number " *
-                    "type $T is not supported by SuiteSparse packages",
+                    "type $T is not supported by SparseArrays",
                     maxlog = 1
                 )
                 qr!(Matrix(AG), ColumnNorm())
@@ -222,7 +222,7 @@ function handle_primal_eq(solver::Solver{T}) where {T <: Real}
                 @warn(
                     "using dense factorization of A' in preprocessing and initial " *
                     "point finding because sparse factorization for number type $T " *
-                    "is not supported by SuiteSparse packages",
+                    "is not supported by SparseArrays",
                     maxlog = 1
                 )
                 qr!(Matrix(A'), ColumnNorm())
@@ -398,7 +398,7 @@ end
 # (pivoted) QR factorizations are usually rank-revealing but may be unreliable
 # see http://www.math.sjsu.edu/~foster/rankrevealingcode.html
 # TODO could replace this with rank(qr_fact) when available for both dense and sparse
-get_rank_est(qr_fact::SuiteSparse.SPQR.QRSparse, init_tol_qr::Real) = rank(qr_fact)
+get_rank_est(qr_fact::SparseArrays.SPQR.QRSparse, init_tol_qr::Real) = rank(qr_fact)
 
 function get_rank_est(qr_fact::QRPivoted, init_tol_qr::Real)
     factors = qr_fact.factors
