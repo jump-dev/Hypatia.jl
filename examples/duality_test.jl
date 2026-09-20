@@ -57,12 +57,12 @@ function generate_constraint(
     return t * id - x
 end
 
-function initialize_cone(::Type{Hypatia.LinMatrixIneqCone{T}}) where {T}
-    As = Symmetric.([Matrix(T(1) * I(2)), randn(T, 2, 2), randn(T, 2, 2)])
+function initialize_cone(::Type{Hypatia.LinMatrixIneqCone{T, R}}) where {T, R}
+    As = Hermitian.([Matrix(R(1) * I(2)), randn(R, 2, 2), randn(R, 2, 2)])
     x = randn(T, 3)
     return (As,), x
 end
-function generate_constraint(::Type{Hypatia.LinMatrixIneqCone{T}}, t, x) where {T}
+function generate_constraint(::Type{Hypatia.LinMatrixIneqCone{T, R}}, t, x) where {T, R}
     return t * [1, 0, 0] - x
 end
 
@@ -233,7 +233,8 @@ function cone_types(T::Type{<:Real})
         Hypatia.DoublyNonnegativeTriCone{T},
         Hypatia.PosSemidefTriSparseCone{Cones.PSDSparseDense, T, T},
         Hypatia.PosSemidefTriSparseCone{Cones.PSDSparseDense, T, Complex{T}},
-        Hypatia.LinMatrixIneqCone{T},
+        Hypatia.LinMatrixIneqCone{T, T},
+        Hypatia.LinMatrixIneqCone{T, Complex{T}},
         Hypatia.EpiNormInfCone{T, T},
         Hypatia.EpiNormInfCone{T, Complex{T}},
         Hypatia.EpiNormEuclCone{T},

@@ -75,7 +75,7 @@ function build(inst::SparseLMIJuMP{T}) where {T <: Float64}
         JuMP.@constraint(
             model,
             [k in 1:num_lmis],
-            vcat(y, x, 1) in Hypatia.LinMatrixIneqCone{T}([matI, Ps[k, :]..., Qs[k]])
+            vcat(y, x, 1) in Hypatia.LinMatrixIneqCone{T, T}([matI, Ps[k, :]..., Qs[k]])
         )
     else
         error()

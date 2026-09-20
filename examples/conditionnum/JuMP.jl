@@ -55,11 +55,12 @@ function build(inst::ConditionNumJuMP{T}) where {T <: Float64}
     JuMP.@objective(model, Min, gamma)
 
     if inst.use_linmatrixineq
-        lmiT = Hypatia.LinMatrixIneqCone{T}
+        lmiT = Hypatia.LinMatrixIneqCone{T, T}
+        id = Matrix(one(T) * I(side))
         JuMP.@constraints(model, begin
             vcat(nu, y) in lmiT([F0, Fi...])
-            vcat(-1, nu, y) in lmiT([I, M0, Mi...])
-            vcat(gamma, -nu, -y) in lmiT([I, M0, Mi...])
+            vcat(-1, nu, y) in lmiT([id, M0, Mi...])
+            vcat(gamma, -nu, -y) in lmiT([id, M0, Mi...])
         end)
     else
         S1 = Symmetric(nu * F0 + sum(y[i] * Fi[i] for i in eachindex(y)))

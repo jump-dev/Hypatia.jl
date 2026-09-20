@@ -11,13 +11,16 @@ $(TYPEDEF)
 Linear matrix inequality cone parametrized by list of real symmetric or complex
 Hermitian matrices `mats` of equal dimension.
 
-    $(FUNCTIONNAME){T}(mats::Vector, use_dual::Bool = false)
+    $(FUNCTIONNAME){T, R}(mats::Vector{AbstractMatrix{R}}, use_dual::Bool = false)
 """
-mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
+mutable struct LinMatrixIneq{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_dual_barrier::Bool
+    is_complex::Bool
+    is_sparse::Bool
     dim::Int
     side::Int
-    As::Vector
+    denseAs::Vector{Hermitian{R,Matrix{R}}}
+    sparseAs::Vector{Hermitian{R,SparseMatrixCSC{R, Int}}}
 
     point::Vector{T}
     dual_point::Vector{T}
@@ -42,29 +45,28 @@ mutable struct LinMatrixIneq{T <: Real} <: Cone{T}
     fact::Any
     sumAinvAs::Vector
 
-    function LinMatrixIneq{T}(As::Vector; use_dual::Bool = false) where {T <: Real}
+    function LinMatrixIneq{T, R}(As::Vector; use_dual::Bool = false) where {T <: Real, R <: RealOrComplex{T}} 
         dim = length(As)
         @assert dim > 1
-        side = 0
+        side = size(first(As), 1)
         for A_i in As
-            if A_i isa AbstractMatrix
-                if iszero(side)
-                    side = size(A_i, 1)
-                else
-                    @assert size(A_i, 1) == side
-                end
-            end
+            @assert size(A_i, 1) == side
             @assert ishermitian(A_i)
         end
-        @assert side > 0
         # necessary to ensure linear independence of As (but not sufficient)
-        @assert svec_length(side) >= dim
+        @assert svec_length(R, side) >= dim
         @assert isposdef(first(As))
-        cone = new{T}()
+        cone = new{T, R}()
         cone.use_dual_barrier = use_dual
         cone.dim = dim
         cone.side = side
-        cone.As = As
+        cone.is_complex = (R <: Complex)
+        cone.is_sparse = issparse(first(As))
+        if cone.is_sparse
+            cone.sparseAs = Hermitian.(As)
+        else
+            cone.denseAs = Hermitian.(As)
+        end
         return cone
     end
 end
@@ -83,7 +85,7 @@ end
 
 get_nu(cone::LinMatrixIneq) = cone.side
 
-function set_initial_point!(arr::AbstractVector, cone::LinMatrixIneq{T}) where {T <: Real}
+function set_initial_point!(arr::AbstractVector, cone::LinMatrixIneq)
     arr .= 0
     arr[1] = 1
     return arr
@@ -92,10 +94,14 @@ end
 lmi_fact(arr::AbstractSparseMatrix) = cholesky(Hermitian(arr), shift = false, check = false)
 lmi_fact(arr::AbstractMatrix) = cholesky!(Hermitian(arr), check = false)
 
-function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
+function update_feas(cone::LinMatrixIneq)
     @assert !cone.feas_updated
 
-    cone.sumA = sum(w_i * A_i for (w_i, A_i) in zip(cone.point, cone.As))
+    if cone.is_sparse
+        cone.sumA = sum(wᵢ * Aᵢ for (wᵢ, Aᵢ) in zip(cone.point, cone.sparseAs))
+    else
+        cone.sumA = sum(wᵢ * Aᵢ for (wᵢ, Aᵢ) in zip(cone.point, cone.denseAs))
+    end
     cone.fact = lmi_fact(cone.sumA)
     cone.is_feas = isposdef(cone.fact)
 
@@ -103,11 +109,15 @@ function update_feas(cone::LinMatrixIneq{T}) where {T <: Real}
     return cone.is_feas
 end
 
-function update_grad(cone::LinMatrixIneq{T}) where {T <: Real}
+function update_grad(cone::LinMatrixIneq)
     @assert cone.is_feas
 
     L = cone.fact.L
-    cone.sumAinvAs = [Hermitian(L \ (L \ A_i)', :U) for A_i in cone.As]
+    if cone.is_sparse
+        cone.sumAinvAs = [Hermitian(L \ (L \ A_i)', :U) for A_i in cone.sparseAs]
+    else
+        cone.sumAinvAs = [Hermitian(L \ (L \ A_i)', :U) for A_i in cone.denseAs]
+    end
     @inbounds for (i, mat_i) in enumerate(cone.sumAinvAs)
         cone.grad[i] = -tr(mat_i)
     end
@@ -163,7 +173,7 @@ function dder3(cone::LinMatrixIneq, dir::AbstractVector)
 end
 
 function pretty_name(cone::LinMatrixIneq)
-    realorcomplex = isreal(cone.As) ? "real " : "complex "
+    realorcomplex = cone.is_complex ? "complex " : "real "
     dualorprimal = use_dual_barrier(cone) ? "dual " : ""
     return realorcomplex * dualorprimal * "linear matrix inequality"
 end
