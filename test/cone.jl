@@ -283,7 +283,7 @@ function new_vec(w::Vector, dw::Int, R::Type{Complex{T}}) where {T <: Real}
 end
 
 function new_herm(w::Vector, dW::Int, T::Type{<:Real})
-    W = similar(w, dW, dW)
+    W = zeros(eltype(w), dW, dW)
     Cones.svec_to_smat!(W, w, sqrt(T(2)))
     return Hermitian(W, :U)
 end
