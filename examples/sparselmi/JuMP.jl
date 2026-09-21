@@ -41,16 +41,17 @@ function build(inst::SparseLMIJuMP{T}) where {T <: Float64}
             for idx in rand(1:side_Ps, div(side_Ps, 3))
                 M[idx, idx] = rand()
             end
-            return Symmetric(M)
+            return M + M'
         else
-            return Symmetric(randn(side_Ps, side_Ps))
+            M = randn(side_Ps, side_Ps)
+            return M + M'
         end
     end
-    rand_psd() = (M = rand_symm(); Symmetric(M * M'))
+    rand_psd() = (M = rand_symm(); M * M')
 
     Ps = [rand_symm() for k in 1:num_lmis, i in 1:num_Ps]
     Qs = [-rand_psd() for k in 1:num_lmis]
-    matI = Symmetric(one(Qs[1]))
+    matI = one(Qs[1])
 
     model = JuMP.Model()
     JuMP.@variable(model, y)

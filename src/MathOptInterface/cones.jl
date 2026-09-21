@@ -262,7 +262,9 @@ struct LinMatrixIneqCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVector
 end
 export LinMatrixIneqCone
 
-function LinMatrixIneqCone{T, R}(As::Vector) where {T <: Real, R <: RealOrComplex{T}}
+function LinMatrixIneqCone{T, R}(
+    As::Vector{<:Union{Matrix{R}, SparseMatrixCSC{R, Int}}},
+) where {T <: Real, R <: RealOrComplex{T}}
     return LinMatrixIneqCone{T, R}(As, false)
 end
 

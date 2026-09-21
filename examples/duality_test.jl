@@ -58,7 +58,9 @@ function generate_constraint(
 end
 
 function initialize_cone(::Type{Hypatia.LinMatrixIneqCone{T, R}}) where {T, R}
-    As = Hermitian.([Matrix(R(1) * I(2)), randn(R, 2, 2), randn(R, 2, 2)])
+    d = 2
+    rand_herm(d) = (M = randn(R, d, d); M + M')
+    As = [Matrix(R(1) * I(d)), rand_herm(d), rand_herm(d)]
     x = randn(T, 3)
     return (As,), x
 end

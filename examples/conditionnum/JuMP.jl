@@ -37,12 +37,13 @@ end
 function build(inst::ConditionNumJuMP{T}) where {T <: Float64}
     (side, len_y) = (inst.side, inst.len_y)
 
-    rand_pd() = (Mh = randn(side, side); Symmetric(Mh * Mh'))
+    rand_pd() = (Mh = randn(side, side); Mh * Mh')
+    rand_sym() = (Mh = randn(side, side); Mh + Mh')
     Mi = [rand_pd() for i in 1:len_y]
     M0 = rand_pd()
     # make some F_i matrices pos def
     Fi = [
-        (rand() > 0.5 || i <= 2) ? rand_pd() : Symmetric(randn(side, side)) for i in 1:len_y
+        (rand() > 0.5 || i <= 2) ? rand_pd() : rand_sym() for i in 1:len_y
     ]
     F0 = rand_pd() + I
 

@@ -19,8 +19,8 @@ mutable struct LinMatrixIneq{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     is_sparse::Bool
     dim::Int
     side::Int
-    denseAs::Vector{Hermitian{R,Matrix{R}}}
-    sparseAs::Vector{Hermitian{R,SparseMatrixCSC{R, Int}}}
+    denseAs::Vector{Matrix{R}}
+    sparseAs::Vector{SparseMatrixCSC{R, Int}}
 
     point::Vector{T}
     dual_point::Vector{T}
@@ -41,14 +41,17 @@ mutable struct LinMatrixIneq{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_hess_prod_slow::Bool
     use_hess_prod_slow_updated::Bool
 
-    densesumA::Hermitian{R,Matrix{R}}
-    sparsesumA::Hermitian{R,SparseMatrixCSC{R, Int}}
-    densefact::Cholesky{R,Matrix{R}}
+    densesumA::Hermitian{R, Matrix{R}}
+    sparsesumA::Hermitian{R, SparseMatrixCSC{R, Int}}
+    densefact::Cholesky{R, Matrix{R}}
     sparsefact::SparseArrays.CHOLMOD.Factor{R, Int}
-    densesumAinvAs::Vector{Hermitian{R,Matrix{R}}}
-    sparsesumAinvAs::Vector{Hermitian{R,SparseMatrixCSC{R, Int}}}
+    densesumAinvAs::Vector{Hermitian{R, Matrix{R}}}
+    sparsesumAinvAs::Vector{Hermitian{R, SparseMatrixCSC{R, Int}}}
 
-    function LinMatrixIneq{T, R}(As::Vector; use_dual::Bool = false) where {T <: Real, R <: RealOrComplex{T}} 
+    function LinMatrixIneq{T, R}(
+        As::Vector{<:Union{Matrix{R}, SparseMatrixCSC{R, Int}}};
+        use_dual::Bool = false,
+    ) where {T <: Real, R <: RealOrComplex{T}}
         dim = length(As)
         @assert dim > 1
         side = size(first(As), 1)
@@ -66,9 +69,9 @@ mutable struct LinMatrixIneq{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
         cone.is_complex = (R <: Complex)
         cone.is_sparse = issparse(first(As))
         if cone.is_sparse
-            cone.sparseAs = Hermitian.(As)
+            cone.sparseAs = As
         else
-            cone.denseAs = Hermitian.(As)
+            cone.denseAs = As
         end
         return cone
     end
@@ -98,11 +101,13 @@ function update_feas(cone::LinMatrixIneq)
     @assert !cone.feas_updated
 
     if cone.is_sparse
-        cone.sparsesumA = sum(wᵢ * Aᵢ for (wᵢ, Aᵢ) in zip(cone.point, cone.sparseAs))
+        cone.sparsesumA =
+            Hermitian(sum(wᵢ * Aᵢ for (wᵢ, Aᵢ) in zip(cone.point, cone.sparseAs)))
         cone.sparsefact = cholesky(cone.sparsesumA; shift = false, check = false)
         cone.is_feas = isposdef(cone.sparsefact)
     else
-        cone.densesumA = sum(wᵢ * Aᵢ for (wᵢ, Aᵢ) in zip(cone.point, cone.denseAs))
+        cone.densesumA =
+            Hermitian(sum(wᵢ * Aᵢ for (wᵢ, Aᵢ) in zip(cone.point, cone.denseAs)))
         cone.densefact = cholesky!(cone.densesumA; check = false)
         cone.is_feas = isposdef(cone.densefact)
     end
