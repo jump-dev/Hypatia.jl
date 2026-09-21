@@ -810,7 +810,7 @@ end
 function linmatrixineq2(T; options...)
     tol = test_tol(T)
     Random.seed!(1)
-    for R in (T, Complex{T}), dim in (2,3)
+    for R in (T, Complex{T}), dim in (2, 3)
         c = ones(T, dim - 1)
         A = zeros(T, 0, dim - 1)
         b = T[]
@@ -837,10 +837,7 @@ function linmatrixineq3(T; options...)
     sparse1 = sparse(dense1)
     sparse2 = sparse(dense2)
 
-    As_list = [
-        [dense1, dense2],
-        [sparse1, sparse2],
-    ]
+    As_list = [[dense1, dense2], [sparse1, sparse2]]
 
     for As in As_list
         if !(T <: BlasReal) && any(a -> a isa SparseMatrixCSC, As)
