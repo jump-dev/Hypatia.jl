@@ -793,12 +793,12 @@ function linmatrixineq1(T; options...)
         G[1, 1] = -1
         h = T[0, 2]
         A_1_half = rand(R, side, side)
-        A_1 = Hermitian(A_1_half * A_1_half' + 2I)
+        A_1 = A_1_half * A_1_half' + 2I
         F = eigen(A_1)
         val_1 = F.values[end]
         vec_1 = F.vectors[:, end]
-        As = [A_1, Hermitian(-vec_1 * vec_1')]
-        cones = Cone{T}[Cones.LinMatrixIneq{T}(As)]
+        As = [A_1, -vec_1 * vec_1']
+        cones = Cone{T}[Cones.LinMatrixIneq{T, R}(As)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
@@ -810,22 +810,20 @@ end
 function linmatrixineq2(T; options...)
     tol = test_tol(T)
     Random.seed!(1)
-    CT = Complex{T}
-    for Rs in [[T, T], [CT, CT], [T, CT, T], [CT, T, T]]
-        dim = length(Rs)
+    for R in (T, Complex{T}), dim in (2, 3)
         c = ones(T, dim - 1)
         A = zeros(T, 0, dim - 1)
         b = T[]
         G = vcat(spzeros(T, 1, dim - 1), sparse(-one(T) * I, dim - 1, dim - 1))
         h = zeros(T, dim)
         h[1] = 1
-        As = Hermitian[]
-        for R in Rs
+        As = Matrix{R}[]
+        for _ in 1:dim
             A_half = rand(R, 3, 3)
-            push!(As, Hermitian(A_half * A_half'))
+            push!(As, A_half * A_half')
         end
         As[1] += I
-        cones = Cone{T}[Cones.LinMatrixIneq{T}(As)]
+        cones = Cone{T}[Cones.LinMatrixIneq{T, R}(As)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
@@ -834,28 +832,12 @@ function linmatrixineq2(T; options...)
 end
 
 function linmatrixineq3(T; options...)
-    dense1 = [1 0; 0 1]
-    dense2 = [1 0; 0 -1]
+    dense1 = T[1 0; 0 1]
+    dense2 = T[1 0; 0 -1]
     sparse1 = sparse(dense1)
     sparse2 = sparse(dense2)
-    diag1 = Diagonal([1, 1])
-    diag2 = Diagonal([1, -1])
 
-    # not all combinations work due to missing methods in LinearAlgebra
-    As_list = [
-        [dense1, dense2],
-        # [dense1, sparse2],
-        [dense1, diag2],
-        # [sparse1, dense2],
-        [sparse1, sparse2],
-        # [sparse1, diag2],
-        [diag1, dense2],
-        # [diag1, sparse2],
-        # [diag1, diag2],
-        [I, dense2],
-        # [I, sparse2],
-        # [I, diag2],
-    ]
+    As_list = [[dense1, dense2], [sparse1, sparse2]]
 
     for As in As_list
         if !(T <: BlasReal) && any(a -> a isa SparseMatrixCSC, As)
@@ -868,7 +850,7 @@ function linmatrixineq3(T; options...)
         G = zeros(T, 2, 1)
         G[1, 1] = -1
         h = T[0, -1]
-        cones = Cone{T}[Cones.LinMatrixIneq{T}(As)]
+        cones = Cone{T}[Cones.LinMatrixIneq{T, T}(As)]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal

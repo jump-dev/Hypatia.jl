@@ -233,12 +233,19 @@ function test_moi_cones(T::Type{<:Real})
     end
 
     @testset "LinMatrixIneq" begin
-        As = [Symmetric(Matrix(one(T) * I, 2, 2)), Hermitian(Complex{T}[1 0; 0 -1])]
-        moi_cone = Hypatia.LinMatrixIneqCone{T}(As)
+        As = [Matrix(one(T) * I, 2, 2), T[1 0; 0 -1]]
+        moi_cone = Hypatia.LinMatrixIneqCone{T, T}(As)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
-        @test hyp_cone isa Cones.LinMatrixIneq{T}
+        @test hyp_cone isa Cones.LinMatrixIneq{T, T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 2
-        @test hyp_cone.As == As
+        @test hyp_cone.denseAs == As
+
+        cAs = [Matrix(one(Complex{T}) * I, 2, 2), Complex{T}[1 0; 0 -1]]
+        moi_cone = Hypatia.LinMatrixIneqCone{T, Complex{T}}(cAs)
+        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+        @test hyp_cone isa Cones.LinMatrixIneq{T, Complex{T}}
+        @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 2
+        @test hyp_cone.denseAs == cAs
     end
 
     @testset "EpiNormInf" begin
