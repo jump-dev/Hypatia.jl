@@ -283,7 +283,7 @@ function new_vec(w::Vector, dw::Int, R::Type{Complex{T}}) where {T <: Real}
 end
 
 function new_herm(w::Vector, dW::Int, T::Type{<:Real})
-    W = similar(w, dW, dW)
+    W = zeros(eltype(w), dW, dW)
     Cones.svec_to_smat!(W, w, sqrt(T(2)))
     return Hermitian(W, :U)
 end
@@ -300,15 +300,13 @@ function rand_sppsd_pattern(dW::Int)
     return (row_idxs, col_idxs)
 end
 
-function rand_herms(ds::Int, Rd::Vector, T::Type{<:Real})
-    Ps = Vector{LinearAlgebra.HermOrSym{R, Matrix{R}} where {R <: RealOrComplex{T}}}(
-        undef,
-        length(Rd),
-    )
-    A_1_half = randn(Rd[1], ds, ds)
-    Ps[1] = Hermitian(A_1_half * A_1_half' + I, :U)
-    for i in 2:length(Rd)
-        Ps[i] = Hermitian(randn(Rd[i], ds, ds), :U)
+function rand_herms(ds::Int, n::Int, R)
+    Ps = Vector{Matrix{R}}(undef, n)
+    A_1_half = randn(R, ds, ds)
+    Ps[1] = A_1_half * A_1_half' + I
+    for i in 2:n
+        temp = randn(R, ds, ds)
+        Ps[i] = temp + temp'
     end
     return Ps
 end
@@ -444,23 +442,22 @@ function show_time_alloc(C::Type{<:Cones.PosSemidefTriSparse})
 end
 
 # LinMatrixIneq
-function test_oracles(C::Type{Cones.LinMatrixIneq{T}}) where {T}
+function test_oracles(C::Type{Cones.LinMatrixIneq{T, R}}) where {T, R}
     Random.seed!(1)
-    Rd_list = [[T, T], [T, Complex{T}], [Complex{T}, T, T]]
-    for ds in [2, 3, 4], Rd in Rd_list
-        test_oracles(C(rand_herms(ds, Rd, T)), noise = T(1e-2), init_tol = Inf)
+    for ds in (2, 3, 4), n in (2, 2, 3)
+        test_oracles(C(rand_herms(ds, n, R)), noise = T(1e-2), init_tol = Inf)
     end
 end
 
-function test_barrier(C::Type{Cones.LinMatrixIneq{T}}) where {T}
+function test_barrier(C::Type{Cones.LinMatrixIneq{T, R}}) where {T, R}
     Random.seed!(1)
-    Ps = rand_herms(2, [T, Complex{T}], T)
+    Ps = rand_herms(2, 2, R)
     barrier(s) = -logdet_pd(Hermitian(sum(s[i] * Ps[i] for i in eachindex(s)), :U))
     return test_barrier(C(Ps), barrier)
 end
 
-function show_time_alloc(C::Type{Cones.LinMatrixIneq{T}}) where {T}
-    return show_time_alloc(C(rand_herms(3, [T, Complex{T}, T, Complex{T}], T)))
+function show_time_alloc(C::Type{Cones.LinMatrixIneq{T, R}}) where {T, R}
+    return show_time_alloc(C(rand_herms(3, 4, R)))
 end
 
 # EpiNormInf

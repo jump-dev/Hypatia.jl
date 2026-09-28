@@ -37,12 +37,13 @@ end
 function build(inst::ConditionNumJuMP{T}) where {T <: Float64}
     (side, len_y) = (inst.side, inst.len_y)
 
-    rand_pd() = (Mh = randn(side, side); Symmetric(Mh * Mh'))
+    rand_pd() = (Mh = randn(side, side); Mh * Mh')
+    rand_sym() = (Mh = randn(side, side); Mh + Mh')
     Mi = [rand_pd() for i in 1:len_y]
     M0 = rand_pd()
     # make some F_i matrices pos def
     Fi = [
-        (rand() > 0.5 || i <= 2) ? rand_pd() : Symmetric(randn(side, side)) for i in 1:len_y
+        (rand() > 0.5 || i <= 2) ? rand_pd() : rand_sym() for i in 1:len_y
     ]
     F0 = rand_pd() + I
 
@@ -55,11 +56,12 @@ function build(inst::ConditionNumJuMP{T}) where {T <: Float64}
     JuMP.@objective(model, Min, gamma)
 
     if inst.use_linmatrixineq
-        lmiT = Hypatia.LinMatrixIneqCone{T}
+        lmiT = Hypatia.LinMatrixIneqCone{T, T}
+        id = Matrix(one(T) * I(side))
         JuMP.@constraints(model, begin
             vcat(nu, y) in lmiT([F0, Fi...])
-            vcat(-1, nu, y) in lmiT([I, M0, Mi...])
-            vcat(gamma, -nu, -y) in lmiT([I, M0, Mi...])
+            vcat(-1, nu, y) in lmiT([id, M0, Mi...])
+            vcat(gamma, -nu, -y) in lmiT([id, M0, Mi...])
         end)
     else
         S1 = Symmetric(nu * F0 + sum(y[i] * Fi[i] for i in eachindex(y)))

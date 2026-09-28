@@ -256,22 +256,29 @@ See [`Cones.LinMatrixIneq`](@ref).
 
 $(TYPEDFIELDS)
 """
-struct LinMatrixIneqCone{T <: Real} <: MOI.AbstractVectorSet
+struct LinMatrixIneqCone{T <: Real, R <: RealOrComplex{T}} <: MOI.AbstractVectorSet
     As::Vector
     use_dual::Bool
 end
 export LinMatrixIneqCone
 
-LinMatrixIneqCone{T}(As::Vector) where {T <: Real} = LinMatrixIneqCone{T}(As, false)
+function LinMatrixIneqCone{T, R}(
+    As::Vector{<:Union{Matrix{R}, SparseMatrixCSC{R, Int}}},
+) where {T <: Real, R <: RealOrComplex{T}}
+    return LinMatrixIneqCone{T, R}(As, false)
+end
 
 MOI.dimension(cone::LinMatrixIneqCone) = length(cone.As)
-function MOI.dual_set(cone::LinMatrixIneqCone{T}) where {T}
-    return LinMatrixIneqCone{T}(cone.As, !cone.use_dual)
+function MOI.dual_set(cone::LinMatrixIneqCone{T, R}) where {T, R}
+    return LinMatrixIneqCone{T, R}(cone.As, !cone.use_dual)
 end
-MOI.dual_set_type(::Type{LinMatrixIneqCone{T}}) where {T} = LinMatrixIneqCone{T}
+MOI.dual_set_type(::Type{LinMatrixIneqCone{T, R}}) where {T, R} = LinMatrixIneqCone{T, R}
 
-function cone_from_moi(::Type{T}, cone::LinMatrixIneqCone{T}) where {T <: Real}
-    return Cones.LinMatrixIneq{T}(cone.As, use_dual = cone.use_dual)
+function cone_from_moi(
+    ::Type{T},
+    cone::LinMatrixIneqCone{T, R},
+) where {T <: Real, R <: RealOrComplex{T}}
+    return Cones.LinMatrixIneq{T, R}(cone.As, use_dual = cone.use_dual)
 end
 
 """
