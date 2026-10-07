@@ -20,6 +20,7 @@ import Base.convert
 import Hypatia.Cones
 import Hypatia.Models
 import Hypatia.SparseNonSymCache
+import Hypatia.USE_GPL_LIBS
 import Hypatia.SparseSymCache
 import Hypatia.diag_min
 import Hypatia.update_fact

@@ -19,6 +19,21 @@ nonsymmetric
 
 abstract type SparseNonSymCache{T <: Real} end
 
+abstract type SparseSymCache{T <: Real} end
+
+# helper for symmetric solvers that need nonzero diagonal
+diag_min(::SparseSymCache{T}) where {T} = zero(T)
+
+# CHOLMOD needs nonzero diagonal
+diag_min(::SparseSymCache{Float64}) = sqrt(eps())
+
+# sparse cache interface, also implemented by the HSL and Pardiso extensions
+function int_type end
+function update_fact end
+function inv_prod end
+function free_memory end
+
+@static if USE_GPL_LIBS
 # only works with Float64
 mutable struct UMFPACKNonSymCache{Float64} <: SparseNonSymCache{Float64}
     analyzed::Bool
@@ -62,11 +77,6 @@ SparseNonSymCache{Float64}() = UMFPACKNonSymCache{Float64}()
 symmetric
 =#
 
-abstract type SparseSymCache{T <: Real} end
-
-# helper for symmetric solvers that need nonzero diagonal
-diag_min(::SparseSymCache{T}) where {T} = zero(T)
-
 # only works with Float64
 mutable struct CHOLMODSymCache{Float64} <: SparseSymCache{Float64}
     analyzed::Bool
@@ -78,9 +88,6 @@ mutable struct CHOLMODSymCache{Float64} <: SparseSymCache{Float64}
     end
 end
 int_type(::CHOLMODSymCache) = SparseArraysInt
-
-# CHOLMOD needs nonzero diagonal
-diag_min(::SparseSymCache{Float64}) = sqrt(eps())
 
 function update_fact(
     cache::CHOLMODSymCache{Float64},
@@ -123,3 +130,4 @@ helpers
 =#
 
 free_memory(::Union{UMFPACKNonSymCache{Float64}, CHOLMODSymCache{Float64}}) = nothing
+end # @static if USE_GPL_LIBS

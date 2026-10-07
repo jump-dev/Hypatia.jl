@@ -5,6 +5,10 @@ This Julia package Hypatia.jl is released under the MIT license; see LICENSE
 file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 =#
 
+# sparse LMI cones are unsupported without CHOLMOD
+const SparseCholFactor{R} =
+    @static USE_GPL_LIBS ? SparseArrays.CHOLMOD.Factor{R, Int} : Factorization{R}
+
 """
 $(TYPEDEF)
 
@@ -44,7 +48,7 @@ mutable struct LinMatrixIneq{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     densesumA::Hermitian{R, Matrix{R}}
     sparsesumA::Hermitian{R, SparseMatrixCSC{R, Int}}
     densefact::Cholesky{R, Matrix{R}}
-    sparsefact::SparseArrays.CHOLMOD.Factor{R, Int}
+    sparsefact::SparseCholFactor{R}
     densesumAinvAs::Vector{Hermitian{R, Matrix{R}}}
     sparsesumAinvAs::Vector{Hermitian{R, SparseMatrixCSC{R, Int}}}
 

@@ -27,6 +27,9 @@ end
 
 const HYPATIA_VERSION = _get_version()
 
+# UMFPACK, CHOLMOD, and SPQR are GPL and absent from Julia builds with USE_GPL_LIBS=0
+const USE_GPL_LIBS = Base.USE_GPL_LIBS
+
 # linear algebra helpers
 using LinearAlgebra
 using GenericLinearAlgebra

@@ -18,6 +18,7 @@ import LinearAlgebra.BlasReal
 import PolynomialRoots
 using SparseArrays
 import Hypatia.RealOrComplex
+import Hypatia.USE_GPL_LIBS
 import Hypatia.outer_prod!
 import Hypatia.update_eigen!
 import Hypatia.spectral_outer!
