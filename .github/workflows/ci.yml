@@ -32,3 +32,18 @@ jobs:
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
+  test-nogpl:
+    # Julia built with USE_GPL_LIBS=0 (no UMFPACK, CHOLMOD, or SPQR). juliaup
+    # only provides this variant for nightly channels.
+    name: Julia nightly+nogpl - ubuntu-latest - x64 - ${{ github.event_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/install-juliaup@v3
+        with:
+          channel: 'nightly+nogpl'
+      - name: Check that GPL libs are disabled
+        run: julia -e '@assert !Base.USE_GPL_LIBS'
+      - uses: julia-actions/cache@v3
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
