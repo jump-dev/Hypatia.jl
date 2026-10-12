@@ -19,107 +19,115 @@ nonsymmetric
 
 abstract type SparseNonSymCache{T <: Real} end
 
-# only works with Float64
-mutable struct UMFPACKNonSymCache{Float64} <: SparseNonSymCache{Float64}
-    analyzed::Bool
-    umfpack::SparseArrays.UMFPACK.UmfpackLU
-    function UMFPACKNonSymCache{Float64}()
-        cache = new{Float64}()
-        cache.analyzed = false
-        return cache
-    end
-end
-
-int_type(::UMFPACKNonSymCache) = SparseArraysInt
-
-function update_fact(
-    cache::UMFPACKNonSymCache{Float64},
-    A::SparseMatrixCSC{Float64, SparseArraysInt},
-)
-    if !cache.analyzed
-        cache.umfpack = lu(A) # symbolic and numeric factorization
-        cache.analyzed = true
-    else
-        lu!(cache.umfpack, A, check = false)
-    end
-    return
-end
-
-function inv_prod(
-    cache::UMFPACKNonSymCache{Float64},
-    x::Vector{Float64},
-    A::SparseMatrixCSC{Float64, SparseArraysInt},
-    b::Vector{Float64},
-)
-    ldiv!(x, cache.umfpack, b) # does not repeat symbolic or numeric factorization
-    return x
-end
-
-# default to UMFPACK
-SparseNonSymCache{Float64}() = UMFPACKNonSymCache{Float64}()
-
-#=
-symmetric
-=#
-
 abstract type SparseSymCache{T <: Real} end
 
 # helper for symmetric solvers that need nonzero diagonal
 diag_min(::SparseSymCache{T}) where {T} = zero(T)
 
-# only works with Float64
-mutable struct CHOLMODSymCache{Float64} <: SparseSymCache{Float64}
-    analyzed::Bool
-    cholmod::SparseArrays.CHOLMOD.Factor
-    function CHOLMODSymCache{Float64}()
-        cache = new{Float64}()
-        cache.analyzed = false
-        return cache
-    end
-end
-int_type(::CHOLMODSymCache) = SparseArraysInt
-
 # CHOLMOD needs nonzero diagonal
 diag_min(::SparseSymCache{Float64}) = sqrt(eps())
 
-function update_fact(
-    cache::CHOLMODSymCache{Float64},
-    A::SparseMatrixCSC{Float64, SparseArraysInt},
-)
-    A_symm = Symmetric(A, :L)
+# sparse cache interface, also implemented by the HSL and Pardiso extensions
+function int_type end
+function update_fact end
+function inv_prod end
+function free_memory end
 
-    if !cache.analyzed
-        cache.cholmod = SparseArrays.CHOLMOD.ldlt(A_symm, check = false)
-        cache.analyzed = true
-    else
-        ldlt!(cache.cholmod, A_symm, check = false)
-    end
-
-    if !issuccess(cache.cholmod)
-        @warn("numerical failure: sparse factorization failed")
-        ldlt!(cache.cholmod, A_symm, shift = 1e-4, check = false)
-        if !issuccess(cache.cholmod)
-            @warn("numerical failure: could not fix sparse factorization failure")
+@static if USE_GPL_LIBS
+    # only works with Float64
+    mutable struct UMFPACKNonSymCache{Float64} <: SparseNonSymCache{Float64}
+        analyzed::Bool
+        umfpack::SparseArrays.UMFPACK.UmfpackLU
+        function UMFPACKNonSymCache{Float64}()
+            cache = new{Float64}()
+            cache.analyzed = false
+            return cache
         end
     end
-    return
-end
 
-function inv_prod(
-    cache::CHOLMODSymCache{Float64},
-    x::Vector{Float64},
-    A::SparseMatrixCSC{Float64, SparseArraysInt},
-    b::Vector{Float64},
-)
-    x .= cache.cholmod \ b # TODO try to make this in-place
-    return x
-end
+    int_type(::UMFPACKNonSymCache) = SparseArraysInt
 
-# default to CHOLMOD
-SparseSymCache{Float64}() = CHOLMODSymCache{Float64}()
+    function update_fact(
+        cache::UMFPACKNonSymCache{Float64},
+        A::SparseMatrixCSC{Float64, SparseArraysInt},
+    )
+        if !cache.analyzed
+            cache.umfpack = lu(A) # symbolic and numeric factorization
+            cache.analyzed = true
+        else
+            lu!(cache.umfpack, A, check = false)
+        end
+        return
+    end
 
-#=
+    function inv_prod(
+        cache::UMFPACKNonSymCache{Float64},
+        x::Vector{Float64},
+        A::SparseMatrixCSC{Float64, SparseArraysInt},
+        b::Vector{Float64},
+    )
+        ldiv!(x, cache.umfpack, b) # does not repeat symbolic or numeric factorization
+        return x
+    end
+
+    # default to UMFPACK
+    SparseNonSymCache{Float64}() = UMFPACKNonSymCache{Float64}()
+
+    #=
+symmetric
+=#
+
+    # only works with Float64
+    mutable struct CHOLMODSymCache{Float64} <: SparseSymCache{Float64}
+        analyzed::Bool
+        cholmod::SparseArrays.CHOLMOD.Factor
+        function CHOLMODSymCache{Float64}()
+            cache = new{Float64}()
+            cache.analyzed = false
+            return cache
+        end
+    end
+    int_type(::CHOLMODSymCache) = SparseArraysInt
+
+    function update_fact(
+        cache::CHOLMODSymCache{Float64},
+        A::SparseMatrixCSC{Float64, SparseArraysInt},
+    )
+        A_symm = Symmetric(A, :L)
+
+        if !cache.analyzed
+            cache.cholmod = SparseArrays.CHOLMOD.ldlt(A_symm, check = false)
+            cache.analyzed = true
+        else
+            ldlt!(cache.cholmod, A_symm, check = false)
+        end
+
+        if !issuccess(cache.cholmod)
+            @warn("numerical failure: sparse factorization failed")
+            ldlt!(cache.cholmod, A_symm, shift = 1e-4, check = false)
+            if !issuccess(cache.cholmod)
+                @warn("numerical failure: could not fix sparse factorization failure")
+            end
+        end
+        return
+    end
+
+    function inv_prod(
+        cache::CHOLMODSymCache{Float64},
+        x::Vector{Float64},
+        A::SparseMatrixCSC{Float64, SparseArraysInt},
+        b::Vector{Float64},
+    )
+        x .= cache.cholmod \ b # TODO try to make this in-place
+        return x
+    end
+
+    # default to CHOLMOD
+    SparseSymCache{Float64}() = CHOLMODSymCache{Float64}()
+
+    #=
 helpers
 =#
 
-free_memory(::Union{UMFPACKNonSymCache{Float64}, CHOLMODSymCache{Float64}}) = nothing
+    free_memory(::Union{UMFPACKNonSymCache{Float64}, CHOLMODSymCache{Float64}}) = nothing
+end # @static if USE_GPL_LIBS

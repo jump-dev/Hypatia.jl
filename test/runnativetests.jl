@@ -97,6 +97,8 @@ end
             (Solvers.SymIndefSparseSystemSolver, [Float64]),
             (Solvers.QRCholDenseSystemSolver, all_reals),
         ]
+        # default sparse caches use GPL UMFPACK/CHOLMOD
+        Hypatia.USE_GPL_LIBS || filter!(s -> !(s[2] == [Float64]), syssolvers)
         for inst_name in inst_minimal,
             (syssolver, real_types) in syssolvers,
             T in real_types
@@ -162,6 +164,7 @@ end
             (Solvers.SymIndefSparseSystemSolver, [Float64]),
             (Solvers.QRCholDenseSystemSolver, diff_reals),
         ]
+        Hypatia.USE_GPL_LIBS || filter!(s -> !(s[2] == [Float64]), syssolvers)
         for inst_name in inst_modify,
             (syssolver, real_types) in syssolvers,
             T in real_types,

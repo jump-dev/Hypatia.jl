@@ -123,11 +123,15 @@ function set_initial_point!(arr::AbstractVector, cone::PosSemidefTriSparse)
 end
 
 include("denseimpl.jl")
-# cholmod implementation only works after this commit
-# see https://github.com/JuliaLang/julia/pull/40560
-include("cholmodimpl.jl")
-const PSDSparseImplList =
-    [(PSDSparseDense, Real), (PSDSparseCholmod, LinearAlgebra.BlasReal)]
+@static if USE_GPL_LIBS
+    # cholmod implementation only works after this commit
+    # see https://github.com/JuliaLang/julia/pull/40560
+    include("cholmodimpl.jl")
+    const PSDSparseImplList =
+        [(PSDSparseDense, Real), (PSDSparseCholmod, LinearAlgebra.BlasReal)]
+else
+    const PSDSparseImplList = [(PSDSparseDense, Real)]
+end
 
 function pretty_name(cone::PosSemidefTriSparse)
     realorcomplex = cone.is_complex ? "complex " : "real "
