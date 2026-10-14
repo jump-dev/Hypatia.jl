@@ -884,6 +884,22 @@ function test_oracles(C::Type{Cones.WSOSInterpEpiNormOne{T}}) where {T}
         (d, Ps) = rand_interp(num_vars, halfdeg, T)
         test_oracles(C(1 + ds, d, Ps), init_tol = Inf)
     end
+
+    # Cholesky of a diagonal Hessian block can fail numerically near the boundary;
+    # negate one so the inverse Hessian product takes the fallback factorization
+    cone = C(3, rand_interp(1, 1, T)...)
+    Cones.setup_data!(cone)
+    point = Cones.set_initial_point!(zeros(T, Cones.dimension(cone)), cone)
+    perturb_scale!(point, T(1e-1), one(T))
+    Cones.load_point(cone, point)
+    @test Cones.is_feas(cone)
+    Cones.grad(cone)
+    prod_vec = zero(point)
+    Cones.hess_prod!(prod_vec, point, cone)
+    cone.hess_diag_blocks[2] .*= -1
+    Cones.inv_hess_prod!(prod_vec, point, cone)
+    @test !isa(cone.hess_diag_facts[1], Cholesky)
+    @test Cones.hess_prod!(zero(point), prod_vec, cone) ≈ point
 end
 
 function test_barrier(C::Type{Cones.WSOSInterpEpiNormOne{T}}) where {T}
