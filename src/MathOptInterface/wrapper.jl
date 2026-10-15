@@ -271,12 +271,12 @@ function MOI.modify(
     i = ci.value
     idxs = opt.moi_cone_idxs[i]
     set = opt.moi_cones[i]
-    new_h = chg.new_constant
+    new_h = copy(chg.new_constant)
     if needs_rescale(set)
         rescale_affine(set, new_h)
     end
     if needs_permute(set)
-        new_h = h[permute_idxs(set)]
+        new_h = new_h[permute_idxs(set)]
     end
     Solvers.modify_h(opt.solver, idxs, new_h)
     return
@@ -433,9 +433,8 @@ function _con_IJV(
     if needs_permute(set)
         perm_idxs = permute_idxs(set)
         @views vect[idxs] = vect[perm_idxs .+ start]
-        func_idxs = permute_affine(set, func)
-        func_idxs .+= start
-        append!(IM, func_idxs)
+        inv_perm = invperm(perm_idxs)
+        append!(IM, start + inv_perm[vt.output_index] for vt in func.terms)
     else
         append!(IM, start + vt.output_index for vt in func.terms)
     end

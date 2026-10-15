@@ -31,23 +31,6 @@ function permute_idxs(cone::SpecNucCone)
     return vcat(1, vec(W_idxs))
 end
 
-function permute_affine(cone::SpecNucCone, func::VAF{T}) where {T}
-    terms = func.terms
-    idxs_new = zeros(Int, length(terms))
-    for k in eachindex(idxs_new)
-        i = terms[k].output_index
-        @assert i >= 1
-        if i <= 2
-            idxs_new[k] = i
-            continue
-        end
-        (col_old, row_old) = divrem(i - 2, cone.row_dim)
-        k_idx = row_old * cone.column_dim + col_old + 2
-        idxs_new[k] = terms[k_idx].output_index
-    end
-    return idxs_new
-end
-
 # transformation (svec rescaling and real/imag parts reordering) for MOI Hermitian PSD cone not in svec (scaled upper triangle) form
 needs_untransform(::MOI.HermitianPositiveSemidefiniteConeTriangle) = true
 
@@ -138,37 +121,4 @@ function permute_idxs(cone::MOI.HermitianPositiveSemidefiniteConeTriangle)
     end
     @assert l == 1 + MOI.dimension(cone)
     return idxs
-end
-
-function vec_to_symm_idxs(k::Int)
-    i = div(1 + isqrt(8 * k - 7), 2)
-    j = k - div((i - 1) * i, 2)
-    if i > j
-        return (j, i)
-    end
-    return (i, j)
-end
-
-function permute_affine(
-    cone::MOI.HermitianPositiveSemidefiniteConeTriangle,
-    func::VAF{T},
-) where {T}
-    side = isqrt(MOI.dimension(cone))
-    re_len = Cones.svec_length(side)
-    terms = func.terms
-    idxs_new = zeros(Int, length(terms))
-    for k in eachindex(idxs_new)
-        l = terms[k].output_index
-        if l > re_len
-            # imag
-            (i, j) = vec_to_symm_idxs(l - re_len)
-            idxs_new[k] = j^2 + 2 * i
-        else
-            # real
-            @assert l >= 1
-            (i, j) = vec_to_symm_idxs(l)
-            idxs_new[k] = (j - 1)^2 + 2 * i - 1
-        end
-    end
-    return idxs_new
 end
