@@ -169,4 +169,4 @@ inst_cones_many = [
 
 inst_indirect = ["indirect1", "indirect2", "indirect3", "indirect4", "indirect5"]
 
-inst_modify = ["modify1", "modify2"]
+inst_modify = ["modify1", "modify2", "modify3"]
