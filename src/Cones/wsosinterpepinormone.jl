@@ -109,8 +109,7 @@ function setup_extra_data!(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     cone.matfact = [[cholesky(hcat([one(T)])) for _ in 1:R] for _ in cone.Ps]
     cone.hess_edge_blocks = [zeros(T, U, U) for _ in 1:(R - 1)]
     cone.hess_diag_blocks = [zeros(T, U, U) for _ in 1:R]
-    # TODO preallocate better
-    cone.hess_diag_facts = Factorization{T}[cholesky(hcat([one(T)])) for _ in 1:(R - 1)]
+    cone.hess_diag_facts = Vector{Factorization{T}}(undef, R - 1)
     cone.hess_diags = [zeros(T, U, U) for _ in 1:(R - 1)]
     cone.ΛLi_Λ = [[zeros(T, L, L) for _ in 1:(R - 1)] for L in Ls]
     cone.Λ11 = [zeros(T, L, L) for L in Ls]
