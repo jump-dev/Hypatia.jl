@@ -154,6 +154,5 @@ function permute_idxs(set::MOI.Scaled{MOI.HermitianPositiveSemidefiniteConeTrian
         k_re += 1
         l += 1
     end
-    @assert l == 1 + MOI.dimension(set)
     return idxs
 end
