@@ -30,8 +30,11 @@ function test_moi_cones(T::Type{<:Real})
     end
 
     @testset "HermitianPositiveSemidefiniteConeTriangle" begin
-        moi_cone = MOI.HermitianPositiveSemidefiniteConeTriangle(3)
-        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+        moi_cone = MOI.Scaled(MOI.HermitianPositiveSemidefiniteConeTriangle(3))
+        hyp_cone = Hypatia.cone_from_moi(
+            T,
+            MOI.Bridges.map_set(Hypatia.PermuteBridge{T}, moi_cone),
+        )
         @test hyp_cone isa Cones.PosSemidefTri{T, Complex{T}}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 9
         @test !Cones.use_dual_barrier(hyp_cone)
@@ -71,7 +74,10 @@ function test_moi_cones(T::Type{<:Real})
 
     @testset "NormSpectralCone" begin
         moi_cone = MOI.NormSpectralCone(2, 3)
-        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+        hyp_cone = Hypatia.cone_from_moi(
+            T,
+            MOI.Bridges.map_set(Hypatia.PermuteBridge{T}, moi_cone),
+        )
         @test hyp_cone isa Cones.EpiNormSpectral{T, T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 7
         @test !Cones.use_dual_barrier(hyp_cone)
@@ -79,7 +85,10 @@ function test_moi_cones(T::Type{<:Real})
 
     @testset "NormNuclearCone" begin
         moi_cone = MOI.NormNuclearCone(2, 3)
-        hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
+        hyp_cone = Hypatia.cone_from_moi(
+            T,
+            MOI.Bridges.map_set(Hypatia.PermuteBridge{T}, moi_cone),
+        )
         @test hyp_cone isa Cones.EpiNormSpectral{T, T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 7
         @test Cones.use_dual_barrier(hyp_cone)

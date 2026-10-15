@@ -52,7 +52,7 @@ const VV = MOI.VectorOfVariables
 const VAF = MOI.VectorAffineFunction
 import LowRankOpt as LRO
 include("MathOptInterface/cones.jl")
-include("MathOptInterface/transform.jl")
+include("MathOptInterface/bridges.jl")
 include("MathOptInterface/wrapper.jl")
 
 end

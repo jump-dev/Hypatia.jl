@@ -27,13 +27,6 @@ function cone_from_moi(
     return Cones.PosSemidefTri{T, T}(MOI.dimension(cone))
 end
 
-function cone_from_moi(
-    ::Type{T},
-    cone::MOI.HermitianPositiveSemidefiniteConeTriangle,
-) where {T <: Real}
-    return Cones.PosSemidefTri{T, Complex{T}}(MOI.dimension(cone))
-end
-
 function cone_from_moi(::Type{T}, cone::MOI.NormInfinityCone) where {T <: Real}
     return Cones.EpiNormInf{T, T}(MOI.dimension(cone))
 end
@@ -48,17 +41,6 @@ end
 
 function cone_from_moi(::Type{T}, cone::MOI.RotatedSecondOrderCone) where {T <: Real}
     return Cones.EpiPerSquare{T}(MOI.dimension(cone))
-end
-
-function cone_from_moi(::Type{T}, cone::MOI.NormSpectralCone) where {T <: Real}
-    return Cones.EpiNormSpectral{T, T}(extrema((cone.row_dim, cone.column_dim))...)
-end
-
-function cone_from_moi(::Type{T}, cone::MOI.NormNuclearCone) where {T <: Real}
-    return Cones.EpiNormSpectral{T, T}(
-        extrema((cone.row_dim, cone.column_dim))...,
-        use_dual = true,
-    )
 end
 
 function cone_from_moi(::Type{T}, cone::MOI.PowerCone{T}) where {T <: Real}
@@ -933,13 +915,10 @@ const SupportedCone{T <: Real} = Union{
     HypatiaCones{T},
     MOI.Nonnegatives,
     MOI.Scaled{MOI.PositiveSemidefiniteConeTriangle},
-    MOI.HermitianPositiveSemidefiniteConeTriangle,
     MOI.NormInfinityCone,
     MOI.NormOneCone,
     MOI.SecondOrderCone,
     MOI.RotatedSecondOrderCone,
-    MOI.NormSpectralCone,
-    MOI.NormNuclearCone,
     MOI.PowerCone{T},
     MOI.DualPowerCone{T},
     MOI.GeometricMeanCone,

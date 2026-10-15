@@ -38,6 +38,13 @@ MOI.empty!(opt::Optimizer) = (opt.solver.status = Solvers.NotLoaded)
 
 MOI.get(::Optimizer, ::MOI.SolverName) = "Hypatia"
 
+function MOI.get(
+    ::Optimizer{T},
+    ::MOI.Bridges.ListOfNonstandardBridges{T},
+) where {T <: Real}
+    return Type[PermuteBridge{T}]
+end
+
 MOI.get(opt::Optimizer, ::MOI.RawSolver) = opt.solver
 
 MOI.supports(::Optimizer, ::MOI.Silent) = true
@@ -154,8 +161,7 @@ function MOI.copy_to(opt::Optimizer{T}, src::MOI.ModelLike) where {T <: Real}
     opt.zeros_idxs = zeros_idxs = Vector{UnitRange{Int}}()
     for ci in get_src_cons(VAF{T}, MOI.Zeros)
         fi = get_con_fun(ci)
-        si = get_con_set(ci)
-        _con_IJV(IA, JA, VA, model_b, zeros_idxs, fi, si, idx_map)
+        _con_IJV(IA, JA, VA, model_b, zeros_idxs, fi, idx_map)
         idx_map[ci] = MOI.ConstraintIndex{VAF{T}, MOI.Zeros}(length(zeros_idxs))
     end
     model_A = dropzeros!(sparse(IA, JA, VA, length(model_b), n))
@@ -171,7 +177,7 @@ function MOI.copy_to(opt::Optimizer{T}, src::MOI.ModelLike) where {T <: Real}
     for ci in get_src_cons(VAF{T}, MOI.Nonnegatives)
         fi = get_con_fun(ci)
         si = get_con_set(ci)
-        _con_IJV(IG, JG, VG, model_h, moi_cone_idxs, fi, si, idx_map)
+        _con_IJV(IG, JG, VG, model_h, moi_cone_idxs, fi, idx_map)
         push!(moi_cones, si)
         idx_map[ci] = MOI.ConstraintIndex{VAF{T}, MOI.Nonnegatives}(length(moi_cones))
     end
@@ -199,7 +205,7 @@ function MOI.copy_to(opt::Optimizer{T}, src::MOI.ModelLike) where {T <: Real}
         for ci in get_src_cons(F, S)
             fi = get_con_fun(ci)
             si = get_con_set(ci)
-            _con_IJV(IG, JG, VG, model_h, moi_cone_idxs, fi, si, idx_map)
+            _con_IJV(IG, JG, VG, model_h, moi_cone_idxs, fi, idx_map)
             push!(cones, cone_from_moi(T, si))
             push!(moi_cones, si)
             idx_map[ci] = MOI.ConstraintIndex{F, S}(length(moi_cones))
@@ -268,17 +274,8 @@ function MOI.modify(
     ci::MOI.ConstraintIndex{VAF{T}, <:SupportedCone{T}},
     chg::MOI.VectorConstantChange{T},
 ) where {T}
-    i = ci.value
-    idxs = opt.moi_cone_idxs[i]
-    set = opt.moi_cones[i]
-    new_h = copy(chg.new_constant)
-    if needs_rescale(set)
-        rescale_affine(set, new_h)
-    end
-    if needs_permute(set)
-        new_h = new_h[permute_idxs(set)]
-    end
-    Solvers.modify_h(opt.solver, idxs, new_h)
+    idxs = opt.moi_cone_idxs[ci.value]
+    Solvers.modify_h(opt.solver, idxs, chg.new_constant)
     return
 end
 
@@ -392,9 +389,7 @@ function MOI.get(
     ci::MOI.ConstraintIndex{VAF{T}, <:SupportedCone{T}},
 ) where {T}
     MOI.check_result_index_bounds(opt, attr)
-    i = ci.value
-    z_i = opt.solver.result.z[opt.moi_cone_idxs[i]]
-    return untransform_affine(opt.moi_cones[i], z_i)
+    return opt.solver.result.z[opt.moi_cone_idxs[ci.value]]
 end
 
 function MOI.get(
@@ -403,9 +398,7 @@ function MOI.get(
     ci::MOI.ConstraintIndex{VAF{T}, <:SupportedCone{T}},
 ) where {T}
     MOI.check_result_index_bounds(opt, attr)
-    i = ci.value
-    s_i = opt.solver.result.s[opt.moi_cone_idxs[i]]
-    return untransform_affine(opt.moi_cones[i], s_i)
+    return opt.solver.result.s[opt.moi_cone_idxs[ci.value]]
 end
 
 function _con_IJV(
@@ -415,7 +408,6 @@ function _con_IJV(
     vect::Vector{T},
     idxs_vect::Vector{UnitRange{Int}},
     func::VAF{T},
-    set::MOI.AbstractVectorSet,
     idx_map::MOI.IndexMap,
 ) where {T <: Real}
     dim = MOI.output_dimension(func)
@@ -425,18 +417,6 @@ function _con_IJV(
     append!(JM, idx_map[vt.scalar_term.variable].value for vt in func.terms)
     append!(VM, -vt.scalar_term.coefficient for vt in func.terms)
     append!(vect, func.constants)
-    if needs_rescale(set)
-        @views vm = VM[(end - length(func.terms) + 1):end]
-        rescale_affine(set, func, vm)
-        @views rescale_affine(set, vect[idxs])
-    end
-    if needs_permute(set)
-        perm_idxs = permute_idxs(set)
-        @views vect[idxs] = vect[perm_idxs .+ start]
-        inv_perm = invperm(perm_idxs)
-        append!(IM, start + inv_perm[vt.output_index] for vt in func.terms)
-    else
-        append!(IM, start + vt.output_index for vt in func.terms)
-    end
+    append!(IM, start + vt.output_index for vt in func.terms)
     return
 end
