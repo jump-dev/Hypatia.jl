@@ -75,6 +75,27 @@ include(joinpath(@__DIR__, "moicones.jl"))
         W1 = W0 + [0 0; 0 1; -5 0]
         @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
         @test MOI.get(model, MOI.ObjectiveValue()) ≈ f(W1) rtol = 1e-6
+
+        # change the coefficients of x[2] in W[1, 1] and W[2, 2]
+        chg = MOI.MultirowChange(index_map[x[2]], [(2, 3.0), (6, 1.0)])
+        MOI.modify(model, index_map[ci], chg)
+        MOI.optimize!(model)
+        W2 = W1 + [4 0; 0 -2; 0 0]
+        @test MOI.get(model, MOI.ObjectiveValue()) ≈ f(W2) rtol = 1e-6
+
+        # restore the original function
+        func0 = MOI.Utilities.map_indices(index_map, func)
+        MOI.set(model, MOI.ConstraintFunction(), index_map[ci], func0)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.ObjectiveValue()) ≈ f(W0) rtol = 1e-6
+
+        # a new shape would change the permutation of the function
+        @test_throws MOI.SetAttributeNotAllowed MOI.set(
+            model,
+            MOI.ConstraintSet(),
+            index_map[ci],
+            S(2, 3),
+        )
     end
 
     @testset "Hermitian PSD constant change" begin
