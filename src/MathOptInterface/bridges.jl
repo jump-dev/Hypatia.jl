@@ -25,6 +25,8 @@ struct PermuteBridge{T <: Real, S <: PermutedCone, S2} <:
     set::S
 end
 
+# below 1 so that the Hermitian PSD cone takes SetDotScalingBridge and this
+# bridge (cost 1.1) rather than HermitianToSymmetricPSDBridge to a real PSD cone
 MOI.Bridges.bridging_cost(::Type{<:PermuteBridge}) = 0.1
 
 function MOI.supports_constraint(
@@ -102,6 +104,17 @@ function MOI.modify(
     return
 end
 
+function MOI.modify(
+    model::MOI.ModelLike,
+    bridge::PermuteBridge{T},
+    chg::MOI.MultirowChange{T},
+) where {T}
+    inv_perm = invperm(permute_idxs(bridge.set))
+    new_coefs = [(inv_perm[i], c) for (i, c) in chg.new_coefficients]
+    MOI.modify(model, bridge.constraint, MOI.MultirowChange(chg.variable, new_coefs))
+    return
+end
+
 function MOI.set(
     model::MOI.ModelLike,
     attr::MOI.ConstraintFunction,
@@ -112,6 +125,7 @@ function MOI.set(
     return
 end
 
+# a new shape would also change the permutation of the function
 function MOI.set(
     ::MOI.ModelLike,
     attr::MOI.ConstraintSet,
