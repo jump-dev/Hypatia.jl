@@ -2963,3 +2963,52 @@ function modify2(T; options...)
     @test iszero(solver.time_rescale)
     @test iszero(solver.time_loadsys)
 end
+
+function modify3(T; options...)
+    # sparse QR of A' permutes the rows of A', so the variables are permuted;
+    # the known optimal value is -dot(b, y_opt)
+    tol = test_tol(T)
+    A = T[
+        0 1 0 1 1 0
+        1 0 1 0 0 1
+        0 1 1 0 1 0
+    ]
+    x_opt = T[1, 1, 1, 0, 0, 0]
+    y_opt = T[1, -2, 1]
+    z_opt = T[0, 0, 0, 1, 2, 3]
+    b = A * x_opt
+    c = z_opt - A' * y_opt
+    G = Matrix{T}(-I, 6, 6)
+    h = zeros(T, 6)
+    if T <: BlasReal
+        A = sparse(A)
+        G = sparse(G)
+    end
+    cones = Cone{T}[Cones.Nonnegative{T}(6)]
+
+    r = build_solve_check(c, A, b, G, h, cones, tol; options...)
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ -dot(b, y_opt) atol = tol rtol = tol
+    solver = r.solver
+
+    # doubling c doubles the optimal value
+    c = 2 * c
+    Solvers.modify_c(solver, c)
+    @test Solvers.get_status(solver) == Solvers.Modified
+    r = build_solve_check(
+        c,
+        A,
+        b,
+        G,
+        h,
+        cones,
+        tol;
+        solver = solver,
+        already_loaded = true,
+        options...,
+    )
+    @test r.status == Solvers.Optimal
+    @test r.primal_obj ≈ -2 * dot(b, y_opt) atol = tol rtol = tol
+    @test iszero(solver.time_rescale)
+    @test iszero(solver.time_loadsys)
+end

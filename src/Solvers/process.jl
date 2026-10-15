@@ -288,6 +288,7 @@ function handle_primal_eq(solver::Solver{T}) where {T <: Real}
             row_piv = Ap_fact.prow
             model.A = model.A[y_keep_idxs, row_piv]
             model.G = model.G[:, row_piv]
+            model.c = model.c[row_piv]
             solver.x_keep_idxs = solver.x_keep_idxs[row_piv]
         end
 
@@ -362,9 +363,6 @@ function update_primal_eq(solver::Solver{T}, init_z::Vector{T}) where {T <: Real
     if !(solver.reduce && isa(model.G, MatrixyAG))
         # not reducing
         model.b = model.b[solver.y_keep_idxs]
-        if !(Ap_fact isa QRPivoted{T, Matrix{T}})
-            model.c = model.c[Ap_fact.prow]
-        end
 
         # init_y = Ap_R \ ((Ap_Q' * (-c - G' * z))[1:Ap_rank])
         rhs_y = mul!(copy(model.c), model.G', init_z, -1, -1)
@@ -375,8 +373,11 @@ function update_primal_eq(solver::Solver{T}, init_z::Vector{T}) where {T <: Real
     end
 
     # reduce
-    # [cQ1 cQ2] = c0' * Q
+    # [cQ1 cQ2] = c0[prow]' * Q
     # c = cQ2
+    if !(Ap_fact isa QRPivoted{T, Matrix{T}})
+        model.c = model.c[Ap_fact.prow]
+    end
     cQ = model.c' * solver.reduce_Ap_Q
     cQ1 = solver.reduce_cQ1 = cQ[1:Ap_rank]
     model.c = cQ[(Ap_rank + 1):end]
