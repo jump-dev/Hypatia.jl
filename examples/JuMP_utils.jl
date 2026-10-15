@@ -115,6 +115,10 @@ function setup_model(
         @eval $extender{Float64}()
     end
     opt = MOI.Bridges.full_bridge_optimizer(MOIU.CachingOptimizer(extT, hyp_opt), Float64)
+    if solver_type != Hypatia.Optimizer
+        # give the other solver standard MOI cones rather than Hypatia's
+        MOI.Bridges.remove_bridge(opt, Hypatia.PermuteBridge{Float64})
+    end
     if !isnothing(extender)
         # for PolyJuMP/SumOfSquares models
         for B in model.bridge_types
