@@ -115,6 +115,16 @@ function MOI.modify(
     return
 end
 
+# SetDotScalingBridge drops zero coefficients from a MultirowChange before this
+# bridge sees it, so refuse it and let a CachingOptimizer rebuild the model
+function MOI.modify(
+    ::MOI.ModelLike,
+    ::PermuteBridge{T, MOI.Scaled{MOI.HermitianPositiveSemidefiniteConeTriangle}},
+    chg::MOI.MultirowChange{T},
+) where {T}
+    return throw(MOI.Bridges.ModifyBridgeNotAllowed(chg))
+end
+
 function MOI.set(
     model::MOI.ModelLike,
     attr::MOI.ConstraintFunction,

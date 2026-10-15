@@ -98,7 +98,7 @@ include(joinpath(@__DIR__, "moicones.jl"))
         )
     end
 
-    @testset "Hermitian PSD constant change" begin
+    @testset "Hermitian PSD modify" begin
         src = MOI.Utilities.Model{Float64}()
         t = MOI.add_variable(src)
         terms = [MOI.VectorAffineTerm(i, MOI.ScalarAffineTerm(1.0, t)) for i in (1, 3)]
@@ -120,6 +120,13 @@ include(joinpath(@__DIR__, "moicones.jl"))
         MOI.optimize!(model)
         @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
         @test MOI.get(model, MOI.ObjectiveValue()) ≈ sqrt(10) rtol = 1e-6
+
+        chg = MOI.MultirowChange(index_map[t], [(1, 0.0)])
+        @test_throws MOI.Bridges.ModifyBridgeNotAllowed MOI.modify(
+            model,
+            index_map[ci],
+            chg,
+        )
     end
 
     # real types, tolerances, and tests to include for MOI.Test tests
