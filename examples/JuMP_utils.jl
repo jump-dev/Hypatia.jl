@@ -115,6 +115,10 @@ function setup_model(
         @eval $extender{Float64}()
     end
     opt = MOI.Bridges.full_bridge_optimizer(MOIU.CachingOptimizer(extT, hyp_opt), Float64)
+    if solver_type != Hypatia.Optimizer
+        # give the other solver standard MOI cones rather than Hypatia's
+        MOI.Bridges.remove_bridge(opt, Hypatia.PermuteBridge{Float64})
+    end
     if !isnothing(extender)
         # for PolyJuMP/SumOfSquares models
         for B in model.bridge_types
@@ -143,17 +147,10 @@ function setup_model(
         for (cone, idxs) in zip(hyp_opt.moi_cones, hyp_opt.moi_cone_idxs)
             h_i = hyp_model.h[idxs]
             G_i = hyp_model.G[idxs, :]
-            if Hypatia.needs_untransform(cone)
-                Hypatia.untransform_affine(cone, h_i)
-                @inbounds @views for j in 1:size(G_i, 2)
-                    Hypatia.untransform_affine(cone, G_i[:, j])
-                end
-            end
             con_i = JuMP.@constraint(model, h_i - G_i * x in cone)
             push!(cone_refs, con_i)
         end
 
-        model.ext[:moi_cones] = hyp_opt.moi_cones
         model.ext[:hyp_model] = hyp_model
         model.ext[:x_var] = x
         model.ext[:eq_refs] = eq_refs
@@ -203,17 +200,9 @@ function solve_check(model::JuMP.Model; test::Bool = true)
     y = (isempty(eq_refs) ? Float64[] : -JuMP.dual.(eq_refs))
     s = Float64[]
     z = Float64[]
-    for (cone, cr) in zip(model.ext[:moi_cones], model.ext[:cone_refs])
+    for cr in model.ext[:cone_refs]
         s_k = JuMP.value.(cr)
         z_k = JuMP.dual.(cr)
-        if Hypatia.needs_rescale(cone)
-            Hypatia.rescale_affine(cone, s_k)
-            Hypatia.rescale_affine(cone, z_k)
-        end
-        if Hypatia.needs_permute(cone)
-            s_k = s_k[Hypatia.permute_idxs(cone)]
-            z_k = z_k[Hypatia.permute_idxs(cone)]
-        end
         append!(s, s_k)
         append!(z, z_k)
     end

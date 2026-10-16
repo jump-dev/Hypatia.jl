@@ -61,7 +61,7 @@ include(joinpath(@__DIR__, "moicones.jl"))
         MOI.set(src, MOI.ObjectiveSense(), MOI.MIN_SENSE)
         obj = 1.0 * t
         MOI.set(src, MOI.ObjectiveFunction{typeof(obj)}(), obj)
-        model = Hypatia.Optimizer()
+        model = MOI.instantiate(Hypatia.Optimizer, with_bridge_type = Float64)
         MOI.set(model, MOI.Silent(), true)
         index_map = MOI.copy_to(model, src)
         MOI.optimize!(model)
@@ -75,9 +75,30 @@ include(joinpath(@__DIR__, "moicones.jl"))
         W1 = W0 + [0 0; 0 1; -5 0]
         @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
         @test MOI.get(model, MOI.ObjectiveValue()) ≈ f(W1) rtol = 1e-6
+
+        # change the coefficients of x[2] in W[1, 1] and W[2, 2]
+        chg = MOI.MultirowChange(index_map[x[2]], [(2, 3.0), (6, 1.0)])
+        MOI.modify(model, index_map[ci], chg)
+        MOI.optimize!(model)
+        W2 = W1 + [4 0; 0 -2; 0 0]
+        @test MOI.get(model, MOI.ObjectiveValue()) ≈ f(W2) rtol = 1e-6
+
+        # restore the original function
+        func0 = MOI.Utilities.map_indices(index_map, func)
+        MOI.set(model, MOI.ConstraintFunction(), index_map[ci], func0)
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.ObjectiveValue()) ≈ f(W0) rtol = 1e-6
+
+        # a new shape would change the permutation of the function
+        @test_throws MOI.SetAttributeNotAllowed MOI.set(
+            model,
+            MOI.ConstraintSet(),
+            index_map[ci],
+            S(2, 3),
+        )
     end
 
-    @testset "Hermitian PSD constant change" begin
+    @testset "Hermitian PSD modify" begin
         src = MOI.Utilities.Model{Float64}()
         t = MOI.add_variable(src)
         terms = [MOI.VectorAffineTerm(i, MOI.ScalarAffineTerm(1.0, t)) for i in (1, 3)]
@@ -87,7 +108,7 @@ include(joinpath(@__DIR__, "moicones.jl"))
         MOI.set(src, MOI.ObjectiveSense(), MOI.MIN_SENSE)
         obj = 1.0 * t
         MOI.set(src, MOI.ObjectiveFunction{typeof(obj)}(), obj)
-        model = Hypatia.Optimizer()
+        model = MOI.instantiate(Hypatia.Optimizer, with_bridge_type = Float64)
         MOI.set(model, MOI.Silent(), true)
         index_map = MOI.copy_to(model, src)
         MOI.optimize!(model)
@@ -99,6 +120,13 @@ include(joinpath(@__DIR__, "moicones.jl"))
         MOI.optimize!(model)
         @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
         @test MOI.get(model, MOI.ObjectiveValue()) ≈ sqrt(10) rtol = 1e-6
+
+        chg = MOI.MultirowChange(index_map[t], [(1, 0.0)])
+        @test_throws MOI.Bridges.ModifyBridgeNotAllowed MOI.modify(
+            model,
+            index_map[ci],
+            chg,
+        )
     end
 
     # real types, tolerances, and tests to include for MOI.Test tests
