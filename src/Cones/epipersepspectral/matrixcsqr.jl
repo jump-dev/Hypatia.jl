@@ -179,13 +179,13 @@ function update_hess_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where {T}
     h_der2(∇2h, viw_λ, cone.h)
 
     # setup viw_λ_Δ
-    rteps = sqrt(eps(T))
+    thresh = cbrt(eps(T))
     idx = 1
     @inbounds for j in 1:(cone.d)
         λ_j = viw_λ[j]
         for i in 1:(j - 1)
             t = viw_λ[i] - λ_j
-            if abs(t) < rteps
+            if abs(t) < thresh * max(viw_λ[i], λ_j)
                 viw_λ_Δ[idx] = 0
             else
                 viw_λ_Δ[idx] = t
@@ -439,6 +439,7 @@ function update_dder3_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where {T}
     h_der3(∇3h, viw_λ, cone.h)
 
     # setup Δ2h
+    thresh = eps(T)^(2/9)
     i6 = inv(T(6))
     @inbounds Threads.@threads for k in 1:d
         idx_jk = sum(1:(k - 1))
@@ -455,11 +456,14 @@ function update_dder3_aux(cone::EpiPerSepSpectral{<:MatrixCSqr{T}}) where {T}
 
             @inbounds for i in 1:j
                 denom_ij = viw_λ_Δ[idx_ij]
+                denom_ik = viw_λ_Δ[idx_jk + i]
+                λ_i = viw_λ[i]
+                near_ij = (abs(denom_ij) < thresh * max(λ_i, viw_λ[j]))
+                near_ik = (abs(denom_ik) < thresh * max(λ_i, viw_λ[k]))
                 Δ2h[ijk + i] =
                     Δ2h[jik] = Δ2h[kij] = begin
-                        if iszero(denom_ij)
-                            denom_ik = viw_λ_Δ[idx_jk + i]
-                            if iszero(denom_ik)
+                        if near_ij
+                            if near_ik
                                 (∇3h[i] + ∇3h_jk) * i6
                             else
                                 (Δh[jd + i] - Δh_jk) / denom_ik
