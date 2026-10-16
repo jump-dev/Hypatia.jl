@@ -41,9 +41,16 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     ::Type{<:PermuteBridge{T}},
     ::Type{VAF{T}},
     ::Type{S},
-) where {T <: Real, S <: PermutedCone}
-    S2 = (S <: MOI.Scaled ? PosSemidefTriCone{T, Complex{T}} : EpiNormSpectralCone{T, T})
-    return PermuteBridge{T, S, S2}
+) where {T <: Real, S <: Union{MOI.NormSpectralCone, MOI.NormNuclearCone}}
+    return PermuteBridge{T, S, EpiNormSpectralCone{T, T}}
+end
+
+function MOI.Bridges.Constraint.concrete_bridge_type(
+    ::Type{<:PermuteBridge{T}},
+    ::Type{VAF{T}},
+    ::Type{S},
+) where {T <: Real, S <: MOI.Scaled{MOI.HermitianPositiveSemidefiniteConeTriangle}}
+    return PermuteBridge{T, S, PosSemidefTriCone{T, Complex{T}}}
 end
 
 function MOI.Bridges.map_set(
