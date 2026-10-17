@@ -734,6 +734,8 @@ function test_barrier(
             return -log(u - v * Cones.h_val(Wλ ./ v, h_fun)) - log(v) - sum(log, Wλ)
         end
         test_barrier(C(h_fun, dW), barrier)
+        # clustered eigenvalues
+        test_barrier(C(h_fun, dW), barrier, noise = T(1e-6), TFD = BigFloat)
     end
 end
 
@@ -786,7 +788,12 @@ function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T, R}}) where {T, R}
         W = new_herm(w, dW, R)
         return real(-log(u - dot(W, log(W) - log(V)))) - logdet_pd(V) - logdet_pd(W)
     end
-    return test_barrier(C(1 + 2 * dw), barrier, TFD = BigFloat)
+    test_barrier(C(1 + 2 * dw), barrier, TFD = BigFloat)
+    # small eigenvalues
+    test_barrier(C(1 + 2 * dw), barrier, scale = T(1e-6), TFD = BigFloat)
+    # partly clustered eigenvalues, where the near-equal formulas limit the accuracy
+    test_barrier(C(1 + 2 * dw), barrier, noise = T(5e-3), tol = 1e-5, TFD = BigFloat)
+    return
 end
 
 function show_time_alloc(C::Type{Cones.EpiTrRelEntropyTri{T, R}}) where {T, R}
