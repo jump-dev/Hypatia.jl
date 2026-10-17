@@ -524,7 +524,7 @@ function Δ2!(Δ2::Matrix{T}, λ::Vector{T}, log_λ::Vector{T}) where {T <: Real
         for i in 1:(j - 1)
             λ_i = λ[i]
             λ_ij = λ_i - λ_j
-            if abs(λ_ij) < thresh
+            if abs(λ_ij) < thresh * max(λ_i, λ_j)
                 Δ2[i, j] = 2 / (λ_i + λ_j)
             else
                 Δ2[i, j] = (log_λ[i] - lλ_j) / λ_ij
@@ -547,13 +547,14 @@ function Δ3!(Δ3::Array{T, 3}, Δ2::Matrix{T}, λ::Vector{T}) where {T <: Real}
         λ_j = λ[j]
         λ_k = λ[k]
         λ_jk = λ_j - λ_k
-        if abs(λ_jk) < thresh
+        if abs(λ_jk) < thresh * max(λ_j, λ_k)
             λ_i = λ[i]
             λ_ij = λ_i - λ_j
-            if abs(λ_ij) < thresh
+            if abs(λ_ij) < thresh * max(λ_i, λ_j)
                 t = abs2(3 / (λ_i + λ_j + λ_k)) / -2
             else
-                t = (Δ2[i, j] - Δ2[j, k]) / λ_ij
+                # λ is sorted, so λ_i - λ_k is the widest of the three gaps
+                t = (Δ2[i, j] - Δ2[j, k]) / (λ_i - λ_k)
             end
         else
             t = (Δ2[i, j] - Δ2[i, k]) / λ_jk
@@ -672,16 +673,16 @@ function Δ4_ij!(
         λ_ij = λ_i - λ_j
         λ_ik = λ_i - λ_k
         λ_il = λ_i - λ_l
-        B_ik = (abs(λ_ik) < thresh)
-        B_il = (abs(λ_il) < thresh)
+        B_ik = (abs(λ_ik) < thresh * max(λ_i, λ_k))
+        B_il = (abs(λ_il) < thresh * max(λ_i, λ_l))
 
-        if (abs(λ_ij) < thresh) && B_ik && B_il
+        if (abs(λ_ij) < thresh * max(λ_i, λ_j)) && B_ik && B_il
             λ_mean = (λ_i + λ_j + λ_k + λ_l)/4
             t = λ_mean^-3 / 3
         elseif B_ik && B_il
-            t = (Δ3[i, i, i] - Δ3[i, i, j]) / λ_ij
+            t = (Δ3[i, k, l] - Δ3[j, k, l]) / λ_ij
         elseif B_il
-            t = (Δ3[i, i, j] - Δ3[i, j, k]) / λ_ik
+            t = (Δ3[i, j, l] - Δ3[j, k, l]) / λ_ik
         else
             t = (Δ3[i, j, k] - Δ3[j, k, l]) / λ_il
         end
