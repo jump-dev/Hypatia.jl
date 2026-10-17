@@ -53,7 +53,6 @@ mutable struct WSOSInterpEpiNormOne{T <: Real} <: Cone{T}
     tempUU_vec::Vector{Matrix{T}} # reused in update_hess
     tempUU::Matrix{T}
     tempUU2::Matrix{T}
-    tempURU::Matrix{T}
     tempURU2::Matrix{T}
     # for each (2, 2)-block pertaining to (lambda_1, lambda_i),
     # P * inv(Λ)[1, 1] * Ps = P * inv(Λ)i[2, 2] * Ps
@@ -121,7 +120,6 @@ function setup_extra_data!(cone::WSOSInterpEpiNormOne{T}) where {T <: Real}
     cone.tempUU_vec = [zeros(T, U, U) for _ in Ps]
     cone.tempUU = zeros(T, U, U)
     cone.tempUU2 = zeros(T, U, U)
-    cone.tempURU = zeros(T, U, U * (R - 1))
     cone.tempURU2 = zeros(T, U * (R - 1), U)
     cone.PΛiPs1 = [Vector{Matrix{T}}(undef, R) for Pk in Ps]
     cone.PΛiPs2 = [Vector{Matrix{T}}(undef, R) for Pk in Ps]
@@ -400,26 +398,22 @@ function inv_hess_prod!(
     end
     U = cone.U
     R = cone.R
-    edge = cone.tempURU
     Diz = cone.tempURU2
     s_fact = cone.hess_schur_fact
 
-    @inbounds for r in 1:(R - 1)
-        idxs = block_idxs(U, r)
-        @views copyto!(edge[:, idxs], cone.hess_edge_blocks[r])
-    end
     @inbounds for r in 2:R
         idxs = block_idxs(U, r)
         @views ldiv!(prod[idxs, :], cone.hess_diag_facts[r - 1], arr[idxs, :])
     end
     # prod += u * inv(schur) * u' * arr
-    ldiv!(s_fact, edge)
-    @inbounds @views for j in 1:size(arr, 2)
-        Dix = prod[(U + 1):end, j]
-        p1j = prod[1:U, j]
-        ldiv!(p1j, s_fact, arr[1:U, j])
-        mul!(p1j, edge, Dix, -1, true)
-        mul!(Dix, Diz, p1j, -1, true)
+    @inbounds @views begin
+        p1 = prod[1:U, :]
+        copyto!(p1, arr[1:U, :])
+        for r in 2:R
+            mul!(p1, cone.hess_edge_blocks[r - 1], prod[block_idxs(U, r), :], -1, true)
+        end
+        ldiv!(s_fact, p1)
+        mul!(prod[(U + 1):end, :], Diz, p1, -1, true)
     end
 
     return prod
