@@ -13,16 +13,10 @@ using Test
 using Printf
 using Hypatia
 
-test_files = [
-    "polyutils",
-    "cone",
-    "native",
-    "moi",
-    # "examples", # CI runs examples separately
-    # require optional dependencies:
-    # "pardiso",
-    # "hsl",
-]
+# set HYPATIA_TEST_FILES to run a subset, separated by `;` (CI runs them in parallel)
+# not included: examples (run separately in CI), pardiso and hsl (optional dependencies)
+test_files = split(get(ENV, "HYPATIA_TEST_FILES", ""), ";"; keepempty = false)
+isempty(test_files) && (test_files = ["polyutils", "cone", "native", "moi"])
 
 println()
 @info("starting all tests")
