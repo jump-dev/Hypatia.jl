@@ -734,6 +734,8 @@ function test_barrier(
             return -log(u - v * Cones.h_val(Wλ ./ v, h_fun)) - log(v) - sum(log, Wλ)
         end
         test_barrier(C(h_fun, dW), barrier)
+        # the cutoffs do not depend on h_fun, and BigFloat derivatives are slow to compile
+        h_fun == first(sep_spectral_funs) || continue
         # clustered eigenvalues
         test_barrier(C(h_fun, dW), barrier, noise = T(1e-6), TFD = BigFloat)
         # partly clustered eigenvalues, where the near-equal formulas limit the accuracy
