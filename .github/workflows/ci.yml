@@ -19,7 +19,11 @@ jobs:
           - version: '1'
             os: ubuntu-latest
             arch: x64
-            test_files: 'polyutils;cone;native'
+            test_files: 'cone'
+          - version: '1'
+            os: ubuntu-latest
+            arch: x64
+            test_files: 'polyutils;native'
           - version: '1'
             os: ubuntu-latest
             arch: x64
