@@ -514,8 +514,48 @@ function dder3(
     return dder3
 end
 
+# The divided differences of log are computed at sorted eigenvalues λ. Where the nodes
+# λ_lo ≤ ... ≤ λ_hi have a relative spread (λ_hi - λ_lo) / (λ_hi + λ_lo) of at most
+# 1 / r, `Δ_series` sums a series whose relative error, barring underflow and overflow,
+# is a small multiple of eps(T). Otherwise they use the recursion over the widest gap,
+# f[x_0, ..., x_n] = (f[x_0, ..., x_{n-1}] - f[x_1, ..., x_n]) / (x_0 - x_n).
+# Since log[x_0, ..., x_n] = (-1)^(n - 1) * ∫_0^∞ dt / ∏_j (x_j + t), for n ≥ 2 the two
+# lower-order differences have the same sign, and the recursion multiplies their relative
+# errors by at most (1 + (1 + ρ) / (n - 1)) / ρ < r + (r + 1) / (n - 1).
+is_near(λ_lo::T, λ_hi::T, r::Int) where {T <: Real} = (λ_hi - λ_lo <= λ_lo / r + λ_hi / r)
+
+# Divided difference of log of order n = N - 1 at nodes x with relative spread
+# ρ = (hi - lo) / (hi + lo) ≤ 1/8. With c = (lo + hi) / 2 and z = x / c .- 1, it is
+# (-1)^(n - 1) / c^n * sum_{k ≥ 0} (-1)^k h_k(z) / (n + k), where h_k is the complete
+# homogeneous symmetric polynomial of degree k, and the k-th term is at most
+# b_k = binomial(n + k, n) / (n + k) * ρ^k in absolute value.
+function Δ_series(x::NTuple{N, T}) where {N, T <: Real}
+    n = N - 1
+    (lo, hi) = extrema(x)
+    c = lo / 2 + hi / 2
+    ρ = (hi - lo) / 2 / c
+    z = map(x_i -> (x_i - c) / c, x)
+    # h[m] = h_k(z[1:m]), from h_k(z[1:m]) = z[m] * h_{k - 1}(z[1:m]) + h_k(z[1:(m - 1)])
+    h = ntuple(_ -> one(T), Val(N))
+    s = inv(T(n))
+    b = ρ
+    k = 0
+    # for n ≤ 3, b_{k + 2} ≤ b_{k + 1} / 4, so the terms after k sum to at most
+    # 4/3 * b_{k + 1}
+    while b > eps(T) * s
+        k += 1
+        h = accumulate((t, zh) -> zh[1] * zh[2] + t, map(tuple, z, h); init = zero(T))
+        s += (isodd(k) ? -h[N] : h[N]) / (n + k)
+        b *= ρ * (n + k) / (k + 1)
+    end
+    # dividing by c n times avoids overflow and underflow in c^n
+    for _ in 1:n
+        s /= c
+    end
+    return isodd(n) ? s : -s
+end
+
 function Δ2!(Δ2::Matrix{T}, λ::Vector{T}, log_λ::Vector{T}) where {T <: Real}
-    thresh = cbrt(eps(T))
     d = length(λ)
 
     @inbounds for j in 1:d
@@ -523,11 +563,10 @@ function Δ2!(Δ2::Matrix{T}, λ::Vector{T}, log_λ::Vector{T}) where {T <: Real
         lλ_j = log_λ[j]
         for i in 1:(j - 1)
             λ_i = λ[i]
-            λ_ij = λ_i - λ_j
-            if abs(λ_ij) < thresh * max(λ_i, λ_j)
-                Δ2[i, j] = 2 / (λ_i + λ_j)
+            if is_near(λ_i, λ_j, 8)
+                Δ2[i, j] = Δ_series((λ_i, λ_j))
             else
-                Δ2[i, j] = (log_λ[i] - lλ_j) / λ_ij
+                Δ2[i, j] = (log_λ[i] - lλ_j) / (λ_i - λ_j)
             end
         end
         Δ2[j, j] = inv(λ_j)
@@ -540,24 +579,15 @@ end
 
 function Δ3!(Δ3::Array{T, 3}, Δ2::Matrix{T}, λ::Vector{T}) where {T <: Real}
     @assert issymmetric(Δ2) # must be symmetric (wrapper is less efficient)
-    thresh = eps(T)^(2/9)
     d = length(λ)
 
     @inbounds for k in 1:d, j in 1:k, i in 1:j
-        λ_j = λ[j]
+        λ_i = λ[i]
         λ_k = λ[k]
-        λ_jk = λ_j - λ_k
-        if abs(λ_jk) < thresh * max(λ_j, λ_k)
-            λ_i = λ[i]
-            λ_ij = λ_i - λ_j
-            if abs(λ_ij) < thresh * max(λ_i, λ_j)
-                t = abs2(3 / (λ_i + λ_j + λ_k)) / -2
-            else
-                # λ is sorted, so λ_i - λ_k is the widest of the three gaps
-                t = (Δ2[i, j] - Δ2[j, k]) / (λ_i - λ_k)
-            end
+        if is_near(λ_i, λ_k, 8)
+            t = Δ_series((λ_i, λ[j], λ_k))
         else
-            t = (Δ2[i, j] - Δ2[i, k]) / λ_jk
+            t = (Δ2[i, j] - Δ2[j, k]) / (λ_i - λ_k)
         end
 
         Δ3[i, j, k] =
@@ -662,29 +692,22 @@ function Δ4_ij!(
     Δ3::Array{T, 3},
     λ::Vector{T},
 ) where {T <: Real}
-    thresh = eps(T)^(4/27)
     d = length(λ)
-    λ_i = λ[i]
-    λ_j = λ[j]
 
     @inbounds for l in 1:d, k in 1:l
-        λ_k = λ[k]
-        λ_l = λ[l]
-        λ_ij = λ_i - λ_j
-        λ_ik = λ_i - λ_k
-        λ_il = λ_i - λ_l
-        B_ik = (abs(λ_ik) < thresh * max(λ_i, λ_k))
-        B_il = (abs(λ_il) < thresh * max(λ_i, λ_l))
-
-        if (abs(λ_ij) < thresh * max(λ_i, λ_j)) && B_ik && B_il
-            λ_mean = (λ_i + λ_j + λ_k + λ_l)/4
-            t = λ_mean^-3 / 3
-        elseif B_ik && B_il
-            t = (Δ3[i, k, l] - Δ3[j, k, l]) / λ_ij
-        elseif B_il
-            t = (Δ3[i, j, l] - Δ3[j, k, l]) / λ_ik
+        # i ≤ j and k ≤ l, so λ[lo] and λ[hi] are the smallest and largest nodes
+        lo = min(i, k)
+        hi = max(j, l)
+        # the recursion is cheaper than `Δ_series`, so it is used down to a spread of
+        # 1/128: below 1/8 its second-order differences are from `Δ_series`, and it
+        # multiplies their errors by less than 193, below the 17 * 12.5 that two
+        # recursions above a spread of 1/8 allow
+        if is_near(λ[lo], λ[hi], 128)
+            t = Δ_series((λ[i], λ[j], λ[k], λ[l]))
         else
-            t = (Δ3[i, j, k] - Δ3[j, k, l]) / λ_il
+            Δ3_lo = (lo == i ? Δ3[j, k, l] : Δ3[i, j, l]) # without λ[lo]
+            Δ3_hi = (hi == l ? Δ3[i, j, k] : Δ3[i, k, l]) # without λ[hi]
+            t = (Δ3_hi - Δ3_lo) / (λ[lo] - λ[hi])
         end
 
         Δ4_ij[k, l] = t

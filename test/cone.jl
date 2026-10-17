@@ -795,9 +795,10 @@ function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T, R}}) where {T, R}
     test_barrier(C(1 + 2 * dw), barrier, TFD = BigFloat)
     # small eigenvalues
     test_barrier(C(1 + 2 * dw), barrier, scale = T(1e-6), TFD = BigFloat)
-    # partly clustered eigenvalues, where the near-equal formulas limit the accuracy
-    test_barrier(C(1 + 2 * dw), barrier, noise = T(3e-4), tol = 5e-8, TFD = BigFloat)
-    test_barrier(C(1 + 2 * dw), barrier, noise = T(5e-3), tol = 5e-6, TFD = BigFloat)
+    # clustered and partly clustered eigenvalues
+    test_barrier(C(1 + 2 * dw), barrier, noise = T(1e-6), TFD = BigFloat)
+    test_barrier(C(1 + 2 * dw), barrier, noise = T(3e-4), TFD = BigFloat)
+    test_barrier(C(1 + 2 * dw), barrier, noise = T(5e-3), TFD = BigFloat)
     return
 end
 
