@@ -241,7 +241,7 @@ function update_grad(
     smat_to_svec!(dzdW, mat, rt2)
     axpby!(-1, dzdW, -1, g_W)
 
-    Δ2!(Δ2_V, V_λ, cone.V_λ_log)
+    Δ2!(Δ2_V, V_λ)
 
     spectral_outer!(W_sim, V_vecs', Hermitian(cone.W, :U), mat)
     @. mat = W_sim * Δ2_V
@@ -258,7 +258,7 @@ end
 
 function update_hess_aux(cone::EpiTrRelEntropyTri)
     @assert cone.grad_updated
-    Δ2!(cone.Δ2_W, cone.W_fact.values, cone.W_λ_log)
+    Δ2!(cone.Δ2_W, cone.W_fact.values)
     Δ3!(cone.Δ3_V, cone.Δ2_V, cone.V_fact.values)
     @inbounds for k in 1:(cone.d)
         @. @views cone.Wsim_Δ3[:, :, k] = cone.W_sim * cone.Δ3_V[:, :, k]
@@ -514,20 +514,22 @@ function dder3(
     return dder3
 end
 
-function Δ2!(Δ2::Matrix{T}, λ::Vector{T}, log_λ::Vector{T}) where {T <: Real}
-    thresh = cbrt(eps(T))
+function Δ2!(Δ2::Matrix{T}, λ::Vector{T}) where {T <: Real}
     d = length(λ)
 
     @inbounds for j in 1:d
         λ_j = λ[j]
-        lλ_j = log_λ[j]
         for i in 1:(j - 1)
-            λ_i = λ[i]
-            λ_ij = λ_i - λ_j
-            if abs(λ_ij) < thresh * max(λ_i, λ_j)
-                Δ2[i, j] = 2 / (λ_i + λ_j)
+            # (log(hi) - log(lo)) / δ without cancellation, unless hi / lo overflows
+            (lo, hi) = minmax(λ[i], λ_j)
+            δ = hi - lo
+            r = δ / lo
+            Δ2[i, j] = if iszero(δ)
+                inv(lo)
+            elseif isfinite(r)
+                log1p(r) / δ
             else
-                Δ2[i, j] = (log_λ[i] - lλ_j) / λ_ij
+                (log(hi) - log(lo)) / δ
             end
         end
         Δ2[j, j] = inv(λ_j)

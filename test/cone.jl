@@ -798,6 +798,13 @@ function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T, R}}) where {T, R}
     # partly clustered eigenvalues, where the near-equal formulas limit the accuracy
     test_barrier(C(1 + 2 * dw), barrier, noise = T(3e-4), tol = 5e-8, TFD = BigFloat)
     test_barrier(C(1 + 2 * dw), barrier, noise = T(5e-3), tol = 5e-6, TFD = BigFloat)
+    # divided differences of log at close and distant eigenvalues of various scales, unsorted,
+    # including a pair whose ratio overflows
+    s = 4 * sqrt(floatmax(T))
+    λ = T[1e8, 1e-12, 1 + 1e-9, 1.00001e-12, s, 1, inv(s)]
+    dd(a, b) = (a == b ? inv(big(a)) : (log(big(a)) - log(big(b))) / (big(a) - big(b)))
+    Δ2 = Cones.Δ2!(zeros(T, 7, 7), λ)
+    @test all(isapprox.(Δ2, dd.(λ, λ'), rtol = 10 * eps(T)))
     return
 end
 
