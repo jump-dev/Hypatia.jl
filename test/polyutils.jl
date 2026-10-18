@@ -45,6 +45,10 @@ function test_interp_domain(T::Type{<:Real})
                 @test length(ellip.Ps) == 2
                 @test free.U == ball.U == ellip.U
                 @test size(ball.pts) == size(ellip.pts)
+                for (dom, interp) in ((ball_dom, ball), (ellip_dom, ellip))
+                    ref = PolyUtils.ref_pts(dom, interp.pts)
+                    @test all(norm(r) <= 1 + sqrt(eps(T)) for r in eachrow(ref))
+                end
             end
         end
     end
@@ -84,6 +88,7 @@ function test_quadrature(T::Type{<:Real})
     @testset "quadrature n = $n, halfdeg = $halfdeg" for (n, halfdeg) in
                                                          ((1, 5), (2, 2), (3, 1))
         box_dom = PolyUtils.BoxDomain{T}(fill(-1, n), fill(3, n))
+        @test PolyUtils.ref_pts(box_dom, [box_dom.l box_dom.u]') == [-1; 1] .* ones(T, 1, n)
         for sample in (false, true)
             box = interpolate(box_dom, halfdeg, sample = sample, get_quadr = true)
             @test sum(box.w) ≈ 2^n

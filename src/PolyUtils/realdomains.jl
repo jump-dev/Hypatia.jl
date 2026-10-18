@@ -47,8 +47,9 @@ function weights(dom::Domain, pts::AbstractMatrix)::Vector{Vector} end
 """
 $(SIGNATURES)
 
-Affine map of points in the domain to reference coordinates in ``[-1, 1]^n``,
-where the Chebyshev basis is evaluated. Defaults to the identity.
+Invertible affine map of points in the domain into ``[-1, 1]^n``, where the
+Chebyshev basis is evaluated. Defaults to the identity, for domains inside
+``[-1, 1]^n``.
 """
 ref_pts(::Domain, pts::AbstractMatrix) = pts
 
