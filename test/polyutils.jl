@@ -84,7 +84,10 @@ function test_quadrature(T::Type{<:Real})
     @testset "quadrature n = $n, halfdeg = $halfdeg" for (n, halfdeg) in
                                                          ((1, 5), (2, 2), (3, 1))
         box_dom = PolyUtils.BoxDomain{T}(fill(-1, n), fill(3, n))
-        box = interpolate(box_dom, halfdeg, sample = false, get_quadr = true)
-        @test sum(box.w) ≈ 2^n
+        for sample in (false, true)
+            box = interpolate(box_dom, halfdeg, sample = sample, get_quadr = true)
+            @test sum(box.w) ≈ 2^n
+            @test dot(box.w, box.pts[:, 1]) ≈ 2^n
+        end
     end
 end

@@ -75,7 +75,6 @@ function interp_sample(
 end
 
 # slow but high-quality hyperrectangle/box point selections
-# unlike sampling functions, P0 is always formed using points in [-1, 1]
 function interp_box(
     dom::FreeDomain{T},
     n::Int,
@@ -314,7 +313,7 @@ function make_wsos_arrays(
     get_quadr::Bool,
 ) where {T <: Real}
     n = size(cand_pts, 2)
-    (V, keep_pts, w) = choose_interp_pts(cand_pts, d, get_quadr)
+    (V, keep_pts, w) = choose_interp_pts(ref_pts(dom, cand_pts), d, get_quadr)
     pts = cand_pts[keep_pts, :]
     P0 = V[:, 1:get_L(n, d)] # subset of poly evaluations up to total degree d
     Lsub = get_L(n, div(2d - degree(dom), 2))

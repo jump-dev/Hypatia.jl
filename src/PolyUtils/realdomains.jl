@@ -45,6 +45,14 @@ Evaluations of the polynomial domain constraints at the points.
 function weights(dom::Domain, pts::AbstractMatrix)::Vector{Vector} end
 
 """
+$(SIGNATURES)
+
+Affine map of points in the domain to reference coordinates in ``[-1, 1]^n``,
+where the Chebyshev basis is evaluated. Defaults to the identity.
+"""
+ref_pts(::Domain, pts::AbstractMatrix) = pts
+
+"""
 $(TYPEDEF)
 
 Real vectors ``x ∈ ℝⁿ`` of dimension `n::Int`.
@@ -109,6 +117,10 @@ function weights(dom::BoxDomain{T}, pts::AbstractMatrix{T}) where {T <: Real}
     return g::Vector{Vector{T}}
 end
 
+function ref_pts(dom::BoxDomain, pts::AbstractMatrix)
+    return (pts .- (dom.u + dom.l)' / 2) ./ ((dom.u - dom.l)' / 2)
+end
+
 # for hyperball and hyperellipse
 function ball_sample(dom::Domain{T}, npts::Int) where {T <: Real}
     dim = dimension(dom)
@@ -156,6 +168,8 @@ function weights(dom::BallDomain{T}, pts::AbstractMatrix{T}) where {T <: Real}
     return [g]::Vector{Vector{T}}
 end
 
+ref_pts(dom::BallDomain, pts::AbstractMatrix) = (pts .- dom.c') / dom.r
+
 """
 $(TYPEDEF)
 
@@ -195,3 +209,5 @@ function weights(dom::EllipsoidDomain{T}, pts::AbstractMatrix{T}) where {T <: Re
     @assert all(g .>= 0)
     return [g]::Vector{Vector{T}}
 end
+
+ref_pts(dom::EllipsoidDomain, pts::AbstractMatrix) = (pts .- dom.c') * dom.QU'
