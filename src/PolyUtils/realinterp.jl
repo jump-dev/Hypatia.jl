@@ -16,8 +16,8 @@ Compute interpolation data for a real weighted sum-of-squares conic constraint
 on a domain. The points `pts` are in the domain, while `Ps` and `V` use the
 polynomial basis at these points mapped by [`ref_pts`](@ref). The quadrature
 weights `w` (if `get_quadr`) integrate over ``[-1, 1]^n`` in these reference
-coordinates, which is the box up to a constant factor for a box domain, and a
-region containing the domain for a ball or ellipsoid domain.
+coordinates, that is, up to a constant factor, over the box for a box domain
+and over a region containing the domain for a ball or ellipsoid domain.
 """
 function interpolate(
     dom::Domain{T},
