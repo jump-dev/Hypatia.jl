@@ -521,7 +521,7 @@ function Δ2!(Δ2::Matrix{T}, λ::Vector{T}) where {T <: Real}
         λ_j = λ[j]
         for i in 1:(j - 1)
             # (log(hi) - log(lo)) / δ without cancellation, unless hi / lo overflows
-            (lo, hi) = minmax(λ[i], λ_j)
+            lo, hi = λ[i], λ_j
             δ = hi - lo
             r = δ / lo
             Δ2[i, j] = if iszero(δ)
@@ -542,7 +542,7 @@ end
 
 function Δ3!(Δ3::Array{T, 3}, Δ2::Matrix{T}, λ::Vector{T}) where {T <: Real}
     @assert issymmetric(Δ2) # must be symmetric (wrapper is less efficient)
-    thresh = eps(T)^(2/9)
+    thresh = cbrt(eps(T))
     d = length(λ)
 
     @inbounds for k in 1:d, j in 1:k, i in 1:j
@@ -664,7 +664,7 @@ function Δ4_ij!(
     Δ3::Array{T, 3},
     λ::Vector{T},
 ) where {T <: Real}
-    thresh = eps(T)^(4/27)
+    thresh = eps(T)^(2/9)
     d = length(λ)
     λ_i = λ[i]
     λ_j = λ[j]
