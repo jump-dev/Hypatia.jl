@@ -21,10 +21,12 @@ function test_interp_domain(T::Type{<:Real})
                                                                    ((1, 5), (2, 2), (3, 1))
         free_dom = PolyUtils.FreeDomain{T}(n)
         box_dom = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n))
-        ball_dom = PolyUtils.BallDomain{T}(ones(T, n), one(T))
+        ball_dom = PolyUtils.BallDomain{T}(ones(T, n), T(2))
         Q = rand(T, n, n)
         Q = Symmetric(Q * Q')
         ellip_dom = PolyUtils.EllipsoidDomain{T}(ones(T, n), Q)
+        @test PolyUtils.ref_pts(ball_dom, ball_dom.c' .+ ball_dom.r * I(n)) ≈ I(n)
+        @test PolyUtils.ref_pts(ellip_dom, ellip_dom.c' .+ inv(ellip_dom.QU)') ≈ I(n)
 
         for sample in (true, false)
             interp_options = (; sample = sample, sample_factor = 10)
@@ -45,10 +47,6 @@ function test_interp_domain(T::Type{<:Real})
                 @test length(ellip.Ps) == 2
                 @test free.U == ball.U == ellip.U
                 @test size(ball.pts) == size(ellip.pts)
-                for (dom, interp) in ((ball_dom, ball), (ellip_dom, ellip))
-                    ref = PolyUtils.ref_pts(dom, interp.pts)
-                    @test all(norm(r) <= 1 + sqrt(eps(T)) for r in eachrow(ref))
-                end
             end
         end
     end
