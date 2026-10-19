@@ -812,6 +812,7 @@ function test_barrier(C::Type{Cones.EpiTrRelEntropyTri{T, R}}) where {T, R}
     Δ3 = Cones.Δ3!(zeros(T, 5, 5, 5), Cones.Δ2!(zeros(T, 5, 5), λ), λ)
     @test Δ3[2, 3, 4] ≈ dd3(λ[2:4]...) rtol = 2e-11
     @test Δ3[3, 4, 5] ≈ dd3(λ[3:5]...) rtol = 1e-12
+    @test Cones.Δ4_ij!(zeros(T, 5, 5), 2, 1, Δ3, λ)[3, 4] ≈ dd4(λ[1:4]...) rtol = 1e-8
     @test Cones.Δ4_ij!(zeros(T, 5, 5), 2, 3, Δ3, λ)[1, 4] ≈ dd4(λ[1:4]...) rtol = 1e-8
     return
 end
