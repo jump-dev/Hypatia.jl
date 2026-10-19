@@ -549,10 +549,10 @@ function Δ3!(Δ3::Array{T, 3}, Δ2::Matrix{T}, λ::Vector{T}) where {T <: Real}
         λ_j = λ[j]
         λ_k = λ[k]
         λ_jk = λ_j - λ_k
-        if abs(λ_jk) < thresh * max(λ_j, λ_k)
+        if abs(λ_jk) < thresh * (λ_j + λ_k)
             λ_i = λ[i]
             λ_ij = λ_i - λ_j
-            if abs(λ_ij) < thresh * max(λ_i, λ_j)
+            if abs(λ_ij) < thresh * (λ_i + λ_j)
                 t = abs2(3 / (λ_i + λ_j + λ_k)) / -2
             else
                 # λ is sorted, so λ_i - λ_k is the widest of the three gaps
@@ -675,10 +675,10 @@ function Δ4_ij!(
         λ_ij = λ_i - λ_j
         λ_ik = λ_i - λ_k
         λ_il = λ_i - λ_l
-        B_ik = (abs(λ_ik) < thresh * max(λ_i, λ_k))
-        B_il = (abs(λ_il) < thresh * max(λ_i, λ_l))
+        B_ik = (abs(λ_ik) < thresh * (λ_i + λ_k))
+        B_il = (abs(λ_il) < thresh * (λ_i + λ_l))
 
-        if (abs(λ_ij) < thresh * max(λ_i, λ_j)) && B_ik && B_il
+        if (abs(λ_ij) < thresh * (λ_i + λ_j)) && B_ik && B_il
             λ_mean = (λ_i + λ_j + λ_k + λ_l)/4
             t = λ_mean^-3 / 3
         elseif B_ik && B_il
