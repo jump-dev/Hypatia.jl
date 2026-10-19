@@ -35,6 +35,7 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
     hess_fact_mat::Symmetric{T, Matrix{T}}
     hess_fact::Factorization{T}
 
+    α_deficit::T
     ϕ::T
     ζ::T
     tempw1::Vector{T}
@@ -54,6 +55,8 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
 end
 
 function setup_extra_data!(cone::HypoPowerMean{T}) where {T <: Real}
+    # 1 - sum(α) summed as rationals; big first, as Rational{BigInt}(::Double64) can throw
+    cone.α_deficit = T(1 - sum(Rational{BigInt} ∘ big, cone.α))
     cone.tempw1 = zeros(T, cone.dim - 1)
     cone.tempw2 = zero(cone.tempw1)
     return cone
@@ -195,7 +198,8 @@ function update_inv_hess(cone::HypoPowerMean)
 
     @. tempw1 = 1 + α * ζiϕ
     s1 = sum(abs2(α_i) / t_i for (α_i, t_i) in zip(α, tempw1))
-    s2 = 1 - ζiϕ * s1
+    # equals 1 - ζiϕ * s1, without its cancellation near the boundary
+    s2 = sum(α_i / t_i for (α_i, t_i) in zip(α, tempw1)) + cone.α_deficit
     ϕs2i = ϕ / s2
     Hi11 = (ϕ - u)^2 + s1 * ϕ * ϕs2i
     @. tempw2 = w / tempw1
@@ -220,6 +224,8 @@ function inv_hess_prod!(
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
+    g1 = cone.grad[1]
+    @views gw = cone.grad[2:end]
     ϕ = cone.ϕ
     ζiϕ = ϕ / cone.ζ
     tempw1 = cone.tempw1
@@ -227,21 +233,19 @@ function inv_hess_prod!(
     α = cone.α
 
     @. tempw1 = 1 + α * ζiϕ
-    s1 = sum(abs2(α_i) / t_i for (α_i, t_i) in zip(α, tempw1))
-    s2 = 1 - ζiϕ * s1
+    # equals 1 - ζiϕ * sum(abs2.(α) ./ tempw1), without its cancellation near the boundary
+    s2 = sum(α_i / t_i for (α_i, t_i) in zip(α, tempw1)) + cone.α_deficit
     ϕs2i = ϕ / s2
-    Hi11 = (ϕ - u)^2 + s1 * ϕ * ϕs2i
-    @. tempw2 = w / tempw1
-    @. tempw1 = α * tempw2
-    @. tempw2 *= w
+    @. tempw1 = α * w / tempw1
 
+    # cancel against the gradient (q = λ = 1 for arr = g) before dividing by s2
     @inbounds for j in 1:size(arr, 2)
-        p = arr[1, j]
         @views r = arr[2:end, j]
-        s3 = dot(r, tempw1)
-        prod[1, j] = Hi11 * p + ϕs2i * s3
-        cj = ϕs2i * (p + s3 / cone.ζ)
-        @. prod[2:end, j] = cj * tempw1 + r * tempw2
+        λ = arr[1, j] / g1
+        @. tempw2 = r / gw
+        e = sum(α_i * (q_i - λ) for (α_i, q_i) in zip(α, tempw2)) - cone.α_deficit * λ
+        prod[1, j] = -λ * u - ϕs2i * e
+        @. prod[2:end, j] = -w * tempw2 - (ζiϕ * e / s2) * tempw1
     end
 
     return prod
