@@ -57,6 +57,7 @@ mutable struct EpiPerSepSpectral{Q <: ConeOfSquares, T <: Real} <: Cone{T}
     hess_fact::Factorization{T}
 
     w_view::SubArray{T, 1, Vector{T}, Tuple{UnitRange{Int}}, true}
+    # read with get_cache, which asserts the concrete cache type
     cache::CSqrCache{T}
 
     function EpiPerSepSpectral{Q, T}(
