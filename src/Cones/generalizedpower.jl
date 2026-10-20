@@ -8,8 +8,8 @@ file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 """
 $(TYPEDEF)
 
-Generalized power cone parametrized by powers `α` in the unit simplex and
-dimension `d` of the normed variables.
+Generalized power cone parametrized by positive powers `α` (divided by their
+sum) and dimension `d` of the normed variables.
 
     $(FUNCTIONNAME){T}(α::Vector{T}, d::Int, use_dual::Bool = false)
 """
@@ -42,7 +42,6 @@ mutable struct GeneralizedPower{T <: Real} <: Cone{T}
     w2::T
     zw::T
     zwzwi::T
-    α_deficit::T
     tempu1::Vector{T}
     tempu2::Vector{T}
 
@@ -55,12 +54,12 @@ mutable struct GeneralizedPower{T <: Real} <: Cone{T}
         dim = length(α) + n
         @assert dim >= 3
         @assert all(α_i > 0 for α_i in α)
-        @assert sum(α) ≈ 1
+        @assert 0 < sum(α) < Inf
         cone = new{T}()
         cone.n = n
         cone.use_dual_barrier = use_dual
         cone.dim = dim
-        cone.α = α
+        cone.α = α ./ sum(α)
         return cone
     end
 end
@@ -69,8 +68,6 @@ function setup_extra_data!(cone::GeneralizedPower{T}) where {T <: Real}
     m = length(cone.α)
     cone.u_idxs = 1:m
     cone.w_idxs = (m + 1):(cone.dim)
-    # 1 - sum(α) summed as rationals; big first, as Rational{BigInt}(::Double64) can throw
-    cone.α_deficit = T(1 - sum(Rational{BigInt} ∘ big, cone.α))
     cone.tempu1 = zeros(T, m)
     cone.tempu2 = zeros(T, m)
     return cone
@@ -191,7 +188,7 @@ function update_inv_hess(cone::GeneralizedPower{T}) where {T <: Real}
     @. uiα = α / u
     k2 = -dot(uiα, guiα)
     # equals (1 + w2 / z) / 2 - k2 * gww, without its cancellation near the boundary
-    sα = sum(α_i / (1 + α_i * cone.zwzwi) for α_i in α) + cone.α_deficit
+    sα = sum(α_i / (1 + α_i * cone.zwzwi) for α_i in α)
     k1 = ((zw / z) / 2 + gww * sα) / cone.zwzwi
     k3 = zw * (-k2 * (gww + 2) / k1 + 1) / (z + w2)
     k4 = -gww / k1
@@ -279,7 +276,7 @@ function inv_hess_prod!(
     @. uiα = α / u
     k2 = -dot(uiα, guiα)
     # equals (1 + w2 / z) / 2 - k2 * gww, without its cancellation near the boundary
-    sα = sum(α_i / (1 + α_i * cone.zwzwi) for α_i in α) + cone.α_deficit
+    sα = sum(α_i / (1 + α_i * cone.zwzwi) for α_i in α)
     k1 = ((zw / z) / 2 + gww * sα) / cone.zwzwi
     k3 = zw * (-k2 * (gww + 2) + k1) / (z + w2)
     # where w2 > zw (gww > 2), cancel against the gradient (q = t = 1 for arr = g) before
@@ -297,8 +294,7 @@ function inv_hess_prod!(
         if near_boundary
             t = dot_wr / gww
             @. prod_u = p / gu
-            dq = sum(α_i * (q_i - t) for (α_i, q_i) in zip(α, prod_u))
-            d = (dq - cone.α_deficit * t) / k1
+            d = sum(α_i * (q_i - t) for (α_i, q_i) in zip(α, prod_u)) / k1
             @. prod_w = zw * r / 2 - w * (2 * t + d)
             @. prod_u = guiα * (gww * d) - u * prod_u
         else

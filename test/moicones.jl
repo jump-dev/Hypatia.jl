@@ -288,22 +288,20 @@ function test_moi_cones(T::Type{<:Real})
 
     @testset "GeneralizedPower" begin
         α = rand(T, 2)
-        α ./= sum(α)
         moi_cone = Hypatia.GeneralizedPowerCone{T}(α, 3)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
         @test hyp_cone isa Cones.GeneralizedPower{T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 5
-        @test hyp_cone.α == α
+        @test hyp_cone.α == α ./ sum(α)
     end
 
     @testset "HypoPowerMean" begin
         α = rand(T, 2)
-        α ./= sum(α)
         moi_cone = Hypatia.HypoPowerMeanCone{T}(α)
         hyp_cone = Hypatia.cone_from_moi(T, moi_cone)
         @test hyp_cone isa Cones.HypoPowerMean{T}
         @test MOI.dimension(moi_cone) == Cones.dimension(hyp_cone) == 3
-        @test hyp_cone.α == α
+        @test hyp_cone.α == α ./ sum(α)
     end
 
     @testset "HypoGeoMean" begin

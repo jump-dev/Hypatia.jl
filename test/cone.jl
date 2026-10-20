@@ -600,18 +600,19 @@ end
 function test_barrier(C::Type{Cones.GeneralizedPower{T}}) where {T}
     (du, dw) = (4, 2)
     α = rand_powers(T, du)
-    function barrier(s)
+    function barrier(s, β = α)
         (u, w) = (s[1:du], s[(du + 1):end])
-        return -log(exp(2 * sum(α[i] * log(u[i]) for i in eachindex(u))) - sum(abs2, w)) -
-               sum((1 - α[i]) * log(u[i]) for i in eachindex(u))
+        return -log(exp(2 * sum(β[i] * log(u[i]) for i in eachindex(u))) - sum(abs2, w)) -
+               sum((1 - β[i]) * log(u[i]) for i in eachindex(u))
     end
     test_barrier(C(α, dw), barrier)
-    # near the boundary, where sum(α) is 1 only up to rounding
+    # near the boundary, against the barrier with the normalized powers in BigFloat
+    β = big.(α) ./ sum(big.(α))
     u0 = T[1, 2, 3, 4]
-    z = exp(2 * sum(α .* log.(big.(u0))))
+    z = exp(2 * sum(β .* log.(big.(u0))))
     point = vcat(u0, T.(fill(sqrt(z * (1 - big(1e-12)) / dw), dw)))
     cone = C(α, dw)
-    @test maximum(inv_hess_errors(cone, barrier, point)) < 1e-6
+    @test maximum(inv_hess_errors(cone, s -> barrier(s, β), point)) < 1e-6
     @test Cones.check_numerics(cone)
     return
 end
@@ -632,16 +633,17 @@ end
 
 function test_barrier(C::Type{Cones.HypoPowerMean{T}}) where {T}
     α = rand_powers(T, 4)
-    function barrier(s)
+    function barrier(s, β = α)
         (u, w) = (s[1], s[2:end])
-        return -log(exp(sum(α[i] * log(w[i]) for i in eachindex(w))) - u) - sum(log, w)
+        return -log(exp(sum(β[i] * log(w[i]) for i in eachindex(w))) - u) - sum(log, w)
     end
     test_barrier(C(α), barrier)
-    # near the boundary, where sum(α) is 1 only up to rounding
+    # near the boundary, against the barrier with the normalized powers in BigFloat
+    β = big.(α) ./ sum(big.(α))
     w0 = T[1, 2, 3, 4]
-    u0 = T(exp(sum(α .* log.(big.(w0)))) * (1 - big(1e-12)))
+    u0 = T(exp(sum(β .* log.(big.(w0)))) * (1 - big(1e-12)))
     cone = C(α)
-    @test maximum(inv_hess_errors(cone, barrier, vcat(u0, w0))) < 1e-6
+    @test maximum(inv_hess_errors(cone, s -> barrier(s, β), vcat(u0, w0))) < 1e-6
     @test Cones.check_numerics(cone)
     return
 end
