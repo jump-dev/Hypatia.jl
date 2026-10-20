@@ -195,7 +195,9 @@ function dder3(cone::LinMatrixIneq, dir::AbstractVector)
 
     if cone.is_sparse
         sumAinvAs = cone.sparsesumAinvAs
-        dir_mat = sum(d_i * mat_i for (d_i, mat_i) in zip(dir, sumAinvAs))
+        # a SparseMatrixCSC, since on Julia 1.10 the product of Hermitian sparse matrices
+        # calls CHOLMOD's ssmult, which takes only Float64 matrices
+        dir_mat = sparse(sum(d_i * mat_i for (d_i, mat_i) in zip(dir, sumAinvAs)))
         Z = Hermitian(dir_mat * dir_mat')
         @inbounds for i in 1:(cone.dim)
             dder3[i] = real(dot(Z, sumAinvAs[i]))
