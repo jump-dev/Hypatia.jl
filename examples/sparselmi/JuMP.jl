@@ -58,10 +58,12 @@ function build(inst::SparseLMIJuMP{T}) where {T <: Float64}
     JuMP.@objective(model, Min, y)
     JuMP.@variable(model, x[1:num_Ps])
     JuMP.@constraint(model, sum(x) == 1)
+    Ss = [Qs[k] + y * matI + sum(x[i] * Ps[k, i] for i in 1:num_Ps) for k in 1:num_lmis]
+    model.ext[:S_vars] = Ss
 
     if inst.use_psd || inst.use_sparsepsd
         for k in 1:num_lmis
-            Sk = Symmetric(Qs[k] + y * matI + sum(x[i] * Ps[k, i] for i in 1:num_Ps))
+            Sk = Symmetric(Ss[k])
             if inst.use_psd
                 JuMP.@constraint(model, Sk in JuMP.PSDCone())
             else
@@ -69,7 +71,15 @@ function build(inst::SparseLMIJuMP{T}) where {T <: Float64}
                     (inst.use_cholmod_impl ? Cones.PSDSparseCholmod : Cones.PSDSparseDense)
                 cone = Hypatia.PosSemidefTriSparseCone{impl, T, T}
                 (row_idxs, col_idxs, vals) = findnz(sparse(LowerTriangular(Sk)))
-                JuMP.@constraint(model, vals in cone(side_Ps, row_idxs, col_idxs, false))
+                rt2 = sqrt(2)
+                vals_scal = [
+                    vals[j] * (row_idxs[j] == col_idxs[j] ? 1.0 : rt2) for
+                    j in eachindex(vals)
+                ]
+                JuMP.@constraint(
+                    model,
+                    vals_scal in cone(side_Ps, row_idxs, col_idxs, false)
+                )
             end
         end
     elseif inst.use_linmatrixineq
@@ -83,4 +93,16 @@ function build(inst::SparseLMIJuMP{T}) where {T <: Float64}
     end
 
     return model
+end
+
+function test_extra(inst::SparseLMIJuMP{T}, model::JuMP.Model) where {T}
+    stat = JuMP.termination_status(model)
+    @test stat == MOI.OPTIMAL
+    (stat == MOI.OPTIMAL) || return
+
+    # the smallest eigenvalue over the LMI matrices is zero at the optimum
+    tol = eps(T)^0.2
+    λ_min = minimum(eigmin(Symmetric(Matrix(JuMP.value.(S)))) for S in model.ext[:S_vars])
+    @test λ_min ≈ 0 atol = tol
+    return
 end
