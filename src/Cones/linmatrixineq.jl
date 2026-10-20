@@ -124,7 +124,7 @@ function update_grad(cone::LinMatrixIneq)
     @assert cone.is_feas
 
     if cone.is_sparse
-        sL = cone.sparsefact.L
+        sL = cone.sparsefact.PtL
         cone.sparsesumAinvAs = [Hermitian(sL \ (sL \ A_i)', :U) for A_i in cone.sparseAs]
         @inbounds for (i, mat_i) in enumerate(cone.sparsesumAinvAs)
             cone.grad[i] = -tr(mat_i)

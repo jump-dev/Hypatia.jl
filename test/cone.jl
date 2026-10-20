@@ -447,6 +447,17 @@ function test_oracles(C::Type{Cones.LinMatrixIneq{T, R}}) where {T, R}
     for ds in (2, 3, 4), n in (2, 2, 3)
         test_oracles(C(rand_herms(ds, n, R)), noise = T(1e-2), init_tol = Inf)
     end
+    if Hypatia.USE_GPL_LIBS && T <: LinearAlgebra.BlasFloat && VERSION ≥ v"1.11"
+        # sparse Aᵢ, where CHOLMOD's fill-reducing ordering can permute the sum
+        for ds in (5, 8), n in (2, 3)
+            Ps = [sparse(one(R) * I, ds, ds)]
+            for _ in 2:n
+                temp = sprandn(R, ds, ds, 0.3)
+                push!(Ps, temp + temp')
+            end
+            test_oracles(C(Ps), noise = T(1e-2), init_tol = Inf)
+        end
+    end
 end
 
 function test_barrier(C::Type{Cones.LinMatrixIneq{T, R}}) where {T, R}
