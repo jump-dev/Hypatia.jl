@@ -318,6 +318,22 @@ function rand_powers(T, d)
     return α
 end
 
+# relative errors of the inverse Hessian oracles at point, against the BigFloat Hessian
+function inv_hess_errors(cone::Cones.Cone{T}, barrier::Function, point::Vector{T}) where {T}
+    Cones.setup_data!(cone)
+    Cones.reset_data(cone)
+    Cones.load_point(cone, point)
+    @test Cones.is_feas(cone)
+    Cones.grad(cone)
+    r = randn(T, length(point))
+    Hir = ForwardDiff.hessian(barrier, big.(point)) \ big.(r)
+    relerr(x) = Float64(norm(x - Hir) / norm(Hir))
+    return (
+        relerr(Cones.inv_hess(cone) * r),
+        relerr(Cones.inv_hess_prod!(zero(r), r, cone)),
+    )
+end
+
 # real Ps for WSOS cones, use unit box domain
 function rand_interp(num_vars::Int, halfdeg::Int, T::Type{<:Real})
     Random.seed!(1)
@@ -593,14 +609,23 @@ function test_oracles(C::Type{Cones.GeneralizedPower{T}}) where {T}
 end
 
 function test_barrier(C::Type{Cones.GeneralizedPower{T}}) where {T}
-    (du, dw) = (2, 2)
+    (du, dw) = (4, 2)
     α = rand_powers(T, du)
-    function barrier(s)
+    function barrier(s, β = α)
         (u, w) = (s[1:du], s[(du + 1):end])
-        return -log(exp(2 * sum(α[i] * log(u[i]) for i in eachindex(u))) - sum(abs2, w)) -
-               sum((1 - α[i]) * log(u[i]) for i in eachindex(u))
+        return -log(exp(2 * sum(β[i] * log(u[i]) for i in eachindex(u))) - sum(abs2, w)) -
+               sum((1 - β[i]) * log(u[i]) for i in eachindex(u))
     end
-    return test_barrier(C(α, dw), barrier)
+    test_barrier(C(α, dw), barrier)
+    # near the boundary, against the barrier with the normalized powers in BigFloat
+    β = big.(α) ./ sum(big.(α))
+    u0 = T[1, 2, 3, 4]
+    z = exp(2 * sum(β .* log.(big.(u0))))
+    point = vcat(u0, T.(fill(sqrt(z * (1 - big(1e-12)) / dw), dw)))
+    cone = C(α, dw)
+    @test maximum(inv_hess_errors(cone, s -> barrier(s, β), point)) < 1e-6
+    @test Cones.check_numerics(cone)
+    return
 end
 
 function show_time_alloc(C::Type{Cones.GeneralizedPower{T}}) where {T}
@@ -618,12 +643,20 @@ function test_oracles(C::Type{Cones.HypoPowerMean{T}}) where {T}
 end
 
 function test_barrier(C::Type{Cones.HypoPowerMean{T}}) where {T}
-    α = rand_powers(T, 3)
-    function barrier(s)
+    α = rand_powers(T, 4)
+    function barrier(s, β = α)
         (u, w) = (s[1], s[2:end])
-        return -log(exp(sum(α[i] * log(w[i]) for i in eachindex(w))) - u) - sum(log, w)
+        return -log(exp(sum(β[i] * log(w[i]) for i in eachindex(w))) - u) - sum(log, w)
     end
-    return test_barrier(C(α), barrier)
+    test_barrier(C(α), barrier)
+    # near the boundary, against the barrier with the normalized powers in BigFloat
+    β = big.(α) ./ sum(big.(α))
+    w0 = T[1, 2, 3, 4]
+    u0 = T(exp(sum(β .* log.(big.(w0)))) * (1 - big(1e-12)))
+    cone = C(α)
+    @test maximum(inv_hess_errors(cone, s -> barrier(s, β), vcat(u0, w0))) < 1e-6
+    @test Cones.check_numerics(cone)
+    return
 end
 
 function show_time_alloc(C::Type{Cones.HypoPowerMean{T}}) where {T}

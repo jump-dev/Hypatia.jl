@@ -8,8 +8,8 @@ file in the root directory or at https://github.com/jump-dev/Hypatia.jl
 """
 $(TYPEDEF)
 
-Hypograph of weighted power mean cone parametrized by powers `α` in the unit
-simplex.
+Hypograph of weighted power mean cone parametrized by positive powers `α`
+(divided by their sum).
 
     $(FUNCTIONNAME){T}(α::Vector{T}, use_dual::Bool = false)
 """
@@ -44,11 +44,11 @@ mutable struct HypoPowerMean{T <: Real} <: Cone{T}
         dim = length(α) + 1
         @assert dim >= 2
         @assert all(ai > 0 for ai in α)
-        @assert sum(α) ≈ 1
+        @assert 0 < sum(α) < Inf
         cone = new{T}()
         cone.use_dual_barrier = use_dual
         cone.dim = dim
-        cone.α = α
+        cone.α = α ./ sum(α)
         return cone
     end
 end
@@ -67,7 +67,7 @@ function set_initial_point!(
 ) where {T <: Real}
     # get closed form central ray if all powers are equal, else use fitting
     d = cone.dim - 1
-    if all(isequal(inv(T(d))), cone.α)
+    if allequal(cone.α)
         (u, w) = get_central_ray_hypogeomean(T, d)
     else
         (u, w) = get_central_ray_hypopowermean(cone.α)
@@ -195,7 +195,8 @@ function update_inv_hess(cone::HypoPowerMean)
 
     @. tempw1 = 1 + α * ζiϕ
     s1 = sum(abs2(α_i) / t_i for (α_i, t_i) in zip(α, tempw1))
-    s2 = 1 - ζiϕ * s1
+    # equals 1 - ζiϕ * s1, without its cancellation near the boundary
+    s2 = sum(α_i / t_i for (α_i, t_i) in zip(α, tempw1))
     ϕs2i = ϕ / s2
     Hi11 = (ϕ - u)^2 + s1 * ϕ * ϕs2i
     @. tempw2 = w / tempw1
@@ -220,6 +221,8 @@ function inv_hess_prod!(
     @assert cone.grad_updated
     u = cone.point[1]
     @views w = cone.point[2:end]
+    g1 = cone.grad[1]
+    @views gw = cone.grad[2:end]
     ϕ = cone.ϕ
     ζiϕ = ϕ / cone.ζ
     tempw1 = cone.tempw1
@@ -227,21 +230,19 @@ function inv_hess_prod!(
     α = cone.α
 
     @. tempw1 = 1 + α * ζiϕ
-    s1 = sum(abs2(α_i) / t_i for (α_i, t_i) in zip(α, tempw1))
-    s2 = 1 - ζiϕ * s1
+    # equals 1 - ζiϕ * sum(abs2.(α) ./ tempw1), without its cancellation near the boundary
+    s2 = sum(α_i / t_i for (α_i, t_i) in zip(α, tempw1))
     ϕs2i = ϕ / s2
-    Hi11 = (ϕ - u)^2 + s1 * ϕ * ϕs2i
-    @. tempw2 = w / tempw1
-    @. tempw1 = α * tempw2
-    @. tempw2 *= w
+    @. tempw1 = α * w / tempw1
 
+    # cancel against the gradient (q = λ = 1 for arr = g) before dividing by s2
     @inbounds for j in 1:size(arr, 2)
-        p = arr[1, j]
         @views r = arr[2:end, j]
-        s3 = dot(r, tempw1)
-        prod[1, j] = Hi11 * p + ϕs2i * s3
-        cj = ϕs2i * (p + s3 / cone.ζ)
-        @. prod[2:end, j] = cj * tempw1 + r * tempw2
+        λ = arr[1, j] / g1
+        @. tempw2 = r / gw
+        e = sum(α_i * (q_i - λ) for (α_i, q_i) in zip(α, tempw2))
+        prod[1, j] = -λ * u - ϕs2i * e
+        @. prod[2:end, j] = -w * tempw2 - (ζiϕ * e / s2) * tempw1
     end
 
     return prod
