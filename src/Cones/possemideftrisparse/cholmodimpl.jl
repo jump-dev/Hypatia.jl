@@ -52,6 +52,11 @@ mutable struct PSDSparseCholmodCache{T <: BlasReal, R <: RealOrComplex{T}} <:
     PSDSparseCholmodCache{T, R}() where {T <: BlasReal, R <: RealOrComplex{T}} = new{T, R}()
 end
 
+# the cone's cache field has an abstract type
+function get_cache(cone::PosSemidefTriSparse{PSDSparseCholmod, T, R}) where {T, R}
+    return cone.cache::PSDSparseCholmodCache{T, R}
+end
+
 _unsafe_load(::Type{T}, ptr::Ptr, i) where {T} = unsafe_load(convert(Ptr{T}, ptr), i)
 
 function setup_extra_data!(
@@ -195,7 +200,7 @@ function update_feas(
 ) where {T <: BlasReal, R <: RealOrComplex{T}}
     @assert !cone.feas_updated
     point = cone.point
-    cache = cone.cache
+    cache = get_cache(cone)
     sparse_point = cache.sparse_point
 
     # svec scale point and copy directly to CHOLDMOD Sparse data structure
@@ -236,7 +241,7 @@ function update_grad(
     cone::PosSemidefTriSparse{PSDSparseCholmod, T, R},
 ) where {T <: BlasReal, R <: RealOrComplex{T}}
     @assert cone.is_feas
-    cache = cone.cache
+    cache = get_cache(cone)
     num_cols = cache.num_cols
     num_rows = cache.num_rows
 
@@ -295,7 +300,7 @@ end
 function update_hess(cone::PosSemidefTriSparse{PSDSparseCholmod})
     @assert cone.grad_updated
     isdefined(cone, :hess) || alloc_hess!(cone)
-    cache = cone.cache
+    cache = get_cache(cone)
     temp_blocks = cache.temp_blocks
     rt2 = cone.rt2
     invrt2 = inv(rt2)
@@ -388,7 +393,7 @@ function hess_prod_slow!(
     @assert cone.hess_updated
     cone.use_hess_prod_slow || return hess_prod!(prod, arr, cone)
     @assert cone.grad_updated
-    cache = cone.cache
+    cache = get_cache(cone)
     temp_blocks = cache.temp_blocks
 
     @inbounds for i in 1:size(arr, 2)
@@ -407,7 +412,7 @@ function _hess_step1(
     supernode_list::AbstractVector{Int},
 )
     @assert cone.grad_updated
-    cache = cone.cache
+    cache = get_cache(cone)
     temp_blocks = cache.temp_blocks
 
     @inbounds for k in supernode_list
@@ -452,7 +457,7 @@ function _hess_step2(
     supernode_list::AbstractVector{Int},
     save_L_pr::Bool,
 )
-    cache = cone.cache
+    cache = get_cache(cone)
     temp_blocks = cache.temp_blocks
 
     @inbounds for k in supernode_list
@@ -489,7 +494,7 @@ function _hess_step2(
 end
 
 function _hess_step3(cone::PosSemidefTriSparse{PSDSparseCholmod})
-    cache = cone.cache
+    cache = get_cache(cone)
     temp_blocks = cache.temp_blocks
 
     @inbounds for k in reverse(1:length(cache.num_cols))
@@ -522,7 +527,7 @@ function _hess_step3(cone::PosSemidefTriSparse{PSDSparseCholmod})
 end
 
 function outer_L_prod(cone::PosSemidefTriSparse{PSDSparseCholmod}, k::Int)
-    cache = cone.cache
+    cache = get_cache(cone)
 
     num_col = cache.num_cols[k]
     num_row = cache.num_rows[k]
@@ -542,7 +547,7 @@ end
 
 function dder3(cone::PosSemidefTriSparse{PSDSparseCholmod}, dir::AbstractVector)
     @assert cone.grad_updated
-    cache = cone.cache
+    cache = get_cache(cone)
     temp_blocks = cache.temp_blocks
 
     @views svec_to_smat_sparse!(temp_blocks, dir, cone)
@@ -619,7 +624,7 @@ function svec_to_smat_sparse!(
         b .= 0
     end
     @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in
-                  enumerate(cone.cache.map_blocks)
+                  enumerate(get_cache(cone).map_blocks)
         vec_i = vec[i]
         if scal
             vec_i /= cone.rt2
@@ -636,7 +641,7 @@ function smat_to_svec_sparse!(
 ) where {T <: BlasReal}
     @assert length(vec) == length(cone.row_idxs)
     @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in
-                  enumerate(cone.cache.map_blocks)
+                  enumerate(get_cache(cone).map_blocks)
         vec_i = blocks[super][row_idx, col_idx]
         if scal
             vec_i *= cone.rt2
@@ -656,7 +661,7 @@ function svec_to_smat_sparse!(
     end
     idx = 1
     @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in
-                  enumerate(cone.cache.map_blocks)
+                  enumerate(get_cache(cone).map_blocks)
         if scal
             blocks[super][row_idx, col_idx] =
                 Complex(vec[idx], (swapped ? -vec[idx + 1] : vec[idx + 1])) / cone.rt2
@@ -677,7 +682,7 @@ function smat_to_svec_sparse!(
 ) where {T <: BlasReal}
     idx = 1
     @inbounds for (i, (super, row_idx, col_idx, scal, swapped)) in
-                  enumerate(cone.cache.map_blocks)
+                  enumerate(get_cache(cone).map_blocks)
         vec_R = blocks[super][row_idx, col_idx]
         if scal
             vec_R *= cone.rt2
