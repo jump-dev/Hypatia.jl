@@ -44,6 +44,7 @@ mutable struct WSOSInterpNonnegative{T <: Real, R <: RealOrComplex{T}} <: Cone{T
     tempLU::Vector{Matrix{R}}
     ΛFLP::Vector{Matrix{R}}
     tempUU::Matrix{R}
+    tempKU::Matrix{T}
     ΛF::Vector{Cholesky{R, Matrix{R}}}
     Ps_times::Vector{Float64}
     Ps_order::Vector{Int}
@@ -87,6 +88,7 @@ function setup_extra_data!(
     cone.tempLU = [zeros(R, L, dim) for L in Ls]
     cone.ΛFLP = [zeros(R, L, dim) for L in Ls]
     cone.tempUU = zeros(R, dim, dim)
+    cone.tempKU = zeros(T, count(==(1), Ls), dim)
     K = length(Ls)
     cone.ΛF = Vector{Cholesky{R, Matrix{R}}}(undef, K)
     cone.Ps_times = zeros(K)
@@ -152,14 +154,24 @@ function update_hess(cone::WSOSInterpNonnegative)
     @assert cone.grad_updated
     isdefined(cone, :hess) || alloc_hess!(cone)
     UU = cone.tempUU
+    KU = cone.tempKU
 
     cone.hess .= 0
+    k1 = 0
     @inbounds for k in eachindex(cone.Ps)
-        outer_prod!(cone.ΛFLP[k], UU, true, false)
+        ΛFLPk = cone.ΛFLP[k]
+        if size(ΛFLPk, 1) == 1
+            # a 1x1 Λ gives a rank one term, added below with the others in one update
+            k1 += 1
+            @views KU[k1, :] .= abs2.(ΛFLPk[1, :])
+            continue
+        end
+        outer_prod!(ΛFLPk, UU, true, false)
         for j in 1:(cone.dim), i in 1:j
             cone.hess.data[i, j] += abs2(UU[i, j])
         end
     end
+    iszero(k1) || outer_prod!(KU, cone.hess.data, true, true)
 
     cone.hess_updated = true
     return cone.hess
