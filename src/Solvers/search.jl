@@ -19,6 +19,7 @@ mutable struct StepSearcher{T <: Real}
     nup1::T
     cone_times::Vector{Float64}
     cone_order::Vector{Int}
+    screen_cones::Vector{Bool}
     prev_sched::Int
     prox::T
 
@@ -39,6 +40,7 @@ mutable struct StepSearcher{T <: Real}
         searcher.nup1 = T(model.nu + 1)
         searcher.cone_times = zeros(length(cones))
         searcher.cone_order = collect(1:length(cones))
+        searcher.screen_cones = fill(false, length(cones))
         searcher.prev_sched = 0
         searcher.prox = zero(T)
         return searcher
@@ -148,10 +150,19 @@ function check_cone_points(model::Models.Model{T}, stepper::Stepper{T};) where {
         in_prox_k = false
         if Cones.is_feas(cone_k) &&
            Cones.is_dual_feas(cone_k) &&
+           !(
+               searcher.screen_cones[k] &&
+               aggfun(agg_proxsqr, Cones.proxsqr_lower_bound(cone_k, irtmu)) >=
+               proxsqr_bound
+           ) &&
            Cones.check_numerics(cone_k)
             proxsqr_k = Cones.get_proxsqr(cone_k, irtmu, use_max_prox)
             agg_proxsqr = aggfun(agg_proxsqr, proxsqr_k)
             in_prox_k = (agg_proxsqr < proxsqr_bound)
+            # if the exact check factorized the Hessian, try the cheaper lower bound first
+            # at later trials
+            searcher.screen_cones[k] =
+                hasproperty(cone_k, :hess_fact_updated) && cone_k.hess_fact_updated
         end
         searcher.cone_times[k] = time() - start_time
         in_prox_k || return false
