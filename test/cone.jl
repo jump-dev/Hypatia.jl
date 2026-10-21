@@ -346,7 +346,7 @@ function inv_hess_errors(cone::Cones.Cone{T}, barrier::Function, point::Vector{T
 end
 
 # relative errors in the local norms of hess_prod_slow!, inv_hess_prod! and dder3 at point,
-# along a Hessian-scaled direction, against the BigFloat derivatives of the barrier
+# along Hessian-scaled directions, against the BigFloat derivatives of the barrier
 function local_norm_errors(
     cone::Cones.Cone{T},
     barrier::Function,
@@ -368,7 +368,7 @@ function local_norm_errors(
     H_fact = cholesky(Symmetric(H))
     z = T.(H_fact \ big.(randn(T, length(point))))
     Hz = H * big.(z)
-    r = T.(Hz)
+    r = T.(H * big.(randn(T, length(point))))
     Hir = H_fact \ big.(r)
     grad(y) =
         ForwardDiff.gradient(barrier, y, ForwardDiff.GradientConfig(barrier, y, chunk))
@@ -432,7 +432,6 @@ function test_barrier(C::Type{Cones.PosSemidefTri{T, R}}) where {T, R}
     dW = 3
     barrier(s) = -logdet_pd(Hermitian(new_herm(s, dW, R), :U))
     test_barrier(C(Cones.svec_length(R, dW)), barrier)
-    R <: Complex || return
     # near the boundary
     Random.seed!(1)
     point = rand_herm_near_boundary(dW, R)
@@ -781,7 +780,6 @@ function test_barrier(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R}
         return -log(exp(logdet_W / dW) - u) - logdet_W
     end
     test_barrier(C(1 + Cones.svec_length(R, dW)), barrier)
-    R <: Complex || return
     # near the boundary of W
     Random.seed!(1)
     w = rand_herm_near_boundary(dW, R)
@@ -832,7 +830,6 @@ function test_barrier(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R}
         return -log(v * logdet_pd(W / v) - u) - log(v) - logdet_pd(W)
     end
     test_barrier(C(2 + Cones.svec_length(R, dW)), barrier)
-    R <: Complex || return
     # near the boundary of W
     Random.seed!(1)
     w = rand_herm_near_boundary(dW, R)

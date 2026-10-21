@@ -276,8 +276,7 @@ function inv_hess_prod!(
     @assert cone.grad_updated
     v = cone.point[2]
     @views w = cone.point[3:end]
-    svec_to_smat!(cone.mat4, w, cone.rt2)
-    W = Hermitian(cone.mat4, :U)
+    FU = cone.fact_W.U
     d = cone.d
     ζ = cone.ζ
     ϕ = cone.ϕ
@@ -285,7 +284,6 @@ function inv_hess_prod!(
     ζζvi = ζ / ζv
     c1 = ζv / v + d
     w_aux = cone.mat2
-    w_aux2 = cone.mat3
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
@@ -301,8 +299,13 @@ function inv_hess_prod!(
         prod[1, j] = ζ * ((v * (d * p * v + trrw) - d * c2) / ζv + ζ * p) + ϕ * c2
         prod[2, j] = c2
 
-        mul!(w_aux2, w_aux, W)
-        mul!(w_aux, W, w_aux2)
+        # W R W as Uᴴ (U R Uᴴ) U, then the Hermitian part: near the boundary, products
+        # with W itself, or reading one triangle, can lose all accuracy in the local norm
+        rmul!(w_aux, FU')
+        lmul!(FU, w_aux)
+        rmul!(w_aux, FU)
+        lmul!(FU', w_aux)
+        hermitianpart!(w_aux)
         @views prod_w = prod[3:end, j]
         smat_to_svec!(prod_w, w_aux, cone.rt2)
         axpby!(c3, w, ζζvi, prod_w)
