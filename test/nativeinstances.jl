@@ -839,7 +839,7 @@ function linmatrixineq3(T; options...)
 
     As_list = [[dense1, dense2], [sparse1, sparse2]]
 
-    for As in As_list
+    for As in As_list, R in (T, Complex{T})
         if !(T <: BlasReal) && any(a -> a isa SparseMatrixCSC, As)
             continue # can only use sparse with BlasReal
         end
@@ -850,7 +850,7 @@ function linmatrixineq3(T; options...)
         G = zeros(T, 2, 1)
         G[1, 1] = -1
         h = T[0, -1]
-        cones = Cone{T}[Cones.LinMatrixIneq{T, T}(As)]
+        cones = Cone{T}[Cones.LinMatrixIneq{T, R}([R.(A_i) for A_i in As])]
 
         r = build_solve_check(c, A, b, G, h, cones, tol; options...)
         @test r.status == Solvers.Optimal
