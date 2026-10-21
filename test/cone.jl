@@ -785,6 +785,10 @@ function test_barrier(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R}
     w = rand_herm_near_boundary(dW, R)
     point = vcat(exp(logdet_pd(new_herm(w, dW, R)) / dW) / 2, w)
     @test maximum(local_norm_errors(C(length(point)), barrier, point)) < 1e-6
+    # near the boundary of the hypograph
+    w = Cones.smat_to_svec!(zeros(T, length(point) - 1), Matrix{R}(I, dW, dW), sqrt(T(2)))
+    point = vcat(1 - T(1e-8), w)
+    @test maximum(local_norm_errors(C(length(point)), barrier, point)) < 1e-6
     return
 end
 
