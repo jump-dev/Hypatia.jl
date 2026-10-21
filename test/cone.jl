@@ -334,7 +334,10 @@ function inv_hess_errors(cone::Cones.Cone{T}, barrier::Function, point::Vector{T
     @test Cones.is_feas(cone)
     Cones.grad(cone)
     r = randn(T, length(point))
-    Hir = ForwardDiff.hessian(barrier, big.(point)) \ big.(r)
+    x = big.(point)
+    chunk = ForwardDiff.Chunk{1}()
+    H = ForwardDiff.hessian(barrier, x, ForwardDiff.HessianConfig(barrier, x, chunk))
+    Hir = H \ big.(r)
     relerr(x) = Float64(norm(x - Hir) / norm(Hir))
     return (
         relerr(Cones.inv_hess(cone) * r),
@@ -656,15 +659,29 @@ function test_oracles(C::Type{<:Cones.MatrixEpiPerSquare})
 end
 
 function test_barrier(C::Type{Cones.MatrixEpiPerSquare{T, R}}) where {T, R}
-    (dr, ds) = (2, 2)
-    du = Cones.svec_length(R, dr)
-    function barrier(s)
+    function barrier(s, dr, ds)
+        du = Cones.svec_length(R, dr)
         U = new_herm(s[1:du], dr, R)
         v = s[du + 1]
         W = reshape(new_vec(s[(du + 2):end], dr * ds, R), dr, ds)
         return -logdet_pd(Hermitian(2 * v * U - W * W', :U)) + (dr - 1) * log(v)
     end
-    return test_barrier(C(dr, ds), barrier)
+    test_barrier(C(2, 2), s -> barrier(s, 2, 2))
+    # near the boundary, where 2vU - WWᴴ has eigenvalues 1e-12, 1 and 2
+    (dr, ds) = (3, 4)
+    du = Cones.svec_length(R, dr)
+    W = randn(R, dr, ds)
+    Q = Matrix(qr(randn(R, dr, dr)).Q)
+    U = (W * W' + Q * Diagonal(T[1e-12, 1, 2]) * Q') / 2
+    cone = C(dr, ds)
+    point = zeros(T, Cones.dimension(cone))
+    @views Cones.smat_to_svec!(point[1:du], U, sqrt(T(2)))
+    point[du + 1] = 1
+    @views Cones.vec_copyto!(point[(du + 2):end], W)
+    barrier_b(s) = barrier(s, dr, ds)
+    @test maximum(inv_hess_errors(cone, barrier_b, point)) < 1e-6
+    @test maximum(local_norm_errors(cone, barrier_b, point)) < 1e-2
+    return
 end
 
 show_time_alloc(C::Type{<:Cones.MatrixEpiPerSquare}) = show_time_alloc(C(2, 2))
