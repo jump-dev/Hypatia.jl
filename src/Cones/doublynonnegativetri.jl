@@ -188,6 +188,9 @@ function hess_prod!(
         copytri!(cone.mat3, 'U')
         rdiv!(cone.mat3, cone.fact_mat)
         ldiv!(cone.fact_mat, cone.mat3)
+        # reading only one triangle turns the skew part of the rounding error into an
+        # error up to cond(X) times larger in the local norm
+        hermitianpart!(cone.mat3)
         smat_to_svec!(view(prod, :, i), cone.mat3, cone.rt2)
     end
     offdiags = cone.offdiag_idxs

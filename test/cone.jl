@@ -300,6 +300,14 @@ function rand_sppsd_pattern(dW::Int)
     return (row_idxs, col_idxs)
 end
 
+# svec of a random Hermitian matrix with smallest eigenvalue 1e-8
+function rand_herm_near_boundary(dW::Int, R::Type{<:RealOrComplex})
+    T = real(R)
+    W = new_herm(randn(T, Cones.svec_length(R, dW)), dW, R)
+    W += (T(1e-8) - eigmin(W)) * I
+    return Cones.smat_to_svec!(zeros(T, Cones.svec_length(R, dW)), W, sqrt(T(2)))
+end
+
 function rand_herms(ds::Int, n::Int, R)
     Ps = Vector{Matrix{R}}(undef, n)
     A_1_half = randn(R, ds, ds)
@@ -331,6 +339,48 @@ function inv_hess_errors(cone::Cones.Cone{T}, barrier::Function, point::Vector{T
     return (
         relerr(Cones.inv_hess(cone) * r),
         relerr(Cones.inv_hess_prod!(zero(r), r, cone)),
+    )
+end
+
+# relative errors in the local norms of hess_prod_slow!, inv_hess_prod! and dder3 at point,
+# along a Hessian-scaled direction, against the BigFloat derivatives of the barrier
+function local_norm_errors(
+    cone::Cones.Cone{T},
+    barrier::Function,
+    point::Vector{T},
+) where {T}
+    Cones.setup_data!(cone)
+    Cones.reset_data(cone)
+    Cones.load_point(cone, point)
+    @test Cones.is_feas(cone)
+    Cones.grad(cone)
+    if hasproperty(cone, :use_hess_prod_slow)
+        Cones.update_use_hess_prod_slow(cone)
+        cone.use_hess_prod_slow = true
+    end
+    x = big.(point)
+    # chunk size 1 compiles much faster than the default in BigFloat
+    chunk = ForwardDiff.Chunk{1}()
+    H = ForwardDiff.hessian(barrier, x, ForwardDiff.HessianConfig(barrier, x, chunk))
+    H_fact = cholesky(Symmetric(H))
+    z = T.(H_fact \ big.(randn(T, length(point))))
+    Hz = H * big.(z)
+    r = T.(Hz)
+    Hir = H_fact \ big.(r)
+    grad(y) =
+        ForwardDiff.gradient(barrier, y, ForwardDiff.GradientConfig(barrier, y, chunk))
+    dir3(t) = ForwardDiff.derivative(s -> grad(x + s * z), t)
+    d3 = -ForwardDiff.derivative(dir3, zero(BigFloat)) / 2
+    dual_norm(v) = sqrt(dot(v, H_fact \ v))
+    local_norm(v) = sqrt(dot(v, H * v))
+    hess_err = dual_norm(Cones.hess_prod_slow!(zero(z), z, cone) - Hz) / dual_norm(Hz)
+    Hi_r = Cones.inv_hess_prod!(zero(r), r, cone)
+    inv_hess_err = local_norm(Hi_r - Hir) / local_norm(Hir)
+    dder3_err = dual_norm(Cones.dder3(cone, z) - d3) / dot(z, Hz)
+    return (
+        hess = Float64(hess_err),
+        inv_hess = Float64(inv_hess_err),
+        dder3 = Float64(dder3_err),
     )
 end
 
@@ -378,7 +428,13 @@ end
 function test_barrier(C::Type{Cones.PosSemidefTri{T, R}}) where {T, R}
     dW = 3
     barrier(s) = -logdet_pd(Hermitian(new_herm(s, dW, R), :U))
-    return test_barrier(C(Cones.svec_length(R, dW)), barrier)
+    test_barrier(C(Cones.svec_length(R, dW)), barrier)
+    R <: Complex || return
+    # near the boundary
+    Random.seed!(1)
+    point = rand_herm_near_boundary(dW, R)
+    @test maximum(local_norm_errors(C(length(point)), barrier, point)) < 1e-6
+    return
 end
 
 function show_time_alloc(C::Type{Cones.PosSemidefTri{T, R}}) where {T, R}
@@ -432,10 +488,8 @@ end
 function test_barrier(
     C::Type{<:Cones.PosSemidefTriSparse{<:Cones.PSDSparseImpl, T, Complex{T}}},
 ) where {T}
-    dW = 20
-    (row_idxs, col_idxs) = rand_sppsd_pattern(dW)
     invrt2 = inv(sqrt(T(2)))
-    function barrier(s)
+    function smat(s, dW, row_idxs, col_idxs)
         scal_s = zeros(Complex{eltype(s)}, length(row_idxs))
         idx = 1
         for i in eachindex(scal_s)
@@ -447,10 +501,24 @@ function test_barrier(
                 idx += 2
             end
         end
-        W = Matrix(sparse(row_idxs, col_idxs, scal_s, dW, dW))
-        return -logdet_pd(Hermitian(W, :L))
+        return Hermitian(Matrix(sparse(row_idxs, col_idxs, scal_s, dW, dW)), :L)
     end
-    return test_barrier(C(dW, row_idxs, col_idxs), barrier)
+    dW = 20
+    (row_idxs, col_idxs) = rand_sppsd_pattern(dW)
+    barrier(s) = -logdet_pd(smat(s, dW, row_idxs, col_idxs))
+    test_barrier(C(dW, row_idxs, col_idxs), barrier)
+    # near the boundary (smallest eigenvalue 1e-8), on a smaller pattern
+    Random.seed!(1)
+    (rows_b, cols_b) = rand_sppsd_pattern(10)
+    barrier_b(s) = -logdet_pd(smat(s, 10, rows_b, cols_b))
+    cone = C(10, rows_b, cols_b)
+    id = Cones.set_initial_point!(zeros(T, Cones.dimension(cone)), cone)
+    point = randn(T, Cones.dimension(cone))
+    point .+= (T(1e-8) - eigmin(smat(point, 10, rows_b, cols_b))) * id
+    errs = local_norm_errors(cone, barrier_b, point)
+    # inv_hess_prod! factorizes the explicit Hessian, which is less accurate here
+    @test max(errs.hess, errs.dder3) < 1e-6
+    return
 end
 
 function show_time_alloc(C::Type{<:Cones.PosSemidefTriSparse})
@@ -695,7 +763,14 @@ function test_barrier(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R}
         logdet_W = logdet_pd(new_herm(w, dW, R))
         return -log(exp(logdet_W / dW) - u) - logdet_W
     end
-    return test_barrier(C(1 + Cones.svec_length(R, dW)), barrier)
+    test_barrier(C(1 + Cones.svec_length(R, dW)), barrier)
+    R <: Complex || return
+    # near the boundary of W
+    Random.seed!(1)
+    w = rand_herm_near_boundary(dW, R)
+    point = vcat(exp(logdet_pd(new_herm(w, dW, R)) / dW) / 2, w)
+    @test maximum(local_norm_errors(C(length(point)), barrier, point)) < 1e-6
+    return
 end
 
 function show_time_alloc(C::Type{Cones.HypoRootdetTri{T, R}}) where {T, R}
@@ -739,7 +814,14 @@ function test_barrier(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R}
         W = new_herm(w, dW, R)
         return -log(v * logdet_pd(W / v) - u) - log(v) - logdet_pd(W)
     end
-    return test_barrier(C(2 + Cones.svec_length(R, dW)), barrier)
+    test_barrier(C(2 + Cones.svec_length(R, dW)), barrier)
+    R <: Complex || return
+    # near the boundary of W
+    Random.seed!(1)
+    w = rand_herm_near_boundary(dW, R)
+    point = vcat(logdet_pd(new_herm(w, dW, R)) - 1, 1, w)
+    @test maximum(local_norm_errors(C(length(point)), barrier, point)) < 1e-6
+    return
 end
 
 function show_time_alloc(C::Type{Cones.HypoPerLogdetTri{T, R}}) where {T, R}

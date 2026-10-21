@@ -223,6 +223,9 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::HypoPer
         end
         rdiv!(w_aux, FU')
         ldiv!(FU, w_aux)
+        # reading only one triangle turns the skew part of the rounding error into an
+        # error that can be much larger in the local norm
+        hermitianpart!(w_aux)
         @views smat_to_svec!(prod[3:end, j], w_aux, cone.rt2)
     end
 
@@ -350,6 +353,7 @@ function dder3(cone::HypoPerLogdetTri, dir::AbstractVector)
     end
     rdiv!(w_aux, FU')
     ldiv!(FU, w_aux)
+    hermitianpart!(w_aux)
     @views smat_to_svec!(dder3[3:end], w_aux, cone.rt2)
 
     return dder3

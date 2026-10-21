@@ -140,6 +140,9 @@ function hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::PosSemi
         copytri!(cone.mat4, 'U', true)
         rdiv!(cone.mat4, cone.fact_mat)
         ldiv!(cone.fact_mat, cone.mat4)
+        # reading only one triangle turns the skew part of the rounding error into an
+        # error up to cond(X) times larger in the local norm
+        hermitianpart!(cone.mat4)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
     end
 

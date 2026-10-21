@@ -156,6 +156,9 @@ function hess_prod_slow!(
         copytri!(Λ, 'L', true)
         ldiv!(cache.fact_mat, Λ)
         rdiv!(Λ, cache.fact_mat)
+        # reading only one triangle turns the skew part of the rounding error into an
+        # error up to cond(X) times larger in the local norm
+        hermitianpart!(Λ)
         smat_to_svec_sparse!(prod[:, j], Λ, cone)
     end
 
