@@ -16,6 +16,7 @@ dimension
 degree
 sample
 weights
+ref_pts
 EllipsoidDomain
 BoxDomain
 BallDomain

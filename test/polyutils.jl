@@ -21,10 +21,12 @@ function test_interp_domain(T::Type{<:Real})
                                                                    ((1, 5), (2, 2), (3, 1))
         free_dom = PolyUtils.FreeDomain{T}(n)
         box_dom = PolyUtils.BoxDomain{T}(-ones(T, n), ones(T, n))
-        ball_dom = PolyUtils.BallDomain{T}(ones(T, n), one(T))
+        ball_dom = PolyUtils.BallDomain{T}(ones(T, n), T(2))
         Q = rand(T, n, n)
         Q = Symmetric(Q * Q')
         ellip_dom = PolyUtils.EllipsoidDomain{T}(ones(T, n), Q)
+        @test PolyUtils.ref_pts(ball_dom, ball_dom.c' .+ ball_dom.r * I(n)) ≈ I(n)
+        @test PolyUtils.ref_pts(ellip_dom, ellip_dom.c' .+ inv(ellip_dom.QU)') ≈ I(n)
 
         for sample in (true, false)
             interp_options = (; sample = sample, sample_factor = 10)
@@ -84,7 +86,11 @@ function test_quadrature(T::Type{<:Real})
     @testset "quadrature n = $n, halfdeg = $halfdeg" for (n, halfdeg) in
                                                          ((1, 5), (2, 2), (3, 1))
         box_dom = PolyUtils.BoxDomain{T}(fill(-1, n), fill(3, n))
-        box = interpolate(box_dom, halfdeg, sample = false, get_quadr = true)
-        @test sum(box.w) ≈ 2^n
+        @test PolyUtils.ref_pts(box_dom, [box_dom.l box_dom.u]') == [-1; 1] .* ones(T, 1, n)
+        for sample in (false, true)
+            box = interpolate(box_dom, halfdeg, sample = sample, get_quadr = true)
+            @test sum(box.w) ≈ 2^n
+            @test dot(box.w, box.pts[:, 1]) ≈ 2^n
+        end
     end
 end
