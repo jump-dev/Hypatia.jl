@@ -56,6 +56,23 @@ function inv_fact!(mat::Matrix{T}, fact::LU{T, Matrix{T}}) where {T <: Real}
     return mat
 end
 
+# helpers for in-place solves B = U \ B or B = U' \ B with an upper triangular U
+# (ldiv! calls LAPACK trtrs, which with OpenBLAS threads is much slower than BLAS trsm
+# for small matrices; trsm does not check that U is nonsingular)
+
+function ldiv_tri!(U::UpperTriangular{R, Matrix{R}}, B::Matrix{R}) where {R <: BlasFloat}
+    return BLAS.trsm!('L', 'U', 'N', 'N', one(R), U.data, B)
+end
+
+function ldiv_tri!(
+    Ut::LowerTriangular{R, Adjoint{R, Matrix{R}}},
+    B::Matrix{R},
+) where {R <: BlasFloat}
+    return BLAS.trsm!('L', 'U', 'C', 'N', one(R), parent(Ut.data), B)
+end
+
+ldiv_tri!(U::LinearAlgebra.AbstractTriangular, B::AbstractVecOrMat) = ldiv!(U, B)
+
 # helpers for updating symmetric/Hermitian eigendecomposition
 
 update_eigen!(X::Matrix{<:BlasFloat}) = LAPACK.syev!('V', 'U', X)[1]

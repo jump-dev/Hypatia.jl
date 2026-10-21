@@ -24,6 +24,7 @@ import Hypatia.update_eigen!
 import Hypatia.spectral_outer!
 import Hypatia.posdef_fact_copy!
 import Hypatia.inv_fact!
+import Hypatia.ldiv_tri!
 
 include("arrayutilities.jl")
 
