@@ -123,13 +123,15 @@ function update_grad(cone::LinMatrixIneq)
 
     if cone.is_sparse
         sL = cone.sparsefact.PtL
-        cone.sparsesumAinvAs = [sparse(Hermitian(sL \ (sL \ A_i)', :U)) for A_i in cone.sparseAs]
+        cone.sparsesumAinvAs =
+            [sparse(Hermitian(sL \ (sL \ A_i)', :U)) for A_i in cone.sparseAs]
         @inbounds for (i, mat_i) in enumerate(cone.sparsesumAinvAs)
             cone.grad[i] = -real(tr(mat_i))
         end
     else
         dL = cone.densefact.L
-        cone.densesumAinvAs = [copytri!(dL \ (dL \ A_i)', 'U', true) for A_i in cone.denseAs]
+        cone.densesumAinvAs =
+            [copytri!(dL \ (dL \ A_i)', 'U', true) for A_i in cone.denseAs]
         @inbounds for (i, mat_i) in enumerate(cone.densesumAinvAs)
             cone.grad[i] = -real(tr(mat_i))
         end
