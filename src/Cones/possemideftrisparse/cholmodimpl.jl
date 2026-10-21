@@ -472,6 +472,9 @@ function _hess_step2(
         ldiv!(L_n', temp_block_n)
         rdiv!(temp_block, L_n')
         rdiv!(temp_block, L_n)
+        # later steps read only the lower triangle, which turns the skew part of the
+        # rounding error into an error up to cond(L_n L_n') times larger in the local norm
+        hermitianpart!(temp_block_n)
 
         if num_row > num_col
             idxs_a = (num_col + 1):num_row
@@ -598,6 +601,7 @@ function dder3(cone::PosSemidefTriSparse{PSDSparseCholmod}, dir::AbstractVector)
         rdiv!(temp_block_n, L_n)
         mul!(temp_block_a, S, L_pr)
         mul!(temp_block_n, L_pr', temp_block_a, 2, true)
+        hermitianpart!(temp_block_n)
         mul!(temp_block_a, cache.S_pr_blocks[k], L_pr, 2, false)
         mul!(temp_block_a, S, L_pr_pr_a, -1, true)
     end
