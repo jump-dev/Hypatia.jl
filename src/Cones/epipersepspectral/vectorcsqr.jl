@@ -44,6 +44,11 @@ mutable struct VectorCSqrCache{T <: Real} <: CSqrCache{T}
     VectorCSqrCache{T}() where {T <: Real} = new{T}()
 end
 
+# the cone's cache field has an abstract type
+function get_cache(cone::EpiPerSepSpectral{VectorCSqr{T}}) where {T}
+    return cone.cache::VectorCSqrCache{T}
+end
+
 function setup_csqr_cache(cone::EpiPerSepSpectral{VectorCSqr{T}}) where {T}
     cone.cache = cache = VectorCSqrCache{T}()
     d = cone.d
@@ -68,7 +73,7 @@ end
 
 function update_feas(cone::EpiPerSepSpectral{VectorCSqr{T}}) where {T}
     @assert !cone.feas_updated
-    cache = cone.cache
+    cache = get_cache(cone)
     v = cone.point[2]
 
     if (v > eps(T)) && all(>(eps(T)), cone.w_view)
@@ -90,7 +95,7 @@ function is_dual_feas(cone::EpiPerSepSpectral{VectorCSqr{T}}) where {T}
     @views w = cone.dual_point[3:end]
 
     h_conj_dom_pos(cone.h) && any(<(eps(T)), w) && return false
-    uiw = cone.cache.w1
+    uiw = get_cache(cone).w1
     @. uiw = w / u
     return (cone.dual_point[2] - u * h_conj(uiw, cone.h) > eps(T))
 end
@@ -99,7 +104,7 @@ function update_grad(cone::EpiPerSepSpectral{<:VectorCSqr})
     @assert !cone.grad_updated && cone.is_feas
     grad = cone.grad
     v = cone.point[2]
-    cache = cone.cache
+    cache = get_cache(cone)
     ζi = cache.ζi = inv(cache.ζ)
     ∇h = cache.∇h
     h_der1(∇h, cache.viw, cone.h)
@@ -117,7 +122,7 @@ end
 function update_hess_aux(cone::EpiPerSepSpectral{<:VectorCSqr})
     @assert !cone.hess_aux_updated
     @assert cone.grad_updated
-    cache = cone.cache
+    cache = get_cache(cone)
     cache.ζivi = inv(cache.ζ * cone.point[2])
     h_der2(cache.∇2h, cache.viw, cone.h)
     return cone.hess_aux_updated = true
@@ -128,7 +133,7 @@ function update_hess(cone::EpiPerSepSpectral{<:VectorCSqr})
     isdefined(cone, :hess) || alloc_hess!(cone)
     v = cone.point[2]
     H = cone.hess.data
-    cache = cone.cache
+    cache = get_cache(cone)
     ζi = cache.ζi
     ζivi = cache.ζivi
     σ = cache.σ
@@ -182,7 +187,7 @@ function hess_prod!(
     cone.hess_aux_updated || update_hess_aux(cone)
     v = cone.point[2]
     w = cone.w_view
-    cache = cone.cache
+    cache = get_cache(cone)
     ζi = cache.ζi
     ζivi = cache.ζivi
     viw = cache.viw
@@ -213,7 +218,7 @@ function update_inv_hess_aux(cone::EpiPerSepSpectral{<:VectorCSqr})
     @assert !cone.inv_hess_aux_updated
     cone.hess_aux_updated || update_hess_aux(cone)
     v = cone.point[2]
-    cache = cone.cache
+    cache = get_cache(cone)
     ∇h = cache.∇h
     wi = cache.wi
     w1 = cache.w1
@@ -237,7 +242,7 @@ function update_inv_hess(cone::EpiPerSepSpectral{<:VectorCSqr})
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
     isdefined(cone, :inv_hess) || alloc_inv_hess!(cone)
     Hi = cone.inv_hess.data
-    cache = cone.cache
+    cache = get_cache(cone)
     m = cache.m
     α = cache.α
     γ = cache.γ
@@ -276,7 +281,7 @@ function inv_hess_prod!(
     cone::EpiPerSepSpectral{VectorCSqr{T}},
 ) where {T}
     cone.inv_hess_aux_updated || update_inv_hess_aux(cone)
-    cache = cone.cache
+    cache = get_cache(cone)
     m = cache.m
     α = cache.α
     γ = cache.γ
@@ -301,7 +306,8 @@ end
 function update_dder3_aux(cone::EpiPerSepSpectral{<:VectorCSqr})
     @assert !cone.dder3_aux_updated
     cone.hess_aux_updated || update_hess_aux(cone)
-    h_der3(cone.cache.∇3h, cone.cache.viw, cone.h)
+    cache = get_cache(cone)
+    h_der3(cache.∇3h, cache.viw, cone.h)
     return cone.dder3_aux_updated = true
 end
 
@@ -310,7 +316,7 @@ function dder3(cone::EpiPerSepSpectral{VectorCSqr{T}}, dir::AbstractVector{T}) w
     v = cone.point[2]
     w = cone.w_view
     dder3 = cone.dder3
-    cache = cone.cache
+    cache = get_cache(cone)
     ζi = cache.ζi
     σ = cache.σ
     ∇h = cache.∇h

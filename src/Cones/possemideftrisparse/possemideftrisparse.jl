@@ -54,6 +54,7 @@ mutable struct PosSemidefTriSparse{I <: PSDSparseImpl, T <: Real, R <: RealOrCom
     use_hess_prod_slow::Bool
     use_hess_prod_slow_updated::Bool
 
+    # read with get_cache, which asserts the concrete cache type
     cache::PSDSparseCache{T, R}
 
     function PosSemidefTriSparse{I, T, R}(

@@ -21,6 +21,11 @@ mutable struct PSDSparseDenseCache{T <: Real, R <: RealOrComplex{T}} <: PSDSpars
     PSDSparseDenseCache{T, R}() where {T <: Real, R <: RealOrComplex{T}} = new{T, R}()
 end
 
+# the cone's cache field has an abstract type
+function get_cache(cone::PosSemidefTriSparse{PSDSparseDense, T, R}) where {T, R}
+    return cone.cache::PSDSparseDenseCache{T, R}
+end
+
 function setup_extra_data!(cone::PosSemidefTriSparse{PSDSparseDense, T, R}) where {T, R}
     cone.cache = cache = PSDSparseDenseCache{T, R}()
     cache.mat = zeros(R, cone.side, cone.side)
@@ -31,7 +36,7 @@ end
 
 function update_feas(cone::PosSemidefTriSparse{PSDSparseDense})
     @assert !cone.feas_updated
-    cache = cone.cache
+    cache = get_cache(cone)
     Λ = cache.mat
 
     svec_to_smat_sparse!(Λ, cone.point, cone)
@@ -44,7 +49,7 @@ end
 
 function update_grad(cone::PosSemidefTriSparse{PSDSparseDense})
     @assert !cone.grad_updated && cone.is_feas
-    cache = cone.cache
+    cache = get_cache(cone)
     inv_mat = cache.inv_mat
 
     inv_fact!(inv_mat, cache.fact_mat)
@@ -62,7 +67,7 @@ function update_hess(cone::PosSemidefTriSparse{PSDSparseDense, T, T}) where {T <
     rt2 = cone.rt2
     H = cone.hess.data
     fill!(H, 0)
-    Λi = cone.cache.inv_mat
+    Λi = get_cache(cone).inv_mat
 
     @inbounds for (idx2, (i2, j2)) in enumerate(zip(cone.row_idxs, cone.col_idxs))
         for idx1 in 1:idx2
@@ -91,7 +96,7 @@ function update_hess(
     rt2 = cone.rt2
     H = cone.hess.data
     fill!(H, 0)
-    Λi = cone.cache.inv_mat
+    Λi = get_cache(cone).inv_mat
 
     idx2 = 1
     @inbounds for (i2, j2) in zip(cone.row_idxs, cone.col_idxs)
@@ -149,7 +154,7 @@ function hess_prod_slow!(
     @assert cone.hess_updated
     cone.use_hess_prod_slow || return hess_prod!(prod, arr, cone)
     @assert is_feas(cone)
-    cache = cone.cache
+    cache = get_cache(cone)
 
     @inbounds @views for j in 1:size(arr, 2)
         Λ = svec_to_smat_sparse!(cache.mat2, arr[:, j], cone)
@@ -167,7 +172,7 @@ end
 
 function dder3(cone::PosSemidefTriSparse{PSDSparseDense}, dir::AbstractVector)
     @assert is_feas(cone)
-    cache = cone.cache
+    cache = get_cache(cone)
 
     Λ = svec_to_smat_sparse!(cache.mat2, dir, cone)
     copytri!(Λ, 'L', true)
