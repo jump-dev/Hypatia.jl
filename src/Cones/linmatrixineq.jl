@@ -45,12 +45,12 @@ mutable struct LinMatrixIneq{T <: Real, R <: RealOrComplex{T}} <: Cone{T}
     use_hess_prod_slow::Bool
     use_hess_prod_slow_updated::Bool
 
-    densesumA::Hermitian{R, Matrix{R}}
-    sparsesumA::Hermitian{R, SparseMatrixCSC{R, Int}}
+    densesumA::Matrix{R}
+    sparsesumA::SparseMatrixCSC{R, Int}
     densefact::Cholesky{R, Matrix{R}}
     sparsefact::SparseCholFactor{R}
-    densesumAinvAs::Vector{Hermitian{R, Matrix{R}}}
-    sparsesumAinvAs::Vector{Hermitian{R, SparseMatrixCSC{R, Int}}}
+    densesumAinvAs::Vector{Matrix{R}}
+    sparsesumAinvAs::Vector{SparseMatrixCSC{R, Int}}
 
     function LinMatrixIneq{T, R}(
         As::Vector{<:Union{Matrix{R}, SparseMatrixCSC{R, Int}}};
@@ -105,14 +105,12 @@ function update_feas(cone::LinMatrixIneq)
     @assert !cone.feas_updated
 
     if cone.is_sparse
-        cone.sparsesumA =
-            Hermitian(sum(wᵢ * Aᵢ for (wᵢ, Aᵢ) in zip(cone.point, cone.sparseAs)))
-        cone.sparsefact = cholesky(cone.sparsesumA; shift = false, check = false)
+        cone.sparsesumA = sum(wᵢ * Aᵢ for (wᵢ, Aᵢ) in zip(cone.point, cone.sparseAs))
+        cone.sparsefact = cholesky(Hermitian(cone.sparsesumA); shift = false, check = false)
         cone.is_feas = isposdef(cone.sparsefact)
     else
-        cone.densesumA =
-            Hermitian(sum(wᵢ * Aᵢ for (wᵢ, Aᵢ) in zip(cone.point, cone.denseAs)))
-        cone.densefact = cholesky!(cone.densesumA; check = false)
+        cone.densesumA = sum(wᵢ * Aᵢ for (wᵢ, Aᵢ) in zip(cone.point, cone.denseAs))
+        cone.densefact = cholesky!(Hermitian(cone.densesumA); check = false)
         cone.is_feas = isposdef(cone.densefact)
     end
 
@@ -125,15 +123,15 @@ function update_grad(cone::LinMatrixIneq)
 
     if cone.is_sparse
         sL = cone.sparsefact.PtL
-        cone.sparsesumAinvAs = [Hermitian(sL \ (sL \ A_i)', :U) for A_i in cone.sparseAs]
+        cone.sparsesumAinvAs = [sL \ (sL \ A_i)' for A_i in cone.sparseAs]
         @inbounds for (i, mat_i) in enumerate(cone.sparsesumAinvAs)
-            cone.grad[i] = -tr(mat_i)
+            cone.grad[i] = -real(tr(mat_i))
         end
     else
         dL = cone.densefact.L
-        cone.densesumAinvAs = [Hermitian(dL \ (dL \ A_i)', :U) for A_i in cone.denseAs]
+        cone.densesumAinvAs = [dL \ (dL \ A_i)' for A_i in cone.denseAs]
         @inbounds for (i, mat_i) in enumerate(cone.densesumAinvAs)
-            cone.grad[i] = -tr(mat_i)
+            cone.grad[i] = -real(tr(mat_i))
         end
     end
 
@@ -149,12 +147,12 @@ function update_hess(cone::LinMatrixIneq)
     if cone.is_sparse
         sumAinvAs = cone.sparsesumAinvAs
         @inbounds for i in 1:(cone.dim), j in i:(cone.dim)
-            H[i, j] = real(dot(sumAinvAs[i], sumAinvAs[j]'))
+            H[i, j] = real(dot(Hermitian(sumAinvAs[i]), Hermitian(sumAinvAs[j])))
         end
     else
         sumAinvAs = cone.densesumAinvAs
         @inbounds for i in 1:(cone.dim), j in i:(cone.dim)
-            H[i, j] = real(dot(sumAinvAs[i], sumAinvAs[j]'))
+            H[i, j] = real(dot(Hermitian(sumAinvAs[i]), Hermitian(sumAinvAs[j])))
         end
     end
 
@@ -173,7 +171,7 @@ function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Li
         @inbounds for j in 1:size(arr, 2)
             j_mat = Hermitian(sum(arr[i, j] * sumAinvAs[i] for i in 1:(cone.dim)))
             for i in 1:(cone.dim)
-                prod[i, j] = real(dot(j_mat, sumAinvAs[i]))
+                prod[i, j] = real(dot(j_mat, Hermitian(sumAinvAs[i])))
             end
         end
     else
@@ -181,7 +179,7 @@ function hess_prod_slow!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Li
         @inbounds for j in 1:size(arr, 2)
             j_mat = Hermitian(sum(arr[i, j] * sumAinvAs[i] for i in 1:(cone.dim)))
             for i in 1:(cone.dim)
-                prod[i, j] = real(dot(j_mat, sumAinvAs[i]))
+                prod[i, j] = real(dot(j_mat, Hermitian(sumAinvAs[i])))
             end
         end
     end
@@ -198,14 +196,14 @@ function dder3(cone::LinMatrixIneq, dir::AbstractVector)
         dir_mat = sum(d_i * mat_i for (d_i, mat_i) in zip(dir, sumAinvAs))
         Z = Hermitian(dir_mat * dir_mat')
         @inbounds for i in 1:(cone.dim)
-            dder3[i] = real(dot(Z, sumAinvAs[i]))
+            dder3[i] = real(dot(Z, Hermitian(sumAinvAs[i])))
         end
     else
         sumAinvAs = cone.densesumAinvAs
         dir_mat = sum(d_i * mat_i for (d_i, mat_i) in zip(dir, sumAinvAs))
         Z = Hermitian(dir_mat * dir_mat')
         @inbounds for i in 1:(cone.dim)
-            dder3[i] = real(dot(Z, sumAinvAs[i]))
+            dder3[i] = real(dot(Z, Hermitian(sumAinvAs[i])))
         end
     end
 
