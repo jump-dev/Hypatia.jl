@@ -308,6 +308,34 @@ function get_proxsqr(
     return abs(prox_sqr)
 end
 
+# lower bound on the squared proximity r'H⁻¹r that does not form or factorize the current
+# Hessian H: with r = irtmu * dual_point + grad, r'H⁻¹r ≥ (u'r)² / u'Hu for any u, and
+# u'Hu = x'dder3(u); u = H₀⁻¹r for the cone's previous Hessian factorization H₀ is exact
+# when H₀ = H; reltol is an empirical margin for rounding in dder3
+function proxsqr_lower_bound(
+    cone::Cone{T},
+    irtmu::T,
+    reltol::T = sqrt(sqrt(eps(T))),
+) where {T <: Real}
+    (use_dder3(cone) && isdefined(cone, :hess_fact) && issuccess(cone.hess_fact)) ||
+        return zero(T)
+    g = grad(cone)
+    r = cone.vec1
+    u = cone.vec2
+
+    @. r = irtmu * cone.dual_point + g
+    ldiv!(cone.hess_fact, copyto!(u, r))
+    ru = dot(r, u)
+    ru > 0 || return zero(T)
+    # scaling u to u'H₀u = 1 keeps x'dder3(u), which is quadratic in u, near 1 when H₀ is
+    # near H
+    u ./= sqrt(ru)
+    uHu = dot(cone.point, dder3(cone, u))
+    uHu > 0 || return zero(T)
+
+    return (1 - reltol) * ru / uHu
+end
+
 include("nonnegative.jl")
 include("possemideftri.jl")
 include("doublynonnegativetri.jl")
