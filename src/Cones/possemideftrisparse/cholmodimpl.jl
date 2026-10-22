@@ -598,11 +598,15 @@ function dder3(cone::PosSemidefTriSparse{PSDSparseCholmod}, dir::AbstractVector)
         rdiv!(L_pr_pr_a, L_n')
         rdiv!(L_pr_pr_a, L_n)
         @. @views temp_block_n = -L_pr_pr[idxs_n, :]
-        ldiv!(L_n, D_pr)
-        mul!(temp_block_n, D_pr', D_pr, 2, true)
+        # solve with L_n on each side, add 2 Y² with Y = L_n \ D_pr / L_n', and solve with
+        # L_n' on each side; forming D_pr (L_n L_n')⁻¹ D_pr before solving would give the
+        # result a relative error up to eps cond(L_n L_n') in the local norm
         ldiv!(L_n, temp_block_n)
-        ldiv!(L_n', temp_block_n)
         rdiv!(temp_block_n, L_n')
+        ldiv!(L_n, D_pr)
+        rdiv!(D_pr, L_n')
+        mul!(temp_block_n, D_pr', D_pr, 2, true)
+        ldiv!(L_n', temp_block_n)
         rdiv!(temp_block_n, L_n)
         mul!(temp_block_a, S, L_pr)
         mul!(temp_block_n, L_pr', temp_block_a, 2, true)
