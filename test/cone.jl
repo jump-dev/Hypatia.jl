@@ -86,6 +86,9 @@ function test_oracles(
     grad = Cones.grad(cone)
     @test dot(point, grad) ≈ -nu atol = tol rtol = tol
 
+    # bound from the initial point's Hessian factorization, before this point's Hessian
+    proxsqr_lb = Cones.proxsqr_lower_bound(cone, one(T))
+
     hess = Matrix(Cones.hess(cone))
     inv_hess = Matrix(Cones.inv_hess(cone))
     @test hess * inv_hess ≈ I atol = tol rtol = tol
@@ -101,6 +104,17 @@ function test_oracles(
     psi = dual_point + grad
     proxsqr = dot(psi, Cones.inv_hess_prod!(prod_vec, psi, cone))
     @test Cones.get_proxsqr(cone, one(T), false) ≈ proxsqr atol = tol rtol = tol
+
+    if isdefined(cone, :hess_fact)
+        @test 0 < proxsqr_lb <= proxsqr
+        # the Hessian factorization is now from this point, so the bound is tight, and the
+        # default margin keeps it below the proximity
+        @test Cones.proxsqr_lower_bound(cone, one(T)) <= proxsqr
+        proxsqr_lb = Cones.proxsqr_lower_bound(cone, one(T), zero(T))
+        @test proxsqr_lb ≈ proxsqr atol = tol rtol = tol
+    else
+        @test iszero(proxsqr_lb)
+    end
 
     if hasproperty(cone, :use_hess_prod_slow)
         Cones.update_use_hess_prod_slow(cone)

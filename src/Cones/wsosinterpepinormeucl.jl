@@ -307,7 +307,7 @@ function update_hess(cone::WSOSInterpEpiNormEucl)
 end
 
 function dder3(cone::WSOSInterpEpiNormEucl, dir::AbstractVector)
-    @assert cone.hess_updated
+    @assert cone.grad_updated
     dder3 = cone.dder3
     dder3 .= 0
     R = cone.R
