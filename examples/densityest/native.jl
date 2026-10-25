@@ -65,7 +65,7 @@ function build(inst::DensityEstNative{T}) where {T <: Real}
     (U, _, Ps, V, w) =
         PolyUtils.interpolate(domain, halfdeg, calc_V = true, get_quadr = true)
     F = qr!(Array(V'), ColumnNorm())
-    V_X = PolyUtils.make_chebyshev_vandermonde(X, 2halfdeg)
+    V_X = PolyUtils.make_chebyshev_vandermonde(PolyUtils.ref_pts(domain, X), 2halfdeg)
     X_pts_polys = (F \ V_X')'
 
     cones = Cones.Cone{T}[]
