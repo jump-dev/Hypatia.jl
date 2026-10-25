@@ -256,17 +256,13 @@ function inv_hess_prod!(
 ) where {T <: Real}
     @assert cone.grad_updated
     @views w = cone.point[2:end]
-    svec_to_smat!(cone.mat4, w, cone.rt2)
-    W = Hermitian(cone.mat4, :U)
+    FU = cone.fact_W.U
     ζ = cone.ζ
     ϕ = cone.ϕ
     di = cone.di
     η = cone.η
-    θ = 1 + η
-    θi = inv(θ)
-    c1 = η / θ
+    θi = inv(1 + η)
     w_aux = cone.mat2
-    w_aux2 = cone.mat3
 
     @inbounds for j in 1:size(arr, 2)
         p = arr[1, j]
@@ -274,16 +270,22 @@ function inv_hess_prod!(
         svec_to_smat!(w_aux, r, cone.rt2)
         copytri!(w_aux, 'U', true)
 
-        c2 = di * dot(w, r)
-        c3 = ϕ * p * di
-        c4 = c3 + c1 * c2
+        # ϕ p + ⟨w, r⟩ cancels near the hypograph boundary for Hessian-scaled r; computing
+        # it once for both parts puts its rounding error along (ϕ, w), which H weighs little
+        c2 = dot(w, r)
+        c3 = di * (ϕ * p + c2)
 
-        prod[1, j] = ζ * p * ζ + ϕ * (c3 + c2)
-        mul!(w_aux2, w_aux, W)
-        mul!(w_aux, W, w_aux2)
+        prod[1, j] = ζ * p * ζ + ϕ * c3
+        # W R W as Uᴴ (U R Uᴴ) U, then the Hermitian part: near the boundary, products
+        # with W itself, or reading one triangle, can lose all accuracy in the local norm
+        rmul!(w_aux, FU')
+        lmul!(FU, w_aux)
+        rmul!(w_aux, FU)
+        lmul!(FU', w_aux)
+        hermitianpart!(w_aux)
         @views prod_w = prod[2:end, j]
         smat_to_svec!(prod_w, w_aux, cone.rt2)
-        axpby!(c4, w, θi, prod_w)
+        axpby!(c3 - θi * di * c2, w, θi, prod_w)
     end
 
     return prod

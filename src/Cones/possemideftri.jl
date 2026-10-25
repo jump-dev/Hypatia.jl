@@ -154,8 +154,14 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Pos
 
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
-        mul!(cone.mat3, Hermitian(cone.mat4, :U), cone.mat)
-        mul!(cone.mat4, Hermitian(cone.mat, :U), cone.mat3)
+        copytri!(cone.mat4, 'U', true)
+        # X R X as Uᴴ (U R Uᴴ) U, then the Hermitian part: near the boundary, products
+        # with X itself, or reading one triangle, can lose all accuracy in the local norm
+        rmul!(cone.mat4, cone.fact_mat.U')
+        lmul!(cone.fact_mat.U, cone.mat4)
+        rmul!(cone.mat4, cone.fact_mat.U)
+        lmul!(cone.fact_mat.U', cone.mat4)
+        hermitianpart!(cone.mat4)
         smat_to_svec!(view(prod, :, i), cone.mat4, cone.rt2)
     end
 
