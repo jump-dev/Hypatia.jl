@@ -155,8 +155,9 @@ function inv_hess_prod!(prod::AbstractVecOrMat, arr::AbstractVecOrMat, cone::Pos
     @inbounds for i in 1:size(arr, 2)
         svec_to_smat!(cone.mat4, view(arr, :, i), cone.rt2)
         copytri!(cone.mat4, 'U', true)
-        # X R X as Uᴴ (U R Uᴴ) U, then the Hermitian part: near the boundary, products
-        # with X itself, or reading one triangle, can lose all accuracy in the local norm
+        # X R X as Uᴴ (U R Uᴴ) U, then the Hermitian part: near the boundary of X, two
+        # dense products with X, or reading one triangle, can lose all accuracy for a
+        # Hessian-scaled input (relative error ≥ 1 in the local norm ‖z‖_H = √(z'Hz))
         rmul!(cone.mat4, cone.fact_mat.U')
         lmul!(cone.fact_mat.U, cone.mat4)
         rmul!(cone.mat4, cone.fact_mat.U)

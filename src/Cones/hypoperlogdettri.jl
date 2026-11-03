@@ -299,8 +299,9 @@ function inv_hess_prod!(
         prod[1, j] = ζ * ((v * (d * p * v + trrw) - d * c2) / ζv + ζ * p) + ϕ * c2
         prod[2, j] = c2
 
-        # W R W as Uᴴ (U R Uᴴ) U, then the Hermitian part: near the boundary, products
-        # with W itself, or reading one triangle, can lose all accuracy in the local norm
+        # W R W as Uᴴ (U R Uᴴ) U, then the Hermitian part: near the boundary of W, two
+        # dense products with W, or reading one triangle, can lose all accuracy for a
+        # Hessian-scaled input (relative error ≥ 1 in the local norm ‖z‖_H = √(z'Hz))
         rmul!(w_aux, FU')
         lmul!(FU, w_aux)
         rmul!(w_aux, FU)
