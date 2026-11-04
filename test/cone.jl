@@ -532,8 +532,11 @@ function test_barrier(
     point = randn(T, Cones.dimension(cone))
     point .+= (T(1e-8) - eigmin(smat(point, 10, rows_b, cols_b))) * id
     errs = local_norm_errors(cone, barrier_b, point)
-    # inv_hess_prod! factorizes the explicit Hessian, which is less accurate here
-    @test max(errs.hess, errs.dder3) < 1e-6
+    # inv_hess_prod! is not checked: it factorizes the explicit Hessian, which is less
+    # accurate here
+    @test errs.hess < 1e-6
+    # with c the condition number of the point's matrix, dder3 should err by about eps √c
+    @test errs.dder3 < 1e6 * eps(T)
     return
 end
 
