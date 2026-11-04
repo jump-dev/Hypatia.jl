@@ -270,14 +270,17 @@ function inv_hess_prod!(
         svec_to_smat!(w_aux, r, cone.rt2)
         copytri!(w_aux, 'U', true)
 
-        # ϕ p + ⟨w, r⟩ cancels near the hypograph boundary for Hessian-scaled r; computing
-        # it once for both parts puts its rounding error along (ϕ, w), which H weighs little
+        # c3 = di τ, τ = ϕ p + ⟨w, r⟩: for Hessian-scaled (p, r) near the hypograph
+        # boundary, τ can be mostly rounding error. Using one c3 in both parts puts that
+        # error along (ϕ, w), where ‖(ϕ, w)‖_H = √d; separate sums leave a difference
+        # along (0, w), where ‖(0, w)‖_H ≈ ϕ/ζ
         c2 = dot(w, r)
         c3 = di * (ϕ * p + c2)
 
         prod[1, j] = ζ * p * ζ + ϕ * c3
-        # W R W as Uᴴ (U R Uᴴ) U, then the Hermitian part: near the boundary, products
-        # with W itself, or reading one triangle, can lose all accuracy in the local norm
+        # W R W as Uᴴ (U R Uᴴ) U, then the Hermitian part: near the boundary of W, two
+        # dense products with W, or reading one triangle, can lose all accuracy for a
+        # Hessian-scaled input (relative error ≥ 1 in the local norm ‖z‖_H = √(z'Hz))
         rmul!(w_aux, FU')
         lmul!(FU, w_aux)
         rmul!(w_aux, FU)
